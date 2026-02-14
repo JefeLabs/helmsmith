@@ -1,0 +1,24 @@
+# Complexity Report
+
+## Summary
+
+| Band | Count |
+|------|-------|
+| Low (1-3) | {{summary.low}} |
+| Medium (4-6) | {{summary.medium}} |
+| High (7-10) | {{summary.high}} |
+| **Average** | **{{summary.average}}** |
+
+## Tasks by Complexity
+
+{{#each tasks}}
+{{#if-gte complexity 7}}
+- {{complexity-color complexity}} **{{id}}** — {{title}} — Consider decomposition
+{{else}}
+{{#if-gte complexity 4}}
+- {{complexity-color complexity}} **{{id}}** — {{title}}
+{{else}}
+- {{complexity-color complexity}} **{{id}}** — {{title}} — Implementation-ready
+{{/if-gte}}
+{{/if-gte}}
+{{/each}}

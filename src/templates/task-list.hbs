@@ -1,0 +1,19 @@
+# Task List
+
+{{#if filters}}
+{{#if filters.status}}> Filter: status={{filters.status}}
+{{/if}}
+{{#if filters.category}}> Filter: category={{filters.category}}
+{{/if}}
+{{#if filters.type}}> Filter: type={{filters.type}}
+{{/if}}
+{{/if}}
+
+| ID | Title | Status | Complexity | Priority | Type |
+|----|-------|--------|------------|----------|------|
+{{#each tasks}}
+{{> task-row}}
+{{/each}}
+
+---
+**{{tasks.length}}** {{pluralize tasks.length 'task' 'tasks'}} total

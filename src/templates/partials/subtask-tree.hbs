@@ -1,0 +1,6 @@
+{{#if children.length}}
+### Subtasks ({{children.length}})
+{{#each children}}
+- {{status-badge status}} **{{id}}** — {{title}} ({{complexity-color complexity}})
+{{/each}}
+{{/if}}

@@ -1,0 +1,11 @@
+# Dependency Graph
+
+{{#each tasks}}
+{{#if dependencies.length}}
+**{{id}}** ({{title}})
+{{#each dependencies}}
+  - depends on **{{taskId}}** ({{type}})
+{{/each}}
+
+{{/if}}
+{{/each}}
