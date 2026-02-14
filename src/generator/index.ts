@@ -23,30 +23,32 @@ const templateCache = new Map<string, HandlebarsTemplateDelegate>();
 
 /**
  * Resolve the built-in templates directory.
- * Works from both src/ (dev/test via tsx/vitest) and dist/ (compiled).
+ * Works from:
+ *   - src/generator/index.ts  (dev via vitest/tsx)
+ *   - dist/cli.js             (tsup bundle)
+ *   - dist/generator/index.js (non-bundled compile)
  */
 function getBuiltinTemplatesDir(): string {
   const currentFile = fileURLToPath(import.meta.url);
-  // From src/generator/index.ts -> src/templates/
-  // From dist/generator/index.js -> dist/templates/ (won't exist)
-  // We try src/templates/ first by walking up to project root
-  const generatorDir = join(currentFile, '..');
-  const srcDir = join(generatorDir, '..');
-  const templatesDir = join(srcDir, 'templates');
+  const currentDir = join(currentFile, '..');
 
-  if (existsSync(templatesDir)) {
-    return templatesDir;
-  }
+  const candidates = [
+    // Dev: src/generator/index.ts -> src/templates/
+    join(currentDir, '..', 'templates'),
+    // Bundled: dist/cli.js -> <root>/src/templates/
+    join(currentDir, '..', 'src', 'templates'),
+    // Non-bundled dist: dist/generator/index.js -> <root>/src/templates/
+    join(currentDir, '..', '..', 'src', 'templates'),
+  ];
 
-  // Fallback: try from project root
-  const projectRoot = join(srcDir, '..');
-  const srcTemplatesDir = join(projectRoot, 'src', 'templates');
-  if (existsSync(srcTemplatesDir)) {
-    return srcTemplatesDir;
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
   }
 
   throw new Error(
-    `Built-in templates directory not found. Searched: ${templatesDir}, ${srcTemplatesDir}`,
+    `Built-in templates directory not found. Searched:\n${candidates.map(c => `  - ${c}`).join('\n')}`,
   );
 }
 
