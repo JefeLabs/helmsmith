@@ -9,6 +9,9 @@ import type {
   IndexQueryResult,
   PragmaticLayer,
   SymbolKind,
+  EntryPoint,
+  EntryPointTrace,
+  EntryPointIndex,
 } from './types.js';
 
 /**
@@ -239,6 +242,83 @@ export function formatQueryResultForPrompt(result: IndexQueryResult): string {
         const range = `${sym.source.file}:${sym.source.range.startLine}-${sym.source.range.endLine}`;
         lines.push(`    ${sym.kind} ${sym.name} (${sym.visibility}) — ${range}`);
       }
+    }
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Build an EntryPointIndex from detected entry points and optional traces.
+ */
+export function buildEntryPointIndex(
+  repoRoot: string,
+  entryPoints: EntryPoint[],
+  traces: EntryPointTrace[] = [],
+): EntryPointIndex {
+  return {
+    version: 1,
+    repoRoot,
+    generatedAt: new Date().toISOString(),
+    entryPoints,
+    traces,
+    validation: {
+      orphanComponents: [],
+      unreachableComponents: [],
+      entryPointsWithoutTraces: entryPoints
+        .filter(ep => !traces.some(t => t.entryPointId === ep.id))
+        .map(ep => ep.id),
+      coveragePercentage: 0,
+    },
+  };
+}
+
+/**
+ * Format an EntryPointIndex as human-readable text for AI prompt inclusion.
+ */
+export function formatEntryPointIndexForPrompt(index: EntryPointIndex): string {
+  const lines: string[] = [];
+  lines.push(`Entry Points (${index.entryPoints.length}):`);
+
+  // Group by category
+  const byCategory = new Map<string, EntryPoint[]>();
+  for (const ep of index.entryPoints) {
+    const group = byCategory.get(ep.category) ?? [];
+    group.push(ep);
+    byCategory.set(ep.category, group);
+  }
+
+  for (const [category, eps] of byCategory) {
+    lines.push('');
+    lines.push(`  ${category} (${eps.length}):`);
+    for (const ep of eps) {
+      const confidence = Math.round(ep.confidence * 100);
+      lines.push(`    ${ep.name} [${ep.componentId}] (${confidence}% confidence)`);
+      if (ep.filePath) {
+        lines.push(`      File: ${ep.filePath}`);
+      }
+    }
+  }
+
+  if (index.traces.length > 0) {
+    lines.push('');
+    lines.push(`Traces (${index.traces.length}):`);
+    for (const trace of index.traces) {
+      lines.push(`  ${trace.entryPointId}: ${trace.componentChain.join(' → ')}`);
+      if (trace.sideEffects.length > 0) {
+        lines.push(`    Side effects: ${trace.sideEffects.map(se => `${se.type}(${se.target})`).join(', ')}`);
+      }
+      if (trace.externalSystems.length > 0) {
+        lines.push(`    External: ${trace.externalSystems.join(', ')}`);
+      }
+    }
+  }
+
+  if (index.validation.coveragePercentage > 0) {
+    lines.push('');
+    lines.push(`Coverage: ${index.validation.coveragePercentage}%`);
+    if (index.validation.orphanComponents.length > 0) {
+      lines.push(`Orphan components: ${index.validation.orphanComponents.join(', ')}`);
     }
   }
 

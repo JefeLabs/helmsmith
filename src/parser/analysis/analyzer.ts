@@ -2,7 +2,8 @@ import chalk from 'chalk';
 import type { TaskNode } from '../../config/schema.js';
 import { PROJECT_STYLES } from '../../config/styles.js';
 import { callAI } from '../../auth/call-ai.js';
-import { formatComponentIndexForPrompt } from './retrieval.js';
+import { formatComponentIndexForPrompt, formatEntryPointIndexForPrompt, buildEntryPointIndex } from './retrieval.js';
+import { applyValidation, generateValidationWarnings } from './entrypoint-validation.js';
 import { buildArchitectureDiscoveryPrompt, buildTaskGenerationPrompt } from './prompts.js';
 import { runScanPipeline } from './scanner.js';
 import {
@@ -14,6 +15,8 @@ import type {
   AITaskWithTags,
   AnalysisPipelineOptions,
   AnalysisPipelineResult,
+  EntryPointIndex,
+  EntryPoint,
 } from './types.js';
 
 /**
@@ -193,7 +196,9 @@ export async function runAnalysisPipeline(
   let sourceResult = null;
   let componentIndex = undefined;
   let symbolIndex = undefined;
+  let entryPointIndex: EntryPointIndex | undefined = undefined;
   let componentIndexSummary: string | null = null;
+  let entryPointIndexSummary: string | null = null;
 
   if (options.codebasePath && !options.skipScan) {
     try {
@@ -202,10 +207,15 @@ export async function runAnalysisPipeline(
       sourceResult = scan.sourceResult;
       componentIndex = scan.componentIndex;
       symbolIndex = scan.symbolIndex;
+      entryPointIndex = scan.entryPointIndex;
       warnings.push(...scan.warnings);
 
       if (scan.components.length > 0) {
         componentIndexSummary = formatComponentIndexForPrompt(componentIndex);
+      }
+
+      if (scan.entryPointIndex.entryPoints.length > 0) {
+        entryPointIndexSummary = formatEntryPointIndexForPrompt(scan.entryPointIndex);
       }
     } catch (err) {
       warnings.push(`Scan pipeline failed: ${(err as Error).message}`);
@@ -214,7 +224,7 @@ export async function runAnalysisPipeline(
 
   // --- Step 3: Phase 1 — Architecture Discovery ---
   console.error(chalk.dim('  Phase 1: Architecture discovery...'));
-  const phase1Messages = buildArchitectureDiscoveryPrompt(documentContent, scanResult, sourceResult, componentIndexSummary);
+  const phase1Messages = buildArchitectureDiscoveryPrompt(documentContent, scanResult, sourceResult, componentIndexSummary, entryPointIndexSummary);
   const phase1Response = await callAI(phase1Messages, options.model, options.provider, 'parser-analysis');
   const phase1Content = phase1Response.choices?.[0]?.message?.content;
 
@@ -236,6 +246,51 @@ export async function runAnalysisPipeline(
       `${analysis.dataSources.length} data sources`,
     ),
   );
+
+  // --- Step 3.25: Merge static + AI entry points ---
+  if (entryPointIndex) {
+    const staticEntryPoints = entryPointIndex.entryPoints;
+    const aiEntryPoints = analysis.entryPoints ?? [];
+    const mergedMap = new Map<string, EntryPoint>();
+
+    // Static first, AI overrides (higher semantic understanding)
+    for (const ep of staticEntryPoints) {
+      mergedMap.set(ep.id, ep);
+    }
+    for (const ep of aiEntryPoints) {
+      mergedMap.set(ep.id, ep);
+    }
+
+    const mergedEntryPoints = Array.from(mergedMap.values());
+    const aiTraces = analysis.entryPointTraces ?? [];
+    const aiSideEffects = analysis.sideEffects ?? [];
+
+    entryPointIndex = buildEntryPointIndex(
+      entryPointIndex.repoRoot,
+      mergedEntryPoints,
+      aiTraces,
+    );
+
+    // Update analysis with merged data
+    analysis.entryPoints = mergedEntryPoints;
+    analysis.sideEffects = aiSideEffects;
+    analysis.entryPointTraces = aiTraces;
+
+    // Apply validation if we have a component index
+    if (componentIndex) {
+      entryPointIndex = applyValidation(entryPointIndex, componentIndex);
+      const validationWarnings = generateValidationWarnings(entryPointIndex.validation);
+      warnings.push(...validationWarnings);
+    }
+
+    if (mergedEntryPoints.length > 0) {
+      console.error(
+        chalk.dim(
+          `  Entry points: ${mergedEntryPoints.length} (${staticEntryPoints.length} static + ${aiEntryPoints.length} AI-enriched)`,
+        ),
+      );
+    }
+  }
 
   // --- Step 3.5: Load blueprint context (if configured) ---
   let blueprintOption: Parameters<typeof buildTaskGenerationPrompt>[2]['blueprint'] = undefined;
@@ -299,5 +354,5 @@ export async function runAnalysisPipeline(
     chalk.dim(`  Generated ${tasks.length} top-level task(s)`),
   );
 
-  return { analysis, tasks, warnings, componentIndex, symbolIndex };
+  return { analysis, tasks, warnings, componentIndex, symbolIndex, entryPointIndex };
 }

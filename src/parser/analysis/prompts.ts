@@ -14,6 +14,7 @@ export function buildArchitectureDiscoveryPrompt(
   scanResult?: CodebaseScanResult | null,
   sourceAnalysis?: SourceAnalysisResult | null,
   componentIndexSummary?: string | null,
+  entryPointIndexSummary?: string | null,
 ): ChatCompletionMessage[] {
   const systemContent = [
     'You are a senior software architect analyzing a project document.',
@@ -68,6 +69,13 @@ export function buildArchitectureDiscoveryPrompt(
     '- Include at least one interface if there are 2+ components',
     '- Cross-cutting concerns should only be included if clearly mentioned or implied',
     '- Be specific about tech stack based on the document content and any codebase scan data',
+    '',
+    'If entry point data is provided, also return these optional arrays:',
+    '  "entryPoints": [{ "id": "ep:component:name", "name": "human label", "category": "http-api|ui-route|cli-command|event|job-cron|internal-service|callback-webhook", "componentId": "owning-component", "filePath": "relative/path", "symbolName": "handler", "metadata": {}, "detectedBy": "static|ai|manifest|manual", "confidence": 0.0-1.0, "tags": [] }],',
+    '  "sideEffects": [{ "type": "database-write|database-read|cache-mutation|file-write|file-read|external-api-call|event-publish|email-send|notification|queue-enqueue|state-mutation", "target": "resource-name", "description": "what happens", "componentId": "component", "detectedBy": "static|ai|manual" }],',
+    '  "entryPointTraces": [{ "entryPointId": "ep:x:y", "componentChain": ["comp1","comp2"], "sideEffects": [...], "externalSystems": [], "dataSourcesAccessed": [], "description": "narrative" }]',
+    '',
+    'These arrays default to [] if you cannot determine them from the provided data.',
   ].join('\n');
 
   const userParts: string[] = [];
@@ -91,6 +99,14 @@ export function buildArchitectureDiscoveryPrompt(
     userParts.push('');
     userParts.push('=== COMPONENT INDEX ===');
     userParts.push(componentIndexSummary);
+  }
+
+  if (entryPointIndexSummary) {
+    userParts.push('');
+    userParts.push('=== ENTRY POINT INDEX (pre-detected) ===');
+    userParts.push(entryPointIndexSummary);
+    userParts.push('');
+    userParts.push('Refine these entry points: correct categories, add missing ones, infer side effects and traces.');
   }
 
   return [
@@ -140,6 +156,8 @@ export function buildTaskGenerationPrompt(
     '  - "concern:<name>" — cross-cutting concern (e.g. "concern:security")',
     '  - "interface:<from>-to-<to>" — interface implementation (e.g. "interface:api-to-auth")',
     '  - "datasource:<name>" — data source setup (e.g. "datasource:users-db")',
+    '  - "entrypoint:<category>:<name>" — links task to an entry point (e.g. "entrypoint:http-api:post-login")',
+    '  - "side-effect:<type>:<target>" — task involves a side effect (e.g. "side-effect:database-write:sessions")',
     '',
     'Task organization rules:',
     '  1. One top-level task per component (tagged component:<name>, layer:<layer>)',

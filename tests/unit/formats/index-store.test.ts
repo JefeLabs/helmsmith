@@ -30,6 +30,7 @@ const validComponentIndex: ComponentIndex = {
       rootPath: '/test/repo',
       languageSet: ['typescript'],
       entrypoints: ['src/index.ts'],
+      entryPointIds: [],
       publicSurface: [],
       tags: ['component:test-pkg', 'build:npm'],
     },

@@ -19,6 +19,12 @@ import {
   ComponentIndexSchema,
   SymbolIndexEntrySchema,
   SymbolIndexSchema,
+  EntryPointCategorySchema,
+  EntryPointSchema,
+  SideEffectTypeSchema,
+  SideEffectSchema,
+  EntryPointTraceSchema,
+  EntryPointIndexSchema,
 } from '../../../../src/parser/analysis/types.js';
 
 const fixturesDir = join(import.meta.dirname, '../../../fixtures/analysis');
@@ -358,5 +364,196 @@ describe('SymbolIndexSchema', () => {
         entries: [{ componentId: 'x', layer: 'backend', symbols: [] }],
       }),
     ).toThrow();
+  });
+});
+
+// --- Entry Point schemas ---
+
+describe('EntryPointCategorySchema', () => {
+  it('accepts all valid categories', () => {
+    const cats = ['http-api', 'ui-route', 'cli-command', 'event', 'job-cron', 'internal-service', 'callback-webhook'];
+    for (const cat of cats) {
+      expect(EntryPointCategorySchema.parse(cat)).toBe(cat);
+    }
+  });
+
+  it('rejects invalid categories', () => {
+    expect(() => EntryPointCategorySchema.parse('graphql')).toThrow();
+    expect(() => EntryPointCategorySchema.parse('rest')).toThrow();
+  });
+});
+
+describe('EntryPointSchema', () => {
+  const validEntryPoint = {
+    id: 'ep:auth:post-login',
+    name: 'POST /api/auth/login',
+    category: 'http-api' as const,
+    componentId: 'auth-service',
+    filePath: 'src/routes/auth.ts',
+    symbolName: 'handleLogin',
+    metadata: { method: 'POST', path: '/api/auth/login' },
+    detectedBy: 'static' as const,
+    confidence: 0.95,
+    tags: ['auth'],
+  };
+
+  it('parses a valid entry point', () => {
+    const result = EntryPointSchema.parse(validEntryPoint);
+    expect(result.id).toBe('ep:auth:post-login');
+    expect(result.category).toBe('http-api');
+    expect(result.confidence).toBe(0.95);
+  });
+
+  it('defaults metadata and tags when missing', () => {
+    const result = EntryPointSchema.parse({
+      id: 'ep:x:y',
+      name: 'test',
+      category: 'cli-command',
+      componentId: 'cli',
+      filePath: 'bin/cli.ts',
+      detectedBy: 'manifest',
+      confidence: 1.0,
+    });
+    expect(result.metadata).toEqual({});
+    expect(result.tags).toEqual([]);
+  });
+
+  it('rejects confidence out of range', () => {
+    expect(() => EntryPointSchema.parse({ ...validEntryPoint, confidence: 1.5 })).toThrow();
+    expect(() => EntryPointSchema.parse({ ...validEntryPoint, confidence: -0.1 })).toThrow();
+  });
+
+  it('rejects invalid detectedBy', () => {
+    expect(() => EntryPointSchema.parse({ ...validEntryPoint, detectedBy: 'guessed' })).toThrow();
+  });
+});
+
+describe('SideEffectTypeSchema', () => {
+  it('accepts all valid side effect types', () => {
+    const types = [
+      'database-write', 'database-read', 'cache-mutation',
+      'file-write', 'file-read', 'external-api-call',
+      'event-publish', 'email-send', 'notification',
+      'queue-enqueue', 'state-mutation',
+    ];
+    for (const t of types) {
+      expect(SideEffectTypeSchema.parse(t)).toBe(t);
+    }
+  });
+
+  it('rejects invalid types', () => {
+    expect(() => SideEffectTypeSchema.parse('network-call')).toThrow();
+  });
+});
+
+describe('SideEffectSchema', () => {
+  it('parses a valid side effect', () => {
+    const result = SideEffectSchema.parse({
+      type: 'database-write',
+      target: 'users-db.sessions',
+      description: 'Create session',
+      componentId: 'auth-service',
+      detectedBy: 'ai',
+    });
+    expect(result.type).toBe('database-write');
+    expect(result.target).toBe('users-db.sessions');
+  });
+
+  it('componentId and dataSourceId are optional', () => {
+    const result = SideEffectSchema.parse({
+      type: 'external-api-call',
+      target: 'stripe-api',
+      description: 'Charge customer',
+      detectedBy: 'manual',
+    });
+    expect(result.componentId).toBeUndefined();
+    expect(result.dataSourceId).toBeUndefined();
+  });
+});
+
+describe('EntryPointTraceSchema', () => {
+  it('parses a valid trace', () => {
+    const result = EntryPointTraceSchema.parse({
+      entryPointId: 'ep:api:post-login',
+      componentChain: ['api-gateway', 'auth-service'],
+      sideEffects: [
+        { type: 'database-read', target: 'users', description: 'Read user', detectedBy: 'ai' },
+      ],
+      externalSystems: ['stripe'],
+      dataSourcesAccessed: ['users-db'],
+      description: 'Login flow',
+    });
+    expect(result.componentChain).toHaveLength(2);
+    expect(result.sideEffects).toHaveLength(1);
+    expect(result.externalSystems).toContain('stripe');
+  });
+
+  it('defaults arrays when missing', () => {
+    const result = EntryPointTraceSchema.parse({
+      entryPointId: 'ep:x:y',
+    });
+    expect(result.componentChain).toEqual([]);
+    expect(result.sideEffects).toEqual([]);
+    expect(result.externalSystems).toEqual([]);
+    expect(result.dataSourcesAccessed).toEqual([]);
+  });
+});
+
+describe('EntryPointIndexSchema', () => {
+  it('parses the sample fixture', () => {
+    const raw = JSON.parse(readFileSync(join(fixturesDir, 'sample-entrypoint-index.json'), 'utf-8'));
+    const result = EntryPointIndexSchema.parse(raw);
+
+    expect(result.version).toBe(1);
+    expect(result.entryPoints).toHaveLength(4);
+    expect(result.traces).toHaveLength(2);
+    expect(result.validation.orphanComponents).toContain('email-templates');
+    expect(result.validation.coveragePercentage).toBe(80);
+  });
+
+  it('defaults validation fields', () => {
+    const result = EntryPointIndexSchema.parse({
+      version: 1,
+      repoRoot: '/test',
+      generatedAt: '2026-01-01T00:00:00Z',
+    });
+    expect(result.entryPoints).toEqual([]);
+    expect(result.traces).toEqual([]);
+    expect(result.validation.orphanComponents).toEqual([]);
+    expect(result.validation.coveragePercentage).toBe(0);
+  });
+
+  it('rejects wrong version', () => {
+    expect(() => EntryPointIndexSchema.parse({
+      version: 2,
+      repoRoot: '/a',
+      generatedAt: 'now',
+    })).toThrow();
+  });
+});
+
+describe('ArchitectureAnalysisSchema (entry point extensions)', () => {
+  it('defaults new entry point fields for backward compatibility', () => {
+    const raw = JSON.parse(readFileSync(join(fixturesDir, 'sample-analysis.json'), 'utf-8'));
+    const result = ArchitectureAnalysisSchema.parse(raw);
+
+    expect(result.entryPoints).toEqual([]);
+    expect(result.sideEffects).toEqual([]);
+    expect(result.entryPointTraces).toEqual([]);
+  });
+});
+
+describe('BuildComponentSchema (entryPointIds extension)', () => {
+  it('defaults entryPointIds to empty array for backward compatibility', () => {
+    const result = BuildComponentSchema.parse({
+      id: 'my-svc',
+      name: 'my-svc',
+      rootPath: '/a',
+      languageSet: ['typescript'],
+      entrypoints: ['src/index.ts'],
+      publicSurface: [],
+      tags: [],
+    });
+    expect(result.entryPointIds).toEqual([]);
   });
 });

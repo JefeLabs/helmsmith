@@ -214,9 +214,10 @@ program
         const { mkdir } = await import('node:fs/promises');
         await mkdir(repoHome, { recursive: true });
 
-        const { writeComponentIndex, writeSymbolIndex } = await import('./formats/index-store.js');
+        const { writeComponentIndex, writeSymbolIndex, writeEntryPointIndex } = await import('./formats/index-store.js');
         await writeComponentIndex(repoHome, result.componentIndex);
         await writeSymbolIndex(repoHome, result.symbolIndex);
+        await writeEntryPointIndex(repoHome, result.entryPointIndex);
         console.log(chalk.dim(`\n  Indexes persisted to ${repoHome}`));
       } else {
         console.log(chalk.yellow('\n  Not inside a git repository — indexes not persisted.'));
@@ -229,6 +230,18 @@ program
       console.log(chalk.dim(`  Components: ${result.components.length}`));
       console.log(chalk.dim(`  Symbols: ${result.symbolIndex.entries.reduce((sum, e) => sum + e.symbols.length, 0)}`));
       console.log(chalk.dim(`  Layers: ${[...new Set(result.symbolIndex.entries.map(e => e.layer))].join(', ') || 'none'}`));
+      if (result.entryPointIndex.entryPoints.length > 0) {
+        const epCount = result.entryPointIndex.entryPoints.length;
+        const categories = [...new Set(result.entryPointIndex.entryPoints.map(ep => ep.category))];
+        const reachableComponents = new Set<string>();
+        for (const ep of result.entryPointIndex.entryPoints) {
+          reachableComponents.add(ep.componentId);
+        }
+        const totalComponents = result.components.length || 1;
+        const coveragePct = Math.round((reachableComponents.size / totalComponents) * 100);
+        console.log(chalk.dim(`  Entry points: ${epCount} detected [${categories.join(', ')}]`));
+        console.log(chalk.dim(`  Coverage: ${reachableComponents.size}/${totalComponents} components (${coveragePct}%)`));
+      }
       if (result.scanResult.detectedPatterns.length > 0) {
         console.log(chalk.dim(`  Patterns: ${result.scanResult.detectedPatterns.join(', ')}`));
       }

@@ -61,6 +61,90 @@ export const CrossCuttingConcernSchema = z.object({
 
 export type CrossCuttingConcern = z.infer<typeof CrossCuttingConcernSchema>;
 
+// --- Entry Point Category ---
+
+export const EntryPointCategorySchema = z.enum([
+  'http-api', 'ui-route', 'cli-command', 'event',
+  'job-cron', 'internal-service', 'callback-webhook',
+]);
+
+export type EntryPointCategory = z.infer<typeof EntryPointCategorySchema>;
+
+// --- Entry Point (first-class entity) ---
+
+export const EntryPointSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  category: EntryPointCategorySchema,
+  componentId: z.string(),
+  filePath: z.string(),
+  symbolName: z.string().optional(),
+  metadata: z.record(z.string(), z.string()).default({}),
+  detectedBy: z.enum(['static', 'ai', 'manifest', 'manual']),
+  confidence: z.number().min(0).max(1),
+  tags: z.array(z.string()).default([]),
+});
+
+export type EntryPoint = z.infer<typeof EntryPointSchema>;
+
+// --- Side Effect ---
+
+export const SideEffectTypeSchema = z.enum([
+  'database-write', 'database-read', 'cache-mutation',
+  'file-write', 'file-read', 'external-api-call',
+  'event-publish', 'email-send', 'notification',
+  'queue-enqueue', 'state-mutation',
+]);
+
+export type SideEffectType = z.infer<typeof SideEffectTypeSchema>;
+
+export const SideEffectSchema = z.object({
+  type: SideEffectTypeSchema,
+  target: z.string(),
+  description: z.string(),
+  componentId: z.string().optional(),
+  dataSourceId: z.string().optional(),
+  detectedBy: z.enum(['static', 'ai', 'manual']),
+});
+
+export type SideEffect = z.infer<typeof SideEffectSchema>;
+
+// --- Entry Point Trace (relationship graph) ---
+
+export const EntryPointTraceSchema = z.object({
+  entryPointId: z.string(),
+  componentChain: z.array(z.string()).default([]),
+  sideEffects: z.array(SideEffectSchema).default([]),
+  externalSystems: z.array(z.string()).default([]),
+  dataSourcesAccessed: z.array(z.string()).default([]),
+  description: z.string().optional(),
+});
+
+export type EntryPointTrace = z.infer<typeof EntryPointTraceSchema>;
+
+// --- Entry Point Index (persisted) ---
+
+export const EntryPointIndexSchema = z.object({
+  version: z.literal(1),
+  repoRoot: z.string(),
+  generatedAt: z.string(),
+  entryPoints: z.array(EntryPointSchema).default([]),
+  traces: z.array(EntryPointTraceSchema).default([]),
+  validation: z.object({
+    orphanComponents: z.array(z.string()).default([]),
+    unreachableComponents: z.array(z.string()).default([]),
+    entryPointsWithoutTraces: z.array(z.string()).default([]),
+    coveragePercentage: z.number().default(0),
+  }).default({
+    orphanComponents: [],
+    unreachableComponents: [],
+    entryPointsWithoutTraces: [],
+    coveragePercentage: 0,
+  }),
+});
+
+export type EntryPointIndex = z.infer<typeof EntryPointIndexSchema>;
+
 // --- Full Architecture Analysis (Phase 1 output) ---
 
 export const ArchitectureAnalysisSchema = z.object({
@@ -69,6 +153,9 @@ export const ArchitectureAnalysisSchema = z.object({
   interfaces: z.array(ComponentInterfaceSchema),
   dataSources: z.array(DataSourceSchema),
   crossCuttingConcerns: z.array(CrossCuttingConcernSchema),
+  entryPoints: z.array(EntryPointSchema).default([]),
+  sideEffects: z.array(SideEffectSchema).default([]),
+  entryPointTraces: z.array(EntryPointTraceSchema).default([]),
 });
 
 export type ArchitectureAnalysis = z.infer<typeof ArchitectureAnalysisSchema>;
@@ -163,6 +250,7 @@ export const BuildComponentSchema = z.object({
   howToTest: z.string().optional(),
   howToRun: z.string().optional(),
   entrypoints: z.array(z.string()),
+  entryPointIds: z.array(z.string()).default([]),
   publicSurface: z.array(EnhancedSourceSymbolSchema),
   tags: z.array(z.string()),
 });
@@ -276,4 +364,5 @@ export interface AnalysisPipelineResult {
   warnings: string[];
   componentIndex?: ComponentIndex;
   symbolIndex?: SymbolIndex;
+  entryPointIndex?: EntryPointIndex;
 }

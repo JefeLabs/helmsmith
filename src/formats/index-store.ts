@@ -2,11 +2,12 @@ import { readFile, writeFile, rename } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import lockfile from 'proper-lockfile';
-import type { ComponentIndex, SymbolIndex } from '../parser/analysis/types.js';
-import { ComponentIndexSchema, SymbolIndexSchema } from '../parser/analysis/types.js';
+import type { ComponentIndex, SymbolIndex, EntryPointIndex } from '../parser/analysis/types.js';
+import { ComponentIndexSchema, SymbolIndexSchema, EntryPointIndexSchema } from '../parser/analysis/types.js';
 
 const COMPONENT_INDEX_FILENAME = 'component-index.json';
 const SYMBOL_INDEX_FILENAME = 'symbol-index.json';
+const ENTRYPOINT_INDEX_FILENAME = 'entrypoint-index.json';
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 200;
 
@@ -147,5 +148,64 @@ export async function writeSymbolIndex(repoHome: string, index: SymbolIndex): Pr
 
   throw new Error(
     `Failed to write ${SYMBOL_INDEX_FILENAME} after ${MAX_RETRIES} attempts: ${lastError?.message}`,
+  );
+}
+
+/**
+ * Read and validate entrypoint-index.json for a home directory.
+ * Returns null if the file does not exist.
+ */
+export async function readEntryPointIndex(home: string): Promise<EntryPointIndex | null> {
+  const indexPath = join(home, ENTRYPOINT_INDEX_FILENAME);
+
+  if (!existsSync(indexPath)) {
+    return null;
+  }
+
+  const content = await readFile(indexPath, 'utf-8');
+  const parsed = JSON.parse(content);
+  return EntryPointIndexSchema.parse(parsed);
+}
+
+/**
+ * Atomically write an entry point index to entrypoint-index.json with file locking.
+ */
+export async function writeEntryPointIndex(home: string, index: EntryPointIndex): Promise<void> {
+  EntryPointIndexSchema.parse(index);
+
+  const indexPath = join(home, ENTRYPOINT_INDEX_FILENAME);
+  const tmpPath = join(home, `${ENTRYPOINT_INDEX_FILENAME}.tmp`);
+
+  if (!existsSync(indexPath)) {
+    await writeFile(indexPath, '{}', 'utf-8');
+  }
+
+  let lastError: Error | undefined;
+
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      const release = await lockfile.lock(indexPath, {
+        retries: { retries: 2, minTimeout: 100, maxTimeout: 500 },
+      });
+
+      try {
+        const content = JSON.stringify(index, null, 2);
+        await writeFile(tmpPath, content, 'utf-8');
+        await rename(tmpPath, indexPath);
+      } finally {
+        await release();
+      }
+
+      return;
+    } catch (err) {
+      lastError = err as Error;
+      if (attempt < MAX_RETRIES - 1) {
+        await sleep(RETRY_DELAY_MS * (attempt + 1));
+      }
+    }
+  }
+
+  throw new Error(
+    `Failed to write ${ENTRYPOINT_INDEX_FILENAME} after ${MAX_RETRIES} attempts: ${lastError?.message}`,
   );
 }

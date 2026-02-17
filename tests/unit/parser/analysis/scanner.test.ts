@@ -20,6 +20,15 @@ vi.mock('../../../../src/parser/analysis/source-analyzer.js', () => ({
   analyzeSourceEnhanced: vi.fn(),
 }));
 
+vi.mock('../../../../src/parser/analysis/entrypoint-detection.js', () => ({
+  detectEntryPoints: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock('../../../../src/parser/analysis/entrypoint-validation.js', () => ({
+  applyValidation: vi.fn((index: unknown) => index),
+  generateValidationWarnings: vi.fn().mockReturnValue([]),
+}));
+
 import { runScanPipeline } from '../../../../src/parser/analysis/scanner.js';
 import { discoverComponents } from '../../../../src/parser/analysis/component-discovery.js';
 import { scanCodebase } from '../../../../src/parser/analysis/codebase-scanner.js';
@@ -47,6 +56,7 @@ const fakeComponent: BuildComponent = {
   rootPath: '/test',
   languageSet: ['typescript'],
   entrypoints: ['src/index.ts'],
+  entryPointIds: [],
   publicSurface: [],
   tags: ['node'],
 };
@@ -99,6 +109,8 @@ describe('runScanPipeline', () => {
     expect(result.componentIndex.components).toHaveLength(1);
     expect(result.symbolIndex.version).toBe(1);
     expect(result.symbolIndex.entries).toHaveLength(1);
+    expect(result.entryPointIndex.version).toBe(1);
+    expect(result.entryPointIndex.entryPoints).toHaveLength(0);
     expect(result.warnings).toHaveLength(0);
   });
 

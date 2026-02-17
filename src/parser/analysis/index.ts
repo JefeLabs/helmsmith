@@ -38,6 +38,12 @@ export type {
   AITaskWithTags,
   AnalysisPipelineOptions,
   AnalysisPipelineResult,
+  EntryPointCategory,
+  EntryPoint,
+  SideEffectType,
+  SideEffect,
+  EntryPointTrace,
+  EntryPointIndex,
 } from './types.js';
 export {
   buildComponentIndex,
@@ -45,7 +51,21 @@ export {
   queryIndex,
   formatComponentIndexForPrompt,
   formatQueryResultForPrompt,
+  buildEntryPointIndex,
+  formatEntryPointIndexForPrompt,
 } from './retrieval.js';
+export {
+  detectEntryPoints,
+  detectEntryPointsFromAST,
+  detectEntryPointsFromManifest,
+  detectFileBasedRoutes,
+} from './entrypoint-detection.js';
+export {
+  validateEntryPointCoverage,
+  applyValidation,
+  generateValidationWarnings,
+} from './entrypoint-validation.js';
+export type { EntryPointValidationResult } from './entrypoint-validation.js';
 export {
   ArchitectureAnalysisSchema,
   ArchitectureComponentSchema,
@@ -64,4 +84,10 @@ export {
   SymbolIndexSchema,
   Phase2ResponseSchema,
   AITaskWithTagsSchema,
+  EntryPointCategorySchema,
+  EntryPointSchema,
+  SideEffectTypeSchema,
+  SideEffectSchema,
+  EntryPointTraceSchema,
+  EntryPointIndexSchema,
 } from './types.js';

@@ -2,7 +2,9 @@ import chalk from 'chalk';
 import { scanCodebase } from './codebase-scanner.js';
 import { analyzeSourceEnhanced } from './source-analyzer.js';
 import { discoverComponents } from './component-discovery.js';
-import { buildComponentIndex, buildSymbolIndex } from './retrieval.js';
+import { buildComponentIndex, buildSymbolIndex, buildEntryPointIndex } from './retrieval.js';
+import { detectEntryPoints } from './entrypoint-detection.js';
+import { applyValidation, generateValidationWarnings } from './entrypoint-validation.js';
 import type {
   CodebaseScanResult,
   SourceAnalysisResult,
@@ -10,6 +12,8 @@ import type {
   ComponentIndex,
   SymbolIndex,
   EnhancedFileAnalysis,
+  EntryPointIndex,
+  EntryPoint,
 } from './types.js';
 
 export interface ScanPipelineResult {
@@ -19,6 +23,7 @@ export interface ScanPipelineResult {
   sourceResult: SourceAnalysisResult | null;
   componentIndex: ComponentIndex;
   symbolIndex: SymbolIndex;
+  entryPointIndex: EntryPointIndex;
   warnings: string[];
 }
 
@@ -72,9 +77,39 @@ export async function runScanPipeline(rootPath: string): Promise<ScanPipelineRes
     warnings.push(`Source analysis failed: ${(err as Error).message}`);
   }
 
-  // --- Step 3: Build indexes ---
+  // --- Step 3: Entry point detection ---
+  let detectedEntryPoints: EntryPoint[] = [];
+  console.error(chalk.dim('  Detecting entry points...'));
+  try {
+    detectedEntryPoints = await detectEntryPoints(rootPath, enhancedFiles, components);
+    const categories = [...new Set(detectedEntryPoints.map(ep => ep.category))];
+    console.error(
+      chalk.dim(
+        `  Found ${detectedEntryPoints.length} entry point(s)` +
+        (categories.length > 0 ? ` [${categories.join(', ')}]` : ''),
+      ),
+    );
+  } catch (err) {
+    warnings.push(`Entry point detection failed: ${(err as Error).message}`);
+  }
+
+  // --- Step 4: Build indexes ---
   const componentIndex = buildComponentIndex(rootPath, components);
   const symbolIndex = buildSymbolIndex(rootPath, enhancedFiles, components);
+  let entryPointIndex = buildEntryPointIndex(rootPath, detectedEntryPoints);
+
+  // Apply validation (orphan detection, coverage)
+  entryPointIndex = applyValidation(entryPointIndex, componentIndex);
+  const validationWarnings = generateValidationWarnings(entryPointIndex.validation);
+  warnings.push(...validationWarnings);
+
+  // Link entry point IDs back to their owning components
+  for (const ep of detectedEntryPoints) {
+    const comp = components.find(c => c.id === ep.componentId);
+    if (comp && !comp.entryPointIds.includes(ep.id)) {
+      comp.entryPointIds.push(ep.id);
+    }
+  }
 
   if (components.length > 0) {
     console.error(chalk.dim(`  Built component index (${components.length}) and symbol index (${symbolIndex.entries.length} entries)`));
@@ -89,6 +124,7 @@ export async function runScanPipeline(rootPath: string): Promise<ScanPipelineRes
     sourceResult,
     componentIndex,
     symbolIndex,
+    entryPointIndex,
     warnings,
   };
 }
