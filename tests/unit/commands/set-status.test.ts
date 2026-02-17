@@ -20,6 +20,7 @@ function makeTask(overrides: Partial<TaskNode> = {}): TaskNode {
     assignee: null,
     outputs: [],
     tags: [],
+    qaFeedback: [],
     children: [],
     metadata: {
       source: '',
@@ -162,6 +163,28 @@ describe('executeSetStatus', () => {
     const result = executeSetStatus(tasks, 'A', 'done', STATES, false);
     const taskB = result.tasks.find((t) => t.id === 'B');
     expect(taskB?.readiness).toBe('ready');
+  });
+
+  it('rejects closed transition when qa-review-needed tag is present', () => {
+    const tasks = [makeTask({ id: '1', status: 'review', tags: ['qa-review-needed'] })];
+    expect(() =>
+      executeSetStatus(tasks, '1', 'done', STATES, false),
+    ).toThrow('qa-review-needed');
+    expect(() =>
+      executeSetStatus(tasks, '1', 'done', STATES, false),
+    ).toThrow("qa-clear");
+  });
+
+  it('allows non-closed transition when qa-review-needed tag is present', () => {
+    const tasks = [makeTask({ id: '1', status: 'todo', tags: ['qa-review-needed'] })];
+    const result = executeSetStatus(tasks, '1', 'in-progress', STATES, false);
+    expect(result.task.status).toBe('in-progress');
+  });
+
+  it('force bypasses qa-review-needed gate', () => {
+    const tasks = [makeTask({ id: '1', status: 'review', tags: ['qa-review-needed'] })];
+    const result = executeSetStatus(tasks, '1', 'done', STATES, false, { force: true });
+    expect(result.task.status).toBe('done');
   });
 
   it('handles deeply nested cascade', () => {

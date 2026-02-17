@@ -4,15 +4,17 @@ import {
   aggregateComplexity,
   aggregateProgress,
   aggregateDependencies,
+  aggregateQA,
 } from './aggregator.js';
 import type { ReportType } from './types.js';
 
-export type { ReportType, ReportFormat, SummaryReportContext, SkillCoverage } from './types.js';
+export type { ReportType, ReportFormat, SummaryReportContext, SkillCoverage, QAReportContext } from './types.js';
 export {
   aggregateSummary,
   aggregateComplexity,
   aggregateProgress,
   aggregateDependencies,
+  aggregateQA,
   generateMermaidSyntax,
 } from './aggregator.js';
 
@@ -22,6 +24,7 @@ export const REPORT_TYPE_TO_TEMPLATE: Record<ReportType, string> = {
   complexity: 'complexity-report',
   progress: 'progress-report',
   dependencies: 'dependency-graph',
+  qa: 'qa-report',
 };
 
 /**
@@ -42,5 +45,7 @@ export function aggregateReport(
       return aggregateProgress(tasks, states) as unknown as Record<string, unknown>;
     case 'dependencies':
       return aggregateDependencies(tasks) as unknown as Record<string, unknown>;
+    case 'qa':
+      return aggregateQA(tasks, states) as unknown as Record<string, unknown>;
   }
 }

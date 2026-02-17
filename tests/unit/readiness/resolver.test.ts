@@ -250,6 +250,52 @@ describe('buildDelegationManifest', () => {
     const taskA = manifest.ready_tasks.find((t) => t.id === 'A');
     expect(taskA?.dependencies).toEqual(['B']);
   });
+
+  it('collects qa-failed tasks in dedicated section', () => {
+    const tasks = [
+      makeTask({
+        id: 'A',
+        status: 'qa-failed',
+        priority: 'high',
+        requiredSkills: ['backend'],
+        qaFeedback: [{
+          testType: 'unit',
+          result: 'fail',
+          description: 'Null pointer in parser',
+          cause: 'Missing check',
+          severity: 'critical',
+          reporter: 'qa-agent',
+          timestamp: '2026-02-01T00:00:00Z',
+        }],
+      }),
+      makeTask({ id: 'B', status: 'todo' }),
+    ];
+
+    const manifest = buildDelegationManifest(tasks, STATES);
+
+    expect(manifest.qa_failed_tasks).toHaveLength(1);
+    expect(manifest.qa_failed_tasks[0].id).toBe('A');
+    expect(manifest.qa_failed_tasks[0].latest_feedback.test_type).toBe('unit');
+    expect(manifest.qa_failed_tasks[0].latest_feedback.severity).toBe('critical');
+    expect(manifest.summary.qa_failed).toBe(1);
+    // A should not appear in ready_tasks
+    expect(manifest.ready_tasks.map((t) => t.id)).not.toContain('A');
+  });
+
+  it('includes qa_failed count in summary', () => {
+    const tasks = [
+      makeTask({ id: 'A', status: 'qa-failed', qaFeedback: [{
+        testType: 'e2e', result: 'fail', description: 'fails', cause: '', severity: 'major', reporter: 'qa', timestamp: '',
+      }] }),
+      makeTask({ id: 'B', status: 'todo' }),
+      makeTask({ id: 'C', status: 'done' }),
+    ];
+
+    const manifest = buildDelegationManifest(tasks, STATES);
+    expect(manifest.summary.qa_failed).toBe(1);
+    expect(manifest.summary.completed).toBe(1);
+    expect(manifest.summary.in_progress).toBe(1); // qa-failed counts as in_progress
+  });
 });
 
 // --- findNextTask ---
@@ -315,6 +361,30 @@ describe('findNextTask', () => {
   it('returns null for empty task list', () => {
     const next = findNextTask([], STATES);
     expect(next).toBeNull();
+  });
+
+  it('returns qa-failed task with priority boost over regular tasks', () => {
+    const tasks = [
+      makeTask({ id: 'T-1', status: 'todo', priority: 'critical' }),
+      makeTask({ id: 'T-2', status: 'qa-failed', priority: 'low', qaFeedback: [{
+        testType: 'unit', result: 'fail', description: 'fails', cause: '', severity: 'major', reporter: 'qa', timestamp: '',
+      }] }),
+    ];
+
+    const next = findNextTask(tasks, STATES);
+    // qa-failed gets +10 bonus, so even low priority (1+10=11) beats critical (4)
+    expect(next?.id).toBe('T-2');
+  });
+
+  it('returns qa-failed tasks even though they are active category', () => {
+    const tasks = [
+      makeTask({ id: 'T-1', status: 'qa-failed', priority: 'medium', qaFeedback: [{
+        testType: 'unit', result: 'fail', description: 'fails', cause: '', severity: 'major', reporter: 'qa', timestamp: '',
+      }] }),
+    ];
+
+    const next = findNextTask(tasks, STATES);
+    expect(next?.id).toBe('T-1');
   });
 
   it('handles numeric ID sorting correctly', () => {

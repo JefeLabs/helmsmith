@@ -37,10 +37,10 @@ describe('scorer pipeline integration', () => {
     fetchSpy.mockRestore();
   });
 
-  it('AIScorer falls back gracefully when callCopilot fails', async () => {
-    // Mock callCopilot to fail
-    vi.doMock('../../../src/auth/token-manager.js', () => ({
-      callCopilot: vi.fn().mockRejectedValue(new Error('Network error')),
+  it('AIScorer falls back gracefully when callAI fails', async () => {
+    // Mock callAI to fail
+    vi.doMock('../../../src/auth/call-ai.js', () => ({
+      callAI: vi.fn().mockRejectedValue(new Error('Network error')),
     }));
 
     // Re-import to get mocked version
@@ -61,6 +61,6 @@ describe('scorer pipeline integration', () => {
     expect(result.score).toBeLessThanOrEqual(10);
     expect(result.breakdown).toBeDefined();
 
-    vi.doUnmock('../../../src/auth/token-manager.js');
+    vi.doUnmock('../../../src/auth/call-ai.js');
   });
 });

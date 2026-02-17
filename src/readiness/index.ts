@@ -25,5 +25,7 @@ export type {
   ReadyTaskEntry,
   BlockedTaskEntry,
   ManifestSummary,
+  ManifestSummaryWithQA,
+  QAFailedTaskEntry,
   DelegationManifest,
 } from './types.js';

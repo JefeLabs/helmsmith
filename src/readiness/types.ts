@@ -83,10 +83,31 @@ export interface ManifestSummary {
   completed: number;
 }
 
+/** A QA-failed task entry in the delegation manifest. */
+export interface QAFailedTaskEntry {
+  id: string;
+  title: string;
+  priority: string;
+  complexity: number;
+  required_skills: string[];
+  latest_feedback: {
+    test_type: string;
+    description: string;
+    severity: string;
+    reporter: string;
+  };
+}
+
+/** Summary counts in the delegation manifest. */
+export interface ManifestSummaryWithQA extends ManifestSummary {
+  qa_failed: number;
+}
+
 /** The full delegation manifest output by the ready command. */
 export interface DelegationManifest {
   generated_at: string;
+  qa_failed_tasks: QAFailedTaskEntry[];
   ready_tasks: ReadyTaskEntry[];
   blocked_tasks: BlockedTaskEntry[];
-  summary: ManifestSummary;
+  summary: ManifestSummaryWithQA;
 }

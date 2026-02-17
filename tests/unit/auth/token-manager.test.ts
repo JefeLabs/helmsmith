@@ -177,6 +177,92 @@ describe('token-manager', () => {
     });
   });
 
+  describe('readAuthFile', () => {
+    it('returns default when auth.json does not exist', async () => {
+      const { readAuthFile } = await import('../../../src/auth/token-manager.js');
+      const result = await readAuthFile();
+      expect(result.active_provider).toBe('copilot');
+      expect(result.copilot).toBeUndefined();
+      expect(result.anthropic).toBeUndefined();
+      expect(result.openai).toBeUndefined();
+    });
+
+    it('auto-migrates legacy flat format to multi-provider', async () => {
+      const { writeFile: fsWriteFile } = await import('node:fs/promises');
+      // Write legacy flat format
+      await fsWriteFile(
+        join(tempDir, 'auth.json'),
+        JSON.stringify({
+          github_token: 'gho_legacy_token',
+          copilot_token: 'tid=cached_token',
+          copilot_token_expires_at: 1700000000,
+          username: 'legacyuser',
+        }),
+      );
+
+      const { readAuthFile } = await import('../../../src/auth/token-manager.js');
+      const result = await readAuthFile();
+
+      expect(result.active_provider).toBe('copilot');
+      expect(result.copilot).toBeDefined();
+      expect(result.copilot!.github_token).toBe('gho_legacy_token');
+      expect(result.copilot!.copilot_token).toBe('tid=cached_token');
+      expect(result.copilot!.copilot_token_expires_at).toBe(1700000000);
+      expect(result.copilot!.username).toBe('legacyuser');
+
+      // Verify the file was persisted in new format
+      const raw = await readFile(join(tempDir, 'auth.json'), 'utf-8');
+      const persisted = JSON.parse(raw);
+      expect(persisted.active_provider).toBe('copilot');
+      expect(persisted.copilot).toBeDefined();
+      // No top-level github_token anymore
+      expect(persisted.github_token).toBeUndefined();
+    });
+
+    it('reads new multi-provider format correctly', async () => {
+      const { writeFile: fsWriteFile } = await import('node:fs/promises');
+      await fsWriteFile(
+        join(tempDir, 'auth.json'),
+        JSON.stringify({
+          active_provider: 'anthropic',
+          copilot: { github_token: 'gho_test' },
+          anthropic: { access_token: 'ant_token' },
+        }),
+      );
+
+      const { readAuthFile } = await import('../../../src/auth/token-manager.js');
+      const result = await readAuthFile();
+
+      expect(result.active_provider).toBe('anthropic');
+      expect(result.copilot?.github_token).toBe('gho_test');
+      expect(result.anthropic?.access_token).toBe('ant_token');
+    });
+
+    it('returns default for invalid JSON', async () => {
+      const { writeFile: fsWriteFile } = await import('node:fs/promises');
+      await fsWriteFile(join(tempDir, 'auth.json'), 'not valid json{{{');
+
+      const { readAuthFile } = await import('../../../src/auth/token-manager.js');
+      const result = await readAuthFile();
+      expect(result.active_provider).toBe('copilot');
+    });
+  });
+
+  describe('writeAuthFile', () => {
+    it('writes multi-provider format', async () => {
+      const { writeAuthFile } = await import('../../../src/auth/token-manager.js');
+      await writeAuthFile({
+        active_provider: 'openai',
+        openai: { access_token: 'oai_token', display_name: 'OpenAI User' },
+      });
+
+      const raw = await readFile(join(tempDir, 'auth.json'), 'utf-8');
+      const parsed = JSON.parse(raw);
+      expect(parsed.active_provider).toBe('openai');
+      expect(parsed.openai.access_token).toBe('oai_token');
+    });
+  });
+
   describe('callCopilot', () => {
     it('sends correct headers and body', async () => {
       await writeAuthCredentials({ github_token: 'gho_test' });

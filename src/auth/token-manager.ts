@@ -2,14 +2,17 @@ import { readFile, writeFile, unlink, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { getHomePath } from '../utils/home.js';
+import { CLI_BIN_NAME } from '../config/branding.js';
 import {
   AuthCredentialsSchema,
+  AuthFileSchema,
   COPILOT_TOKEN_URL,
   COPILOT_CHAT_URL,
   COPILOT_MODELS_URL,
   EDITOR_VERSION,
   TOKEN_REFRESH_THRESHOLD,
   type AuthCredentials,
+  type AuthFile,
   type CopilotTokenResponse,
   type ChatCompletionMessage,
   type ChatCompletionResponse,
@@ -60,6 +63,58 @@ export async function deleteAuthCredentials(): Promise<void> {
   if (existsSync(authPath)) {
     await unlink(authPath);
   }
+}
+
+// --- Multi-provider auth file (new format) ---
+
+/**
+ * Read auth.json in the new multi-provider format.
+ * Auto-migrates from legacy flat format (Copilot-only) if detected.
+ * Returns a valid AuthFile — empty providers if file is missing.
+ */
+export async function readAuthFile(): Promise<AuthFile> {
+  const authPath = getAuthPath();
+  if (!existsSync(authPath)) {
+    return { active_provider: 'copilot' };
+  }
+
+  try {
+    const raw = await readFile(authPath, 'utf-8');
+    const parsed = JSON.parse(raw);
+
+    // Detect legacy flat format: has github_token at top level, no active_provider
+    if (parsed.github_token && !parsed.active_provider) {
+      // Auto-migrate: wrap under copilot key
+      const migrated: AuthFile = {
+        active_provider: 'copilot',
+        copilot: {
+          github_token: parsed.github_token,
+          copilot_token: parsed.copilot_token,
+          copilot_token_expires_at: parsed.copilot_token_expires_at,
+          username: parsed.username,
+        },
+      };
+      // Persist the migrated format
+      await writeAuthFile(migrated);
+      return migrated;
+    }
+
+    return AuthFileSchema.parse(parsed);
+  } catch {
+    return { active_provider: 'copilot' };
+  }
+}
+
+/**
+ * Write auth.json in multi-provider format. Creates parent directory if needed.
+ */
+export async function writeAuthFile(authFile: AuthFile): Promise<void> {
+  const authPath = getAuthPath();
+  const dir = dirname(authPath);
+  if (!existsSync(dir)) {
+    await mkdir(dir, { recursive: true });
+  }
+  await writeFile(authPath, JSON.stringify(authFile, null, 2), 'utf-8');
 }
 
 /**
@@ -140,7 +195,7 @@ export async function callCopilot(
 ): Promise<ChatCompletionResponse> {
   const tokenSource = await resolveGitHubToken();
   if (!tokenSource) {
-    throw new Error('Not authenticated. Run "agentx-taskmaster auth login" first.');
+    throw new Error(`Not authenticated. Run "${CLI_BIN_NAME} auth login" first.`);
   }
 
   const doRequest = async (copilotToken: string): Promise<Response> => {

@@ -5,14 +5,14 @@ export { loadProjectConfig, projectConfigExists };
 
 /**
  * Load config for a project and return the value at a dot-separated key path.
- * E.g., getConfigValue('myProject', 'ai.model') => 'claude-sonnet-4-20250514'
+ * E.g., getConfigValue('/path/to/project', 'ai.model') => 'claude-sonnet-4-20250514'
  * Returns undefined if the key path does not exist.
  */
 export async function getConfigValue(
-  projectName: string,
+  projectDir: string,
   keyPath: string,
 ): Promise<unknown> {
-  const config = await loadProjectConfig(projectName);
+  const config = await loadProjectConfig(projectDir);
   return resolveKeyPath(config, keyPath);
 }
 
@@ -35,9 +35,9 @@ function resolveKeyPath(obj: unknown, keyPath: string): unknown {
 }
 
 /**
- * Load the full project config for a project by name.
+ * Load the full project config for a project directory.
  * Re-exported as a convenience alias.
  */
-export async function readProjectConfig(projectName: string): Promise<ProjectConfig> {
-  return loadProjectConfig(projectName);
+export async function readProjectConfig(projectDir: string): Promise<ProjectConfig> {
+  return loadProjectConfig(projectDir);
 }

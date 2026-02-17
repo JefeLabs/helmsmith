@@ -18,13 +18,13 @@ describe('resolveStates', () => {
   it('returns simple preset states', () => {
     const states = resolveStates({ preset: 'simple', enforce_transitions: false });
     const names = states.map((s) => s.name);
-    expect(names).toEqual(['todo', 'in-progress', 'done']);
+    expect(names).toEqual(['todo', 'in-progress', 'qa-failed', 'done']);
   });
 
   it('returns standard preset states', () => {
     const states = resolveStates({ preset: 'standard', enforce_transitions: false });
     const names = states.map((s) => s.name);
-    expect(names).toEqual(['backlog', 'todo', 'in-progress', 'review', 'blocked', 'done']);
+    expect(names).toEqual(['backlog', 'todo', 'in-progress', 'review', 'blocked', 'qa-failed', 'done']);
   });
 
   it('returns kanban preset states', () => {
@@ -38,6 +38,7 @@ describe('resolveStates', () => {
       'testing',
       'blocked',
       'on-hold',
+      'qa-failed',
       'done',
     ]);
   });
@@ -141,7 +142,7 @@ describe('validateTransition', () => {
     const result = validateTransition(standardStates, 'todo', 'done', true);
     expect(result.valid).toBe(false);
     expect(result.error).toContain('Allowed transitions from "todo": in-progress, blocked');
-    expect(result.error).toContain('Valid states: backlog, todo, in-progress, review, blocked, done');
+    expect(result.error).toContain('Valid states: backlog, todo, in-progress, review, blocked, qa-failed, done');
   });
 });
 
@@ -247,6 +248,7 @@ describe('isActiveState', () => {
     expect(isActiveState(states, 'in-progress')).toBe(true);
     expect(isActiveState(states, 'review')).toBe(true);
     expect(isActiveState(states, 'blocked')).toBe(true);
+    expect(isActiveState(states, 'qa-failed')).toBe(true);
   });
 
   it('returns false for non-active states', () => {
@@ -279,13 +281,14 @@ describe('getValidStatuses', () => {
       'in-progress',
       'review',
       'blocked',
+      'qa-failed',
       'done',
     ]);
   });
 
   it('returns all state names for simple preset', () => {
     const states = resolveStates({ preset: 'simple', enforce_transitions: false });
-    expect(getValidStatuses(states)).toEqual(['todo', 'in-progress', 'done']);
+    expect(getValidStatuses(states)).toEqual(['todo', 'in-progress', 'qa-failed', 'done']);
   });
 });
 
@@ -307,6 +310,7 @@ describe('findTaskById', () => {
       assignee: null,
       outputs: [],
       tags: [],
+      qaFeedback: [],
       children: [
         {
           id: 'T-1.1',
@@ -342,6 +346,7 @@ describe('findTaskById', () => {
       assignee: null,
       outputs: [],
       tags: [],
+      qaFeedback: [],
       children: [],
       metadata: { source: '', autoExpanded: false, skillsInferred: false, createdAt: '' },
     },

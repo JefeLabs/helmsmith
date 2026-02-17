@@ -6,6 +6,7 @@ import { getHomePath } from './home.js';
 const DEFAULTS_FILE = 'defaults.yaml';
 
 export interface Defaults {
+  provider?: string;
   model?: string;
   style?: string;
   statusPreset?: string;

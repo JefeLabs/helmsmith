@@ -2,7 +2,7 @@ import type { TaskNode, StateDefinition } from '../config/schema.js';
 import type { ComplexityReportContext, ProgressReportContext, DependencyGraphContext } from '../generator/types.js';
 import { flattenTasks } from '../readiness/dag.js';
 import { isClosedState, isActiveState, isOpenState } from '../config/state-engine.js';
-import type { SummaryReportContext, SkillCoverage } from './types.js';
+import type { SummaryReportContext, SkillCoverage, QAReportContext, QAReportFailure } from './types.js';
 
 /**
  * Aggregate data for the summary report (project health dashboard).
@@ -173,4 +173,65 @@ export function generateMermaidSyntax(tasks: TaskNode[]): string {
   }
 
   return lines.join('\n');
+}
+
+/**
+ * Aggregate data for the QA report.
+ * Collects all qa-failed tasks, qa-review-needed tasks, and summary stats.
+ */
+export function aggregateQA(
+  tasks: TaskNode[],
+  _states: StateDefinition[],
+): QAReportContext {
+  const flat = flattenTasks(tasks);
+
+  // Collect qa-failed tasks with their latest feedback
+  const failures: QAReportFailure[] = [];
+  for (const task of flat) {
+    if (task.status === 'qa-failed' && task.qaFeedback.length > 0) {
+      const latest = task.qaFeedback[task.qaFeedback.length - 1];
+      failures.push({
+        id: task.id,
+        title: task.title,
+        severity: latest.severity,
+        testType: latest.testType,
+        description: latest.description,
+        cause: latest.cause,
+        reporter: latest.reporter,
+        timestamp: latest.timestamp,
+      });
+    }
+  }
+
+  // Collect tasks tagged qa-review-needed
+  const reviewNeeded = flat
+    .filter((t) => t.tags.includes('qa-review-needed'))
+    .map((t) => ({ id: t.id, title: t.title }));
+
+  // Summary stats
+  const bySeverity = { critical: 0, major: 0, minor: 0 };
+  const testTypeMap = new Map<string, number>();
+
+  for (const f of failures) {
+    if (f.severity === 'critical') bySeverity.critical++;
+    else if (f.severity === 'minor') bySeverity.minor++;
+    else bySeverity.major++;
+
+    testTypeMap.set(f.testType, (testTypeMap.get(f.testType) ?? 0) + 1);
+  }
+
+  const byTestType = Array.from(testTypeMap.entries())
+    .map(([testType, count]) => ({ testType, count }))
+    .sort((a, b) => b.count - a.count);
+
+  return {
+    generatedAt: new Date().toISOString(),
+    failures,
+    reviewNeeded,
+    stats: {
+      totalFailures: failures.length,
+      bySeverity,
+      byTestType,
+    },
+  };
 }

@@ -1,7 +1,7 @@
 import type { TaskNode } from '../config/schema.js';
 import { PROJECT_STYLES } from '../config/styles.js';
 import { getDefaultStatus } from '../config/state-engine.js';
-import { callCopilot } from '../auth/token-manager.js';
+import { callAI } from '../auth/call-ai.js';
 import type { ChatCompletionMessage } from '../auth/types.js';
 import type {
   ExpansionOptions,
@@ -273,7 +273,7 @@ export async function expandTask(
   if (options.authAvailable && options.model) {
     try {
       const messages = buildExpansionPrompt(task, maxSubtasks, childType);
-      const response = await callCopilot(messages, options.model);
+      const response = await callAI(messages, options.model, options.provider);
       const content = response.choices?.[0]?.message?.content;
       if (!content) {
         throw new Error('Empty response from AI');

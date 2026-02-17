@@ -3,16 +3,16 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import yaml from 'js-yaml';
 import { ProjectConfigSchema, type ProjectConfig } from './schema.js';
-import { getProjectDir } from '../utils/home.js';
 import { readDefaults } from '../utils/defaults.js';
 
 /**
  * Load and validate a project's config.yaml.
  * Merges with global defaults — project config takes precedence.
+ * Takes an absolute project directory path.
  */
-export async function loadProjectConfig(projectName: string): Promise<ProjectConfig> {
+export async function loadProjectConfig(projectDir: string): Promise<ProjectConfig> {
   const defaults = await readDefaults();
-  const configPath = join(getProjectDir(projectName), 'config.yaml');
+  const configPath = join(projectDir, 'config.yaml');
 
   let projectConfig: Record<string, unknown> = {};
 
@@ -32,7 +32,10 @@ export async function loadProjectConfig(projectName: string): Promise<ProjectCon
       vocabulary: defaults.skills ?? [],
       auto_infer: true,
     },
-    ai: projectConfig.ai ?? { model: defaults.model ?? 'gpt-4o' },
+    ai: projectConfig.ai ?? {
+      provider: defaults.provider ?? 'copilot',
+      model: defaults.model ?? 'gpt-4o',
+    },
     thresholds: projectConfig.thresholds ?? defaults.thresholds ?? { expand: 5, flag: 8 },
   };
 
@@ -40,22 +43,23 @@ export async function loadProjectConfig(projectName: string): Promise<ProjectCon
 }
 
 /**
- * Check if a project config.yaml exists.
+ * Check if a project config.yaml exists at the given project directory.
  */
-export function projectConfigExists(projectName: string): boolean {
-  return existsSync(join(getProjectDir(projectName), 'config.yaml'));
+export function projectConfigExists(projectDir: string): boolean {
+  return existsSync(join(projectDir, 'config.yaml'));
 }
 
 /**
  * Write a partial config patch to a project's config.yaml.
  * Deep-merges the patch into the existing config and validates with Zod.
+ * Takes an absolute project directory path.
  */
 export async function writeProjectConfig(
-  projectName: string,
+  projectDir: string,
   patch: Record<string, unknown>,
 ): Promise<void> {
-  const configPath = join(getProjectDir(projectName), 'config.yaml');
-  const existing = await loadProjectConfig(projectName);
+  const configPath = join(projectDir, 'config.yaml');
+  const existing = await loadProjectConfig(projectDir);
   const merged = deepMerge(existing as unknown as Record<string, unknown>, patch);
   const validated = ProjectConfigSchema.parse(merged);
   await writeFile(

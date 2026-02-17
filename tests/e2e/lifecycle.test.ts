@@ -7,14 +7,14 @@ describe('E2E: Project lifecycle', () => {
 
   beforeEach(async () => {
     tempHome = await createTempHome();
-    env = { AGENTX_USERDATA: tempHome };
+    env = { AGENTX_HOME: tempHome };
   });
 
   afterEach(async () => {
     await cleanupTempHome(tempHome);
   });
 
-  it('completes full lifecycle: init -> parse -> score -> list -> set-status -> report', async () => {
+  it('completes full lifecycle: init -> parse -> score -> list -> set-status -> report', { timeout: 15_000 }, async () => {
     // 1. Init project
     const init = await runCli(['init', '--name', 'e2e-project', '--no-interactive'], env);
     expect(init.exitCode).toBe(0);

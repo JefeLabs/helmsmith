@@ -32,6 +32,14 @@ const CONFIG_KEYS: ConfigKey[] = [
     validate: (v) => ['true', 'false'].includes(v) || 'Must be "true" or "false"',
   },
   {
+    key: 'ai.provider',
+    label: 'AI provider',
+    getter: (c) => c.ai.provider,
+    validate: (v) =>
+      ['copilot', 'anthropic', 'openai'].includes(v) ||
+      'Invalid provider. Valid: copilot, anthropic, openai',
+  },
+  {
     key: 'ai.model',
     label: 'AI model',
     getter: (c) => c.ai.model,

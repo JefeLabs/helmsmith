@@ -7,8 +7,13 @@ import {
 } from './factory.js';
 import { STYLE_NAMES, PROJECT_STYLES } from '../config/styles.js';
 import { PRESET_NAMES, STATE_PRESETS } from '../config/state-presets.js';
-import { resolveGitHubToken, fetchCopilotModels } from '../auth/token-manager.js';
-import type { CopilotModelEntry } from '../auth/types.js';
+import { resolveActiveAuth } from '../auth/call-ai.js';
+import { getProvider } from '../auth/provider-registry.js';
+import { AI_PROVIDERS, type AIProviderName, type AIModelEntry } from '../auth/provider.js';
+import type { ProjectLocation, ResolvedProject } from '../utils/location.js';
+import type { TaggedProjectEntry } from '../utils/projects.js';
+import { listAllProjects } from '../utils/projects.js';
+import { formatProjectRef } from '../utils/location.js';
 
 const DEFAULT_SKILLS = [
   'backend',
@@ -49,7 +54,7 @@ function formatTokens(n: number): string {
 /**
  * Build a display description for a model using API data + known fallbacks.
  */
-function describeModel(entry: CopilotModelEntry): string {
+function describeModel(entry: AIModelEntry): string {
   const limits = entry.capabilities?.limits;
   const known = KNOWN_MODEL_META[entry.id];
 
@@ -82,8 +87,17 @@ export interface InitWizardResult {
   style: 'agile-full' | 'story-driven' | 'task-only' | 'flat';
   statePreset: 'simple' | 'standard' | 'kanban';
   skills: string[];
+  provider: AIProviderName;
   model: string;
   thresholds: { expand: number; flag: number };
+  location: ProjectLocation;
+  gitignore: boolean;
+  switchTo?: string;
+  switchToLocation?: ProjectLocation;
+}
+
+export interface InitWizardContext {
+  gitRoot: string | null;
 }
 
 /**
@@ -93,13 +107,109 @@ export interface InitWizardResult {
  */
 export async function runInitWizard(
   opts?: Partial<InitWizardResult>,
+  context?: InitWizardContext,
 ): Promise<InitWizardResult> {
+  const gitRoot = context?.gitRoot ?? null;
+
+  // Step 0: Show existing projects and offer switch
+  if (!opts?.switchTo && !opts?.name) {
+    const allProjects = await listAllProjects(gitRoot);
+    if (allProjects.projects.length > 0) {
+      const switchChoices: Array<{ name: string; value: string }> = [
+        { name: 'Create a new project', value: '__new__' },
+        ...allProjects.projects.map((p) => {
+          const marker = p.name === allProjects.active && p.location === allProjects.activeLocation
+            ? ' (active)'
+            : '';
+          return {
+            name: `Switch to "${p.name}" [${p.location}]${marker}`,
+            value: `${p.location}:${p.name}`,
+          };
+        }),
+      ];
+
+      const switchChoice = await listWithDefault(
+        '__existingProjects',
+        'Existing projects found. What would you like to do?',
+        switchChoices,
+      );
+
+      if (switchChoice !== '__new__') {
+        // Parse "location:name"
+        const colonIndex = switchChoice.indexOf(':');
+        const switchToLocation = switchChoice.substring(0, colonIndex) as ProjectLocation;
+        const switchToName = switchChoice.substring(colonIndex + 1);
+        return {
+          name: '',
+          description: '',
+          style: 'task-only',
+          statePreset: 'standard',
+          skills: [],
+          provider: 'copilot',
+          model: 'gpt-4.1',
+          thresholds: { expand: 5, flag: 8 },
+          location: switchToLocation,
+          gitignore: false,
+          switchTo: switchToName,
+          switchToLocation,
+        };
+      }
+    }
+  }
+
+  // If switchTo was provided via opts, return early
+  if (opts?.switchTo) {
+    return {
+      name: '',
+      description: '',
+      style: 'task-only',
+      statePreset: 'standard',
+      skills: [],
+      provider: 'copilot',
+      model: 'gpt-4.1',
+      thresholds: { expand: 5, flag: 8 },
+      location: opts.switchToLocation ?? 'home',
+      gitignore: false,
+      switchTo: opts.switchTo,
+      switchToLocation: opts.switchToLocation,
+    };
+  }
+
   // Step 1: Project name
   const name =
     opts?.name ??
     (await inputWithDefault('projectName', 'Project name:', {
       validate: (v) => v.trim().length > 0 || 'Project name cannot be empty',
     }));
+
+  // Step 1b: Storage location (only when in a git repo)
+  let location: ProjectLocation;
+  if (opts?.location) {
+    location = opts.location;
+  } else if (gitRoot) {
+    const locationChoices = [
+      { name: `In this repository (${gitRoot}/.agentx/taskmaster/)`, value: 'repo' as ProjectLocation },
+      { name: 'In user home (~/.agentx/taskmaster/)', value: 'home' as ProjectLocation },
+    ];
+    location = await listWithDefault('__storageLocation', 'Where should project data be stored?', locationChoices);
+  } else {
+    location = 'home';
+  }
+
+  // Step 1c: Gitignore (only when repo-local)
+  let gitignore: boolean;
+  if (opts?.gitignore !== undefined) {
+    gitignore = opts.gitignore;
+  } else if (location === 'repo' && gitRoot) {
+    const gitignoreChoices = [
+      { name: 'No \u2014 add .agentx/ to .gitignore (private to you)', value: 'yes' },
+      { name: 'Yes \u2014 track in git (shared with team)', value: 'no' },
+    ];
+    const choice = await listWithDefault('__gitignore', 'Include taskmaster data in source control?', gitignoreChoices);
+    gitignore = choice === 'yes';
+  } else {
+    gitignore = false;
+  }
 
   // Step 2: Description
   const description =
@@ -114,7 +224,6 @@ export async function runInitWizard(
   const style = opts?.style ?? (await listWithDefault('style', 'Project style:', styleChoices));
 
   // Step 4: Status preset selection
-  // TODO: Add custom state wizard when needed
   const presetChoices = PRESET_NAMES.map((key) => {
     const states = STATE_PRESETS[key];
     const stateNames = states.map((s) => s.name).join(' \u2192 ');
@@ -154,17 +263,30 @@ export async function runInitWizard(
     }
   }
 
-  // Step 6: AI model selection (live from Copilot API when authenticated)
+  // Step 6: AI provider selection
+  let provider: AIProviderName;
+  if (opts?.provider) {
+    provider = opts.provider;
+  } else {
+    const providerChoices = AI_PROVIDERS.map((p) => ({
+      name: p === 'copilot' ? 'GitHub Copilot' : p === 'anthropic' ? 'Anthropic Claude' : 'OpenAI ChatGPT',
+      value: p,
+    }));
+    provider = await listWithDefault('provider', 'AI provider:', providerChoices) as AIProviderName;
+  }
+
+  // Step 7: AI model selection (provider-aware, live from API when authenticated)
   let model: string;
   if (opts?.model) {
     model = opts.model;
   } else {
-    const tokenSource = await resolveGitHubToken();
+    const authResult = await resolveActiveAuth(provider);
     let modelChoices: Array<{ name: string; value: string }>;
 
-    if (tokenSource) {
-      // Fetch live models from the Copilot API
-      const liveModels = await fetchCopilotModels();
+    if (authResult) {
+      // Fetch live models from the provider
+      const providerInstance = getProvider(provider);
+      const liveModels = await providerInstance.listModels();
 
       if (liveModels && liveModels.length > 0) {
         // Filter to chat-capable models and build choices with token metadata
@@ -191,14 +313,14 @@ export async function runInitWizard(
       }));
     }
 
-    const authLabel = tokenSource
-      ? `AI model (${modelChoices.length} available for your subscription):`
-      : 'AI model (run "auth login" to see your available models):';
+    const authLabel = authResult
+      ? `AI model (${modelChoices.length} available for your ${provider} subscription):`
+      : `AI model (run "auth login --provider ${provider}" to see your available models):`;
 
     model = await listWithDefault('model', authLabel, modelChoices);
   }
 
-  // Step 7: Thresholds
+  // Step 8: Thresholds
   const expandThreshold =
     opts?.thresholds?.expand ??
     (await numberWithDefault(
@@ -221,7 +343,10 @@ export async function runInitWizard(
     style,
     statePreset,
     skills,
+    provider,
     model,
     thresholds: { expand: expandThreshold, flag: flagThreshold },
+    location,
+    gitignore,
   };
 }

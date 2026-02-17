@@ -1,7 +1,8 @@
 import type { TaskNode } from '../config/schema.js';
 import type { ScoredResult, ScoringProvider } from './types.js';
 import { HeuristicScorer } from './heuristic.js';
-import { callCopilot } from '../auth/token-manager.js';
+import { callAI } from '../auth/call-ai.js';
+import type { AIProviderName } from '../auth/provider.js';
 import type { ChatCompletionMessage } from '../auth/types.js';
 
 /** Weight for AI score in the blended result. */
@@ -96,10 +97,12 @@ export function parseAIResponse(content: string): AIScoreResponse | null {
 export class AIScorer implements ScoringProvider {
   readonly name = 'ai';
   private model: string;
+  private provider?: AIProviderName;
   private heuristic: HeuristicScorer;
 
-  constructor(model: string, heuristic?: HeuristicScorer) {
+  constructor(model: string, heuristic?: HeuristicScorer, provider?: AIProviderName) {
     this.model = model;
+    this.provider = provider;
     this.heuristic = heuristic ?? new HeuristicScorer();
   }
 
@@ -109,7 +112,7 @@ export class AIScorer implements ScoringProvider {
 
     try {
       const messages = buildScoringPrompt(task);
-      const response = await callCopilot(messages, this.model);
+      const response = await callAI(messages, this.model, this.provider);
 
       const content = response.choices?.[0]?.message?.content;
       if (!content) {

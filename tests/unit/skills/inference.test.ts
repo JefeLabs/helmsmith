@@ -2,10 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { TaskNode } from '../../../src/config/schema.js';
 import type { ProjectConfig } from '../../../src/config/schema.js';
 
-// Mock the auth module before importing inference
-vi.mock('../../../src/auth/token-manager.js', () => ({
-  callCopilot: vi.fn(),
-  resolveGitHubToken: vi.fn(),
+// Mock the auth modules before importing inference
+vi.mock('../../../src/auth/call-ai.js', () => ({
+  callAI: vi.fn(),
+  resolveActiveAuth: vi.fn(),
 }));
 
 import {
@@ -18,10 +18,10 @@ import {
   inheritSkills,
 } from '../../../src/skills/inference.js';
 import { BUILT_IN_SKILLS } from '../../../src/skills/types.js';
-import { callCopilot, resolveGitHubToken } from '../../../src/auth/token-manager.js';
+import { callAI, resolveActiveAuth } from '../../../src/auth/call-ai.js';
 
-const mockedCallCopilot = vi.mocked(callCopilot);
-const mockedResolveGitHubToken = vi.mocked(resolveGitHubToken);
+const mockedCallAI = vi.mocked(callAI);
+const mockedResolveActiveAuth = vi.mocked(resolveActiveAuth);
 
 function makeTask(overrides: Partial<TaskNode> = {}): TaskNode {
   return {
@@ -38,6 +38,7 @@ function makeTask(overrides: Partial<TaskNode> = {}): TaskNode {
     assignee: null,
     outputs: [],
     tags: [],
+    qaFeedback: [],
     children: [],
     metadata: {
       source: '',
@@ -271,7 +272,7 @@ describe('inferSkillsForTask', () => {
   const vocab = ['backend', 'frontend', 'database', 'auth', 'testing'];
 
   it('uses AI when available and returns AI result', async () => {
-    mockedCallCopilot.mockResolvedValue({
+    mockedCallAI.mockResolvedValue({
       choices: [{ message: { content: '{"skills": ["backend", "auth"]}' } }],
     });
 
@@ -283,7 +284,7 @@ describe('inferSkillsForTask', () => {
   });
 
   it('falls back to keyword when AI fails', async () => {
-    mockedCallCopilot.mockRejectedValue(new Error('API error'));
+    mockedCallAI.mockRejectedValue(new Error('API error'));
 
     const task = makeTask({ title: 'Build API endpoint' });
     const result = await inferSkillsForTask(task, vocab, 'test-model', true);
@@ -293,7 +294,7 @@ describe('inferSkillsForTask', () => {
   });
 
   it('falls back to keyword when AI returns invalid response', async () => {
-    mockedCallCopilot.mockResolvedValue({
+    mockedCallAI.mockResolvedValue({
       choices: [{ message: { content: 'not json' } }],
     });
 
@@ -310,7 +311,7 @@ describe('inferSkillsForTask', () => {
 
     expect(result.method).toBe('keyword');
     expect(result.skills).toContain('backend');
-    expect(mockedCallCopilot).not.toHaveBeenCalled();
+    expect(mockedCallAI).not.toHaveBeenCalled();
   });
 
   it('includes correct taskId in result', async () => {
@@ -333,7 +334,7 @@ describe('inferSkills', () => {
   });
 
   it('infers skills for all tasks and mutates requiredSkills', async () => {
-    mockedResolveGitHubToken.mockResolvedValue(null); // No AI
+    mockedResolveActiveAuth.mockResolvedValue(null); // No AI
     const config = makeConfig();
     const tasks = [
       makeTask({ id: '1', title: 'Build API endpoint' }),
@@ -350,8 +351,8 @@ describe('inferSkills', () => {
   });
 
   it('uses AI when authenticated', async () => {
-    mockedResolveGitHubToken.mockResolvedValue({ token: 'test', source: 'auth.json' });
-    mockedCallCopilot.mockResolvedValue({
+    mockedResolveActiveAuth.mockResolvedValue({ source: 'auth.json' });
+    mockedCallAI.mockResolvedValue({
       choices: [{ message: { content: '{"skills": ["backend"]}' } }],
     });
 
@@ -361,7 +362,7 @@ describe('inferSkills', () => {
     const results = await inferSkills(tasks, config);
 
     expect(results[0].method).toBe('ai');
-    expect(mockedCallCopilot).toHaveBeenCalled();
+    expect(mockedCallAI).toHaveBeenCalled();
   });
 });
 
@@ -369,7 +370,7 @@ describe('inferSkills', () => {
 
 describe('inheritSkills', () => {
   it('copies parent skills to subtasks', async () => {
-    mockedResolveGitHubToken.mockResolvedValue(null);
+    mockedResolveActiveAuth.mockResolvedValue(null);
     const config = makeConfig({ skills: { vocabulary: [], auto_infer: false } });
 
     const parent = makeTask({
@@ -388,7 +389,7 @@ describe('inheritSkills', () => {
   });
 
   it('sets skillsInferred metadata on subtasks', async () => {
-    mockedResolveGitHubToken.mockResolvedValue(null);
+    mockedResolveActiveAuth.mockResolvedValue(null);
     const config = makeConfig({ skills: { vocabulary: [], auto_infer: false } });
 
     const parent = makeTask({ requiredSkills: ['backend'] });
@@ -399,8 +400,8 @@ describe('inheritSkills', () => {
   });
 
   it('adds AI-inferred skills without removing inherited ones', async () => {
-    mockedResolveGitHubToken.mockResolvedValue({ token: 'test', source: 'auth.json' });
-    mockedCallCopilot.mockResolvedValue({
+    mockedResolveActiveAuth.mockResolvedValue({ source: 'auth.json' });
+    mockedCallAI.mockResolvedValue({
       choices: [{ message: { content: '{"skills": ["testing"]}' } }],
     });
 
@@ -417,8 +418,8 @@ describe('inheritSkills', () => {
   });
 
   it('keeps inherited skills on AI failure', async () => {
-    mockedResolveGitHubToken.mockResolvedValue({ token: 'test', source: 'auth.json' });
-    mockedCallCopilot.mockRejectedValue(new Error('API error'));
+    mockedResolveActiveAuth.mockResolvedValue({ source: 'auth.json' });
+    mockedCallAI.mockRejectedValue(new Error('API error'));
 
     const config = makeConfig();
     const parent = makeTask({ requiredSkills: ['backend'] });

@@ -1,19 +1,28 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { bootstrapHome } from './utils/home.js';
+import {
+  CLI_BIN_NAME,
+  CLI_DESCRIPTION,
+  CLI_VERSION,
+  APP_CONFIG_DIR_DISPLAY,
+  APP_REPO_CONFIG_DIR_DISPLAY,
+} from './config/branding.js';
+import { bootstrapHome, bootstrapRepoHome } from './utils/home.js';
 import {
   createProject,
-  listProjects,
+  listAllProjects,
   switchProject,
   removeProject,
-  readProjects,
+  readGlobalProjects,
 } from './utils/projects.js';
 import { resolveProjectOrThrow } from './config/resolver.js';
 import { loadProjectConfig, writeProjectConfig } from './config/loader.js';
 import { readTasks, writeTasks } from './formats/tasks-store.js';
 import { generateTaskFiles } from './formats/task-writer.js';
 import { syncTaskFiles } from './formats/sync.js';
-import { getProjectDir } from './utils/home.js';
+import { detectGitRoot } from './utils/git.js';
+import { ensureGitignoreEntry } from './utils/gitignore.js';
+import type { ProjectLocation } from './utils/location.js';
 import { resolveStates, validateTransition, findTaskById, getDefaultStatus } from './config/state-engine.js';
 import { setProjectPath, renderToTerminal, renderToMarkdown } from './generator/index.js';
 import { aggregateReport, REPORT_TYPE_TO_TEMPLATE } from './reports/index.js';
@@ -33,7 +42,19 @@ import {
 } from './prompts/config-editor.js';
 import { scoreTasks, createScorer } from './scorer/index.js';
 import type { ComplexityReportContext } from './generator/types.js';
-import { login, resolveGitHubToken, readAuthCredentials, deleteAuthCredentials } from './auth/index.js';
+import {
+  login,
+  resolveGitHubToken,
+  readAuthCredentials,
+  deleteAuthCredentials,
+  callAI,
+  resolveActiveAuth,
+  getProvider,
+  readAuthFile,
+  writeAuthFile,
+  AI_PROVIDERS,
+} from './auth/index.js';
+import type { AIProviderName } from './auth/index.js';
 import { expandTask, expandMultiple, getChildType } from './decomposer/index.js';
 import { confirmExpand, confirmBulkOperation, confirmRemove } from './prompts/confirmations.js';
 import { inferSkills, getEffectiveVocabulary } from './skills/index.js';
@@ -47,15 +68,17 @@ import {
 import { executeAdd, type AddCommandOpts } from './commands/add.js';
 import { executeRemove } from './commands/remove.js';
 import { executeSetStatus } from './commands/set-status.js';
+import { executeQAFail, executeQAFailBatch, type QAFailOpts, type QAFailBatchEntry } from './commands/qa-fail.js';
+import { executeQAClear, executeQAClearBatch, type QAClearBatchEntry } from './commands/qa-clear.js';
 import yaml from 'js-yaml';
 import Table from 'cli-table3';
 
 const program = new Command();
 
 program
-  .name('agentx-taskmaster')
-  .description('CLI-based project task generator with complexity scoring and auto-decomposition')
-  .version('0.1.0')
+  .name(CLI_BIN_NAME)
+  .description(CLI_DESCRIPTION)
+  .version(CLI_VERSION)
   .option('--project <name>', 'Target a specific project without switching active');
 
 // --- Placeholder handler ---
@@ -72,16 +95,19 @@ program
   .option('--style <style>', 'Project style (agile-full, story-driven, task-only, flat)')
   .option('--name <name>', 'Project name')
   .option('--model <model>', 'AI model (e.g., gpt-4.1, gpt-4o, claude-sonnet-4.5)')
+  .option('--repo', 'Store project data in the current repository')
   .option('--no-interactive', 'Skip interactive prompts')
-  .action(async (opts: { style?: string; name?: string; model?: string; interactive?: boolean }) => {
+  .action(async (opts: { style?: string; name?: string; model?: string; repo?: boolean; interactive?: boolean }) => {
     try {
       await bootstrapHome();
+      const gitRoot = await detectGitRoot();
 
       // Build flag overrides for --no-interactive
       const flagOverrides: Partial<InitWizardResult> = {};
       if (opts.name) flagOverrides.name = opts.name;
       if (opts.style) flagOverrides.style = opts.style as InitWizardResult['style'];
       if (opts.model) flagOverrides.model = opts.model;
+      if (opts.repo) flagOverrides.location = 'repo';
 
       // --no-interactive: require at least --name, fill rest from defaults
       if (opts.interactive === false) {
@@ -94,28 +120,49 @@ program
         flagOverrides.style = flagOverrides.style ?? 'task-only';
         flagOverrides.statePreset = 'standard';
         flagOverrides.skills = ['backend', 'frontend', 'database', 'devops', 'testing'];
+        flagOverrides.provider = flagOverrides.provider ?? 'copilot' as AIProviderName;
         flagOverrides.model = flagOverrides.model ?? 'gpt-4.1';
         flagOverrides.thresholds = { expand: 5, flag: 8 };
+        flagOverrides.location = flagOverrides.location ?? 'home';
+        flagOverrides.gitignore = flagOverrides.location === 'repo';
       }
 
       const result = await runInitWizard(
         opts.interactive === false
           ? flagOverrides
-          : { name: flagOverrides.name, style: flagOverrides.style, model: flagOverrides.model },
+          : { name: flagOverrides.name, style: flagOverrides.style, model: flagOverrides.model, location: flagOverrides.location },
+        { gitRoot },
       );
+
+      // Handle switch-to-existing
+      if (result.switchTo) {
+        await switchProject(result.switchTo, result.switchToLocation!, gitRoot);
+        console.log(chalk.green(`Switched active project to "${result.switchTo}".`));
+        return;
+      }
 
       // Create project with wizard config
       const projectConfig = {
         style: result.style,
         states: { preset: result.statePreset, enforce_transitions: false },
         skills: { vocabulary: result.skills, auto_infer: true },
-        ai: { model: result.model },
+        ai: { provider: result.provider ?? 'copilot', model: result.model },
         thresholds: result.thresholds,
       };
-      await createProject(result.name, result.description, projectConfig);
+
+      if (result.location === 'repo' && gitRoot) {
+        await bootstrapRepoHome(gitRoot);
+      }
+
+      await createProject(result.name, result.location, gitRoot, result.description, projectConfig);
+
+      if (result.location === 'repo' && result.gitignore && gitRoot) {
+        await ensureGitignoreEntry(gitRoot);
+      }
 
       // Save to defaults.yaml (last-used-wins)
       await writeDefaults({
+        provider: result.provider,
         model: result.model,
         style: result.style,
         statusPreset: result.statePreset,
@@ -123,11 +170,15 @@ program
         thresholds: result.thresholds,
       });
 
-      console.log(chalk.green(`\nProject "${result.name}" created and set as active.`));
+      const locationLabel = result.location === 'repo' ? ' [repo]' : ' [home]';
+      console.log(chalk.green(`\nProject "${result.name}"${locationLabel} created and set as active.`));
       console.log(chalk.dim(`  Style: ${result.style} | Status preset: ${result.statePreset}`));
       console.log(chalk.dim(`  Model: ${result.model}`));
       console.log(chalk.dim(`  Skills: ${result.skills.join(', ')}`));
       console.log(chalk.dim(`  Thresholds: expand=${result.thresholds.expand}, flag=${result.thresholds.flag}`));
+      if (result.location === 'repo' && result.gitignore) {
+        console.log(chalk.dim(`  .agentx/ added to .gitignore`));
+      }
     } catch (err) {
       console.error(chalk.red(`Error: ${(err as Error).message}`));
       process.exitCode = 1;
@@ -146,9 +197,9 @@ program
   .action(async (file: string, opts: { numTasks?: string; style?: string; append?: boolean; force?: boolean; ai?: boolean }) => {
     try {
       await bootstrapHome();
-      const projectName = await resolveProjectOrThrow(program.opts().project);
-      const projectPath = getProjectDir(projectName);
-      const config = await loadProjectConfig(projectName);
+      const gitRoot = await detectGitRoot();
+      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+      const config = await loadProjectConfig(resolved.projectDir);
 
       // Read input file
       const filePath = resolve(file);
@@ -165,7 +216,7 @@ program
       }
 
       // Overwrite protection
-      const existingTasks = await readTasks(projectPath);
+      const existingTasks = await readTasks(resolved.projectDir);
       if (existingTasks.length > 0 && !opts.append && !opts.force) {
         console.error(
           chalk.red(
@@ -192,12 +243,12 @@ program
       // Try AI parsing first (unless --no-ai)
       const useAI = opts.ai !== false;
       if (useAI) {
-        const tokenSource = await resolveGitHubToken();
-        if (tokenSource) {
+        const authResult = await resolveActiveAuth(config.ai.provider);
+        if (authResult) {
           try {
-            console.log(chalk.dim('  Sending document to AI for task breakdown...'));
+            console.log(chalk.dim(`  Sending document to AI (${config.ai.provider}) for task breakdown...`));
             const { parseWithAI } = await import('./parser/ai-parser.js');
-            const aiResult = await parseWithAI(content, config.ai.model, parseOptions);
+            const aiResult = await parseWithAI(content, config.ai.model, parseOptions, config.ai.provider);
             if (aiResult && aiResult.tasks.length > 0) {
               parsedTasks = aiResult.tasks;
               parseMethod = 'ai';
@@ -217,7 +268,7 @@ program
             parseMethod = 'structural';
           }
         } else {
-          console.log(chalk.dim('  No Copilot auth found, using structural parser.'));
+          console.log(chalk.dim(`  No ${config.ai.provider} auth found, using structural parser.`));
           parsedTasks = null!;
           parseMethod = 'structural';
         }
@@ -277,7 +328,7 @@ program
         }
       }
 
-      await writeTasks(projectPath, finalTasks);
+      await writeTasks(resolved.projectDir, finalTasks);
 
       // Count total tasks recursively
       const countAll = (tasks: typeof finalTasks): number =>
@@ -287,7 +338,7 @@ program
       const topLevel = newTasks.length;
       const total = countAll(newTasks);
       console.log(chalk.green(`Parsed ${topLevel} top-level task(s) (${total} total) from ${file}`));
-      console.log(chalk.dim(`  Parse method: ${parseMethod === 'ai' ? 'AI (Copilot)' : 'structural'}`));
+      console.log(chalk.dim(`  Parse method: ${parseMethod === 'ai' ? `AI (${config.ai.provider})` : 'structural'}`));
       if (skillSummary) {
         console.log(chalk.dim(skillSummary));
       }
@@ -317,9 +368,9 @@ program
   .action(async (opts: { status?: string; type?: string; category?: string; skills?: string; compact?: boolean; format?: string }) => {
     try {
       await bootstrapHome();
-      const projectName = await resolveProjectOrThrow(program.opts().project);
-      const projectPath = getProjectDir(projectName);
-      let tasks = await readTasks(projectPath);
+      const gitRoot = await detectGitRoot();
+      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+      let tasks = await readTasks(resolved.projectDir);
 
       if (tasks.length === 0) {
         console.log(chalk.yellow('No tasks found. Run a parse command to generate tasks.'));
@@ -345,7 +396,7 @@ program
         return;
       }
 
-      setProjectPath(projectPath);
+      setProjectPath(resolved.projectDir);
       const context = {
         tasks,
         filters: {
@@ -371,9 +422,9 @@ program
   .action(async (id: string, opts: { withChildren?: boolean; format?: string }) => {
     try {
       await bootstrapHome();
-      const projectName = await resolveProjectOrThrow(program.opts().project);
-      const projectPath = getProjectDir(projectName);
-      const tasks = await readTasks(projectPath);
+      const gitRoot = await detectGitRoot();
+      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+      const tasks = await readTasks(resolved.projectDir);
 
       const task = findTaskById(tasks, id);
       if (!task) {
@@ -387,7 +438,7 @@ program
         return;
       }
 
-      setProjectPath(projectPath);
+      setProjectPath(resolved.projectDir);
       const output = renderToTerminal('task-detail', { task, withChildren: opts.withChildren });
       console.log(output);
     } catch (err) {
@@ -408,10 +459,10 @@ program
   .action(async (opts: { recalculate?: boolean; threshold?: string; all?: boolean; heuristicOnly?: boolean; format?: string }) => {
     try {
       await bootstrapHome();
-      const projectName = await resolveProjectOrThrow(program.opts().project);
-      const projectPath = getProjectDir(projectName);
-      const config = await loadProjectConfig(projectName);
-      const tasks = await readTasks(projectPath);
+      const gitRoot = await detectGitRoot();
+      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+      const config = await loadProjectConfig(resolved.projectDir);
+      const tasks = await readTasks(resolved.projectDir);
 
       if (tasks.length === 0) {
         console.log(chalk.yellow('No tasks found. Run a parse command to generate tasks.'));
@@ -433,12 +484,12 @@ program
       let providerLabel: string;
       let authAvailable = false;
       if (!opts.heuristicOnly) {
-        const tokenSource = await resolveGitHubToken();
-        authAvailable = tokenSource !== null;
+        const authResult = await resolveActiveAuth(config.ai.provider);
+        authAvailable = authResult !== null;
       }
-      const scorer = createScorer(config.ai.model, authAvailable);
+      const scorer = createScorer(config.ai.model, authAvailable, config.ai.provider);
       providerLabel = authAvailable
-        ? `AI (${config.ai.model}) + heuristic blend`
+        ? `AI (${config.ai.provider}/${config.ai.model}) + heuristic blend`
         : 'heuristic (no AI authentication)';
 
       // Score
@@ -457,7 +508,7 @@ program
       }
 
       // Persist
-      await writeTasks(projectPath, tasks);
+      await writeTasks(resolved.projectDir, tasks);
 
       // JSON output
       if (opts.format === 'json') {
@@ -483,7 +534,7 @@ program
         summary: { low, medium, high, average },
       };
 
-      setProjectPath(projectPath);
+      setProjectPath(resolved.projectDir);
       const output = renderToTerminal('complexity-report', context as unknown as Record<string, unknown>);
       console.log(output);
 
@@ -514,10 +565,10 @@ program
   .action(async (id: string, opts: { force?: boolean; maxSubtasks?: string }) => {
     try {
       await bootstrapHome();
-      const projectName = await resolveProjectOrThrow(program.opts().project);
-      const projectPath = getProjectDir(projectName);
-      const config = await loadProjectConfig(projectName);
-      const tasks = await readTasks(projectPath);
+      const gitRoot = await detectGitRoot();
+      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+      const config = await loadProjectConfig(resolved.projectDir);
+      const tasks = await readTasks(resolved.projectDir);
 
       const task = findTaskById(tasks, id);
       if (!task) {
@@ -561,8 +612,8 @@ program
       }
 
       // Resolve auth for AI expansion
-      const tokenSource = await resolveGitHubToken();
-      const authAvailable = tokenSource !== null;
+      const authResult = await resolveActiveAuth(config.ai.provider);
+      const authAvailable = authResult !== null;
 
       // Expand
       const result = await expandTask(task, config.style, {
@@ -571,6 +622,7 @@ program
         statesConfig: config.states,
         model: config.ai.model,
         authAvailable,
+        provider: config.ai.provider,
       });
 
       if ('reason' in result) {
@@ -581,7 +633,7 @@ program
 
       // Apply children to the task
       task.children = result.children;
-      await writeTasks(projectPath, tasks);
+      await writeTasks(resolved.projectDir, tasks);
 
       // Summary
       console.log(
@@ -606,10 +658,10 @@ program
   .action(async (opts: { threshold?: string; dryRun?: boolean; force?: boolean }) => {
     try {
       await bootstrapHome();
-      const projectName = await resolveProjectOrThrow(program.opts().project);
-      const projectPath = getProjectDir(projectName);
-      const config = await loadProjectConfig(projectName);
-      const tasks = await readTasks(projectPath);
+      const gitRoot = await detectGitRoot();
+      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+      const config = await loadProjectConfig(resolved.projectDir);
+      const tasks = await readTasks(resolved.projectDir);
 
       if (tasks.length === 0) {
         console.log(chalk.yellow('No tasks found. Run a parse command first.'));
@@ -662,14 +714,15 @@ program
       }
 
       // Resolve auth
-      const tokenSource = await resolveGitHubToken();
-      const authAvailable = tokenSource !== null;
+      const authResult = await resolveActiveAuth(config.ai.provider);
+      const authAvailable = authResult !== null;
 
       // Batch expand
       const batchResult = await expandMultiple(tasks, config.style, threshold, {
         statesConfig: config.states,
         model: config.ai.model,
         authAvailable,
+        provider: config.ai.provider,
       });
 
       // Apply children to tasks in the array
@@ -680,7 +733,7 @@ program
         }
       }
 
-      await writeTasks(projectPath, tasks);
+      await writeTasks(resolved.projectDir, tasks);
 
       // Summary
       if (batchResult.expanded.length > 0) {
@@ -717,11 +770,11 @@ program
   .action(async (id: string, newStatus: string, opts: { cascade?: boolean; force?: boolean }) => {
     try {
       await bootstrapHome();
-      const projectName = await resolveProjectOrThrow(program.opts().project);
-      const projectPath = getProjectDir(projectName);
-      const config = await loadProjectConfig(projectName);
+      const gitRoot = await detectGitRoot();
+      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+      const config = await loadProjectConfig(resolved.projectDir);
       const states = resolveStates(config.states);
-      const tasks = await readTasks(projectPath);
+      const tasks = await readTasks(resolved.projectDir);
 
       if (opts.force) {
         console.log(chalk.yellow('Warning: Transition rules bypassed with --force.'));
@@ -732,7 +785,7 @@ program
         force: opts.force,
       });
 
-      await writeTasks(projectPath, result.tasks);
+      await writeTasks(resolved.projectDir, result.tasks);
 
       console.log(
         chalk.green(`Updated ${id}: ${chalk.dim(result.oldStatus)} → ${chalk.bold(result.newStatus)}`),
@@ -759,10 +812,10 @@ program
   .action(async (typeArg: string | undefined, opts: { title?: string; type?: string; parent?: string; priority?: string; skills?: string }) => {
     try {
       await bootstrapHome();
-      const projectName = await resolveProjectOrThrow(program.opts().project);
-      const projectPath = getProjectDir(projectName);
-      const config = await loadProjectConfig(projectName);
-      const tasks = await readTasks(projectPath);
+      const gitRoot = await detectGitRoot();
+      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+      const config = await loadProjectConfig(resolved.projectDir);
+      const tasks = await readTasks(resolved.projectDir);
 
       const addOpts: AddCommandOpts = {
         typeArg,
@@ -774,7 +827,7 @@ program
       };
 
       const result = await executeAdd(tasks, config, addOpts);
-      await writeTasks(projectPath, result.tasks);
+      await writeTasks(resolved.projectDir, result.tasks);
 
       console.log(chalk.green(`Created task ${chalk.bold(result.task.id)}: ${result.task.title}`));
       console.log(chalk.dim(`  Type: ${result.task.type} | Priority: ${result.task.priority} | Status: ${result.task.status}`));
@@ -798,11 +851,11 @@ program
   .action(async (id: string, opts: { force?: boolean }) => {
     try {
       await bootstrapHome();
-      const projectName = await resolveProjectOrThrow(program.opts().project);
-      const projectPath = getProjectDir(projectName);
-      const config = await loadProjectConfig(projectName);
+      const gitRoot = await detectGitRoot();
+      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+      const config = await loadProjectConfig(resolved.projectDir);
       const states = resolveStates(config.states);
-      const tasks = await readTasks(projectPath);
+      const tasks = await readTasks(resolved.projectDir);
 
       const task = findTaskById(tasks, id);
       if (!task) {
@@ -820,9 +873,309 @@ program
       }
 
       const result = executeRemove(tasks, id, states);
-      await writeTasks(projectPath, result.tasks);
+      await writeTasks(resolved.projectDir, result.tasks);
 
       console.log(chalk.green(`Removed ${result.removedIds.length} task(s): ${result.removedIds.join(', ')}`));
+    } catch (err) {
+      console.error(chalk.red(`Error: ${(err as Error).message}`));
+      process.exitCode = 1;
+    }
+  });
+
+// --- qa-fail ---
+program
+  .command('qa-fail <id>')
+  .description('Report a QA test failure for a task')
+  .option('--test-type <type>', 'Test type (component|integration|api|e2e|unit|manual|other)')
+  .option('--description <desc>', 'What failed')
+  .option('--cause <cause>', 'Likely root cause')
+  .option('--severity <sev>', 'Severity (critical|major|minor)', 'major')
+  .option('--reporter <name>', 'Who reported', 'qa-agent')
+  .option('--cascade', 'Also set children to qa-failed')
+  .option('--force', 'Bypass transition rules')
+  .option('--no-interactive', 'Skip prompts, require flags')
+  .action(async (id: string, opts: {
+    testType?: string;
+    description?: string;
+    cause?: string;
+    severity?: string;
+    reporter?: string;
+    cascade?: boolean;
+    force?: boolean;
+    interactive?: boolean;
+  }) => {
+    try {
+      await bootstrapHome();
+      const gitRoot = await detectGitRoot();
+      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+      const config = await loadProjectConfig(resolved.projectDir);
+      const states = resolveStates(config.states);
+      const tasks = await readTasks(resolved.projectDir);
+
+      let testType = opts.testType as QAFailOpts['testType'];
+      let description = opts.description ?? '';
+
+      // Interactive prompts if flags not provided
+      if (opts.interactive !== false && (!testType || !description)) {
+        const { select, input } = await import('@inquirer/prompts');
+        if (!testType) {
+          testType = await select({
+            message: 'Test type:',
+            choices: [
+              { name: 'component', value: 'component' },
+              { name: 'integration', value: 'integration' },
+              { name: 'api', value: 'api' },
+              { name: 'e2e', value: 'e2e' },
+              { name: 'unit', value: 'unit' },
+              { name: 'manual', value: 'manual' },
+              { name: 'other', value: 'other' },
+            ],
+          }) as QAFailOpts['testType'];
+        }
+        if (!description) {
+          description = await input({ message: 'What failed:' });
+        }
+      }
+
+      if (!testType) {
+        console.error(chalk.red('Error: --test-type is required when using --no-interactive.'));
+        process.exitCode = 1;
+        return;
+      }
+      if (!description) {
+        console.error(chalk.red('Error: --description is required when using --no-interactive.'));
+        process.exitCode = 1;
+        return;
+      }
+
+      const result = executeQAFail(tasks, id, states, config.states.enforce_transitions, {
+        testType,
+        description,
+        cause: opts.cause,
+        severity: (opts.severity as QAFailOpts['severity']) ?? 'major',
+        reporter: opts.reporter,
+        cascade: opts.cascade,
+        force: opts.force,
+      });
+
+      await writeTasks(resolved.projectDir, result.tasks);
+
+      console.log(
+        chalk.red(`QA Failed ${chalk.bold(id)}: ${chalk.dim(result.oldStatus)} → ${chalk.bold('qa-failed')}`),
+      );
+      console.log(chalk.dim(`  Test type: ${testType} | Severity: ${opts.severity ?? 'major'}`));
+      console.log(chalk.dim(`  Description: ${description}`));
+
+      if (result.taggedDependents.length > 0) {
+        console.log(chalk.yellow(`  Tagged ${result.taggedDependents.length} dependent(s) with qa-review-needed: ${result.taggedDependents.join(', ')}`));
+      }
+      if (result.pulledBackDependents.length > 0) {
+        console.log(chalk.yellow(`  Pulled back ${result.pulledBackDependents.length} dependent(s) from done: ${result.pulledBackDependents.join(', ')}`));
+      }
+    } catch (err) {
+      console.error(chalk.red(`Error: ${(err as Error).message}`));
+      process.exitCode = 1;
+    }
+  });
+
+// --- qa-clear ---
+program
+  .command('qa-clear <id>')
+  .description('Clear qa-review-needed tag after reviewing impact and rerunning tests')
+  .option('--reporter <name>', 'Who verified', 'qa-agent')
+  .option('--note <text>', 'Optional note about what was reviewed/retested')
+  .action(async (id: string, opts: { reporter?: string; note?: string }) => {
+    try {
+      await bootstrapHome();
+      const gitRoot = await detectGitRoot();
+      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+      const config = await loadProjectConfig(resolved.projectDir);
+      const states = resolveStates(config.states);
+      const tasks = await readTasks(resolved.projectDir);
+
+      const result = executeQAClear(tasks, id, states, {
+        reporter: opts.reporter,
+        note: opts.note,
+      });
+
+      await writeTasks(resolved.projectDir, result.tasks);
+
+      if (result.tagRemoved) {
+        console.log(chalk.green(`Cleared qa-review-needed tag from ${chalk.bold(id)}`));
+      } else {
+        console.log(chalk.yellow(`Task ${chalk.bold(id)} did not have qa-review-needed tag (recorded pass entry anyway).`));
+      }
+      if (opts.note) {
+        console.log(chalk.dim(`  Note: ${opts.note}`));
+      }
+    } catch (err) {
+      console.error(chalk.red(`Error: ${(err as Error).message}`));
+      process.exitCode = 1;
+    }
+  });
+
+// --- qa-fail-batch ---
+program
+  .command('qa-fail-batch')
+  .description('Report multiple QA failures atomically (single readiness recompute)')
+  .option('--file <path>', 'Read failures from a JSON file')
+  .option('--json <string>', 'Inline JSON array of failures')
+  .option('--reporter <name>', 'Default reporter for all entries (overridable per-entry)')
+  .option('--cascade', 'Cascade qa-failed to children of each failed task')
+  .option('--force', 'Bypass transition rules')
+  .action(async (opts: {
+    file?: string;
+    json?: string;
+    reporter?: string;
+    cascade?: boolean;
+    force?: boolean;
+  }) => {
+    try {
+      await bootstrapHome();
+      const gitRoot = await detectGitRoot();
+      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+      const config = await loadProjectConfig(resolved.projectDir);
+      const states = resolveStates(config.states);
+      const tasks = await readTasks(resolved.projectDir);
+
+      // Parse input
+      let rawEntries: QAFailBatchEntry[];
+      if (opts.file) {
+        const filePath = resolve(opts.file);
+        if (!existsSync(filePath)) {
+          console.error(chalk.red(`Error: File "${opts.file}" not found.`));
+          process.exitCode = 1;
+          return;
+        }
+        const content = await readFile(filePath, 'utf-8');
+        rawEntries = JSON.parse(content);
+      } else if (opts.json) {
+        rawEntries = JSON.parse(opts.json);
+      } else {
+        console.error(chalk.red('Error: Provide --file <path> or --json <string>.'));
+        process.exitCode = 1;
+        return;
+      }
+
+      if (!Array.isArray(rawEntries) || rawEntries.length === 0) {
+        console.error(chalk.red('Error: Input must be a non-empty JSON array.'));
+        process.exitCode = 1;
+        return;
+      }
+
+      // Apply default reporter
+      if (opts.reporter) {
+        for (const entry of rawEntries) {
+          if (!entry.reporter) {
+            entry.reporter = opts.reporter;
+          }
+        }
+      }
+
+      const result = executeQAFailBatch(tasks, rawEntries, states, config.states.enforce_transitions, {
+        cascade: opts.cascade,
+        force: opts.force,
+      });
+
+      await writeTasks(resolved.projectDir, result.tasks);
+
+      // Output summary
+      if (result.entries.length > 0) {
+        console.log(chalk.red(`QA Failed ${result.summary.failed} task(s) atomically:`));
+        for (const entry of result.entries) {
+          console.log(chalk.dim(`  ${entry.taskId}: ${entry.oldStatus} → qa-failed (${entry.feedbackEntry.severity})`));
+        }
+        if (result.summary.dependentsTagged > 0) {
+          console.log(chalk.yellow(`  Tagged ${result.summary.dependentsTagged} unique dependent(s) with qa-review-needed`));
+        }
+        if (result.summary.dependentsPulledBack > 0) {
+          console.log(chalk.yellow(`  Pulled back ${result.summary.dependentsPulledBack} dependent(s) from done`));
+        }
+        console.log(chalk.dim(`  Severity: ${result.summary.critical} critical, ${result.summary.major} major, ${result.summary.minor} minor`));
+      }
+
+      if (result.errors.length > 0) {
+        console.log(chalk.yellow(`\n${result.errors.length} entry/entries skipped:`));
+        for (const err of result.errors) {
+          console.log(chalk.yellow(`  ${err.taskId}: ${err.error}`));
+        }
+      }
+    } catch (err) {
+      console.error(chalk.red(`Error: ${(err as Error).message}`));
+      process.exitCode = 1;
+    }
+  });
+
+// --- qa-clear-batch ---
+program
+  .command('qa-clear-batch [ids...]')
+  .description('Clear qa-review-needed tags from multiple tasks atomically')
+  .option('--file <path>', 'Read clears from a JSON file (for per-task notes)')
+  .option('--reporter <name>', 'Default reporter for all entries', 'qa-agent')
+  .option('--note <text>', 'Default note for all entries (when using positional IDs)')
+  .action(async (ids: string[], opts: {
+    file?: string;
+    reporter?: string;
+    note?: string;
+  }) => {
+    try {
+      await bootstrapHome();
+      const gitRoot = await detectGitRoot();
+      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+      const config = await loadProjectConfig(resolved.projectDir);
+      const states = resolveStates(config.states);
+      const tasks = await readTasks(resolved.projectDir);
+
+      let clearEntries: QAClearBatchEntry[];
+
+      if (opts.file) {
+        const filePath = resolve(opts.file);
+        if (!existsSync(filePath)) {
+          console.error(chalk.red(`Error: File "${opts.file}" not found.`));
+          process.exitCode = 1;
+          return;
+        }
+        const content = await readFile(filePath, 'utf-8');
+        clearEntries = JSON.parse(content);
+      } else if (ids.length > 0) {
+        // Build entries from positional args
+        clearEntries = ids.map((id) => ({
+          taskId: id,
+          reporter: opts.reporter,
+          note: opts.note,
+        }));
+      } else {
+        console.error(chalk.red('Error: Provide task IDs as arguments or use --file <path>.'));
+        process.exitCode = 1;
+        return;
+      }
+
+      if (!Array.isArray(clearEntries) || clearEntries.length === 0) {
+        console.error(chalk.red('Error: Input must be a non-empty list.'));
+        process.exitCode = 1;
+        return;
+      }
+
+      const result = executeQAClearBatch(tasks, clearEntries, states);
+
+      await writeTasks(resolved.projectDir, result.tasks);
+
+      // Output summary
+      if (result.entries.length > 0) {
+        const cleared = result.entries.filter((e) => e.tagRemoved).length;
+        console.log(chalk.green(`Cleared qa-review-needed from ${cleared} task(s):`));
+        for (const entry of result.entries) {
+          const status = entry.tagRemoved ? chalk.green('cleared') : chalk.dim('(tag not present)');
+          console.log(chalk.dim(`  ${entry.taskId}: ${status}`));
+        }
+      }
+
+      if (result.errors.length > 0) {
+        console.log(chalk.yellow(`\n${result.errors.length} entry/entries skipped:`));
+        for (const err of result.errors) {
+          console.log(chalk.yellow(`  ${err.taskId}: ${err.error}`));
+        }
+      }
     } catch (err) {
       console.error(chalk.red(`Error: ${(err as Error).message}`));
       process.exitCode = 1;
@@ -839,18 +1192,18 @@ program
   .action(async (opts: { type: string; format: string; template?: string }) => {
     try {
       await bootstrapHome();
-      const projectName = await resolveProjectOrThrow(program.opts().project);
-      const projectPath = getProjectDir(projectName);
-      const config = await loadProjectConfig(projectName);
-      const tasks = await readTasks(projectPath);
+      const gitRoot = await detectGitRoot();
+      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+      const config = await loadProjectConfig(resolved.projectDir);
+      const tasks = await readTasks(resolved.projectDir);
       const states = resolveStates(config.states);
 
       // Always recompute readiness for accurate reports
       const results = recomputeAllReadiness(tasks, states);
       applyReadiness(tasks, results);
-      await writeTasks(projectPath, tasks);
+      await writeTasks(resolved.projectDir, tasks);
 
-      setProjectPath(projectPath);
+      setProjectPath(resolved.projectDir);
 
       let context: Record<string, unknown>;
       let templateName: string;
@@ -862,7 +1215,7 @@ program
         templateName = opts.template;
       } else {
         // Built-in report type
-        const validTypes = ['summary', 'complexity', 'progress', 'dependencies'];
+        const validTypes = ['summary', 'complexity', 'progress', 'dependencies', 'qa'];
         if (!validTypes.includes(opts.type)) {
           console.error(chalk.red(`Invalid report type "${opts.type}". Valid types: ${validTypes.join(', ')}`));
           process.exitCode = 1;
@@ -902,16 +1255,16 @@ program
   .action(async () => {
     try {
       await bootstrapHome();
-      const projectName = await resolveProjectOrThrow(program.opts().project);
-      const projectPath = getProjectDir(projectName);
-      const config = await loadProjectConfig(projectName);
-      const tasks = await readTasks(projectPath);
+      const gitRoot = await detectGitRoot();
+      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+      const config = await loadProjectConfig(resolved.projectDir);
+      const tasks = await readTasks(resolved.projectDir);
       const states = resolveStates(config.states);
 
       // Recompute and persist readiness
       const results = recomputeAllReadiness(tasks, states);
       applyReadiness(tasks, results);
-      await writeTasks(projectPath, tasks);
+      await writeTasks(resolved.projectDir, tasks);
 
       const next = findNextTask(tasks, states);
 
@@ -949,16 +1302,16 @@ program
   .action(async (opts: { format: string; skills?: string }) => {
     try {
       await bootstrapHome();
-      const projectName = await resolveProjectOrThrow(program.opts().project);
-      const projectPath = getProjectDir(projectName);
-      const config = await loadProjectConfig(projectName);
-      const tasks = await readTasks(projectPath);
+      const gitRoot = await detectGitRoot();
+      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+      const config = await loadProjectConfig(resolved.projectDir);
+      const tasks = await readTasks(resolved.projectDir);
       const states = resolveStates(config.states);
 
       // Recompute and persist readiness
       const results = recomputeAllReadiness(tasks, states);
       applyReadiness(tasks, results);
-      await writeTasks(projectPath, tasks);
+      await writeTasks(resolved.projectDir, tasks);
 
       const manifest = buildDelegationManifest(tasks, states);
 
@@ -975,7 +1328,19 @@ program
       } else if (opts.format === 'yaml') {
         console.log(yaml.dump(manifest, { lineWidth: -1, noRefs: true }));
       } else {
-        // Table format (default)
+        // Table format (default) — QA failures first for visibility
+        if (manifest.qa_failed_tasks.length > 0) {
+          console.log(chalk.bold.red(`\nQA Failed Tasks (${manifest.qa_failed_tasks.length}):`));
+          const qaTable = new Table({
+            head: ['ID', 'Title', 'Priority', 'Severity', 'Test Type', 'Description'],
+            style: { head: ['red'] },
+          });
+          for (const t of manifest.qa_failed_tasks) {
+            qaTable.push([t.id, t.title, t.priority, t.latest_feedback.severity, t.latest_feedback.test_type, t.latest_feedback.description]);
+          }
+          console.log(qaTable.toString());
+        }
+
         console.log(chalk.bold.green(`\nReady Tasks (${manifest.ready_tasks.length}):`));
         if (manifest.ready_tasks.length > 0) {
           const readyTable = new Table({
@@ -1003,7 +1368,7 @@ program
         }
 
         console.log(chalk.bold(`\nSummary:`));
-        console.log(`  Total: ${manifest.summary.total}  Ready: ${manifest.summary.ready}  Blocked: ${manifest.summary.blocked}  In Progress: ${manifest.summary.in_progress}  Completed: ${manifest.summary.completed}`);
+        console.log(`  Total: ${manifest.summary.total}  Ready: ${manifest.summary.ready}  Blocked: ${manifest.summary.blocked}  In Progress: ${manifest.summary.in_progress}  QA Failed: ${manifest.summary.qa_failed}  Completed: ${manifest.summary.completed}`);
       }
     } catch (err) {
       console.error(chalk.red(`Error: ${(err as Error).message}`));
@@ -1019,10 +1384,10 @@ program
   .action(async (opts: { fix?: boolean }) => {
     try {
       await bootstrapHome();
-      const projectName = await resolveProjectOrThrow(program.opts().project);
-      const projectPath = getProjectDir(projectName);
-      const config = await loadProjectConfig(projectName);
-      const tasks = await readTasks(projectPath);
+      const gitRoot = await detectGitRoot();
+      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+      const config = await loadProjectConfig(resolved.projectDir);
+      const tasks = await readTasks(resolved.projectDir);
       const states = resolveStates(config.states);
       const vocabulary = getEffectiveVocabulary(config.skills.vocabulary);
 
@@ -1033,7 +1398,7 @@ program
         // Recompute readiness after fixes
         const results = recomputeAllReadiness(tasks, states);
         applyReadiness(tasks, results);
-        await writeTasks(projectPath, tasks);
+        await writeTasks(resolved.projectDir, tasks);
 
         console.log(chalk.bold.green(`\nFixes applied (${report.fixes.length}):`));
         for (const fix of report.fixes) {
@@ -1092,16 +1457,16 @@ program
   .action(async () => {
     try {
       await bootstrapHome();
-      const projectName = await resolveProjectOrThrow(program.opts().project);
-      const projectPath = getProjectDir(projectName);
-      const tasks = await readTasks(projectPath);
+      const gitRoot = await detectGitRoot();
+      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+      const tasks = await readTasks(resolved.projectDir);
 
       if (tasks.length === 0) {
         console.log(chalk.yellow('No tasks found in tasks.json.'));
         return;
       }
 
-      const files = await generateTaskFiles(projectPath, tasks);
+      const files = await generateTaskFiles(resolved.projectDir, tasks);
       console.log(chalk.green(`Generated ${files.length} YAML task file(s) in tasks/.`));
     } catch (err) {
       console.error(chalk.red(`Error: ${(err as Error).message}`));
@@ -1118,9 +1483,9 @@ program
   .action(async (opts: { dryRun?: boolean; diff?: boolean }) => {
     try {
       await bootstrapHome();
-      const projectName = await resolveProjectOrThrow(program.opts().project);
-      const projectPath = getProjectDir(projectName);
-      const result = await syncTaskFiles(projectPath, { dryRun: opts.dryRun });
+      const gitRoot = await detectGitRoot();
+      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+      const result = await syncTaskFiles(resolved.projectDir, { dryRun: opts.dryRun });
 
       if (result.changes.length === 0) {
         console.log(chalk.green('Everything is in sync.'));
@@ -1163,8 +1528,9 @@ program
   .action(async (opts: { set?: string; get?: string }) => {
     try {
       await bootstrapHome();
-      const projectName = await resolveProjectOrThrow(program.opts().project);
-      const config = await loadProjectConfig(projectName);
+      const gitRoot = await detectGitRoot();
+      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+      const config = await loadProjectConfig(resolved.projectDir);
 
       // --get key
       if (opts.get) {
@@ -1199,7 +1565,7 @@ program
           return;
         }
         const patch = applyConfigValue(key, value);
-        await writeProjectConfig(projectName, patch);
+        await writeProjectConfig(resolved.projectDir, patch);
         console.log(chalk.green(`Set ${key} = ${value}`));
         return;
       }
@@ -1211,7 +1577,7 @@ program
         return;
       }
       const patch = applyConfigValue(result.key, result.value);
-      await writeProjectConfig(projectName, patch);
+      await writeProjectConfig(resolved.projectDir, patch);
       console.log(chalk.green(`Set ${result.key} = ${result.value}`));
     } catch (err) {
       console.error(chalk.red(`Error: ${(err as Error).message}`));
@@ -1222,28 +1588,60 @@ program
 // --- auth (subcommands) ---
 const auth = program
   .command('auth')
-  .description('Authentication with GitHub Copilot');
+  .description('Authentication with AI providers (Copilot, Anthropic, OpenAI)');
 
 auth
   .command('login')
-  .description('Authenticate with GitHub Copilot via OAuth device flow')
-  .action(async () => {
+  .description('Authenticate with an AI provider')
+  .option('--provider <provider>', 'Provider (copilot, anthropic, openai)')
+  .option('--force', 'Skip cached credentials and force interactive OAuth flow')
+  .action(async (opts: { provider?: string; force?: boolean }) => {
     try {
       await bootstrapHome();
 
-      // Check if already authenticated
-      const existing = await resolveGitHubToken();
-      if (existing) {
-        const creds = await readAuthCredentials();
-        const user = creds?.username ?? 'unknown';
-        console.log(chalk.yellow(`Already authenticated as @${user} (source: ${existing.source}).`));
-        console.log(chalk.dim('Run "agentx-taskmaster auth logout" first to re-authenticate.'));
-        return;
+      let providerName: AIProviderName;
+
+      if (opts.provider) {
+        if (!AI_PROVIDERS.includes(opts.provider as AIProviderName)) {
+          console.error(chalk.red(`Unknown provider "${opts.provider}". Valid: ${AI_PROVIDERS.join(', ')}`));
+          process.exitCode = 1;
+          return;
+        }
+        providerName = opts.provider as AIProviderName;
+      } else {
+        // Interactive provider selection
+        const { select } = await import('@inquirer/prompts');
+        providerName = await select({
+          message: 'Select AI provider:',
+          choices: [
+            { name: 'GitHub Copilot (device flow)', value: 'copilot' as AIProviderName },
+            { name: 'Anthropic Claude (OAuth)', value: 'anthropic' as AIProviderName },
+            { name: 'OpenAI ChatGPT (OAuth)', value: 'openai' as AIProviderName },
+          ],
+        });
       }
 
-      const result = await login();
-      console.log(chalk.green(`\nAuthenticated as @${result.username}`));
-      console.log(chalk.dim('  Token stored in ~/.agentx-userdata/taskmaster/auth.json'));
+      const provider = getProvider(providerName);
+
+      // Check if already authenticated for this provider (unless --force)
+      if (!opts.force) {
+        const existing = await provider.resolveAuth();
+        if (existing && (existing.source.startsWith('auth.json') || existing.source.startsWith('env:'))) {
+          console.log(chalk.yellow(`Already authenticated with ${providerName} (source: ${existing!.source}).`));
+          console.log(chalk.dim(`Run "${CLI_BIN_NAME} auth login --provider ${providerName} --force" to re-authenticate.`));
+          return;
+        }
+      }
+
+      const result = await provider.login({ force: opts.force });
+      console.log(chalk.green(`\nAuthenticated with ${providerName} as ${result.displayName}`));
+      console.log(chalk.dim(`  Credentials stored in ${APP_CONFIG_DIR_DISPLAY}/auth.json`));
+
+      // Set as active provider
+      const authFile = await readAuthFile();
+      authFile.active_provider = providerName;
+      await writeAuthFile(authFile);
+      console.log(chalk.dim(`  Active provider set to: ${providerName}`));
     } catch (err) {
       console.error(chalk.red(`Error: ${(err as Error).message}`));
       process.exitCode = 1;
@@ -1252,43 +1650,46 @@ auth
 
 auth
   .command('status')
-  .description('Show authentication status and token validity')
+  .description('Show authentication status for all providers')
   .option('--verbose', 'Show detailed token info')
   .action(async (opts: { verbose?: boolean }) => {
     try {
       await bootstrapHome();
 
-      const tokenSource = await resolveGitHubToken();
-      if (!tokenSource) {
-        console.log(chalk.yellow('Not authenticated. Run "agentx-taskmaster auth login" to connect.'));
-        return;
+      const authFile = await readAuthFile();
+      console.log(chalk.bold(`Active provider: ${authFile.active_provider}\n`));
+
+      let anyAuth = false;
+      for (const name of AI_PROVIDERS) {
+        const provider = getProvider(name);
+        const authResult = await provider.resolveAuth();
+        const marker = name === authFile.active_provider ? chalk.green(' (active)') : '';
+
+        if (authResult) {
+          anyAuth = true;
+          const displayName = name === 'copilot'
+            ? authFile.copilot?.username ? `@${authFile.copilot.username}` : 'authenticated'
+            : authFile[name]?.display_name ?? 'authenticated';
+          console.log(`  ${chalk.bold(name)}${marker}: ${chalk.green(displayName)} (${authResult.source})`);
+        } else {
+          console.log(`  ${chalk.bold(name)}${marker}: ${chalk.dim('not authenticated')}`);
+        }
       }
 
-      const creds = await readAuthCredentials();
-      const username = creds?.username ?? 'unknown';
-
-      console.log(chalk.green(`Authenticated as @${username}`));
-      console.log(chalk.dim(`  Token source: ${tokenSource.source}`));
+      if (!anyAuth) {
+        console.log(chalk.yellow(`\nNo providers authenticated. Run "${CLI_BIN_NAME} auth login" to connect.`));
+      }
 
       if (opts.verbose) {
-        if (creds?.copilot_token_expires_at) {
-          const expiresAt = new Date(creds.copilot_token_expires_at * 1000);
-          const now = new Date();
-          const isValid = expiresAt > now;
-          console.log(
-            chalk.dim(`  Copilot token expires: ${expiresAt.toISOString()} (${isValid ? chalk.green('valid') : chalk.red('expired')})`),
-          );
-        } else {
-          console.log(chalk.dim('  Copilot token: not cached (will be fetched on next API call)'));
-        }
-
         // Show configured model from active project if available
         try {
-          const projectName = await resolveProjectOrThrow(program.opts().project);
-          const config = await loadProjectConfig(projectName);
+          const gitRoot = await detectGitRoot();
+          const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+          const config = await loadProjectConfig(resolved.projectDir);
+          console.log(chalk.dim(`\n  Configured provider: ${config.ai.provider}`));
           console.log(chalk.dim(`  Configured model: ${config.ai.model}`));
         } catch {
-          console.log(chalk.dim('  Configured model: (no active project)'));
+          console.log(chalk.dim('\n  Configured model: (no active project)'));
         }
       }
     } catch (err) {
@@ -1298,25 +1699,75 @@ auth
   });
 
 auth
-  .command('logout')
-  .description('Revoke stored Copilot credentials')
-  .action(async () => {
+  .command('switch <provider>')
+  .description('Switch active AI provider without re-authenticating')
+  .action(async (providerArg: string) => {
     try {
       await bootstrapHome();
 
-      // Warn if token comes from env var
-      const tokenSource = await resolveGitHubToken();
-      if (tokenSource && tokenSource.source !== 'auth.json') {
-        console.log(
-          chalk.yellow(
-            `Token is provided via environment variable (${tokenSource.source}). ` +
-              'Unset the variable to fully log out.',
-          ),
-        );
+      if (!AI_PROVIDERS.includes(providerArg as AIProviderName)) {
+        console.error(chalk.red(`Unknown provider "${providerArg}". Valid: ${AI_PROVIDERS.join(', ')}`));
+        process.exitCode = 1;
+        return;
       }
 
-      await deleteAuthCredentials();
-      console.log(chalk.green('Logged out. Credentials removed from auth.json.'));
+      const providerName = providerArg as AIProviderName;
+      const provider = getProvider(providerName);
+      const authResult = await provider.resolveAuth();
+
+      if (!authResult) {
+        console.error(
+          chalk.red(
+            `Not authenticated with ${providerName}. Run "${CLI_BIN_NAME} auth login --provider ${providerName}" first.`,
+          ),
+        );
+        process.exitCode = 1;
+        return;
+      }
+
+      const authFile = await readAuthFile();
+      authFile.active_provider = providerName;
+      await writeAuthFile(authFile);
+      console.log(chalk.green(`Switched active provider to ${providerName}.`));
+    } catch (err) {
+      console.error(chalk.red(`Error: ${(err as Error).message}`));
+      process.exitCode = 1;
+    }
+  });
+
+auth
+  .command('logout')
+  .description('Revoke stored credentials for a provider')
+  .option('--provider <provider>', 'Provider to log out (default: active provider)')
+  .action(async (opts: { provider?: string }) => {
+    try {
+      await bootstrapHome();
+
+      const authFile = await readAuthFile();
+      const providerName = (opts.provider ?? authFile.active_provider) as AIProviderName;
+
+      if (!AI_PROVIDERS.includes(providerName)) {
+        console.error(chalk.red(`Unknown provider "${providerName}". Valid: ${AI_PROVIDERS.join(', ')}`));
+        process.exitCode = 1;
+        return;
+      }
+
+      // Warn if Copilot token comes from env var
+      if (providerName === 'copilot') {
+        const tokenSource = await resolveGitHubToken();
+        if (tokenSource && tokenSource.source !== 'auth.json') {
+          console.log(
+            chalk.yellow(
+              `Token is provided via environment variable (${tokenSource.source}). ` +
+                'Unset the variable to fully log out.',
+            ),
+          );
+        }
+      }
+
+      const provider = getProvider(providerName);
+      await provider.logout();
+      console.log(chalk.green(`Logged out from ${providerName}. Credentials removed.`));
     } catch (err) {
       console.error(chalk.red(`Error: ${(err as Error).message}`));
       process.exitCode = 1;
@@ -1330,22 +1781,24 @@ const projects = program
 
 projects
   .command('list')
-  .description('List all projects with active marker')
+  .description('List all projects with active marker and location tags')
   .action(async () => {
     try {
       await bootstrapHome();
-      const registry = await readProjects();
-      const projectList = registry.projects;
+      const gitRoot = await detectGitRoot();
+      const all = await listAllProjects(gitRoot);
 
-      if (projectList.length === 0) {
-        console.log(chalk.yellow('No projects found. Run \'agentx-taskmaster projects create <name>\' to create one.'));
+      if (all.projects.length === 0) {
+        console.log(chalk.yellow(`No projects found. Run '${CLI_BIN_NAME} projects create <name>' to create one.`));
         return;
       }
 
       console.log(chalk.bold('\nProjects:\n'));
-      for (const project of projectList) {
-        const marker = project.name === registry.active ? chalk.green(' (active)') : '';
-        console.log(`  ${chalk.bold(project.name)}${marker}`);
+      for (const project of all.projects) {
+        const isActive = project.name === all.active && project.location === all.activeLocation;
+        const marker = isActive ? chalk.green(' (active)') : '';
+        const locationTag = chalk.dim(` [${project.location}]`);
+        console.log(`  ${chalk.bold(project.name)}${locationTag}${marker}`);
         if (project.description) {
           console.log(`    ${chalk.dim(project.description)}`);
         }
@@ -1363,12 +1816,28 @@ projects
   .description('Create a new project')
   .option('--description <desc>', 'Project description')
   .option('--style <style>', 'Project style')
-  .action(async (name: string, opts: { description?: string; style?: string }) => {
+  .option('--repo', 'Store project data in the current repository')
+  .action(async (name: string, opts: { description?: string; style?: string; repo?: boolean }) => {
     try {
       await bootstrapHome();
-      const entry = await createProject(name, opts.description ?? '');
-      console.log(chalk.green(`\nProject "${entry.name}" created and set as active.`));
-      console.log(chalk.dim(`  Directory: ~/.agentx-userdata/taskmaster/${entry.name}/`));
+      const gitRoot = await detectGitRoot();
+      const location: ProjectLocation = opts.repo ? 'repo' : 'home';
+
+      if (location === 'repo' && !gitRoot) {
+        console.error(chalk.red('Error: --repo requires being inside a git repository.'));
+        process.exitCode = 1;
+        return;
+      }
+
+      if (location === 'repo' && gitRoot) {
+        await bootstrapRepoHome(gitRoot);
+      }
+
+      const entry = await createProject(name, location, gitRoot, opts.description ?? '');
+      const locationTag = location === 'repo' ? ' [repo]' : ' [home]';
+      const displayDir = location === 'repo' ? APP_REPO_CONFIG_DIR_DISPLAY : APP_CONFIG_DIR_DISPLAY;
+      console.log(chalk.green(`\nProject "${entry.name}"${locationTag} created and set as active.`));
+      console.log(chalk.dim(`  Directory: ${displayDir}/${entry.name}/`));
       console.log(chalk.dim(`  Config: config.yaml | Tasks: tasks.json`));
       console.log();
     } catch (err) {
@@ -1379,12 +1848,27 @@ projects
 
 projects
   .command('switch <name>')
-  .description('Set the active project')
+  .description('Set the active project (searches both home and repo)')
   .action(async (name: string) => {
     try {
       await bootstrapHome();
-      await switchProject(name);
-      console.log(chalk.green(`Switched active project to "${name}".`));
+      const gitRoot = await detectGitRoot();
+
+      // Search repo first, then home
+      let found = false;
+      if (gitRoot) {
+        const repo = await import('./utils/projects.js').then((m) => m.readRepoProjects(gitRoot));
+        if (repo.projects.some((p) => p.name === name)) {
+          await switchProject(name, 'repo', gitRoot);
+          console.log(chalk.green(`Switched active project to "${name}" [repo].`));
+          found = true;
+        }
+      }
+
+      if (!found) {
+        await switchProject(name, 'home');
+        console.log(chalk.green(`Switched active project to "${name}" [home].`));
+      }
     } catch (err) {
       console.error(chalk.red(`Error: ${(err as Error).message}`));
       process.exitCode = 1;
@@ -1398,6 +1882,7 @@ projects
   .action(async (name: string, opts: { force?: boolean }) => {
     try {
       await bootstrapHome();
+      const gitRoot = await detectGitRoot();
 
       if (!opts.force) {
         console.log(chalk.yellow(`Warning: This will remove project "${name}" from the registry.`));
@@ -1406,8 +1891,22 @@ projects
         return;
       }
 
-      await removeProject(name);
-      console.log(chalk.green(`Project "${name}" removed from registry.`));
+      // Search repo first, then home
+      let removed = false;
+      if (gitRoot) {
+        const { readRepoProjects } = await import('./utils/projects.js');
+        const repo = await readRepoProjects(gitRoot);
+        if (repo.projects.some((p) => p.name === name)) {
+          await removeProject(name, 'repo', gitRoot);
+          console.log(chalk.green(`Project "${name}" [repo] removed from registry.`));
+          removed = true;
+        }
+      }
+
+      if (!removed) {
+        await removeProject(name, 'home', null);
+        console.log(chalk.green(`Project "${name}" [home] removed from registry.`));
+      }
     } catch (err) {
       console.error(chalk.red(`Error: ${(err as Error).message}`));
       process.exitCode = 1;

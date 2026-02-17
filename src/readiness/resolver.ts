@@ -7,6 +7,7 @@ import type {
   DelegationManifest,
   ReadyTaskEntry,
   BlockedTaskEntry,
+  QAFailedTaskEntry,
   ValidationReport,
 } from './types.js';
 
@@ -109,6 +110,7 @@ export function buildDelegationManifest(
     resultMap.set(r.taskId, r);
   }
 
+  const qaFailedTasks: QAFailedTaskEntry[] = [];
   const readyTasks: ReadyTaskEntry[] = [];
   const blockedTasks: BlockedTaskEntry[] = [];
 
@@ -116,6 +118,7 @@ export function buildDelegationManifest(
   let totalBlocked = 0;
   let totalInProgress = 0;
   let totalCompleted = 0;
+  let totalQAFailed = 0;
 
   for (const task of flat) {
     const result = resultMap.get(task.id);
@@ -125,6 +128,31 @@ export function buildDelegationManifest(
 
     if (isClosed) {
       totalCompleted++;
+      continue;
+    }
+
+    // Collect qa-failed tasks into a dedicated section
+    if (task.status === 'qa-failed') {
+      totalQAFailed++;
+      totalInProgress++;
+      const latestFeedback = task.qaFeedback.length > 0
+        ? task.qaFeedback[task.qaFeedback.length - 1]
+        : undefined;
+      qaFailedTasks.push({
+        id: task.id,
+        title: task.title,
+        priority: task.priority,
+        complexity: task.complexity,
+        required_skills: [...task.requiredSkills],
+        latest_feedback: latestFeedback
+          ? {
+              test_type: latestFeedback.testType,
+              description: latestFeedback.description,
+              severity: latestFeedback.severity,
+              reporter: latestFeedback.reporter,
+            }
+          : { test_type: 'other', description: 'No feedback recorded', severity: 'major', reporter: 'unknown' },
+      });
       continue;
     }
 
@@ -163,6 +191,7 @@ export function buildDelegationManifest(
 
   return {
     generated_at: new Date().toISOString(),
+    qa_failed_tasks: qaFailedTasks,
     ready_tasks: readyTasks,
     blocked_tasks: blockedTasks,
     summary: {
@@ -171,6 +200,7 @@ export function buildDelegationManifest(
       blocked: totalBlocked,
       in_progress: totalInProgress,
       completed: totalCompleted,
+      qa_failed: totalQAFailed,
     },
   };
 }
@@ -193,8 +223,15 @@ export function findNextTask(
     resultMap.set(r.taskId, r);
   }
 
-  // Filter to open-category tasks that are ready or pending
+  // QA-failed priority bonus
+  const QA_FAILED_BONUS = 10;
+
+  // Filter to open-category tasks that are ready or pending,
+  // plus qa-failed tasks (which are active but should surface for next-task)
   const candidates = flat.filter((task) => {
+    // Always include qa-failed tasks (they need immediate attention)
+    if (task.status === 'qa-failed') return true;
+
     const result = resultMap.get(task.id);
     if (!result) return false;
     if (result.readiness !== 'ready' && result.readiness !== 'pending') return false;
@@ -205,10 +242,12 @@ export function findNextTask(
     return null;
   }
 
-  // Sort by priority (descending), then by ID (ascending)
+  // Sort by priority (descending, with qa-failed bonus), then by ID (ascending)
   candidates.sort((a, b) => {
-    const weightA = PRIORITY_WEIGHT[a.priority] ?? 0;
-    const weightB = PRIORITY_WEIGHT[b.priority] ?? 0;
+    const bonusA = a.status === 'qa-failed' ? QA_FAILED_BONUS : 0;
+    const bonusB = b.status === 'qa-failed' ? QA_FAILED_BONUS : 0;
+    const weightA = (PRIORITY_WEIGHT[a.priority] ?? 0) + bonusA;
+    const weightB = (PRIORITY_WEIGHT[b.priority] ?? 0) + bonusB;
     if (weightB !== weightA) {
       return weightB - weightA;
     }

@@ -11,7 +11,7 @@ export const COPILOT_TOKEN_URL = 'https://api.github.com/copilot_internal/v2/tok
 export const COPILOT_CHAT_URL = 'https://api.githubcopilot.com/chat/completions';
 export const COPILOT_MODELS_URL = 'https://api.githubcopilot.com/models';
 
-export const EDITOR_VERSION = 'vscode/1.100.0';
+export const EDITOR_VERSION = 'AgentX-Taskmaster/0.1.0';
 
 /** Proactive refresh threshold in seconds (5 minutes). */
 export const TOKEN_REFRESH_THRESHOLD = 5 * 60;
@@ -26,6 +26,7 @@ export const COPILOT_MODELS = {
 
 // --- Zod schemas ---
 
+/** Legacy flat format (pre-multi-provider). Kept for auto-migration. */
 export const AuthCredentialsSchema = z.object({
   github_token: z.string(),
   copilot_token: z.string().optional(),
@@ -34,6 +35,38 @@ export const AuthCredentialsSchema = z.object({
 });
 
 export type AuthCredentials = z.infer<typeof AuthCredentialsSchema>;
+
+// --- Multi-provider auth file schemas ---
+
+/** Copilot-specific credentials stored under the "copilot" key. */
+export const CopilotCredentialsSchema = z.object({
+  github_token: z.string(),
+  copilot_token: z.string().optional(),
+  copilot_token_expires_at: z.number().optional(),
+  username: z.string().optional(),
+});
+
+export type CopilotCredentials = z.infer<typeof CopilotCredentialsSchema>;
+
+/** OAuth-based credentials for Anthropic / OpenAI. */
+export const OAuthCredentialsSchema = z.object({
+  access_token: z.string(),
+  refresh_token: z.string().optional(),
+  token_expires_at: z.number().optional(),
+  display_name: z.string().optional(),
+});
+
+export type OAuthCredentials = z.infer<typeof OAuthCredentialsSchema>;
+
+/** New multi-provider auth.json structure. */
+export const AuthFileSchema = z.object({
+  active_provider: z.enum(['copilot', 'anthropic', 'openai']).default('copilot'),
+  copilot: CopilotCredentialsSchema.optional(),
+  anthropic: OAuthCredentialsSchema.optional(),
+  openai: OAuthCredentialsSchema.optional(),
+});
+
+export type AuthFile = z.infer<typeof AuthFileSchema>;
 
 // --- Interfaces ---
 

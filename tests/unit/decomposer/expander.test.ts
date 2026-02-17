@@ -11,9 +11,10 @@ import {
 } from '../../../src/decomposer/expander.js';
 import type { StatesConfig } from '../../../src/config/schema.js';
 
-// Mock callCopilot
-vi.mock('../../../src/auth/token-manager.js', () => ({
-  callCopilot: vi.fn(),
+// Mock callAI (replaces callCopilot)
+vi.mock('../../../src/auth/call-ai.js', () => ({
+  callAI: vi.fn(),
+  resolveActiveAuth: vi.fn(),
 }));
 
 // Mock getDefaultStatus
@@ -21,7 +22,7 @@ vi.mock('../../../src/config/state-engine.js', () => ({
   getDefaultStatus: vi.fn(() => 'todo'),
 }));
 
-import { callCopilot } from '../../../src/auth/token-manager.js';
+import { callAI } from '../../../src/auth/call-ai.js';
 
 const defaultStatesConfig: StatesConfig = {
   preset: 'standard',
@@ -464,7 +465,7 @@ describe('expandTask', () => {
         },
       ],
     };
-    vi.mocked(callCopilot).mockResolvedValueOnce(mockResponse);
+    vi.mocked(callAI).mockResolvedValueOnce(mockResponse);
 
     const task = makeTask({
       id: 'T-5',
@@ -480,7 +481,7 @@ describe('expandTask', () => {
       model: 'gpt-4o',
     });
 
-    expect(callCopilot).toHaveBeenCalledOnce();
+    expect(callAI).toHaveBeenCalledOnce();
     expect('children' in result).toBe(true);
     if ('children' in result) {
       expect(result.children).toHaveLength(2);
@@ -490,7 +491,7 @@ describe('expandTask', () => {
   });
 
   it('falls back to heuristic when AI fails', async () => {
-    vi.mocked(callCopilot).mockRejectedValueOnce(new Error('API error'));
+    vi.mocked(callAI).mockRejectedValueOnce(new Error('API error'));
 
     const task = makeTask({
       id: 'T-5',
@@ -516,7 +517,7 @@ describe('expandTask', () => {
     const mockResponse = {
       choices: [{ message: { content: '[]' } }],
     };
-    vi.mocked(callCopilot).mockResolvedValueOnce(mockResponse);
+    vi.mocked(callAI).mockResolvedValueOnce(mockResponse);
 
     const task = makeTask({
       id: 'T-5',

@@ -9,12 +9,12 @@ const TEST_DIR = join(tmpdir(), `agentx-test-defaults-${Date.now()}`);
 
 describe('defaults manager', () => {
   beforeEach(async () => {
-    process.env.AGENTX_USERDATA = TEST_DIR;
+    process.env.AGENTX_HOME = TEST_DIR;
     await bootstrapHome();
   });
 
   afterEach(() => {
-    delete process.env.AGENTX_USERDATA;
+    delete process.env.AGENTX_HOME;
     if (existsSync(TEST_DIR)) {
       rmSync(TEST_DIR, { recursive: true, force: true });
     }

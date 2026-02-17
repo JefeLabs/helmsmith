@@ -1,5 +1,6 @@
 import type { TaskNode } from '../config/schema.js';
 import type { StatesConfig } from '../config/schema.js';
+import type { AIProviderName } from '../auth/provider.js';
 
 /**
  * Options passed to expandTask() and expandMultiple().
@@ -10,6 +11,7 @@ export interface ExpansionOptions {
   dryRun?: boolean;
   model?: string;
   authAvailable?: boolean;
+  provider?: AIProviderName;
   statesConfig: StatesConfig;
 }
 

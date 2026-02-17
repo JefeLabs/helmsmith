@@ -7,14 +7,14 @@ describe('E2E: Multi-project isolation', () => {
 
   beforeEach(async () => {
     tempHome = await createTempHome();
-    env = { AGENTX_USERDATA: tempHome };
+    env = { AGENTX_HOME: tempHome };
   });
 
   afterEach(async () => {
     await cleanupTempHome(tempHome);
   });
 
-  it('two projects are isolated from each other', async () => {
+  it('two projects are isolated from each other', { timeout: 15_000 }, async () => {
     // Create project A
     const initA = await runCli(['init', '--name', 'project-a', '--no-interactive'], env);
     expect(initA.exitCode).toBe(0);

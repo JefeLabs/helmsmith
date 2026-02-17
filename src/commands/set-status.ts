@@ -1,5 +1,5 @@
 import type { TaskNode, StateDefinition } from '../config/schema.js';
-import { findTaskById, validateTransition } from '../config/state-engine.js';
+import { findTaskById, validateTransition, isClosedState } from '../config/state-engine.js';
 import { recomputeAllReadiness, applyReadiness } from '../readiness/index.js';
 
 export interface SetStatusOpts {
@@ -48,6 +48,18 @@ export function executeSetStatus(
 
   const oldStatus = task.status;
   const validNames = states.map((s) => s.name);
+
+  // QA gate: reject closed transitions while qa-review-needed tag is present
+  if (
+    task.tags.includes('qa-review-needed') &&
+    isClosedState(states, newStatus) &&
+    !opts.force
+  ) {
+    throw new Error(
+      `Task "${targetId}" has qa-review-needed tag. ` +
+        `Run 'qa-clear ${targetId}' after reviewing impact and rerunning tests.`,
+    );
+  }
 
   if (opts.force) {
     // --force bypasses transition rules but validates target state exists

@@ -1,6 +1,7 @@
 import type { TaskNode } from '../config/schema.js';
 import type { ChatCompletionMessage } from '../auth/types.js';
-import { callCopilot } from '../auth/token-manager.js';
+import { callAI } from '../auth/call-ai.js';
+import type { AIProviderName } from '../auth/provider.js';
 import { PROJECT_STYLES } from '../config/styles.js';
 import type { ParseOptions } from './types.js';
 
@@ -187,9 +188,10 @@ export async function parseWithAI(
   content: string,
   model: string,
   options: ParseOptions,
+  provider?: AIProviderName,
 ): Promise<{ tasks: TaskNode[]; warning?: string } | null> {
   const messages = buildParsePrompt(content, options);
-  const response = await callCopilot(messages, model);
+  const response = await callAI(messages, model, provider);
   const responseContent = response.choices?.[0]?.message?.content;
 
   if (!responseContent) {

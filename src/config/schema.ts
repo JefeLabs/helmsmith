@@ -21,6 +21,20 @@ export const TaskMetadataSchema = z.object({
 
 export type TaskMetadata = z.infer<typeof TaskMetadataSchema>;
 
+// --- QA feedback entry schema ---
+
+export const QAFeedbackEntrySchema = z.object({
+  testType: z.enum(['component', 'integration', 'api', 'e2e', 'unit', 'manual', 'other']),
+  result: z.enum(['fail', 'pass']),
+  description: z.string(),
+  cause: z.string().default(''),
+  severity: z.enum(['critical', 'major', 'minor']).default('major'),
+  reporter: z.string().default('qa-agent'),
+  timestamp: z.string(),
+});
+
+export type QAFeedbackEntry = z.infer<typeof QAFeedbackEntrySchema>;
+
 // --- TaskNode schema (recursive) ---
 
 export const TaskNodeSchema: z.ZodType<TaskNode> = z.lazy(() =>
@@ -38,6 +52,7 @@ export const TaskNodeSchema: z.ZodType<TaskNode> = z.lazy(() =>
     assignee: z.string().nullable().default(null),
     outputs: z.array(z.string()).default([]),
     tags: z.array(z.string()).default([]),
+    qaFeedback: z.array(QAFeedbackEntrySchema).default([]),
     children: z.array(TaskNodeSchema).default([]),
     metadata: TaskMetadataSchema.default({}),
   }),
@@ -57,6 +72,7 @@ export interface TaskNode {
   assignee: string | null;
   outputs: string[];
   tags: string[];
+  qaFeedback: QAFeedbackEntry[];
   children: TaskNode[];
   metadata: TaskMetadata;
 }
@@ -96,8 +112,11 @@ export type SkillsConfig = z.infer<typeof SkillsConfigSchema>;
 
 // --- AI configuration schema ---
 
+export const AIProviderNameSchema = z.enum(['copilot', 'anthropic', 'openai']);
+
 export const AIConfigSchema = z.object({
-  model: z.string().default('gpt-4o'),
+  provider: AIProviderNameSchema.default('copilot'),
+  model: z.string().default('claude-sonnet-4-20250514'),
 });
 
 export type AIConfig = z.infer<typeof AIConfigSchema>;

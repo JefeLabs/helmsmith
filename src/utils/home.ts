@@ -2,35 +2,55 @@ import { mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-
-const DEFAULT_USERDATA = join(homedir(), '.agentx-userdata');
-const TASKMASTER_DIR = 'taskmaster';
+import {
+  CONFIG_PARENT_DIR,
+  CONFIG_DIR_NAME,
+  ENV_CONFIG_OVERRIDE,
+} from '../config/branding.js';
+import type { ProjectLocation } from './location.js';
+import { getRepoTaskmasterHome } from './git.js';
 
 /**
- * Returns the root agentx-userdata directory.
- * Respects the AGENTX_USERDATA env var override.
+ * Returns the root config directory (e.g. ~/.agentx).
+ * Respects the AGENTX_HOME env var override.
  */
-export function getUserdataRoot(): string {
-  return process.env.AGENTX_USERDATA ?? DEFAULT_USERDATA;
+export function getConfigRoot(): string {
+  return process.env[ENV_CONFIG_OVERRIDE] ?? join(homedir(), CONFIG_PARENT_DIR);
 }
 
 /**
- * Returns the taskmaster home directory path.
- * e.g. ~/.agentx-userdata/taskmaster/
+ * Returns the global (home) tool-specific home directory path.
+ * e.g. ~/.agentx/taskmaster/
  */
 export function getTaskmasterHome(): string {
-  return join(getUserdataRoot(), TASKMASTER_DIR);
+  return join(getConfigRoot(), CONFIG_DIR_NAME);
+}
+
+/**
+ * Returns the taskmaster home for a given location.
+ * - 'home' → ~/.agentx/taskmaster/
+ * - 'repo' → {gitRoot}/.agentx/taskmaster/
+ */
+export function getTaskmasterHomeFor(location: ProjectLocation, gitRoot?: string | null): string {
+  if (location === 'repo') {
+    if (!gitRoot) {
+      throw new Error('gitRoot is required for repo-local projects');
+    }
+    return getRepoTaskmasterHome(gitRoot);
+  }
+  return getTaskmasterHome();
 }
 
 /**
  * Returns the path for a specific project directory.
+ * Location-aware: routes to home or repo-local storage.
  */
-export function getProjectDir(projectName: string): string {
-  return join(getTaskmasterHome(), projectName);
+export function getProjectDir(name: string, location: ProjectLocation = 'home', gitRoot?: string | null): string {
+  return join(getTaskmasterHomeFor(location, gitRoot), name);
 }
 
 /**
- * Returns the path to a specific file within the taskmaster home.
+ * Returns the path to a specific file within the global tool home directory.
  */
 export function getHomePath(filename: string): string {
   return join(getTaskmasterHome(), filename);
@@ -38,7 +58,7 @@ export function getHomePath(filename: string): string {
 
 /**
  * Bootstrap the global home directory structure.
- * Creates ~/.agentx-userdata/taskmaster/ if it doesn't exist.
+ * Creates the tool config directory if it doesn't exist.
  * Returns true if newly created, false if already existed.
  */
 export async function bootstrapHome(): Promise<boolean> {
@@ -47,6 +67,22 @@ export async function bootstrapHome(): Promise<boolean> {
 
   if (!existed) {
     await mkdir(home, { recursive: true });
+  }
+
+  return !existed;
+}
+
+/**
+ * Bootstrap the repo-local home directory.
+ * Creates {gitRoot}/.agentx/taskmaster/ if it doesn't exist.
+ * Returns true if newly created.
+ */
+export async function bootstrapRepoHome(gitRoot: string): Promise<boolean> {
+  const repoHome = getRepoTaskmasterHome(gitRoot);
+  const existed = existsSync(repoHome);
+
+  if (!existed) {
+    await mkdir(repoHome, { recursive: true });
   }
 
   return !existed;
@@ -63,8 +99,8 @@ export function homeExists(): boolean {
  * Scaffold per-project directory structure:
  * <project>/tasks.json, config.yaml, tasks/, templates/, docs/
  */
-export async function scaffoldProjectDir(projectName: string): Promise<void> {
-  const projectDir = getProjectDir(projectName);
+export async function scaffoldProjectDir(name: string, location: ProjectLocation = 'home', gitRoot?: string | null): Promise<void> {
+  const projectDir = getProjectDir(name, location, gitRoot);
 
   await mkdir(projectDir, { recursive: true });
   await mkdir(join(projectDir, 'tasks'), { recursive: true });

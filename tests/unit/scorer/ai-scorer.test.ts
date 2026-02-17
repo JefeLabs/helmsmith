@@ -2,13 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { makeTask } from '../../fixtures/tasks.js';
 import { AIScorer, buildScoringPrompt, parseAIResponse } from '../../../src/scorer/ai-scorer.js';
 
-// Mock callCopilot
-vi.mock('../../../src/auth/token-manager.js', () => ({
-  callCopilot: vi.fn(),
+// Mock callAI (replaces callCopilot)
+vi.mock('../../../src/auth/call-ai.js', () => ({
+  callAI: vi.fn(),
 }));
 
-const { callCopilot } = await import('../../../src/auth/token-manager.js');
-const mockedCallCopilot = vi.mocked(callCopilot);
+const { callAI } = await import('../../../src/auth/call-ai.js');
+const mockedCallAI = vi.mocked(callAI);
 
 describe('buildScoringPrompt', () => {
   it('includes task title and description', () => {
@@ -99,7 +99,7 @@ describe('AIScorer', () => {
   });
 
   it('blends AI and heuristic scores (70/30)', async () => {
-    mockedCallCopilot.mockResolvedValueOnce({
+    mockedCallAI.mockResolvedValueOnce({
       choices: [{ message: { content: '{"score": 8, "label": "high", "reasoning": "complex"}' } }],
     });
 
@@ -124,7 +124,7 @@ describe('AIScorer', () => {
   });
 
   it('clamps blended score to 1-10', async () => {
-    mockedCallCopilot.mockResolvedValueOnce({
+    mockedCallAI.mockResolvedValueOnce({
       choices: [{ message: { content: '{"score": 10, "label": "high", "reasoning": "extreme"}' } }],
     });
 
@@ -137,7 +137,7 @@ describe('AIScorer', () => {
   });
 
   it('assigns correct label from blended score', async () => {
-    mockedCallCopilot.mockResolvedValueOnce({
+    mockedCallAI.mockResolvedValueOnce({
       choices: [{ message: { content: '{"score": 2, "label": "low", "reasoning": "simple"}' } }],
     });
 
@@ -151,7 +151,7 @@ describe('AIScorer', () => {
   });
 
   it('falls back to heuristic on API error', async () => {
-    mockedCallCopilot.mockRejectedValueOnce(new Error('Network failure'));
+    mockedCallAI.mockRejectedValueOnce(new Error('Network failure'));
 
     const task = makeTask({
       id: 'T-1',
@@ -169,7 +169,7 @@ describe('AIScorer', () => {
   });
 
   it('falls back to heuristic on malformed AI response', async () => {
-    mockedCallCopilot.mockResolvedValueOnce({
+    mockedCallAI.mockResolvedValueOnce({
       choices: [{ message: { content: 'This is not JSON' } }],
     });
 
@@ -183,7 +183,7 @@ describe('AIScorer', () => {
   });
 
   it('falls back to heuristic when response has no choices', async () => {
-    mockedCallCopilot.mockResolvedValueOnce({ choices: [] });
+    mockedCallAI.mockResolvedValueOnce({ choices: [] });
 
     const task = makeTask({ id: 'T-1', title: 'Test task', description: 'Some task' });
     const scorer = new AIScorer('gpt-4o');
@@ -203,7 +203,7 @@ describe('AIScorer', () => {
       crossCutting: 0,
     });
 
-    mockedCallCopilot.mockResolvedValueOnce({
+    mockedCallAI.mockResolvedValueOnce({
       choices: [{ message: { content: '{"score": 5, "label": "medium", "reasoning": "ok"}' } }],
     });
 

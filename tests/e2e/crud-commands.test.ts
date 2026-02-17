@@ -7,7 +7,7 @@ describe('E2E: CRUD commands', () => {
 
   beforeEach(async () => {
     tempHome = await createTempHome();
-    env = { AGENTX_USERDATA: tempHome };
+    env = { AGENTX_HOME: tempHome };
     // Init a project for all CRUD tests
     await runCli(['init', '--name', 'crud-project', '--no-interactive'], env);
   });
@@ -16,7 +16,7 @@ describe('E2E: CRUD commands', () => {
     await cleanupTempHome(tempHome);
   });
 
-  it('add -> show -> list -> remove lifecycle', async () => {
+  it('add -> show -> list -> remove lifecycle', { timeout: 15_000 }, async () => {
     // Add a task
     const add = await runCli(['add', '--title', 'Integration test task', '--priority', 'high'], env);
     expect(add.exitCode).toBe(0);

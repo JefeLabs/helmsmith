@@ -42,7 +42,7 @@ export async function runCli(
 }
 
 /**
- * Create a temp directory for AGENTX_USERDATA isolation.
+ * Create a temp directory for AGENTX_HOME isolation.
  */
 export async function createTempHome(): Promise<string> {
   return mkdtemp(join(tmpdir(), 'agentx-e2e-'));

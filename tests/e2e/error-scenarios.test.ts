@@ -7,7 +7,7 @@ describe('E2E: Error scenarios', () => {
 
   beforeEach(async () => {
     tempHome = await createTempHome();
-    env = { AGENTX_USERDATA: tempHome };
+    env = { AGENTX_HOME: tempHome };
   });
 
   afterEach(async () => {

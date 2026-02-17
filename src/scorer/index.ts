@@ -22,14 +22,15 @@ export {
 import { HeuristicScorer } from './heuristic.js';
 import { AIScorer } from './ai-scorer.js';
 import type { ScoringProvider } from './types.js';
+import type { AIProviderName } from '../auth/provider.js';
 
 /**
  * Factory function to create the appropriate scorer.
  * Returns AIScorer when authenticated, HeuristicScorer otherwise.
  */
-export function createScorer(model: string, authAvailable: boolean): ScoringProvider {
+export function createScorer(model: string, authAvailable: boolean, provider?: AIProviderName): ScoringProvider {
   if (authAvailable) {
-    return new AIScorer(model);
+    return new AIScorer(model, undefined, provider);
   }
   return new HeuristicScorer();
 }

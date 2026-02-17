@@ -15,6 +15,22 @@ vi.mock('../../../src/utils/defaults.js', () => ({
   readDefaults: vi.fn().mockResolvedValue({}),
 }));
 
+// Mock auth modules (wizard calls resolveActiveAuth and getProvider)
+vi.mock('../../../src/auth/call-ai.js', () => ({
+  resolveActiveAuth: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock('../../../src/auth/provider-registry.js', () => ({
+  getProvider: vi.fn().mockReturnValue({
+    listModels: vi.fn().mockResolvedValue(null),
+  }),
+}));
+
+// Mock projects listing (wizard calls listAllProjects in Step 0)
+vi.mock('../../../src/utils/projects.js', () => ({
+  listAllProjects: vi.fn().mockResolvedValue({ active: null, activeLocation: null, projects: [] }),
+}));
+
 import {
   input,
   select,
@@ -44,7 +60,11 @@ describe('init-wizard', () => {
       style: 'task-only',
       statePreset: 'standard',
       skills: ['backend', 'frontend'],
+      provider: 'copilot',
+      model: 'gpt-4.1',
       thresholds: { expand: 5, flag: 8 },
+      location: 'home',
+      gitignore: false,
     };
 
     const result = await runInitWizard(opts);
@@ -57,7 +77,7 @@ describe('init-wizard', () => {
     expect(mockNumber).not.toHaveBeenCalled();
   });
 
-  it('prompts for all fields when no opts provided', async () => {
+  it('prompts for all fields when no opts provided (no git context)', async () => {
     // Step 1: name
     mockInput.mockResolvedValueOnce('my-project');
     // Step 2: description
@@ -70,12 +90,16 @@ describe('init-wizard', () => {
     mockCheckbox.mockResolvedValueOnce(['backend']);
     // Step 5b: add custom skills?
     mockConfirm.mockResolvedValueOnce(false);
-    // Step 6: expand threshold
+    // Step 6: provider
+    mockSelect.mockResolvedValueOnce('copilot');
+    // Step 7: model (fallback list since no auth)
+    mockSelect.mockResolvedValueOnce('gpt-4.1');
+    // Step 8: expand threshold
     mockNumber.mockResolvedValueOnce(5);
-    // Step 6b: flag threshold
+    // Step 8b: flag threshold
     mockNumber.mockResolvedValueOnce(8);
 
-    const result = await runInitWizard();
+    const result = await runInitWizard(undefined, { gitRoot: null });
 
     expect(result).toEqual({
       name: 'my-project',
@@ -83,8 +107,43 @@ describe('init-wizard', () => {
       style: 'task-only',
       statePreset: 'standard',
       skills: ['backend'],
+      provider: 'copilot',
+      model: 'gpt-4.1',
       thresholds: { expand: 5, flag: 8 },
+      location: 'home',
+      gitignore: false,
     });
+  });
+
+  it('prompts for storage location when git root is present', async () => {
+    // Step 1: name
+    mockInput.mockResolvedValueOnce('my-project');
+    // Step 1b: storage location (git root present)
+    mockSelect.mockResolvedValueOnce('repo');
+    // Step 1c: gitignore (repo selected)
+    mockSelect.mockResolvedValueOnce('yes');
+    // Step 2: description
+    mockInput.mockResolvedValueOnce('A test project');
+    // Step 3: style
+    mockSelect.mockResolvedValueOnce('task-only');
+    // Step 4: state preset
+    mockSelect.mockResolvedValueOnce('standard');
+    // Step 5: skills
+    mockCheckbox.mockResolvedValueOnce(['backend']);
+    // Step 5b: add custom skills?
+    mockConfirm.mockResolvedValueOnce(false);
+    // Step 6: provider
+    mockSelect.mockResolvedValueOnce('copilot');
+    // Step 7: model
+    mockSelect.mockResolvedValueOnce('gpt-4.1');
+    // Step 8: thresholds
+    mockNumber.mockResolvedValueOnce(5);
+    mockNumber.mockResolvedValueOnce(8);
+
+    const result = await runInitWizard(undefined, { gitRoot: '/tmp/my-repo' });
+
+    expect(result.location).toBe('repo');
+    expect(result.gitignore).toBe(true);
   });
 
   it('uses opt values for provided fields only', async () => {
@@ -93,20 +152,29 @@ describe('init-wizard', () => {
     mockSelect.mockResolvedValueOnce('kanban');
     mockCheckbox.mockResolvedValueOnce(['frontend', 'database']);
     mockConfirm.mockResolvedValueOnce(false);
+    // provider
+    mockSelect.mockResolvedValueOnce('anthropic');
+    // model (fallback list)
+    mockSelect.mockResolvedValueOnce('gpt-4o');
     mockNumber.mockResolvedValueOnce(4);
     mockNumber.mockResolvedValueOnce(9);
 
     const result = await runInitWizard({
       name: 'preset-project',
       style: 'agile-full',
+      location: 'home',
+      gitignore: false,
     });
 
     expect(result.name).toBe('preset-project');
     expect(result.style).toBe('agile-full');
+    expect(result.location).toBe('home');
+    expect(result.gitignore).toBe(false);
     // These were prompted for:
     expect(result.description).toBe('Some description');
     expect(result.statePreset).toBe('kanban');
     expect(result.skills).toEqual(['frontend', 'database']);
+    expect(result.provider).toBe('anthropic');
     expect(result.thresholds).toEqual({ expand: 4, flag: 9 });
   });
 
@@ -120,10 +188,17 @@ describe('init-wizard', () => {
     mockConfirm.mockResolvedValueOnce(true);
     // Custom skills input
     mockInput.mockResolvedValueOnce('graphql, security');
+    // provider
+    mockSelect.mockResolvedValueOnce('copilot');
+    // model
+    mockSelect.mockResolvedValueOnce('gpt-4.1');
     mockNumber.mockResolvedValueOnce(5);
     mockNumber.mockResolvedValueOnce(8);
 
-    const result = await runInitWizard();
+    const result = await runInitWizard(
+      { location: 'home', gitignore: false },
+      { gitRoot: null },
+    );
 
     expect(result.skills).toEqual(['backend', 'graphql', 'security']);
   });
@@ -137,10 +212,17 @@ describe('init-wizard', () => {
     mockConfirm.mockResolvedValueOnce(true);
     // Custom includes "backend" which is already selected
     mockInput.mockResolvedValueOnce('backend, graphql');
+    // provider
+    mockSelect.mockResolvedValueOnce('copilot');
+    // model
+    mockSelect.mockResolvedValueOnce('gpt-4.1');
     mockNumber.mockResolvedValueOnce(5);
     mockNumber.mockResolvedValueOnce(8);
 
-    const result = await runInitWizard();
+    const result = await runInitWizard(
+      { location: 'home', gitignore: false },
+      { gitRoot: null },
+    );
 
     // Should deduplicate
     expect(result.skills).toEqual(['backend', 'frontend', 'graphql']);
@@ -153,10 +235,45 @@ describe('init-wizard', () => {
       style: 'flat',
       statePreset: 'simple',
       skills: [],
+      provider: 'copilot',
+      model: 'gpt-4.1',
       thresholds: { expand: 5, flag: 8 },
+      location: 'home',
+      gitignore: false,
     });
 
     expect(result.name).toBe('my-project');
     expect(result.description).toBe('some desc');
+  });
+
+  it('returns switchTo result when existing project is selected', async () => {
+    // Mock listAllProjects to return existing projects
+    const { listAllProjects } = await import('../../../src/utils/projects.js');
+    vi.mocked(listAllProjects).mockResolvedValueOnce({
+      active: 'existing-project',
+      activeLocation: 'home',
+      projects: [
+        { name: 'existing-project', location: 'home', created: '2026-01-01', description: 'Existing' },
+      ],
+    });
+
+    // User selects the existing project
+    mockSelect.mockResolvedValueOnce('home:existing-project');
+
+    const result = await runInitWizard(undefined, { gitRoot: null });
+
+    expect(result.switchTo).toBe('existing-project');
+    expect(result.switchToLocation).toBe('home');
+  });
+
+  it('handles switchTo from opts', async () => {
+    const result = await runInitWizard({
+      switchTo: 'some-project',
+      switchToLocation: 'repo',
+    });
+
+    expect(result.switchTo).toBe('some-project');
+    expect(result.switchToLocation).toBe('repo');
+    expect(result.location).toBe('repo');
   });
 });

@@ -17,6 +17,7 @@ function makeTask(overrides: Partial<TaskNode> & { id: string; title: string; ty
     assignee: null,
     outputs: [],
     tags: [],
+    qaFeedback: [],
     children: [],
     metadata: {
       source: '',

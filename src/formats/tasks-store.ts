@@ -3,8 +3,6 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import lockfile from 'proper-lockfile';
 import { TasksFileSchema, type TaskNode } from '../config/schema.js';
-import { getProjectDir } from '../utils/home.js';
-
 const TASKS_FILENAME = 'tasks.json';
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 200;
@@ -76,20 +74,6 @@ export async function writeTasks(projectPath: string, tasks: TaskNode[]): Promis
   throw new Error(
     `Failed to write tasks.json after ${MAX_RETRIES} attempts: ${lastError?.message}`,
   );
-}
-
-/**
- * Convenience: read tasks by project name (resolves the project directory).
- */
-export async function readTasksByName(projectName: string): Promise<TaskNode[]> {
-  return readTasks(getProjectDir(projectName));
-}
-
-/**
- * Convenience: write tasks by project name.
- */
-export async function writeTasksByName(projectName: string, tasks: TaskNode[]): Promise<void> {
-  return writeTasks(getProjectDir(projectName), tasks);
 }
 
 function sleep(ms: number): Promise<void> {

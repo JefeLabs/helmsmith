@@ -1,3 +1,4 @@
+// --- Legacy exports (kept for backward compatibility) ---
 export { login, requestDeviceCode, pollForToken } from './device-flow.js';
 
 export {
@@ -8,10 +9,23 @@ export {
   getCopilotToken,
   callCopilot,
   fetchCopilotModels,
+  readAuthFile,
+  writeAuthFile,
 } from './token-manager.js';
 
+// --- Multi-provider exports ---
+export { callAI, resolveActiveAuth } from './call-ai.js';
+export { getProvider, clearProviders } from './provider-registry.js';
+
+export type { AIProvider, AIProviderName, AIModelEntry } from './provider.js';
+export { AI_PROVIDERS, AIProviderNameSchema } from './provider.js';
+
+// --- Types ---
 export type {
   AuthCredentials,
+  AuthFile,
+  CopilotCredentials,
+  OAuthCredentials,
   DeviceCodeResponse,
   CopilotTokenResponse,
   ChatCompletionMessage,
@@ -22,6 +36,9 @@ export type {
 
 export {
   AuthCredentialsSchema,
+  AuthFileSchema,
+  CopilotCredentialsSchema,
+  OAuthCredentialsSchema,
   COPILOT_CLIENT_ID,
   COPILOT_MODELS,
   EDITOR_VERSION,

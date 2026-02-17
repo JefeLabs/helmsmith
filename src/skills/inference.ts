@@ -1,8 +1,7 @@
 import type { TaskNode } from '../config/schema.js';
 import type { ProjectConfig } from '../config/schema.js';
 import type { ChatCompletionMessage } from '../auth/types.js';
-import { callCopilot } from '../auth/token-manager.js';
-import { resolveGitHubToken } from '../auth/token-manager.js';
+import { callAI, resolveActiveAuth } from '../auth/call-ai.js';
 import { BUILT_IN_SKILLS, type SkillInferenceResult } from './types.js';
 
 // --- Keyword-to-skill mapping ---
@@ -148,7 +147,7 @@ export async function inferSkillsForTask(
   if (aiAvailable) {
     try {
       const messages = buildSkillInferencePrompt(task, vocabulary);
-      const response = await callCopilot(messages, model);
+      const response = await callAI(messages, model);
       const content = response.choices?.[0]?.message?.content;
 
       if (content) {
@@ -162,7 +161,7 @@ export async function inferSkillsForTask(
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      fallbackReason = `Copilot API error for task ${task.id}: ${message}`;
+      fallbackReason = `AI API error for task ${task.id}: ${message}`;
     }
   }
 
@@ -188,8 +187,8 @@ export async function inferSkills(
   const model = config.ai.model;
 
   // Check AI availability
-  const tokenSource = await resolveGitHubToken();
-  const aiAvailable = tokenSource !== null;
+  const authResult = await resolveActiveAuth();
+  const aiAvailable = authResult !== null;
 
   const results: SkillInferenceResult[] = [];
 
@@ -221,8 +220,8 @@ export async function inheritSkills(
   // Check AI availability
   let aiAvailable = false;
   if (config.skills.auto_infer) {
-    const tokenSource = await resolveGitHubToken();
-    aiAvailable = tokenSource !== null;
+    const authResult = await resolveActiveAuth();
+    aiAvailable = authResult !== null;
   }
 
   for (const subtask of subtasks) {

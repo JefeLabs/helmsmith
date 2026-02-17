@@ -1,5 +1,5 @@
 /** Built-in report types. */
-export type ReportType = 'summary' | 'complexity' | 'progress' | 'dependencies';
+export type ReportType = 'summary' | 'complexity' | 'progress' | 'dependencies' | 'qa';
 
 /** Output format for reports. */
 export type ReportFormat = 'json' | 'yaml' | 'md' | 'table';
@@ -8,6 +8,30 @@ export type ReportFormat = 'json' | 'yaml' | 'md' | 'table';
 export interface SkillCoverage {
   skill: string;
   count: number;
+}
+
+/** A QA failure entry for the QA report. */
+export interface QAReportFailure {
+  id: string;
+  title: string;
+  severity: string;
+  testType: string;
+  description: string;
+  cause: string;
+  reporter: string;
+  timestamp: string;
+}
+
+/** Context for the QA report template. */
+export interface QAReportContext {
+  generatedAt: string;
+  failures: QAReportFailure[];
+  reviewNeeded: Array<{ id: string; title: string }>;
+  stats: {
+    totalFailures: number;
+    bySeverity: { critical: number; major: number; minor: number };
+    byTestType: Array<{ testType: string; count: number }>;
+  };
 }
 
 /** Context for the summary report template (project health dashboard). */

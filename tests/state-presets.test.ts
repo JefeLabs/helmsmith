@@ -8,15 +8,29 @@ import {
 } from '../src/config/state-presets.js';
 
 describe('SIMPLE_PRESET', () => {
-  it('has exactly 3 states: todo, in-progress, done', () => {
+  it('has exactly 4 states: todo, in-progress, qa-failed, done', () => {
     const names = SIMPLE_PRESET.map((s) => s.name);
-    expect(names).toEqual(['todo', 'in-progress', 'done']);
+    expect(names).toEqual(['todo', 'in-progress', 'qa-failed', 'done']);
   });
 
   it('has correct categories', () => {
-    expect(SIMPLE_PRESET[0].category).toBe('open');
-    expect(SIMPLE_PRESET[1].category).toBe('active');
-    expect(SIMPLE_PRESET[2].category).toBe('closed');
+    const categories = Object.fromEntries(SIMPLE_PRESET.map((s) => [s.name, s.category]));
+    expect(categories).toEqual({
+      todo: 'open',
+      'in-progress': 'active',
+      'qa-failed': 'active',
+      done: 'closed',
+    });
+  });
+
+  it('qa-failed transitions to in-progress', () => {
+    const qaFailed = SIMPLE_PRESET.find((s) => s.name === 'qa-failed');
+    expect(qaFailed?.transitions).toEqual(['in-progress']);
+  });
+
+  it('done transitions include qa-failed', () => {
+    const done = SIMPLE_PRESET.find((s) => s.name === 'done');
+    expect(done?.transitions).toContain('qa-failed');
   });
 
   it('is frozen', () => {
@@ -25,9 +39,9 @@ describe('SIMPLE_PRESET', () => {
 });
 
 describe('STANDARD_PRESET', () => {
-  it('has 6 states: backlog, todo, in-progress, review, blocked, done', () => {
+  it('has 7 states: backlog, todo, in-progress, review, blocked, qa-failed, done', () => {
     const names = STANDARD_PRESET.map((s) => s.name);
-    expect(names).toEqual(['backlog', 'todo', 'in-progress', 'review', 'blocked', 'done']);
+    expect(names).toEqual(['backlog', 'todo', 'in-progress', 'review', 'blocked', 'qa-failed', 'done']);
   });
 
   it('has correct categories', () => {
@@ -38,8 +52,21 @@ describe('STANDARD_PRESET', () => {
       'in-progress': 'active',
       review: 'active',
       blocked: 'active',
+      'qa-failed': 'active',
       done: 'closed',
     });
+  });
+
+  it('qa-failed transitions to in-progress and todo', () => {
+    const qaFailed = STANDARD_PRESET.find((s) => s.name === 'qa-failed');
+    expect(qaFailed?.transitions).toEqual(['in-progress', 'todo']);
+  });
+
+  it('review and done can transition to qa-failed', () => {
+    const review = STANDARD_PRESET.find((s) => s.name === 'review');
+    expect(review?.transitions).toContain('qa-failed');
+    const done = STANDARD_PRESET.find((s) => s.name === 'done');
+    expect(done?.transitions).toContain('qa-failed');
   });
 
   it('all transitions reference valid states within the preset', () => {
@@ -59,7 +86,7 @@ describe('STANDARD_PRESET', () => {
 });
 
 describe('KANBAN_PRESET', () => {
-  it('has 8 states', () => {
+  it('has 9 states', () => {
     const names = KANBAN_PRESET.map((s) => s.name);
     expect(names).toEqual([
       'backlog',
@@ -69,6 +96,7 @@ describe('KANBAN_PRESET', () => {
       'testing',
       'blocked',
       'on-hold',
+      'qa-failed',
       'done',
     ]);
   });
@@ -83,8 +111,21 @@ describe('KANBAN_PRESET', () => {
       testing: 'active',
       blocked: 'active',
       'on-hold': 'active',
+      'qa-failed': 'active',
       done: 'closed',
     });
+  });
+
+  it('qa-failed transitions to in-progress and ready', () => {
+    const qaFailed = KANBAN_PRESET.find((s) => s.name === 'qa-failed');
+    expect(qaFailed?.transitions).toEqual(['in-progress', 'ready']);
+  });
+
+  it('testing and done can transition to qa-failed', () => {
+    const testing = KANBAN_PRESET.find((s) => s.name === 'testing');
+    expect(testing?.transitions).toContain('qa-failed');
+    const done = KANBAN_PRESET.find((s) => s.name === 'done');
+    expect(done?.transitions).toContain('qa-failed');
   });
 
   it('all transitions reference valid states within the preset', () => {
