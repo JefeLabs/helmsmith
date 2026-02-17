@@ -14,6 +14,7 @@ import type { ProjectLocation, ResolvedProject } from '../utils/location.js';
 import type { TaggedProjectEntry } from '../utils/projects.js';
 import { listAllProjects } from '../utils/projects.js';
 import { formatProjectRef } from '../utils/location.js';
+import { INSTRUCTION_FILES, AI_TOOLING_CHOICES, type AITooling } from '../context/index.js';
 
 const DEFAULT_SKILLS = [
   'backend',
@@ -94,6 +95,10 @@ export interface InitWizardResult {
   gitignore: boolean;
   switchTo?: string;
   switchToLocation?: ProjectLocation;
+  /** AI coding tool to install agent instructions for. */
+  aiTooling?: AITooling;
+  /** Which agent instruction roles to install (e.g., ['team-lead', 'developer']). */
+  instructionIds?: string[];
 }
 
 export interface InitWizardContext {
@@ -337,6 +342,44 @@ export async function runInitWizard(
       { min: 1, max: 10, defaultValue: 8 },
     ));
 
+  // Step 9: Agent instructions installation
+  let aiTooling: AITooling | undefined;
+  let instructionIds: string[] | undefined;
+
+  if (opts?.aiTooling !== undefined) {
+    aiTooling = opts.aiTooling;
+    instructionIds = opts.instructionIds;
+  } else {
+    const installInstructions = await confirmPrompt(
+      'Install agent instruction files for your AI coding tool?',
+      true,
+    );
+
+    if (installInstructions) {
+      const toolingChoices = AI_TOOLING_CHOICES.map((t) => ({
+        name: `${t.label} — ${t.description}`,
+        value: t.value,
+      }));
+      aiTooling = await listWithDefault('aiTooling', 'Which AI coding tool?', toolingChoices);
+
+      const roleChoices = INSTRUCTION_FILES.map((f) => ({
+        name: `${f.label} — ${f.description}`,
+        value: f.id,
+      }));
+      instructionIds = await checkboxWithDefaults(
+        'instructionIds',
+        'Which agent roles to install?',
+        roleChoices,
+      );
+
+      // If user deselected everything, skip installation
+      if (instructionIds.length === 0) {
+        aiTooling = undefined;
+        instructionIds = undefined;
+      }
+    }
+  }
+
   return {
     name: name.trim(),
     description: description.trim(),
@@ -348,5 +391,7 @@ export async function runInitWizard(
     thresholds: { expand: expandThreshold, flag: flagThreshold },
     location,
     gitignore,
+    aiTooling,
+    instructionIds,
   };
 }

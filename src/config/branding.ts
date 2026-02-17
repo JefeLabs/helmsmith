@@ -2,15 +2,16 @@
  * Centralized brand constants — the ONLY file with hardcoded brand strings.
  * Everything else in the codebase imports from here.
  *
- * To rebrand: change APP_GROUP_NAME and APP_NAME, then run `npm run rebrand`.
+ * To rebrand: edit branding.yaml at project root, then run `taskmaster rebrand`.
  */
 
-// ── Two root primitives ─────────────────────────────────────
+// ── Three root primitives ────────────────────────────────────
 export const APP_GROUP_NAME = 'agentx';
+export const APP_GROUP_INITIALS = 'ax';
 export const APP_NAME = 'taskmaster';
 
 // ── Derived CLI metadata ────────────────────────────────────
-export const CLI_BIN_NAME = `${APP_GROUP_NAME}-${APP_NAME}`;
+export const CLI_BIN_NAME = APP_NAME;
 export const CLI_DESCRIPTION =
   'CLI-based project task generator with complexity scoring and auto-decomposition';
 export const CLI_VERSION = '0.1.0';

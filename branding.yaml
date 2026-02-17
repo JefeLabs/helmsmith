@@ -1,5 +1,6 @@
-# Rebrand configuration — change these two values and run `npm run rebrand`
+# Rebrand configuration — change these values and run `taskmaster rebrand`
 appGroupName: agentx
+appGroupInitials: ax
 appName: taskmaster
 
 # Optional overrides (uncomment to customize):
@@ -25,5 +26,5 @@ files_to_update:
 
 # Files to rename (use {{appGroupName}} and {{appName}} placeholders)
 files_to_rename:
-  - from: "bin/agentx-taskmaster.js"
+  - from: "bin/taskmaster.js"
     to: "bin/{{appGroupName}}-{{appName}}.js"
