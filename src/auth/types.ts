@@ -88,12 +88,21 @@ export interface ChatCompletionMessage {
   content: string;
 }
 
+export interface TokenUsage {
+  input_tokens: number;
+  output_tokens: number;
+  thinking_tokens?: number;
+  total_tokens: number;
+  content_types?: string[];
+}
+
 export interface ChatCompletionResponse {
   choices: Array<{
     message: {
       content: string;
     };
   }>;
+  usage?: TokenUsage;
 }
 
 export interface TokenSource {

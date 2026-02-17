@@ -130,6 +130,17 @@ export const ThresholdsSchema = z.object({
 
 export type Thresholds = z.infer<typeof ThresholdsSchema>;
 
+// --- Blueprint configuration schema ---
+
+export const BlueprintProjectConfigSchema = z.object({
+  id: z.string().optional(),
+  contextAnswers: z
+    .record(z.string(), z.union([z.string(), z.boolean(), z.array(z.string())]))
+    .default({}),
+}).default({});
+
+export type BlueprintProjectConfig = z.infer<typeof BlueprintProjectConfigSchema>;
+
 // --- Project config.yaml schema ---
 
 export const ProjectConfigSchema = z.object({
@@ -138,6 +149,7 @@ export const ProjectConfigSchema = z.object({
   skills: SkillsConfigSchema.default({}),
   ai: AIConfigSchema.default({}),
   thresholds: ThresholdsSchema.default({}),
+  blueprint: BlueprintProjectConfigSchema,
 });
 
 export type ProjectConfig = z.infer<typeof ProjectConfigSchema>;

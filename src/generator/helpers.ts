@@ -36,6 +36,7 @@ export function registerHelpers(): void {
   Handlebars.registerHelper('if-gt', ifGt);
   Handlebars.registerHelper('if-lt', ifLt);
   Handlebars.registerHelper('if-eq', ifEq);
+  Handlebars.registerHelper('join', join);
 }
 
 /**
@@ -163,4 +164,12 @@ export function ifLt(this: unknown, a: unknown, b: unknown, options: Handlebars.
 
 export function ifEq(this: unknown, a: unknown, b: unknown, options: Handlebars.HelperOptions): string {
   return a == b ? options.fn(this) : options.inverse(this);
+}
+
+/**
+ * Join an array of strings with a separator.
+ */
+export function join(arr: unknown, separator: unknown): string {
+  if (!Array.isArray(arr)) return String(arr ?? '');
+  return arr.join(typeof separator === 'string' ? separator : ', ');
 }

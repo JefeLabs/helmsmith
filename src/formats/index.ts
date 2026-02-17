@@ -15,3 +15,4 @@ export { readTasks, writeTasks } from './tasks-store.js';
 export { generateTaskFiles } from './task-writer.js';
 export { syncTaskFiles, type SyncResult, type SyncChange } from './sync.js';
 export { loadProjectConfig, getConfigValue, readProjectConfig } from './config-reader.js';
+export { readComponentIndex, writeComponentIndex, readSymbolIndex, writeSymbolIndex } from './index-store.js';

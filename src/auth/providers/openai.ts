@@ -5,6 +5,7 @@ import type {
   ChatCompletionMessage,
   ChatCompletionResponse,
   OAuthCredentials,
+  TokenUsage,
 } from '../types.js';
 import { readAuthFile, writeAuthFile } from '../token-manager.js';
 import {
@@ -216,7 +217,7 @@ export class OpenAIProvider implements AIProvider {
           `OpenAI API error (${retryResponse.status}): ${body || retryResponse.statusText}`,
         );
       }
-      return (await retryResponse.json()) as ChatCompletionResponse;
+      return this.normalizeResponse(retryResponse);
     }
 
     if (!response.ok) {
@@ -226,7 +227,31 @@ export class OpenAIProvider implements AIProvider {
       );
     }
 
-    return (await response.json()) as ChatCompletionResponse;
+    return this.normalizeResponse(response);
+  }
+
+  /**
+   * Normalize OpenAI response and extract token usage.
+   * Maps prompt_tokens → input_tokens, completion_tokens → output_tokens.
+   */
+  private async normalizeResponse(response: Response): Promise<ChatCompletionResponse> {
+    const data = (await response.json()) as ChatCompletionResponse & {
+      usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+    };
+
+    let usage: TokenUsage | undefined;
+    if (data.usage) {
+      usage = {
+        input_tokens: data.usage.prompt_tokens,
+        output_tokens: data.usage.completion_tokens,
+        total_tokens: data.usage.total_tokens,
+      };
+    }
+
+    return {
+      choices: data.choices,
+      usage,
+    };
   }
 
   async listModels(): Promise<AIModelEntry[] | null> {

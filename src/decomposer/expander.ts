@@ -273,7 +273,7 @@ export async function expandTask(
   if (options.authAvailable && options.model) {
     try {
       const messages = buildExpansionPrompt(task, maxSubtasks, childType);
-      const response = await callAI(messages, options.model, options.provider);
+      const response = await callAI(messages, options.model, options.provider, 'expander');
       const content = response.choices?.[0]?.message?.content;
       if (!content) {
         throw new Error('Empty response from AI');

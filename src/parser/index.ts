@@ -9,7 +9,7 @@ import type { ParseResult, ParseOptions, PlanFormat, DependencyInferrer } from '
 
 export { noopInferrer } from './types.js';
 export { getNextId, renumberTasks } from './task-generator.js';
-export { parseWithAI } from './ai-parser.js';
+export { parseWithAI, parseWithArchitecturePipeline } from './ai-parser.js';
 export type { ParseResult, ParseOptions, PlanFormat, DependencyInferrer } from './types.js';
 
 /**
@@ -95,6 +95,26 @@ export async function parsePlan(
     case 'text':
       sections = parseText(content);
       break;
+  }
+
+  // Unwrap document-title wrapper: when the parser returns a single root section
+  // whose children are the real content sections, promote those children to
+  // top-level. This handles documents like "# Implementation Plan" with all
+  // actionable sections at ## depth — without this, `list` shows one useless wrapper.
+  if (sections.length === 1 && sections[0].children.length > 0) {
+    const wrapper = sections[0];
+    sections = wrapper.children;
+    // Shift depths so children start at 1 (top-level)
+    const shift = sections[0].depth - 1;
+    if (shift > 0) {
+      function shiftDepth(secs: ParsedSection[]): void {
+        for (const s of secs) {
+          s.depth -= shift;
+          shiftDepth(s.children);
+        }
+      }
+      shiftDepth(sections);
+    }
   }
 
   const sectionsFound = countSections(sections);

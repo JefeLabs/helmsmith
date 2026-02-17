@@ -1,0 +1,38 @@
+# {{blueprint.name}}
+
+> {{blueprint.description}}
+
+**App Type:** {{blueprint.appType}}
+
+{{#if upfront.length}}
+## Upfront (implement before anything else)
+
+| Concern | Category | Complexity | Skills |
+|---------|----------|------------|--------|
+{{#each upfront}}
+| {{title}} | {{category}} | {{estimatedComplexity}} | {{join requiredSkills ", "}} |
+{{/each}}
+{{/if}}
+
+{{#if patternFirst.length}}
+## Pattern-First (set pattern now, implement later)
+
+| Concern | Category | Complexity | Skills |
+|---------|----------|------------|--------|
+{{#each patternFirst}}
+| {{title}} | {{category}} | {{estimatedComplexity}} | {{join requiredSkills ", "}} |
+{{/each}}
+{{/if}}
+
+{{#if deferred.length}}
+## Deferred (safe to phase in)
+
+| Concern | Category | Complexity | Skills |
+|---------|----------|------------|--------|
+{{#each deferred}}
+| {{title}} | {{category}} | {{estimatedComplexity}} | {{join requiredSkills ", "}} |
+{{/each}}
+{{/if}}
+
+---
+**{{totalConcerns}}** concerns total | **{{nonNegotiableCount}}** non-negotiable

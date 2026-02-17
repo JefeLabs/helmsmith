@@ -6,6 +6,7 @@ import type {
   ChatCompletionMessage,
   ChatCompletionResponse,
   OAuthCredentials,
+  TokenUsage,
 } from '../types.js';
 import { readAuthFile, writeAuthFile } from '../token-manager.js';
 import {
@@ -122,7 +123,7 @@ export class AnthropicProvider implements AIProvider {
     const body: Record<string, unknown> = {
       model,
       messages: anthropicMessages,
-      max_tokens: 4096,
+      max_tokens: 128000,
     };
 
     if (systemMessages.length > 0) {
@@ -389,10 +390,11 @@ export class AnthropicProvider implements AIProvider {
       headers['User-Agent'] = 'claude-cli/2.1.7 (external, cli)';
       headers['x-app'] = 'cli';
       headers['anthropic-dangerous-direct-browser-access'] = 'true';
-      headers['anthropic-beta'] = 'oauth-2025-04-20,interleaved-thinking-2025-05-14';
+      headers['anthropic-beta'] = 'oauth-2025-04-20,interleaved-thinking-2025-05-14,output-128k-2025-02-19';
     } else {
       // Standard API key
       headers['x-api-key'] = accessToken;
+      headers['anthropic-beta'] = 'output-128k-2025-02-19';
     }
 
     return headers;
@@ -407,13 +409,35 @@ export class AnthropicProvider implements AIProvider {
     }
 
     const data = (await response.json()) as {
-      content?: Array<{ type: string; text: string }>;
+      content?: Array<{ type: string; text?: string; thinking?: string }>;
+      usage?: { input_tokens: number; output_tokens: number };
     };
 
     // Normalize Anthropic response → OpenAI ChatCompletionResponse shape
     const text = data.content?.find((c) => c.type === 'text')?.text ?? '';
+
+    // Extract usage and content types
+    let usage: TokenUsage | undefined;
+    if (data.usage) {
+      const contentTypes = data.content
+        ? [...new Set(data.content.map((c) => c.type))]
+        : [];
+      const thinkingTokens = data.content
+        ?.filter((c) => c.type === 'thinking')
+        .reduce((sum, c) => sum + (c.thinking?.length ?? 0), 0) ?? 0;
+
+      usage = {
+        input_tokens: data.usage.input_tokens,
+        output_tokens: data.usage.output_tokens,
+        thinking_tokens: thinkingTokens > 0 ? thinkingTokens : undefined,
+        total_tokens: data.usage.input_tokens + data.usage.output_tokens,
+        content_types: contentTypes.length > 0 ? contentTypes : undefined,
+      };
+    }
+
     return {
       choices: [{ message: { content: text } }],
+      usage,
     };
   }
 }

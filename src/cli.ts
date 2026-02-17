@@ -185,6 +185,77 @@ program
     }
   });
 
+// --- scan ---
+program
+  .command('scan [path]')
+  .description('Scan repository and build capabilities model (components, layers, symbols)')
+  .action(async (pathArg?: string) => {
+    try {
+      const gitRoot = await detectGitRoot();
+      const rootPath = pathArg ? resolve(pathArg) : (gitRoot ?? process.cwd());
+
+      if (!existsSync(rootPath)) {
+        console.error(chalk.red(`Error: Path "${rootPath}" does not exist.`));
+        process.exitCode = 1;
+        return;
+      }
+
+      console.log(chalk.bold(`Scanning ${rootPath}...\n`));
+
+      const { runScanPipeline } = await import('./parser/analysis/scanner.js');
+      const result = await runScanPipeline(rootPath);
+
+      // Persist indexes to repo home
+      const repoHome = gitRoot
+        ? (await import('./utils/git.js')).getRepoTaskmasterHome(gitRoot)
+        : null;
+
+      if (repoHome) {
+        const { mkdir } = await import('node:fs/promises');
+        await mkdir(repoHome, { recursive: true });
+
+        const { writeComponentIndex, writeSymbolIndex } = await import('./formats/index-store.js');
+        await writeComponentIndex(repoHome, result.componentIndex);
+        await writeSymbolIndex(repoHome, result.symbolIndex);
+        console.log(chalk.dim(`\n  Indexes persisted to ${repoHome}`));
+      } else {
+        console.log(chalk.yellow('\n  Not inside a git repository — indexes not persisted.'));
+      }
+
+      // Summary
+      console.log(chalk.green('\nScan complete:'));
+      console.log(chalk.dim(`  Files: ${result.scanResult.totalFiles}`));
+      console.log(chalk.dim(`  Directories: ${result.scanResult.totalDirectories}`));
+      console.log(chalk.dim(`  Components: ${result.components.length}`));
+      console.log(chalk.dim(`  Symbols: ${result.symbolIndex.entries.reduce((sum, e) => sum + e.symbols.length, 0)}`));
+      console.log(chalk.dim(`  Layers: ${[...new Set(result.symbolIndex.entries.map(e => e.layer))].join(', ') || 'none'}`));
+      if (result.scanResult.detectedPatterns.length > 0) {
+        console.log(chalk.dim(`  Patterns: ${result.scanResult.detectedPatterns.join(', ')}`));
+      }
+      for (const w of result.warnings) {
+        console.log(chalk.yellow(`  Warning: ${w}`));
+      }
+
+      // Blueprint auto-detection
+      try {
+        const { detectBlueprints } = await import('./blueprints/index.js');
+        const detections = detectBlueprints(result.scanResult, result.components);
+        if (detections.length > 0) {
+          console.log(chalk.bold('\n  Detected archetypes:'));
+          for (const d of detections.slice(0, 5)) {
+            const pct = Math.round(d.confidence * 100);
+            console.log(chalk.dim(`    ${d.blueprintId} (${pct}%) — ${d.matchedSignals.join(', ')}`));
+          }
+        }
+      } catch {
+        // Blueprint detection is best-effort
+      }
+    } catch (err) {
+      console.error(chalk.red(`Error: ${(err as Error).message}`));
+      process.exitCode = 1;
+    }
+  });
+
 // --- parse ---
 program
   .command('parse <file>')
@@ -194,7 +265,8 @@ program
   .option('--append', 'Append to existing project tasks')
   .option('--force', 'Overwrite existing tasks without --append')
   .option('--no-ai', 'Skip AI parsing, use structural parser only')
-  .action(async (file: string, opts: { numTasks?: string; style?: string; append?: boolean; force?: boolean; ai?: boolean }) => {
+  .option('--no-scan', 'Skip codebase scanning (only use PRD document)')
+  .action(async (file: string, opts: { numTasks?: string; style?: string; append?: boolean; force?: boolean; ai?: boolean; scan?: boolean }) => {
     try {
       await bootstrapHome();
       const gitRoot = await detectGitRoot();
@@ -237,35 +309,73 @@ program
       };
 
       let parsedTasks: import('./config/schema.js').TaskNode[];
-      let parseMethod: 'ai' | 'structural';
+      let parseMethod: 'ai-architecture' | 'ai' | 'structural';
       const warnings: string[] = [];
+      let analysisJson: unknown = null;
 
       // Try AI parsing first (unless --no-ai)
       const useAI = opts.ai !== false;
       if (useAI) {
         const authResult = await resolveActiveAuth(config.ai.provider);
         if (authResult) {
+          // Default: architecture pipeline (Phase 1 + Phase 2)
           try {
-            console.log(chalk.dim(`  Sending document to AI (${config.ai.provider}) for task breakdown...`));
-            const { parseWithAI } = await import('./parser/ai-parser.js');
-            const aiResult = await parseWithAI(content, config.ai.model, parseOptions, config.ai.provider);
-            if (aiResult && aiResult.tasks.length > 0) {
-              parsedTasks = aiResult.tasks;
-              parseMethod = 'ai';
-              if (aiResult.warning) {
-                warnings.push(aiResult.warning);
-              }
+            console.log(chalk.dim(`  Architecture pipeline (${config.ai.provider})...`));
+            const { parseWithArchitecturePipeline } = await import('./parser/ai-parser.js');
+            const pipelineResult = await parseWithArchitecturePipeline(
+              content,
+              config.ai.model,
+              parseOptions,
+              config.ai.provider,
+              {
+                codebasePath: gitRoot,
+                skipScan: opts.scan === false,
+                blueprintId: config.blueprint.id,
+                blueprintAnswers: config.blueprint.contextAnswers,
+              },
+            );
+            if (pipelineResult && pipelineResult.tasks.length > 0) {
+              parsedTasks = pipelineResult.tasks;
+              parseMethod = 'ai-architecture';
+              warnings.push(...pipelineResult.warnings);
+              analysisJson = pipelineResult.analysis;
             } else {
-              console.log(chalk.yellow('  AI returned no tasks, falling back to structural parser.'));
+              console.log(chalk.yellow('  Architecture pipeline returned no tasks, falling back to single-shot AI.'));
               parsedTasks = null!;
-              parseMethod = 'structural';
+              parseMethod = 'ai';
             }
           } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
-            console.log(chalk.yellow(`  AI parsing failed: ${message}`));
-            console.log(chalk.yellow('  Falling back to structural parser.'));
+            console.log(chalk.yellow(`  Architecture pipeline failed: ${message}`));
+            console.log(chalk.yellow('  Falling back to single-shot AI parser.'));
             parsedTasks = null!;
-            parseMethod = 'structural';
+            parseMethod = 'ai';
+          }
+
+          // Fallback: single-shot AI (legacy)
+          if (!parsedTasks) {
+            try {
+              console.log(chalk.dim(`  Single-shot AI (${config.ai.provider})...`));
+              const { parseWithAI } = await import('./parser/ai-parser.js');
+              const aiResult = await parseWithAI(content, config.ai.model, parseOptions, config.ai.provider);
+              if (aiResult && aiResult.tasks.length > 0) {
+                parsedTasks = aiResult.tasks;
+                parseMethod = 'ai';
+                if (aiResult.warning) {
+                  warnings.push(aiResult.warning);
+                }
+              } else {
+                console.log(chalk.yellow('  AI returned no tasks, falling back to structural parser.'));
+                parsedTasks = null!;
+                parseMethod = 'structural';
+              }
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err);
+              console.log(chalk.yellow(`  AI parsing failed: ${message}`));
+              console.log(chalk.yellow('  Falling back to structural parser.'));
+              parsedTasks = null!;
+              parseMethod = 'structural';
+            }
           }
         } else {
           console.log(chalk.dim(`  No ${config.ai.provider} auth found, using structural parser.`));
@@ -300,7 +410,7 @@ program
 
       // Skill inference (skip if AI already tagged skills)
       let skillSummary = '';
-      if (parseMethod === 'ai') {
+      if (parseMethod === 'ai-architecture' || parseMethod === 'ai') {
         // Count AI-provided skills
         const countWithSkills = (tasks: typeof finalTasks): number =>
           tasks.reduce((sum, t) => sum + (t.requiredSkills.length > 0 ? 1 : 0) + countWithSkills(t.children), 0);
@@ -330,6 +440,14 @@ program
 
       await writeTasks(resolved.projectDir, finalTasks);
 
+      // Persist analysis.json alongside tasks.json (architecture pipeline only)
+      if (analysisJson) {
+        const { writeFile } = await import('node:fs/promises');
+        const analysisPath = resolve(resolved.projectDir, 'analysis.json');
+        await writeFile(analysisPath, JSON.stringify(analysisJson, null, 2) + '\n');
+        console.log(chalk.dim(`  Architecture analysis saved to analysis.json`));
+      }
+
       // Count total tasks recursively
       const countAll = (tasks: typeof finalTasks): number =>
         tasks.reduce((sum, t) => sum + 1 + countAll(t.children), 0);
@@ -338,7 +456,12 @@ program
       const topLevel = newTasks.length;
       const total = countAll(newTasks);
       console.log(chalk.green(`Parsed ${topLevel} top-level task(s) (${total} total) from ${file}`));
-      console.log(chalk.dim(`  Parse method: ${parseMethod === 'ai' ? `AI (${config.ai.provider})` : 'structural'}`));
+      const methodLabel = parseMethod === 'ai-architecture'
+        ? `AI architecture pipeline (${config.ai.provider})`
+        : parseMethod === 'ai'
+          ? `AI single-shot (${config.ai.provider})`
+          : 'structural';
+      console.log(chalk.dim(`  Parse method: ${methodLabel}`));
       if (skillSummary) {
         console.log(chalk.dim(skillSummary));
       }
@@ -1907,6 +2030,238 @@ projects
         await removeProject(name, 'home', null);
         console.log(chalk.green(`Project "${name}" [home] removed from registry.`));
       }
+    } catch (err) {
+      console.error(chalk.red(`Error: ${(err as Error).message}`));
+      process.exitCode = 1;
+    }
+  });
+
+// --- blueprint (subcommands) ---
+const blueprint = program
+  .command('blueprint')
+  .description('Application archetype blueprints for cross-cutting concerns');
+
+blueprint
+  .command('list')
+  .description('List all available archetype blueprints')
+  .action(async () => {
+    try {
+      const { listBlueprints } = await import('./blueprints/index.js');
+      const blueprints = listBlueprints();
+
+      setProjectPath('');
+      const output = renderToTerminal('blueprint-list', { blueprints });
+      console.log(output);
+    } catch (err) {
+      console.error(chalk.red(`Error: ${(err as Error).message}`));
+      process.exitCode = 1;
+    }
+  });
+
+blueprint
+  .command('show <id>')
+  .description('Show full concern matrix for a blueprint')
+  .option('--urgency <tier>', 'Filter by urgency tier (upfront|pattern-first|deferred)')
+  .action(async (id: string, opts: { urgency?: string }) => {
+    try {
+      const { getBlueprint, groupByUrgency } = await import('./blueprints/index.js');
+      const bp = getBlueprint(id);
+
+      if (!bp) {
+        const { BLUEPRINT_IDS } = await import('./blueprints/index.js');
+        console.error(chalk.red(`Blueprint "${id}" not found. Available: ${BLUEPRINT_IDS.join(', ')}`));
+        process.exitCode = 1;
+        return;
+      }
+
+      const groups = groupByUrgency(bp.concerns);
+
+      let upfront = groups.upfront;
+      let patternFirst = groups['pattern-first'];
+      let deferred = groups.deferred;
+
+      // Filter by urgency if requested
+      if (opts.urgency) {
+        if (opts.urgency === 'upfront') { patternFirst = []; deferred = []; }
+        else if (opts.urgency === 'pattern-first') { upfront = []; deferred = []; }
+        else if (opts.urgency === 'deferred') { upfront = []; patternFirst = []; }
+      }
+
+      setProjectPath('');
+      const output = renderToTerminal('blueprint-detail', {
+        blueprint: bp,
+        upfront,
+        patternFirst,
+        deferred,
+        totalConcerns: bp.concerns.length,
+        nonNegotiableCount: bp.nonNegotiableBundle.length,
+      });
+      console.log(output);
+    } catch (err) {
+      console.error(chalk.red(`Error: ${(err as Error).message}`));
+      process.exitCode = 1;
+    }
+  });
+
+blueprint
+  .command('apply <id>')
+  .description('Apply a blueprint to the current project, generating concern tasks')
+  .option('--answers <json>', 'JSON string of context answers (for CI/non-interactive)')
+  .option('--flat', 'Generate flat top-level tasks instead of grouped by tier')
+  .option('--no-interactive', 'Skip interactive prompts')
+  .action(async (id: string, opts: { answers?: string; flat?: boolean; interactive?: boolean }) => {
+    try {
+      await bootstrapHome();
+      const gitRoot = await detectGitRoot();
+      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+      const config = await loadProjectConfig(resolved.projectDir);
+
+      const { getBlueprint, resolveBlueprint, generateConcernTasks, BLUEPRINT_IDS } =
+        await import('./blueprints/index.js');
+      const bp = getBlueprint(id);
+
+      if (!bp) {
+        console.error(chalk.red(`Blueprint "${id}" not found. Available: ${BLUEPRINT_IDS.join(', ')}`));
+        process.exitCode = 1;
+        return;
+      }
+
+      // Gather context answers
+      let contextAnswers: Record<string, string | boolean | string[]>;
+      if (opts.answers) {
+        contextAnswers = JSON.parse(opts.answers);
+      } else if (opts.interactive === false) {
+        // Use question defaults
+        contextAnswers = {};
+        for (const q of bp.contextQuestions) {
+          if (q.default !== undefined) {
+            contextAnswers[q.id] = q.default;
+          }
+        }
+      } else {
+        const { runBlueprintQuestions } = await import('./prompts/blueprint-questions.js');
+        contextAnswers = await runBlueprintQuestions(bp.contextQuestions);
+      }
+
+      // Resolve concerns based on answers
+      const concerns = resolveBlueprint(bp, contextAnswers);
+
+      // Generate tasks
+      const existingTasks = await readTasks(resolved.projectDir);
+      const startId = existingTasks.length > 0 ? getNextId(existingTasks) : 1;
+      const defaultStatus = getDefaultStatus(config.states);
+
+      const newTasks = generateConcernTasks(concerns, {
+        blueprintId: id,
+        style: opts.flat ? 'flat' : 'grouped',
+        defaultStatus,
+        startId,
+      });
+
+      // Append to existing tasks
+      const finalTasks = [...existingTasks, ...newTasks];
+      await writeTasks(resolved.projectDir, finalTasks);
+
+      // Persist blueprint selection to config
+      await writeProjectConfig(resolved.projectDir, {
+        blueprint: { id, contextAnswers },
+      });
+
+      // Summary
+      const countAll = (tasks: typeof newTasks): number =>
+        tasks.reduce((sum, t) => sum + 1 + countAll(t.children), 0);
+      const total = countAll(newTasks);
+
+      console.log(chalk.green(`Applied blueprint "${bp.name}" — ${newTasks.length} top-level task(s) (${total} total)`));
+      console.log(chalk.dim(`  Blueprint: ${id}`));
+      console.log(chalk.dim(`  Concerns resolved: ${concerns.length}`));
+      console.log(chalk.dim(`  Context answers saved to config.yaml`));
+    } catch (err) {
+      console.error(chalk.red(`Error: ${(err as Error).message}`));
+      process.exitCode = 1;
+    }
+  });
+
+blueprint
+  .command('check')
+  .description('Check task coverage against the configured blueprint')
+  .action(async () => {
+    try {
+      await bootstrapHome();
+      const gitRoot = await detectGitRoot();
+      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+      const config = await loadProjectConfig(resolved.projectDir);
+
+      if (!config.blueprint.id) {
+        console.error(chalk.red('No blueprint configured. Run "blueprint apply <id>" first.'));
+        process.exitCode = 1;
+        return;
+      }
+
+      const { getBlueprint, resolveBlueprint, groupByUrgency } =
+        await import('./blueprints/index.js');
+      const bp = getBlueprint(config.blueprint.id);
+
+      if (!bp) {
+        console.error(chalk.red(`Blueprint "${config.blueprint.id}" not found.`));
+        process.exitCode = 1;
+        return;
+      }
+
+      const concerns = resolveBlueprint(bp, config.blueprint.contextAnswers);
+      const tasks = await readTasks(resolved.projectDir);
+
+      // Build tag set from all tasks (recursive)
+      const taskTags = new Set<string>();
+      const collectTags = (nodes: typeof tasks) => {
+        for (const t of nodes) {
+          for (const tag of t.tags) taskTags.add(tag);
+          collectTags(t.children);
+        }
+      };
+      collectTags(tasks);
+
+      // Check each concern for coverage
+      const concernStatuses = concerns.map((c) => {
+        const blueprintTag = `blueprint:${config.blueprint.id}`;
+        const concernTag = `concern:${c.category}`;
+
+        // A concern is covered if any task has both the blueprint tag and concern tag
+        const present = taskTags.has(blueprintTag) && taskTags.has(concernTag);
+
+        let status: string;
+        if (present) {
+          status = '\u2713 present';
+        } else if (c.urgency === 'deferred') {
+          status = '\u2014 (not required yet)';
+        } else {
+          status = '\u2717 missing';
+        }
+
+        return {
+          title: c.title,
+          urgency: c.urgency,
+          status,
+          isMissing: !present && c.urgency !== 'deferred',
+        };
+      });
+
+      const groups = groupByUrgency(concerns);
+      const missingUpfront = concernStatuses
+        .filter((c) => c.isMissing && c.urgency === 'upfront')
+        .map((c) => c.title);
+
+      const coveredCount = concernStatuses.filter((c) => c.status.startsWith('\u2713')).length;
+
+      setProjectPath(resolved.projectDir);
+      const output = renderToTerminal('blueprint-check', {
+        blueprint: bp,
+        concerns: concernStatuses,
+        coveredCount,
+        totalCount: concerns.length,
+        missingUpfront,
+      });
+      console.log(output);
     } catch (err) {
       console.error(chalk.red(`Error: ${(err as Error).message}`));
       process.exitCode = 1;

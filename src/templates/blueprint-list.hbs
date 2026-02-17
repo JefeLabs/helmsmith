@@ -1,0 +1,10 @@
+# Available Blueprints
+
+| ID | Name | App Type | Concerns | Non-Negotiable |
+|----|------|----------|----------|----------------|
+{{#each blueprints}}
+| {{id}} | {{name}} | {{appType}} | {{concernCount}} | {{nonNegotiableCount}} |
+{{/each}}
+
+---
+**{{blueprints.length}}** {{pluralize blueprints.length 'blueprint' 'blueprints'}} available

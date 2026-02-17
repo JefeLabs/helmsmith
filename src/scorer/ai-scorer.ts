@@ -112,7 +112,7 @@ export class AIScorer implements ScoringProvider {
 
     try {
       const messages = buildScoringPrompt(task);
-      const response = await callAI(messages, this.model, this.provider);
+      const response = await callAI(messages, this.model, this.provider, 'scorer');
 
       const content = response.choices?.[0]?.message?.content;
       if (!content) {

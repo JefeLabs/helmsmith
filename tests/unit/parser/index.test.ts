@@ -161,7 +161,9 @@ describe('parsePlan', () => {
     });
 
     it('warns when headings exceed max depth', async () => {
-      const content = '# Task\n\n## Sub\n\n### Too Deep\n\nBody.';
+      // After document-title unwrapping, # is removed and depths shift by 1.
+      // Task-only has maxDepth 2, so we need 4 levels to exceed it after unwrap.
+      const content = '# Doc Title\n\n## Section\n\n### Sub\n\n#### Too Deep\n\nBody.';
       const result = await parsePlan(content, 'plan.md', {
         ...defaultOptions,
         style: 'task-only',

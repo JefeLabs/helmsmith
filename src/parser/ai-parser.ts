@@ -4,6 +4,8 @@ import { callAI } from '../auth/call-ai.js';
 import type { AIProviderName } from '../auth/provider.js';
 import { PROJECT_STYLES } from '../config/styles.js';
 import type { ParseOptions } from './types.js';
+import { runAnalysisPipeline } from './analysis/analyzer.js';
+import type { ArchitectureAnalysis, AnalysisPipelineOptions } from './analysis/types.js';
 
 /**
  * Lightweight task shape for the AI response (no metadata/readiness/etc.).
@@ -138,6 +140,7 @@ function aiTaskToNode(
     assignee: null,
     outputs: [],
     tags: [],
+    qaFeedback: [],
     children,
     metadata: {
       source: 'ai',
@@ -179,8 +182,9 @@ function resolveDependencies(tasks: TaskNode[], aiTasks: AITask[]): void {
 }
 
 /**
- * Parse a document using AI (Copilot). Sends the full document content
- * to the LLM and returns a structured task breakdown.
+ * Parse a document using the single-shot AI approach.
+ * Sends the full document content to the LLM and returns a structured task breakdown.
+ * This is the legacy fallback — the architecture pipeline is preferred.
  *
  * @returns TaskNode[] on success, or null if AI parsing fails
  */
@@ -191,7 +195,7 @@ export async function parseWithAI(
   provider?: AIProviderName,
 ): Promise<{ tasks: TaskNode[]; warning?: string } | null> {
   const messages = buildParsePrompt(content, options);
-  const response = await callAI(messages, model, provider);
+  const response = await callAI(messages, model, provider, 'parser');
   const responseContent = response.choices?.[0]?.message?.content;
 
   if (!responseContent) {
@@ -214,4 +218,47 @@ export async function parseWithAI(
   resolveDependencies(tasks, aiTasks);
 
   return { tasks };
+}
+
+/**
+ * Parse a document using the architecture-aware pipeline.
+ * Two-phase approach: Phase 1 discovers architecture, Phase 2 generates tasks.
+ * Default when AI auth is available.
+ *
+ * @returns Tasks + analysis on success, or null on failure
+ */
+export async function parseWithArchitecturePipeline(
+  content: string,
+  model: string,
+  options: ParseOptions,
+  provider?: AIProviderName,
+  pipelineOptions?: {
+    codebasePath?: string | null;
+    skipScan?: boolean;
+    blueprintId?: string;
+    blueprintAnswers?: Record<string, string | boolean | string[]>;
+  },
+): Promise<{
+  tasks: TaskNode[];
+  analysis: ArchitectureAnalysis;
+  warnings: string[];
+} | null> {
+  const analysisOptions: AnalysisPipelineOptions = {
+    style: options.style,
+    defaultStatus: options.defaultStatus,
+    numTasks: options.numTasks,
+    model,
+    provider,
+    codebasePath: pipelineOptions?.codebasePath ?? null,
+    skipScan: pipelineOptions?.skipScan ?? false,
+    blueprintId: pipelineOptions?.blueprintId,
+    blueprintAnswers: pipelineOptions?.blueprintAnswers,
+  };
+
+  const result = await runAnalysisPipeline(content, analysisOptions);
+  return {
+    tasks: result.tasks,
+    analysis: result.analysis,
+    warnings: result.warnings,
+  };
 }

@@ -147,7 +147,7 @@ export async function inferSkillsForTask(
   if (aiAvailable) {
     try {
       const messages = buildSkillInferencePrompt(task, vocabulary);
-      const response = await callAI(messages, model);
+      const response = await callAI(messages, model, undefined, 'skills');
       const content = response.choices?.[0]?.message?.content;
 
       if (content) {

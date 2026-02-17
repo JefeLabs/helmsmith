@@ -4,6 +4,7 @@ import type {
   ChatCompletionResponse,
   CopilotCredentials,
   CopilotTokenResponse,
+  TokenUsage,
 } from '../types.js';
 import {
   COPILOT_TOKEN_URL,
@@ -94,7 +95,31 @@ export class CopilotProvider implements AIProvider {
       );
     }
 
-    return (await response.json()) as ChatCompletionResponse;
+    return this.normalizeResponse(response);
+  }
+
+  /**
+   * Normalize Copilot response and extract token usage.
+   * Copilot uses OpenAI-compatible format (prompt_tokens, completion_tokens).
+   */
+  private async normalizeResponse(response: Response): Promise<ChatCompletionResponse> {
+    const data = (await response.json()) as ChatCompletionResponse & {
+      usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+    };
+
+    let usage: TokenUsage | undefined;
+    if (data.usage) {
+      usage = {
+        input_tokens: data.usage.prompt_tokens,
+        output_tokens: data.usage.completion_tokens,
+        total_tokens: data.usage.total_tokens,
+      };
+    }
+
+    return {
+      choices: data.choices,
+      usage,
+    };
   }
 
   async listModels(): Promise<AIModelEntry[] | null> {
