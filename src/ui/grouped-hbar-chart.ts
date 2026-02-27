@@ -16,6 +16,13 @@ export interface HBar {
   avgCommits?: number;
   avgActiveDays?: number;
   avgHeadcount?: number;
+  /** Team-level averages (set on user-level bars in by-time mode). */
+  teamAvgInsertions?: number;
+  teamAvgDeletions?: number;
+  teamAvgNet?: number;
+  teamAvgCommits?: number;
+  teamAvgActiveDays?: number;
+  teamAvgTestPct?: number;
   commits?: number;
   activeDays?: number;
   headcount?: number;
@@ -205,7 +212,7 @@ export function renderGroupedHBarChart(
         // For average rows: use chalk.dim for all values, skip trend indicators
         const trendFn = isAvg
           ? () => "  "
-          : (v: number, a: number | undefined) => trend(v, a, trendThreshold);
+          : (v: number, a: number | undefined, ta?: number) => trend(v, a, trendThreshold, ta);
         const valColor = isAvg ? chalk.dim : (s: string) => s;
 
         // Columns: +ins ▲/▼  -del  net ▲/▼  (hc)  +ins/u  -del/u  net/u
@@ -225,23 +232,23 @@ export function renderGroupedHBarChart(
 
           // +ins
           line += " " + padLeft(valColor(chalk.green("+" + fmt(bar.insertions))), 8);
-          line += trendFn(bar.insertions, bar.avgInsertions);
+          line += trendFn(bar.insertions, bar.avgInsertions, bar.teamAvgInsertions);
 
           // -del
           line += " " + padLeft(valColor(chalk.red("-" + fmt(bar.deletions))), 8);
-          line += trendFn(bar.deletions, bar.avgDeletions);
+          line += trendFn(bar.deletions, bar.avgDeletions, bar.teamAvgDeletions);
 
           // net
           const netStr = net >= 0 ? "+" + fmt(net) : "-" + fmt(Math.abs(net));
           const netColor = net >= 0 ? chalk.green : chalk.red;
           line += " " + padLeft(valColor(netColor(netStr)), 8);
-          line += trendFn(net, bar.avgNet);
+          line += trendFn(net, bar.avgNet, bar.teamAvgNet);
 
           // test%
           if (hasTestPct) {
             if (bar.testPct !== undefined) {
               line += " " + padLeft(chalk.dim(bar.testPct + "%"), 5);
-              line += trendFn(bar.testPct, bar.avgTestPct);
+              line += trendFn(bar.testPct, bar.avgTestPct, bar.teamAvgTestPct);
             } else {
               line += " " + " ".repeat(5) + "  ";
             }
@@ -250,13 +257,13 @@ export function renderGroupedHBarChart(
           // commits
           if (hasCommits) {
             line += " " + padLeft(chalk.dim(fmt(bar.commits ?? 0)), 6);
-            line += trendFn(bar.commits ?? 0, bar.avgCommits);
+            line += trendFn(bar.commits ?? 0, bar.avgCommits, bar.teamAvgCommits);
           }
 
           // active days
           if (hasActiveDays) {
             line += " " + padLeft(chalk.dim(fmt(bar.activeDays ?? 0)), 6);
-            line += trendFn(bar.activeDays ?? 0, bar.avgActiveDays);
+            line += trendFn(bar.activeDays ?? 0, bar.avgActiveDays, bar.teamAvgActiveDays);
           }
 
           // headcount + per-user averages
@@ -272,25 +279,32 @@ export function renderGroupedHBarChart(
             const avgDelPerUser = avgHc > 0 ? (bar.avgDeletions ?? 0) / avgHc : undefined;
             const avgNetPerUser = avgHc > 0 ? (bar.avgNet ?? 0) / avgHc : undefined;
 
+            // Team avg per user (team avg values are already per-member averages)
+            const teamAvgInsPerUser = bar.teamAvgInsertions;
+            const teamAvgDelPerUser = bar.teamAvgDeletions;
+            const teamAvgNetPerUser = bar.teamAvgNet;
+            const teamAvgCmtsPerUser = bar.teamAvgCommits;
+            const teamAvgDaysPerUser = bar.teamAvgActiveDays;
+
             line += " " + padLeft(chalk.dim("+" + fmt(insPerUser)), 7);
-            line += trendFn(insPerUser, avgInsPerUser);
+            line += trendFn(insPerUser, avgInsPerUser, teamAvgInsPerUser);
             line += " " + padLeft(chalk.dim("-" + fmt(delPerUser)), 7);
-            line += trendFn(delPerUser, avgDelPerUser);
+            line += trendFn(delPerUser, avgDelPerUser, teamAvgDelPerUser);
             const npuStr = netPerUser >= 0 ? "+" + fmt(netPerUser) : "-" + fmt(Math.abs(netPerUser));
             line += " " + padLeft(chalk.dim(npuStr), 7);
-            line += trendFn(netPerUser, avgNetPerUser);
+            line += trendFn(netPerUser, avgNetPerUser, teamAvgNetPerUser);
 
             if (hasCommits) {
               const cmtsPerUser = Math.round((bar.commits ?? 0) / hc);
               const avgCmtsPerUser = avgHc > 0 ? (bar.avgCommits ?? 0) / avgHc : undefined;
               line += " " + padLeft(chalk.dim(fmt(cmtsPerUser)), 6);
-              line += trendFn(cmtsPerUser, avgCmtsPerUser);
+              line += trendFn(cmtsPerUser, avgCmtsPerUser, teamAvgCmtsPerUser);
             }
             if (hasActiveDays) {
               const daysPerUser = +((bar.activeDays ?? 0) / hc).toFixed(1);
               const avgDaysPerUser = avgHc > 0 ? (bar.avgActiveDays ?? 0) / avgHc : undefined;
               line += " " + padLeft(chalk.dim(String(daysPerUser)), 6);
-              line += trendFn(daysPerUser, avgDaysPerUser);
+              line += trendFn(daysPerUser, avgDaysPerUser, teamAvgDaysPerUser);
             }
           }
         } else {
@@ -363,13 +377,30 @@ export function renderGroupedHBarChart(
 /**
  * Render a trend indicator comparing a value to its average.
  * Returns " ▲", " ▼", or " ○" (2 chars for alignment).
+ *
+ * When teamAvg is provided and the value exceeds both thresholds
+ * in the same direction, renders a strong (bg-colored) indicator.
  */
-function trend(value: number, avg: number | undefined, pct: number): string {
+function trend(value: number, avg: number | undefined, pct: number, teamAvg?: number): string {
   if (avg === undefined) return "  ";
   const delta = value - avg;
   const threshold = Math.abs(avg) * pct;
-  if (delta > threshold) return " " + chalk.green("\u25B2");
-  if (delta < -threshold) return " " + chalk.red("\u25BC");
+  const aboveOwn = delta > threshold;
+  const belowOwn = delta < -threshold;
+
+  if (teamAvg !== undefined) {
+    const teamDelta = value - teamAvg;
+    const teamThreshold = Math.abs(teamAvg) * pct;
+    const aboveTeam = teamDelta > teamThreshold;
+    const belowTeam = teamDelta < -teamThreshold;
+
+    // Strong: exceeds both own avg and team avg — inverted (bg swap)
+    if (aboveOwn && aboveTeam) return " " + chalk.bgGreen.black("\u25B2");
+    if (belowOwn && belowTeam) return " " + chalk.bgRed.black("\u25BC");
+  }
+
+  if (aboveOwn) return " " + chalk.green("\u25B2");
+  if (belowOwn) return " " + chalk.red("\u25BC");
   return " " + chalk.dim("\u25CB");
 }
 

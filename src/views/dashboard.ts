@@ -19,7 +19,7 @@ import { rollup } from '../aggregator/engine.js';
 import { filterRecords, getLastNWeeks, getLastNMonths, getLastNQuarters, getLastNYears, weekToMonth, weekToQuarter, weekToYear, monthShort } from '../aggregator/filters.js';
 import { computeLeaderboard } from '../aggregator/leaderboard.js';
 import { recordsToCsv } from '../commands/export-data.js';
-import { assignAuthor, assignByIdentifierPrefix } from '../store/author-registry.js';
+import { assignAuthor, unassignAuthor, assignByIdentifierPrefix } from '../store/author-registry.js';
 import { reattributeRecords } from '../collector/author-map.js';
 import { SEGMENT_DEFS, FILETYPE_COLORS, FILETYPE_CHARS } from '../ui/constants.js';
 import { fmt, weekShort, quarterShort, yearShort, padRight, padLeft } from '../ui/format.js';
@@ -416,6 +416,57 @@ function buildContributionGroups(
       const windowStart = Math.max(0, chronIdx - 3);
       const window = fullHist.slice(windowStart, chronIdx + 1);
       bar.perception = classifyPerception(window);
+    }
+  }
+
+  // Compute team averages per bucket and stamp onto user-level bars.
+  // Only applies at user drill level (each bar.label = member name).
+  if (drillLevel === 'user' && !tagOverlay) {
+    // Build member → team lookup from the records
+    const memberTeamMap = new Map<string, string>();
+    for (const r of records) {
+      if (!memberTeamMap.has(r.member)) memberTeamMap.set(r.member, r.team);
+    }
+
+    // For each bucket, compute per-team averages across members
+    for (const group of groups) {
+      // Collect per-team totals for this bucket
+      const teamBucketTotals = new Map<string, {
+        sumIns: number; sumDel: number; sumNet: number;
+        sumCommits: number; sumActiveDays: number; sumTestPct: number;
+        memberCount: number;
+      }>();
+
+      for (const bar of group.bars) {
+        const team = memberTeamMap.get(bar.label) ?? 'unassigned';
+        const e = teamBucketTotals.get(team) ?? {
+          sumIns: 0, sumDel: 0, sumNet: 0,
+          sumCommits: 0, sumActiveDays: 0, sumTestPct: 0,
+          memberCount: 0,
+        };
+        e.sumIns += bar.insertions ?? 0;
+        e.sumDel += bar.deletions ?? 0;
+        e.sumNet += (bar.insertions ?? 0) - (bar.deletions ?? 0);
+        e.sumCommits += bar.commits ?? 0;
+        e.sumActiveDays += bar.activeDays ?? 0;
+        e.sumTestPct += bar.testPct ?? 0;
+        e.memberCount++;
+        teamBucketTotals.set(team, e);
+      }
+
+      // Stamp team average onto each member bar
+      for (const bar of group.bars) {
+        const team = memberTeamMap.get(bar.label) ?? 'unassigned';
+        const t = teamBucketTotals.get(team);
+        if (t && t.memberCount > 0) {
+          bar.teamAvgInsertions = t.sumIns / t.memberCount;
+          bar.teamAvgDeletions = t.sumDel / t.memberCount;
+          bar.teamAvgNet = t.sumNet / t.memberCount;
+          bar.teamAvgCommits = t.sumCommits / t.memberCount;
+          bar.teamAvgActiveDays = t.sumActiveDays / t.memberCount;
+          bar.teamAvgTestPct = t.sumTestPct / t.memberCount;
+        }
+      }
     }
   }
 
@@ -834,7 +885,9 @@ function renderContributionsDetailTab(
   rangeLabel: string,
   periodLabel: string,
   termCols: number,
+  records?: UserWeekRepoRecord[],
 ): void {
+  const recs = records ?? ctx.records;
   const modeLabel = tagOverlay ? 'Tag'
     : drillLevel === 'org' ? 'Organization'
     : drillLevel === 'team' ? 'Team' : 'User';
@@ -848,8 +901,8 @@ function renderContributionsDetailTab(
   console.log('');
 
   const { rows, groupSeparators } = pivotEntity
-    ? buildContributionDetailRowsByEntity(ctx.records, buckets, drillLevel, tagOverlay, ctx.config)
-    : buildContributionDetailRows(ctx.records, buckets, drillLevel, tagOverlay, ctx.config);
+    ? buildContributionDetailRowsByEntity(recs, buckets, drillLevel, tagOverlay, ctx.config)
+    : buildContributionDetailRows(recs, buckets, drillLevel, tagOverlay, ctx.config);
 
   if (rows.length === 0) {
     console.log(chalk.dim('  No data for this time window.'));
@@ -892,7 +945,9 @@ function renderContributionsTab(
   rangeLabel: string,
   termCols: number,
   labelWidth?: number,
+  records?: UserWeekRepoRecord[],
 ): void {
+  const recs = records ?? ctx.records;
   const modeLabel = tagOverlay ? 'Tag'
     : drillLevel === 'org' ? 'Organization'
     : drillLevel === 'team' ? 'Team' : 'User';
@@ -910,8 +965,8 @@ function renderContributionsTab(
   console.log('');
 
   const groups = pivotEntity
-    ? buildContributionGroupsByEntity(ctx.records, buckets, drillLevel, tagOverlay, ctx.config)
-    : buildContributionGroups(ctx.records, buckets, drillLevel, tagOverlay, ctx.config);
+    ? buildContributionGroupsByEntity(recs, buckets, drillLevel, tagOverlay, ctx.config)
+    : buildContributionGroups(recs, buckets, drillLevel, tagOverlay, ctx.config);
 
   // Build an "Avg" summary row from the per-label averages already stamped on bars
   if (groups.length > 1 && groups[0].bars.length > 0) {
@@ -963,6 +1018,80 @@ function renderContributionsTab(
       }
     }
     groups.push({ groupLabel: 'Avg', bars: avgBars, isSummary: true });
+
+    // At user drill level, add a "Team Avg" summary row showing the per-member
+    // average within each member's team (so members can compare to their team).
+    if (drillLevel === 'user' && !tagOverlay && !pivotEntity) {
+      const memberTeamMap = new Map<string, string>();
+      for (const r of recs) {
+        if (!memberTeamMap.has(r.member)) memberTeamMap.set(r.member, r.team);
+      }
+
+      // Collect per-team per-bucket totals
+      const teamBucketData = new Map<string, {
+        sumTotal: number; sumIns: number; sumDel: number;
+        sumCommits: number; sumActiveDays: number; sumTestPct: number;
+        segTotals: Map<string, number>; memberCount: number; bucketCount: number;
+      }>();
+
+      for (const g of groups) {
+        if (g.isSummary) continue;
+        // Count members per team in this bucket
+        const teamMembers = new Map<string, number>();
+        for (const bar of g.bars) {
+          const team = memberTeamMap.get(bar.label) ?? 'unassigned';
+          teamMembers.set(team, (teamMembers.get(team) ?? 0) + 1);
+        }
+        for (const bar of g.bars) {
+          const team = memberTeamMap.get(bar.label) ?? 'unassigned';
+          const mc = teamMembers.get(team) ?? 1;
+          const e = teamBucketData.get(team) ?? {
+            sumTotal: 0, sumIns: 0, sumDel: 0,
+            sumCommits: 0, sumActiveDays: 0, sumTestPct: 0,
+            segTotals: new Map(), memberCount: mc, bucketCount: 0,
+          };
+          e.sumTotal += bar.total;
+          e.sumIns += bar.insertions ?? 0;
+          e.sumDel += bar.deletions ?? 0;
+          e.sumCommits += bar.commits ?? 0;
+          e.sumActiveDays += bar.activeDays ?? 0;
+          e.sumTestPct += bar.testPct ?? 0;
+          for (const seg of bar.segments) {
+            e.segTotals.set(seg.key, (e.segTotals.get(seg.key) ?? 0) + seg.value);
+          }
+          e.memberCount = mc;
+          teamBucketData.set(team, e);
+        }
+      }
+
+      // Count non-summary buckets
+      const bucketCount = groups.filter((g) => !g.isSummary).length;
+
+      // Build one bar per team showing average per member per bucket
+      const teamAvgBars: HBar[] = [];
+      for (const [team, data] of teamBucketData) {
+        const divisor = data.memberCount * bucketCount;
+        if (divisor === 0) continue;
+        teamAvgBars.push({
+          label: team,
+          segments: [...data.segTotals.entries()].map(([key, val]) => ({
+            key,
+            value: Math.round(val / divisor),
+          })),
+          total: Math.round(data.sumTotal / divisor),
+          insertions: Math.round(data.sumIns / divisor),
+          deletions: Math.round(data.sumDel / divisor),
+          testPct: Math.round(data.sumTestPct / divisor),
+          commits: Math.round(data.sumCommits / divisor),
+          activeDays: Math.round(data.sumActiveDays / divisor),
+          headcount: data.memberCount,
+          isAverage: true,
+        });
+      }
+      if (teamAvgBars.length > 0) {
+        groups.push({ groupLabel: 'Team Avg', bars: teamAvgBars, isSummary: true });
+      }
+    }
   }
 
   const trendPct = ctx.config.settings.trend_threshold;
@@ -980,7 +1109,7 @@ function renderContributionsTab(
 
   // ── Footer: aggregate totals + avg per period + legend ──
   const allBucketWeeks = buckets.flatMap((b) => b.weeks);
-  const windowRecords = filterRecords(ctx.records, { weeks: allBucketWeeks });
+  const windowRecords = filterRecords(recs, { weeks: allBucketWeeks });
   const agg = rollup(windowRecords, () => '__all__').get('__all__');
   const periodCount = buckets.length;
 
@@ -1023,8 +1152,9 @@ function renderContributionsTab(
     chalk.dim('  ') +
     chalk.green('\u25B2') + chalk.dim(' above avg  ') +
     chalk.red('\u25BC') + chalk.dim(' below avg  ') +
-    chalk.dim(`\u25CB within ${trendPctLabel}%  `) +
-    chalk.dim(`(avg across ${rangeLabel})`),
+    chalk.bgGreen.black('\u25B2') + chalk.dim(' above avg+team  ') +
+    chalk.bgRed.black('\u25BC') + chalk.dim(' below avg+team  ') +
+    chalk.dim(`\u25CB within ${trendPctLabel}%`),
   );
 }
 
@@ -1086,6 +1216,7 @@ function mapKey(
       if (keyName === 't') return 'contrib_toggle_tag';
       if (keyName === 'd') return 'contrib_toggle_detail';
       if (keyName === 'v') return 'contrib_toggle_pivot';
+      if (keyName === 'h') return 'contrib_toggle_unassigned';
       // Numbered team drill-down
       for (const t of numberedTeams) {
         if (keyName === t.key) return `team:${t.teamName}`;
@@ -1114,6 +1245,9 @@ function mapKey(
       if (keyName === 'return') return 'manage_action_selected';
       if (keyName === 'x' || keyName === 'backspace') return 'manage_remove_repo';
       if (keyName === 'n') return 'manage_new_org';
+      if (keyName === '+' || keyName === '=') return 'manage_add_team';
+      if (keyName === '-') return 'manage_remove_team';
+      if (keyName === 'u') return 'manage_unassign_author';
       if (keyName === 'e') return 'manage_export';
       if (keyName === 'p') return 'manage_bulk_assign';
       break;
@@ -1132,6 +1266,7 @@ function buildHotkeyItems(
   contribDepth: number,
   contribDetail: boolean,
   contribPivotEntity: boolean,
+  contribHideUnassigned: boolean,
   repoWindow: WindowSize,
   lbWindow: WindowSize,
 ): Array<{ key: string; label: string }> {
@@ -1153,6 +1288,7 @@ function buildHotkeyItems(
       items.push({ key: '\u2190/\u2192', label: `${contribDepth}${granShort}` });
       items.push({ key: contribDetail ? '[D]' : 'D', label: 'Detail' });
       items.push({ key: contribPivotEntity ? '[V]' : 'V', label: contribPivotEntity ? 'By Entity' : 'By Time' });
+      items.push({ key: contribHideUnassigned ? 'H' : '[H]', label: contribHideUnassigned ? 'Show all' : 'Assigned' });
       break;
     }
     case 'repo_activity':
@@ -1190,6 +1326,7 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
   let contribDepth: number = ctx.config.settings.weeks_back;
   let contribShowDetail = false;
   let contribPivotEntity = false;
+  let contribHideUnassigned = true;
   let repoWindowWeeks: WindowSize = initialWindow;
   let leaderboardWindowWeeks: WindowSize = initialWindow;
   let manageSection: ManageSectionId = 'repos';
@@ -1239,11 +1376,12 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
         manageSection,
         ctx.config.repos.length > 0,
         (ctx.authorRegistry ? Object.keys(ctx.authorRegistry.authors).length : 0) > 0,
+        ctx.config.orgs.length > 0,
       );
     } else {
       hotkeys = buildHotkeyItems(
         activeTab, contribDrillLevel, contribTagOverlay, contribGranularity, contribDepth,
-        contribShowDetail, contribPivotEntity, repoWindowWeeks, leaderboardWindowWeeks,
+        contribShowDetail, contribPivotEntity, contribHideUnassigned, repoWindowWeeks, leaderboardWindowWeeks,
       );
     }
     console.log(renderHotkeyBar(hotkeys));
@@ -1265,12 +1403,16 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
       : contribGranularity === 'quarter' ? 'Quarter' : 'Year';
 
     // Tab content
+    const contribRecords = contribHideUnassigned
+      ? ctx.records.filter((r) => r.org !== 'unassigned')
+      : ctx.records;
+
     switch (activeTab) {
       case 'contributions':
         if (contribShowDetail) {
-          renderContributionsDetailTab(ctx, contribDrillLevel, contribTagOverlay, contribPivotEntity, contribBuckets, contribRangeLabel, contribPeriodLabel, termCols);
+          renderContributionsDetailTab(ctx, contribDrillLevel, contribTagOverlay, contribPivotEntity, contribBuckets, contribRangeLabel, contribPeriodLabel, termCols, contribRecords);
         } else {
-          renderContributionsTab(ctx, contribDrillLevel, contribTagOverlay, contribPivotEntity, contribBuckets, contribGranularity, contribRangeLabel, termCols, contribLabelWidth);
+          renderContributionsTab(ctx, contribDrillLevel, contribTagOverlay, contribPivotEntity, contribBuckets, contribGranularity, contribRangeLabel, termCols, contribLabelWidth, contribRecords);
         }
         break;
       case 'repo_activity':
@@ -1366,6 +1508,8 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
       if (action === 'contrib_toggle_detail') { contribShowDetail = !contribShowDetail; continue; }
       // Contributions: pivot toggle (time-first ↔ entity-first)
       if (action === 'contrib_toggle_pivot') { contribPivotEntity = !contribPivotEntity; continue; }
+      // Contributions: show/hide unassigned authors
+      if (action === 'contrib_toggle_unassigned') { contribHideUnassigned = !contribHideUnassigned; continue; }
 
       // Repo Activity window
       if (action === 'repo_window_4') { repoWindowWeeks = 4; continue; }
@@ -1456,7 +1600,7 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
         continue;
       }
 
-      // Manage tab: assign selected author (Enter in authors section)
+      // Manage tab: assign/move selected author (Enter in authors section)
       if (action === 'manage_action_selected' && manageSection === 'authors') {
         if (manageAuthorIdx >= 0 && manageAuthorIdx < manageAuthorGroups.length && ctx.authorRegistry) {
           const emails = manageAuthorGroups[manageAuthorIdx];
@@ -1475,14 +1619,61 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
           const emailLabel = emails.length > 1
             ? chalk.dim(` (${emails.length} emails)`)
             : chalk.dim(` <${firstAuthor.email}>`);
-          console.log(chalk.bold(`  Assign: ${firstAuthor.name}`) + emailLabel);
+          const isReassign = !!firstAuthor.org;
+          const verb = isReassign ? 'Move' : 'Assign';
+          console.log(chalk.bold(`  ${verb}: ${firstAuthor.name}`) + emailLabel);
+          if (isReassign) {
+            console.log(chalk.dim(`  Currently: ${firstAuthor.org} → ${firstAuthor.team}`));
+          }
           console.log('');
+
+          // If already assigned, offer quick "change team within same org"
+          const currentOrg = isReassign
+            ? ctx.config.orgs.find((o) => o.name === firstAuthor.org)
+            : undefined;
+          if (currentOrg && currentOrg.teams.length > 1) {
+            console.log(chalk.dim(`  Change team within ${currentOrg.name}:`));
+            for (let i = 0; i < currentOrg.teams.length; i++) {
+              const isCurrent = currentOrg.teams[i].name === firstAuthor.team;
+              const marker = isCurrent ? chalk.green(' ●') : '  ';
+              console.log(`  ${chalk.cyan(String(i + 1))}  ${currentOrg.teams[i].name}${marker}`);
+            }
+            console.log(`  ${chalk.cyan('O')}  Pick different org`);
+            console.log(`  ${chalk.dim('Esc')}  Cancel\n`);
+
+            const teamOrOrgChoice = await readKey();
+            if (teamOrOrgChoice.name === 'escape') { continue; }
+
+            if (teamOrOrgChoice.name !== 'o') {
+              // Quick team change within same org
+              const teamIdx = parseInt(teamOrOrgChoice.name, 10) - 1;
+              if (isNaN(teamIdx) || teamIdx < 0 || teamIdx >= currentOrg.teams.length) { continue; }
+              const teamName = currentOrg.teams[teamIdx].name;
+
+              for (const email of emails) {
+                ctx.authorRegistry = assignAuthor(ctx.authorRegistry, email, currentOrg.name, teamName);
+              }
+              if (ctx.onSaveAuthorRegistry) {
+                await ctx.onSaveAuthorRegistry(ctx.authorRegistry);
+              }
+              ctx.records = reattributeRecords(ctx.records, ctx.config, ctx.authorRegistry);
+              const countLabel = emails.length > 1 ? ` (${emails.length} emails)` : '';
+              console.log(chalk.green(`  Moved to ${currentOrg.name} → ${teamName}${countLabel}`));
+              console.log(chalk.dim('  Press any key to continue.'));
+              await readKey();
+              continue;
+            }
+            // Fall through to full org picker
+            console.log('');
+          }
 
           // Pick org
           for (let i = 0; i < ctx.config.orgs.length; i++) {
             const o = ctx.config.orgs[i];
             const prefix = o.type === 'core' ? '\u2605' : '\u25C6';
-            console.log(`  ${chalk.cyan(String(i + 1))}  ${prefix} ${o.name}`);
+            const isCurrent = isReassign && o.name === firstAuthor.org;
+            const marker = isCurrent ? chalk.green(' ●') : '';
+            console.log(`  ${chalk.cyan(String(i + 1))}  ${prefix} ${o.name}${marker}`);
           }
           console.log(`  ${chalk.dim('Esc')}  Cancel\n`);
 
@@ -1499,7 +1690,9 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
           } else {
             console.log('');
             for (let i = 0; i < selectedOrg.teams.length; i++) {
-              console.log(`  ${chalk.cyan(String(i + 1))}  ${selectedOrg.teams[i].name}`);
+              const isCurrent = isReassign && selectedOrg.name === firstAuthor.org && selectedOrg.teams[i].name === firstAuthor.team;
+              const marker = isCurrent ? chalk.green(' ●') : '';
+              console.log(`  ${chalk.cyan(String(i + 1))}  ${selectedOrg.teams[i].name}${marker}`);
             }
             console.log(`  ${chalk.dim('Esc')}  Cancel\n`);
 
@@ -1520,7 +1713,51 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
           // Re-attribute existing records with updated author assignments
           ctx.records = reattributeRecords(ctx.records, ctx.config, ctx.authorRegistry);
           const countLabel = emails.length > 1 ? ` (${emails.length} emails)` : '';
-          console.log(chalk.green(`  Assigned to ${selectedOrg.name} → ${teamName}${countLabel}`));
+          console.log(chalk.green(`  ${isReassign ? 'Moved' : 'Assigned'} to ${selectedOrg.name} → ${teamName}${countLabel}`));
+
+          console.log(chalk.dim('  Press any key to continue.'));
+          await readKey();
+        }
+        continue;
+      }
+
+      // Manage tab: unassign selected author
+      if (action === 'manage_unassign_author' && manageSection === 'authors') {
+        if (manageAuthorIdx >= 0 && manageAuthorIdx < manageAuthorGroups.length && ctx.authorRegistry) {
+          const emails = manageAuthorGroups[manageAuthorIdx];
+          const firstAuthor = ctx.authorRegistry.authors[emails[0].toLowerCase()];
+          if (!firstAuthor) { continue; }
+
+          if (!firstAuthor.org) {
+            process.stdout.write('\n');
+            console.log(chalk.dim(`  ${firstAuthor.name} is already unassigned.`));
+            console.log(chalk.dim('  Press any key to continue.'));
+            await readKey();
+            continue;
+          }
+
+          process.stdout.write('\n');
+          const emailLabel = emails.length > 1
+            ? chalk.dim(` (${emails.length} emails)`)
+            : chalk.dim(` <${firstAuthor.email}>`);
+          console.log(chalk.bold(`  Unassign: ${firstAuthor.name}`) + emailLabel);
+          console.log(chalk.dim(`  Currently: ${firstAuthor.org} → ${firstAuthor.team}`));
+          console.log('');
+          console.log(`  ${chalk.cyan('Y')}  Confirm unassign`);
+          console.log(`  ${chalk.dim('Esc')}  Cancel\n`);
+
+          const confirm = await readKey();
+          if (confirm.name !== 'y') { continue; }
+
+          for (const email of emails) {
+            ctx.authorRegistry = unassignAuthor(ctx.authorRegistry, email);
+          }
+          if (ctx.onSaveAuthorRegistry) {
+            await ctx.onSaveAuthorRegistry(ctx.authorRegistry);
+          }
+          ctx.records = reattributeRecords(ctx.records, ctx.config, ctx.authorRegistry);
+          const countLabel = emails.length > 1 ? ` (${emails.length} emails)` : '';
+          console.log(chalk.green(`  Unassigned ${firstAuthor.name}${countLabel}`));
 
           console.log(chalk.dim('  Press any key to continue.'));
           await readKey();
@@ -1758,6 +1995,171 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
           console.log(chalk.green(`\n  Organization "${newOrg.name}" added (runtime only).`));
         }
 
+        console.log(chalk.dim('\n  Press any key to continue.'));
+        await readKey();
+        continue;
+      }
+
+      // Manage tab: add team to existing org
+      if (action === 'manage_add_team' && manageSection === 'orgs') {
+        if (ctx.config.orgs.length === 0) { continue; }
+
+        process.stdout.write('\x1B[2J\x1B[3J\x1B[H');
+        console.log(chalk.bold('Add Team to Organization\n'));
+
+        // Pick org
+        for (let i = 0; i < ctx.config.orgs.length; i++) {
+          const o = ctx.config.orgs[i];
+          const prefix = o.type === 'core' ? '\u2605' : '\u25C6';
+          const teamCount = chalk.dim(`(${o.teams.length} team${o.teams.length !== 1 ? 's' : ''})`);
+          console.log(`  ${chalk.cyan(String(i + 1))}  ${prefix} ${o.name} ${teamCount}`);
+        }
+        console.log(`  ${chalk.dim('Esc')}  Cancel\n`);
+
+        const orgChoice = await readKey();
+        if (orgChoice.name === 'escape') { continue; }
+        const orgIdx = parseInt(orgChoice.name, 10) - 1;
+        if (isNaN(orgIdx) || orgIdx < 0 || orgIdx >= ctx.config.orgs.length) { continue; }
+        const selectedOrg = ctx.config.orgs[orgIdx];
+
+        // Show existing teams
+        console.log(chalk.dim(`  Existing teams in ${selectedOrg.name}: ${selectedOrg.teams.map((t) => t.name).join(', ')}\n`));
+
+        // Team name
+        const teamName = await readLine(chalk.cyan('  Team name: '));
+        if (!teamName?.trim()) { continue; }
+
+        // Check for duplicate
+        if (selectedOrg.teams.some((t) => t.name.toLowerCase() === teamName.trim().toLowerCase())) {
+          console.log(chalk.yellow(`\n  Team "${teamName.trim()}" already exists in ${selectedOrg.name}.`));
+          console.log(chalk.dim('  Press any key to continue.'));
+          await readKey();
+          continue;
+        }
+
+        // Tag
+        const teamTag = await readLine(
+          chalk.cyan('  Team tag ') + chalk.dim('(default): '),
+        ) ?? '';
+
+        selectedOrg.teams.push({
+          name: teamName.trim(),
+          tag: teamTag.trim() || 'default',
+          members: [],
+        });
+
+        if (ctx.onAddOrg) {
+          try {
+            await ctx.onAddOrg(selectedOrg);
+            console.log(chalk.green(`\n  Team "${teamName.trim()}" added to ${selectedOrg.name} and saved.`));
+          } catch (err) {
+            console.log(chalk.red(`\n  Error saving: ${err instanceof Error ? err.message : err}`));
+          }
+        } else {
+          console.log(chalk.green(`\n  Team "${teamName.trim()}" added to ${selectedOrg.name} (runtime only).`));
+        }
+
+        console.log(chalk.dim(`  Teams: ${selectedOrg.teams.map((t) => t.name).join(', ')}`));
+        console.log(chalk.dim('\n  Press any key to continue.'));
+        await readKey();
+        continue;
+      }
+
+      // Manage tab: remove team from org
+      if (action === 'manage_remove_team' && manageSection === 'orgs') {
+        if (ctx.config.orgs.length === 0) { continue; }
+
+        process.stdout.write('\x1B[2J\x1B[3J\x1B[H');
+        console.log(chalk.bold('Remove Team from Organization\n'));
+
+        // Pick org
+        for (let i = 0; i < ctx.config.orgs.length; i++) {
+          const o = ctx.config.orgs[i];
+          const prefix = o.type === 'core' ? '\u2605' : '\u25C6';
+          const teamCount = chalk.dim(`(${o.teams.length} team${o.teams.length !== 1 ? 's' : ''})`);
+          console.log(`  ${chalk.cyan(String(i + 1))}  ${prefix} ${o.name} ${teamCount}`);
+        }
+        console.log(`  ${chalk.dim('Esc')}  Cancel\n`);
+
+        const orgChoice = await readKey();
+        if (orgChoice.name === 'escape') { continue; }
+        const orgIdx = parseInt(orgChoice.name, 10) - 1;
+        if (isNaN(orgIdx) || orgIdx < 0 || orgIdx >= ctx.config.orgs.length) { continue; }
+        const selectedOrg = ctx.config.orgs[orgIdx];
+
+        if (selectedOrg.teams.length <= 1) {
+          console.log(chalk.yellow(`  ${selectedOrg.name} has only one team — cannot remove the last team.`));
+          console.log(chalk.dim('  Press any key to continue.'));
+          await readKey();
+          continue;
+        }
+
+        // Pick team to remove
+        console.log(chalk.dim(`  Select team to remove from ${selectedOrg.name}:\n`));
+        for (let i = 0; i < selectedOrg.teams.length; i++) {
+          const t = selectedOrg.teams[i];
+          const memberCount = t.members.length > 0 ? chalk.dim(` (${t.members.length} members)`) : '';
+          console.log(`  ${chalk.cyan(String(i + 1))}  ${t.name}${memberCount}`);
+        }
+        console.log(`  ${chalk.dim('Esc')}  Cancel\n`);
+
+        const teamChoice = await readKey();
+        if (teamChoice.name === 'escape') { continue; }
+        const teamIdx = parseInt(teamChoice.name, 10) - 1;
+        if (isNaN(teamIdx) || teamIdx < 0 || teamIdx >= selectedOrg.teams.length) { continue; }
+        const teamToRemove = selectedOrg.teams[teamIdx];
+
+        // Check if authors are assigned to this team
+        const assignedCount = ctx.authorRegistry
+          ? Object.values(ctx.authorRegistry.authors).filter(
+              (a) => a.org === selectedOrg.name && a.team === teamToRemove.name,
+            ).length
+          : 0;
+
+        if (assignedCount > 0) {
+          console.log(chalk.yellow(`\n  ${assignedCount} author${assignedCount !== 1 ? 's' : ''} assigned to "${teamToRemove.name}".`));
+          console.log(chalk.yellow('  They will become unassigned.'));
+        }
+
+        console.log(`\n  ${chalk.red('Remove')} "${teamToRemove.name}" from ${selectedOrg.name}?`);
+        console.log(`  ${chalk.cyan('Y')}  Confirm`);
+        console.log(`  ${chalk.dim('Esc')}  Cancel\n`);
+
+        const confirm = await readKey();
+        if (confirm.name !== 'y') { continue; }
+
+        // Remove the team
+        selectedOrg.teams.splice(teamIdx, 1);
+
+        // Unassign authors that were on this team
+        if (assignedCount > 0 && ctx.authorRegistry) {
+          for (const author of Object.values(ctx.authorRegistry.authors)) {
+            if (author.org === selectedOrg.name && author.team === teamToRemove.name) {
+              author.org = undefined;
+              author.team = undefined;
+            }
+          }
+          if (ctx.onSaveAuthorRegistry) {
+            await ctx.onSaveAuthorRegistry(ctx.authorRegistry);
+          }
+          ctx.records = reattributeRecords(ctx.records, ctx.config, ctx.authorRegistry);
+        }
+
+        if (ctx.onAddOrg) {
+          try {
+            await ctx.onAddOrg(selectedOrg);
+            console.log(chalk.green(`  Team "${teamToRemove.name}" removed from ${selectedOrg.name}.`));
+          } catch (err) {
+            console.log(chalk.red(`  Error saving: ${err instanceof Error ? err.message : err}`));
+          }
+        } else {
+          console.log(chalk.green(`  Team "${teamToRemove.name}" removed (runtime only).`));
+        }
+
+        if (assignedCount > 0) {
+          console.log(chalk.dim(`  ${assignedCount} author${assignedCount !== 1 ? 's' : ''} unassigned.`));
+        }
+        console.log(chalk.dim(`  Remaining teams: ${selectedOrg.teams.map((t) => t.name).join(', ')}`));
         console.log(chalk.dim('\n  Press any key to continue.'));
         await readKey();
         continue;
