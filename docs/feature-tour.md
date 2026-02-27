@@ -9,31 +9,63 @@ A walkthrough of every feature in the GitRadar TUI, organized by how you'd use t
 ### Default: Interactive Dashboard
 
 ```bash
-gitradar                     # launch the full TUI
-gitradar --demo              # use synthetic data (no repos needed)
-gitradar -w 8 --team Platform # filter to 8 weeks, Platform team only
+gitradar                           # launch the full TUI
+gitradar --demo                    # use synthetic data (no repos needed)
+gitradar --workspace my-workspace  # launch a specific workspace
 ```
 
 ### Scan Only
 
 ```bash
-gitradar scan                # scan repos, print results, exit (no TUI)
-gitradar scan --force-scan   # full re-scan ignoring staleness
+gitradar scan                      # scan repos, print results, exit (no TUI)
+gitradar scan --force-scan         # full re-scan ignoring staleness
 ```
 
-### Trends Direct
+### Workspace Management
 
 ```bash
-gitradar trends              # jump straight to the trends screen
+gitradar workspace create my-team --label "My Team"   # create workspace
+gitradar workspace list                                # list workspaces
+```
+
+### Repo Management
+
+```bash
+gitradar repo list                    # list repos in current workspace
+gitradar repo add ~/code/my-project   # discover and add repos from directory
+gitradar repo remove frontend-app     # remove a repo
+```
+
+### Org & Author Management
+
+```bash
+gitradar org list                                          # list orgs and teams
+gitradar org add --name "Acme" --type core --team Platform --tag infra
+gitradar org add-team --name "Acme" --team Mobile --tag mobile
+
+gitradar author list                                       # list discovered authors
+gitradar author list --unassigned                          # show only unassigned
+gitradar author assign alice@co.com --org Acme --team Platform
+gitradar author bulk-assign --prefix CON --org ContractCo --team Squad
+```
+
+### View Commands (non-interactive)
+
+```bash
+gitradar view contributions --json              # JSON output
+gitradar view contributions --group-by team     # group by team
+gitradar view leaderboard -w 8                  # top performers, 8 weeks
+gitradar view repo-activity                     # repo activity summary
+gitradar view trends                            # jump to trends screen
 ```
 
 ### Data Management
 
 ```bash
-gitradar --store-stats       # print record count, orgs, teams, week range
-gitradar --prune 90          # drop records older than 90 days
-gitradar --reset             # delete all data files, start fresh
-gitradar --json              # dump filtered records as JSON to stdout
+gitradar data export                # portable YAML export (no local paths)
+gitradar data export-csv            # CSV export to stdout
+gitradar data export-csv -o out.csv # CSV export to file
+gitradar data import backup.yml     # import workspace from YAML
 ```
 
 ### Filtering Flags
@@ -47,21 +79,40 @@ All filters apply globally and can be combined:
 | `--tag infrastructure` | Show only one tag |
 | `--group backend` | Show only repos in a group |
 | `-w 8` | Override weeks of history |
+| `--workspace <name>` | Select workspace |
 
 ---
 
 ## 2. Dashboard Tabs
 
-The dashboard is the main screen. Four tabs are accessible via single-keypress hotkeys.
+The dashboard is the main screen. Four tabs are accessible via single-keypress hotkeys or Tab cycling.
 
 ### Tab C: Contributions
 
-The default landing tab. Shows a **grouped stacked horizontal bar chart** of lines changed per week.
+The default landing tab. Shows a **grouped stacked horizontal bar chart** of lines changed, with full drill-down, pivot, and granularity controls.
 
-- **Expand modes**: Press `O` for org-level, `E` for team-level, `G` for tag-level
-- **Time windows**: Press `W` to cycle through 4 weeks, 8 weeks, and 3 months
-- **Detail table**: Press `D` to toggle between the chart and a data table showing commits, avg size, files added/deleted, lines added/deleted, and net per group per week
-- **Drill-down**: Press `1`-`9` to jump into a numbered team's detail view
+#### Drill Levels
+
+Navigate the org hierarchy with arrow keys:
+
+- **↓** — Drill deeper: org → team → user
+- **↑** — Drill up: user → team → org
+
+At each level, entities are numbered (`1`-`9`) and you can press a number to jump into a team's detail view.
+
+#### Granularity & Time Window
+
+- **+/-** — Switch granularity: week → month → quarter → year (and back)
+- **←/→** — Extend or shrink the time window (e.g., 12 weeks → 14 weeks, or 6 months → 4 months)
+
+Each granularity has its own depth range. Weeks: 2–24, months: 2–12, quarters: 2–8, years: 1–5.
+
+#### Modes & Toggles
+
+- **T** — Toggle tag overlay (group by tag instead of org/team)
+- **D** — Toggle between chart and detail data table (commits, avg size, files, lines per group per time bucket)
+- **V** — Pivot: toggle between "by time" (time buckets as groups, entities as bars) and "by entity" (entities as groups, time buckets as bars)
+- **H** — Toggle unassigned author visibility (hidden by default)
 
 Each bar is color-coded by file type:
 - `█` green = app code
@@ -70,15 +121,6 @@ Each bar is color-coded by file type:
 - `▒` magenta = storybook
 
 Core teams are prefixed with `★`, consultants with `◆`.
-
-### Tab A: Avg Output
-
-Shows **per-person average output** with a running average marker (`◈`).
-
-- Each bar = this week's avg lines/person for the group
-- The `◈` marker = 3-month running average per person
-- Bar past marker = above-average week; bar short = below-average
-- Toggle between org-level (`O`) and team-level (`E`) grouping
 
 ### Tab R: Repo Activity
 
@@ -96,6 +138,46 @@ Shows **per-person average output** with a running average marker (`◈`).
 - Top 5 contributors per category
 - Each entry shows: rank, name, value, team, and a mini stacked bar
 - Time windows: `1` (4 weeks), `2` (8 weeks), `3` (3 months)
+
+### Tab M: Manage
+
+Full configuration management without leaving the TUI. Five sub-sections accessible via hotkeys:
+
+#### Repos Section (R)
+
+- **D** — Add repos: scan a directory path to discover git repos
+- **↑↓** — Select a repo
+- **⏎** — Collect (scan) the selected repo
+- **S** — Collect all repos
+- **X** — Remove the selected repo
+
+#### Orgs Section (O)
+
+- **N** — Create a new organization (prompts for name, type, team, tag)
+- **+** — Add a team to an existing org
+- **-** — Remove a team from an org (warns if authors are assigned, unassigns them)
+
+#### Authors Section (A)
+
+Shows all discovered authors from git history, grouped by assignment status.
+
+- **↑↓** — Select an author
+- **⏎** — Assign or move: pick org → pick team. Shows current assignment with `●` marker. Offers quick team change within same org.
+- **U** — Unassign the selected author (with Y/N confirmation)
+- **P** — Bulk assign by identifier prefix: assign all authors whose name, email, or identifier matches a prefix
+
+#### Groups Section (G)
+
+Shows repo groups and their member repos.
+
+#### Tags Section (T)
+
+Shows team tags and which teams use each tag.
+
+#### Global Manage Actions
+
+- **E** — Export workspace data as portable YAML
+- **Q** — Quit
 
 ---
 
@@ -143,7 +225,7 @@ Accessed from the Team Detail view by pressing a member's number.
 
 ## 5. Trends View
 
-Full-screen historical analysis. Accessed from the dashboard by pressing `T`.
+Full-screen historical analysis. Accessed from the CLI via `gitradar view trends`.
 
 ### Sections
 
@@ -151,14 +233,6 @@ Full-screen historical analysis. Accessed from the dashboard by pressing `T`.
 2. **File Type Breakdown (12 weeks)** — Full grouped horizontal bars for every week in the window
 3. **Avg Output per Person (sparklines)** — Per-team sparkline using `▁▂▃▄▅▆▇█` characters, avg lines/person/week, and running average value
 4. **Test Ratio Sparkline** — Per-team test ratio trend with direction indicator (up/flat/down)
-
-### Expand Modes
-
-- `O` — Group by org
-- `E` — Group by team
-- `G` — Group by tag
-- `B` — Back to dashboard
-- `Q` — Quit
 
 ---
 
@@ -195,7 +269,33 @@ Terminal output during scan:
 
 ---
 
-## 8. Demo Mode
+## 8. Author Discovery & Assignment
+
+GitRadar automatically discovers authors from git history and maintains an author registry.
+
+### Discovery
+
+Every git commit author (email + name) is recorded in `~/.agentx/gitradar/data/authors.json` with:
+- First seen / last seen dates
+- Repos seen in
+- Total commit count
+- Extracted identifier (e.g., "Edwin Cruz (CONEWC)" → identifier "CONEWC")
+
+### Assignment
+
+Authors can be assigned to orgs/teams via:
+1. **Config members** — Directly listed in `config.yml` with email, name, aliases
+2. **TUI Manage tab** — Interactive assign/move/unassign from the Authors section
+3. **CLI commands** — `gitradar author assign` and `gitradar author bulk-assign`
+4. **Identifier rules** — Orgs with an `identifier` prefix auto-match authors by their parenthesized code
+
+### Reattribution
+
+When author assignments change, records are reattributed on startup. The `reattributeRecords()` function re-resolves each record's org/team/tag using the current author map and registry, ensuring data always reflects the latest assignments.
+
+---
+
+## 9. Demo Mode
 
 ```bash
 gitradar --demo
@@ -214,7 +314,7 @@ Useful for evaluation, demos, and UI development without real repositories.
 
 ---
 
-## 9. Configuration
+## 10. Configuration
 
 Single YAML file at `~/.agentx/gitradar/config.yml`:
 
@@ -227,6 +327,7 @@ repos:
 orgs:
   - name: Acme Corp
     type: core
+    identifier: ACM        # optional: auto-assign authors with this prefix
     teams:
       - name: Platform
         tag: infrastructure
@@ -245,27 +346,70 @@ Key configuration features:
 - **Groups** — Categorize repos (web, backend, mobile, etc.)
 - **Tags** — Cross-team categorization (infrastructure, feature, analytics)
 - **Org types** — Distinguish `core` teams from `consultant` teams
+- **Identifiers** — Auto-assign authors based on parenthesized codes in git names
 - **Path resolution** — Supports `~` expansion and relative paths (resolved against config location)
 
 ---
 
-## 10. Keyboard Reference
+## 11. Keyboard Reference
 
-### Dashboard
+### Dashboard — Contributions Tab
 
 | Key | Action |
 |-----|--------|
-| `C` | Contributions tab |
-| `A` | Avg Output tab |
-| `R` | Repo Activity tab |
-| `P` | Top Performers tab |
-| `E` | Expand by team |
-| `G` | Expand by tag |
-| `O` | Collapse to org |
-| `W` | Cycle time window |
+| `↓` | Drill deeper (org → team → user) |
+| `↑` | Drill up (user → team → org) |
+| `T` | Toggle tag overlay |
+| `+`/`-` | Finer/coarser granularity (week ↔ month ↔ quarter ↔ year) |
+| `←`/`→` | Shrink/extend time window |
 | `D` | Toggle chart/detail table |
+| `V` | Pivot: by time ↔ by entity |
+| `H` | Toggle unassigned author visibility |
 | `1`-`9` | Drill into numbered team |
-| `T` | Open Trends view |
+| `Tab` | Next tab |
+| `Q` | Quit |
+
+### Dashboard — Repo Activity Tab
+
+| Key | Action |
+|-----|--------|
+| `1` | 4 weeks window |
+| `2` | 8 weeks window |
+| `3` | 3 months window |
+| `Tab` | Next tab |
+| `Q` | Quit |
+
+### Dashboard — Top Performers Tab
+
+| Key | Action |
+|-----|--------|
+| `1` | 4 weeks window |
+| `2` | 8 weeks window |
+| `3` | 3 months window |
+| `Tab` | Next tab |
+| `Q` | Quit |
+
+### Dashboard — Manage Tab
+
+| Key | Action |
+|-----|--------|
+| `R` | Repos section |
+| `O` | Orgs section |
+| `A` | Authors section |
+| `G` | Groups section |
+| `T` | Tags section |
+| `↑`/`↓` | Select item |
+| `⏎` | Action on selected (collect repo / assign author) |
+| `D` | Add repos from directory |
+| `S` | Collect all repos |
+| `X` | Remove selected repo |
+| `N` | New organization |
+| `+` | Add team to org |
+| `-` | Remove team from org |
+| `U` | Unassign selected author |
+| `P` | Bulk assign by prefix |
+| `E` | Export workspace |
+| `Tab` | Next tab |
 | `Q` | Quit |
 
 ### Team Detail
@@ -281,14 +425,4 @@ Key configuration features:
 | Key | Action |
 |-----|--------|
 | `B` | Back to team |
-| `Q` | Quit |
-
-### Trends
-
-| Key | Action |
-|-----|--------|
-| `E` | Expand by team |
-| `G` | Expand by tag |
-| `O` | Collapse to org |
-| `B` | Back to dashboard |
 | `Q` | Quit |
