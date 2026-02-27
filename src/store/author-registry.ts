@@ -113,6 +113,27 @@ export function assignAuthor(
 }
 
 /**
+ * Unassign an author (clear org and team).
+ * Returns the updated registry.
+ */
+export function unassignAuthor(
+  registry: AuthorRegistry,
+  email: string,
+): AuthorRegistry {
+  const key = email.toLowerCase();
+  const existing = registry.authors[key];
+  if (!existing) return registry;
+
+  return {
+    ...registry,
+    authors: {
+      ...registry.authors,
+      [key]: { ...existing, org: undefined, team: undefined },
+    },
+  };
+}
+
+/**
  * Bulk-assign all authors whose identifier starts with a given prefix.
  * Returns the updated registry and the count of authors assigned.
  */

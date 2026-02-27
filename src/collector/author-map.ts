@@ -184,7 +184,19 @@ export function reattributeRecords(
 
   return records.map((r) => {
     const resolved = resolveAuthor(map, r.email, r.member, rules);
-    if (!resolved) return r;
+
+    if (!resolved) {
+      // Author not in the map — check if they're explicitly unassigned in the registry.
+      // If so, force record to unassigned (don't keep stale org/team from disk).
+      if (authorRegistry) {
+        const regEntry = authorRegistry.authors[r.email.toLowerCase()];
+        if (regEntry && !regEntry.org && r.org !== 'unassigned') {
+          return { ...r, org: 'unassigned', orgType: 'core' as const, team: 'unassigned', tag: 'default' };
+        }
+      }
+      return r;
+    }
+
     if (
       resolved.org === r.org &&
       resolved.orgType === r.orgType &&
