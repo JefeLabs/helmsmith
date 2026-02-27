@@ -1,0 +1,50 @@
+import { loadConfig, saveConfig } from '../config/loader.js';
+import type { Org } from '../types/schema.js';
+
+export interface AddOrgOptions {
+  name: string;
+  type: 'core' | 'consultant';
+  identifier?: string;
+  team: string;
+  tag?: string;
+  config?: string;
+}
+
+export async function addOrg(options: AddOrgOptions): Promise<void> {
+  let config;
+  try {
+    config = await loadConfig(options.config);
+  } catch {
+    config = { repos: [], orgs: [], groups: {}, tags: {}, settings: { weeks_back: 12, staleness_minutes: 60, trend_threshold: 0.10 } };
+  }
+
+  // Check for duplicate org name
+  if (config.orgs.some((o) => o.name.toLowerCase() === options.name.toLowerCase())) {
+    console.error(`Organization "${options.name}" already exists.`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const newOrg: Org = {
+    name: options.name,
+    type: options.type,
+    identifier: options.identifier,
+    teams: [
+      {
+        name: options.team,
+        tag: options.tag ?? 'default',
+        members: [],
+      },
+    ],
+  };
+
+  config.orgs.push(newOrg);
+  await saveConfig(options.config, { orgs: config.orgs });
+
+  const typeIcon = options.type === 'core' ? '★' : '◆';
+  console.log(`Created org: ${typeIcon} ${options.name} (${options.type})`);
+  console.log(`  Team: ${options.team}${options.tag ? ` [${options.tag}]` : ''}`);
+  if (options.identifier) {
+    console.log(`  Identifier prefix: ${options.identifier}`);
+  }
+}

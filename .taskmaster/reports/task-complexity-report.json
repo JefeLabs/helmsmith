@@ -1,0 +1,93 @@
+{
+	"meta": {
+		"generatedAt": "2026-02-25T07:48:34.338Z",
+		"tasksAnalyzed": 10,
+		"totalTasks": 10,
+		"analysisCount": 10,
+		"thresholdScore": 5,
+		"projectName": "Task Master",
+		"usedResearch": true
+	},
+	"complexityAnalysis": [
+		{
+			"taskId": 1,
+			"taskTitle": "Project Setup and Core Type Definitions",
+			"complexityScore": 4,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: (1) npm project initialization with all dependencies, (2) TypeScript/ESM configuration, (3) Zod schemas for config/data types in src/types/schema.ts, (4) Path resolution utilities in src/store/paths.ts with home directory expansion. Each subtask should include corresponding tests.",
+			"reasoning": "Moderate complexity. Greenfield setup with clearly specified dependencies and config. The PRD provides exact Zod schema definitions (MemberSchema, TeamSchema, OrgSchema, etc.) making implementation straightforward. Main complexity is ensuring proper ESM configuration with NodeNext module resolution. Path utilities are standard Node.js work with ~ expansion."
+		},
+		{
+			"taskId": 2,
+			"taskTitle": "File Classifier and Config Loader",
+			"complexityScore": 5,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: (1) File classifier with ordered regex rule matching (storybook > test > config > app priority), (2) Visual encoding constants for file types (chars/colors), (3) YAML config loader with Zod validation, (4) Path resolution for repo paths including ~ expansion and relative path handling. Each with comprehensive tests.",
+			"reasoning": "Medium complexity. The classifier requires careful regex pattern design with priority ordering (first match wins). The PRD specifies all patterns clearly. Config loader needs YAML parsing with Zod validation plus path normalization. The tricky part is handling edge cases like '.stories.test.tsx' which should classify as storybook, not test."
+		},
+		{
+			"taskId": 3,
+			"taskTitle": "UI Foundation: Format Utilities and Basic Components",
+			"complexityScore": 5,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: (1) Format utilities (fmt, delta, weekLabel, weekShort) in src/ui/format.ts, (2) ANSI handling utilities (stripAnsi, padRight, padLeft, visualWidth), (3) Legend renderer with inline and styled modes, (4) Sparkline component using block characters ▁▂▃▄▅▆▇█, (5) Inline stacked bar and banner components. Each with unit tests.",
+			"reasoning": "Medium complexity with multiple independent utilities. ANSI-aware string manipulation requires careful implementation for width calculations. Sparkline scaling to min/max is algorithmic. The PRD specifies exact characters and chalk colors. These are foundational components reused everywhere, so quality matters."
+		},
+		{
+			"taskId": 4,
+			"taskTitle": "Data Storage Layer",
+			"complexityScore": 6,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: (1) Scan state loading/saving with atomic writes, (2) Scan state helper functions (getRepoState, updateRepoState, isStale, rotateHashes), (3) Commits data loading/saving with atomic writes, (4) Record merging logic with key-based dedup (member::week::repo), (5) Pruning and auto-prune detection with stats calculation. Each with comprehensive tests.",
+			"reasoning": "Above-medium complexity. The merge logic using composite keys (member::week::repo) and summing metrics requires careful implementation. Atomic file writes (.tmp + rename) are important for data integrity. Hash rotation maintaining max 500 entries needs correct algorithm. Auto-prune detection at >50MB or >100K records adds logic branches."
+		},
+		{
+			"taskId": 5,
+			"taskTitle": "Git Collector with Author Resolution",
+			"complexityScore": 7,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Break down into: (1) Author map builder from config with email/name/alias indexing, (2) Author resolution logic with fallback chain (email → name → alias), (3) Git log parsing with --numstat format extraction, (4) Per-commit processing with classification and ISO week calculation, (5) Hash-based deduplication against recentHashes, (6) scanAllRepos orchestrator with staleness checking and progress output. Each with mocked tests.",
+			"reasoning": "Higher complexity. Integrates multiple systems: simple-git library, file classifier, author map, and storage layer. Git log parsing with --numstat format requires careful regex work. ISO week calculation from commit dates involves date math. Deduplication using hash sets with a 1-day overlap strategy requires careful logic. This is a critical path component."
+		},
+		{
+			"taskId": 6,
+			"taskTitle": "Aggregation Engine and Leaderboard",
+			"complexityScore": 6,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: (1) Generic rollup engine with groupBy function and metric summing, (2) Filter records by multiple dimensions (weeks, org, team, tag, group, member), (3) Leaderboard computation for 4 categories (Overall, App, Test, Config), (4) Trends computation with weekly aggregation and testRatio, (5) Running average and delta calculations. Each with unit tests covering edge cases.",
+			"reasoning": "Above-medium complexity. The rollup engine needs to handle arbitrary groupBy functions while summing all metric fields correctly. Leaderboard requires sorting by different filetype metrics and producing 4 parallel columns. Running average calculation over a 12-week window per team involves date filtering. The PRD provides clear interfaces but the aggregation logic has many moving parts."
+		},
+		{
+			"taskId": 7,
+			"taskTitle": "Chart Components: Grouped HBar and Avg Output",
+			"complexityScore": 7,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: (1) Global max calculation and scale factor computation, (2) Grouped HBar chart rendering with week groups and separators, (3) Segment rendering with proportional character allocation (min 1 char for non-zero), (4) X-axis and legend rendering, (5) Avg Output chart with ◈ running average marker positioning. Include visual snapshot tests.",
+			"reasoning": "Higher complexity. These are the visual centerpieces requiring precise character-level rendering. The grouped structure with week labels and ┤ axis characters needs careful string building. Segment scaling with minimum 1-char guarantee for non-zero values is tricky. The ◈ marker must be positioned correctly relative to the bar end. Core vs consultant (★/◆) prefixes add visual complexity."
+		},
+		{
+			"taskId": 8,
+			"taskTitle": "Table and Line Chart Components",
+			"complexityScore": 8,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Break down into: (1) Column sizing algorithm with fixed/minWidth/flex distribution, (2) ANSI-aware cell rendering with truncation and ellipsis, (3) Table structure with border styles (rounded/minimal/none) and zebra striping, (4) Line chart Y-axis scaling and row rendering, (5) Line character selection (─╭╮╰╯│ for solid, · for dotted), (6) X-axis labels and legend integration. Include visual tests.",
+			"reasoning": "High complexity. The custom table is marked as 'L' (large) in the PRD's implementation order. Column sizing with flex weights is algorithmic. ANSI-aware width calculation using stripAnsi() for all measurements is error-prone. Line chart rendering in terminal requires careful character placement at calculated positions. Multiple series with different styles (solid/dotted) adds complexity."
+		},
+		{
+			"taskId": 9,
+			"taskTitle": "Dashboard and Detail Views",
+			"complexityScore": 9,
+			"recommendedSubtasks": 8,
+			"expansionPrompt": "Break down into: (1) Dashboard layout with 3 sections and height budget management, (2) Team Contribution chart with expand modes (org/team/tag), (3) Avg Output section with running average markers, (4) Top Performers leaderboard with 4 columns and mini bars, (5) Team detail view with member bars, line chart, and tables, (6) Member detail view with weekly bars and repo breakdown, (7) Trends view with 12-week display and sparklines, (8) View menu handling with inquirer prompts. Integration tests required.",
+			"reasoning": "High complexity - this is the largest task. Four distinct view screens, each with multiple sections. The dashboard alone has 3 complex chart sections plus a menu. Expand modes require re-rendering logic. Terminal height adaptation for weeksToShow calculation. Each detail view needs data transformations from records to chart-ready formats. The PRD marks views/dashboard.ts as 'L' (large) with many dependencies."
+		},
+		{
+			"taskId": 10,
+			"taskTitle": "Navigator and CLI Entry Point",
+			"complexityScore": 7,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Break down into: (1) View stack navigator with push/pop/replace/quit actions, (2) ViewContext type and initialization, (3) Commander CLI setup with all options, (4) Startup flow orchestration (load → scan → merge → launch), (5) Special modes handling (--json, --reset, --prune, --store-stats, --demo), (6) Demo data generator with realistic patterns. E2E tests required.",
+			"reasoning": "Above-medium complexity. The navigator is a state machine managing view transitions. CLI needs comprehensive option parsing with commander. Startup flow orchestrates config loading, incremental scanning with progress display (ora), data merging, and view launching. Special modes like --json output and --reset require separate code paths. Demo data generator needs realistic-looking patterns across orgs, teams, and weeks."
+		}
+	]
+}
