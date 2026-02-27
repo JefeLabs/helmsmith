@@ -431,6 +431,7 @@ export function buildManageHotkeyItems(
   activeSection: ManageSection,
   hasRepos: boolean,
   hasAuthors: boolean = false,
+  hasOrgs: boolean = false,
 ): Array<{ key: string; label: string }> {
   const items: Array<{ key: string; label: string }> = [];
 
@@ -455,12 +456,17 @@ export function buildManageHotkeyItems(
   // Org actions
   if (activeSection === 'orgs') {
     items.push({ key: 'N', label: 'New org' });
+    if (hasOrgs) {
+      items.push({ key: '+', label: 'Add team' });
+      items.push({ key: '-', label: 'Remove team' });
+    }
   }
 
   // Author actions
   if (activeSection === 'authors' && hasAuthors) {
     items.push({ key: '\u2191\u2193', label: 'Select' });
-    items.push({ key: '\u23CE', label: 'Assign' });
+    items.push({ key: '\u23CE', label: 'Assign/Move' });
+    items.push({ key: 'U', label: 'Unassign' });
     items.push({ key: 'P', label: 'Bulk assign prefix' });
   }
 
