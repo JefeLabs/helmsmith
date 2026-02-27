@@ -319,12 +319,14 @@ view
   .description('Show contribution data by member, team, org, or repo')
   .option('-w, --weeks <n>', 'Weeks of history', parseInt)
   .option('--by <dimension>', 'Group by: member, team, org, repo', 'member')
-  .action(async (cmdOpts: { weeks?: number; by?: string }) => {
+  .option('--pivot <granularity>', 'Pivot by time: week, month, quarter, year')
+  .action(async (cmdOpts: { weeks?: number; by?: string; pivot?: string }) => {
     const g = globals();
     const { contributions } = await import('./commands/contributions.js');
     await contributions({
       weeks: cmdOpts.weeks ?? g.weeks,
       groupBy: (cmdOpts.by as 'member' | 'team' | 'org' | 'repo') ?? 'member',
+      pivot: cmdOpts.pivot as 'week' | 'month' | 'quarter' | 'year' | undefined,
       json: g.json,
       filters: globalFilters(),
     });

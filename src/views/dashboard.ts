@@ -422,6 +422,153 @@ function buildContributionGroups(
   return groups;
 }
 
+/**
+ * Entity-first chart groups: outer = entities, inner = time buckets as bars.
+ * Same bar data, just flipped axes.
+ */
+function buildContributionGroupsByEntity(
+  records: UserWeekRepoRecord[],
+  buckets: TimeBucket[],
+  drillLevel: DrillLevel,
+  tagOverlay: boolean,
+  config: ViewContext['config'],
+): HBarGroup[] {
+  const groupByFn = tagOverlay ? (r: UserWeekRepoRecord) => r.tag
+    : drillLevel === 'org' ? (r: UserWeekRepoRecord) => r.org
+    : drillLevel === 'team' ? (r: UserWeekRepoRecord) => r.team
+    : (r: UserWeekRepoRecord) => r.member;
+
+  // Build entity list
+  type Entry = { label: string; orgType?: 'core' | 'consultant'; key: string };
+  let entries: Entry[] = [];
+  if (tagOverlay) {
+    const tagKeys = Object.keys(config.tags ?? {});
+    const tagRolled = rollup(records, (r) => r.tag);
+    for (const [tag] of tagRolled) {
+      if (!tagKeys.includes(tag)) tagKeys.push(tag);
+    }
+    entries = tagKeys.map((t) => ({ label: config.tags?.[t]?.label ?? t, key: t }));
+  } else if (drillLevel === 'org') {
+    entries = config.orgs.map((o) => ({ label: o.name, orgType: o.type, key: o.name }));
+  } else if (drillLevel === 'team') {
+    for (const org of config.orgs) {
+      for (const team of org.teams) {
+        entries.push({ label: team.name, orgType: org.type, key: team.name });
+      }
+    }
+  } else {
+    const memberRolled = rollup(records, groupByFn);
+    const sorted = [...memberRolled.entries()].sort(
+      (a, b) => (b[1].insertions + b[1].deletions) - (a[1].insertions + a[1].deletions),
+    );
+    entries = sorted.map(([m]) => ({ label: m, key: m }));
+  }
+
+  const allBucketWeeks = new Set(buckets.flatMap((b) => b.weeks));
+  const groups: HBarGroup[] = [];
+
+  for (const entry of entries) {
+    const entityRecords = records.filter((r) =>
+      allBucketWeeks.has(r.week) && groupByFn(r) === entry.key,
+    );
+    if (entityRecords.length === 0) continue;
+
+    const bars: HBar[] = [];
+    for (const bucket of buckets) {
+      const bucketRecords = entityRecords.filter((r) => bucket.weeks.includes(r.week));
+      if (bucketRecords.length === 0) continue;
+
+      const rolled = rollup(bucketRecords, groupByFn);
+      const agg = rolled.get(entry.key);
+      if (!agg) continue;
+
+      bars.push({
+        label: bucket.label,
+        orgType: entry.orgType,
+        segments: [
+          { key: 'app', value: agg.filetype.app.insertions + agg.filetype.app.deletions },
+          { key: 'test', value: agg.filetype.test.insertions + agg.filetype.test.deletions },
+          { key: 'config', value: agg.filetype.config.insertions + agg.filetype.config.deletions },
+          { key: 'storybook', value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions },
+        ],
+        total: agg.insertions + agg.deletions,
+        insertions: agg.insertions,
+        deletions: agg.deletions,
+        testPct: computeTestPct(agg),
+        commits: agg.commits,
+        activeDays: agg.activeDays,
+        headcount: agg.activeMembers,
+      });
+    }
+
+    if (bars.length === 0) continue;
+
+    const prefix = entry.orgType === 'core' ? '\u2605 ' : entry.orgType === 'consultant' ? '\u25C6 ' : '';
+    groups.push({ groupLabel: prefix + entry.label, bars });
+  }
+
+  // Compute per-label averages (labels are now time bucket labels)
+  const labelTotals = new Map<string, {
+    sumTotal: number; sumIns: number; sumDel: number; sumNet: number;
+    sumCommits: number; sumActiveDays: number; sumHeadcount: number;
+    sumTestPct: number; count: number;
+  }>();
+  for (const group of groups) {
+    for (const bar of group.bars) {
+      const e = labelTotals.get(bar.label) ?? {
+        sumTotal: 0, sumIns: 0, sumDel: 0, sumNet: 0,
+        sumCommits: 0, sumActiveDays: 0, sumHeadcount: 0,
+        sumTestPct: 0, count: 0,
+      };
+      e.sumTotal += bar.total;
+      e.sumIns += bar.insertions ?? 0;
+      e.sumDel += bar.deletions ?? 0;
+      e.sumNet += (bar.insertions ?? 0) - (bar.deletions ?? 0);
+      e.sumCommits += bar.commits ?? 0;
+      e.sumActiveDays += bar.activeDays ?? 0;
+      e.sumHeadcount += bar.headcount ?? 0;
+      e.sumTestPct += bar.testPct ?? 0;
+      e.count++;
+      labelTotals.set(bar.label, e);
+    }
+  }
+  for (const group of groups) {
+    for (const bar of group.bars) {
+      const e = labelTotals.get(bar.label);
+      if (e && e.count > 0) {
+        bar.avg = e.sumTotal / e.count;
+        bar.avgInsertions = e.sumIns / e.count;
+        bar.avgDeletions = e.sumDel / e.count;
+        bar.avgNet = e.sumNet / e.count;
+        bar.avgCommits = e.sumCommits / e.count;
+        bar.avgActiveDays = e.sumActiveDays / e.count;
+        bar.avgHeadcount = e.sumHeadcount / e.count;
+        bar.avgTestPct = e.sumTestPct / e.count;
+      }
+    }
+  }
+
+  // Perception: for entity-first, bars are chronological (most-recent-first)
+  for (const group of groups) {
+    const chronTotals: number[] = [];
+    for (let bi = group.bars.length - 1; bi >= 0; bi--) {
+      chronTotals.push(group.bars[bi].total);
+    }
+    for (let bi = 0; bi < group.bars.length; bi++) {
+      const chronIdx = group.bars.length - 1 - bi;
+      if (chronIdx < 1) {
+        group.bars[bi].perception = 'new';
+        continue;
+      }
+      const windowStart = Math.max(0, chronIdx - 3);
+      const window = chronTotals.slice(windowStart, chronIdx + 1);
+      group.bars[bi].perception = classifyPerception(window);
+    }
+  }
+
+  return groups;
+}
+
 // ── Top Performers tab data ──────────────────────────────────────────────────
 
 function renderLeaderboard(
@@ -564,12 +711,125 @@ function buildContributionDetailRows(
   return { rows, groupSeparators };
 }
 
+/**
+ * Entity-first detail rows: outer loop = entities, inner loop = time buckets.
+ * Each entity gets a header row (with totals) followed by per-period sub-rows.
+ */
+function buildContributionDetailRowsByEntity(
+  records: UserWeekRepoRecord[],
+  buckets: TimeBucket[],
+  drillLevel: DrillLevel,
+  tagOverlay: boolean,
+  config: ViewContext['config'],
+): { rows: Record<string, any>[]; groupSeparators: number[] } {
+  const rows: Record<string, any>[] = [];
+  const groupSeparators: number[] = [];
+
+  const groupByFn = tagOverlay ? (r: UserWeekRepoRecord) => r.tag
+    : drillLevel === 'org' ? (r: UserWeekRepoRecord) => r.org
+    : drillLevel === 'team' ? (r: UserWeekRepoRecord) => r.team
+    : (r: UserWeekRepoRecord) => r.member;
+
+  // Build entity list
+  let entries: Array<{ label: string; orgType?: 'core' | 'consultant'; key: string }> = [];
+  if (tagOverlay) {
+    const tagKeys = Object.keys(config.tags ?? {});
+    const tagRolled = rollup(records, (r) => r.tag);
+    for (const [tag] of tagRolled) {
+      if (!tagKeys.includes(tag)) tagKeys.push(tag);
+    }
+    entries = tagKeys.map((t) => ({ label: config.tags?.[t]?.label ?? t, key: t }));
+  } else if (drillLevel === 'org') {
+    entries = config.orgs.map((o) => ({ label: o.name, orgType: o.type, key: o.name }));
+  } else if (drillLevel === 'team') {
+    for (const org of config.orgs) {
+      for (const team of org.teams) {
+        entries.push({ label: team.name, orgType: org.type, key: team.name });
+      }
+    }
+  } else {
+    const memberRolled = rollup(records, groupByFn);
+    // Sort members by total lines desc
+    const sorted = [...memberRolled.entries()].sort(
+      (a, b) => (b[1].insertions + b[1].deletions) - (a[1].insertions + a[1].deletions),
+    );
+    entries = sorted.map(([m]) => ({ label: m, key: m }));
+  }
+
+  // Collect all bucket weeks for filtering
+  const allBucketWeeks = new Set(buckets.flatMap((b) => b.weeks));
+
+  for (let ei = 0; ei < entries.length; ei++) {
+    const entry = entries[ei];
+    const prefix = entry.orgType === 'core' ? '\u2605 ' : entry.orgType === 'consultant' ? '\u25C6 ' : '';
+
+    // Entity total row
+    const entityRecords = records.filter((r) => {
+      if (!allBucketWeeks.has(r.week)) return false;
+      return groupByFn(r) === entry.key;
+    });
+    if (entityRecords.length === 0) continue;
+
+    const totalRolled = rollup(entityRecords, groupByFn);
+    const totalAgg = totalRolled.get(entry.key);
+    if (!totalAgg) continue;
+
+    const totalAvgSize = totalAgg.commits > 0 ? Math.round((totalAgg.insertions + totalAgg.deletions) / totalAgg.commits) : 0;
+
+    rows.push({
+      group: prefix + entry.label,
+      week: 'TOTAL',
+      commits: totalAgg.commits,
+      avgSize: totalAvgSize,
+      files: totalAgg.filesChanged,
+      filesAdded: totalAgg.filesAdded,
+      filesDeleted: totalAgg.filesDeleted,
+      insertions: totalAgg.insertions,
+      deletions: totalAgg.deletions,
+      net: totalAgg.netLines,
+    });
+
+    // Per-bucket sub-rows
+    for (const bucket of buckets) {
+      const bucketRecords = entityRecords.filter((r) => bucket.weeks.includes(r.week));
+      if (bucketRecords.length === 0) continue;
+
+      const rolled = rollup(bucketRecords, groupByFn);
+      const agg = rolled.get(entry.key);
+      if (!agg) continue;
+
+      const avgSize = agg.commits > 0 ? Math.round((agg.insertions + agg.deletions) / agg.commits) : 0;
+
+      rows.push({
+        group: '',
+        week: bucket.label,
+        commits: agg.commits,
+        avgSize,
+        files: agg.filesChanged,
+        filesAdded: agg.filesAdded,
+        filesDeleted: agg.filesDeleted,
+        insertions: agg.insertions,
+        deletions: agg.deletions,
+        net: agg.netLines,
+      });
+    }
+
+    // Separator between entities (except last)
+    if (ei < entries.length - 1) {
+      groupSeparators.push(rows.length - 1);
+    }
+  }
+
+  return { rows, groupSeparators };
+}
+
 // ── Tab content renderers ────────────────────────────────────────────────────
 
 function renderContributionsDetailTab(
   ctx: ViewContext,
   drillLevel: DrillLevel,
   tagOverlay: boolean,
+  pivotEntity: boolean,
   buckets: TimeBucket[],
   rangeLabel: string,
   periodLabel: string,
@@ -580,25 +840,34 @@ function renderContributionsDetailTab(
     : drillLevel === 'team' ? 'Team' : 'User';
   const firstLabel = buckets[0]?.label ?? '';
   const lastLabel = buckets[buckets.length - 1]?.label ?? '';
+  const pivotLabel = pivotEntity ? 'by entity' : 'by time';
   console.log(
     chalk.bold(`Contribution Detail`) + '  ' +
-    chalk.dim(`(${modeLabel} view \u00b7 ${rangeLabel} \u00b7 ${firstLabel} \u2192 ${lastLabel})`),
+    chalk.dim(`(${modeLabel} view \u00b7 ${pivotLabel} \u00b7 ${rangeLabel} \u00b7 ${firstLabel} \u2192 ${lastLabel})`),
   );
   console.log('');
 
-  const { rows, groupSeparators } = buildContributionDetailRows(
-    ctx.records, buckets, drillLevel, tagOverlay, ctx.config,
-  );
+  const { rows, groupSeparators } = pivotEntity
+    ? buildContributionDetailRowsByEntity(ctx.records, buckets, drillLevel, tagOverlay, ctx.config)
+    : buildContributionDetailRows(ctx.records, buckets, drillLevel, tagOverlay, ctx.config);
 
   if (rows.length === 0) {
     console.log(chalk.dim('  No data for this time window.'));
     return;
   }
 
+  // Swap column order: entity-first puts entity name first, time-first puts period first
+  const col1 = pivotEntity
+    ? { key: 'group', label: modeLabel, minWidth: 12 }
+    : { key: 'week', label: periodLabel, minWidth: 4 };
+  const col2 = pivotEntity
+    ? { key: 'week', label: periodLabel, minWidth: 6 }
+    : { key: 'group', label: modeLabel, minWidth: 12 };
+
   console.log(renderTable({
     columns: [
-      { key: 'week', label: periodLabel, minWidth: 4 },
-      { key: 'group', label: modeLabel, minWidth: 12 },
+      col1,
+      col2,
       { key: 'commits', label: 'Commits', align: 'right', minWidth: 7 },
       { key: 'avgSize', label: 'Avg Size', align: 'right', minWidth: 8, format: (v) => fmt(v) },
       { key: 'filesAdded', label: '+Files', align: 'right', minWidth: 6, format: (v) => chalk.green(fmt(v)) },
@@ -617,6 +886,7 @@ function renderContributionsTab(
   ctx: ViewContext,
   drillLevel: DrillLevel,
   tagOverlay: boolean,
+  pivotEntity: boolean,
   buckets: TimeBucket[],
   granularity: ContribGranularity,
   rangeLabel: string,
@@ -626,19 +896,22 @@ function renderContributionsTab(
   const modeLabel = tagOverlay ? 'Tag'
     : drillLevel === 'org' ? 'Organization'
     : drillLevel === 'team' ? 'Team' : 'User';
-  const byLabel = granularity === 'week' ? 'Week'
+  const byLabel = pivotEntity ? modeLabel
+    : granularity === 'week' ? 'Week'
     : granularity === 'month' ? 'Month'
     : granularity === 'quarter' ? 'Quarter' : 'Year';
   const firstLabel = buckets[0]?.label ?? '';
   const lastLabel = buckets[buckets.length - 1]?.label ?? '';
   console.log(
     chalk.bold(`Contribution by ${byLabel}`) + '  ' +
-    chalk.dim(`(${modeLabel} view \u00b7 ${rangeLabel} \u00b7 ${firstLabel} \u2192 ${lastLabel})`) +
+    chalk.dim(`(${pivotEntity ? 'by entity' : 'by time'} \u00b7 ${rangeLabel} \u00b7 ${firstLabel} \u2192 ${lastLabel})`) +
     '  ' + legend,
   );
   console.log('');
 
-  const groups = buildContributionGroups(ctx.records, buckets, drillLevel, tagOverlay, ctx.config);
+  const groups = pivotEntity
+    ? buildContributionGroupsByEntity(ctx.records, buckets, drillLevel, tagOverlay, ctx.config)
+    : buildContributionGroups(ctx.records, buckets, drillLevel, tagOverlay, ctx.config);
 
   // Build an "Avg" summary row from the per-label averages already stamped on bars
   if (groups.length > 1 && groups[0].bars.length > 0) {
@@ -812,6 +1085,7 @@ function mapKey(
       if (keyName === 'up') return 'contrib_drill_up';
       if (keyName === 't') return 'contrib_toggle_tag';
       if (keyName === 'd') return 'contrib_toggle_detail';
+      if (keyName === 'v') return 'contrib_toggle_pivot';
       // Numbered team drill-down
       for (const t of numberedTeams) {
         if (keyName === t.key) return `team:${t.teamName}`;
@@ -857,6 +1131,7 @@ function buildHotkeyItems(
   contribGranularity: ContribGranularity,
   contribDepth: number,
   contribDetail: boolean,
+  contribPivotEntity: boolean,
   repoWindow: WindowSize,
   lbWindow: WindowSize,
 ): Array<{ key: string; label: string }> {
@@ -877,6 +1152,7 @@ function buildHotkeyItems(
       items.push({ key: '+/-', label: contribGranularity });
       items.push({ key: '\u2190/\u2192', label: `${contribDepth}${granShort}` });
       items.push({ key: contribDetail ? '[D]' : 'D', label: 'Detail' });
+      items.push({ key: contribPivotEntity ? '[V]' : 'V', label: contribPivotEntity ? 'By Entity' : 'By Time' });
       break;
     }
     case 'repo_activity':
@@ -913,6 +1189,7 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
   let contribGranularity: ContribGranularity = 'week';
   let contribDepth: number = ctx.config.settings.weeks_back;
   let contribShowDetail = false;
+  let contribPivotEntity = false;
   let repoWindowWeeks: WindowSize = initialWindow;
   let leaderboardWindowWeeks: WindowSize = initialWindow;
   let manageSection: ManageSectionId = 'repos';
@@ -966,7 +1243,7 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
     } else {
       hotkeys = buildHotkeyItems(
         activeTab, contribDrillLevel, contribTagOverlay, contribGranularity, contribDepth,
-        contribShowDetail, repoWindowWeeks, leaderboardWindowWeeks,
+        contribShowDetail, contribPivotEntity, repoWindowWeeks, leaderboardWindowWeeks,
       );
     }
     console.log(renderHotkeyBar(hotkeys));
@@ -991,9 +1268,9 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
     switch (activeTab) {
       case 'contributions':
         if (contribShowDetail) {
-          renderContributionsDetailTab(ctx, contribDrillLevel, contribTagOverlay, contribBuckets, contribRangeLabel, contribPeriodLabel, termCols);
+          renderContributionsDetailTab(ctx, contribDrillLevel, contribTagOverlay, contribPivotEntity, contribBuckets, contribRangeLabel, contribPeriodLabel, termCols);
         } else {
-          renderContributionsTab(ctx, contribDrillLevel, contribTagOverlay, contribBuckets, contribGranularity, contribRangeLabel, termCols, contribLabelWidth);
+          renderContributionsTab(ctx, contribDrillLevel, contribTagOverlay, contribPivotEntity, contribBuckets, contribGranularity, contribRangeLabel, termCols, contribLabelWidth);
         }
         break;
       case 'repo_activity':
@@ -1087,6 +1364,8 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
       if (action === 'contrib_toggle_tag') { contribTagOverlay = !contribTagOverlay; continue; }
       // Contributions: detail toggle
       if (action === 'contrib_toggle_detail') { contribShowDetail = !contribShowDetail; continue; }
+      // Contributions: pivot toggle (time-first ↔ entity-first)
+      if (action === 'contrib_toggle_pivot') { contribPivotEntity = !contribPivotEntity; continue; }
 
       // Repo Activity window
       if (action === 'repo_window_4') { repoWindowWeeks = 4; continue; }
