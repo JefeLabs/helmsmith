@@ -33,6 +33,7 @@ import { getCommitsPath, getScanStatePath, getAuthorRegistryPath, getConfigDir, 
 import { scanAllRepos } from './collector/index.js';
 import { getCurrentWeek } from './aggregator/filters.js';
 import { filterRecords } from './aggregator/filters.js';
+import { reattributeRecords } from './collector/author-map.js';
 import { runNavigator } from './views/navigator.js';
 import { dashboardView } from './views/dashboard.js';
 import { trendsView } from './views/trends.js';
@@ -273,6 +274,17 @@ org
     }
     const { addOrg } = await import('./commands/add-org.js');
     await addOrg({ ...cmdOpts, type: cmdOpts.type, config: globals().config });
+  });
+
+org
+  .command('add-team')
+  .description('Add a team to an existing organization')
+  .requiredOption('--name <org>', 'Organization name')
+  .requiredOption('--team <name>', 'Team name')
+  .option('--tag <tag>', 'Team tag (default: "default")')
+  .action(async (cmdOpts: { name: string; team: string; tag?: string }) => {
+    const { addTeamToOrg } = await import('./commands/add-org.js');
+    await addTeamToOrg({ org: cmdOpts.name, team: cmdOpts.team, tag: cmdOpts.tag, config: globals().config });
   });
 
 // ── gitradar author ──────────────────────────────────────────────────────────
@@ -638,6 +650,9 @@ async function runMain(opts: RunOptions): Promise<void> {
     console.log(JSON.stringify(records, null, 2));
     return;
   }
+
+  // ── Reattribute records to reflect latest author assignments ─────────────
+  records = reattributeRecords(records, config, authorRegistry);
 
   // ── Build ViewContext and launch navigator ───────────────────────────────
 
