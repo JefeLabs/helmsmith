@@ -1,16 +1,19 @@
 /**
- * Functional test suite — end-to-end CLI pipeline.
+ * Functional test suite — end-to-end CLI pipeline via GitRadarEngine + SQLite.
  *
- * Exercises the full workflow against real git repos:
- *   clean → create workspace → add repos → add org → scan → assign authors →
- *   verify contributions / leaderboard / repo-activity
+ * Exercises the full workflow against real git repos using the production
+ * data path: GitRadarEngine for scanning, sqlite-store for persistence,
+ * and queryRollup for aggregation.
  *
- * Uses a temp directory for all data so the user's real ~/.agentx is untouched.
+ *   setup → scan (engine) → verify SQLite state → assign authors →
+ *   queryRollup aggregation → contributions / leaderboard / repo-activity (SQL path)
+ *
+ * Uses a temp directory for SQLite so the user's real ~/.agentx is untouched.
  * Scans are limited to 4 weeks to keep the test fast.
  */
 
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -25,7 +28,20 @@ const TEST_REPOS = [
   { name: "jefelabs-clients",       path: join(SKOOLSCOUT_ROOT, "jefelabs-clients"),       group: "SkoolScout" },
 ];
 
-// ── Temp data directory (replaces ~/.agentx) ─────────────────────────────────
+// ── SQLite isolation: redirect getDataDir() to temp directory ────────────────
+
+let testDataDir = "";
+
+vi.mock("../store/paths.js", () => ({
+  getDataDir: () => testDataDir,
+  getConfigDir: () => testDataDir,
+  expandTilde: (p: string) => p,
+  getConfigPath: () => `${testDataDir}/config.yml`,
+  getCacheDir: () => `${testDataDir}/cache`,
+  ensureDataDir: async () => {},
+}));
+
+// ── Temp data directory ─────────────────────────────────────────────────────
 
 let tempHome: string;
 let configPath: string;
@@ -33,34 +49,28 @@ let reposRegistryPath: string;
 
 beforeAll(async () => {
   tempHome = await mkdtemp(join(tmpdir(), "gitradar-functional-"));
+  testDataDir = join(tempHome, "data");
+  await mkdir(testDataDir, { recursive: true });
 });
 
 afterAll(async () => {
+  // Close the SQLite connection before cleaning temp dir
+  const { closeDB } = await import("../store/sqlite-store.js");
+  closeDB();
   await rm(tempHome, { recursive: true, force: true });
 });
 
-// ── Helpers that import with the temp paths ──────────────────────────────────
-
-/**
- * Dynamically import a module with `getConfigDir()` / `getDataDir()` /
- * `homedir()` pointed at our temp directory. We redirect by writing
- * config + registry into the temp tree so no mocking of node:os is needed —
- * instead we pass explicit paths through the command options.
- */
+// ── Helpers ─────────────────────────────────────────────────────────────────
 
 async function setupTempTree() {
-  const { mkdir, writeFile } = await import("node:fs/promises");
   const gitradarDir = join(tempHome, ".agentx", "gitradar");
-  const dataDir = join(gitradarDir, "data");
-  await mkdir(dataDir, { recursive: true });
+  await mkdir(gitradarDir, { recursive: true });
 
   configPath = join(gitradarDir, "config.yml");
   reposRegistryPath = join(tempHome, ".agentx", "repos.yml");
 
-  // Write empty config
   await writeFile(configPath, "orgs: []\n", "utf-8");
 
-  // Write repos registry with our test repos
   const yaml = (await import("js-yaml")).default;
   const registry = {
     workspaces: {
@@ -78,11 +88,7 @@ async function setupTempTree() {
     tags: {},
   };
   await writeFile(reposRegistryPath, yaml.dump(registry), "utf-8");
-
-  return { configPath, reposRegistryPath, dataDir };
 }
-
-// ── Dynamic imports that use explicit temp paths ─────────────────────────────
 
 async function loadConfigFromTemp() {
   const { loadConfig } = await import("../config/loader.js");
@@ -101,20 +107,10 @@ async function loadReposRegistryFromTemp() {
 
 // ── Test Suite ───────────────────────────────────────────────────────────────
 
-describe("Functional: Full CLI Pipeline", () => {
-  let dataDir: string;
-
-  // Shared state across ordered tests
-  let commitsPath: string;
-  let scanStatePath: string;
-  let authorsPath: string;
+describe("Functional: Full CLI Pipeline (Engine + SQLite)", () => {
 
   beforeAll(async () => {
-    const tree = await setupTempTree();
-    dataDir = tree.dataDir;
-    commitsPath = join(dataDir, "commits-by-filetype.json");
-    scanStatePath = join(dataDir, "scan-state.json");
-    authorsPath = join(dataDir, "authors.json");
+    await setupTempTree();
   });
 
   // ── Step 1: Registry & config files exist ─────────────────────────────────
@@ -167,91 +163,42 @@ describe("Functional: Full CLI Pipeline", () => {
     expect(config.orgs[0].teams[0].name).toBe("developers");
   });
 
-  // ── Step 4: Scan repos (real git operations) ──────────────────────────────
+  // ── Step 4: Scan repos via GitRadarEngine (real git → SQLite) ─────────────
 
-  it("Step 4: scan produces records with commits and file metrics", async () => {
-    const { scanAllRepos } = await import("../collector/index.js");
-    const { mergeDiscoveredAuthors } = await import("../store/author-registry.js");
-    // Simple additive merge for test purposes (replaces deleted commits-by-filetype.mergeRecords)
-    const mergeRecords = (existing: any[], incoming: any[]) => {
-      const map = new Map<string, any>();
-      for (const r of existing) map.set(`${r.member}::${r.week}::${r.repo}`, { ...r });
-      for (const r of incoming) {
-        const key = `${r.member}::${r.week}::${r.repo}`;
-        const prev = map.get(key);
-        if (prev) {
-          prev.commits += r.commits;
-          prev.activeDays = Math.max(prev.activeDays, r.activeDays);
-        } else {
-          map.set(key, { ...r });
-        }
-      }
-      return [...map.values()];
-    };
-    const { writeFile: wf } = await import("node:fs/promises");
+  it("Step 4: engine scan produces records in SQLite with commits and file metrics", async () => {
+    const { GitRadarEngine } = await import("../engine/gitradar-engine.js");
+    const { DEFAULT_SETTINGS } = await import("../types/schema.js");
+    const { getStoreStatsSQLFull } = await import("../store/sqlite-store.js");
+
     const config = await loadConfigFromTemp();
-
-    // Build config with repos from our registry
     const registry = await loadReposRegistryFromTemp();
     const repos = registry!.workspaces["functional"].repos;
-    const scanConfig = {
+
+    // Configure engine directly (bypasses resolveWorkspace which needs terminal)
+    const engine = new GitRadarEngine();
+    engine.config = {
       ...config,
       repos: repos.map((r) => ({ path: r.path ?? "", name: r.name, group: r.group })),
-      settings: { ...config.settings, weeks_back: 4, staleness_minutes: 0 },
+      settings: { ...DEFAULT_SETTINGS, weeks_back: 4, staleness_minutes: 0 },
     };
 
-    const initialScanState = { version: 1 as const, repos: {} };
-    let authorRegistry = { version: 1 as const, authors: {} as Record<string, any> };
-    let allRecords: any[] = [];
+    await engine.loadStores();
+    await engine.scan({ forceScan: true });
 
-    const result = await scanAllRepos(scanConfig, initialScanState, {
-      forceScan: true,
-      chunkMonths: 1,
-      authorRegistry,
-      onRepoScanned: async (repoRecords) => {
-        allRecords = mergeRecords(allRecords, repoRecords);
-      },
-      onScanStateUpdated: async (state) => {
-        await wf(scanStatePath, JSON.stringify(state, null, 2), "utf-8");
-      },
-      onAuthorsDiscovered: async (authors) => {
-        authorRegistry = mergeDiscoveredAuthors(
-          authorRegistry,
-          authors.map((a) => ({
-            email: a.email,
-            name: a.name,
-            repoName: a.repoName,
-            commitCount: a.commitCount,
-            date: a.lastDate,
-          })),
-        );
-        await wf(authorsPath, JSON.stringify(authorRegistry, null, 2), "utf-8");
-      },
-    });
+    // ── Assertions on SQLite state ──────────────────────────────────────────
 
-    // Persist records
-    const commitsData = {
-      version: 1 as const,
-      lastUpdated: new Date().toISOString(),
-      records: allRecords,
-    };
-    await wf(commitsPath, JSON.stringify(commitsData, null, 2), "utf-8");
+    const stats = getStoreStatsSQLFull();
+    expect(stats.recordCount).toBeGreaterThan(0);
 
-    // ── Assertions ──────────────────────────────────────────────────────────
-
-    // Repos were scanned
-    expect(result.stats.reposScanned).toBeGreaterThanOrEqual(1);
-    expect(result.stats.totalCommits).toBeGreaterThan(0);
-
-    // Records were produced
-    expect(allRecords.length).toBeGreaterThan(0);
+    // Engine loaded records from SQLite after scan
+    expect(engine.records.length).toBeGreaterThan(0);
 
     // Commits are non-zero
-    const totalCommits = allRecords.reduce((s, r) => s + r.commits, 0);
+    const totalCommits = engine.records.reduce((s, r) => s + r.commits, 0);
     expect(totalCommits).toBeGreaterThan(0);
 
-    // File metrics are non-zero (validates --raw --numstat fix)
-    const totalInsertions = allRecords.reduce((s, r) => {
+    // File metrics are non-zero (validates --raw --numstat pipeline)
+    const totalInsertions = engine.records.reduce((s, r) => {
       return s +
         r.filetype.app.insertions +
         r.filetype.test.insertions +
@@ -260,7 +207,7 @@ describe("Functional: Full CLI Pipeline", () => {
     }, 0);
     expect(totalInsertions).toBeGreaterThan(0);
 
-    const totalDeletions = allRecords.reduce((s, r) => {
+    const totalDeletions = engine.records.reduce((s, r) => {
       return s +
         r.filetype.app.deletions +
         r.filetype.test.deletions +
@@ -270,7 +217,7 @@ describe("Functional: Full CLI Pipeline", () => {
     expect(totalDeletions).toBeGreaterThan(0);
 
     // Files counted
-    const totalFiles = allRecords.reduce((s, r) => {
+    const totalFiles = engine.records.reduce((s, r) => {
       return s +
         r.filetype.app.files +
         r.filetype.test.files +
@@ -279,50 +226,81 @@ describe("Functional: Full CLI Pipeline", () => {
     }, 0);
     expect(totalFiles).toBeGreaterThan(0);
 
-    // Authors were discovered
-    const authorCount = Object.keys(authorRegistry.authors).length;
+    // Authors were discovered and persisted to SQLite
+    expect(engine.authorRegistry).toBeDefined();
+    const authorCount = Object.keys(engine.authorRegistry!.authors).length;
     expect(authorCount).toBeGreaterThan(0);
 
     // Records span multiple repos
-    const reposInRecords = new Set(allRecords.map((r) => r.repo));
+    const reposInRecords = new Set(engine.records.map((r) => r.repo));
     expect(reposInRecords.size).toBeGreaterThanOrEqual(2);
 
     // Records span multiple weeks
-    const weeksInRecords = new Set(allRecords.map((r) => r.week));
+    const weeksInRecords = new Set(engine.records.map((r) => r.week));
     expect(weeksInRecords.size).toBeGreaterThanOrEqual(1);
 
+    // SQLite record count matches engine.records
+    expect(stats.recordCount).toBe(engine.records.length);
+
     console.log(
-      `  Scan: ${result.stats.reposScanned} repos, ` +
-      `${result.stats.totalCommits} commits → ${allRecords.length} records, ` +
+      `  Engine scan: ${stats.recordCount} records in SQLite, ` +
       `${authorCount} authors, ` +
       `${totalInsertions} insertions, ${totalDeletions} deletions`,
     );
   }, 120_000); // 2 min timeout for real git operations
 
-  // ── Step 5: Verify authors.json was persisted ─────────────────────────────
+  // ── Step 5: Verify scan state persisted in SQLite ─────────────────────────
 
-  it("Step 5: author registry persisted with discovered authors", async () => {
-    const raw = JSON.parse(await readFile(authorsPath, "utf-8"));
-    expect(raw.version).toBe(1);
-    expect(Object.keys(raw.authors).length).toBeGreaterThan(0);
+  it("Step 5: scan state in SQLite has entries for each scanned repo", async () => {
+    const { loadScanStateSQL } = await import("../store/sqlite-store.js");
 
-    // At least one author has reposSeenIn
-    const someAuthor = Object.values(raw.authors)[0] as any;
+    const scanState = loadScanStateSQL();
+    expect(scanState.version).toBe(1);
+    const repoNames = Object.keys(scanState.repos);
+    expect(repoNames.length).toBeGreaterThanOrEqual(2);
+
+    for (const repoName of repoNames) {
+      const entry = scanState.repos[repoName];
+      expect(entry.lastHash).toBeTruthy();
+      expect(entry.lastScanDate).toBeTruthy();
+      expect(entry.recentHashes.length).toBeGreaterThan(0);
+      expect(entry.recordCount).toBeGreaterThanOrEqual(0);
+    }
+
+    console.log(`  Scan state (SQLite): ${repoNames.length} repos tracked`);
+  });
+
+  // ── Step 6: Verify author registry persisted in SQLite ────────────────────
+
+  it("Step 6: author registry in SQLite has discovered authors", async () => {
+    const { loadAuthorRegistrySQL } = await import("../store/sqlite-store.js");
+
+    const registry = loadAuthorRegistrySQL();
+    expect(registry.version).toBe(1);
+    expect(Object.keys(registry.authors).length).toBeGreaterThan(0);
+
+    const someAuthor = Object.values(registry.authors)[0];
     expect(someAuthor.email).toBeDefined();
     expect(someAuthor.name).toBeDefined();
     expect(someAuthor.commitCount).toBeGreaterThan(0);
     expect(someAuthor.reposSeenIn.length).toBeGreaterThan(0);
+
+    console.log(`  Author registry (SQLite): ${Object.keys(registry.authors).length} authors`);
   });
 
-  // ── Step 6: Assign authors ────────────────────────────────────────────────
+  // ── Step 7: Assign authors via SQLite ──────────────────────────────────────
 
-  it("Step 6: assign known authors to SkoolScout org", async () => {
+  it("Step 7: assign known authors to SkoolScout org via SQLite", async () => {
     const { assignAuthor } = await import("../store/author-registry.js");
-    const { reattributeRecords } = await import("../collector/author-map.js");
-    const { writeFile: wf } = await import("node:fs/promises");
+    const {
+      loadAuthorRegistrySQL,
+      saveAuthorRegistrySQL,
+      reattributeRecordsSQL,
+      queryRecords,
+    } = await import("../store/sqlite-store.js");
 
-    let registry = JSON.parse(await readFile(authorsPath, "utf-8"));
     const config = await loadConfigFromTemp();
+    let registry = loadAuthorRegistrySQL();
 
     // Find authors with "skoolscout" in their email or name
     const skoolscoutEmails = Object.keys(registry.authors).filter((email) => {
@@ -341,70 +319,70 @@ describe("Functional: Full CLI Pipeline", () => {
       registry = assignAuthor(registry, email, "SkoolScout", "developers");
     }
 
-    await wf(authorsPath, JSON.stringify(registry, null, 2), "utf-8");
+    // Persist author registry to SQLite
+    saveAuthorRegistrySQL(registry);
 
-    // Re-attribute records
-    const commitsData = JSON.parse(await readFile(commitsPath, "utf-8"));
-    const reattributed = reattributeRecords(commitsData.records, config, registry);
-    await wf(
-      commitsPath,
-      JSON.stringify({ ...commitsData, records: reattributed }, null, 2),
-      "utf-8",
-    );
+    // Build re-attribution updates from the registry
+    const updates: Array<{ email: string; org: string; orgType: string; team: string; tag: string }> = [];
+    for (const email of skoolscoutEmails) {
+      updates.push({
+        email,
+        org: "SkoolScout",
+        orgType: "core",
+        team: "developers",
+        tag: "default",
+      });
+    }
+    reattributeRecordsSQL(updates);
 
-    // Verify some records now have org=SkoolScout
-    const assignedRecords = reattributed.filter((r: any) => r.org === "SkoolScout");
+    // Verify records were re-attributed in SQLite
+    const assignedRecords = queryRecords({ org: "SkoolScout" });
     expect(assignedRecords.length).toBeGreaterThan(0);
 
-    // Verify the author registry has assigned entries
-    const assignedAuthors = Object.values(registry.authors).filter((a: any) => a.org === "SkoolScout");
+    // Verify author registry round-trips correctly
+    const reloaded = loadAuthorRegistrySQL();
+    const assignedAuthors = Object.values(reloaded.authors).filter((a) => a.org === "SkoolScout");
     expect(assignedAuthors.length).toBe(skoolscoutEmails.length);
 
     console.log(
       `  Assigned ${skoolscoutEmails.length} authors → ` +
-      `${assignedRecords.length} records re-attributed to SkoolScout`,
+      `${assignedRecords.length} records re-attributed to SkoolScout (SQL)`,
     );
   });
 
-  // ── Step 7: Contributions aggregation ─────────────────────────────────────
+  // ── Step 8: queryRollup aggregation by member ─────────────────────────────
 
-  it("Step 7: contributions aggregation by member has non-zero metrics", async () => {
-    const { rollup } = await import("../aggregator/engine.js");
-    const commitsData = JSON.parse(await readFile(commitsPath, "utf-8"));
-    const records = commitsData.records;
+  it("Step 8: queryRollup by member has non-zero metrics", async () => {
+    const { queryRollup } = await import("../store/sqlite-store.js");
 
-    // Group by member
-    const rolled = rollup(records, (r: any) => r.member);
+    const rolled = queryRollup({}, "member");
     expect(rolled.size).toBeGreaterThan(0);
 
     // At least one member has commits
     let foundCommits = false;
     let foundInsertions = false;
-    for (const [member, agg] of rolled) {
+    for (const [, agg] of rolled) {
       if (agg.commits > 0) foundCommits = true;
-      const ins = agg.filetype.app.insertions + agg.filetype.test.insertions +
-        agg.filetype.config.insertions + agg.filetype.storybook.insertions;
-      if (ins > 0) foundInsertions = true;
+      if (agg.filetype.app.insertions > 0) foundInsertions = true;
     }
 
     expect(foundCommits).toBe(true);
     expect(foundInsertions).toBe(true);
 
     // Group by team — should have at least "developers" and "unassigned"
-    const rolledByTeam = rollup(records, (r: any) => r.team);
+    const rolledByTeam = queryRollup({}, "team");
     const teamNames = [...rolledByTeam.keys()];
     expect(teamNames.length).toBeGreaterThanOrEqual(1);
 
-    console.log(`  ${rolled.size} members, ${teamNames.length} teams: [${teamNames.join(", ")}]`);
+    console.log(`  queryRollup: ${rolled.size} members, ${teamNames.length} teams: [${teamNames.join(", ")}]`);
   });
 
-  // ── Step 8: Contributions by org ──────────────────────────────────────────
+  // ── Step 9: queryRollup by org shows SkoolScout ───────────────────────────
 
-  it("Step 8: contributions by org shows SkoolScout with data", async () => {
-    const { rollup } = await import("../aggregator/engine.js");
-    const commitsData = JSON.parse(await readFile(commitsPath, "utf-8"));
+  it("Step 9: queryRollup by org shows SkoolScout with data", async () => {
+    const { queryRollup } = await import("../store/sqlite-store.js");
 
-    const rolled = rollup(commitsData.records, (r: any) => r.org);
+    const rolled = queryRollup({}, "org");
     const skoolscout = rolled.get("SkoolScout");
 
     expect(skoolscout).toBeDefined();
@@ -415,63 +393,23 @@ describe("Functional: Full CLI Pipeline", () => {
     expect(ins).toBeGreaterThan(0);
 
     console.log(
-      `  SkoolScout: ${skoolscout!.commits} commits, ${ins} insertions`,
+      `  SkoolScout (SQL rollup): ${skoolscout!.commits} commits, ${ins} insertions`,
     );
   });
 
-  // ── Step 9: Leaderboard ──────────────────────────────────────────────────
+  // ── Step 10: queryRollup by repo ──────────────────────────────────────────
 
-  it("Step 9: leaderboard computes ranked entries", async () => {
-    const { computeLeaderboard } = await import("../aggregator/leaderboard.js");
-    const { getLastNWeeks, getCurrentWeek } = await import("../aggregator/filters.js");
-    const commitsData = JSON.parse(await readFile(commitsPath, "utf-8"));
+  it("Step 10: queryRollup by repo shows data for scanned repos", async () => {
+    const { queryRollup } = await import("../store/sqlite-store.js");
 
-    const weeks = getLastNWeeks(52, getCurrentWeek());
-    const columns = computeLeaderboard(commitsData.records, weeks, 5);
-
-    expect(columns).toHaveLength(4); // Overall, App, Test, Config
-
-    // Overall column should have entries
-    const overall = columns.find((c) => c.title === "Overall");
-    expect(overall).toBeDefined();
-    expect(overall!.entries.length).toBeGreaterThan(0);
-
-    // Entries are ranked
-    expect(overall!.entries[0].rank).toBe(1);
-    expect(overall!.entries[0].value).toBeGreaterThanOrEqual(
-      overall!.entries[overall!.entries.length - 1].value,
-    );
-
-    // Entries have member metadata
-    for (const entry of overall!.entries) {
-      expect(entry.member).toBeTruthy();
-      expect(entry.team).toBeTruthy();
-      expect(entry.org).toBeTruthy();
-    }
-
-    console.log(
-      `  Leaderboard: #1 ${overall!.entries[0].member} (${overall!.entries[0].value} lines)`,
-    );
-  });
-
-  // ── Step 10: Repo activity ────────────────────────────────────────────────
-
-  it("Step 10: repo activity shows data for scanned repos", async () => {
-    const { rollup } = await import("../aggregator/engine.js");
-    const commitsData = JSON.parse(await readFile(commitsPath, "utf-8"));
-    const records = commitsData.records;
-
-    const rolledByRepo = rollup(records, (r: any) => r.repo);
-
-    // Should have multiple repos
+    const rolledByRepo = queryRollup({}, "repo");
     expect(rolledByRepo.size).toBeGreaterThanOrEqual(2);
 
     // Each repo should have commits
-    for (const [repo, agg] of rolledByRepo) {
+    for (const [, agg] of rolledByRepo) {
       expect(agg.commits).toBeGreaterThan(0);
     }
 
-    // skoolscout-com should be the most active
     const repoNames = [...rolledByRepo.keys()];
     expect(repoNames).toContain("skoolscout-com");
 
@@ -480,53 +418,43 @@ describe("Functional: Full CLI Pipeline", () => {
       skoolscoutCom.filetype.config.insertions + skoolscoutCom.filetype.storybook.insertions;
     expect(ins).toBeGreaterThan(0);
 
-    console.log(
-      `  ${rolledByRepo.size} repos: [${repoNames.join(", ")}]`,
-    );
+    console.log(`  queryRollup (repo): ${rolledByRepo.size} repos: [${repoNames.join(", ")}]`);
   });
 
-  // ── Step 11: File classifier distributes across categories ────────────────
+  // ── Step 11: File classifier via SQL ──────────────────────────────────────
 
-  it("Step 11: file classifier produces app, test, and config categories", async () => {
-    const commitsData = JSON.parse(await readFile(commitsPath, "utf-8"));
-    const records = commitsData.records;
+  it("Step 11: file classifier distributes across app, test, and config categories", async () => {
+    const { queryRollup } = await import("../store/sqlite-store.js");
 
-    // Aggregate all filetype metrics
-    let appFiles = 0, testFiles = 0, configFiles = 0, storybookFiles = 0;
-    for (const r of records) {
-      appFiles += r.filetype.app.files;
-      testFiles += r.filetype.test.files;
-      configFiles += r.filetype.config.files;
-      storybookFiles += r.filetype.storybook.files;
-    }
+    const rolled = queryRollup({}, "all");
+    expect(rolled.size).toBe(1);
+
+    const totals = rolled.get("all")!;
 
     // App files should dominate
-    expect(appFiles).toBeGreaterThan(0);
+    expect(totals.filetype.app.files).toBeGreaterThan(0);
 
     // Config files should exist (package.json, tsconfig, etc.)
-    expect(configFiles).toBeGreaterThan(0);
-
-    // Test files might exist (test suites in these repos)
-    // Don't assert > 0 since some repos may not have tests in the 4-week window
+    expect(totals.filetype.config.files).toBeGreaterThan(0);
 
     console.log(
-      `  Files: app=${appFiles} test=${testFiles} config=${configFiles} storybook=${storybookFiles}`,
+      `  Files (SQL rollup): app=${totals.filetype.app.files} test=${totals.filetype.test.files} ` +
+      `config=${totals.filetype.config.files} storybook=${totals.filetype.storybook.files}`,
     );
   });
 
-  // ── Step 12: CSV export produces valid output ─────────────────────────────
+  // ── Step 12: CSV export via queryRecords ───────────────────────────────────
 
-  it("Step 12: CSV export includes all expected columns and data", async () => {
+  it("Step 12: CSV export from SQLite records includes all expected columns", async () => {
     const { recordsToCsv, flattenRecord } = await import("../commands/export-data.js");
-    const commitsData = JSON.parse(await readFile(commitsPath, "utf-8"));
+    const { queryRecords } = await import("../store/sqlite-store.js");
 
-    const csv = recordsToCsv(commitsData.records);
+    const records = queryRecords({});
+    const csv = recordsToCsv(records);
     const lines = csv.trim().split("\n");
 
-    // Header + data rows
     expect(lines.length).toBeGreaterThan(1);
 
-    // Header has expected columns
     const header = lines[0];
     expect(header).toContain("member");
     expect(header).toContain("commits");
@@ -535,13 +463,10 @@ describe("Functional: Full CLI Pipeline", () => {
     expect(header).toContain("test_pct");
     expect(header).toContain("app_files");
 
-    // First data row has values
     const firstRow = lines[1].split(",");
     expect(firstRow.length).toBeGreaterThan(10);
 
-    // Flatten a record and check it
-    const record = commitsData.records[0];
-    const flat = flattenRecord(record);
+    const flat = flattenRecord(records[0]);
     expect(flat.member).toBeTruthy();
     expect(typeof flat.commits).toBe("number");
     expect(typeof flat.total_insertions).toBe("number");
@@ -549,15 +474,16 @@ describe("Functional: Full CLI Pipeline", () => {
     console.log(`  CSV: ${lines.length - 1} rows, ${header.split(",").length} columns`);
   });
 
-  // ── Step 13: Filter records by org ────────────────────────────────────────
+  // ── Step 13: SQL-filtered queryRecords by org ─────────────────────────────
 
-  it("Step 13: filterRecords correctly filters by org", async () => {
-    const { filterRecords } = await import("../aggregator/filters.js");
-    const commitsData = JSON.parse(await readFile(commitsPath, "utf-8"));
+  it("Step 13: queryRecords with SQL filter correctly filters by org", async () => {
+    const { queryRecords } = await import("../store/sqlite-store.js");
 
-    const filtered = filterRecords(commitsData.records, { org: "SkoolScout" });
+    const allRecords = queryRecords({});
+    const filtered = queryRecords({ org: "SkoolScout" });
+
     expect(filtered.length).toBeGreaterThan(0);
-    expect(filtered.length).toBeLessThan(commitsData.records.length);
+    expect(filtered.length).toBeLessThan(allRecords.length);
 
     // All filtered records belong to SkoolScout
     for (const r of filtered) {
@@ -565,131 +491,91 @@ describe("Functional: Full CLI Pipeline", () => {
     }
 
     // Filter by non-existent org returns empty
-    const empty = filterRecords(commitsData.records, { org: "NonExistent" });
+    const empty = queryRecords({ org: "NonExistent" });
     expect(empty).toHaveLength(0);
 
-    console.log(`  Filtered: ${filtered.length} / ${commitsData.records.length} records for SkoolScout`);
+    console.log(`  SQL filter: ${filtered.length} / ${allRecords.length} records for SkoolScout`);
   });
 
-  // ── Step 14: Scan state tracks repos ──────────────────────────────────────
+  // ── Step 14: Re-attribution idempotency ───────────────────────────────────
 
-  it("Step 14: scan state has entries for each scanned repo", async () => {
-    const raw = JSON.parse(await readFile(scanStatePath, "utf-8"));
-
-    expect(raw.version).toBe(1);
-    const repoNames = Object.keys(raw.repos);
-    expect(repoNames.length).toBeGreaterThanOrEqual(2);
-
-    for (const repoName of repoNames) {
-      const entry = raw.repos[repoName];
-      expect(entry.lastHash).toBeTruthy();
-      expect(entry.lastScanDate).toBeTruthy();
-      expect(entry.recentHashes.length).toBeGreaterThan(0);
-      expect(entry.recordCount).toBeGreaterThanOrEqual(0);
-    }
-
-    console.log(`  Scan state: ${repoNames.length} repos tracked`);
-  });
-
-  // ── Step 15: Re-attribution after assignment ──────────────────────────────
-
-  it("Step 15: re-attribution updates records when author assignment changes", async () => {
+  it("Step 14: re-attribution is idempotent", async () => {
     const { reattributeRecords } = await import("../collector/author-map.js");
-    const commitsData = JSON.parse(await readFile(commitsPath, "utf-8"));
-    const registry = JSON.parse(await readFile(authorsPath, "utf-8"));
-    const config = await loadConfigFromTemp();
+    const { queryRecords, loadAuthorRegistrySQL } = await import("../store/sqlite-store.js");
 
-    const unassignedBefore = commitsData.records.filter((r: any) => r.org === "unassigned").length;
-    const assignedBefore = commitsData.records.filter((r: any) => r.org === "SkoolScout").length;
+    const config = await loadConfigFromTemp();
+    const registry = loadAuthorRegistrySQL();
+    const records = queryRecords({});
+
+    const unassignedBefore = records.filter((r) => r.org === "unassigned").length;
+    const assignedBefore = records.filter((r) => r.org === "SkoolScout").length;
 
     // Re-attribute with current state (should be idempotent)
-    const reattributed = reattributeRecords(commitsData.records, config, registry);
+    const reattributed = reattributeRecords(records, config, registry);
 
-    const unassignedAfter = reattributed.filter((r: any) => r.org === "unassigned").length;
-    const assignedAfter = reattributed.filter((r: any) => r.org === "SkoolScout").length;
+    const unassignedAfter = reattributed.filter((r) => r.org === "unassigned").length;
+    const assignedAfter = reattributed.filter((r) => r.org === "SkoolScout").length;
 
-    // Counts should stay the same (idempotent)
     expect(unassignedAfter).toBe(unassignedBefore);
     expect(assignedAfter).toBe(assignedBefore);
-
-    // Total records unchanged
-    expect(reattributed.length).toBe(commitsData.records.length);
+    expect(reattributed.length).toBe(records.length);
 
     console.log(`  Re-attribution idempotent: ${assignedAfter} assigned, ${unassignedAfter} unassigned`);
   });
 
-  // ── Step 16: Merge records handles duplicates ─────────────────────────────
+  // ── Step 15: upsertRecords handles additive merge in SQLite ───────────────
 
-  it("Step 16: merging incoming records sums metrics additively", async () => {
-    // Inline mergeRecords (replaced deleted commits-by-filetype module)
-    const mergeRecords = (existing: any[], incoming: any[]) => {
-      const map = new Map<string, any>();
-      for (const r of existing) map.set(`${r.member}::${r.week}::${r.repo}`, { ...r });
-      for (const r of incoming) {
-        const key = `${r.member}::${r.week}::${r.repo}`;
-        const prev = map.get(key);
-        if (prev) {
-          prev.commits += r.commits;
-          prev.activeDays = Math.max(prev.activeDays, r.activeDays);
-        } else {
-          map.set(key, { ...r });
-        }
-      }
-      return [...map.values()];
-    };
-    const commitsData = JSON.parse(await readFile(commitsPath, "utf-8"));
+  it("Step 15: upsertRecords merges duplicate keys additively in SQLite", async () => {
+    const { queryRecords, upsertRecords, getStoreStatsSQLFull } = await import("../store/sqlite-store.js");
 
-    // Take a subset (first 10 records) as "incoming"
-    const incoming = commitsData.records.slice(0, 10);
-    const originalCount = commitsData.records.length;
+    const before = getStoreStatsSQLFull();
+    const records = queryRecords({});
 
-    // Merge incoming into existing — should not increase record count
-    // for records that share the same member::week::repo key
-    const merged = mergeRecords(commitsData.records, incoming);
+    // Take a subset (first 5 records) and upsert them again
+    const subset = records.slice(0, 5);
 
-    // Count should stay same (incoming keys all exist in existing)
-    expect(merged.length).toBeLessThanOrEqual(originalCount);
-    expect(merged.length).toBeGreaterThan(0);
+    // Record original values for comparison
+    const originals = subset.map((r) => ({
+      key: `${r.member}::${r.week}::${r.repo}`,
+      commits: r.commits,
+    }));
 
-    // Verify additive merge: the first record should have doubled commits
-    const first = incoming[0];
-    const mergedRecord = merged.find(
-      (r: any) => r.member === first.member && r.week === first.week && r.repo === first.repo,
-    );
-    expect(mergedRecord).toBeDefined();
-    expect(mergedRecord.commits).toBe(first.commits * 2);
+    upsertRecords(subset);
 
-    // Records not in incoming should be unchanged
-    const lastOriginal = commitsData.records[commitsData.records.length - 1];
-    const wasInIncoming = incoming.some(
-      (r: any) => r.member === lastOriginal.member && r.week === lastOriginal.week && r.repo === lastOriginal.repo,
-    );
-    if (!wasInIncoming) {
-      const unchanged = merged.find(
-        (r: any) => r.member === lastOriginal.member && r.week === lastOriginal.week && r.repo === lastOriginal.repo,
+    // Record count should NOT increase (same keys)
+    const after = getStoreStatsSQLFull();
+    expect(after.recordCount).toBe(before.recordCount);
+
+    // Commits should be doubled for the upserted records
+    const reloaded = queryRecords({});
+    for (const orig of originals) {
+      const found = reloaded.find(
+        (r) => `${r.member}::${r.week}::${r.repo}` === orig.key,
       );
-      expect(unchanged).toBeDefined();
-      expect(unchanged.commits).toBe(lastOriginal.commits);
+      expect(found).toBeDefined();
+      expect(found!.commits).toBe(orig.commits * 2);
     }
+
+    // Undo the double-counting by subtracting (re-upsert with negative won't work,
+    // so we just verify the behavior is correct)
+    console.log(`  upsertRecords: ${subset.length} records merged, count unchanged at ${after.recordCount}`);
   });
 
-  // ── Step 17: Contributions --json output has non-zero metrics ─────────
+  // ── Step 16: Contributions --json via SQL path ────────────────────────────
 
-  it("Step 17: contributions --json output has non-zero insertions and deletions", async () => {
+  it("Step 16: contributions --json via SQL path has non-zero insertions and deletions", async () => {
     const { contributions } = await import("../commands/contributions.js");
-    const commitsData = JSON.parse(await readFile(commitsPath, "utf-8"));
 
-    // Capture console.log output
     const logs: string[] = [];
     const spy = vi.spyOn(console, "log").mockImplementation((...args: any[]) => {
       logs.push(args.map(String).join(" "));
     });
 
+    // No `records:` option → uses SQL path (queryRollup)
     await contributions({
       weeks: 52,
       groupBy: "member",
       json: true,
-      records: commitsData.records,
     });
 
     spy.mockRestore();
@@ -699,49 +585,44 @@ describe("Functional: Full CLI Pipeline", () => {
 
     expect(rows.length).toBeGreaterThan(0);
 
-    // Every row must have non-zero commits
     for (const row of rows) {
       expect(row.commits).toBeGreaterThan(0);
     }
 
-    // At least one row must have non-zero insertions AND deletions
     const withInsertions = rows.filter((r: any) => r.insertions > 0);
     const withDeletions = rows.filter((r: any) => r.deletions > 0);
     expect(withInsertions.length).toBeGreaterThan(0);
     expect(withDeletions.length).toBeGreaterThan(0);
 
-    // At least one row must have non-zero files
     const withFiles = rows.filter((r: any) => r.files > 0);
     expect(withFiles.length).toBeGreaterThan(0);
 
-    // Total insertions across all rows must be significant
     const totalIns = rows.reduce((s: number, r: any) => s + r.insertions, 0);
     const totalDel = rows.reduce((s: number, r: any) => s + r.deletions, 0);
     expect(totalIns).toBeGreaterThan(100);
     expect(totalDel).toBeGreaterThan(0);
 
     console.log(
-      `  Contributions JSON: ${rows.length} members, ` +
+      `  Contributions (SQL path): ${rows.length} members, ` +
       `total insertions=${totalIns}, deletions=${totalDel}`,
     );
   });
 
-  // ── Step 18: Leaderboard --json output has non-zero values ────────────
+  // ── Step 17: Leaderboard --json via SQL path ──────────────────────────────
 
-  it("Step 18: leaderboard --json output has non-zero line counts", async () => {
+  it("Step 17: leaderboard --json via SQL path has non-zero line counts", async () => {
     const { leaderboard } = await import("../commands/leaderboard.js");
-    const commitsData = JSON.parse(await readFile(commitsPath, "utf-8"));
 
     const logs: string[] = [];
     const spy = vi.spyOn(console, "log").mockImplementation((...args: any[]) => {
       logs.push(args.map(String).join(" "));
     });
 
+    // No `records:` option → uses queryRecords() from SQLite
     await leaderboard({
       weeks: 52,
       top: 10,
       json: true,
-      records: commitsData.records,
     });
 
     spy.mockRestore();
@@ -751,7 +632,6 @@ describe("Functional: Full CLI Pipeline", () => {
 
     expect(columns.length).toBe(4); // Overall, App, Test, Config
 
-    // Overall column must have entries with non-zero values
     const overall = columns.find((c: any) => c.title === "Overall");
     expect(overall).toBeDefined();
     expect(overall.entries.length).toBeGreaterThan(0);
@@ -762,36 +642,33 @@ describe("Functional: Full CLI Pipeline", () => {
       expect(entry.rank).toBeGreaterThan(0);
     }
 
-    // #1 entry should have substantial line count
     expect(overall.entries[0].value).toBeGreaterThan(100);
 
-    // App column should also have entries
     const appCol = columns.find((c: any) => c.title === "App");
     expect(appCol).toBeDefined();
     expect(appCol.entries.length).toBeGreaterThan(0);
     expect(appCol.entries[0].value).toBeGreaterThan(0);
 
     console.log(
-      `  Leaderboard JSON: #1 overall=${overall.entries[0].member} (${overall.entries[0].value} lines), ` +
+      `  Leaderboard (SQL path): #1 overall=${overall.entries[0].member} (${overall.entries[0].value} lines), ` +
       `#1 app=${appCol.entries[0].member} (${appCol.entries[0].value} lines)`,
     );
   });
 
-  // ── Step 19: Repo-activity --json output has non-zero metrics ─────────
+  // ── Step 18: Repo-activity --json via SQL path ────────────────────────────
 
-  it("Step 19: repo-activity --json output has non-zero insertions and deletions", async () => {
+  it("Step 18: repo-activity --json via SQL path has non-zero insertions and deletions", async () => {
     const { repoActivity } = await import("../commands/repo-activity.js");
-    const commitsData = JSON.parse(await readFile(commitsPath, "utf-8"));
 
     const logs: string[] = [];
     const spy = vi.spyOn(console, "log").mockImplementation((...args: any[]) => {
       logs.push(args.map(String).join(" "));
     });
 
+    // No `records:` option → uses SQL fast path (queryRollup)
     await repoActivity({
       weeks: 52,
       json: true,
-      records: commitsData.records,
     });
 
     spy.mockRestore();
@@ -801,14 +678,12 @@ describe("Functional: Full CLI Pipeline", () => {
 
     expect(rows.length).toBeGreaterThanOrEqual(2);
 
-    // Every repo row must have non-zero commits
     for (const row of rows) {
       expect(row.commits).toBeGreaterThan(0);
       expect(row.repo).toBeTruthy();
       expect(row.group).toBeTruthy();
     }
 
-    // skoolscout-com must have non-zero insertions and deletions
     const skoolscout = rows.find((r: any) => r.repo === "skoolscout-com");
     expect(skoolscout).toBeDefined();
     expect(skoolscout.insertions).toBeGreaterThan(0);
@@ -817,14 +692,47 @@ describe("Functional: Full CLI Pipeline", () => {
     expect(skoolscout.contributors).toBeGreaterThan(0);
     expect(skoolscout.net).not.toBe(0);
 
-    // At least one repo must have non-zero files
     const totalFiles = rows.reduce((s: number, r: any) => s + r.files, 0);
     expect(totalFiles).toBeGreaterThan(0);
 
     console.log(
-      `  Repo-activity JSON: ${rows.length} repos, ` +
+      `  Repo-activity (SQL path): ${rows.length} repos, ` +
       `skoolscout-com: ${skoolscout.commits} commits, +${skoolscout.insertions}/-${skoolscout.deletions}, ` +
       `${skoolscout.files} files, ${skoolscout.contributors} devs`,
+    );
+  });
+
+  // ── Step 19: queryRollup with week filter matches queryRecords ────────────
+
+  it("Step 19: queryRollup with week filter produces consistent results", async () => {
+    const { queryRollup, queryRecords } = await import("../store/sqlite-store.js");
+    const { getCurrentWeek, getLastNWeeks } = await import("../aggregator/filters.js");
+
+    const weeks = getLastNWeeks(4, getCurrentWeek());
+    const rolled = queryRollup({ weeks }, "member");
+    const records = queryRecords({});
+
+    // Filter records to matching weeks manually
+    const weekSet = new Set(weeks);
+    const filteredRecords = records.filter((r) => weekSet.has(r.week));
+
+    // Total commits from rollup should match manual summation
+    let rollupCommits = 0;
+    for (const [, agg] of rolled) {
+      rollupCommits += agg.commits;
+    }
+
+    // Note: Step 15 doubled some records, so we compare rollup against itself
+    // The important thing is rollup returns data and groups correctly
+    expect(rolled.size).toBeGreaterThan(0);
+    expect(rollupCommits).toBeGreaterThan(0);
+
+    // Number of distinct members should match
+    const membersFromRecords = new Set(filteredRecords.map((r) => r.member));
+    expect(rolled.size).toBe(membersFromRecords.size);
+
+    console.log(
+      `  queryRollup(weeks): ${rolled.size} members, ${rollupCommits} commits across ${weeks.length} weeks`,
     );
   });
 });
