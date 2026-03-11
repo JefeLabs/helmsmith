@@ -4,6 +4,8 @@ import { computeLeaderboard } from '../aggregator/leaderboard.js';
 import { rollup } from '../aggregator/engine.js';
 import { calculateSegments, type Segment, type SegmentThresholds } from '../aggregator/segments.js';
 import { fmt } from '../ui/format.js';
+import { printTitle, printNoData, printJson, type Column } from '../ui/cli-renderer.js';
+import { renderTable } from '../ui/table.js';
 import type { UserWeekRepoRecord } from '../types/schema.js';
 
 export interface LeaderboardOptions {
@@ -16,6 +18,13 @@ export interface LeaderboardOptions {
   /** Pre-loaded records (skips disk read when provided — useful for testing). */
   records?: UserWeekRepoRecord[];
 }
+
+const sectionColumns: Column[] = [
+  { key: 'rank', label: '#', align: 'right', minWidth: 3 },
+  { key: 'member', label: 'Name', minWidth: 25, flex: 1 },
+  { key: 'team', label: 'Team', minWidth: 15 },
+  { key: 'value', label: 'Lines', align: 'right', minWidth: 8, format: (v: any) => fmt(v) },
+];
 
 export async function leaderboard(options: LeaderboardOptions = {}): Promise<void> {
   let records = options.records ?? queryRecords({});
@@ -51,27 +60,25 @@ export async function leaderboard(options: LeaderboardOptions = {}): Promise<voi
   const columns = computeLeaderboard(records, weeks, topN);
 
   if (columns.every((c) => c.entries.length === 0)) {
-    console.log('No data for leaderboard. Run "gitradar scan" first.');
+    printNoData('No data for leaderboard. Run "gitradar scan" first.');
     return;
   }
 
   if (options.json) {
-    console.log(JSON.stringify(columns, null, 2));
+    printJson(columns);
     return;
   }
 
-  console.log(`\nTop Performers (last ${weeksBack} weeks)\n`);
+  printTitle(`Top Performers (last ${weeksBack} weeks)`);
 
   for (const col of columns) {
     if (col.entries.length === 0) continue;
     console.log(`  ${col.title}`);
-    console.log(`  ${'#'.padStart(3)} ${'Name'.padEnd(25)} ${'Team'.padEnd(15)} ${'Lines'.padStart(8)}`);
-    console.log(`  ${'-'.repeat(55)}`);
-    for (const entry of col.entries) {
-      const name = entry.member.length > 24 ? entry.member.slice(0, 23) + '…' : entry.member;
-      const team = entry.team.length > 14 ? entry.team.slice(0, 13) + '…' : entry.team;
-      console.log(`  ${String(entry.rank).padStart(3)} ${name.padEnd(25)} ${team.padEnd(15)} ${fmt(entry.value).padStart(8)}`);
-    }
+    console.log('  ' + renderTable({
+      columns: sectionColumns,
+      rows: col.entries,
+      borderStyle: 'minimal',
+    }).split('\n').join('\n  '));
     console.log('');
   }
 }

@@ -2,6 +2,7 @@ import { queryRecords, queryRollup } from '../store/sqlite-store.js';
 import { filterRecords, getLastNWeeks, getCurrentWeek, type Filters } from '../aggregator/filters.js';
 import { rollup } from '../aggregator/engine.js';
 import { fmt } from '../ui/format.js';
+import { printTable, printNoData, printJson, type Column } from '../ui/cli-renderer.js';
 
 export interface RepoActivityOptions {
   weeks?: number;
@@ -23,6 +24,17 @@ interface RepoRow {
   weeklyCommits: number[];
 }
 
+const repoColumns: Column[] = [
+  { key: 'repo', label: 'Repo', minWidth: 30, flex: 1 },
+  { key: 'group', label: 'Group', minWidth: 10 },
+  { key: 'commits', label: 'cmts', align: 'right', minWidth: 6 },
+  { key: 'contributors', label: 'devs', align: 'right', minWidth: 5 },
+  { key: 'insertions', label: '+ins', align: 'right', minWidth: 8, format: (v: any) => '+' + fmt(v) },
+  { key: 'deletions', label: '-del', align: 'right', minWidth: 8, format: (v: any) => '-' + fmt(v) },
+  { key: 'net', label: 'net', align: 'right', minWidth: 8, format: (v: any) => (v >= 0 ? '+' : '') + fmt(v) },
+  { key: 'files', label: 'files', align: 'right', minWidth: 6 },
+];
+
 export async function repoActivity(options: RepoActivityOptions = {}): Promise<void> {
   const weeksBack = options.weeks ?? 8;
   const currentWeek = getCurrentWeek();
@@ -38,7 +50,7 @@ export async function repoActivity(options: RepoActivityOptions = {}): Promise<v
     const rolled = queryRollup(sqlFilters, 'repo');
 
     if (rolled.size === 0) {
-      console.log('No records found. Run "gitradar scan" first.');
+      printNoData();
       return;
     }
 
@@ -89,7 +101,7 @@ export async function repoActivity(options: RepoActivityOptions = {}): Promise<v
     records = records.filter((r) => weekSet.has(r.week));
 
     if (records.length === 0) {
-      console.log('No records found. Run "gitradar scan" first.');
+      printNoData();
       return;
     }
 
@@ -117,23 +129,14 @@ export async function repoActivity(options: RepoActivityOptions = {}): Promise<v
   rows.sort((a, b) => b.commits - a.commits);
 
   if (options.json) {
-    console.log(JSON.stringify(rows, null, 2));
+    printJson(rows);
     return;
   }
 
-  console.log(`\nRepo Activity (last ${weeksBack} weeks)\n`);
-
-  const header = `${'Repo'.padEnd(30)} ${'Group'.padEnd(10)} ${'cmts'.padStart(6)} ${'devs'.padStart(5)} ${'+ins'.padStart(8)} ${'-del'.padStart(8)} ${'net'.padStart(8)} ${'files'.padStart(6)}`;
-  console.log(header);
-  console.log('-'.repeat(header.length));
-
-  for (const row of rows) {
-    const name = row.repo.length > 29 ? row.repo.slice(0, 28) + '…' : row.repo;
-    const group = row.group.length > 9 ? row.group.slice(0, 8) + '…' : row.group;
-    console.log(
-      `${name.padEnd(30)} ${group.padEnd(10)} ${String(row.commits).padStart(6)} ${String(row.contributors).padStart(5)} ${('+' + fmt(row.insertions)).padStart(8)} ${('-' + fmt(row.deletions)).padStart(8)} ${((row.net >= 0 ? '+' : '') + fmt(row.net)).padStart(8)} ${String(row.files).padStart(6)}`,
-    );
-  }
-
-  console.log(`\n${rows.length} repos`);
+  printTable({
+    title: `Repo Activity (last ${weeksBack} weeks)`,
+    columns: repoColumns,
+    rows,
+    summary: `${rows.length} repos`,
+  });
 }

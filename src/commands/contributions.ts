@@ -8,6 +8,7 @@ import { rollup } from '../aggregator/engine.js';
 import type { RolledUp } from '../aggregator/engine.js';
 import { fmt, weekLabel, quarterShort, yearShort } from '../ui/format.js';
 import { calculateSegments, type Segment, type SegmentThresholds } from '../aggregator/segments.js';
+import { printTable, printTitle, printNoData, printJson, printSummary, type Column } from '../ui/cli-renderer.js';
 import type { UserWeekRepoRecord } from '../types/schema.js';
 
 export type PivotGranularity = 'week' | 'month' | 'quarter' | 'year';
@@ -83,6 +84,25 @@ function aggregateRows(
 }
 
 export { aggregateRows };
+
+// ── Shared column definitions ────────────────────────────────────────────────
+
+function contributionColumns(segMap?: Map<string, string>): Column[] {
+  return [
+    { key: 'name', label: 'Name', minWidth: 30, flex: 1 },
+    ...(segMap ? [{
+      key: 'name', label: 'seg', align: 'right' as const, minWidth: 3,
+      format: (v: any) => ((segMap.get(v) ?? 'middle')[0]).toUpperCase(),
+    }] : []),
+    { key: 'commits', label: 'cmts', align: 'right', minWidth: 6 },
+    { key: 'activeDays', label: 'days', align: 'right', minWidth: 5 },
+    { key: 'insertions', label: '+ins', align: 'right', minWidth: 8, format: (v: any) => '+' + fmt(v) },
+    { key: 'deletions', label: '-del', align: 'right', minWidth: 8, format: (v: any) => '-' + fmt(v) },
+    { key: 'net', label: 'net', align: 'right', minWidth: 8, format: (v: any) => (v >= 0 ? '+' : '') + fmt(v) },
+    { key: 'testPct', label: 'tst%', align: 'right', minWidth: 5, format: (v: any) => v + '%' },
+    { key: 'files', label: 'files', align: 'right', minWidth: 6 },
+  ];
+}
 
 // ── Pivot logic ──────────────────────────────────────────────────────────────
 
@@ -209,6 +229,61 @@ function aggregatePivot(
 
 export { aggregatePivot };
 
+// ── Pivot rendering ──────────────────────────────────────────────────────────
+
+function renderPivot(
+  entities: PivotEntity[],
+  groupBy: string,
+  pivot: PivotGranularity,
+  weeksBack: number,
+  bucketCount: number,
+  recordCount: number,
+): void {
+  // Flatten entities + sub-rows into renderTable-compatible rows with groupSeparators
+  const pivotColumns: Column[] = [
+    { key: 'name', label: 'Name', minWidth: 22, flex: 1 },
+    { key: 'period', label: 'period', minWidth: 9 },
+    { key: 'commits', label: 'cmts', align: 'right', minWidth: 6 },
+    { key: 'activeDays', label: 'days', align: 'right', minWidth: 5 },
+    { key: 'insertions', label: '+ins', align: 'right', minWidth: 8, format: (v: any) => '+' + fmt(v) },
+    { key: 'deletions', label: '-del', align: 'right', minWidth: 8, format: (v: any) => '-' + fmt(v) },
+    { key: 'net', label: 'net', align: 'right', minWidth: 8, format: (v: any) => (v >= 0 ? '+' : '') + fmt(v) },
+    { key: 'testPct', label: 'tst%', align: 'right', minWidth: 5, format: (v: any) => v + '%' },
+    { key: 'files', label: 'files', align: 'right', minWidth: 6 },
+  ];
+
+  const flatRows: Record<string, any>[] = [];
+  const groupSeps: number[] = [];
+
+  for (const entity of entities) {
+    // Total row (with entity name)
+    flatRows.push({
+      ...entity.total,
+      name: entity.name,
+      period: 'TOTAL',
+    });
+    // Period sub-rows
+    for (const p of entity.periods) {
+      if (p.row.commits === 0) continue;
+      flatRows.push({
+        ...p.row,
+        name: '',
+        period: p.label,
+      });
+    }
+    // Mark end of this entity group for separator
+    groupSeps.push(flatRows.length - 1);
+  }
+
+  printTable({
+    title: `Contributions by ${groupBy} (pivot: ${pivot}, last ${weeksBack} weeks)`,
+    columns: pivotColumns,
+    rows: flatRows,
+    groupSeparator: groupSeps,
+    summary: `${entities.length} ${groupBy}s, ${bucketCount} ${pivot}s, ${recordCount} records`,
+  });
+}
+
 // ── Main entry point ─────────────────────────────────────────────────────────
 
 export async function contributions(options: ContributionsOptions = {}): Promise<void> {
@@ -229,21 +304,16 @@ export async function contributions(options: ContributionsOptions = {}): Promise
     };
     const rolled = queryRollup(sqlFilters, groupBy as RollupGroupBy);
     if (rolled.size === 0) {
-      console.log('No records found. Run "gitradar scan" first.');
+      printNoData();
       return;
     }
 
     // We have everything we need from SQL
     let rows = rolledUpToRows(rolled);
     if (options.json) {
-      console.log(JSON.stringify(rows, null, 2));
+      printJson(rows);
       return;
     }
-
-    const header = `${'Name'.padEnd(30)} ${'seg'.padStart(3)} ${'cmts'.padStart(6)} ${'days'.padStart(5)} ${'+ins'.padStart(8)} ${'-del'.padStart(8)} ${'net'.padStart(8)} ${'tst%'.padStart(5)} ${'files'.padStart(6)}`;
-    console.log(`\nContributions by ${groupBy} (last ${weeksBack} weeks)\n`);
-    console.log(header);
-    console.log('-'.repeat(header.length));
 
     // Compute segments for display (from SQL-aggregated totals)
     const memberTotals = new Map<string, number>();
@@ -256,22 +326,17 @@ export async function contributions(options: ContributionsOptions = {}): Promise
     if (options.segment) {
       rows = rows.filter((row) => segMap.get(row.name) === options.segment);
       if (rows.length === 0) {
-        console.log(`No ${options.segment}-segment contributors found.`);
+        printNoData(`No ${options.segment}-segment contributors found.`);
         return;
       }
     }
 
-    for (const row of rows) {
-      const name = row.name.length > 29 ? row.name.slice(0, 28) + '\u2026' : row.name;
-      const seg = (segMap.get(row.name) ?? 'middle')[0].toUpperCase();
-      console.log(
-        `${name.padEnd(30)} ${seg.padStart(3)} ${String(row.commits).padStart(6)} ${String(row.activeDays).padStart(5)} ${('+' + fmt(row.insertions)).padStart(8)} ${('-' + fmt(row.deletions)).padStart(8)} ${(row.net >= 0 ? '+' : '') + fmt(row.net)}`.padEnd(80) +
-        `${String(row.testPct) + '%'}`.padStart(5) +
-        `${String(row.files).padStart(6)}`,
-      );
-    }
-
-    console.log(`\n${rows.length} ${groupBy}s`);
+    printTable({
+      title: `Contributions by ${groupBy} (last ${weeksBack} weeks)`,
+      columns: contributionColumns(segMap),
+      rows,
+      summary: `${rows.length} ${groupBy}s`,
+    });
     return;
   }
 
@@ -286,7 +351,7 @@ export async function contributions(options: ContributionsOptions = {}): Promise
   records = records.filter((r) => weekSet.has(r.week));
 
   if (records.length === 0) {
-    console.log('No records found. Run "gitradar scan" first.');
+    printNoData();
     return;
   }
 
@@ -296,7 +361,7 @@ export async function contributions(options: ContributionsOptions = {}): Promise
     const entities = aggregatePivot(records, groupBy, options.pivot, buckets);
 
     if (options.json) {
-      console.log(JSON.stringify(entities.map((e) => ({
+      printJson(entities.map((e) => ({
         name: e.name,
         total: e.total,
         periods: e.periods.map((p) => ({
@@ -304,39 +369,11 @@ export async function contributions(options: ContributionsOptions = {}): Promise
           label: p.label,
           ...p.row,
         })),
-      })), null, 2));
+      })));
       return;
     }
 
-    // Render grouped table: entity header → period sub-rows
-    const nameWidth = 22;
-    const periodWidth = 9;
-    const header = `${'Name'.padEnd(nameWidth)} ${'period'.padEnd(periodWidth)} ${'cmts'.padStart(6)} ${'days'.padStart(5)} ${'+ins'.padStart(8)} ${'-del'.padStart(8)} ${'net'.padStart(8)} ${'tst%'.padStart(5)} ${'files'.padStart(6)}`;
-
-    console.log(`\nContributions by ${groupBy} (pivot: ${options.pivot}, last ${weeksBack} weeks)\n`);
-    console.log(header);
-    console.log('-'.repeat(header.length));
-
-    const formatRow = (label: string, isName: boolean, row: ContributionRow) => {
-      const col1 = isName
-        ? (label.length > nameWidth - 1 ? label.slice(0, nameWidth - 2) + '\u2026' : label).padEnd(nameWidth)
-        : ' '.repeat(nameWidth);
-      const col2 = isName ? 'TOTAL'.padEnd(periodWidth) : label.padEnd(periodWidth);
-      return `${col1} ${col2} ${String(row.commits).padStart(6)} ${String(row.activeDays).padStart(5)} ${('+' + fmt(row.insertions)).padStart(8)} ${('-' + fmt(row.deletions)).padStart(8)} ${((row.net >= 0 ? '+' : '') + fmt(row.net)).padStart(8)} ${(String(row.testPct) + '%').padStart(5)} ${String(row.files).padStart(6)}`;
-    };
-
-    for (const entity of entities) {
-      // Entity total row (with name)
-      console.log(formatRow(entity.name, true, entity.total));
-      // Period sub-rows
-      for (const p of entity.periods) {
-        if (p.row.commits === 0) continue;  // skip empty periods
-        console.log(formatRow(p.label, false, p.row));
-      }
-      console.log('');  // blank line between entities
-    }
-
-    console.log(`${entities.length} ${groupBy}s, ${buckets.length} ${options.pivot}s, ${records.length} records`);
+    renderPivot(entities, groupBy, options.pivot, weeksBack, buckets.length, records.length);
     return;
   }
 
@@ -348,7 +385,7 @@ export async function contributions(options: ContributionsOptions = {}): Promise
   for (const row of rows) {
     memberTotals.set(row.name, row.insertions + row.deletions);
   }
-  const segMap = calculateSegments(memberTotals);
+  const segMap = calculateSegments(memberTotals, options.segmentThresholds);
 
   // Filter by segment if requested
   if (options.segment) {
@@ -357,25 +394,14 @@ export async function contributions(options: ContributionsOptions = {}): Promise
 
   if (options.json) {
     const jsonRows = rows.map((r) => ({ ...r, segment: segMap.get(r.name) ?? 'middle' }));
-    console.log(JSON.stringify(jsonRows, null, 2));
+    printJson(jsonRows);
     return;
   }
 
-  // Table header
-  const header = `${'Name'.padEnd(30)} ${'seg'.padStart(3)} ${'cmts'.padStart(6)} ${'days'.padStart(5)} ${'+ins'.padStart(8)} ${'-del'.padStart(8)} ${'net'.padStart(8)} ${'tst%'.padStart(5)} ${'files'.padStart(6)}`;
-  console.log(`\nContributions by ${groupBy} (last ${weeksBack} weeks)\n`);
-  console.log(header);
-  console.log('-'.repeat(header.length));
-
-  for (const row of rows) {
-    const name = row.name.length > 29 ? row.name.slice(0, 28) + '\u2026' : row.name;
-    const seg = (segMap.get(row.name) ?? 'middle')[0].toUpperCase();
-    console.log(
-      `${name.padEnd(30)} ${seg.padStart(3)} ${String(row.commits).padStart(6)} ${String(row.activeDays).padStart(5)} ${('+' + fmt(row.insertions)).padStart(8)} ${('-' + fmt(row.deletions)).padStart(8)} ${(row.net >= 0 ? '+' : '') + fmt(row.net)}`.padEnd(80) +
-      `${String(row.testPct) + '%'}`.padStart(5) +
-      `${String(row.files).padStart(6)}`,
-    );
-  }
-
-  console.log(`\n${rows.length} ${groupBy}s, ${records.length} records`);
+  printTable({
+    title: `Contributions by ${groupBy} (last ${weeksBack} weeks)`,
+    columns: contributionColumns(segMap),
+    rows,
+    summary: `${rows.length} ${groupBy}s, ${records.length} records`,
+  });
 }
