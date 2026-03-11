@@ -29,7 +29,7 @@ import {
   saveAuthorRegistry,
   mergeDiscoveredAuthors,
 } from './store/author-registry.js';
-import { getCommitsPath, getScanStatePath, getAuthorRegistryPath, getConfigDir, getDataDir, getConfigPath } from './store/paths.js';
+import { getCommitsPath, getScanStatePath, getAuthorRegistryPath, getEnrichmentsPath, getConfigDir, getDataDir, getConfigPath } from './store/paths.js';
 import { scanAllRepos } from './collector/index.js';
 import { getCurrentWeek } from './aggregator/filters.js';
 import { filterRecords } from './aggregator/filters.js';
@@ -410,6 +410,26 @@ data
     await importWorkspace(file);
   });
 
+// ── gitradar enrich ──────────────────────────────────────────────────────
+
+program
+  .command('enrich')
+  .description('Enrich data with GitHub PR metrics and churn analysis')
+  .option('-w, --weeks <n>', 'Weeks to enrich (default: 4)', parseInt)
+  .option('--repo <name>', 'Enrich only this repo')
+  .option('--force', 'Re-enrich even if data exists')
+  .option('--skip-churn', 'Skip churn rate calculation')
+  .action(async (cmdOpts: { weeks?: number; repo?: string; force?: boolean; skipChurn?: boolean }) => {
+    const { enrich: enrichCmd } = await import('./commands/enrich.js');
+    await enrichCmd({
+      weeks: cmdOpts.weeks,
+      repo: cmdOpts.repo,
+      force: cmdOpts.force,
+      skipChurn: cmdOpts.skipChurn,
+      config: globals().config,
+    });
+  });
+
 // ── Default action (no subcommand → TUI) ────────────────────────────────────
 
 program.action(async () => {
@@ -444,6 +464,7 @@ async function runMain(opts: RunOptions): Promise<void> {
       await rm(getCommitsPath(), { force: true });
       await rm(getScanStatePath(), { force: true });
       await rm(getAuthorRegistryPath(), { force: true });
+      await rm(getEnrichmentsPath(), { force: true });
       console.log('Data files deleted. Starting fresh.');
     } catch {
       console.log('No data files to delete.');

@@ -58,6 +58,13 @@ export function getAuthorRegistryPath(): string {
 }
 
 /**
+ * Enrichments data file path: ~/.agentx/gitradar/data/enrichments.json
+ */
+export function getEnrichmentsPath(): string {
+  return join(getDataDir(), "enrichments.json");
+}
+
+/**
  * Ensure the data directory (and all parents) exist.
  */
 export async function ensureDataDir(): Promise<void> {

@@ -6,6 +6,8 @@ export const MemberSchema = z.object({
   name: z.string(),
   email: z.string().optional(),
   aliases: z.array(z.string()).optional().default([]),
+  /** GitHub username (without @) for PR/review metrics. */
+  githubHandle: z.string().optional(),
 });
 
 export const TeamSchema = z.object({
@@ -121,6 +123,8 @@ export const DiscoveredAuthorSchema = z.object({
   name: z.string(),
   /** Extracted from parenthesized identifier in git name, e.g. "CONEWC" from "Edwin Cruz (CONEWC)". */
   identifier: z.string().optional(),
+  /** GitHub username (without @) for PR/review metrics. */
+  githubHandle: z.string().optional(),
   /** Assigned org name (undefined = unassigned). */
   org: z.string().optional(),
   /** Assigned team name (undefined = unassigned). */
@@ -134,6 +138,23 @@ export const DiscoveredAuthorSchema = z.object({
 export const AuthorRegistrySchema = z.object({
   version: z.literal(1),
   authors: z.record(z.string(), DiscoveredAuthorSchema),
+});
+
+// ── Enrichment Schemas ────────────────────────────────────────────────────
+
+export const ProductivityExtensionsSchema = z.object({
+  prs_opened: z.number().default(0),
+  prs_merged: z.number().default(0),
+  avg_cycle_hrs: z.number().default(0),
+  reviews_given: z.number().default(0),
+  churn_rate_pct: z.number().default(0),
+});
+
+export const EnrichmentStoreSchema = z.object({
+  version: z.literal(1),
+  lastUpdated: z.string(),
+  enrichments: z.record(z.string(), ProductivityExtensionsSchema),
+  // key format: "member::week::repo" (same as commits store)
 });
 
 // ── Repos Registry Schemas ─────────────────────────────────────────────────
@@ -177,6 +198,9 @@ export type ScanState = z.infer<typeof ScanStateSchema>;
 
 export type DiscoveredAuthor = z.infer<typeof DiscoveredAuthorSchema>;
 export type AuthorRegistry = z.infer<typeof AuthorRegistrySchema>;
+
+export type ProductivityExtensions = z.infer<typeof ProductivityExtensionsSchema>;
+export type EnrichmentStore = z.infer<typeof EnrichmentStoreSchema>;
 
 export type WorkspaceRepo = z.infer<typeof WorkspaceRepoSchema>;
 export type Workspace = z.infer<typeof WorkspaceSchema>;

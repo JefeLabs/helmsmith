@@ -445,3 +445,153 @@ export async function scanRepo(
     discoveredAuthors: Array.from(rawAuthorsMap.values()),
   };
 }
+
+/**
+ * Calculate code churn rate for a specific author in a time period.
+ *
+ * "Churn" = lines changed in files that were also modified within the
+ * instability window (default 21 days) prior to each commit.
+ * A high churn rate suggests code instability or rework.
+ *
+ * Returns a percentage (0-100). Samples up to `maxCommits` to bound performance.
+ *
+ * Note: Uses simple-git (which internally uses execFile, not shell exec)
+ * for all git operations. Author email is passed as a git argument, not
+ * interpolated into a shell command.
+ */
+export async function calculateChurnRate(
+  repoPath: string,
+  authorEmail: string,
+  since: string,
+  until: string,
+  instabilityWindowDays = 21,
+  maxCommits = 50,
+): Promise<number> {
+  const git = simpleGit(repoPath);
+
+  // Get author's commits in the period
+  let logOutput: string;
+  try {
+    logOutput = await git.raw([
+      "log",
+      `--since=${since}`,
+      `--until=${until}`,
+      `--author=${authorEmail}`,
+      "--no-merges",
+      "--format=%H",
+      "--numstat",
+    ]);
+  } catch {
+    return 0;
+  }
+
+  if (!logOutput.trim()) return 0;
+
+  // Parse into commit hashes + their files with line counts
+  const commitFiles = parseChurnLog(logOutput);
+
+  // Sample if too many commits
+  const sampled = commitFiles.length > maxCommits
+    ? sampleEvenly(commitFiles, maxCommits)
+    : commitFiles;
+
+  let totalLines = 0;
+  let churnLines = 0;
+
+  for (const { hash, files } of sampled) {
+    // Get the commit date for this commit
+    let dateStr: string;
+    try {
+      dateStr = (await git.raw(["log", "-1", "--format=%aI", hash])).trim();
+    } catch {
+      continue;
+    }
+
+    const commitDate = new Date(dateStr);
+    const windowStart = new Date(commitDate);
+    windowStart.setDate(windowStart.getDate() - instabilityWindowDays);
+    const windowSince = windowStart.toISOString().slice(0, 10);
+    const windowUntil = commitDate.toISOString().slice(0, 10);
+
+    for (const file of files) {
+      const lines = file.insertions + file.deletions;
+      totalLines += lines;
+
+      // Check if this file was modified by anyone in the instability window
+      try {
+        const priorLog = await git.raw([
+          "log",
+          `--since=${windowSince}`,
+          `--until=${windowUntil}`,
+          "--format=%H",
+          "--",
+          file.path,
+        ]);
+        // If there are prior commits to this file (excluding current commit)
+        const priorHashes = priorLog.trim().split("\n").filter((h) => h && h !== hash);
+        if (priorHashes.length > 0) {
+          churnLines += lines;
+        }
+      } catch {
+        // File may not exist in git history at this point
+      }
+    }
+  }
+
+  if (totalLines === 0) return 0;
+  return Math.round((churnLines / totalLines) * 100);
+}
+
+// ── Churn helpers ──────────────────────────────────────────────────────────
+
+export interface ChurnCommit {
+  hash: string;
+  files: Array<{ path: string; insertions: number; deletions: number }>;
+}
+
+/**
+ * Parse a simplified git log output (hash + numstat) into commit-file pairs.
+ */
+export function parseChurnLog(output: string): ChurnCommit[] {
+  const commits: ChurnCommit[] = [];
+  let current: ChurnCommit | null = null;
+
+  for (const line of output.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    // Hash line (40 hex chars)
+    if (/^[0-9a-f]{40}$/.test(trimmed)) {
+      if (current) commits.push(current);
+      current = { hash: trimmed, files: [] };
+      continue;
+    }
+
+    // Numstat line
+    if (current) {
+      const match = NUMSTAT_RE.exec(trimmed);
+      if (match) {
+        const ins = match[1] === "-" ? 0 : parseInt(match[1], 10) || 0;
+        const del = match[2] === "-" ? 0 : parseInt(match[2], 10) || 0;
+        const path = trimmed.split("\t").slice(2).join("\t");
+        current.files.push({ path, insertions: ins, deletions: del });
+      }
+    }
+  }
+
+  if (current) commits.push(current);
+  return commits;
+}
+
+/**
+ * Evenly sample N items from an array.
+ */
+export function sampleEvenly<T>(arr: T[], n: number): T[] {
+  if (n >= arr.length) return arr;
+  const step = arr.length / n;
+  const result: T[] = [];
+  for (let i = 0; i < n; i++) {
+    result.push(arr[Math.floor(i * step)]);
+  }
+  return result;
+}

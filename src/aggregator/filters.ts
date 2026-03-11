@@ -187,6 +187,20 @@ export function weekToYear(isoWeek: string): string {
   return String(monday.getUTCFullYear());
 }
 
+/**
+ * Convert an ISO week string "YYYY-Www" to a date range (Monday to Sunday)
+ * suitable for API queries. Returns ISO date strings "YYYY-MM-DD".
+ */
+export function isoWeekToDateRange(isoWeek: string): { since: string; until: string } {
+  const monday = isoWeekToMonday(isoWeek);
+  const sunday = new Date(monday);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
+  return {
+    since: monday.toISOString().slice(0, 10),
+    until: sunday.toISOString().slice(0, 10),
+  };
+}
+
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
 /**

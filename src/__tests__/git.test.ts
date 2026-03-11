@@ -26,7 +26,7 @@ vi.mock("../collector/classifier.js", () => ({
   DEFAULT_IGNORE_PATTERNS: [],
 }));
 
-const { parseGitLogOutput, getISOWeek, scanRepo, generateDateChunks } = await import(
+const { parseGitLogOutput, getISOWeek, scanRepo, generateDateChunks, parseChurnLog, sampleEvenly } = await import(
   "../collector/git.js"
 );
 
@@ -495,5 +495,77 @@ describe("generateDateChunks", () => {
     const chunks = generateDateChunks(date, date, 3);
 
     expect(chunks).toHaveLength(0);
+  });
+});
+
+// ── parseChurnLog ──────────────────────────────────────────────────────────
+
+describe("parseChurnLog", () => {
+  it("parses single commit with numstat", () => {
+    const output = [
+      "abc123def456abc123def456abc123def456abc1",
+      "10\t5\tsrc/index.ts",
+      "3\t1\tsrc/utils.ts",
+    ].join("\n");
+
+    const commits = parseChurnLog(output);
+    expect(commits).toHaveLength(1);
+    expect(commits[0].hash).toBe("abc123def456abc123def456abc123def456abc1");
+    expect(commits[0].files).toHaveLength(2);
+    expect(commits[0].files[0]).toEqual({ path: "src/index.ts", insertions: 10, deletions: 5 });
+    expect(commits[0].files[1]).toEqual({ path: "src/utils.ts", insertions: 3, deletions: 1 });
+  });
+
+  it("parses multiple commits", () => {
+    const output = [
+      "aaaa00000000000000000000000000000000aaaa",
+      "5\t2\tsrc/a.ts",
+      "",
+      "bbbb00000000000000000000000000000000bbbb",
+      "3\t1\tsrc/b.ts",
+    ].join("\n");
+
+    const commits = parseChurnLog(output);
+    expect(commits).toHaveLength(2);
+    expect(commits[0].files[0].path).toBe("src/a.ts");
+    expect(commits[1].files[0].path).toBe("src/b.ts");
+  });
+
+  it("returns empty for empty output", () => {
+    expect(parseChurnLog("")).toHaveLength(0);
+    expect(parseChurnLog("  \n  ")).toHaveLength(0);
+  });
+
+  it("handles binary files (- for insertions/deletions)", () => {
+    const output = [
+      "cccc00000000000000000000000000000000cccc",
+      "-\t-\timage.png",
+    ].join("\n");
+
+    const commits = parseChurnLog(output);
+    expect(commits[0].files[0]).toEqual({ path: "image.png", insertions: 0, deletions: 0 });
+  });
+});
+
+// ── sampleEvenly ──────────────────────────────────────────────────────────
+
+describe("sampleEvenly", () => {
+  it("returns all items when n >= length", () => {
+    const arr = [1, 2, 3];
+    expect(sampleEvenly(arr, 5)).toEqual([1, 2, 3]);
+    expect(sampleEvenly(arr, 3)).toEqual([1, 2, 3]);
+  });
+
+  it("samples evenly from array", () => {
+    const arr = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+    const sampled = sampleEvenly(arr, 5);
+    expect(sampled).toHaveLength(5);
+    // Should pick indices 0, 2, 4, 6, 8
+    expect(sampled).toEqual([0, 2, 4, 6, 8]);
+  });
+
+  it("handles n=1", () => {
+    const arr = [10, 20, 30];
+    expect(sampleEvenly(arr, 1)).toEqual([10]);
   });
 });

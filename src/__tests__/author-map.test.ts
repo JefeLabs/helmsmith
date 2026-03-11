@@ -127,6 +127,50 @@ describe("buildAuthorMap", () => {
     expect(entry!.org).toBe("ExtDev Inc");
   });
 
+  it("populates githubHandle from config members", () => {
+    const config = makeSampleConfig();
+    config.orgs[0].teams[0].members[0].githubHandle = "alicejohnson";
+    const map = buildAuthorMap(config);
+
+    const entry = map.get("alice@acme.com");
+    expect(entry).toBeDefined();
+    expect(entry!.githubHandle).toBe("alicejohnson");
+  });
+
+  it("leaves githubHandle undefined when not configured", () => {
+    const config = makeSampleConfig();
+    const map = buildAuthorMap(config);
+
+    const entry = map.get("bob@acme.com");
+    expect(entry).toBeDefined();
+    expect(entry!.githubHandle).toBeUndefined();
+  });
+
+  it("populates githubHandle from author registry", () => {
+    const config = makeSampleConfig();
+    const registry: AuthorRegistry = {
+      version: 1,
+      authors: {
+        "new@dev.com": {
+          email: "new@dev.com",
+          name: "New Dev",
+          githubHandle: "newdev-gh",
+          org: "Acme Corp",
+          team: "Platform",
+          firstSeen: "2026-01-01",
+          lastSeen: "2026-02-25",
+          reposSeenIn: ["frontend"],
+          commitCount: 50,
+        },
+      },
+    };
+    const map = buildAuthorMap(config, registry);
+
+    const entry = map.get("new@dev.com");
+    expect(entry).toBeDefined();
+    expect(entry!.githubHandle).toBe("newdev-gh");
+  });
+
   it("all keys for same member point to same resolved author object", () => {
     const config = makeSampleConfig();
     const map = buildAuthorMap(config);

@@ -1,7 +1,8 @@
 import { writeFile } from "node:fs/promises";
 import { loadCommitsData } from "../store/commits-by-filetype.js";
+import { loadEnrichments, getEnrichment } from "../store/enrichments.js";
 import { filterRecords, type Filters } from "../aggregator/filters.js";
-import type { UserWeekRepoRecord } from "../types/schema.js";
+import type { UserWeekRepoRecord, EnrichmentStore } from "../types/schema.js";
 
 export interface ExportDataOptions {
   output?: string;
@@ -61,10 +62,17 @@ const HEADERS = [
   "doc_files",
   "doc_insertions",
   "doc_deletions",
+  // Enrichment metrics (from gitradar enrich)
+  "prs_opened",
+  "prs_merged",
+  "avg_cycle_hrs",
+  "reviews_given",
+  "churn_rate_pct",
 ];
 
 export function flattenRecord(
   r: UserWeekRepoRecord,
+  enrichmentStore?: EnrichmentStore,
 ): Record<string, string | number> {
   const flat: Record<string, string | number> = {
     member: r.member,
@@ -110,6 +118,23 @@ export function flattenRecord(
   const denom = appLines + testLines;
   flat.test_pct = denom > 0 ? Math.round((testLines / denom) * 100) : 0;
 
+  // Enrichment metrics (default to 0 if not enriched)
+  if (enrichmentStore) {
+    const key = `${r.member}::${r.week}::${r.repo}`;
+    const e = getEnrichment(enrichmentStore, key);
+    flat.prs_opened = e.prs_opened;
+    flat.prs_merged = e.prs_merged;
+    flat.avg_cycle_hrs = e.avg_cycle_hrs;
+    flat.reviews_given = e.reviews_given;
+    flat.churn_rate_pct = e.churn_rate_pct;
+  } else {
+    flat.prs_opened = 0;
+    flat.prs_merged = 0;
+    flat.avg_cycle_hrs = 0;
+    flat.reviews_given = 0;
+    flat.churn_rate_pct = 0;
+  }
+
   return flat;
 }
 
@@ -123,9 +148,9 @@ function escapeCsvField(value: string | number): string {
   return str;
 }
 
-export function recordsToCsv(records: UserWeekRepoRecord[]): string {
+export function recordsToCsv(records: UserWeekRepoRecord[], enrichmentStore?: EnrichmentStore): string {
   const rows = records.map((r) => {
-    const flat = flattenRecord(r);
+    const flat = flattenRecord(r, enrichmentStore);
     return HEADERS.map((h) => escapeCsvField(flat[h])).join(",");
   });
   return [HEADERS.join(","), ...rows].join("\n") + "\n";
@@ -145,7 +170,8 @@ export async function exportData(options: ExportDataOptions): Promise<void> {
     return;
   }
 
-  const csv = recordsToCsv(records);
+  const enrichmentStore = await loadEnrichments();
+  const csv = recordsToCsv(records, enrichmentStore);
 
   if (options.output) {
     await writeFile(options.output, csv, "utf-8");

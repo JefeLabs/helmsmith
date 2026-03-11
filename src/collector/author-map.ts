@@ -11,6 +11,8 @@ export interface ResolvedAuthor {
   orgType: "core" | "consultant";
   team: string;
   tag: string;
+  /** GitHub username (without @) for PR/review metrics. */
+  githubHandle?: string;
 }
 
 /**
@@ -62,6 +64,7 @@ export function buildAuthorMap(
           orgType: org.type,
           team: team.name,
           tag: team.tag,
+          githubHandle: member.githubHandle,
         };
 
         // Index by name (lowercase)
@@ -100,6 +103,7 @@ export function buildAuthorMap(
           orgType: org.type,
           team: team.name,
           tag: team.tag,
+          githubHandle: author.githubHandle,
         };
         map.set(emailKey, resolved);
       }
