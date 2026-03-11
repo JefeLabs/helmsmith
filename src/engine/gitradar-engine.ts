@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { homedir } from 'node:os';
 import pLimit from 'p-limit';
+import ora from 'ora';
 import { loadConfig, saveConfig } from '../config/loader.js';
 import { detectGitRoot } from '../config/git-root.js';
 import {
@@ -48,6 +49,7 @@ import {
 } from '../collector/github.js';
 import { calculateChurnRate, calculateFastChurnRate } from '../collector/git.js';
 import type { ViewContext } from '../views/types.js';
+import { DEFAULT_SETTINGS } from '../types/schema.js';
 import type { Config, Org, UserWeekRepoRecord, AuthorRegistry, ScanState, ProductivityExtensions } from '../types/schema.js';
 
 export interface RunOptions {
@@ -123,7 +125,7 @@ export class GitRadarEngine {
    */
   async resolveWorkspace(opts: RunOptions): Promise<boolean> {
     let configOrgs: Config['orgs'] = [];
-    let configSettings: Config['settings'] = { weeks_back: 12, staleness_minutes: 60, trend_threshold: 0.10 };
+    let configSettings: Config['settings'] = { ...DEFAULT_SETTINGS };
     let configWorkspace: string | undefined;
     try {
       const baseConfig = await loadConfig(opts.config);
@@ -405,14 +407,23 @@ export class GitRadarEngine {
       console.log("Skipping GitHub metrics. Only churn analysis will be performed.");
     }
 
-    const churnLimit = pLimit(3);
+    const churnConcurrency = this.config.settings.churn_concurrency ?? 3;
+    const churnWindowDays = this.config.settings.churn_window_days ?? 21;
+    const churnMaxCommits = this.config.settings.churn_max_commits ?? 50;
+    const churnLimit = pLimit(churnConcurrency);
 
     let enrichedCount = 0;
     let skippedCount = 0;
     let errorCount = 0;
     const cacheStats = createCacheStats();
 
-    for (const repoName of repoNames) {
+    const repoTotal = repoNames.length;
+
+    for (let repoIdx = 0; repoIdx < repoTotal; repoIdx++) {
+      const repoName = repoNames[repoIdx];
+      const repoLabel = repoTotal > 1 ? `[${repoIdx + 1}/${repoTotal}] ${repoName}` : repoName;
+      const spinner = ora({ text: `${repoLabel}: preparing`, indent: 2 }).start();
+
       const repoRecords = repoMap.get(repoName)!;
 
       const repoConfig = this.config.repos.find(
@@ -420,11 +431,13 @@ export class GitRadarEngine {
       );
       if (!repoConfig) {
         skippedCount++;
+        spinner.warn(`${repoLabel}: skipped (no config)`);
         continue;
       }
 
       let githubRemote: { owner: string; repo: string } | null = null;
       if (octokit) {
+        spinner.text = `${repoLabel}: detecting GitHub remote`;
         githubRemote = await detectGitHubRemote(repoConfig.path);
       }
 
@@ -444,7 +457,10 @@ export class GitRadarEngine {
         : memberWeekEntries.filter((e) => !hasEnrichment(e.key));
       skippedCount += memberWeekEntries.length - toEnrich.length;
 
-      if (toEnrich.length === 0) continue;
+      if (toEnrich.length === 0) {
+        spinner.succeed(`${repoLabel}: all ${memberWeekEntries.length} member-weeks already enriched`);
+        continue;
+      }
 
       // ── Batch GitHub metrics by week ──────────────────────────────────
       // Group entries by week so each batch query covers authors sharing
@@ -469,7 +485,14 @@ export class GitRadarEngine {
       const ghResultMap = new Map<string, GitHubMetrics>();
 
       if (octokit && githubRemote) {
+        const weekKeys = Array.from(byWeek.keys());
+        const weekTotal = weekKeys.length;
+        let weekIdx = 0;
+
         for (const [week, entries] of byWeek) {
+          weekIdx++;
+          spinner.text = `${repoLabel}: GitHub PRs (week ${weekIdx}/${weekTotal})`;
+
           const dateRange = isoWeekToDateRange(week);
 
           // Build batch entries for authors that have GitHub handles
@@ -511,14 +534,24 @@ export class GitRadarEngine {
             }
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            console.log(`  Warning: GitHub batch fetch failed for ${repoName} ${week}: ${msg}`);
+            spinner.warn(`${repoLabel}: GitHub batch failed for ${week}: ${msg}`);
+            spinner.start(`${repoLabel}: continuing`);
           }
         }
       }
 
       // ── Merge GitHub results + churn into final metrics ───────────────
       const SAVE_BATCH_SIZE = 20;
+      const totalBatches = Math.ceil(toEnrich.length / SAVE_BATCH_SIZE);
+      let batchIdx = 0;
+
       for (let batchStart = 0; batchStart < toEnrich.length; batchStart += SAVE_BATCH_SIZE) {
+        batchIdx++;
+        const phase = options.skipChurn ? 'saving' : 'churn analysis';
+        spinner.text = totalBatches > 1
+          ? `${repoLabel}: ${phase} (batch ${batchIdx}/${totalBatches})`
+          : `${repoLabel}: ${phase}`;
+
         const batch = toEnrich.slice(batchStart, batchStart + SAVE_BATCH_SIZE);
 
         const settled = await Promise.allSettled(
@@ -544,9 +577,10 @@ export class GitRadarEngine {
 
               if (!options.skipChurn) {
                 try {
-                  const churnFn = options.deepChurn ? calculateChurnRate : calculateFastChurnRate;
                   metrics.churn_rate_pct = await churnLimit(() =>
-                    churnFn(repoConfig.path, email, dateRange.since, dateRange.until),
+                    options.deepChurn
+                      ? calculateChurnRate(repoConfig.path, email, dateRange.since, dateRange.until, churnWindowDays, churnMaxCommits)
+                      : calculateFastChurnRate(repoConfig.path, email, dateRange.since, dateRange.until, churnWindowDays),
                   );
                 } catch {
                   errorCount++;
@@ -572,10 +606,8 @@ export class GitRadarEngine {
         }
       }
 
-      console.log(
-        `  \u2713 ${repoName}: ${toEnrich.length} member-weeks enriched` +
-          (githubRemote ? ` (GitHub: ${githubRemote.owner}/${githubRemote.repo})` : ""),
-      );
+      const ghLabel = githubRemote ? ` (GitHub: ${githubRemote.owner}/${githubRemote.repo})` : "";
+      spinner.succeed(`${repoLabel}: ${toEnrich.length} member-weeks enriched${ghLabel}`);
     }
 
     const parts = [`${enrichedCount} enriched`, `${skippedCount} skipped`];

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { DEFAULT_SETTINGS } from '../types/schema.js';
 import type { Config, UserWeekRepoRecord } from '../types/schema.js';
 import type { ViewContext, NavigationAction, ViewFn } from '../views/types.js';
 import { computeWeeksToShow } from '../views/dashboard.js';
@@ -93,11 +94,7 @@ function makeSampleConfig(): Config {
       infrastructure: { label: 'Infra' },
       feature: { label: 'Feature' },
     },
-    settings: {
-      weeks_back: 12,
-      staleness_minutes: 60,
-      trend_threshold: 0.10,
-    },
+    settings: { ...DEFAULT_SETTINGS },
   };
 }
 

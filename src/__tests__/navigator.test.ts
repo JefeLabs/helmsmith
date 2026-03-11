@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { runNavigator } from '../views/navigator.js';
 import type { ViewContext, ViewFn, NavigationAction } from '../views/types.js';
+import { DEFAULT_SETTINGS } from '../types/schema.js';
 import type { Config } from '../types/schema.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -11,7 +12,7 @@ function makeCtx(): ViewContext {
     orgs: [],
     groups: {},
     tags: {},
-    settings: { weeks_back: 12, staleness_minutes: 60, trend_threshold: 0.10 },
+    settings: { ...DEFAULT_SETTINGS },
   };
   return { config, records: [], currentWeek: '2026-W09' };
 }

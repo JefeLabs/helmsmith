@@ -1,4 +1,5 @@
 import { loadConfig, saveConfig } from '../config/loader.js';
+import { DEFAULT_SETTINGS } from '../types/schema.js';
 import type { Org } from '../types/schema.js';
 
 export interface AddOrgOptions {
@@ -15,7 +16,7 @@ export async function addOrg(options: AddOrgOptions): Promise<void> {
   try {
     config = await loadConfig(options.config);
   } catch {
-    config = { repos: [], orgs: [], groups: {}, tags: {}, settings: { weeks_back: 12, staleness_minutes: 60, trend_threshold: 0.10 } };
+    config = { repos: [], orgs: [], groups: {}, tags: {}, settings: { ...DEFAULT_SETTINGS } };
   }
 
   // Check for duplicate org name

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { DEFAULT_SETTINGS } from "../types/schema.js";
 import type { Config, ScanState } from "../types/schema.js";
 import type { ScanResult } from "../collector/git.js";
 
@@ -47,7 +48,7 @@ function makeSampleConfig(overrides?: Partial<Config>): Config {
     ],
     groups: {},
     tags: {},
-    settings: { weeks_back: 12, staleness_minutes: 60, trend_threshold: 0.10 },
+    settings: { ...DEFAULT_SETTINGS },
     ...overrides,
   };
 }

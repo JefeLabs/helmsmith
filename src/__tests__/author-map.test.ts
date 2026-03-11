@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { DEFAULT_SETTINGS } from "../types/schema.js";
 import type { Config, AuthorRegistry, UserWeekRepoRecord } from "../types/schema.js";
 import { buildAuthorMap, resolveAuthor, reattributeRecords, extractGitHubHandle } from "../collector/author-map.js";
 
@@ -63,7 +64,7 @@ function makeSampleConfig(): Config {
     ],
     groups: {},
     tags: {},
-    settings: { weeks_back: 12, staleness_minutes: 60, trend_threshold: 0.10 },
+    settings: { ...DEFAULT_SETTINGS },
   };
 }
 

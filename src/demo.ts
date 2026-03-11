@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS } from './types/schema.js';
 import type { Config, UserWeekRepoRecord } from './types/schema.js';
 
 /**
@@ -185,11 +186,7 @@ export function generateDemoData(weeks: number = 12): {
       feature: { label: 'Feature' },
       analytics: { label: 'Analytics' },
     },
-    settings: {
-      weeks_back: weeks,
-      staleness_minutes: 60,
-      trend_threshold: 0.10,
-    },
+    settings: { ...DEFAULT_SETTINGS, weeks_back: weeks },
   };
 
   // Generate records

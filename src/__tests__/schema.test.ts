@@ -11,6 +11,7 @@ import {
   WorkspaceRepoSchema,
   WorkspaceSchema,
   ReposRegistrySchema,
+  DEFAULT_SETTINGS,
 } from "../types/schema.js";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -195,11 +196,7 @@ describe("ConfigSchema", () => {
         },
       ],
     });
-    expect(result.settings).toEqual({
-      weeks_back: 12,
-      staleness_minutes: 60,
-      trend_threshold: 0.10,
-    });
+    expect(result.settings).toEqual(DEFAULT_SETTINGS);
   });
 
   it("allows overriding settings", () => {

@@ -56,10 +56,28 @@ export const ConfigSchema = z.object({
       trend_threshold: z.number().optional().default(0.10),
       /** Glob patterns for files to exclude from metrics (e.g. "package-lock.json", "*.min.js", "dist/*"). */
       ignore_patterns: z.array(z.string()).optional(),
+      /** How many days before the analysis period to look for "recently modified" files
+       *  when computing churn rate. A longer window catches more instability but may
+       *  over-count churn on actively developed files. Default: 21 days. */
+      churn_window_days: z.number().optional().default(21),
+      /** Maximum commits to sample per author when using deep churn analysis (--deep-churn).
+       *  Higher values improve precision but increase git operations. Default: 50. */
+      churn_max_commits: z.number().optional().default(50),
+      /** Maximum concurrent git processes for churn calculations. Default: 3. */
+      churn_concurrency: z.number().optional().default(3),
     })
     .optional()
-    .default({ weeks_back: 12, staleness_minutes: 60, trend_threshold: 0.10 }),
+    .default({
+      weeks_back: 12, staleness_minutes: 60, trend_threshold: 0.10,
+      churn_window_days: 21, churn_max_commits: 50, churn_concurrency: 3,
+    }),
 });
+
+/** Default settings — use when constructing Config objects outside of Zod parsing. */
+export const DEFAULT_SETTINGS: Config['settings'] = {
+  weeks_back: 12, staleness_minutes: 60, trend_threshold: 0.10,
+  churn_window_days: 21, churn_max_commits: 50, churn_concurrency: 3,
+};
 
 // ── Data Schemas ────────────────────────────────────────────────────────────
 

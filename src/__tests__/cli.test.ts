@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Command } from 'commander';
+import { DEFAULT_SETTINGS } from '../types/schema.js';
 
 // ── Mock all external modules ────────────────────────────────────────────────
 
@@ -79,7 +80,7 @@ vi.mock('../demo.js', () => ({
       ],
       groups: {},
       tags: {},
-      settings: { weeks_back: weeks ?? 12, staleness_minutes: 60, trend_threshold: 0.10 },
+      settings: { ...DEFAULT_SETTINGS, weeks_back: weeks ?? 12 },
     },
     records: [
       {
@@ -327,7 +328,7 @@ describe('CLI navigation integration', () => {
         orgs: [],
         groups: {},
         tags: {},
-        settings: { weeks_back: 12, staleness_minutes: 60, trend_threshold: 0.10 },
+        settings: { ...DEFAULT_SETTINGS },
       },
       records: [],
       currentWeek: '2026-W09',
@@ -350,7 +351,7 @@ describe('CLI navigation integration', () => {
         orgs: [],
         groups: {},
         tags: {},
-        settings: { weeks_back: 12, staleness_minutes: 60, trend_threshold: 0.10 },
+        settings: { ...DEFAULT_SETTINGS },
       },
       records: [],
       currentWeek: '2026-W09',
@@ -371,7 +372,7 @@ describe('CLI scan integration', () => {
       orgs: [],
       groups: {},
       tags: {},
-      settings: { weeks_back: 12, staleness_minutes: 60, trend_threshold: 0.10 },
+      settings: { ...DEFAULT_SETTINGS },
     };
 
     await mockedScan(config, { version: 1, repos: {} }, {
