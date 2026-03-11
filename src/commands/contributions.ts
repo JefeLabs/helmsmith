@@ -52,11 +52,14 @@ function aggregateRows(
 
   for (const [name, agg] of rolled) {
     const ins = agg.filetype.app.insertions + agg.filetype.test.insertions +
-      agg.filetype.config.insertions + agg.filetype.storybook.insertions;
+      agg.filetype.config.insertions + agg.filetype.storybook.insertions +
+      agg.filetype.doc.insertions;
     const del = agg.filetype.app.deletions + agg.filetype.test.deletions +
-      agg.filetype.config.deletions + agg.filetype.storybook.deletions;
+      agg.filetype.config.deletions + agg.filetype.storybook.deletions +
+      agg.filetype.doc.deletions;
     const files = agg.filetype.app.files + agg.filetype.test.files +
-      agg.filetype.config.files + agg.filetype.storybook.files;
+      agg.filetype.config.files + agg.filetype.storybook.files +
+      agg.filetype.doc.files;
     const appLines = agg.filetype.app.insertions + agg.filetype.app.deletions;
     const testLines = agg.filetype.test.insertions + agg.filetype.test.deletions;
     const denom = appLines + testLines;

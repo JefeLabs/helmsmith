@@ -12,7 +12,15 @@ import { getCommitsPath, ensureDataDir } from "./paths.js";
 export async function loadCommitsData(): Promise<CommitsByFiletype> {
   try {
     const raw = await readFile(getCommitsPath(), "utf-8");
-    return JSON.parse(raw) as CommitsByFiletype;
+    const data = JSON.parse(raw) as CommitsByFiletype;
+    // Backfill doc filetype for records created before the doc category existed
+    const emptyDoc = { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 };
+    for (const r of data.records) {
+      if (!r.filetype.doc) {
+        r.filetype.doc = { ...emptyDoc };
+      }
+    }
+    return data;
   } catch {
     return {
       version: 1,
@@ -112,6 +120,18 @@ export function mergeRecords(
             deletions:
               prev.filetype.storybook.deletions +
               record.filetype.storybook.deletions,
+          },
+          doc: {
+            files:
+              (prev.filetype.doc?.files ?? 0) + (record.filetype.doc?.files ?? 0),
+            filesAdded: (prev.filetype.doc?.filesAdded ?? 0) + (record.filetype.doc?.filesAdded ?? 0),
+            filesDeleted: (prev.filetype.doc?.filesDeleted ?? 0) + (record.filetype.doc?.filesDeleted ?? 0),
+            insertions:
+              (prev.filetype.doc?.insertions ?? 0) +
+              (record.filetype.doc?.insertions ?? 0),
+            deletions:
+              (prev.filetype.doc?.deletions ?? 0) +
+              (record.filetype.doc?.deletions ?? 0),
           },
         },
       });

@@ -24,6 +24,7 @@ function makeRecord(
       test: { files: 4, filesAdded: 0, filesDeleted: 0, insertions: 40, deletions: 10 },
       config: { files: 2, filesAdded: 0, filesDeleted: 0, insertions: 15, deletions: 5 },
       storybook: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 8, deletions: 2 },
+      doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
     },
     ...overrides,
   };
@@ -132,6 +133,7 @@ describe("rollup", () => {
           test: { files: 2, filesAdded: 0, filesDeleted: 0, insertions: 20, deletions: 5 },
           config: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 10, deletions: 2 },
           storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+          doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
         },
       }),
       makeRecord({
@@ -140,6 +142,7 @@ describe("rollup", () => {
           test: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 15, deletions: 3 },
           config: { files: 2, filesAdded: 0, filesDeleted: 0, insertions: 12, deletions: 4 },
           storybook: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 5, deletions: 1 },
+          doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
         },
       }),
     ];
@@ -151,6 +154,7 @@ describe("rollup", () => {
     expect(acme.filetype.test).toEqual({ files: 3, filesAdded: 0, filesDeleted: 0, insertions: 35, deletions: 8 });
     expect(acme.filetype.config).toEqual({ files: 3, filesAdded: 0, filesDeleted: 0, insertions: 22, deletions: 6 });
     expect(acme.filetype.storybook).toEqual({ files: 1, filesAdded: 0, filesDeleted: 0, insertions: 5, deletions: 1 });
+    expect(acme.filetype.doc).toEqual({ files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 });
   });
 
   it("groups by team dimension", () => {
@@ -221,6 +225,7 @@ describe("rollup", () => {
           test: { files: 2, filesAdded: 0, filesDeleted: 0, insertions: 20, deletions: 5 },
           config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
           storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+          doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
         },
       }),
     ];

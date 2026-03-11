@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { classifyFile, type FileType } from "../collector/classifier.js";
+import { classifyFile, buildIgnoreMatcher, DEFAULT_IGNORE_PATTERNS, type FileType } from "../collector/classifier.js";
 
 describe("classifyFile", () => {
   // ── Storybook (Priority 1) ─────────────────────────────────────────────────
@@ -38,7 +38,8 @@ describe("classifyFile", () => {
     });
 
     it("does NOT classify .mdx files outside storybook paths as storybook", () => {
-      expect(classifyFile("docs/guide.mdx")).toBe("app");
+      expect(classifyFile("docs/guide.mdx")).toBe("doc");
+      expect(classifyFile("src/guide.mdx")).toBe("app");
     });
   });
 
@@ -245,16 +246,39 @@ describe("classifyFile", () => {
       expect(classifyFile("public/index.html")).toBe("app");
     });
 
-    it("classifies .md files as app", () => {
-      expect(classifyFile("README.md")).toBe("app");
-    });
-
-    it("classifies .sql files as app", () => {
+    it("classifies .sql files as app (not doc)", () => {
       expect(classifyFile("migrations/001.sql")).toBe("app");
     });
+  });
 
-    it("classifies .graphql files as app", () => {
-      expect(classifyFile("schema.graphql")).toBe("app");
+  describe("doc files", () => {
+    it("classifies .md files as doc", () => {
+      expect(classifyFile("README.md")).toBe("doc");
+    });
+
+    it("classifies CHANGELOG as doc", () => {
+      expect(classifyFile("CHANGELOG.md")).toBe("doc");
+    });
+
+    it("classifies CONTRIBUTING as doc", () => {
+      expect(classifyFile("CONTRIBUTING.md")).toBe("doc");
+    });
+
+    it("classifies LICENSE as doc", () => {
+      expect(classifyFile("LICENSE")).toBe("doc");
+    });
+
+    it("classifies files in /docs/ as doc", () => {
+      expect(classifyFile("docs/architecture.md")).toBe("doc");
+      expect(classifyFile("docs/api-guide.txt")).toBe("doc");
+    });
+
+    it("classifies files in /documentation/ as doc", () => {
+      expect(classifyFile("documentation/setup.md")).toBe("doc");
+    });
+
+    it("does not classify .mdx storybook files as doc", () => {
+      expect(classifyFile("components/Button.stories.mdx")).toBe("storybook");
     });
   });
 
@@ -314,6 +338,95 @@ describe("classifyFile", () => {
 
     it("classifies pnpm-lock.yaml as config", () => {
       expect(classifyFile("pnpm-lock.yaml")).toBe("config");
+    });
+  });
+});
+
+// ── Ignore Matcher ──────────────────────────────────────────────────────────
+
+describe("buildIgnoreMatcher", () => {
+  describe("default patterns", () => {
+    const isIgnored = buildIgnoreMatcher();
+
+    it("ignores package-lock.json", () => {
+      expect(isIgnored("package-lock.json")).toBe(true);
+    });
+
+    it("ignores yarn.lock", () => {
+      expect(isIgnored("yarn.lock")).toBe(true);
+    });
+
+    it("ignores pnpm-lock.yaml", () => {
+      expect(isIgnored("pnpm-lock.yaml")).toBe(true);
+    });
+
+    it("ignores *.min.js files", () => {
+      expect(isIgnored("vendor/jquery.min.js")).toBe(true);
+      expect(isIgnored("app.min.js")).toBe(true);
+    });
+
+    it("ignores *.min.css files", () => {
+      expect(isIgnored("styles.min.css")).toBe(true);
+    });
+
+    it("ignores *.map files", () => {
+      expect(isIgnored("app.js.map")).toBe(true);
+      expect(isIgnored("styles.css.map")).toBe(true);
+    });
+
+    it("ignores dist/* files", () => {
+      expect(isIgnored("dist/bundle.js")).toBe(true);
+      expect(isIgnored("dist/index.html")).toBe(true);
+    });
+
+    it("ignores build/* files", () => {
+      expect(isIgnored("build/output.js")).toBe(true);
+    });
+
+    it("ignores .next/* files", () => {
+      expect(isIgnored(".next/cache/data.json")).toBe(true);
+    });
+
+    it("ignores *.generated.* files", () => {
+      expect(isIgnored("schema.generated.ts")).toBe(true);
+    });
+
+    it("does NOT ignore regular source files", () => {
+      expect(isIgnored("src/index.ts")).toBe(false);
+      expect(isIgnored("package.json")).toBe(false);
+      expect(isIgnored("src/utils/format.js")).toBe(false);
+    });
+
+    it("does NOT ignore regular lock-like filenames", () => {
+      expect(isIgnored("src/lock-manager.ts")).toBe(false);
+    });
+  });
+
+  describe("custom patterns", () => {
+    it("uses only user-provided patterns when specified", () => {
+      const isIgnored = buildIgnoreMatcher(["custom.lock", "*.generated.ts"]);
+      expect(isIgnored("custom.lock")).toBe(true);
+      expect(isIgnored("schema.generated.ts")).toBe(true);
+      // Default patterns should NOT apply
+      expect(isIgnored("package-lock.json")).toBe(false);
+    });
+
+    it("supports directory patterns", () => {
+      const isIgnored = buildIgnoreMatcher(["out/*"]);
+      expect(isIgnored("out/bundle.js")).toBe(true);
+      expect(isIgnored("src/out.ts")).toBe(false);
+    });
+
+    it("is case-insensitive", () => {
+      const isIgnored = buildIgnoreMatcher(["Package-Lock.JSON"]);
+      expect(isIgnored("package-lock.json")).toBe(true);
+    });
+  });
+
+  describe("DEFAULT_IGNORE_PATTERNS", () => {
+    it("is exported and non-empty", () => {
+      expect(DEFAULT_IGNORE_PATTERNS.length).toBeGreaterThan(0);
+      expect(DEFAULT_IGNORE_PATTERNS).toContain("package-lock.json");
     });
   });
 });

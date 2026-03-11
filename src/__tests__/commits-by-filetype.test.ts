@@ -44,6 +44,7 @@ function makeFiletype(overrides?: Partial<Record<string, unknown>>) {
     test: { files: 3, filesAdded: 0, filesDeleted: 0, insertions: 80, deletions: 20 },
     config: { files: 2, filesAdded: 0, filesDeleted: 0, insertions: 15, deletions: 5 },
     storybook: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 30, deletions: 10 },
+    doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
     ...overrides,
   };
 }

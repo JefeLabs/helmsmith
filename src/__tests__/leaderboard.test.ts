@@ -24,6 +24,7 @@ function makeRecord(
       test: { files: 4, filesAdded: 0, filesDeleted: 0, insertions: 40, deletions: 10 },
       config: { files: 2, filesAdded: 0, filesDeleted: 0, insertions: 15, deletions: 5 },
       storybook: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 8, deletions: 2 },
+      doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
     },
     ...overrides,
   };
@@ -68,6 +69,7 @@ describe("computeLeaderboard", () => {
           test: { files: 2, filesAdded: 0, filesDeleted: 0, insertions: 40, deletions: 10 },
           config: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 10, deletions: 5 },
           storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+          doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
         },
       }),
       makeRecord({
@@ -78,6 +80,7 @@ describe("computeLeaderboard", () => {
           test: { files: 5, filesAdded: 0, filesDeleted: 0, insertions: 100, deletions: 20 },
           config: { files: 3, filesAdded: 0, filesDeleted: 0, insertions: 30, deletions: 10 },
           storybook: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 5, deletions: 2 },
+          doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
         },
       }),
     ];
@@ -106,6 +109,7 @@ describe("computeLeaderboard", () => {
           test: { files: 10, filesAdded: 0, filesDeleted: 0, insertions: 500, deletions: 100 },
           config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
           storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+          doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
         },
       }),
       makeRecord({
@@ -116,6 +120,7 @@ describe("computeLeaderboard", () => {
           test: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 5, deletions: 2 },
           config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
           storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+          doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
         },
       }),
     ];
@@ -171,6 +176,7 @@ describe("computeLeaderboard", () => {
           test: { files: 3, filesAdded: 0, filesDeleted: 0, insertions: 60, deletions: 15 },
           config: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 10, deletions: 5 },
           storybook: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 8, deletions: 2 },
+          doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
         },
       }),
     ];
@@ -182,6 +188,7 @@ describe("computeLeaderboard", () => {
     expect(entry.filetype.test).toBe(75); // 60+15
     expect(entry.filetype.config).toBe(15); // 10+5
     expect(entry.filetype.storybook).toBe(10); // 8+2
+    expect(entry.filetype.doc).toBe(0);
   });
 
   it("includes member metadata (team, org, orgType)", () => {
@@ -214,6 +221,7 @@ describe("computeLeaderboard", () => {
           test: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
           config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
           storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+          doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
         },
       }),
       makeRecord({
@@ -224,6 +232,7 @@ describe("computeLeaderboard", () => {
           test: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
           config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
           storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+          doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
         },
       }),
     ];
@@ -247,6 +256,7 @@ describe("computeLeaderboard", () => {
           test: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
           config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
           storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+          doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
         },
       }),
     );

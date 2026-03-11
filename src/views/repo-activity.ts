@@ -70,6 +70,7 @@ export function buildRepoOrgGroups(
           { key: 'test', value: agg.filetype.test.insertions + agg.filetype.test.deletions },
           { key: 'config', value: agg.filetype.config.insertions + agg.filetype.config.deletions },
           { key: 'storybook', value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions },
+          { key: 'doc', value: agg.filetype.doc.insertions + agg.filetype.doc.deletions },
         ],
         total: agg.insertions + agg.deletions,
       });

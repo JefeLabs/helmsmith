@@ -2,7 +2,7 @@ import { simpleGit } from "simple-git";
 import type { UserWeekRepoRecord } from "../types/schema.js";
 import type { AuthorMap } from "./author-map.js";
 import { resolveAuthor } from "./author-map.js";
-import { classifyFile } from "./classifier.js";
+import { classifyFile, buildIgnoreMatcher } from "./classifier.js";
 
 export type FileStatus = 'A' | 'M' | 'D' | 'R' | 'C' | 'T' | 'unknown';
 
@@ -36,6 +36,8 @@ export interface ScanOptions {
     team: string;
     tag: string;
   }>;
+  /** Glob patterns for files to exclude from metrics. Uses defaults if undefined. */
+  ignorePatterns?: string[];
 }
 
 /**
@@ -205,6 +207,7 @@ function emptyFiletype(): UserWeekRepoRecord["filetype"] {
     test: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
     config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
     storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+    doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
   };
 }
 
@@ -283,6 +286,7 @@ function processCommitBatch(
   newHashes: string[],
   rawAuthorsMap: Map<string, RawAuthor>,
   identifierRules?: ScanOptions["identifierRules"],
+  shouldIgnore?: (filePath: string) => boolean,
 ): number {
   let skipped = 0;
 
@@ -351,6 +355,7 @@ function processCommitBatch(
     record.commits += 1;
 
     for (const file of commit.files) {
+      if (shouldIgnore?.(file.path)) continue;
       const category = classifyFile(file.path);
       record.filetype[category].files += 1;
       if (file.status === 'A') record.filetype[category].filesAdded += 1;
@@ -380,8 +385,9 @@ export async function scanRepo(
   repoPath: string,
   options: ScanOptions
 ): Promise<ScanResult> {
-  const { repoName, group, authorMap, recentHashes, since, chunkMonths, identifierRules } = options;
+  const { repoName, group, authorMap, recentHashes, since, chunkMonths, identifierRules, ignorePatterns } = options;
 
+  const shouldIgnore = buildIgnoreMatcher(ignorePatterns);
   const git = simpleGit(repoPath);
   const ranges = buildScanRanges(since, chunkMonths);
 
@@ -418,6 +424,7 @@ export async function scanRepo(
     skippedCount += processCommitBatch(
       commits, repoName, group, authorMap, recentHashes,
       recordMap, activeDaysMap, newHashes, rawAuthorsMap, identifierRules,
+      shouldIgnore,
     );
     // `output` and `commits` go out of scope here → eligible for GC
   }

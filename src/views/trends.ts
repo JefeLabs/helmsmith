@@ -128,6 +128,7 @@ function buildFileTypeBreakdownBars(
             { key: 'test', value: agg.filetype.test.insertions + agg.filetype.test.deletions },
             { key: 'config', value: agg.filetype.config.insertions + agg.filetype.config.deletions },
             { key: 'storybook', value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions },
+            { key: 'doc', value: agg.filetype.doc.insertions + agg.filetype.doc.deletions },
           ],
           total: agg.insertions + agg.deletions,
         });
@@ -168,6 +169,7 @@ function buildFileTypeBreakdownBars(
             { key: 'test', value: agg.filetype.test.insertions + agg.filetype.test.deletions },
             { key: 'config', value: agg.filetype.config.insertions + agg.filetype.config.deletions },
             { key: 'storybook', value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions },
+            { key: 'doc', value: agg.filetype.doc.insertions + agg.filetype.doc.deletions },
           ],
           total: agg.insertions + agg.deletions,
         });
@@ -206,7 +208,8 @@ function buildAvgOutputSparklines(
             r.filetype.app.insertions + r.filetype.app.deletions +
             r.filetype.test.insertions + r.filetype.test.deletions +
             r.filetype.config.insertions + r.filetype.config.deletions +
-            r.filetype.storybook.insertions + r.filetype.storybook.deletions;
+            r.filetype.storybook.insertions + r.filetype.storybook.deletions +
+            (r.filetype.doc?.insertions ?? 0) + (r.filetype.doc?.deletions ?? 0);
         }
         weeklyAvgs.push(members.size > 0 ? total / members.size : 0);
       }

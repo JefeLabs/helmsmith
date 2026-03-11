@@ -219,12 +219,13 @@ export function generateDemoData(weeks: number = 12): {
             // Active days 1-5
             const activeDays = 1 + Math.floor(rand() * 5);
 
-            // File type distribution: ~60% app, ~25% test, ~10% config, ~5% storybook
+            // File type distribution: ~55% app, ~22% test, ~10% config, ~5% storybook, ~8% doc
             const totalFiles = 2 + Math.floor(rand() * 12);
-            const appFiles = Math.max(1, Math.round(totalFiles * (0.55 + rand() * 0.15)));
-            const testFiles = Math.max(0, Math.round(totalFiles * (0.2 + rand() * 0.1)));
+            const appFiles = Math.max(1, Math.round(totalFiles * (0.50 + rand() * 0.15)));
+            const testFiles = Math.max(0, Math.round(totalFiles * (0.18 + rand() * 0.1)));
             const configFiles = Math.max(0, Math.round(totalFiles * (0.05 + rand() * 0.1)));
-            const storybookFiles = Math.max(0, totalFiles - appFiles - testFiles - configFiles);
+            const docFiles = Math.max(0, Math.round(totalFiles * (0.03 + rand() * 0.1)));
+            const storybookFiles = Math.max(0, totalFiles - appFiles - testFiles - configFiles - docFiles);
 
             // Lines per file: 10-80 insertions, 5-30 deletions
             const insPerFile = 10 + Math.floor(rand() * 70);
@@ -270,6 +271,13 @@ export function generateDemoData(weeks: number = 12): {
                   filesDeleted: 0,
                   insertions: storybookFiles * Math.round(insPerFile * 0.4),
                   deletions: storybookFiles * Math.round(delPerFile * 0.2),
+                },
+                doc: {
+                  files: docFiles,
+                  filesAdded: 0,
+                  filesDeleted: 0,
+                  insertions: docFiles * Math.round(insPerFile * 0.5),
+                  deletions: docFiles * Math.round(delPerFile * 0.3),
                 },
               },
             });

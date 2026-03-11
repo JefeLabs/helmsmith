@@ -221,6 +221,7 @@ function makeRecord(overrides: Partial<UserWeekRepoRecord> = {}): UserWeekRepoRe
       test: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 10, deletions: 5 },
       config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
       storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+      doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
     },
     ...overrides,
   };

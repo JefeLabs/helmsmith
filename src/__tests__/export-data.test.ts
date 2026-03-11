@@ -38,6 +38,7 @@ function makeRecord(
       test: { files: 2, filesAdded: 1, filesDeleted: 0, insertions: 40, deletions: 5 },
       config: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 3, deletions: 1 },
       storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+      doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
     },
     ...overrides,
   };
@@ -90,6 +91,7 @@ describe("flattenRecord", () => {
     expect(flat.test_lines).toBe(40 + 5);       // 45
     expect(flat.config_lines).toBe(3 + 1);      // 4
     expect(flat.storybook_lines).toBe(0);
+    expect(flat.doc_lines).toBe(0);
   });
 
   it("computes test_pct as test_lines / (app_lines + test_lines)", () => {

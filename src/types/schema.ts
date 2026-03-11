@@ -45,6 +45,8 @@ export const ConfigSchema = z.object({
       weeks_back: z.number().optional().default(12),
       staleness_minutes: z.number().optional().default(60),
       trend_threshold: z.number().optional().default(0.10),
+      /** Glob patterns for files to exclude from metrics (e.g. "package-lock.json", "*.min.js", "dist/*"). */
+      ignore_patterns: z.array(z.string()).optional(),
     })
     .optional()
     .default({ weeks_back: 12, staleness_minutes: 60, trend_threshold: 0.10 }),
@@ -84,6 +86,13 @@ export const UserWeekRepoRecordSchema = z.object({
     test: FiletypeMetricsSchema,
     config: FiletypeMetricsSchema,
     storybook: FiletypeMetricsSchema,
+    doc: FiletypeMetricsSchema.optional().default({
+      files: 0,
+      filesAdded: 0,
+      filesDeleted: 0,
+      insertions: 0,
+      deletions: 0,
+    }),
   }),
 });
 

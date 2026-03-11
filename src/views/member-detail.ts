@@ -50,6 +50,7 @@ function buildWeeklyBars(
             { key: 'test', value: agg.filetype.test.insertions + agg.filetype.test.deletions },
             { key: 'config', value: agg.filetype.config.insertions + agg.filetype.config.deletions },
             { key: 'storybook', value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions },
+            { key: 'doc', value: agg.filetype.doc.insertions + agg.filetype.doc.deletions },
           ],
           total: totalLines,
         },
@@ -131,6 +132,7 @@ function buildMemberReposTable(
         test: agg.filetype.test.insertions + agg.filetype.test.deletions,
         config: agg.filetype.config.insertions + agg.filetype.config.deletions,
         storybook: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions,
+        doc: agg.filetype.doc.insertions + agg.filetype.doc.deletions,
       },
       delta: prevTotal > 0 || totalLines > 0 ? delta(totalLines, prevTotal) : chalk.dim('\u2500 0%'),
     });

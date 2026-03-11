@@ -126,6 +126,7 @@ export async function scanAllRepos(
       since,
       chunkMonths: options?.chunkMonths,
       identifierRules,
+      ignorePatterns: config.settings.ignore_patterns,
     });
 
     if (options?.onRepoScanned) {

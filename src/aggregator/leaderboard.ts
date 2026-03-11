@@ -13,6 +13,7 @@ export interface LeaderboardEntry {
     test: number;
     config: number;
     storybook: number;
+    doc: number;
   };
 }
 
@@ -85,6 +86,7 @@ export function computeLeaderboard(
     test: number;
     config: number;
     storybook: number;
+    doc: number;
   }
 
   const summaries: MemberSummary[] = [];
@@ -103,11 +105,14 @@ export function computeLeaderboard(
         agg.filetype.config.insertions +
         agg.filetype.config.deletions +
         agg.filetype.storybook.insertions +
-        agg.filetype.storybook.deletions,
+        agg.filetype.storybook.deletions +
+        agg.filetype.doc.insertions +
+        agg.filetype.doc.deletions,
       app: agg.filetype.app.insertions + agg.filetype.app.deletions,
       test: agg.filetype.test.insertions + agg.filetype.test.deletions,
       config: agg.filetype.config.insertions + agg.filetype.config.deletions,
       storybook: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions,
+      doc: agg.filetype.doc.insertions + agg.filetype.doc.deletions,
     });
   }
 
@@ -143,6 +148,7 @@ export function computeLeaderboard(
         test: s.test,
         config: s.config,
         storybook: s.storybook,
+        doc: s.doc,
       },
     }));
 

@@ -5,6 +5,7 @@ export const FILETYPE_CHARS = {
   test: "\u2593",
   config: "\u2591",
   storybook: "\u2592",
+  doc: "\u2594",
 } as const;
 
 export const FILETYPE_COLORS = {
@@ -12,6 +13,7 @@ export const FILETYPE_COLORS = {
   test: chalk.blue,
   config: chalk.yellow,
   storybook: chalk.magenta,
+  doc: chalk.cyan,
 } as const;
 
 export type FileType = keyof typeof FILETYPE_CHARS;

@@ -14,6 +14,7 @@ export interface TrendPoint {
   test: number;
   config: number;
   storybook: number;
+  doc: number;
   testRatio: number;
 }
 
@@ -41,6 +42,8 @@ export function computeTrend(
       agg.filetype.config.insertions + agg.filetype.config.deletions;
     const storybook =
       agg.filetype.storybook.insertions + agg.filetype.storybook.deletions;
+    const doc =
+      agg.filetype.doc.insertions + agg.filetype.doc.deletions;
 
     const denominator = app + test;
     const testRatio = denominator === 0 ? 0 : test / denominator;
@@ -56,6 +59,7 @@ export function computeTrend(
       test,
       config,
       storybook,
+      doc,
       testRatio,
     });
   }
@@ -106,7 +110,8 @@ export function computeRunningAvg(
       ft.app.insertions + ft.app.deletions +
       ft.test.insertions + ft.test.deletions +
       ft.config.insertions + ft.config.deletions +
-      ft.storybook.insertions + ft.storybook.deletions;
+      ft.storybook.insertions + ft.storybook.deletions +
+      ft.doc.insertions + ft.doc.deletions;
     members.add(r.member);
     activeWeeks.add(r.week);
   }
@@ -152,7 +157,8 @@ export function computeRunningAvgByOrg(
       ft.app.insertions + ft.app.deletions +
       ft.test.insertions + ft.test.deletions +
       ft.config.insertions + ft.config.deletions +
-      ft.storybook.insertions + ft.storybook.deletions;
+      ft.storybook.insertions + ft.storybook.deletions +
+      ft.doc.insertions + ft.doc.deletions;
     members.add(r.member);
     activeWeeks.add(r.week);
   }

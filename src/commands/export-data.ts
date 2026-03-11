@@ -10,7 +10,7 @@ export interface ExportDataOptions {
 
 // ── Row flattening ──────────────────────────────────────────────────────────
 
-const FILETYPE_CATEGORIES = ["app", "test", "config", "storybook"] as const;
+const FILETYPE_CATEGORIES = ["app", "test", "config", "storybook", "doc"] as const;
 
 /**
  * Column order: identity → dimensions → summary metrics → lines-touched
@@ -44,6 +44,7 @@ const HEADERS = [
   "test_lines",
   "config_lines",
   "storybook_lines",
+  "doc_lines",
   // Detailed per-filetype breakdown
   "app_files",
   "app_insertions",
@@ -57,6 +58,9 @@ const HEADERS = [
   "storybook_files",
   "storybook_insertions",
   "storybook_deletions",
+  "doc_files",
+  "doc_insertions",
+  "doc_deletions",
 ];
 
 export function flattenRecord(
@@ -80,8 +84,9 @@ export function flattenRecord(
   let totalDel = 0;
   let totalFiles = 0;
 
+  const emptyMetrics = { files: 0, insertions: 0, deletions: 0 };
   for (const cat of FILETYPE_CATEGORIES) {
-    const m = r.filetype[cat];
+    const m = r.filetype[cat] ?? emptyMetrics;
     flat[`${cat}_files`] = m.files;
     flat[`${cat}_insertions`] = m.insertions;
     flat[`${cat}_deletions`] = m.deletions;

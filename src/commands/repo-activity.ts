@@ -51,11 +51,14 @@ export async function repoActivity(options: RepoActivityOptions = {}): Promise<v
     const group = repoRecords[0]?.group ?? 'default';
 
     const ins = agg.filetype.app.insertions + agg.filetype.test.insertions +
-      agg.filetype.config.insertions + agg.filetype.storybook.insertions;
+      agg.filetype.config.insertions + agg.filetype.storybook.insertions +
+      agg.filetype.doc.insertions;
     const del = agg.filetype.app.deletions + agg.filetype.test.deletions +
-      agg.filetype.config.deletions + agg.filetype.storybook.deletions;
+      agg.filetype.config.deletions + agg.filetype.storybook.deletions +
+      agg.filetype.doc.deletions;
     const files = agg.filetype.app.files + agg.filetype.test.files +
-      agg.filetype.config.files + agg.filetype.storybook.files;
+      agg.filetype.config.files + agg.filetype.storybook.files +
+      agg.filetype.doc.files;
 
     // Weekly commits breakdown
     const weeklyCommits = weeks.map((w) => {

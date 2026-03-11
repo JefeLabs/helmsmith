@@ -85,6 +85,7 @@ function makeRecord(member: string, repo: string) {
       test: { files: 2, filesAdded: 0, filesDeleted: 0, insertions: 30, deletions: 5 },
       config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
       storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+      doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
     },
   };
 }

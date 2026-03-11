@@ -23,10 +23,11 @@ export interface RolledUp {
     test: FiletypeRollup;
     config: FiletypeRollup;
     storybook: FiletypeRollup;
+    doc: FiletypeRollup;
   };
 }
 
-const FILETYPE_KEYS = ["app", "test", "config", "storybook"] as const;
+const FILETYPE_KEYS = ["app", "test", "config", "storybook", "doc"] as const;
 
 function emptyRolledUp(): RolledUp {
   return {
@@ -44,6 +45,7 @@ function emptyRolledUp(): RolledUp {
       test: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
       config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
       storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+      doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
     },
   };
 }

@@ -22,6 +22,8 @@ vi.mock("../collector/classifier.js", () => ({
     if (filePath.endsWith(".json") || filePath.endsWith(".yml")) return "config";
     return "app";
   }),
+  buildIgnoreMatcher: vi.fn(() => () => false),
+  DEFAULT_IGNORE_PATTERNS: [],
 }));
 
 const { parseGitLogOutput, getISOWeek, scanRepo, generateDateChunks } = await import(

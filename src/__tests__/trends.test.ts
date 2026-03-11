@@ -24,6 +24,7 @@ function makeRecord(
       test: { files: 4, filesAdded: 0, filesDeleted: 0, insertions: 40, deletions: 10 },
       config: { files: 2, filesAdded: 0, filesDeleted: 0, insertions: 15, deletions: 5 },
       storybook: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 8, deletions: 2 },
+      doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
     },
     ...overrides,
   };
@@ -76,6 +77,7 @@ describe("computeTrend", () => {
           test: { files: 2, filesAdded: 0, filesDeleted: 0, insertions: 40, deletions: 10 },
           config: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 15, deletions: 5 },
           storybook: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 8, deletions: 2 },
+          doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
         },
       }),
     ];
@@ -97,6 +99,7 @@ describe("computeTrend", () => {
           test: { files: 2, filesAdded: 0, filesDeleted: 0, insertions: 40, deletions: 10 },
           config: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 15, deletions: 5 },
           storybook: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 8, deletions: 2 },
+          doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
         },
       }),
     ];
@@ -108,6 +111,7 @@ describe("computeTrend", () => {
     expect(point.test).toBe(50);       // 40+10
     expect(point.config).toBe(20);     // 15+5
     expect(point.storybook).toBe(10);  // 8+2
+    expect(point.doc).toBe(0);
   });
 
   it("computes testRatio as test / (app + test)", () => {
@@ -119,6 +123,7 @@ describe("computeTrend", () => {
           test: { files: 2, filesAdded: 0, filesDeleted: 0, insertions: 40, deletions: 10 },
           config: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 15, deletions: 5 },
           storybook: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 8, deletions: 2 },
+          doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
         },
       }),
     ];
@@ -139,6 +144,7 @@ describe("computeTrend", () => {
           test: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
           config: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 15, deletions: 5 },
           storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+          doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
         },
       }),
     ];
@@ -205,6 +211,7 @@ describe("computeRunningAvg", () => {
           test: { files: 2, filesAdded: 0, filesDeleted: 0, insertions: 40, deletions: 10 },
           config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
           storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+          doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
         },
       }),
     ];
@@ -228,6 +235,7 @@ describe("computeRunningAvg", () => {
           test: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
           config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
           storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+          doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
         },
       }),
       makeRecord({
@@ -239,6 +247,7 @@ describe("computeRunningAvg", () => {
           test: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
           config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
           storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+          doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
         },
       }),
     ];
@@ -263,6 +272,7 @@ describe("computeRunningAvg", () => {
           test: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
           config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
           storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+          doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
         },
       }),
       // Outside window (W04 is outside 4-week window ending W08)
@@ -275,6 +285,7 @@ describe("computeRunningAvg", () => {
           test: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
           config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
           storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+          doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
         },
       }),
     ];
@@ -296,6 +307,7 @@ describe("computeRunningAvg", () => {
           test: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
           config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
           storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+          doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
         },
       }),
     ];

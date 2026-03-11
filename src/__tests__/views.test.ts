@@ -37,6 +37,7 @@ function makeRecord(overrides: Partial<UserWeekRepoRecord> = {}): UserWeekRepoRe
       test: { files: 3, filesAdded: 0, filesDeleted: 0, insertions: 100, deletions: 30 },
       config: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 20, deletions: 5 },
       storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+      doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
     },
     ...overrides,
   };
@@ -113,10 +114,10 @@ function makeSampleRecords(): UserWeekRepoRecord[] {
     records.push(makeRecord({ member: 'Bob Kumar', email: 'bob@company.com', team: 'Platform', org: 'Team A', orgType: 'core', tag: 'infrastructure', week, repo: 'api-server', group: 'backend', commits: 8 }));
 
     // Eva - Product
-    records.push(makeRecord({ member: 'Eva Jones', email: 'eva@company.com', team: 'Product', org: 'Team A', orgType: 'core', tag: 'feature', week, repo: 'frontend-app', commits: 12, filetype: { app: { files: 8, filesAdded: 0, filesDeleted: 0, insertions: 300, deletions: 80 }, test: { files: 4, filesAdded: 0, filesDeleted: 0, insertions: 120, deletions: 40 }, config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 }, storybook: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 30, deletions: 10 } } }));
+    records.push(makeRecord({ member: 'Eva Jones', email: 'eva@company.com', team: 'Product', org: 'Team A', orgType: 'core', tag: 'feature', week, repo: 'frontend-app', commits: 12, filetype: { app: { files: 8, filesAdded: 0, filesDeleted: 0, insertions: 300, deletions: 80 }, test: { files: 4, filesAdded: 0, filesDeleted: 0, insertions: 120, deletions: 40 }, config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 }, storybook: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 30, deletions: 10 }, doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 } } }));
 
     // Leo - Frontend Squad
-    records.push(makeRecord({ member: 'Leo Garcia', email: 'leo@consultant.com', team: 'Frontend Squad', org: 'Team B', orgType: 'consultant', tag: 'feature', week, repo: 'frontend-app', commits: 6, filetype: { app: { files: 4, filesAdded: 0, filesDeleted: 0, insertions: 150, deletions: 40 }, test: { files: 2, filesAdded: 0, filesDeleted: 0, insertions: 60, deletions: 20 }, config: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 10, deletions: 5 }, storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 } } }));
+    records.push(makeRecord({ member: 'Leo Garcia', email: 'leo@consultant.com', team: 'Frontend Squad', org: 'Team B', orgType: 'consultant', tag: 'feature', week, repo: 'frontend-app', commits: 6, filetype: { app: { files: 4, filesAdded: 0, filesDeleted: 0, insertions: 150, deletions: 40 }, test: { files: 2, filesAdded: 0, filesDeleted: 0, insertions: 60, deletions: 20 }, config: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 10, deletions: 5 }, storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 }, doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 } } }));
   }
 
   return records;
