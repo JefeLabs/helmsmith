@@ -345,4 +345,219 @@ describe("SQLite store", () => {
 
     db.close();
   });
+
+  // ── queryRollup SQL logic ───────────────────────────────────────────────
+
+  describe("queryRollup SQL aggregation", () => {
+    function createFullSchemaDB(dir: string) {
+      const dbPath = join(dir, "rollup.db");
+      const db = new Database(dbPath);
+      db.pragma("journal_mode = WAL");
+      db.exec(`
+        CREATE TABLE records (
+          member TEXT NOT NULL, email TEXT NOT NULL, org TEXT NOT NULL, org_type TEXT NOT NULL,
+          team TEXT NOT NULL, tag TEXT NOT NULL, week TEXT NOT NULL, repo TEXT NOT NULL, grp TEXT NOT NULL,
+          commits INTEGER NOT NULL DEFAULT 0, active_days INTEGER NOT NULL DEFAULT 0,
+          intent_feat INTEGER NOT NULL DEFAULT 0, intent_fix INTEGER NOT NULL DEFAULT 0,
+          intent_refactor INTEGER NOT NULL DEFAULT 0, intent_docs INTEGER NOT NULL DEFAULT 0,
+          intent_test INTEGER NOT NULL DEFAULT 0, intent_chore INTEGER NOT NULL DEFAULT 0,
+          intent_other INTEGER NOT NULL DEFAULT 0,
+          app_files INTEGER NOT NULL DEFAULT 0, app_files_added INTEGER NOT NULL DEFAULT 0,
+          app_files_deleted INTEGER NOT NULL DEFAULT 0, app_ins INTEGER NOT NULL DEFAULT 0, app_del INTEGER NOT NULL DEFAULT 0,
+          test_files INTEGER NOT NULL DEFAULT 0, test_files_added INTEGER NOT NULL DEFAULT 0,
+          test_files_deleted INTEGER NOT NULL DEFAULT 0, test_ins INTEGER NOT NULL DEFAULT 0, test_del INTEGER NOT NULL DEFAULT 0,
+          config_files INTEGER NOT NULL DEFAULT 0, config_files_added INTEGER NOT NULL DEFAULT 0,
+          config_files_deleted INTEGER NOT NULL DEFAULT 0, config_ins INTEGER NOT NULL DEFAULT 0, config_del INTEGER NOT NULL DEFAULT 0,
+          storybook_files INTEGER NOT NULL DEFAULT 0, storybook_files_added INTEGER NOT NULL DEFAULT 0,
+          storybook_files_deleted INTEGER NOT NULL DEFAULT 0, storybook_ins INTEGER NOT NULL DEFAULT 0, storybook_del INTEGER NOT NULL DEFAULT 0,
+          doc_files INTEGER NOT NULL DEFAULT 0, doc_files_added INTEGER NOT NULL DEFAULT 0,
+          doc_files_deleted INTEGER NOT NULL DEFAULT 0, doc_ins INTEGER NOT NULL DEFAULT 0, doc_del INTEGER NOT NULL DEFAULT 0,
+          PRIMARY KEY (member, week, repo)
+        );
+        CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      `);
+      return db;
+    }
+
+    function insertRecord(db: Database.Database, overrides: Partial<{
+      member: string; email: string; org: string; orgType: string; team: string; tag: string;
+      week: string; repo: string; group: string; commits: number; activeDays: number;
+      appIns: number; appDel: number; appFiles: number; testIns: number; testDel: number; testFiles: number;
+    }> = {}) {
+      const m = overrides.member ?? "Alice";
+      const e = overrides.email ?? "alice@co.com";
+      const o = overrides.org ?? "Acme";
+      const ot = overrides.orgType ?? "core";
+      const t = overrides.team ?? "FE";
+      const tag = overrides.tag ?? "default";
+      const w = overrides.week ?? "2026-W10";
+      const r = overrides.repo ?? "app";
+      const g = overrides.group ?? "default";
+      const c = overrides.commits ?? 5;
+      const ad = overrides.activeDays ?? 3;
+      const ai = overrides.appIns ?? 100;
+      const adel = overrides.appDel ?? 20;
+      const af = overrides.appFiles ?? 8;
+      const ti = overrides.testIns ?? 40;
+      const td = overrides.testDel ?? 5;
+      const tf = overrides.testFiles ?? 3;
+
+      db.prepare(`
+        INSERT INTO records (member, email, org, org_type, team, tag, week, repo, grp,
+          commits, active_days, app_ins, app_del, app_files, test_ins, test_del, test_files)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(m, e, o, ot, t, tag, w, r, g, c, ad, ai, adel, af, ti, td, tf);
+    }
+
+    // Directly test the SQL aggregation query that queryRollup uses
+    function runRollupSQL(db: Database.Database, groupCol: string, where: string, params: Record<string, unknown>) {
+      const groupByClause = groupCol === "'all'" ? "" : `GROUP BY ${groupCol}`;
+      const sql = `
+        SELECT ${groupCol} as group_key,
+          SUM(commits) as commits, SUM(active_days) as active_days,
+          COUNT(DISTINCT member) as active_members,
+          SUM(app_files) as app_files, SUM(app_ins) as app_ins, SUM(app_del) as app_del,
+          SUM(test_files) as test_files, SUM(test_ins) as test_ins, SUM(test_del) as test_del,
+          SUM(config_ins) as config_ins, SUM(config_del) as config_del
+        FROM records ${where} ${groupByClause}
+      `;
+      return db.prepare(sql).all(params) as Array<Record<string, unknown>>;
+    }
+
+    it("groups by member and sums metrics", () => {
+      const db = createFullSchemaDB(tmpDir);
+      insertRecord(db, { member: "Alice", commits: 5, appIns: 100, testIns: 40 });
+      insertRecord(db, { member: "Alice", week: "2026-W11", commits: 3, appIns: 50, testIns: 20 });
+      insertRecord(db, { member: "Bob", commits: 7, appIns: 200, testIns: 60 });
+
+      const rows = runRollupSQL(db, "member", "", {});
+      expect(rows).toHaveLength(2);
+
+      const alice = rows.find((r) => r.group_key === "Alice")!;
+      expect(alice.commits).toBe(8);
+      expect(alice.app_ins).toBe(150);
+      expect(alice.test_ins).toBe(60);
+
+      const bob = rows.find((r) => r.group_key === "Bob")!;
+      expect(bob.commits).toBe(7);
+      expect(bob.app_ins).toBe(200);
+
+      db.close();
+    });
+
+    it("groups by org with week filter", () => {
+      const db = createFullSchemaDB(tmpDir);
+      insertRecord(db, { member: "Alice", org: "Acme", week: "2026-W10", commits: 5 });
+      insertRecord(db, { member: "Bob", org: "Acme", week: "2026-W11", commits: 3 });
+      insertRecord(db, { member: "Charlie", org: "Beta", week: "2026-W10", commits: 4 });
+
+      const rows = runRollupSQL(db, "org",
+        "WHERE week IN (SELECT value FROM json_each(@weeks_json))",
+        { weeks_json: JSON.stringify(["2026-W10"]) },
+      );
+      expect(rows).toHaveLength(2);
+
+      const acme = rows.find((r) => r.group_key === "Acme")!;
+      expect(acme.commits).toBe(5);
+      expect(acme.active_members).toBe(1); // only Alice in W10
+
+      const beta = rows.find((r) => r.group_key === "Beta")!;
+      expect(beta.commits).toBe(4);
+
+      db.close();
+    });
+
+    it("counts distinct members correctly", () => {
+      const db = createFullSchemaDB(tmpDir);
+      insertRecord(db, { member: "Alice", repo: "app", week: "2026-W10" });
+      insertRecord(db, { member: "Alice", repo: "app", week: "2026-W11" });
+      insertRecord(db, { member: "Bob", repo: "app", week: "2026-W10" });
+
+      const rows = runRollupSQL(db, "repo", "", {});
+      expect(rows).toHaveLength(1);
+      expect(rows[0].active_members).toBe(2); // Alice + Bob
+
+      db.close();
+    });
+
+    it("groups all records under single key", () => {
+      const db = createFullSchemaDB(tmpDir);
+      insertRecord(db, { member: "Alice", commits: 5 });
+      insertRecord(db, { member: "Bob", commits: 3 });
+
+      const rows = runRollupSQL(db, "'all'", "", {});
+      expect(rows).toHaveLength(1);
+      expect(rows[0].group_key).toBe("all");
+      expect(rows[0].commits).toBe(8);
+      expect(rows[0].active_members).toBe(2);
+
+      db.close();
+    });
+
+    it("applies multiple filters simultaneously", () => {
+      const db = createFullSchemaDB(tmpDir);
+      insertRecord(db, { member: "Alice", org: "Acme", team: "FE", week: "2026-W10" });
+      insertRecord(db, { member: "Bob", org: "Acme", team: "BE", week: "2026-W10" });
+      insertRecord(db, { member: "Charlie", org: "Beta", team: "FE", week: "2026-W10" });
+
+      const rows = runRollupSQL(db, "member",
+        "WHERE org = @org AND team = @team",
+        { org: "Acme", team: "FE" },
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].group_key).toBe("Alice");
+
+      db.close();
+    });
+
+    it("returns empty result for no matching records", () => {
+      const db = createFullSchemaDB(tmpDir);
+      insertRecord(db, { week: "2026-W10" });
+
+      const rows = runRollupSQL(db, "member",
+        "WHERE week = @week",
+        { week: "2026-W99" },
+      );
+      expect(rows).toHaveLength(0);
+
+      db.close();
+    });
+
+    it("groups by week for trend analysis", () => {
+      const db = createFullSchemaDB(tmpDir);
+      insertRecord(db, { member: "Alice", week: "2026-W10", commits: 5, appIns: 100 });
+      insertRecord(db, { member: "Bob", week: "2026-W10", commits: 3, appIns: 50 });
+      insertRecord(db, { member: "Alice", week: "2026-W11", commits: 7, appIns: 200 });
+
+      const rows = runRollupSQL(db, "week", "", {});
+      expect(rows).toHaveLength(2);
+
+      const w10 = rows.find((r) => r.group_key === "2026-W10")!;
+      expect(w10.commits).toBe(8);
+      expect(w10.active_members).toBe(2);
+      expect(w10.app_ins).toBe(150);
+
+      const w11 = rows.find((r) => r.group_key === "2026-W11")!;
+      expect(w11.commits).toBe(7);
+      expect(w11.active_members).toBe(1);
+
+      db.close();
+    });
+
+    it("groups by tag", () => {
+      const db = createFullSchemaDB(tmpDir);
+      insertRecord(db, { member: "Alice", tag: "infra", commits: 5 });
+      insertRecord(db, { member: "Bob", tag: "feature", commits: 3 });
+      insertRecord(db, { member: "Charlie", tag: "infra", commits: 4 });
+
+      const rows = runRollupSQL(db, "tag", "", {});
+      expect(rows).toHaveLength(2);
+
+      const infra = rows.find((r) => r.group_key === "infra")!;
+      expect(infra.commits).toBe(9);
+      expect(infra.active_members).toBe(2);
+
+      db.close();
+    });
+  });
 });

@@ -5,6 +5,7 @@ import { promisify } from "node:util";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { getCacheDir } from "../store/paths.js";
+import { classifyGitError } from "./git.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -39,7 +40,11 @@ export async function detectGitHubRemote(
   try {
     url = (await git.remote(["get-url", "origin"])) ?? "";
     url = url.trim();
-  } catch {
+  } catch (error) {
+    const gitErr = classifyGitError(error);
+    if (gitErr.severity === 'fatal') {
+      console.error(`  Remote detection error (${repoPath}): ${gitErr.reason}`);
+    }
     return null;
   }
 

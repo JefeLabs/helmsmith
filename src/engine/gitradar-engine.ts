@@ -35,6 +35,7 @@ import {
   hasEnrichment,
   resetAllData,
   getMetaTimestamps,
+  queryRollup,
 } from '../store/sqlite-store.js';
 import { scanAllRepos } from '../collector/index.js';
 import { getCurrentWeek, getLastNWeeks, isoWeekToDateRange } from '../aggregator/filters.js';
@@ -653,6 +654,7 @@ export class GitRadarEngine {
       scanState: this.scanState,
       authorRegistry: this.authorRegistry,
       enrichments: enrichmentStore,
+      queryRollup,
       onRefreshData: () => {
         const now = getMetaTimestamps();
         const changed =

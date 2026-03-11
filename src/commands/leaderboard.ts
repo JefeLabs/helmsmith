@@ -1,4 +1,4 @@
-import { queryRecords } from '../store/sqlite-store.js';
+import { queryRecords, queryRollup } from '../store/sqlite-store.js';
 import { filterRecords, getLastNWeeks, getCurrentWeek, type Filters } from '../aggregator/filters.js';
 import { computeLeaderboard } from '../aggregator/leaderboard.js';
 import { rollup } from '../aggregator/engine.js';
@@ -26,9 +26,10 @@ export async function leaderboard(options: LeaderboardOptions = {}): Promise<voi
   // Filter by segment if requested
   if (options.segment) {
     const weeksForSeg = getLastNWeeks(options.weeks ?? 4, getCurrentWeek());
-    const weekSet = new Set(weeksForSeg);
-    const segRecords = records.filter((r) => weekSet.has(r.week));
-    const rolled = rollup(segRecords, (r: UserWeekRepoRecord) => r.member);
+    // Use SQL rollup when operating from DB, JS rollup when pre-loaded
+    const rolled = options.records
+      ? rollup(records.filter((r) => weeksForSeg.includes(r.week)), (r: UserWeekRepoRecord) => r.member)
+      : queryRollup({ weeks: weeksForSeg, ...options.filters }, 'member');
     const memberTotals = new Map<string, number>();
     for (const [name, agg] of rolled) {
       memberTotals.set(name, agg.insertions + agg.deletions);

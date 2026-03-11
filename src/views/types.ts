@@ -1,4 +1,5 @@
 import type { Config, Org, UserWeekRepoRecord, ScanState, AuthorRegistry, EnrichmentStore } from '../types/schema.js';
+import type { RolledUp, RollupFilters, RollupGroupBy } from '../store/sqlite-store.js';
 
 export interface ViewContext {
   config: Config;
@@ -7,6 +8,9 @@ export interface ViewContext {
   scanState?: ScanState;
   authorRegistry?: AuthorRegistry;
   enrichments?: EnrichmentStore;
+  /** SQL-accelerated rollup. When available, views should prefer this over
+   *  in-memory rollup() for better performance with large datasets. */
+  queryRollup?: (filters: RollupFilters, groupBy: RollupGroupBy) => Map<string, RolledUp>;
   /** Scan a single repo by name. Returns updated records + scan state. */
   onScanRepo?: (repoName: string) => Promise<{
     records: UserWeekRepoRecord[];

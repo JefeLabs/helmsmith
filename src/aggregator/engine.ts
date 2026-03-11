@@ -1,31 +1,11 @@
 import type { UserWeekRepoRecord, FiletypeMetrics } from "../types/schema.js";
 
-export interface FiletypeRollup {
-  files: number;
-  filesAdded: number;
-  filesDeleted: number;
-  insertions: number;
-  deletions: number;
-}
+// Re-export types from sqlite-store (canonical definition)
+export type { FiletypeRollup, RolledUp, RollupGroupBy, RollupFilters } from "../store/sqlite-store.js";
+export { queryRollup } from "../store/sqlite-store.js";
 
-export interface RolledUp {
-  commits: number;
-  insertions: number;
-  deletions: number;
-  netLines: number;
-  filesChanged: number;
-  filesAdded: number;
-  filesDeleted: number;
-  activeDays: number;
-  activeMembers: number;
-  filetype: {
-    app: FiletypeRollup;
-    test: FiletypeRollup;
-    config: FiletypeRollup;
-    storybook: FiletypeRollup;
-    doc: FiletypeRollup;
-  };
-}
+// Import for local use
+import type { RolledUp } from "../store/sqlite-store.js";
 
 const FILETYPE_KEYS = ["app", "test", "config", "storybook", "doc"] as const;
 
@@ -51,7 +31,11 @@ function emptyRolledUp(): RolledUp {
 }
 
 /**
- * Generic rollup: group records by an arbitrary key function and sum all metrics.
+ * In-memory rollup: group records by an arbitrary key function and sum all metrics.
+ *
+ * Use this when operating on pre-loaded records (e.g. test fixtures, pre-filtered
+ * arrays). For production paths reading from SQLite, prefer `queryRollup()` which
+ * pushes filtering and aggregation into SQL for O(1) memory and indexed performance.
  */
 export function rollup(
   records: UserWeekRepoRecord[],

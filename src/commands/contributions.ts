@@ -1,10 +1,11 @@
-import { queryRecords } from '../store/sqlite-store.js';
+import { queryRecords, queryRollup, type RollupGroupBy } from '../store/sqlite-store.js';
 import {
   filterRecords, getLastNWeeks, getLastNMonths, getLastNQuarters, getLastNYears,
   getCurrentWeek, weekToMonth, weekToQuarter, weekToYear, monthShort,
   type Filters,
 } from '../aggregator/filters.js';
 import { rollup } from '../aggregator/engine.js';
+import type { RolledUp } from '../aggregator/engine.js';
 import { fmt, weekLabel, quarterShort, yearShort } from '../ui/format.js';
 import { calculateSegments, type Segment } from '../aggregator/segments.js';
 import type { UserWeekRepoRecord } from '../types/schema.js';
@@ -36,6 +37,34 @@ interface ContributionRow {
   configLines: number;
 }
 
+function rolledUpToRows(rolled: Map<string, RolledUp>): ContributionRow[] {
+  const rows: ContributionRow[] = [];
+
+  for (const [name, agg] of rolled) {
+    const appLines = agg.filetype.app.insertions + agg.filetype.app.deletions;
+    const testLines = agg.filetype.test.insertions + agg.filetype.test.deletions;
+    const denom = appLines + testLines;
+
+    rows.push({
+      name,
+      commits: agg.commits,
+      activeDays: agg.activeDays,
+      insertions: agg.insertions,
+      deletions: agg.deletions,
+      net: agg.netLines,
+      files: agg.filesChanged,
+      testPct: denom > 0 ? Math.round((testLines / denom) * 100) : 0,
+      appLines,
+      testLines,
+      configLines: agg.filetype.config.insertions + agg.filetype.config.deletions,
+    });
+  }
+
+  // Sort by total lines touched descending
+  rows.sort((a, b) => (b.insertions + b.deletions) - (a.insertions + a.deletions));
+  return rows;
+}
+
 function aggregateRows(
   records: UserWeekRepoRecord[],
   groupBy: string,
@@ -49,41 +78,7 @@ function aggregateRows(
     }
   };
 
-  const rolled = rollup(records, keyFn);
-  const rows: ContributionRow[] = [];
-
-  for (const [name, agg] of rolled) {
-    const ins = agg.filetype.app.insertions + agg.filetype.test.insertions +
-      agg.filetype.config.insertions + agg.filetype.storybook.insertions +
-      agg.filetype.doc.insertions;
-    const del = agg.filetype.app.deletions + agg.filetype.test.deletions +
-      agg.filetype.config.deletions + agg.filetype.storybook.deletions +
-      agg.filetype.doc.deletions;
-    const files = agg.filetype.app.files + agg.filetype.test.files +
-      agg.filetype.config.files + agg.filetype.storybook.files +
-      agg.filetype.doc.files;
-    const appLines = agg.filetype.app.insertions + agg.filetype.app.deletions;
-    const testLines = agg.filetype.test.insertions + agg.filetype.test.deletions;
-    const denom = appLines + testLines;
-
-    rows.push({
-      name,
-      commits: agg.commits,
-      activeDays: agg.activeDays,
-      insertions: ins,
-      deletions: del,
-      net: ins - del,
-      files,
-      testPct: denom > 0 ? Math.round((testLines / denom) * 100) : 0,
-      appLines,
-      testLines,
-      configLines: agg.filetype.config.insertions + agg.filetype.config.deletions,
-    });
-  }
-
-  // Sort by total lines touched descending
-  rows.sort((a, b) => (b.insertions + b.deletions) - (a.insertions + a.deletions));
-  return rows;
+  return rolledUpToRows(rollup(records, keyFn));
 }
 
 export { aggregateRows };
@@ -216,15 +211,76 @@ export { aggregatePivot };
 // ── Main entry point ─────────────────────────────────────────────────────────
 
 export async function contributions(options: ContributionsOptions = {}): Promise<void> {
-  let records = options.records ?? queryRecords({});
+  const weeksBack = options.weeks ?? 12;
+  const currentWeek = getCurrentWeek();
+  const weeks = getLastNWeeks(weeksBack, currentWeek);
+  const groupBy = options.groupBy ?? 'member';
+
+  // SQL-accelerated path: use queryRollup when no pre-loaded records
+  const useSQLPath = !options.records && !options.pivot;
+
+  let records: UserWeekRepoRecord[];
+  if (useSQLPath) {
+    // Build SQL filters combining user filters + week range
+    const sqlFilters: import('../store/sqlite-store.js').RollupFilters = {
+      weeks,
+      ...options.filters,
+    };
+    const rolled = queryRollup(sqlFilters, groupBy as RollupGroupBy);
+    if (rolled.size === 0) {
+      console.log('No records found. Run "gitradar scan" first.');
+      return;
+    }
+
+    // We have everything we need from SQL
+    let rows = rolledUpToRows(rolled);
+    if (options.json) {
+      console.log(JSON.stringify(rows, null, 2));
+      return;
+    }
+
+    const header = `${'Name'.padEnd(30)} ${'seg'.padStart(3)} ${'cmts'.padStart(6)} ${'days'.padStart(5)} ${'+ins'.padStart(8)} ${'-del'.padStart(8)} ${'net'.padStart(8)} ${'tst%'.padStart(5)} ${'files'.padStart(6)}`;
+    console.log(`\nContributions by ${groupBy} (last ${weeksBack} weeks)\n`);
+    console.log(header);
+    console.log('-'.repeat(header.length));
+
+    // Compute segments for display (from SQL-aggregated totals)
+    const memberTotals = new Map<string, number>();
+    for (const row of rows) {
+      memberTotals.set(row.name, row.insertions + row.deletions);
+    }
+    const segMap = calculateSegments(memberTotals);
+
+    // Filter by segment if requested
+    if (options.segment) {
+      rows = rows.filter((row) => segMap.get(row.name) === options.segment);
+      if (rows.length === 0) {
+        console.log(`No ${options.segment}-segment contributors found.`);
+        return;
+      }
+    }
+
+    for (const row of rows) {
+      const name = row.name.length > 29 ? row.name.slice(0, 28) + '\u2026' : row.name;
+      const seg = (segMap.get(row.name) ?? 'middle')[0].toUpperCase();
+      console.log(
+        `${name.padEnd(30)} ${seg.padStart(3)} ${String(row.commits).padStart(6)} ${String(row.activeDays).padStart(5)} ${('+' + fmt(row.insertions)).padStart(8)} ${('-' + fmt(row.deletions)).padStart(8)} ${(row.net >= 0 ? '+' : '') + fmt(row.net)}`.padEnd(80) +
+        `${String(row.testPct) + '%'}`.padStart(5) +
+        `${String(row.files).padStart(6)}`,
+      );
+    }
+
+    console.log(`\n${rows.length} ${groupBy}s`);
+    return;
+  }
+
+  // Fallback path: pre-loaded records, pivot mode, or segment filtering
+  records = options.records ?? queryRecords({});
 
   if (options.filters) {
     records = filterRecords(records, options.filters);
   }
 
-  const weeksBack = options.weeks ?? 12;
-  const currentWeek = getCurrentWeek();
-  const weeks = getLastNWeeks(weeksBack, currentWeek);
   const weekSet = new Set(weeks);
   records = records.filter((r) => weekSet.has(r.week));
 
@@ -232,8 +288,6 @@ export async function contributions(options: ContributionsOptions = {}): Promise
     console.log('No records found. Run "gitradar scan" first.');
     return;
   }
-
-  const groupBy = options.groupBy ?? 'member';
 
   // ── Pivot mode ──────────────────────────────────────────────────────────
   if (options.pivot) {

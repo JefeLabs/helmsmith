@@ -1,4 +1,4 @@
-import { queryRecords } from '../store/sqlite-store.js';
+import { queryRecords, queryRollup } from '../store/sqlite-store.js';
 import { filterRecords, getLastNWeeks, getCurrentWeek, type Filters } from '../aggregator/filters.js';
 import { rollup } from '../aggregator/engine.js';
 import { fmt } from '../ui/format.js';
@@ -24,58 +24,94 @@ interface RepoRow {
 }
 
 export async function repoActivity(options: RepoActivityOptions = {}): Promise<void> {
-  let records = options.records ?? queryRecords({});
-
-  if (options.filters) {
-    records = filterRecords(records, options.filters);
-  }
-
   const weeksBack = options.weeks ?? 8;
   const currentWeek = getCurrentWeek();
   const weeks = getLastNWeeks(weeksBack, currentWeek);
-  const weekSet = new Set(weeks);
-  records = records.filter((r) => weekSet.has(r.week));
 
-  if (records.length === 0) {
-    console.log('No records found. Run "gitradar scan" first.');
-    return;
-  }
+  // SQL-accelerated path when no pre-loaded records
+  const useSQLPath = !options.records;
 
-  // Aggregate by repo
-  const rolled = rollup(records, (r) => r.repo);
-  const rows: RepoRow[] = [];
+  let rows: RepoRow[];
 
-  for (const [repo, agg] of rolled) {
-    const repoRecords = records.filter((r) => r.repo === repo);
-    const contributors = new Set(repoRecords.map((r) => r.member)).size;
-    const group = repoRecords[0]?.group ?? 'default';
+  if (useSQLPath) {
+    const sqlFilters = { weeks, ...options.filters };
+    const rolled = queryRollup(sqlFilters, 'repo');
 
-    const ins = agg.filetype.app.insertions + agg.filetype.test.insertions +
-      agg.filetype.config.insertions + agg.filetype.storybook.insertions +
-      agg.filetype.doc.insertions;
-    const del = agg.filetype.app.deletions + agg.filetype.test.deletions +
-      agg.filetype.config.deletions + agg.filetype.storybook.deletions +
-      agg.filetype.doc.deletions;
-    const files = agg.filetype.app.files + agg.filetype.test.files +
-      agg.filetype.config.files + agg.filetype.storybook.files +
-      agg.filetype.doc.files;
+    if (rolled.size === 0) {
+      console.log('No records found. Run "gitradar scan" first.');
+      return;
+    }
 
-    // Weekly commits breakdown
-    const weeklyCommits = weeks.map((w) => {
-      return repoRecords.filter((r) => r.week === w).reduce((s, r) => s + r.commits, 0);
-    });
+    // Get per-repo group name via a lightweight query
+    const db = (await import('../store/sqlite-store.js')).getDB();
+    const groupRows = db.prepare(
+      "SELECT DISTINCT repo, grp FROM records WHERE week IN (SELECT value FROM json_each(?))",
+    ).all(JSON.stringify(weeks)) as Array<{ repo: string; grp: string }>;
+    const repoGroups = new Map(groupRows.map((r) => [r.repo, r.grp]));
 
-    rows.push({
-      repo,
-      group,
-      commits: agg.commits,
-      contributors,
-      insertions: ins,
-      deletions: del,
-      net: ins - del,
-      files,
-      weeklyCommits,
-    });
+    // Get weekly commits per repo via SQL
+    const weeklyRows = db.prepare(`
+      SELECT repo, week, SUM(commits) as commits
+      FROM records
+      WHERE week IN (SELECT value FROM json_each(?))
+      GROUP BY repo, week
+    `).all(JSON.stringify(weeks)) as Array<{ repo: string; week: string; commits: number }>;
+    const weeklyMap = new Map<string, Map<string, number>>();
+    for (const r of weeklyRows) {
+      let repoMap = weeklyMap.get(r.repo);
+      if (!repoMap) { repoMap = new Map(); weeklyMap.set(r.repo, repoMap); }
+      repoMap.set(r.week, r.commits);
+    }
+
+    rows = [];
+    for (const [repo, agg] of rolled) {
+      rows.push({
+        repo,
+        group: repoGroups.get(repo) ?? 'default',
+        commits: agg.commits,
+        contributors: agg.activeMembers,
+        insertions: agg.insertions,
+        deletions: agg.deletions,
+        net: agg.netLines,
+        files: agg.filesChanged,
+        weeklyCommits: weeks.map((w) => weeklyMap.get(repo)?.get(w) ?? 0),
+      });
+    }
+  } else {
+    // Fallback: pre-loaded records
+    let records = options.records!;
+
+    if (options.filters) {
+      records = filterRecords(records, options.filters);
+    }
+
+    const weekSet = new Set(weeks);
+    records = records.filter((r) => weekSet.has(r.week));
+
+    if (records.length === 0) {
+      console.log('No records found. Run "gitradar scan" first.');
+      return;
+    }
+
+    const rolled = rollup(records, (r) => r.repo);
+    rows = [];
+
+    for (const [repo, agg] of rolled) {
+      const repoRecords = records.filter((r) => r.repo === repo);
+      rows.push({
+        repo,
+        group: repoRecords[0]?.group ?? 'default',
+        commits: agg.commits,
+        contributors: agg.activeMembers,
+        insertions: agg.insertions,
+        deletions: agg.deletions,
+        net: agg.netLines,
+        files: agg.filesChanged,
+        weeklyCommits: weeks.map((w) =>
+          repoRecords.filter((r) => r.week === w).reduce((s, r) => s + r.commits, 0),
+        ),
+      });
+    }
   }
 
   rows.sort((a, b) => b.commits - a.commits);
@@ -99,5 +135,5 @@ export async function repoActivity(options: RepoActivityOptions = {}): Promise<v
     );
   }
 
-  console.log(`\n${rows.length} repos, ${records.length} records`);
+  console.log(`\n${rows.length} repos`);
 }

@@ -76,7 +76,7 @@ vi.mock("../collector/classifier.js", () => ({
   DEFAULT_IGNORE_PATTERNS: [],
 }));
 
-const { parseGitLogOutput, getISOWeek, scanRepo, generateDateChunks, parseChurnLog, sampleEvenly, parseIntent, calculateFastChurnRate, GitLogLineParser } = await import(
+const { parseGitLogOutput, getISOWeek, scanRepo, generateDateChunks, parseChurnLog, sampleEvenly, parseIntent, calculateFastChurnRate, GitLogLineParser, classifyGitError } = await import(
   "../collector/git.js"
 );
 
@@ -392,10 +392,10 @@ describe("scanRepo", () => {
     );
   });
 
-  it("handles git errors gracefully", async () => {
+  it("handles fatal git errors gracefully", async () => {
     spawnQueue.push(new Error("not a git repository"));
 
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const result = await scanRepo("/repos/broken", {
       repoName: "broken",
@@ -408,10 +408,32 @@ describe("scanRepo", () => {
     expect(result.newRecords).toEqual([]);
     expect(result.newHashes).toEqual([]);
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("git error")
+      expect.stringContaining("not a git repository")
     );
 
     consoleSpy.mockRestore();
+  });
+
+  it("silently handles expected git errors", async () => {
+    spawnQueue.push(new Error("does not have any commits yet"));
+
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await scanRepo("/repos/empty", {
+      repoName: "empty",
+      group: "default",
+      authorMap: makeAuthorMap(),
+      recentHashes: new Set(),
+    });
+
+    expect(result.commitCount).toBe(0);
+    expect(result.newRecords).toEqual([]);
+    // Expected errors: neither console.log warning nor console.error
+    expect(errorSpy).not.toHaveBeenCalled();
+
+    logSpy.mockRestore();
+    errorSpy.mockRestore();
   });
 
   it("caps activeDays at 7", async () => {
@@ -948,5 +970,86 @@ describe("calculateFastChurnRate", () => {
     mockRaw.mockRejectedValueOnce(new Error("git error"));
     const result = await calculateFastChurnRate("/repo", "dev@co.com", "2026-01-01", "2026-02-01");
     expect(result).toBe(0);
+  });
+});
+
+// ── classifyGitError ────────────────────────────────────────────────────────
+
+describe("classifyGitError", () => {
+  it("classifies locked index as fatal", () => {
+    const err = new Error("fatal: Unable to create '/repo/.git/index.lock': File exists.");
+    const info = classifyGitError(err);
+    expect(info.severity).toBe("fatal");
+    expect(info.reason).toContain("locked");
+  });
+
+  it("classifies corrupt repository as fatal", () => {
+    const info = classifyGitError(new Error("error: object file is empty or corrupt"));
+    expect(info.severity).toBe("fatal");
+    expect(info.reason).toContain("corrupt");
+  });
+
+  it("classifies not-a-git-repo as fatal", () => {
+    const info = classifyGitError(new Error("fatal: not a git repository (or any parent up to mount point /)"));
+    expect(info.severity).toBe("fatal");
+    expect(info.reason).toContain("not a git repository");
+  });
+
+  it("classifies permission denied as fatal", () => {
+    const info = classifyGitError(new Error("error: permission denied reading objects"));
+    expect(info.severity).toBe("fatal");
+    expect(info.reason).toContain("permission denied");
+  });
+
+  it("classifies bad revision as fatal", () => {
+    const info = classifyGitError(new Error("fatal: bad revision 'nonexistent'"));
+    expect(info.severity).toBe("fatal");
+    expect(info.reason).toContain("bad revision");
+  });
+
+  it("classifies empty repo as expected", () => {
+    const info = classifyGitError(new Error("fatal: your current branch 'main' does not have any commits yet"));
+    expect(info.severity).toBe("expected");
+    expect(info.reason).toContain("empty repository");
+  });
+
+  it("classifies unknown revision as expected", () => {
+    const info = classifyGitError(new Error("fatal: unknown revision or path not in the working tree"));
+    expect(info.severity).toBe("expected");
+  });
+
+  it("classifies no such path as expected", () => {
+    const info = classifyGitError(new Error("fatal: no such path 'deleted-file.ts' in HEAD"));
+    expect(info.severity).toBe("expected");
+    expect(info.reason).toContain("file not found");
+  });
+
+  it("classifies ENOENT as transient", () => {
+    const info = classifyGitError(new Error("ENOENT: no such file or directory, stat '/missing-repo'"));
+    expect(info.severity).toBe("transient");
+    expect(info.reason).toContain("path not found");
+  });
+
+  it("classifies EACCES as fatal", () => {
+    const info = classifyGitError(new Error("EACCES: permission denied, open '/repo/.git/HEAD'"));
+    expect(info.severity).toBe("fatal");
+  });
+
+  it("classifies unknown errors as transient", () => {
+    const info = classifyGitError(new Error("something completely unexpected"));
+    expect(info.severity).toBe("transient");
+    expect(info.reason).toBe("unexpected git error");
+  });
+
+  it("handles non-Error values", () => {
+    const info = classifyGitError("string error about corrupt data");
+    expect(info.severity).toBe("fatal");
+    expect(info.original).toBe("string error about corrupt data");
+  });
+
+  it("preserves original message", () => {
+    const msg = "fatal: Unable to create '/repo/.git/index.lock': File exists.";
+    const info = classifyGitError(new Error(msg));
+    expect(info.original).toBe(msg);
   });
 });

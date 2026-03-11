@@ -11,6 +11,72 @@ import type { FileType } from "./classifier.js";
 // equivalent to simple-git's internal execFile usage. All args are
 // constructed from internal code, never from raw user input.
 
+// ── Git Error Classification ──────────────────────────────────────────────
+
+/**
+ * Severity of a git error, used to decide whether to swallow or surface it.
+ *
+ * - `fatal`: The repository is broken / inaccessible — stop and report to user.
+ *   Examples: locked index, corrupt object, repo not found, permission denied.
+ * - `expected`: A normal condition that doesn't indicate a real problem.
+ *   Examples: file not found in history, empty log output, no matching author.
+ * - `transient`: Temporary issues that might succeed on retry.
+ *   Examples: ENOENT when repo path was moved/unmounted between scans.
+ */
+export type GitErrorSeverity = 'fatal' | 'expected' | 'transient';
+
+export interface GitErrorInfo {
+  severity: GitErrorSeverity;
+  /** Short reason suitable for log messages. */
+  reason: string;
+  /** Original error message for debug output. */
+  original: string;
+}
+
+const FATAL_PATTERNS: Array<[RegExp, string]> = [
+  [/\.git\/index\.lock/i, 'index file is locked (another git process running?)'],
+  [/corrupt/i, 'repository appears corrupt'],
+  [/not a git repository/i, 'not a git repository'],
+  [/permission denied/i, 'permission denied'],
+  [/bad revision/i, 'bad revision reference'],
+  [/ambiguous argument/i, 'ambiguous argument (check branch/ref names)'],
+  [/fatal: bad object/i, 'bad object reference (possible corruption)'],
+  [/unable to read tree/i, 'unable to read tree (possible corruption)'],
+  [/packed-refs.*lock/i, 'packed-refs locked'],
+];
+
+const EXPECTED_PATTERNS: Array<[RegExp, string]> = [
+  [/does not have any commits yet/i, 'empty repository'],
+  [/unknown revision/i, 'no commits match the given range'],
+  [/no such path/i, 'file not found in history'],
+  [/bad default revision/i, 'empty repository or no default branch'],
+  [/path .* does not exist/i, 'file not found in history'],
+];
+
+/**
+ * Classify a git error message to determine severity.
+ * Fatal errors should be surfaced to the user; expected errors can be silently
+ * swallowed; transient errors may warrant a warning.
+ */
+export function classifyGitError(error: unknown): GitErrorInfo {
+  const msg = error instanceof Error ? error.message : String(error);
+
+  for (const [re, reason] of FATAL_PATTERNS) {
+    if (re.test(msg)) return { severity: 'fatal', reason, original: msg };
+  }
+
+  for (const [re, reason] of EXPECTED_PATTERNS) {
+    if (re.test(msg)) return { severity: 'expected', reason, original: msg };
+  }
+
+  // ENOENT / EACCES at the OS level (repo path doesn't exist / not accessible)
+  if (/ENOENT/.test(msg)) return { severity: 'transient', reason: 'repository path not found', original: msg };
+  if (/EACCES/.test(msg)) return { severity: 'fatal', reason: 'permission denied', original: msg };
+
+  // Default: treat unknown errors as transient (log a warning but don't crash)
+  return { severity: 'transient', reason: 'unexpected git error', original: msg };
+}
+
 export type FileStatus = 'A' | 'M' | 'D' | 'R' | 'C' | 'T' | 'unknown';
 
 /**
@@ -678,8 +744,15 @@ export async function scanRepo(
       totalCommitCount += result.commitCount;
       skippedCount += result.skippedCount;
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.log(`  Warning: git error in ${repoName}: ${msg}`);
+      const gitErr = classifyGitError(error);
+      if (gitErr.severity === 'fatal') {
+        console.error(`  Error: ${repoName}: ${gitErr.reason}`);
+        return { newRecords: [], newHashes: [], commitCount: 0, skippedCount: 0, discoveredAuthors: [] };
+      }
+      if (gitErr.severity === 'transient') {
+        console.log(`  Warning: git error in ${repoName}: ${gitErr.reason}`);
+      }
+      // 'expected' errors are silently skipped (e.g. empty repo, no commits in range)
       if (ranges.length === 1) {
         return { newRecords: [], newHashes: [], commitCount: 0, skippedCount: 0, discoveredAuthors: [] };
       }
@@ -739,7 +812,11 @@ export async function calculateChurnRate(
       "--format=%H",
       "--numstat",
     ]);
-  } catch {
+  } catch (error) {
+    const gitErr = classifyGitError(error);
+    if (gitErr.severity === 'fatal') {
+      console.error(`  Churn error (${authorEmail}): ${gitErr.reason}`);
+    }
     return 0;
   }
 
@@ -761,7 +838,11 @@ export async function calculateChurnRate(
     let dateStr: string;
     try {
       dateStr = (await git.raw(["log", "-1", "--format=%aI", hash])).trim();
-    } catch {
+    } catch (error) {
+      const gitErr = classifyGitError(error);
+      if (gitErr.severity === 'fatal') {
+        console.error(`  Churn error (commit ${hash.slice(0, 8)}): ${gitErr.reason}`);
+      }
       continue;
     }
 
@@ -790,8 +871,13 @@ export async function calculateChurnRate(
         if (priorHashes.length > 0) {
           churnLines += lines;
         }
-      } catch {
-        // File may not exist in git history at this point
+      } catch (error) {
+        // File may not exist in git history at this point — expected.
+        // Only log if it's a real problem.
+        const gitErr = classifyGitError(error);
+        if (gitErr.severity === 'fatal') {
+          console.error(`  Churn error (file ${file.path}): ${gitErr.reason}`);
+        }
       }
     }
   }
@@ -835,7 +921,11 @@ export async function calculateFastChurnRate(
       "--format=%H",
       "--numstat",
     ]);
-  } catch {
+  } catch (error) {
+    const gitErr = classifyGitError(error);
+    if (gitErr.severity === 'fatal') {
+      console.error(`  Fast churn error (${authorEmail}): ${gitErr.reason}`);
+    }
     return 0;
   }
 
@@ -861,7 +951,11 @@ export async function calculateFastChurnRate(
       "--format=%H|%s",
       "--name-only",
     ]);
-  } catch {
+  } catch (error) {
+    const gitErr = classifyGitError(error);
+    if (gitErr.severity === 'fatal') {
+      console.error(`  Fast churn error (instability window): ${gitErr.reason}`);
+    }
     return 0;
   }
 

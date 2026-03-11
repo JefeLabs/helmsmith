@@ -458,6 +458,218 @@ export function getStoreStatsSQL(): {
   };
 }
 
+// ── SQL-based rollup ────────────────────────────────────────────────────────
+
+export type RollupGroupBy = 'member' | 'repo' | 'org' | 'team' | 'tag' | 'week' | 'all';
+
+export interface RollupFilters {
+  weeks?: string[];
+  weekFrom?: string;
+  weekTo?: string;
+  org?: string;
+  team?: string;
+  tag?: string;
+  group?: string;
+  member?: string;
+  repo?: string;
+}
+
+export interface FiletypeRollup {
+  files: number;
+  filesAdded: number;
+  filesDeleted: number;
+  insertions: number;
+  deletions: number;
+}
+
+export interface RolledUp {
+  commits: number;
+  insertions: number;
+  deletions: number;
+  netLines: number;
+  filesChanged: number;
+  filesAdded: number;
+  filesDeleted: number;
+  activeDays: number;
+  activeMembers: number;
+  filetype: {
+    app: FiletypeRollup;
+    test: FiletypeRollup;
+    config: FiletypeRollup;
+    storybook: FiletypeRollup;
+    doc: FiletypeRollup;
+  };
+}
+
+/** Map RollupGroupBy to the SQL column name. */
+const GROUP_BY_COLUMN: Record<RollupGroupBy, string> = {
+  member: 'member',
+  repo: 'repo',
+  org: 'org',
+  team: 'team',
+  tag: 'tag',
+  week: 'week',
+  all: "'all'",  // string literal — no GROUP BY needed
+};
+
+/**
+ * Aggregate records using SQL SUM() and GROUP BY.
+ *
+ * Replaces the JS-side `rollup()` function for production paths.
+ * All filtering and grouping happens in SQLite, avoiding the cost of
+ * deserializing every row into JS objects. With indexes on week, repo,
+ * org, and team, this is near-instant even with millions of rows.
+ */
+export function queryRollup(
+  filters: RollupFilters,
+  groupBy: RollupGroupBy,
+): Map<string, RolledUp> {
+  const db = getDB();
+
+  const groupCol = GROUP_BY_COLUMN[groupBy];
+  const clauses: string[] = [];
+  const params: Record<string, unknown> = {};
+
+  if (filters.weeks && filters.weeks.length > 0) {
+    clauses.push("week IN (SELECT value FROM json_each(@weeks_json))");
+    params.weeks_json = JSON.stringify(filters.weeks);
+  }
+  if (filters.weekFrom) {
+    clauses.push("week >= @weekFrom");
+    params.weekFrom = filters.weekFrom;
+  }
+  if (filters.weekTo) {
+    clauses.push("week <= @weekTo");
+    params.weekTo = filters.weekTo;
+  }
+  if (filters.org !== undefined) {
+    clauses.push("org = @org");
+    params.org = filters.org;
+  }
+  if (filters.team !== undefined) {
+    clauses.push("team = @team");
+    params.team = filters.team;
+  }
+  if (filters.tag !== undefined) {
+    clauses.push("tag = @tag");
+    params.tag = filters.tag;
+  }
+  if (filters.group !== undefined) {
+    clauses.push("grp = @grp");
+    params.grp = filters.group;
+  }
+  if (filters.member !== undefined) {
+    clauses.push("member = @member");
+    params.member = filters.member;
+  }
+  if (filters.repo !== undefined) {
+    clauses.push("repo = @repo");
+    params.repo = filters.repo;
+  }
+
+  const where = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
+  const groupByClause = groupBy === 'all' ? "" : `GROUP BY ${groupCol}`;
+
+  const sql = `
+    SELECT
+      ${groupCol} as group_key,
+      SUM(commits) as commits,
+      SUM(active_days) as active_days,
+      COUNT(DISTINCT member) as active_members,
+      SUM(app_files) as app_files,
+      SUM(app_files_added) as app_files_added,
+      SUM(app_files_deleted) as app_files_deleted,
+      SUM(app_ins) as app_ins,
+      SUM(app_del) as app_del,
+      SUM(test_files) as test_files,
+      SUM(test_files_added) as test_files_added,
+      SUM(test_files_deleted) as test_files_deleted,
+      SUM(test_ins) as test_ins,
+      SUM(test_del) as test_del,
+      SUM(config_files) as config_files,
+      SUM(config_files_added) as config_files_added,
+      SUM(config_files_deleted) as config_files_deleted,
+      SUM(config_ins) as config_ins,
+      SUM(config_del) as config_del,
+      SUM(storybook_files) as storybook_files,
+      SUM(storybook_files_added) as storybook_files_added,
+      SUM(storybook_files_deleted) as storybook_files_deleted,
+      SUM(storybook_ins) as storybook_ins,
+      SUM(storybook_del) as storybook_del,
+      SUM(doc_files) as doc_files,
+      SUM(doc_files_added) as doc_files_added,
+      SUM(doc_files_deleted) as doc_files_deleted,
+      SUM(doc_ins) as doc_ins,
+      SUM(doc_del) as doc_del
+    FROM records
+    ${where}
+    ${groupByClause}
+  `;
+
+  const rows = db.prepare(sql).all(params) as Array<Record<string, number | string>>;
+  const result = new Map<string, RolledUp>();
+
+  for (const row of rows) {
+    const key = String(row.group_key);
+    const app: FiletypeRollup = {
+      files: row.app_files as number,
+      filesAdded: row.app_files_added as number,
+      filesDeleted: row.app_files_deleted as number,
+      insertions: row.app_ins as number,
+      deletions: row.app_del as number,
+    };
+    const test: FiletypeRollup = {
+      files: row.test_files as number,
+      filesAdded: row.test_files_added as number,
+      filesDeleted: row.test_files_deleted as number,
+      insertions: row.test_ins as number,
+      deletions: row.test_del as number,
+    };
+    const config: FiletypeRollup = {
+      files: row.config_files as number,
+      filesAdded: row.config_files_added as number,
+      filesDeleted: row.config_files_deleted as number,
+      insertions: row.config_ins as number,
+      deletions: row.config_del as number,
+    };
+    const storybook: FiletypeRollup = {
+      files: row.storybook_files as number,
+      filesAdded: row.storybook_files_added as number,
+      filesDeleted: row.storybook_files_deleted as number,
+      insertions: row.storybook_ins as number,
+      deletions: row.storybook_del as number,
+    };
+    const doc: FiletypeRollup = {
+      files: row.doc_files as number,
+      filesAdded: row.doc_files_added as number,
+      filesDeleted: row.doc_files_deleted as number,
+      insertions: row.doc_ins as number,
+      deletions: row.doc_del as number,
+    };
+
+    const insertions = app.insertions + test.insertions + config.insertions + storybook.insertions + doc.insertions;
+    const deletions = app.deletions + test.deletions + config.deletions + storybook.deletions + doc.deletions;
+    const filesChanged = app.files + test.files + config.files + storybook.files + doc.files;
+    const filesAdded = app.filesAdded + test.filesAdded + config.filesAdded + storybook.filesAdded + doc.filesAdded;
+    const filesDeleted = app.filesDeleted + test.filesDeleted + config.filesDeleted + storybook.filesDeleted + doc.filesDeleted;
+
+    result.set(key, {
+      commits: row.commits as number,
+      activeDays: row.active_days as number,
+      activeMembers: row.active_members as number,
+      insertions,
+      deletions,
+      netLines: insertions - deletions,
+      filesChanged,
+      filesAdded,
+      filesDeleted,
+      filetype: { app, test, config, storybook, doc },
+    });
+  }
+
+  return result;
+}
+
 // ── Enrichments store (SQLite-backed) ───────────────────────────────────────
 
 export function loadEnrichmentsSQL(): EnrichmentStore {
