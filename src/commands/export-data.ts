@@ -2,6 +2,7 @@ import { writeFile } from "node:fs/promises";
 import { loadCommitsData } from "../store/commits-by-filetype.js";
 import { loadEnrichments, getEnrichment } from "../store/enrichments.js";
 import { filterRecords, type Filters } from "../aggregator/filters.js";
+import { calculateSegments, type Segment } from "../aggregator/segments.js";
 import type { UserWeekRepoRecord, EnrichmentStore } from "../types/schema.js";
 
 export interface ExportDataOptions {
@@ -68,11 +69,14 @@ const HEADERS = [
   "avg_cycle_hrs",
   "reviews_given",
   "churn_rate_pct",
+  // Segmentation (computed at export time)
+  "segment",
 ];
 
 export function flattenRecord(
   r: UserWeekRepoRecord,
   enrichmentStore?: EnrichmentStore,
+  segmentMap?: Map<string, Segment>,
 ): Record<string, string | number> {
   const flat: Record<string, string | number> = {
     member: r.member,
@@ -135,6 +139,8 @@ export function flattenRecord(
     flat.churn_rate_pct = 0;
   }
 
+  flat.segment = segmentMap?.get(r.member) ?? '';
+
   return flat;
 }
 
@@ -149,8 +155,18 @@ function escapeCsvField(value: string | number): string {
 }
 
 export function recordsToCsv(records: UserWeekRepoRecord[], enrichmentStore?: EnrichmentStore): string {
+  // Pre-compute segment map from total lines touched per member across all records
+  const memberTotals = new Map<string, number>();
+  for (const r of records) {
+    const total = Object.values(r.filetype).reduce(
+      (s, ft) => s + ft.insertions + ft.deletions, 0,
+    );
+    memberTotals.set(r.member, (memberTotals.get(r.member) ?? 0) + total);
+  }
+  const segmentMap = calculateSegments(memberTotals);
+
   const rows = records.map((r) => {
-    const flat = flattenRecord(r, enrichmentStore);
+    const flat = flattenRecord(r, enrichmentStore, segmentMap);
     return HEADERS.map((h) => escapeCsvField(flat[h])).join(",");
   });
   return [HEADERS.join(","), ...rows].join("\n") + "\n";

@@ -17,6 +17,7 @@ import { scanDirectory } from './collector/dir-scanner.js';
 import { readKey } from './ui/keypress.js';
 import { selectWorkspace } from './config/workspace-selector.js';
 import { loadScanState, saveScanState } from './store/scan-state.js';
+import { loadEnrichments } from './store/enrichments.js';
 import {
   loadCommitsData,
   saveCommitsData,
@@ -332,13 +333,15 @@ view
   .option('-w, --weeks <n>', 'Weeks of history', parseInt)
   .option('--by <dimension>', 'Group by: member, team, org, repo', 'member')
   .option('--pivot <granularity>', 'Pivot by time: week, month, quarter, year')
-  .action(async (cmdOpts: { weeks?: number; by?: string; pivot?: string }) => {
+  .option('--segment <tier>', 'Filter to segment: high, middle, low')
+  .action(async (cmdOpts: { weeks?: number; by?: string; pivot?: string; segment?: string }) => {
     const g = globals();
     const { contributions } = await import('./commands/contributions.js');
     await contributions({
       weeks: cmdOpts.weeks ?? g.weeks,
       groupBy: (cmdOpts.by as 'member' | 'team' | 'org' | 'repo') ?? 'member',
       pivot: cmdOpts.pivot as 'week' | 'month' | 'quarter' | 'year' | undefined,
+      segment: cmdOpts.segment as 'high' | 'middle' | 'low' | undefined,
       json: g.json,
       filters: globalFilters(),
     });
@@ -349,12 +352,14 @@ view
   .description('Show top performers')
   .option('-w, --weeks <n>', 'Weeks of history', parseInt)
   .option('--top <n>', 'Number of entries per category', parseInt)
-  .action(async (cmdOpts: { weeks?: number; top?: number }) => {
+  .option('--segment <tier>', 'Filter to segment: high, middle, low')
+  .action(async (cmdOpts: { weeks?: number; top?: number; segment?: string }) => {
     const g = globals();
     const { leaderboard } = await import('./commands/leaderboard.js');
     await leaderboard({
       weeks: cmdOpts.weeks ?? g.weeks ?? 4,
       top: cmdOpts.top,
+      segment: cmdOpts.segment as 'high' | 'middle' | 'low' | undefined,
       json: g.json,
       filters: globalFilters(),
     });
@@ -419,7 +424,8 @@ program
   .option('--repo <name>', 'Enrich only this repo')
   .option('--force', 'Re-enrich even if data exists')
   .option('--skip-churn', 'Skip churn rate calculation')
-  .action(async (cmdOpts: { weeks?: number; repo?: string; force?: boolean; skipChurn?: boolean }) => {
+  .option('--workspace <name>', 'Workspace to use for repo paths')
+  .action(async (cmdOpts: { weeks?: number; repo?: string; force?: boolean; skipChurn?: boolean; workspace?: string }) => {
     const { enrich: enrichCmd } = await import('./commands/enrich.js');
     await enrichCmd({
       weeks: cmdOpts.weeks,
@@ -427,6 +433,7 @@ program
       force: cmdOpts.force,
       skipChurn: cmdOpts.skipChurn,
       config: globals().config,
+      workspace: cmdOpts.workspace,
     });
   });
 
@@ -677,12 +684,15 @@ async function runMain(opts: RunOptions): Promise<void> {
 
   // ── Build ViewContext and launch navigator ───────────────────────────────
 
+  const enrichmentStore = await loadEnrichments();
+
   const ctx: ViewContext = {
     config,
     records,
     currentWeek: getCurrentWeek(),
     scanState: liveScanState,
     authorRegistry,
+    enrichments: enrichmentStore,
     onScanRepo: async (repoName: string) => {
       const repoEntry = ctx.config.repos.find(
         (r) => (r.name ?? r.path.split('/').pop() ?? r.path) === repoName,

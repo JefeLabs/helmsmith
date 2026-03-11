@@ -26,3 +26,9 @@ export const SEGMENT_DEFS = Object.entries(FILETYPE_CHARS).map(
     color: FILETYPE_COLORS[key as FileType],
   })
 );
+
+export const SEGMENT_INDICATORS = {
+  high: { char: "\u25B2", color: chalk.green },
+  middle: { char: "\u25CF", color: chalk.dim },
+  low: { char: "\u25BC", color: chalk.red },
+} as const;

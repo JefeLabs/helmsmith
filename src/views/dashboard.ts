@@ -4,9 +4,10 @@ import path from 'node:path';
 import { writeFile } from 'node:fs/promises';
 import yaml from 'js-yaml';
 import type { ViewContext, NavigationAction } from './types.js';
-import type { UserWeekRepoRecord } from '../types/schema.js';
+import type { UserWeekRepoRecord, EnrichmentStore } from '../types/schema.js';
+import { getEnrichment } from '../store/enrichments.js';
 import { renderGroupedHBarChart } from '../ui/grouped-hbar-chart.js';
-import type { HBarGroup, HBar } from '../ui/grouped-hbar-chart.js';
+import type { HBarGroup, HBar, DetailLayer } from '../ui/grouped-hbar-chart.js';
 import { renderBanner } from '../ui/banner.js';
 import { renderLegend } from '../ui/legend.js';
 import { renderTabBar, renderHotkeyBar, renderBreadcrumb } from '../ui/tab-bar.js';
@@ -21,7 +22,8 @@ import { computeLeaderboard } from '../aggregator/leaderboard.js';
 import { recordsToCsv } from '../commands/export-data.js';
 import { assignAuthor, unassignAuthor, assignByIdentifierPrefix } from '../store/author-registry.js';
 import { reattributeRecords } from '../collector/author-map.js';
-import { SEGMENT_DEFS, FILETYPE_COLORS, FILETYPE_CHARS } from '../ui/constants.js';
+import { SEGMENT_DEFS, FILETYPE_COLORS, FILETYPE_CHARS, SEGMENT_INDICATORS } from '../ui/constants.js';
+import { calculateSegments, type Segment } from '../aggregator/segments.js';
 import { fmt, weekShort, quarterShort, yearShort, padRight, padLeft } from '../ui/format.js';
 import { teamDetailView } from './team-detail.js';
 import { buildRepoOrgGroups } from './repo-activity.js';
@@ -218,6 +220,70 @@ function computeTestPct(agg: { filetype: { app: { insertions: number; deletions:
   return total > 0 ? Math.round((testLines / total) * 100) : 0;
 }
 
+// ── Enrichment aggregation helper ────────────────────────────────────────────
+
+interface AggregatedEnrichments {
+  prsOpened: number;
+  prsMerged: number;
+  reviewsGiven: number;
+  avgCycleHrs: number;
+  churnRatePct: number;
+}
+
+function aggregateEnrichments(
+  records: UserWeekRepoRecord[],
+  enrichments: EnrichmentStore,
+  groupBy: (r: UserWeekRepoRecord) => string,
+): Map<string, AggregatedEnrichments> {
+  const result = new Map<string, {
+    prsOpened: number; prsMerged: number; reviewsGiven: number;
+    sumCycleWeighted: number; totalPrCount: number;
+    sumChurnWeighted: number; totalLines: number;
+  }>();
+  const seen = new Set<string>();
+
+  for (const r of records) {
+    const enrichKey = `${r.member}::${r.week}::${r.repo}`;
+    const groupKey = groupBy(r);
+    const dedupeKey = `${groupKey}::${enrichKey}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+
+    const e = getEnrichment(enrichments, enrichKey);
+    const lines = r.filetype.app.insertions + r.filetype.app.deletions +
+      r.filetype.test.insertions + r.filetype.test.deletions +
+      r.filetype.config.insertions + r.filetype.config.deletions +
+      r.filetype.storybook.insertions + r.filetype.storybook.deletions +
+      (r.filetype.doc?.insertions ?? 0) + (r.filetype.doc?.deletions ?? 0);
+
+    const agg = result.get(groupKey) ?? {
+      prsOpened: 0, prsMerged: 0, reviewsGiven: 0,
+      sumCycleWeighted: 0, totalPrCount: 0,
+      sumChurnWeighted: 0, totalLines: 0,
+    };
+    agg.prsOpened += e.prs_opened;
+    agg.prsMerged += e.prs_merged;
+    agg.reviewsGiven += e.reviews_given;
+    agg.sumCycleWeighted += e.avg_cycle_hrs * e.prs_merged;
+    agg.totalPrCount += e.prs_merged;
+    agg.sumChurnWeighted += e.churn_rate_pct * lines;
+    agg.totalLines += lines;
+    result.set(groupKey, agg);
+  }
+
+  const final = new Map<string, AggregatedEnrichments>();
+  for (const [key, agg] of result) {
+    final.set(key, {
+      prsOpened: agg.prsOpened,
+      prsMerged: agg.prsMerged,
+      reviewsGiven: agg.reviewsGiven,
+      avgCycleHrs: agg.totalPrCount > 0 ? agg.sumCycleWeighted / agg.totalPrCount : 0,
+      churnRatePct: agg.totalLines > 0 ? agg.sumChurnWeighted / agg.totalLines : 0,
+    });
+  }
+  return final;
+}
+
 // ── Contributions tab data ───────────────────────────────────────────────────
 
 function buildContributionGroups(
@@ -226,6 +292,7 @@ function buildContributionGroups(
   drillLevel: DrillLevel,
   tagOverlay: boolean,
   config: ViewContext['config'],
+  enrichments?: EnrichmentStore,
 ): HBarGroup[] {
   const groups: HBarGroup[] = [];
 
@@ -347,6 +414,25 @@ function buildContributionGroups(
       }
     }
 
+    // Stamp enrichment data onto bars
+    if (enrichments) {
+      const groupByFn = tagOverlay ? (r: UserWeekRepoRecord) => (config.tags?.[r.tag]?.label ?? r.tag)
+        : drillLevel === 'org' ? (r: UserWeekRepoRecord) => r.org
+        : drillLevel === 'team' ? (r: UserWeekRepoRecord) => r.team
+        : (r: UserWeekRepoRecord) => r.member;
+      const enrichAgg = aggregateEnrichments(bucketRecords, enrichments, groupByFn);
+      for (const bar of bars) {
+        const e = enrichAgg.get(bar.label);
+        if (e) {
+          bar.prsOpened = e.prsOpened;
+          bar.prsMerged = e.prsMerged;
+          bar.avgCycleHrs = Math.round(e.avgCycleHrs * 10) / 10;
+          bar.reviewsGiven = e.reviewsGiven;
+          bar.churnRatePct = Math.round(e.churnRatePct * 10) / 10;
+        }
+      }
+    }
+
     groups.push({
       groupLabel: bucket.label,
       bars,
@@ -358,14 +444,20 @@ function buildContributionGroups(
   const labelTotals = new Map<string, {
     sumTotal: number; sumIns: number; sumDel: number; sumNet: number;
     sumCommits: number; sumActiveDays: number; sumHeadcount: number;
-    sumTestPct: number; count: number;
+    sumTestPct: number;
+    sumChurnRatePct: number; sumPrsOpened: number; sumPrsMerged: number;
+    sumAvgCycleHrs: number; sumReviewsGiven: number;
+    count: number;
   }>();
   for (const group of groups) {
     for (const bar of group.bars) {
       const entry = labelTotals.get(bar.label) ?? {
         sumTotal: 0, sumIns: 0, sumDel: 0, sumNet: 0,
         sumCommits: 0, sumActiveDays: 0, sumHeadcount: 0,
-        sumTestPct: 0, count: 0,
+        sumTestPct: 0,
+        sumChurnRatePct: 0, sumPrsOpened: 0, sumPrsMerged: 0,
+        sumAvgCycleHrs: 0, sumReviewsGiven: 0,
+        count: 0,
       };
       entry.sumTotal += bar.total;
       entry.sumIns += bar.insertions ?? 0;
@@ -375,6 +467,11 @@ function buildContributionGroups(
       entry.sumActiveDays += bar.activeDays ?? 0;
       entry.sumHeadcount += bar.headcount ?? 0;
       entry.sumTestPct += bar.testPct ?? 0;
+      entry.sumChurnRatePct += bar.churnRatePct ?? 0;
+      entry.sumPrsOpened += bar.prsOpened ?? 0;
+      entry.sumPrsMerged += bar.prsMerged ?? 0;
+      entry.sumAvgCycleHrs += bar.avgCycleHrs ?? 0;
+      entry.sumReviewsGiven += bar.reviewsGiven ?? 0;
       entry.count++;
       labelTotals.set(bar.label, entry);
     }
@@ -391,6 +488,11 @@ function buildContributionGroups(
         bar.avgActiveDays = entry.sumActiveDays / entry.count;
         bar.avgHeadcount = entry.sumHeadcount / entry.count;
         bar.avgTestPct = entry.sumTestPct / entry.count;
+        bar.avgChurnRatePct = entry.sumChurnRatePct / entry.count;
+        bar.avgPrsOpened = entry.sumPrsOpened / entry.count;
+        bar.avgPrsMerged = entry.sumPrsMerged / entry.count;
+        bar.avgAvgCycleHrs = entry.sumAvgCycleHrs / entry.count;
+        bar.avgReviewsGiven = entry.sumReviewsGiven / entry.count;
       }
     }
   }
@@ -438,6 +540,8 @@ function buildContributionGroups(
       const teamBucketTotals = new Map<string, {
         sumIns: number; sumDel: number; sumNet: number;
         sumCommits: number; sumActiveDays: number; sumTestPct: number;
+        sumChurnRatePct: number; sumPrsOpened: number; sumPrsMerged: number;
+        sumAvgCycleHrs: number; sumReviewsGiven: number;
         memberCount: number;
       }>();
 
@@ -446,6 +550,8 @@ function buildContributionGroups(
         const e = teamBucketTotals.get(team) ?? {
           sumIns: 0, sumDel: 0, sumNet: 0,
           sumCommits: 0, sumActiveDays: 0, sumTestPct: 0,
+          sumChurnRatePct: 0, sumPrsOpened: 0, sumPrsMerged: 0,
+          sumAvgCycleHrs: 0, sumReviewsGiven: 0,
           memberCount: 0,
         };
         e.sumIns += bar.insertions ?? 0;
@@ -454,6 +560,11 @@ function buildContributionGroups(
         e.sumCommits += bar.commits ?? 0;
         e.sumActiveDays += bar.activeDays ?? 0;
         e.sumTestPct += bar.testPct ?? 0;
+        e.sumChurnRatePct += bar.churnRatePct ?? 0;
+        e.sumPrsOpened += bar.prsOpened ?? 0;
+        e.sumPrsMerged += bar.prsMerged ?? 0;
+        e.sumAvgCycleHrs += bar.avgCycleHrs ?? 0;
+        e.sumReviewsGiven += bar.reviewsGiven ?? 0;
         e.memberCount++;
         teamBucketTotals.set(team, e);
       }
@@ -469,6 +580,11 @@ function buildContributionGroups(
           bar.teamAvgCommits = t.sumCommits / t.memberCount;
           bar.teamAvgActiveDays = t.sumActiveDays / t.memberCount;
           bar.teamAvgTestPct = t.sumTestPct / t.memberCount;
+          bar.teamAvgChurnRatePct = t.sumChurnRatePct / t.memberCount;
+          bar.teamAvgPrsOpened = t.sumPrsOpened / t.memberCount;
+          bar.teamAvgPrsMerged = t.sumPrsMerged / t.memberCount;
+          bar.teamAvgAvgCycleHrs = t.sumAvgCycleHrs / t.memberCount;
+          bar.teamAvgReviewsGiven = t.sumReviewsGiven / t.memberCount;
         }
       }
     }
@@ -487,6 +603,7 @@ function buildContributionGroupsByEntity(
   drillLevel: DrillLevel,
   tagOverlay: boolean,
   config: ViewContext['config'],
+  enrichments?: EnrichmentStore,
 ): HBarGroup[] {
   const groupByFn = tagOverlay ? (r: UserWeekRepoRecord) => r.tag
     : drillLevel === 'org' ? (r: UserWeekRepoRecord) => r.org
@@ -537,7 +654,7 @@ function buildContributionGroupsByEntity(
       const agg = rolled.get(entry.key);
       if (!agg) continue;
 
-      bars.push({
+      const bar: HBar = {
         label: bucket.label,
         orgType: entry.orgType,
         segments: [
@@ -554,7 +671,21 @@ function buildContributionGroupsByEntity(
         commits: agg.commits,
         activeDays: agg.activeDays,
         headcount: agg.activeMembers,
-      });
+      };
+
+      if (enrichments) {
+        const enrichAgg = aggregateEnrichments(bucketRecords, enrichments, groupByFn);
+        const ea = enrichAgg.get(entry.key);
+        if (ea) {
+          bar.prsOpened = ea.prsOpened;
+          bar.prsMerged = ea.prsMerged;
+          bar.avgCycleHrs = Math.round(ea.avgCycleHrs * 10) / 10;
+          bar.reviewsGiven = ea.reviewsGiven;
+          bar.churnRatePct = Math.round(ea.churnRatePct * 10) / 10;
+        }
+      }
+
+      bars.push(bar);
     }
 
     if (bars.length === 0) continue;
@@ -568,6 +699,9 @@ function buildContributionGroupsByEntity(
     sumTotal: number; sumIns: number; sumDel: number; sumNet: number;
     sumCommits: number; sumActiveDays: number; sumHeadcount: number;
     sumTestPct: number; count: number;
+    sumPrsOpened: number; sumPrsMerged: number; sumReviews: number;
+    churnWeightedSum: number; churnWeight: number;
+    cycleWeightedSum: number; cycleWeight: number;
   }>();
   for (const group of groups) {
     for (const bar of group.bars) {
@@ -575,6 +709,9 @@ function buildContributionGroupsByEntity(
         sumTotal: 0, sumIns: 0, sumDel: 0, sumNet: 0,
         sumCommits: 0, sumActiveDays: 0, sumHeadcount: 0,
         sumTestPct: 0, count: 0,
+        sumPrsOpened: 0, sumPrsMerged: 0, sumReviews: 0,
+        churnWeightedSum: 0, churnWeight: 0,
+        cycleWeightedSum: 0, cycleWeight: 0,
       };
       e.sumTotal += bar.total;
       e.sumIns += bar.insertions ?? 0;
@@ -584,6 +721,17 @@ function buildContributionGroupsByEntity(
       e.sumActiveDays += bar.activeDays ?? 0;
       e.sumHeadcount += bar.headcount ?? 0;
       e.sumTestPct += bar.testPct ?? 0;
+      e.sumPrsOpened += bar.prsOpened ?? 0;
+      e.sumPrsMerged += bar.prsMerged ?? 0;
+      e.sumReviews += bar.reviewsGiven ?? 0;
+      if (bar.churnRatePct !== undefined) {
+        e.churnWeightedSum += bar.churnRatePct * bar.total;
+        e.churnWeight += bar.total;
+      }
+      if (bar.avgCycleHrs !== undefined && bar.prsMerged) {
+        e.cycleWeightedSum += bar.avgCycleHrs * bar.prsMerged;
+        e.cycleWeight += bar.prsMerged;
+      }
       e.count++;
       labelTotals.set(bar.label, e);
     }
@@ -600,6 +748,11 @@ function buildContributionGroupsByEntity(
         bar.avgActiveDays = e.sumActiveDays / e.count;
         bar.avgHeadcount = e.sumHeadcount / e.count;
         bar.avgTestPct = e.sumTestPct / e.count;
+        bar.avgPrsOpened = e.sumPrsOpened / e.count;
+        bar.avgPrsMerged = e.sumPrsMerged / e.count;
+        bar.avgReviewsGiven = e.sumReviews / e.count;
+        bar.avgChurnRatePct = e.churnWeight > 0 ? e.churnWeightedSum / e.churnWeight : undefined;
+        bar.avgAvgCycleHrs = e.cycleWeight > 0 ? e.cycleWeightedSum / e.cycleWeight : undefined;
       }
     }
   }
@@ -952,6 +1105,10 @@ function renderContributionsTab(
   termCols: number,
   labelWidth?: number,
   records?: UserWeekRepoRecord[],
+  excludedSegments?: Set<Segment>,
+  detailLayers?: Set<DetailLayer>,
+  enrichments?: EnrichmentStore,
+  perUserMode = false,
 ): void {
   const recs = records ?? ctx.records;
   const modeLabel = tagOverlay ? 'Tag'
@@ -970,9 +1127,70 @@ function renderContributionsTab(
   );
   console.log('');
 
-  const groups = pivotEntity
-    ? buildContributionGroupsByEntity(recs, buckets, drillLevel, tagOverlay, ctx.config)
-    : buildContributionGroups(recs, buckets, drillLevel, tagOverlay, ctx.config);
+  let groups = pivotEntity
+    ? buildContributionGroupsByEntity(recs, buckets, drillLevel, tagOverlay, ctx.config, enrichments)
+    : buildContributionGroups(recs, buckets, drillLevel, tagOverlay, ctx.config, enrichments);
+
+  // Stamp segments onto bars and optionally filter by excluded segments.
+  // Segments are computed per-group (per time bucket in by-time mode, per entity in by-entity mode)
+  // so that each group gets its own 20/60/20 distribution.
+  if (!pivotEntity) {
+    // By-time mode: each group is a time bucket, bars are entities.
+    // Compute segments across all bars using the global (all-bucket) member totals.
+    const memberTotals = new Map<string, number>();
+    for (const g of groups) {
+      for (const bar of g.bars) {
+        memberTotals.set(bar.label, (memberTotals.get(bar.label) ?? 0) + bar.total);
+      }
+    }
+    const segMap = calculateSegments(memberTotals);
+    for (const g of groups) {
+      for (const bar of g.bars) {
+        bar.segment = segMap.get(bar.label);
+      }
+    }
+  } else {
+    // By-entity mode: each group is an entity, bars are time buckets. No per-bar segmentation.
+    // Segment the entities (groups) themselves by their total across all bars.
+    const entityTotals = new Map<string, number>();
+    for (const g of groups) {
+      const total = g.bars.reduce((s, b) => s + b.total, 0);
+      entityTotals.set(g.groupLabel, total);
+    }
+    const segMap = calculateSegments(entityTotals);
+    for (const g of groups) {
+      const seg = segMap.get(g.groupLabel);
+      if (seg) {
+        // Stamp segment on all bars in this group for display
+        for (const bar of g.bars) {
+          bar.segment = seg;
+        }
+        // Prefix group label with segment indicator
+        const ind = SEGMENT_INDICATORS[seg];
+        g.groupLabel = ind.color(ind.char) + ' ' + g.groupLabel;
+      }
+    }
+  }
+
+  // Filter by excluded segments
+  if (excludedSegments && excludedSegments.size > 0) {
+    if (!pivotEntity) {
+      for (const g of groups) {
+        g.bars = g.bars.filter((b) => !b.segment || !excludedSegments.has(b.segment));
+      }
+      groups = groups.filter((g) => g.bars.length > 0);
+    } else {
+      // Filter entire entity groups
+      const entityTotals = new Map<string, number>();
+      for (const g of groups) {
+        entityTotals.set(g.groupLabel, g.bars.reduce((s, b) => s + b.total, 0));
+      }
+      groups = groups.filter((g) => {
+        const seg = g.bars[0]?.segment;
+        return !seg || !excludedSegments.has(seg);
+      });
+    }
+  }
 
   // Build an "Avg" summary row from the per-label averages already stamped on bars
   if (groups.length > 1 && groups[0].bars.length > 0) {
@@ -1018,6 +1236,11 @@ function renderContributionsTab(
           commits: Math.round(bar.avgCommits ?? 0),
           activeDays: Math.round(bar.avgActiveDays ?? 0),
           headcount: Math.round(bar.avgHeadcount ?? 0),
+          churnRatePct: bar.avgChurnRatePct !== undefined ? Math.round(bar.avgChurnRatePct * 10) / 10 : undefined,
+          prsOpened: bar.avgPrsOpened !== undefined ? Math.round(bar.avgPrsOpened) : undefined,
+          prsMerged: bar.avgPrsMerged !== undefined ? Math.round(bar.avgPrsMerged) : undefined,
+          avgCycleHrs: bar.avgAvgCycleHrs,
+          reviewsGiven: bar.avgReviewsGiven !== undefined ? Math.round(bar.avgReviewsGiven) : undefined,
           isAverage: true,
           sparkData: labelChronTotals.get(bar.label),
         });
@@ -1038,6 +1261,9 @@ function renderContributionsTab(
         sumTotal: number; sumIns: number; sumDel: number;
         sumCommits: number; sumActiveDays: number; sumTestPct: number;
         segTotals: Map<string, number>; memberCount: number; bucketCount: number;
+        sumPrsOpened: number; sumPrsMerged: number; sumReviews: number;
+        churnWeightedSum: number; churnWeight: number;
+        cycleWeightedSum: number; cycleWeight: number;
       }>();
 
       for (const g of groups) {
@@ -1055,6 +1281,9 @@ function renderContributionsTab(
             sumTotal: 0, sumIns: 0, sumDel: 0,
             sumCommits: 0, sumActiveDays: 0, sumTestPct: 0,
             segTotals: new Map(), memberCount: mc, bucketCount: 0,
+            sumPrsOpened: 0, sumPrsMerged: 0, sumReviews: 0,
+            churnWeightedSum: 0, churnWeight: 0,
+            cycleWeightedSum: 0, cycleWeight: 0,
           };
           e.sumTotal += bar.total;
           e.sumIns += bar.insertions ?? 0;
@@ -1064,6 +1293,18 @@ function renderContributionsTab(
           e.sumTestPct += bar.testPct ?? 0;
           for (const seg of bar.segments) {
             e.segTotals.set(seg.key, (e.segTotals.get(seg.key) ?? 0) + seg.value);
+          }
+          e.sumPrsOpened += bar.prsOpened ?? 0;
+          e.sumPrsMerged += bar.prsMerged ?? 0;
+          e.sumReviews += bar.reviewsGiven ?? 0;
+          if (bar.churnRatePct !== undefined) {
+            const linesWeight = bar.total;
+            e.churnWeightedSum += bar.churnRatePct * linesWeight;
+            e.churnWeight += linesWeight;
+          }
+          if (bar.avgCycleHrs !== undefined && bar.prsMerged) {
+            e.cycleWeightedSum += bar.avgCycleHrs * bar.prsMerged;
+            e.cycleWeight += bar.prsMerged;
           }
           e.memberCount = mc;
           teamBucketData.set(team, e);
@@ -1091,6 +1332,11 @@ function renderContributionsTab(
           commits: Math.round(data.sumCommits / divisor),
           activeDays: Math.round(data.sumActiveDays / divisor),
           headcount: data.memberCount,
+          prsOpened: data.sumPrsOpened > 0 ? Math.round(data.sumPrsOpened / divisor) : undefined,
+          prsMerged: data.sumPrsMerged > 0 ? Math.round(data.sumPrsMerged / divisor) : undefined,
+          reviewsGiven: data.sumReviews > 0 ? Math.round(data.sumReviews / divisor) : undefined,
+          churnRatePct: data.churnWeight > 0 ? data.churnWeightedSum / data.churnWeight : undefined,
+          avgCycleHrs: data.cycleWeight > 0 ? data.cycleWeightedSum / data.cycleWeight : undefined,
           isAverage: true,
         });
       }
@@ -1110,6 +1356,8 @@ function renderContributionsTab(
     showXAxis: false,
     labelWidth,
     trendThreshold: trendPct,
+    detailLayers,
+    perUserMode,
   }));
   console.log('');
 
@@ -1148,6 +1396,38 @@ function renderContributionsTab(
       console.log(
         chalk.dim(`  \u00F8 `) +
         chalk.dim(`+${fmt(avgIns)} ins  -${fmt(avgDel)} del  ${avgNetStr} net  ${fmt(avgCmts)} cmts  ${fmt(avgDays)} days  per ${granularity}`),
+      );
+    }
+  }
+
+  // PRs footer summary (when enrichment data exists and any PR data is present)
+  if (enrichments) {
+    let totalPrsOpened = 0;
+    let totalPrsMerged = 0;
+    let totalReviews = 0;
+    let cycleSum = 0;
+    let cycleWeight = 0;
+    for (const g of groups) {
+      if (g.isSummary) continue;
+      for (const bar of g.bars) {
+        totalPrsOpened += bar.prsOpened ?? 0;
+        totalPrsMerged += bar.prsMerged ?? 0;
+        totalReviews += bar.reviewsGiven ?? 0;
+        if (bar.avgCycleHrs !== undefined && bar.prsMerged) {
+          cycleSum += bar.avgCycleHrs * bar.prsMerged;
+          cycleWeight += bar.prsMerged;
+        }
+      }
+    }
+    if (totalPrsOpened > 0 || totalPrsMerged > 0) {
+      const avgCycle = cycleWeight > 0 ? cycleSum / cycleWeight : 0;
+      const cycleStr = avgCycle >= 24 ? `${(avgCycle / 24).toFixed(1)}d` : `${avgCycle.toFixed(1)}h`;
+      console.log(
+        chalk.dim('  \u03A3 ') +
+        chalk.dim(`${fmt(totalPrsOpened)} PRs opened  `) +
+        chalk.dim(`${fmt(totalPrsMerged)} merged  `) +
+        chalk.dim(`${cycleStr} avg cycle  `) +
+        chalk.dim(`${fmt(totalReviews)} reviews`),
       );
     }
   }
@@ -1223,6 +1503,8 @@ function mapKey(
       if (keyName === 'd') return 'contrib_toggle_detail';
       if (keyName === 'v') return 'contrib_toggle_pivot';
       if (keyName === 'h') return 'contrib_toggle_unassigned';
+      if (keyName === 'u') return 'contrib_toggle_peruser';
+      if (keyName === 's') return 'contrib_segment_menu';
       // Numbered team drill-down
       for (const t of numberedTeams) {
         if (keyName === t.key) return `team:${t.teamName}`;
@@ -1270,9 +1552,12 @@ function buildHotkeyItems(
   tagOverlay: boolean,
   contribGranularity: ContribGranularity,
   contribDepth: number,
-  contribDetail: boolean,
+  detailLayers: Set<DetailLayer>,
+  contribTableMode: boolean,
   contribPivotEntity: boolean,
+  contribPerUserMode: boolean,
   contribHideUnassigned: boolean,
+  excludedSegments: Set<Segment>,
   repoWindow: WindowSize,
   lbWindow: WindowSize,
 ): Array<{ key: string; label: string }> {
@@ -1292,9 +1577,23 @@ function buildHotkeyItems(
       items.push({ key: tagOverlay ? '[T]' : 'T', label: 'Tags' });
       items.push({ key: '+/-', label: contribGranularity });
       items.push({ key: '\u2190/\u2192', label: `${contribDepth}${granShort}` });
-      items.push({ key: contribDetail ? '[D]' : 'D', label: 'Detail' });
+      const hasAnyDetail = detailLayers.size > 0 || contribTableMode;
+      let dLabel = 'Detail';
+      if (contribTableMode) {
+        dLabel = 'Table';
+      } else if (detailLayers.has('lines')) {
+        dLabel = 'Lines';
+      }
+      items.push({ key: hasAnyDetail ? '[D]' : 'D', label: dLabel });
       items.push({ key: contribPivotEntity ? '[V]' : 'V', label: contribPivotEntity ? 'By Entity' : 'By Time' });
-      items.push({ key: contribHideUnassigned ? 'H' : '[H]', label: contribHideUnassigned ? 'Show all' : 'Assigned' });
+      items.push({ key: contribPerUserMode ? '[U]' : 'U', label: contribPerUserMode ? '/user' : 'Total' });
+      items.push({ key: contribHideUnassigned ? '[H]' : 'H', label: contribHideUnassigned ? 'Assigned' : 'Show all' });
+      if (excludedSegments.size > 0) {
+        const excluded = [...excludedSegments].map((s) => s[0].toUpperCase()).join('');
+        items.push({ key: '[S]', label: `-${excluded}` });
+      } else {
+        items.push({ key: 'S', label: 'Seg' });
+      }
       break;
     }
     case 'repo_activity':
@@ -1330,9 +1629,12 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
   let contribTagOverlay = false;
   let contribGranularity: ContribGranularity = 'week';
   let contribDepth: number = ctx.config.settings.weeks_back;
-  let contribShowDetail = false;
+  let contribDetailLayers = new Set<DetailLayer>();
+  let contribTableMode = false;
   let contribPivotEntity = false;
+  let contribPerUserMode = false;
   let contribHideUnassigned = true;
+  let contribExcludedSegments = new Set<Segment>();
   let repoWindowWeeks: WindowSize = initialWindow;
   let leaderboardWindowWeeks: WindowSize = initialWindow;
   let manageSection: ManageSectionId = 'repos';
@@ -1387,7 +1689,7 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
     } else {
       hotkeys = buildHotkeyItems(
         activeTab, contribDrillLevel, contribTagOverlay, contribGranularity, contribDepth,
-        contribShowDetail, contribPivotEntity, contribHideUnassigned, repoWindowWeeks, leaderboardWindowWeeks,
+        contribDetailLayers, contribTableMode, contribPivotEntity, contribPerUserMode, contribHideUnassigned, contribExcludedSegments, repoWindowWeeks, leaderboardWindowWeeks,
       );
     }
     console.log(renderHotkeyBar(hotkeys));
@@ -1415,10 +1717,10 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
 
     switch (activeTab) {
       case 'contributions':
-        if (contribShowDetail) {
+        if (contribTableMode) {
           renderContributionsDetailTab(ctx, contribDrillLevel, contribTagOverlay, contribPivotEntity, contribBuckets, contribRangeLabel, contribPeriodLabel, termCols, contribRecords);
         } else {
-          renderContributionsTab(ctx, contribDrillLevel, contribTagOverlay, contribPivotEntity, contribBuckets, contribGranularity, contribRangeLabel, termCols, contribLabelWidth, contribRecords);
+          renderContributionsTab(ctx, contribDrillLevel, contribTagOverlay, contribPivotEntity, contribBuckets, contribGranularity, contribRangeLabel, termCols, contribLabelWidth, contribRecords, contribExcludedSegments, contribDetailLayers, ctx.enrichments, contribPerUserMode);
         }
         break;
       case 'repo_activity':
@@ -1511,11 +1813,56 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
       // Contributions: tag overlay toggle
       if (action === 'contrib_toggle_tag') { contribTagOverlay = !contribTagOverlay; continue; }
       // Contributions: detail toggle
-      if (action === 'contrib_toggle_detail') { contribShowDetail = !contribShowDetail; continue; }
+      if (action === 'contrib_toggle_detail') {
+        process.stdout.write('\n');
+        console.log(chalk.bold('  Detail View:'));
+        console.log(`  ${chalk.cyan('L')}  ${contribDetailLayers.has('lines') ? chalk.underline('Lines') : 'Lines'} ${chalk.dim('(+ins · -del · tst% · churn)')}`);
+        console.log(`  ${chalk.cyan('T')}  ${contribTableMode ? chalk.underline('Table') : 'Table'} ${chalk.dim('(full numeric table)')}`);
+        console.log(chalk.dim('  Esc  Clear\n'));
+        const detailKey = await readKey();
+        if (detailKey.name === 'l') {
+          contribTableMode = false;
+          if (contribDetailLayers.has('lines')) contribDetailLayers.delete('lines');
+          else contribDetailLayers.add('lines');
+        } else if (detailKey.name === 't') {
+          contribTableMode = !contribTableMode;
+          contribDetailLayers.clear();
+        } else {
+          contribDetailLayers.clear();
+          contribTableMode = false;
+        }
+        continue;
+      }
       // Contributions: pivot toggle (time-first ↔ entity-first)
+      if (action === 'contrib_toggle_peruser') { contribPerUserMode = !contribPerUserMode; continue; }
       if (action === 'contrib_toggle_pivot') { contribPivotEntity = !contribPivotEntity; continue; }
       // Contributions: show/hide unassigned authors
       if (action === 'contrib_toggle_unassigned') { contribHideUnassigned = !contribHideUnassigned; continue; }
+
+      // Contributions: segment exclusion menu
+      if (action === 'contrib_segment_menu') {
+        process.stdout.write('\n');
+        console.log(chalk.bold('  Segment Filter:'));
+        console.log(`  ${chalk.cyan('H')}  ${contribExcludedSegments.has('high') ? chalk.strikethrough('High (top 20%)') : 'Hide High (top 20%)'}`);
+        console.log(`  ${chalk.cyan('M')}  ${contribExcludedSegments.has('middle') ? chalk.strikethrough('Middle (60%)') : 'Hide Middle (60%)'}`);
+        console.log(`  ${chalk.cyan('L')}  ${contribExcludedSegments.has('low') ? chalk.strikethrough('Low (bottom 20%)') : 'Hide Low (bottom 20%)'}`);
+        console.log(`  ${chalk.cyan('A')}  Show All (reset)`);
+        console.log(chalk.dim('  Esc  Cancel\n'));
+        const segKey = await readKey();
+        if (segKey.name === 'h') {
+          if (contribExcludedSegments.has('high')) contribExcludedSegments.delete('high');
+          else contribExcludedSegments.add('high');
+        } else if (segKey.name === 'm') {
+          if (contribExcludedSegments.has('middle')) contribExcludedSegments.delete('middle');
+          else contribExcludedSegments.add('middle');
+        } else if (segKey.name === 'l') {
+          if (contribExcludedSegments.has('low')) contribExcludedSegments.delete('low');
+          else contribExcludedSegments.add('low');
+        } else if (segKey.name === 'a') {
+          contribExcludedSegments = new Set<Segment>();
+        }
+        continue;
+      }
 
       // Repo Activity window
       if (action === 'repo_window_4') { repoWindowWeeks = 4; continue; }

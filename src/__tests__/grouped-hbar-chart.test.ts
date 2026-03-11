@@ -390,6 +390,7 @@ describe("renderGroupedHBarChart", () => {
       segmentDefs,
       maxBarWidth: 40,
       maxWidth: 120,
+      columnMode: 'lines',
     });
     const plain = stripAnsi(result);
     expect(plain).toContain("\u25B2");
@@ -410,6 +411,7 @@ describe("renderGroupedHBarChart", () => {
       segmentDefs,
       maxBarWidth: 40,
       maxWidth: 120,
+      columnMode: 'lines',
     });
     const plain = stripAnsi(result);
     expect(plain).toContain("\u25BC");
@@ -457,7 +459,7 @@ describe("renderGroupedHBarChart", () => {
     expect(plain).toContain("\u25B2");
   });
 
-  it("shows headcount and per-user averages when set", () => {
+  it("shows headcount and per-user values in-place when perUserMode is on", () => {
     const groups: HBarGroup[] = [
       {
         groupLabel: "W12",
@@ -471,13 +473,22 @@ describe("renderGroupedHBarChart", () => {
       groups,
       segmentDefs,
       maxBarWidth: 40,
-      maxWidth: 140,
+      maxWidth: 200,
+      columnMode: 'lines',
+      perUserMode: true,
     });
     const plain = stripAnsi(result);
     expect(plain).toContain("(7)");
-    // per-user: +700/7=100, -300/7≈43
+    // In-place divided values: +700/7=100, -300/7≈43
     expect(plain).toContain("+100");
     expect(plain).toContain("-43");
+    // Headers show /u suffix
+    expect(plain).toContain("+ins/u");
+    expect(plain).toContain("-del/u");
+    expect(plain).toContain("net/u");
+    // Totals should NOT appear (replaced in-place)
+    expect(plain).not.toContain("+700");
+    expect(plain).not.toContain("-300");
   });
 
   it("omits headcount when not set", () => {
@@ -512,6 +523,7 @@ describe("renderGroupedHBarChart", () => {
       segmentDefs,
       maxBarWidth: 40,
       maxWidth: 120,
+      columnMode: 'lines',
     });
     const plain = stripAnsi(result);
     expect(plain).toContain("+4.2K");
@@ -539,6 +551,7 @@ describe("renderGroupedHBarChart", () => {
       segmentDefs,
       maxBarWidth: 40,
       maxWidth: 120,
+      columnMode: 'lines',
     });
     const lines = result.split("\n");
     const plainLines = lines.map((l) => stripAnsi(l));
@@ -549,5 +562,416 @@ describe("renderGroupedHBarChart", () => {
     const bigPlusPos = bigLine.indexOf("+");
     const smallPlusPos = smallLine.indexOf("+");
     expect(bigPlusPos).toBe(smallPlusPos);
+  });
+
+  it("compact mode shows net but NOT +ins/-del columns", () => {
+    const groups: HBarGroup[] = [
+      {
+        groupLabel: "W12",
+        bars: [makeBar("Team A", { app: 5000, test: 1000 })],
+      },
+    ];
+    groups[0].bars[0].insertions = 4200;
+    groups[0].bars[0].deletions = 1800;
+    const result = renderGroupedHBarChart({
+      groups,
+      segmentDefs,
+      maxBarWidth: 40,
+      maxWidth: 120,
+      columnMode: 'compact',
+    });
+    const plain = stripAnsi(result);
+    // Net column (4200 - 1800 = 2400) should still show
+    expect(plain).toContain("+2.4K");
+    // But +ins and -del individual columns should be hidden
+    expect(plain).not.toContain("+4.2K");
+    expect(plain).not.toContain("-1.8K");
+  });
+
+  it("compact mode shows headcount when hc > 1, perUserMode divides in-place", () => {
+    const groups: HBarGroup[] = [
+      {
+        groupLabel: "W12",
+        bars: [makeBar("Team A", { app: 1000 })],
+      },
+    ];
+    groups[0].bars[0].insertions = 700;
+    groups[0].bars[0].deletions = 300;
+    groups[0].bars[0].commits = 14;
+    groups[0].bars[0].activeDays = 7;
+    groups[0].bars[0].headcount = 7;
+    // Without perUserMode: hc shows, values are totals
+    const result = renderGroupedHBarChart({
+      groups,
+      segmentDefs,
+      maxBarWidth: 40,
+      maxWidth: 160,
+      columnMode: 'compact',
+    });
+    const plain = stripAnsi(result);
+    expect(plain).toContain("(7)");
+    expect(plain).not.toContain("cmt/u");
+    expect(plain).toContain("14"); // total commits
+
+    // With perUserMode: headers show /u, values divided in-place
+    const resultU = renderGroupedHBarChart({
+      groups,
+      segmentDefs,
+      maxBarWidth: 40,
+      maxWidth: 200,
+      columnMode: 'compact',
+      perUserMode: true,
+    });
+    const plainU = stripAnsi(resultU);
+    expect(plainU).toContain("(7)");
+    expect(plainU).toContain("cmt/u");
+    expect(plainU).toContain("day/u");
+    expect(plainU).toContain("net/u");
+    // Values divided by 7: commits=14/7=2, days=7/7=1
+    expect(plainU).toContain("2"); // cmts/u
+    expect(plainU).toContain("1"); // days/u
+  });
+
+  it("lines mode shows +ins, -del, headcount; perUserMode divides in-place", () => {
+    const groups: HBarGroup[] = [
+      {
+        groupLabel: "W12",
+        bars: [makeBar("Team A", { app: 1000 })],
+      },
+    ];
+    groups[0].bars[0].insertions = 700;
+    groups[0].bars[0].deletions = 300;
+    groups[0].bars[0].headcount = 7;
+    // Without perUserMode: shows totals
+    const result = renderGroupedHBarChart({
+      groups,
+      segmentDefs,
+      maxBarWidth: 40,
+      maxWidth: 180,
+      columnMode: 'lines',
+    });
+    const plain = stripAnsi(result);
+    expect(plain).toContain("+700");
+    expect(plain).toContain("-300");
+    expect(plain).toContain("(7)");
+    expect(plain).not.toContain("+ins/u");
+
+    // With perUserMode: values replaced in-place (700/7=100, 300/7≈43)
+    const resultU = renderGroupedHBarChart({
+      groups,
+      segmentDefs,
+      maxBarWidth: 40,
+      maxWidth: 200,
+      columnMode: 'lines',
+      perUserMode: true,
+    });
+    const plainU = stripAnsi(resultU);
+    expect(plainU).toContain("+ins/u");
+    expect(plainU).toContain("+100"); // 700/7
+    expect(plainU).toContain("-43");  // 300/7
+    // Totals should NOT appear (replaced)
+    expect(plainU).not.toContain("+700");
+  });
+
+  it("commits mode shows cmts, days, hc; perUserMode divides in-place", () => {
+    const groups: HBarGroup[] = [
+      {
+        groupLabel: "W12",
+        bars: [makeBar("Team A", { app: 1000 })],
+      },
+    ];
+    groups[0].bars[0].insertions = 700;
+    groups[0].bars[0].deletions = 300;
+    groups[0].bars[0].commits = 42;
+    groups[0].bars[0].activeDays = 7;
+    groups[0].bars[0].headcount = 7;
+    const result = renderGroupedHBarChart({
+      groups,
+      segmentDefs,
+      maxBarWidth: 40,
+      maxWidth: 180,
+      columnMode: 'commits',
+    });
+    const plain = stripAnsi(result);
+    expect(plain).toContain("42");
+    expect(plain).toContain("(7)");
+    expect(plain).not.toContain("cmt/u");
+
+    // With perUserMode: headers show /u, values divided (42/7=6, 7/7=1)
+    const resultU = renderGroupedHBarChart({
+      groups,
+      segmentDefs,
+      maxBarWidth: 40,
+      maxWidth: 200,
+      columnMode: 'commits',
+      perUserMode: true,
+    });
+    const plainU = stripAnsi(resultU);
+    expect(plainU).toContain("cmt/u");
+    expect(plainU).toContain("day/u");
+    expect(plainU).toContain("6");  // 42/7
+    // Total should NOT appear
+    expect(plainU).not.toContain("42");
+  });
+
+  it("default (no columnMode) behaves as compact", () => {
+    const groups: HBarGroup[] = [
+      {
+        groupLabel: "W12",
+        bars: [makeBar("Team A", { app: 5000, test: 1000 })],
+      },
+    ];
+    groups[0].bars[0].insertions = 4200;
+    groups[0].bars[0].deletions = 1800;
+    const result = renderGroupedHBarChart({
+      groups,
+      segmentDefs,
+      maxBarWidth: 40,
+      maxWidth: 120,
+    });
+    const plain = stripAnsi(result);
+    // Net should show, but +ins/-del should not
+    expect(plain).toContain("+2.4K");
+    expect(plain).not.toContain("+4.2K");
+    expect(plain).not.toContain("-1.8K");
+  });
+
+  it("shows churn% column in lines mode when enrichment data exists", () => {
+    const groups: HBarGroup[] = [
+      {
+        groupLabel: "W12",
+        bars: [makeBar("Team A", { app: 5000, test: 1000 })],
+      },
+    ];
+    groups[0].bars[0].insertions = 4200;
+    groups[0].bars[0].deletions = 1800;
+    groups[0].bars[0].churnRatePct = 23.5;
+    const result = renderGroupedHBarChart({
+      groups,
+      segmentDefs,
+      maxBarWidth: 40,
+      maxWidth: 160,
+      columnMode: "lines",
+    });
+    const plain = stripAnsi(result);
+    expect(plain).toContain("churn");
+    expect(plain).toContain("23.5%");
+  });
+
+  it("hides churn% column in compact mode", () => {
+    const groups: HBarGroup[] = [
+      {
+        groupLabel: "W12",
+        bars: [makeBar("Team A", { app: 5000, test: 1000 })],
+      },
+    ];
+    groups[0].bars[0].churnRatePct = 23.5;
+    const result = renderGroupedHBarChart({
+      groups,
+      segmentDefs,
+      maxBarWidth: 40,
+      maxWidth: 160,
+      columnMode: "compact",
+    });
+    const plain = stripAnsi(result);
+    expect(plain).not.toContain("churn");
+    expect(plain).not.toContain("23.5%");
+  });
+
+  it("shows PR columns in prs mode when enrichment data exists", () => {
+    const groups: HBarGroup[] = [
+      {
+        groupLabel: "W12",
+        bars: [makeBar("Team A", { app: 5000, test: 1000 })],
+      },
+    ];
+    groups[0].bars[0].prsOpened = 12;
+    groups[0].bars[0].prsMerged = 8;
+    groups[0].bars[0].avgCycleHrs = 36.5;
+    groups[0].bars[0].reviewsGiven = 15;
+    const result = renderGroupedHBarChart({
+      groups,
+      segmentDefs,
+      maxBarWidth: 40,
+      maxWidth: 160,
+      columnMode: "prs",
+    });
+    const plain = stripAnsi(result);
+    expect(plain).toContain("PRs");
+    expect(plain).toContain("merged");
+    expect(plain).toContain("cycle");
+    expect(plain).toContain("reviews");
+    expect(plain).toContain("12");
+    expect(plain).toContain("8");
+    expect(plain).toContain("1.5d"); // 36.5h = 1.5d
+    expect(plain).toContain("15");
+  });
+
+  it("PR columns always show when PR data exists (even in compact)", () => {
+    const groups: HBarGroup[] = [
+      {
+        groupLabel: "W12",
+        bars: [makeBar("Team A", { app: 5000, test: 1000 })],
+      },
+    ];
+    groups[0].bars[0].prsOpened = 12;
+    groups[0].bars[0].prsMerged = 8;
+    groups[0].bars[0].avgCycleHrs = 36.5;
+    groups[0].bars[0].reviewsGiven = 15;
+    const result = renderGroupedHBarChart({
+      groups,
+      segmentDefs,
+      maxBarWidth: 40,
+      maxWidth: 200,
+    });
+    const plain = stripAnsi(result);
+    expect(plain).toContain("PRs");
+    expect(plain).toContain("merged");
+    expect(plain).toContain("cycle");
+    expect(plain).toContain("reviews");
+    expect(plain).toContain("12");
+    expect(plain).toContain("8");
+  });
+
+  it("perUserMode replaces values in-place with divided values", () => {
+    const groups: HBarGroup[] = [
+      {
+        groupLabel: "W12",
+        bars: [makeBar("Team A", { app: 8000, test: 2000 })],
+      },
+    ];
+    groups[0].bars[0].insertions = 6000;
+    groups[0].bars[0].deletions = 4000;
+    groups[0].bars[0].commits = 40;
+    groups[0].bars[0].activeDays = 20;
+    groups[0].bars[0].headcount = 4;
+    const result = renderGroupedHBarChart({
+      groups,
+      segmentDefs,
+      maxBarWidth: 40,
+      maxWidth: 200,
+      columnMode: "lines",
+      perUserMode: true,
+    });
+    const plain = stripAnsi(result);
+    // Headers show /u suffix
+    expect(plain).toContain("+ins/u");
+    expect(plain).toContain("-del/u");
+    expect(plain).toContain("net/u");
+    expect(plain).toContain("cmt/u");
+    expect(plain).toContain("day/u");
+    // Values divided by 4 in-place
+    expect(plain).toContain("+1.5K"); // 6000/4
+    expect(plain).toContain("-1.0K"); // 4000/4
+    expect(plain).toContain("+500");  // (6000-4000)/4 = 500
+    // Totals should NOT appear (replaced in-place)
+    expect(plain).not.toContain("+6.0K");
+    expect(plain).not.toContain("-4.0K");
+    // headcount visible
+    expect(plain).toContain("(4)");
+  });
+
+  it("perUserMode with hc=1 shows same values (no division needed)", () => {
+    const groups: HBarGroup[] = [
+      {
+        groupLabel: "W12",
+        bars: [makeBar("User A", { app: 3000, test: 500 })],
+      },
+    ];
+    groups[0].bars[0].insertions = 2500;
+    groups[0].bars[0].deletions = 1000;
+    groups[0].bars[0].commits = 10;
+    groups[0].bars[0].headcount = 1;
+    const result = renderGroupedHBarChart({
+      groups,
+      segmentDefs,
+      maxBarWidth: 40,
+      maxWidth: 200,
+      columnMode: "lines",
+      perUserMode: true,
+    });
+    const plain = stripAnsi(result);
+    // Values unchanged (divisor is 1)
+    expect(plain).toContain("+2.5K");
+    expect(plain).toContain("-1.0K");
+    // Headers still show /u since perUserMode is on
+    expect(plain).toContain("+ins/u");
+  });
+
+  it("perUserMode toggles between totals and per-user values", () => {
+    const groups: HBarGroup[] = [
+      {
+        groupLabel: "W12",
+        bars: [makeBar("Team A", { app: 8000, test: 2000 })],
+      },
+    ];
+    groups[0].bars[0].insertions = 6000;
+    groups[0].bars[0].deletions = 4000;
+    groups[0].bars[0].headcount = 3;
+    // Without perUserMode — totals shown, no /u headers
+    const resultOff = renderGroupedHBarChart({
+      groups: JSON.parse(JSON.stringify(groups)),
+      segmentDefs,
+      maxBarWidth: 40,
+      maxWidth: 200,
+      columnMode: "lines",
+      perUserMode: false,
+    });
+    const plainOff = stripAnsi(resultOff);
+    expect(plainOff).toContain("+ins");
+    expect(plainOff).not.toContain("+ins/u");
+    expect(plainOff).toContain("+6.0K"); // total
+
+    // With perUserMode — headers show /u, values divided in-place
+    const resultOn = renderGroupedHBarChart({
+      groups: JSON.parse(JSON.stringify(groups)),
+      segmentDefs,
+      maxBarWidth: 40,
+      maxWidth: 200,
+      columnMode: "lines",
+      perUserMode: true,
+    });
+    const plainOn = stripAnsi(resultOn);
+    expect(plainOn).toContain("+ins/u");
+    expect(plainOn).toContain("net/u");
+    expect(plainOn).toContain("+2.0K"); // 6000/3
+    expect(plainOn).not.toContain("+6.0K"); // total replaced
+  });
+
+  it("perUserMode divides PR values in-place", () => {
+    const groups: HBarGroup[] = [
+      {
+        groupLabel: "W12",
+        bars: [makeBar("Team A", { app: 5000, test: 1000 })],
+      },
+    ];
+    groups[0].bars[0].insertions = 4000;
+    groups[0].bars[0].deletions = 2000;
+    groups[0].bars[0].prsOpened = 20;
+    groups[0].bars[0].prsMerged = 16;
+    groups[0].bars[0].avgCycleHrs = 48;
+    groups[0].bars[0].reviewsGiven = 12;
+    groups[0].bars[0].headcount = 4;
+    const result = renderGroupedHBarChart({
+      groups,
+      segmentDefs,
+      maxBarWidth: 40,
+      maxWidth: 200,
+      columnMode: "prs",
+      perUserMode: true,
+    });
+    const plain = stripAnsi(result);
+    // Headers show /u suffix
+    expect(plain).toContain("PRs/u");
+    expect(plain).toContain("mrg/u");
+    expect(plain).toContain("rev/u");
+    // Values divided by 4 in-place: 20/4=5, 16/4=4, 12/4=3
+    expect(plain).toContain("5");
+    expect(plain).toContain("4");
+    expect(plain).toContain("3");
+    expect(plain).toContain("2.0d"); // cycle time not divided
+    // Totals should NOT appear
+    expect(plain).not.toContain("20");
+    expect(plain).not.toContain("16");
   });
 });

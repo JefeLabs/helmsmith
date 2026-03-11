@@ -1,15 +1,19 @@
 import { loadCommitsData } from '../store/commits-by-filetype.js';
 import { filterRecords, getLastNWeeks, getCurrentWeek, type Filters } from '../aggregator/filters.js';
 import { computeLeaderboard } from '../aggregator/leaderboard.js';
+import { rollup } from '../aggregator/engine.js';
+import { calculateSegments, type Segment } from '../aggregator/segments.js';
 import { fmt } from '../ui/format.js';
+import type { UserWeekRepoRecord } from '../types/schema.js';
 
 export interface LeaderboardOptions {
   weeks?: number;
   top?: number;
   filters?: Filters;
   json?: boolean;
+  segment?: Segment;
   /** Pre-loaded records (skips disk read when provided — useful for testing). */
-  records?: import('../types/schema.js').UserWeekRepoRecord[];
+  records?: UserWeekRepoRecord[];
 }
 
 export async function leaderboard(options: LeaderboardOptions = {}): Promise<void> {
@@ -17,6 +21,24 @@ export async function leaderboard(options: LeaderboardOptions = {}): Promise<voi
 
   if (options.filters) {
     records = filterRecords(records, options.filters);
+  }
+
+  // Filter by segment if requested
+  if (options.segment) {
+    const weeksForSeg = getLastNWeeks(options.weeks ?? 4, getCurrentWeek());
+    const weekSet = new Set(weeksForSeg);
+    const segRecords = records.filter((r) => weekSet.has(r.week));
+    const rolled = rollup(segRecords, (r: UserWeekRepoRecord) => r.member);
+    const memberTotals = new Map<string, number>();
+    for (const [name, agg] of rolled) {
+      memberTotals.set(name, agg.insertions + agg.deletions);
+    }
+    const segMap = calculateSegments(memberTotals);
+    const allowedMembers = new Set<string>();
+    for (const [name, seg] of segMap) {
+      if (seg === options.segment) allowedMembers.add(name);
+    }
+    records = records.filter((r) => allowedMembers.has(r.member));
   }
 
   const weeksBack = options.weeks ?? 4;

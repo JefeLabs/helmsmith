@@ -142,8 +142,11 @@ export async function fetchGitHubMetrics(options: {
     reviews_given: 0,
   };
 
+  const result = { ...empty };
+
+  // Fetch PRs opened by author in date range
+  let prsMergedList: PRResult[] = [];
   try {
-    // Fetch PRs opened by author in date range
     const prsOpened = await searchPRs(octokit, {
       owner,
       repo,
@@ -152,9 +155,10 @@ export async function fetchGitHubMetrics(options: {
       until,
       state: "all",
     });
+    result.prs_opened = prsOpened.length;
 
     // Fetch PRs merged by author in date range
-    const prsMerged = await searchPRs(octokit, {
+    prsMergedList = await searchPRs(octokit, {
       owner,
       repo,
       author: githubHandle,
@@ -162,35 +166,35 @@ export async function fetchGitHubMetrics(options: {
       until,
       state: "merged",
     });
+    result.prs_merged = prsMergedList.length;
 
     // Calculate cycle time from merged PRs
-    const cycleTime = calculateCycleTime(
-      prsMerged.map((pr) => ({
+    result.avg_cycle_hrs = calculateCycleTime(
+      prsMergedList.map((pr) => ({
         createdAt: pr.created_at,
         mergedAt: pr.merged_at,
       })),
     );
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.log(`  Warning: GitHub PR search error for ${githubHandle}: ${msg}`);
+  }
 
-    // Fetch reviews given by author
-    const reviewCount = await countReviewsGiven(octokit, {
+  // Fetch reviews given by author (independent query)
+  try {
+    result.reviews_given = await countReviewsGiven(octokit, {
       owner,
       repo,
       reviewer: githubHandle,
       since,
       until,
     });
-
-    return {
-      prs_opened: prsOpened.length,
-      prs_merged: prsMerged.length,
-      avg_cycle_hrs: cycleTime,
-      reviews_given: reviewCount,
-    };
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    console.log(`  Warning: GitHub API error for ${githubHandle}: ${msg}`);
-    return empty;
+    console.log(`  Warning: GitHub reviews search error for ${githubHandle}: ${msg}`);
   }
+
+  return result;
 }
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
@@ -212,6 +216,8 @@ interface PRResult {
 
 /**
  * Search for PRs by author in a date range using GitHub search API.
+ * Uses octokit.request() directly to avoid the deprecated
+ * octokit.rest.search.issuesAndPullRequests() wrapper.
  */
 async function searchPRs(
   octokit: Octokit,
@@ -229,7 +235,7 @@ async function searchPRs(
   const perPage = 100;
 
   while (true) {
-    const response = await octokit.rest.search.issuesAndPullRequests({
+    const response = await octokit.request("GET /search/issues", {
       q: query,
       per_page: perPage,
       page,
@@ -276,7 +282,7 @@ async function countReviewsGiven(
   const perPage = 100;
 
   while (true) {
-    const response = await octokit.rest.search.issuesAndPullRequests({
+    const response = await octokit.request("GET /search/issues", {
       q: query,
       per_page: perPage,
       page,

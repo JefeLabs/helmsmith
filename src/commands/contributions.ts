@@ -6,6 +6,7 @@ import {
 } from '../aggregator/filters.js';
 import { rollup } from '../aggregator/engine.js';
 import { fmt, weekLabel, quarterShort, yearShort } from '../ui/format.js';
+import { calculateSegments, type Segment } from '../aggregator/segments.js';
 import type { UserWeekRepoRecord } from '../types/schema.js';
 
 export type PivotGranularity = 'week' | 'month' | 'quarter' | 'year';
@@ -16,6 +17,7 @@ export interface ContributionsOptions {
   filters?: Filters;
   json?: boolean;
   pivot?: PivotGranularity;
+  segment?: Segment;
   /** Pre-loaded records (skips disk read when provided — useful for testing). */
   records?: UserWeekRepoRecord[];
 }
@@ -284,23 +286,37 @@ export async function contributions(options: ContributionsOptions = {}): Promise
   }
 
   // ── Flat mode (original) ────────────────────────────────────────────────
-  const rows = aggregateRows(records, groupBy);
+  let rows = aggregateRows(records, groupBy);
+
+  // Compute segments for flat output
+  const memberTotals = new Map<string, number>();
+  for (const row of rows) {
+    memberTotals.set(row.name, row.insertions + row.deletions);
+  }
+  const segMap = calculateSegments(memberTotals);
+
+  // Filter by segment if requested
+  if (options.segment) {
+    rows = rows.filter((row) => segMap.get(row.name) === options.segment);
+  }
 
   if (options.json) {
-    console.log(JSON.stringify(rows, null, 2));
+    const jsonRows = rows.map((r) => ({ ...r, segment: segMap.get(r.name) ?? 'middle' }));
+    console.log(JSON.stringify(jsonRows, null, 2));
     return;
   }
 
   // Table header
-  const header = `${'Name'.padEnd(30)} ${'cmts'.padStart(6)} ${'days'.padStart(5)} ${'+ins'.padStart(8)} ${'-del'.padStart(8)} ${'net'.padStart(8)} ${'tst%'.padStart(5)} ${'files'.padStart(6)}`;
+  const header = `${'Name'.padEnd(30)} ${'seg'.padStart(3)} ${'cmts'.padStart(6)} ${'days'.padStart(5)} ${'+ins'.padStart(8)} ${'-del'.padStart(8)} ${'net'.padStart(8)} ${'tst%'.padStart(5)} ${'files'.padStart(6)}`;
   console.log(`\nContributions by ${groupBy} (last ${weeksBack} weeks)\n`);
   console.log(header);
   console.log('-'.repeat(header.length));
 
   for (const row of rows) {
     const name = row.name.length > 29 ? row.name.slice(0, 28) + '\u2026' : row.name;
+    const seg = (segMap.get(row.name) ?? 'middle')[0].toUpperCase();
     console.log(
-      `${name.padEnd(30)} ${String(row.commits).padStart(6)} ${String(row.activeDays).padStart(5)} ${('+' + fmt(row.insertions)).padStart(8)} ${('-' + fmt(row.deletions)).padStart(8)} ${(row.net >= 0 ? '+' : '') + fmt(row.net)}`.padEnd(76) +
+      `${name.padEnd(30)} ${seg.padStart(3)} ${String(row.commits).padStart(6)} ${String(row.activeDays).padStart(5)} ${('+' + fmt(row.insertions)).padStart(8)} ${('-' + fmt(row.deletions)).padStart(8)} ${(row.net >= 0 ? '+' : '') + fmt(row.net)}`.padEnd(80) +
       `${String(row.testPct) + '%'}`.padStart(5) +
       `${String(row.files).padStart(6)}`,
     );

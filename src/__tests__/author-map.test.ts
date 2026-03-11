@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { Config, AuthorRegistry, UserWeekRepoRecord } from "../types/schema.js";
-import { buildAuthorMap, resolveAuthor, reattributeRecords } from "../collector/author-map.js";
+import { buildAuthorMap, resolveAuthor, reattributeRecords, extractGitHubHandle } from "../collector/author-map.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -349,5 +349,65 @@ describe("reattributeRecords", () => {
 
     // Same object reference when nothing changed
     expect(result[0]).toBe(record);
+  });
+});
+
+describe("extractGitHubHandle", () => {
+  it("extracts handle from simple noreply email", () => {
+    expect(extractGitHubHandle("octocat@users.noreply.github.com")).toBe("octocat");
+  });
+
+  it("extracts handle from numeric+username noreply email", () => {
+    expect(extractGitHubHandle("12345+octocat@users.noreply.github.com")).toBe("octocat");
+  });
+
+  it("returns null for regular email", () => {
+    expect(extractGitHubHandle("user@example.com")).toBeNull();
+  });
+
+  it("returns null for non-noreply github email", () => {
+    expect(extractGitHubHandle("user@github.com")).toBeNull();
+  });
+});
+
+describe("buildAuthorMap GitHub handle auto-extraction", () => {
+  it("auto-fills githubHandle from noreply email on config members", () => {
+    const config = makeSampleConfig();
+    config.orgs[0].teams[0].members.push({
+      name: "Noreply User",
+      email: "12345+noreplyuser@users.noreply.github.com",
+      aliases: [],
+    });
+    const map = buildAuthorMap(config);
+    const resolved = map.get("12345+noreplyuser@users.noreply.github.com");
+    expect(resolved?.githubHandle).toBe("noreplyuser");
+  });
+
+  it("does not override explicit githubHandle with noreply extraction", () => {
+    const config = makeSampleConfig();
+    config.orgs[0].teams[0].members.push({
+      name: "Explicit User",
+      email: "12345+wrongname@users.noreply.github.com",
+      githubHandle: "correctname",
+      aliases: [],
+    });
+    const map = buildAuthorMap(config);
+    const resolved = map.get("12345+wrongname@users.noreply.github.com");
+    expect(resolved?.githubHandle).toBe("correctname");
+  });
+
+  it("resolveAuthor auto-fills githubHandle from noreply email on lookup", () => {
+    const config = makeSampleConfig();
+    // Add a member with a regular email (no noreply, no githubHandle)
+    config.orgs[0].teams[0].members.push({
+      name: "Regular User",
+      email: "regular@example.com",
+      aliases: [],
+    });
+    const map = buildAuthorMap(config);
+    // Resolve using a noreply email that matches the name
+    const resolved = resolveAuthor(map, "12345+regulargh@users.noreply.github.com", "Regular User");
+    // Should find via name lookup and auto-fill githubHandle from the noreply email
+    expect(resolved?.githubHandle).toBe("regulargh");
   });
 });

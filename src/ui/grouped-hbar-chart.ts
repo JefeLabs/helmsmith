@@ -1,6 +1,8 @@
 import chalk from "chalk";
 import { fmt, stripAnsi, padRight, padLeft } from "../ui/format.js";
 import { sparkline } from "../ui/sparkline.js";
+import { SEGMENT_INDICATORS } from "../ui/constants.js";
+import type { Segment } from "../aggregator/segments.js";
 
 export interface HBar {
   label: string;
@@ -29,8 +31,25 @@ export interface HBar {
   perception?: string;
   testPct?: number;
   avgTestPct?: number;
+  /** Enrichment fields */
+  churnRatePct?: number;
+  prsOpened?: number;
+  prsMerged?: number;
+  avgCycleHrs?: number;
+  reviewsGiven?: number;
+  avgChurnRatePct?: number;
+  avgPrsOpened?: number;
+  avgPrsMerged?: number;
+  avgAvgCycleHrs?: number;
+  avgReviewsGiven?: number;
+  teamAvgChurnRatePct?: number;
+  teamAvgPrsOpened?: number;
+  teamAvgPrsMerged?: number;
+  teamAvgAvgCycleHrs?: number;
+  teamAvgReviewsGiven?: number;
   isAverage?: boolean;
   sparkData?: number[];
+  segment?: Segment;
 }
 
 export interface HBarGroup {
@@ -47,6 +66,9 @@ export interface SegmentDef {
   color: (s: string) => string;
 }
 
+export type DetailLayer = 'lines';
+export type ColumnMode = 'compact' | 'lines' | 'commits' | 'prs';
+
 export interface GroupedHBarChartOptions {
   groups: HBarGroup[];
   segmentDefs: SegmentDef[];
@@ -57,6 +79,9 @@ export interface GroupedHBarChartOptions {
   showLegend?: boolean;
   maxWidth?: number;
   trendThreshold?: number;
+  columnMode?: ColumnMode;
+  detailLayers?: Set<DetailLayer>;
+  perUserMode?: boolean;
 }
 
 /**
@@ -78,7 +103,15 @@ export function renderGroupedHBarChart(
     showXAxis = false,
     maxWidth = 100,
     trendThreshold = 0.10,
+    columnMode = 'compact',
+    detailLayers,
+    perUserMode = false,
   } = options;
+
+  // When detailLayers is provided, it takes precedence over columnMode.
+  // Compact columns (net, cmts, days) + PRs are always shown when data exists.
+  // Lines detail layer adds +ins, -del, tst%, churn.
+  const hasLineLayer = detailLayers ? detailLayers.has('lines') : columnMode === 'lines';
 
   if (groups.length === 0) {
     return "";
@@ -91,13 +124,15 @@ export function renderGroupedHBarChart(
   }
   glw = Math.max(4, glw + 1);
 
-  // Auto-compute bar label width from actual bar labels (with org-type prefix)
+  // Auto-compute bar label width from actual bar labels (with org-type + segment prefixes)
+  const hasSegments = groups.some((g) => g.bars.some((b) => b.segment !== undefined));
   let labelWidth = explicitLabelWidth ?? 14;
   if (explicitLabelWidth === undefined) {
     let maxLabel = 0;
     for (const g of groups) {
       for (const b of g.bars) {
         let len = b.label.length;
+        if (b.segment) len += 2; // "▲ " / "● " / "▼ " prefix
         if (b.orgType) len += 2; // "★ " or "◆ " prefix
         if (len > maxLabel) maxLabel = len;
       }
@@ -111,57 +146,96 @@ export function renderGroupedHBarChart(
     ...groups.flatMap((g) => g.bars.map((b) => b.total))
   );
 
-  // Calculate available bar width
-  // Layout: [groupLabel(glw) ┤] [space] [barLabel(labelWidth)] [space] [bar] [space] [value]
-  const valueWidth = showValues ? 8 : 0;
-  const gutterWidth = glw + 2 + 1 + labelWidth + 1; // prefix + space + label + space
-  const availableBarWidth = Math.min(
-    maxBarWidth,
-    Math.max(10, maxWidth - gutterWidth - valueWidth - 2)
-  );
-
   // Detect which optional columns exist on any bar (for consistent spacing)
   const hasPerception = groups.some((g) => g.bars.some((b) => b.perception !== undefined));
   const hasTestPct = groups.some((g) => g.bars.some((b) => b.testPct !== undefined));
   const hasCommits = groups.some((g) => g.bars.some((b) => b.commits !== undefined));
   const hasActiveDays = groups.some((g) => g.bars.some((b) => b.activeDays !== undefined));
   const hasHeadcount = groups.some((g) => g.bars.some((b) => b.headcount !== undefined));
+  const hasMultiHeadcount = groups.some((g) => g.bars.some((b) => (b.headcount ?? 0) > 1));
+  const hasChurnPct = groups.some((g) => g.bars.some((b) => b.churnRatePct !== undefined));
+  const hasPrs = groups.some((g) => g.bars.some((b) => b.prsOpened !== undefined));
+
+  // Derive column visibility from active layers.
+  // Compact columns (net, cmts, days) are always shown.
+  // Detail layers add extra columns on top.
+  const showInsertions = hasLineLayer;
+  const showDeletions = hasLineLayer;
+  const showNet = true; // always visible (compact base)
+  const showTestPct = hasTestPct && hasLineLayer;
+  const showChurnPct = hasChurnPct && hasLineLayer;
+  const showCommits = hasCommits; // always visible (compact base)
+  const showActiveDays = hasActiveDays; // always visible (compact base)
+  const showPerception = hasPerception;
+  const showHeadcount = hasMultiHeadcount;
+  const showPrs = hasPrs; // always visible when enrichment PR data exists
+
+  // Calculate available bar width
+  // Layout: [groupLabel(glw) ┤] [space] [barLabel(labelWidth)] [space] [bar] [space] [value]
+  const hasExtendedData = groups.some(g => g.bars.some(b => b.insertions !== undefined || b.prsOpened !== undefined));
+  let valueWidth = 0;
+  if (showValues && hasExtendedData) {
+    if (showPerception) valueWidth += 15;
+    if (showInsertions) valueWidth += 11;
+    if (showDeletions) valueWidth += 11;
+    if (showNet) valueWidth += 11;
+    if (showTestPct) valueWidth += 8;
+    if (showCommits) valueWidth += 9;
+    if (showActiveDays) valueWidth += 9;
+    if (showChurnPct) valueWidth += 9;
+    if (showPrs) valueWidth += 36;                // PRs + merged + cycle + reviews (4 × 9)
+    if (showHeadcount) valueWidth += 7;          // "(hc)" column — last
+  } else if (showValues) {
+    valueWidth = 8;
+  }
+  const gutterWidth = glw + 2 + 1 + labelWidth + 1; // prefix + space + label + space
+  const availableBarWidth = Math.min(
+    maxBarWidth,
+    Math.max(10, maxWidth - gutterWidth - valueWidth - 2)
+  );
 
   const lines: string[] = [];
 
   // Column header row (only when showValues and bars have extended data)
   if (showValues && groups.length > 0) {
     const firstBar = groups[0].bars[0];
-    if (firstBar?.insertions !== undefined) {
+    if (firstBar?.insertions !== undefined || firstBar?.prsOpened !== undefined) {
       const headerIndent = " ".repeat(glw + 2) + " " + " ".repeat(labelWidth) + " " + " ".repeat(availableBarWidth);
       let header = headerIndent;
       const T = "  "; // trend spacer (2 chars)
-      if (hasPerception) {
+      const pu = perUserMode; // shorthand for header labels
+      if (showPerception) {
         header += " " + padLeft(chalk.dim("trend"), PERCEPTION_WIDTH);
       }
-      header += " " + padLeft(chalk.dim("+ins"), 8) + T;
-      header += " " + padLeft(chalk.dim("-del"), 8) + T;
-      header += " " + padLeft(chalk.dim("net"), 8) + T;
-      if (hasTestPct) {
+      if (showInsertions) {
+        header += " " + padLeft(chalk.dim(pu ? "+ins/u" : "+ins"), 8) + T;
+      }
+      if (showDeletions) {
+        header += " " + padLeft(chalk.dim(pu ? "-del/u" : "-del"), 8) + T;
+      }
+      if (showNet) {
+        header += " " + padLeft(chalk.dim(pu ? "net/u" : "net"), 8) + T;
+      }
+      if (showTestPct) {
         header += " " + padLeft(chalk.dim("tst%"), 5) + T;
       }
-      if (hasCommits) {
-        header += " " + padLeft(chalk.dim("cmts"), 6) + T;
+      if (showCommits) {
+        header += " " + padLeft(chalk.dim(pu ? "cmt/u" : "cmts"), 6) + T;
       }
-      if (hasActiveDays) {
-        header += " " + padLeft(chalk.dim("days"), 6) + T;
+      if (showActiveDays) {
+        header += " " + padLeft(chalk.dim(pu ? "day/u" : "days"), 6) + T;
       }
-      if (hasHeadcount) {
+      if (showChurnPct) {
+        header += " " + padLeft(chalk.dim("churn"), 6) + T;
+      }
+      if (showPrs) {
+        header += " " + padLeft(chalk.dim(pu ? "PRs/u" : "PRs"), 6) + T;
+        header += " " + padLeft(chalk.dim(pu ? "mrg/u" : "merged"), 6) + T;
+        header += " " + padLeft(chalk.dim("cycle"), 6) + T;
+        header += " " + padLeft(chalk.dim(pu ? "rev/u" : "reviews"), 7) + T;
+      }
+      if (showHeadcount) {
         header += " " + padLeft(chalk.dim("hc"), 6);
-        header += " " + padLeft(chalk.dim("+ins/u"), 7) + T;
-        header += " " + padLeft(chalk.dim("-del/u"), 7) + T;
-        header += " " + padLeft(chalk.dim("net/u"), 7) + T;
-        if (hasCommits) {
-          header += " " + padLeft(chalk.dim("cmt/u"), 6) + T;
-        }
-        if (hasActiveDays) {
-          header += " " + padLeft(chalk.dim("day/u"), 6) + T;
-        }
       }
       lines.push(header);
     }
@@ -181,12 +255,16 @@ export function renderGroupedHBarChart(
         prefix = " ".repeat(glw) + " \u2502";
       }
 
-      // Build bar label with org type prefix
+      // Build bar label with segment + org type prefixes
       let barLabel = bar.label;
       if (bar.orgType === "core") {
         barLabel = "\u2605 " + barLabel;
       } else if (bar.orgType === "consultant") {
         barLabel = "\u25C6 " + barLabel;
+      }
+      if (bar.segment) {
+        const ind = SEGMENT_INDICATORS[bar.segment];
+        barLabel = ind.color(ind.char) + " " + barLabel;
       }
 
       // Render the stacked bar
@@ -215,12 +293,30 @@ export function renderGroupedHBarChart(
           : (v: number, a: number | undefined, ta?: number) => trend(v, a, trendThreshold, ta);
         const valColor = isAvg ? chalk.dim : (s: string) => s;
 
-        // Columns: +ins ▲/▼  -del  net ▲/▼  (hc)  +ins/u  -del/u  net/u
-        if (bar.insertions !== undefined && bar.deletions !== undefined) {
-          const net = bar.insertions - bar.deletions;
+        if ((bar.insertions !== undefined && bar.deletions !== undefined) || bar.prsOpened !== undefined) {
+          // Per-user divisor: divide by headcount when perUserMode is active and hc > 1
+          const pu = perUserMode && (bar.headcount ?? 0) > 1 ? bar.headcount! : 1;
+          const avgPu = perUserMode && (bar.avgHeadcount ?? 0) > 1 ? bar.avgHeadcount! : 1;
 
-          // perception / sparkline (first after bar — headline summary)
-          if (hasPerception) {
+          const ins = Math.round((bar.insertions ?? 0) / pu);
+          const del = Math.round((bar.deletions ?? 0) / pu);
+          const net = ins - del;
+          const cmts = Math.round((bar.commits ?? 0) / pu);
+          const days = +((bar.activeDays ?? 0) / pu).toFixed(1);
+
+          const avgIns = bar.avgInsertions !== undefined ? bar.avgInsertions / avgPu : undefined;
+          const avgDel = bar.avgDeletions !== undefined ? bar.avgDeletions / avgPu : undefined;
+          const avgNet = bar.avgNet !== undefined ? bar.avgNet / avgPu : undefined;
+          const avgCmts = bar.avgCommits !== undefined ? bar.avgCommits / avgPu : undefined;
+          const avgDays = bar.avgActiveDays !== undefined ? bar.avgActiveDays / avgPu : undefined;
+          const teamAvgIns = bar.teamAvgInsertions;
+          const teamAvgDel = bar.teamAvgDeletions;
+          const teamAvgNet = bar.teamAvgNet;
+          const teamAvgCmts = bar.teamAvgCommits;
+          const teamAvgDays = bar.teamAvgActiveDays;
+
+          // perception / sparkline
+          if (showPerception) {
             if (isAvg && bar.sparkData && bar.sparkData.length > 0) {
               line += " " + padLeft(chalk.dim(sparkline(bar.sparkData)), PERCEPTION_WIDTH);
             } else if (bar.perception) {
@@ -231,21 +327,27 @@ export function renderGroupedHBarChart(
           }
 
           // +ins
-          line += " " + padLeft(valColor(chalk.green("+" + fmt(bar.insertions))), 8);
-          line += trendFn(bar.insertions, bar.avgInsertions, bar.teamAvgInsertions);
+          if (showInsertions) {
+            line += " " + padLeft(valColor(chalk.green("+" + fmt(ins))), 8);
+            line += trendFn(ins, avgIns, teamAvgIns);
+          }
 
           // -del
-          line += " " + padLeft(valColor(chalk.red("-" + fmt(bar.deletions))), 8);
-          line += trendFn(bar.deletions, bar.avgDeletions, bar.teamAvgDeletions);
+          if (showDeletions) {
+            line += " " + padLeft(valColor(chalk.red("-" + fmt(del))), 8);
+            line += trendFn(del, avgDel, teamAvgDel);
+          }
 
           // net
-          const netStr = net >= 0 ? "+" + fmt(net) : "-" + fmt(Math.abs(net));
-          const netColor = net >= 0 ? chalk.green : chalk.red;
-          line += " " + padLeft(valColor(netColor(netStr)), 8);
-          line += trendFn(net, bar.avgNet, bar.teamAvgNet);
+          if (showNet) {
+            const netStr = net >= 0 ? "+" + fmt(net) : "-" + fmt(Math.abs(net));
+            const netColor = net >= 0 ? chalk.green : chalk.red;
+            line += " " + padLeft(valColor(netColor(netStr)), 8);
+            line += trendFn(net, avgNet, teamAvgNet);
+          }
 
           // test%
-          if (hasTestPct) {
+          if (showTestPct) {
             if (bar.testPct !== undefined) {
               line += " " + padLeft(chalk.dim(bar.testPct + "%"), 5);
               line += trendFn(bar.testPct, bar.avgTestPct, bar.teamAvgTestPct);
@@ -255,57 +357,52 @@ export function renderGroupedHBarChart(
           }
 
           // commits
-          if (hasCommits) {
-            line += " " + padLeft(chalk.dim(fmt(bar.commits ?? 0)), 6);
-            line += trendFn(bar.commits ?? 0, bar.avgCommits, bar.teamAvgCommits);
+          if (showCommits) {
+            line += " " + padLeft(chalk.dim(fmt(cmts)), 6);
+            line += trendFn(cmts, avgCmts, teamAvgCmts);
           }
 
           // active days
-          if (hasActiveDays) {
-            line += " " + padLeft(chalk.dim(fmt(bar.activeDays ?? 0)), 6);
-            line += trendFn(bar.activeDays ?? 0, bar.avgActiveDays, bar.teamAvgActiveDays);
+          if (showActiveDays) {
+            line += " " + padLeft(chalk.dim(fmt(days)), 6);
+            line += trendFn(days, avgDays, teamAvgDays);
           }
 
-          // headcount + per-user averages
-          if (hasHeadcount && bar.headcount !== undefined && bar.headcount > 0) {
-            const hc = bar.headcount;
-            const avgHc = bar.avgHeadcount ?? hc;
-            line += " " + padLeft(chalk.dim(`(${hc})`), 6);
-
-            const insPerUser = Math.round(bar.insertions / hc);
-            const delPerUser = Math.round(bar.deletions / hc);
-            const netPerUser = Math.round(net / hc);
-            const avgInsPerUser = avgHc > 0 ? (bar.avgInsertions ?? 0) / avgHc : undefined;
-            const avgDelPerUser = avgHc > 0 ? (bar.avgDeletions ?? 0) / avgHc : undefined;
-            const avgNetPerUser = avgHc > 0 ? (bar.avgNet ?? 0) / avgHc : undefined;
-
-            // Team avg per user (team avg values are already per-member averages)
-            const teamAvgInsPerUser = bar.teamAvgInsertions;
-            const teamAvgDelPerUser = bar.teamAvgDeletions;
-            const teamAvgNetPerUser = bar.teamAvgNet;
-            const teamAvgCmtsPerUser = bar.teamAvgCommits;
-            const teamAvgDaysPerUser = bar.teamAvgActiveDays;
-
-            line += " " + padLeft(chalk.dim("+" + fmt(insPerUser)), 7);
-            line += trendFn(insPerUser, avgInsPerUser, teamAvgInsPerUser);
-            line += " " + padLeft(chalk.dim("-" + fmt(delPerUser)), 7);
-            line += trendFn(delPerUser, avgDelPerUser, teamAvgDelPerUser);
-            const npuStr = netPerUser >= 0 ? "+" + fmt(netPerUser) : "-" + fmt(Math.abs(netPerUser));
-            line += " " + padLeft(chalk.dim(npuStr), 7);
-            line += trendFn(netPerUser, avgNetPerUser, teamAvgNetPerUser);
-
-            if (hasCommits) {
-              const cmtsPerUser = Math.round((bar.commits ?? 0) / hc);
-              const avgCmtsPerUser = avgHc > 0 ? (bar.avgCommits ?? 0) / avgHc : undefined;
-              line += " " + padLeft(chalk.dim(fmt(cmtsPerUser)), 6);
-              line += trendFn(cmtsPerUser, avgCmtsPerUser, teamAvgCmtsPerUser);
+          // churn%
+          if (showChurnPct) {
+            if (bar.churnRatePct !== undefined) {
+              line += " " + padLeft(chalk.dim(bar.churnRatePct + "%"), 6);
+              line += trendFn(bar.churnRatePct, bar.avgChurnRatePct, bar.teamAvgChurnRatePct);
+            } else {
+              line += " " + " ".repeat(6) + "  ";
             }
-            if (hasActiveDays) {
-              const daysPerUser = +((bar.activeDays ?? 0) / hc).toFixed(1);
-              const avgDaysPerUser = avgHc > 0 ? (bar.avgActiveDays ?? 0) / avgHc : undefined;
-              line += " " + padLeft(chalk.dim(String(daysPerUser)), 6);
-              line += trendFn(daysPerUser, avgDaysPerUser, teamAvgDaysPerUser);
-            }
+          }
+
+          // PRs columns
+          if (showPrs) {
+            const prsO = Math.round((bar.prsOpened ?? 0) / pu);
+            const prsM = Math.round((bar.prsMerged ?? 0) / pu);
+            const revs = Math.round((bar.reviewsGiven ?? 0) / pu);
+            const avgPrsO = bar.avgPrsOpened !== undefined ? bar.avgPrsOpened / avgPu : undefined;
+            const avgPrsM = bar.avgPrsMerged !== undefined ? bar.avgPrsMerged / avgPu : undefined;
+            const avgRevs = bar.avgReviewsGiven !== undefined ? bar.avgReviewsGiven / avgPu : undefined;
+            line += " " + padLeft(chalk.dim(fmt(prsO)), 6);
+            line += trendFn(prsO, avgPrsO, bar.teamAvgPrsOpened);
+            line += " " + padLeft(chalk.dim(fmt(prsM)), 6);
+            line += trendFn(prsM, avgPrsM, bar.teamAvgPrsMerged);
+            const hrs = bar.avgCycleHrs ?? 0;
+            const cycleLabel = hrs >= 24 ? `${(hrs / 24).toFixed(1)}d` : `${hrs.toFixed(0)}h`;
+            line += " " + padLeft(chalk.dim(cycleLabel), 6);
+            line += trendFn(hrs, bar.avgAvgCycleHrs, bar.teamAvgAvgCycleHrs);
+            line += " " + padLeft(chalk.dim(fmt(revs)), 7);
+            line += trendFn(revs, avgRevs, bar.teamAvgReviewsGiven);
+          }
+
+          // headcount (last column)
+          if (showHeadcount && bar.headcount !== undefined && bar.headcount > 1) {
+            line += " " + padLeft(chalk.dim(`(${bar.headcount})`), 6);
+          } else if (showHeadcount) {
+            line += " " + " ".repeat(6);
           }
         } else {
           line += " " + padLeft(chalk.dim(fmt(bar.total)), 8);

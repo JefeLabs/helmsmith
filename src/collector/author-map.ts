@@ -2,6 +2,18 @@ import type { Config, AuthorRegistry, UserWeekRepoRecord } from "../types/schema
 import { extractIdentifier } from "../store/author-registry.js";
 
 /**
+ * Extract a GitHub username from a noreply email address.
+ * Handles both formats:
+ *   - username@users.noreply.github.com
+ *   - 12345+username@users.noreply.github.com
+ * Returns null if the email is not a GitHub noreply address.
+ */
+export function extractGitHubHandle(email: string): string | null {
+  const match = email.match(/^(?:\d+\+)?([^@]+)@users\.noreply\.github\.com$/i);
+  return match ? match[1] : null;
+}
+
+/**
  * A resolved author with full org/team/tag context.
  */
 export interface ResolvedAuthor {
@@ -64,7 +76,7 @@ export function buildAuthorMap(
           orgType: org.type,
           team: team.name,
           tag: team.tag,
-          githubHandle: member.githubHandle,
+          githubHandle: member.githubHandle ?? (member.email ? extractGitHubHandle(member.email) : null) ?? undefined,
         };
 
         // Index by name (lowercase)
@@ -103,7 +115,7 @@ export function buildAuthorMap(
           orgType: org.type,
           team: team.name,
           tag: team.tag,
-          githubHandle: author.githubHandle,
+          githubHandle: author.githubHandle ?? extractGitHubHandle(author.email) ?? undefined,
         };
         map.set(emailKey, resolved);
       }
@@ -147,7 +159,14 @@ export function resolveAuthor(
   // 1. Direct email or name lookup
   const direct =
     map.get(email.toLowerCase()) ?? map.get(name.toLowerCase()) ?? null;
-  if (direct) return direct;
+  if (direct) {
+    // Auto-fill githubHandle from noreply email if not already set
+    if (!direct.githubHandle) {
+      const handle = extractGitHubHandle(email);
+      if (handle) direct.githubHandle = handle;
+    }
+    return direct;
+  }
 
   // 2. Identifier-based resolution
   if (identifierRules && identifierRules.length > 0) {
@@ -163,6 +182,7 @@ export function resolveAuthor(
             orgType: rule.orgType,
             team: rule.team,
             tag: rule.tag,
+            githubHandle: extractGitHubHandle(email) ?? undefined,
           };
         }
       }

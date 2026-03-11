@@ -10,6 +10,8 @@ import {
   fetchGitHubMetrics,
 } from "../collector/github.js";
 import { calculateChurnRate } from "../collector/git.js";
+import { detectGitRoot } from "../config/git-root.js";
+import { loadAllRegistries, getAvailableWorkspaces } from "../config/repos-registry.js";
 import type { EnrichmentStore, ProductivityExtensions } from "../types/schema.js";
 
 export interface EnrichOptions {
@@ -18,6 +20,7 @@ export interface EnrichOptions {
   force?: boolean;
   skipChurn?: boolean;
   config?: string;
+  workspace?: string;
 }
 
 /**
@@ -34,6 +37,24 @@ export async function enrich(options: EnrichOptions): Promise<void> {
 
   // Load data
   const config = await loadConfig(options.config);
+
+  // Load workspace repos (repos live in repos.yml, not config.yml)
+  if (config.repos.length === 0) {
+    const gitRoot = await detectGitRoot();
+    const registries = await loadAllRegistries(gitRoot ?? undefined);
+    const workspaces = getAvailableWorkspaces(registries);
+    const ws = options.workspace
+      ? workspaces.find((w) => w.name === options.workspace)
+      : workspaces[0];
+    if (ws) {
+      config.repos = ws.repos.map((r) => ({
+        path: r.path ?? '',
+        name: r.name,
+        group: r.group,
+      }));
+    }
+  }
+
   const commitsData = await loadCommitsData();
   let enrichmentStore = await loadEnrichments();
   const authorRegistry = await loadAuthorRegistry();

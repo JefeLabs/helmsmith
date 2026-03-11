@@ -1,5 +1,6 @@
 import type { UserWeekRepoRecord } from "../types/schema.js";
 import type { RolledUp } from "./engine.js";
+export type { Segment } from "./segments.js";
 
 export interface Filters {
   weeks?: string[];
@@ -8,6 +9,7 @@ export interface Filters {
   tag?: string;
   group?: string;
   member?: string;
+  segment?: import("./segments.js").Segment;
 }
 
 export interface Delta {

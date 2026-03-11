@@ -1,4 +1,4 @@
-import type { Config, Org, UserWeekRepoRecord, ScanState, AuthorRegistry } from '../types/schema.js';
+import type { Config, Org, UserWeekRepoRecord, ScanState, AuthorRegistry, EnrichmentStore } from '../types/schema.js';
 
 export interface ViewContext {
   config: Config;
@@ -6,6 +6,7 @@ export interface ViewContext {
   currentWeek: string;
   scanState?: ScanState;
   authorRegistry?: AuthorRegistry;
+  enrichments?: EnrichmentStore;
   /** Scan a single repo by name. Returns updated records + scan state. */
   onScanRepo?: (repoName: string) => Promise<{
     records: UserWeekRepoRecord[];

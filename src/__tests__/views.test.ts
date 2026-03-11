@@ -354,9 +354,10 @@ describe('Dashboard View', () => {
       loggedOutput.push(args.map(String).join(' '));
     });
 
-    // Press D to toggle to detail view, then quit
+    // Press D to open submenu, then T for table view, then quit
     mockedReadKey
-      .mockResolvedValueOnce(key('d'))
+      .mockResolvedValueOnce(key('d'))  // open detail submenu
+      .mockResolvedValueOnce(key('t'))  // choose table
       .mockResolvedValueOnce(key('q'));
 
     await dashboardView(ctx);
@@ -379,10 +380,12 @@ describe('Dashboard View', () => {
       loggedOutput.push(args.map(String).join(' '));
     });
 
-    // Press D twice (detail → chart), then quit
+    // Press D→T for table, then D→Esc back to compact, then quit
     mockedReadKey
-      .mockResolvedValueOnce(key('d'))  // detail mode
-      .mockResolvedValueOnce(key('d'))  // back to chart
+      .mockResolvedValueOnce(key('d'))  // open detail submenu
+      .mockResolvedValueOnce(key('t'))  // choose table
+      .mockResolvedValueOnce(key('d'))  // open detail submenu again
+      .mockResolvedValueOnce(key('escape'))  // Esc → back to compact
       .mockResolvedValueOnce(key('q'));
 
     await dashboardView(ctx);
@@ -390,6 +393,51 @@ describe('Dashboard View', () => {
     const output = loggedOutput.join('\n');
     // After toggling back, chart view with "Contribution by Week" title
     expect(output).toContain('Contribution by Week');
+  });
+
+  it('switches to PRs detail view with D→P', async () => {
+    const { dashboardView } = await import('../views/dashboard.js');
+    const ctx = makeSampleContext();
+
+    const loggedOutput: string[] = [];
+    consoleLogSpy.mockImplementation((...args: any[]) => {
+      loggedOutput.push(args.map(String).join(' '));
+    });
+
+    // Press D to open submenu, then P for PRs view, then quit
+    mockedReadKey
+      .mockResolvedValueOnce(key('d'))  // open detail submenu
+      .mockResolvedValueOnce(key('p'))  // choose PRs
+      .mockResolvedValueOnce(key('q'));
+
+    await dashboardView(ctx);
+
+    const output = loggedOutput.join('\n');
+    // Submenu should show the PRs option
+    expect(output).toContain('PRs');
+    // Hotkey bar should show [D] PRs as the active detail mode
+    expect(output).toContain('PRs');
+  });
+
+  it('toggles per-user mode with U key', async () => {
+    const { dashboardView } = await import('../views/dashboard.js');
+    const ctx = makeSampleContext();
+
+    const loggedOutput: string[] = [];
+    consoleLogSpy.mockImplementation((...args: any[]) => {
+      loggedOutput.push(args.map(String).join(' '));
+    });
+
+    // Press U to toggle per-user mode, then quit
+    mockedReadKey
+      .mockResolvedValueOnce(key('u'))  // toggle per-user
+      .mockResolvedValueOnce(key('q'));
+
+    await dashboardView(ctx);
+
+    const output = loggedOutput.join('\n');
+    // Hotkey bar should show [U] /user when active
+    expect(output).toContain('/user');
   });
 
   it('shows 12 weeks as default window in contributions title', async () => {
