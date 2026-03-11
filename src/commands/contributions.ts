@@ -7,7 +7,7 @@ import {
 import { rollup } from '../aggregator/engine.js';
 import type { RolledUp } from '../aggregator/engine.js';
 import { fmt, weekLabel, quarterShort, yearShort } from '../ui/format.js';
-import { calculateSegments, type Segment } from '../aggregator/segments.js';
+import { calculateSegments, type Segment, type SegmentThresholds } from '../aggregator/segments.js';
 import type { UserWeekRepoRecord } from '../types/schema.js';
 
 export type PivotGranularity = 'week' | 'month' | 'quarter' | 'year';
@@ -19,6 +19,7 @@ export interface ContributionsOptions {
   json?: boolean;
   pivot?: PivotGranularity;
   segment?: Segment;
+  segmentThresholds?: SegmentThresholds;
   /** Pre-loaded records (skips disk read when provided — useful for testing). */
   records?: UserWeekRepoRecord[];
 }
@@ -249,7 +250,7 @@ export async function contributions(options: ContributionsOptions = {}): Promise
     for (const row of rows) {
       memberTotals.set(row.name, row.insertions + row.deletions);
     }
-    const segMap = calculateSegments(memberTotals);
+    const segMap = calculateSegments(memberTotals, options.segmentThresholds);
 
     // Filter by segment if requested
     if (options.segment) {

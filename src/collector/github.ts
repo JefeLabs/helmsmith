@@ -461,7 +461,9 @@ export async function fetchGitHubMetricsBatch(options: {
             rateLimiter, skipCache, cacheStats,
           });
           results.push({ handle: entry.githubHandle, metrics });
-        } catch {
+        } catch (restErr) {
+          const msg = restErr instanceof Error ? restErr.message : String(restErr);
+          console.log(`  Warning: GitHub fallback failed for ${entry.githubHandle}: ${msg}`);
           results.push({ handle: entry.githubHandle, metrics: emptyMetrics() });
         }
       }

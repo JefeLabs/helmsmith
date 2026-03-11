@@ -1,7 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import { queryRecords, loadEnrichmentsSQL, getEnrichmentSQL } from "../store/sqlite-store.js";
 import { filterRecords, type Filters } from "../aggregator/filters.js";
-import { calculateSegments, type Segment } from "../aggregator/segments.js";
+import { calculateSegments, type Segment, type SegmentThresholds } from "../aggregator/segments.js";
 import type { UserWeekRepoRecord, EnrichmentStore } from "../types/schema.js";
 
 export interface ExportDataOptions {
@@ -154,7 +154,7 @@ function escapeCsvField(value: string | number): string {
   return str;
 }
 
-export function recordsToCsv(records: UserWeekRepoRecord[], enrichmentStore?: EnrichmentStore): string {
+export function recordsToCsv(records: UserWeekRepoRecord[], enrichmentStore?: EnrichmentStore, segmentThresholds?: SegmentThresholds): string {
   // Pre-compute segment map from total lines touched per member across all records
   const memberTotals = new Map<string, number>();
   for (const r of records) {
@@ -163,7 +163,7 @@ export function recordsToCsv(records: UserWeekRepoRecord[], enrichmentStore?: En
     );
     memberTotals.set(r.member, (memberTotals.get(r.member) ?? 0) + total);
   }
-  const segmentMap = calculateSegments(memberTotals);
+  const segmentMap = calculateSegments(memberTotals, segmentThresholds);
 
   const rows = records.map((r) => {
     const flat = flattenRecord(r, enrichmentStore, segmentMap);

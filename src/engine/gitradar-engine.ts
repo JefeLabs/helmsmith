@@ -419,196 +419,16 @@ export class GitRadarEngine {
     const cacheStats = createCacheStats();
 
     const repoTotal = repoNames.length;
+    const enrichCtx = { options, octokit, rateLimiter, authorMap, identifierRules, churnWindowDays, churnMaxCommits, churnLimit, cacheStats };
 
     for (let repoIdx = 0; repoIdx < repoTotal; repoIdx++) {
       const repoName = repoNames[repoIdx];
       const repoLabel = repoTotal > 1 ? `[${repoIdx + 1}/${repoTotal}] ${repoName}` : repoName;
-      const spinner = ora({ text: `${repoLabel}: preparing`, indent: 2 }).start();
-
       const repoRecords = repoMap.get(repoName)!;
-
-      const repoConfig = this.config.repos.find(
-        (r) => (r.name ?? r.path.split("/").pop() ?? r.path) === repoName,
-      );
-      if (!repoConfig) {
-        skippedCount++;
-        spinner.warn(`${repoLabel}: skipped (no config)`);
-        continue;
-      }
-
-      let githubRemote: { owner: string; repo: string } | null = null;
-      if (octokit) {
-        spinner.text = `${repoLabel}: detecting GitHub remote`;
-        githubRemote = await detectGitHubRemote(repoConfig.path);
-      }
-
-      // Group records by member+week (deduplicated)
-      const memberWeekEntries: Array<{ key: string; member: string; email: string; week: string }> = [];
-      const seen = new Set<string>();
-      for (const r of repoRecords) {
-        const key = `${r.member}::${r.week}::${repoName}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          memberWeekEntries.push({ key, member: r.member, email: r.email, week: r.week });
-        }
-      }
-
-      const toEnrich = options.force
-        ? memberWeekEntries
-        : memberWeekEntries.filter((e) => !hasEnrichment(e.key));
-      skippedCount += memberWeekEntries.length - toEnrich.length;
-
-      if (toEnrich.length === 0) {
-        spinner.succeed(`${repoLabel}: all ${memberWeekEntries.length} member-weeks already enriched`);
-        continue;
-      }
-
-      // ── Batch GitHub metrics by week ──────────────────────────────────
-      // Group entries by week so each batch query covers authors sharing
-      // the same date range — one GraphQL call per ~10 authors per week.
-      const byWeek = new Map<string, typeof toEnrich>();
-      for (const entry of toEnrich) {
-        const arr = byWeek.get(entry.week) ?? [];
-        arr.push(entry);
-        byWeek.set(entry.week, arr);
-      }
-
-      // Resolve GitHub handles for all entries up front
-      const handleMap = new Map<string, string | undefined>();
-      for (const entry of toEnrich) {
-        if (!handleMap.has(entry.email)) {
-          const resolved = resolveAuthor(authorMap, entry.email, entry.member, identifierRules);
-          handleMap.set(entry.email, resolved?.githubHandle);
-        }
-      }
-
-      // Fetch GitHub metrics in batches grouped by week
-      const ghResultMap = new Map<string, GitHubMetrics>();
-
-      if (octokit && githubRemote) {
-        const weekKeys = Array.from(byWeek.keys());
-        const weekTotal = weekKeys.length;
-        let weekIdx = 0;
-
-        for (const [week, entries] of byWeek) {
-          weekIdx++;
-          spinner.text = `${repoLabel}: GitHub PRs (week ${weekIdx}/${weekTotal})`;
-
-          const dateRange = isoWeekToDateRange(week);
-
-          // Build batch entries for authors that have GitHub handles
-          const batchEntries: Array<{ githubHandle: string; since: string; until: string; keys: string[] }> = [];
-          for (const entry of entries) {
-            const handle = handleMap.get(entry.email);
-            if (handle) {
-              // Multiple keys may share the same handle+week (different member names, same email)
-              const existing = batchEntries.find((b) => b.githubHandle === handle);
-              if (existing) {
-                existing.keys.push(entry.key);
-              } else {
-                batchEntries.push({ githubHandle: handle, since: dateRange.since, until: dateRange.until, keys: [entry.key] });
-              }
-            }
-          }
-
-          if (batchEntries.length === 0) continue;
-
-          try {
-            const batchResults = await fetchGitHubMetricsBatch({
-              octokit,
-              owner: githubRemote.owner,
-              repo: githubRemote.repo,
-              entries: batchEntries.map((b) => ({ githubHandle: b.githubHandle, since: b.since, until: b.until })),
-              rateLimiter,
-              skipCache: options.skipCache,
-              cacheStats,
-            });
-
-            // Map results back to enrichment keys
-            for (const br of batchResults) {
-              const entry = batchEntries.find((b) => b.githubHandle === br.handle);
-              if (entry) {
-                for (const key of entry.keys) {
-                  ghResultMap.set(key, br.metrics);
-                }
-              }
-            }
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            spinner.warn(`${repoLabel}: GitHub batch failed for ${week}: ${msg}`);
-            spinner.start(`${repoLabel}: continuing`);
-          }
-        }
-      }
-
-      // ── Merge GitHub results + churn into final metrics ───────────────
-      const SAVE_BATCH_SIZE = 20;
-      const totalBatches = Math.ceil(toEnrich.length / SAVE_BATCH_SIZE);
-      let batchIdx = 0;
-
-      for (let batchStart = 0; batchStart < toEnrich.length; batchStart += SAVE_BATCH_SIZE) {
-        batchIdx++;
-        const phase = options.skipChurn ? 'saving' : 'churn analysis';
-        spinner.text = totalBatches > 1
-          ? `${repoLabel}: ${phase} (batch ${batchIdx}/${totalBatches})`
-          : `${repoLabel}: ${phase}`;
-
-        const batch = toEnrich.slice(batchStart, batchStart + SAVE_BATCH_SIZE);
-
-        const settled = await Promise.allSettled(
-          batch.map((entry) => {
-            const { key, email, week } = entry;
-            const dateRange = isoWeekToDateRange(week);
-
-            return (async () => {
-              const ghMetrics = ghResultMap.get(key);
-              const metrics: ProductivityExtensions = {
-                prs_opened: ghMetrics?.prs_opened ?? 0,
-                prs_merged: ghMetrics?.prs_merged ?? 0,
-                avg_cycle_hrs: ghMetrics?.avg_cycle_hrs ?? 0,
-                reviews_given: ghMetrics?.reviews_given ?? 0,
-                churn_rate_pct: 0,
-                pr_feature: ghMetrics?.pr_feature ?? 0,
-                pr_fix: ghMetrics?.pr_fix ?? 0,
-                pr_bugfix: ghMetrics?.pr_bugfix ?? 0,
-                pr_chore: ghMetrics?.pr_chore ?? 0,
-                pr_hotfix: ghMetrics?.pr_hotfix ?? 0,
-                pr_other: ghMetrics?.pr_other ?? 0,
-              };
-
-              if (!options.skipChurn) {
-                try {
-                  metrics.churn_rate_pct = await churnLimit(() =>
-                    options.deepChurn
-                      ? calculateChurnRate(repoConfig.path, email, dateRange.since, dateRange.until, churnWindowDays, churnMaxCommits)
-                      : calculateFastChurnRate(repoConfig.path, email, dateRange.since, dateRange.until, churnWindowDays),
-                  );
-                } catch {
-                  errorCount++;
-                }
-              }
-
-              return { key, metrics };
-            })();
-          }),
-        );
-
-        const fulfilled: Array<{ key: string; metrics: ProductivityExtensions }> = [];
-        for (const s of settled) {
-          if (s.status === 'fulfilled') {
-            fulfilled.push(s.value);
-            enrichedCount++;
-          } else {
-            errorCount++;
-          }
-        }
-        if (fulfilled.length > 0) {
-          saveEnrichmentBatchSQL(fulfilled);
-        }
-      }
-
-      const ghLabel = githubRemote ? ` (GitHub: ${githubRemote.owner}/${githubRemote.repo})` : "";
-      spinner.succeed(`${repoLabel}: ${toEnrich.length} member-weeks enriched${ghLabel}`);
+      const result = await this.enrichRepo(repoName, repoLabel, repoRecords, enrichCtx);
+      enrichedCount += result.enriched;
+      skippedCount += result.skipped;
+      errorCount += result.errors;
     }
 
     const parts = [`${enrichedCount} enriched`, `${skippedCount} skipped`];
@@ -617,6 +437,251 @@ export class GitRadarEngine {
       parts.push(`${cacheStats.hits} cached / ${cacheStats.misses} fetched`);
     }
     console.log(`\nEnrichment complete: ${parts.join(", ")}`);
+  }
+
+  /** Enrich a single repo: fetch GitHub metrics + churn, persist results. */
+  private async enrichRepo(
+    repoName: string,
+    repoLabel: string,
+    repoRecords: UserWeekRepoRecord[],
+    ctx: {
+      options: EnrichOptions;
+      octokit: Awaited<ReturnType<typeof createOctokit>>;
+      rateLimiter: GitHubRateLimiter;
+      authorMap: ReturnType<typeof buildAuthorMap>;
+      identifierRules: ReturnType<typeof buildIdentifierRules>;
+      churnWindowDays: number;
+      churnMaxCommits: number;
+      churnLimit: ReturnType<typeof pLimit>;
+      cacheStats: ReturnType<typeof createCacheStats>;
+    },
+  ): Promise<{ enriched: number; skipped: number; errors: number }> {
+    const { options, octokit, rateLimiter, authorMap, identifierRules, churnWindowDays, churnMaxCommits, churnLimit, cacheStats } = ctx;
+    let enriched = 0;
+    let skipped = 0;
+    let errors = 0;
+
+    const spinner = ora({ text: `${repoLabel}: preparing`, indent: 2 }).start();
+
+    const repoConfig = this.config.repos.find(
+      (r) => (r.name ?? r.path.split("/").pop() ?? r.path) === repoName,
+    );
+    if (!repoConfig) {
+      spinner.warn(`${repoLabel}: skipped (no config)`);
+      return { enriched, skipped: skipped + 1, errors };
+    }
+
+    let githubRemote: { owner: string; repo: string } | null = null;
+    if (octokit) {
+      spinner.text = `${repoLabel}: detecting GitHub remote`;
+      githubRemote = await detectGitHubRemote(repoConfig.path);
+    }
+
+    // Group records by member+week (deduplicated)
+    const memberWeekEntries: Array<{ key: string; member: string; email: string; week: string }> = [];
+    const seen = new Set<string>();
+    for (const r of repoRecords) {
+      const key = `${r.member}::${r.week}::${repoName}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        memberWeekEntries.push({ key, member: r.member, email: r.email, week: r.week });
+      }
+    }
+
+    const toEnrich = options.force
+      ? memberWeekEntries
+      : memberWeekEntries.filter((e) => !hasEnrichment(e.key));
+    skipped += memberWeekEntries.length - toEnrich.length;
+
+    if (toEnrich.length === 0) {
+      spinner.succeed(`${repoLabel}: all ${memberWeekEntries.length} member-weeks already enriched`);
+      return { enriched, skipped, errors };
+    }
+
+    // Fetch GitHub metrics batched by week
+    const ghResultMap = await this.fetchGitHubForRepo(
+      repoLabel, toEnrich, octokit, githubRemote, rateLimiter, authorMap, identifierRules, options, cacheStats, spinner,
+    );
+
+    // Merge GitHub results + churn into final metrics and persist
+    const mergeResult = await this.mergeAndPersistEnrichments(
+      repoLabel, repoConfig.path, toEnrich, ghResultMap, options, churnLimit, churnWindowDays, churnMaxCommits, spinner,
+    );
+    enriched += mergeResult.enriched;
+    errors += mergeResult.errors;
+
+    const ghLabel = githubRemote ? ` (GitHub: ${githubRemote.owner}/${githubRemote.repo})` : "";
+    spinner.succeed(`${repoLabel}: ${toEnrich.length} member-weeks enriched${ghLabel}`);
+    return { enriched, skipped, errors };
+  }
+
+  /** Fetch GitHub PR metrics for all entries in a repo, batched by week. */
+  private async fetchGitHubForRepo(
+    repoLabel: string,
+    toEnrich: Array<{ key: string; member: string; email: string; week: string }>,
+    octokit: Awaited<ReturnType<typeof createOctokit>>,
+    githubRemote: { owner: string; repo: string } | null,
+    rateLimiter: GitHubRateLimiter,
+    authorMap: ReturnType<typeof buildAuthorMap>,
+    identifierRules: ReturnType<typeof buildIdentifierRules>,
+    options: EnrichOptions,
+    cacheStats: ReturnType<typeof createCacheStats>,
+    spinner: ReturnType<typeof ora>,
+  ): Promise<Map<string, GitHubMetrics>> {
+    const ghResultMap = new Map<string, GitHubMetrics>();
+    if (!octokit || !githubRemote) return ghResultMap;
+
+    // Group entries by week
+    const byWeek = new Map<string, typeof toEnrich>();
+    for (const entry of toEnrich) {
+      const arr = byWeek.get(entry.week) ?? [];
+      arr.push(entry);
+      byWeek.set(entry.week, arr);
+    }
+
+    // Resolve GitHub handles up front
+    const handleMap = new Map<string, string | undefined>();
+    for (const entry of toEnrich) {
+      if (!handleMap.has(entry.email)) {
+        const resolved = resolveAuthor(authorMap, entry.email, entry.member, identifierRules);
+        handleMap.set(entry.email, resolved?.githubHandle);
+      }
+    }
+
+    const weekKeys = Array.from(byWeek.keys());
+    const weekTotal = weekKeys.length;
+    let weekIdx = 0;
+
+    for (const [week, entries] of byWeek) {
+      weekIdx++;
+      spinner.text = `${repoLabel}: GitHub PRs (week ${weekIdx}/${weekTotal})`;
+
+      const dateRange = isoWeekToDateRange(week);
+
+      const batchEntries: Array<{ githubHandle: string; since: string; until: string; keys: string[] }> = [];
+      for (const entry of entries) {
+        const handle = handleMap.get(entry.email);
+        if (handle) {
+          const existing = batchEntries.find((b) => b.githubHandle === handle);
+          if (existing) {
+            existing.keys.push(entry.key);
+          } else {
+            batchEntries.push({ githubHandle: handle, since: dateRange.since, until: dateRange.until, keys: [entry.key] });
+          }
+        }
+      }
+
+      if (batchEntries.length === 0) continue;
+
+      try {
+        const batchResults = await fetchGitHubMetricsBatch({
+          octokit,
+          owner: githubRemote.owner,
+          repo: githubRemote.repo,
+          entries: batchEntries.map((b) => ({ githubHandle: b.githubHandle, since: b.since, until: b.until })),
+          rateLimiter,
+          skipCache: options.skipCache,
+          cacheStats,
+        });
+
+        for (const br of batchResults) {
+          const entry = batchEntries.find((b) => b.githubHandle === br.handle);
+          if (entry) {
+            for (const key of entry.keys) {
+              ghResultMap.set(key, br.metrics);
+            }
+          }
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        spinner.warn(`${repoLabel}: GitHub batch failed for ${week}: ${msg}`);
+        spinner.start(`${repoLabel}: continuing`);
+      }
+    }
+
+    return ghResultMap;
+  }
+
+  /** Merge GitHub results with churn analysis and persist in batches. */
+  private async mergeAndPersistEnrichments(
+    repoLabel: string,
+    repoPath: string,
+    toEnrich: Array<{ key: string; member: string; email: string; week: string }>,
+    ghResultMap: Map<string, GitHubMetrics>,
+    options: EnrichOptions,
+    churnLimit: ReturnType<typeof pLimit>,
+    churnWindowDays: number,
+    churnMaxCommits: number,
+    spinner: ReturnType<typeof ora>,
+  ): Promise<{ enriched: number; errors: number }> {
+    let enriched = 0;
+    let errors = 0;
+    const SAVE_BATCH_SIZE = 20;
+    const totalBatches = Math.ceil(toEnrich.length / SAVE_BATCH_SIZE);
+    let batchIdx = 0;
+
+    for (let batchStart = 0; batchStart < toEnrich.length; batchStart += SAVE_BATCH_SIZE) {
+      batchIdx++;
+      const phase = options.skipChurn ? 'saving' : 'churn analysis';
+      spinner.text = totalBatches > 1
+        ? `${repoLabel}: ${phase} (batch ${batchIdx}/${totalBatches})`
+        : `${repoLabel}: ${phase}`;
+
+      const batch = toEnrich.slice(batchStart, batchStart + SAVE_BATCH_SIZE);
+
+      const settled = await Promise.allSettled(
+        batch.map((entry) => {
+          const { key, email, week } = entry;
+          const dateRange = isoWeekToDateRange(week);
+
+          return (async () => {
+            const ghMetrics = ghResultMap.get(key);
+            const metrics: ProductivityExtensions = {
+              prs_opened: ghMetrics?.prs_opened ?? 0,
+              prs_merged: ghMetrics?.prs_merged ?? 0,
+              avg_cycle_hrs: ghMetrics?.avg_cycle_hrs ?? 0,
+              reviews_given: ghMetrics?.reviews_given ?? 0,
+              churn_rate_pct: 0,
+              pr_feature: ghMetrics?.pr_feature ?? 0,
+              pr_fix: ghMetrics?.pr_fix ?? 0,
+              pr_bugfix: ghMetrics?.pr_bugfix ?? 0,
+              pr_chore: ghMetrics?.pr_chore ?? 0,
+              pr_hotfix: ghMetrics?.pr_hotfix ?? 0,
+              pr_other: ghMetrics?.pr_other ?? 0,
+            };
+
+            if (!options.skipChurn) {
+              try {
+                metrics.churn_rate_pct = await churnLimit(() =>
+                  options.deepChurn
+                    ? calculateChurnRate(repoPath, email, dateRange.since, dateRange.until, churnWindowDays, churnMaxCommits)
+                    : calculateFastChurnRate(repoPath, email, dateRange.since, dateRange.until, churnWindowDays),
+                );
+              } catch {
+                errors++;
+              }
+            }
+
+            return { key, metrics };
+          })();
+        }),
+      );
+
+      const fulfilled: Array<{ key: string; metrics: ProductivityExtensions }> = [];
+      for (const s of settled) {
+        if (s.status === 'fulfilled') {
+          fulfilled.push(s.value);
+          enriched++;
+        } else {
+          errors++;
+        }
+      }
+      if (fulfilled.length > 0) {
+        saveEnrichmentBatchSQL(fulfilled);
+      }
+    }
+
+    return { enriched, errors };
   }
 
   // ── Filtering ────────────────────────────────────────────────────────────

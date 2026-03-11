@@ -2,7 +2,7 @@ import { queryRecords, queryRollup } from '../store/sqlite-store.js';
 import { filterRecords, getLastNWeeks, getCurrentWeek, type Filters } from '../aggregator/filters.js';
 import { computeLeaderboard } from '../aggregator/leaderboard.js';
 import { rollup } from '../aggregator/engine.js';
-import { calculateSegments, type Segment } from '../aggregator/segments.js';
+import { calculateSegments, type Segment, type SegmentThresholds } from '../aggregator/segments.js';
 import { fmt } from '../ui/format.js';
 import type { UserWeekRepoRecord } from '../types/schema.js';
 
@@ -12,6 +12,7 @@ export interface LeaderboardOptions {
   filters?: Filters;
   json?: boolean;
   segment?: Segment;
+  segmentThresholds?: SegmentThresholds;
   /** Pre-loaded records (skips disk read when provided — useful for testing). */
   records?: UserWeekRepoRecord[];
 }
@@ -34,7 +35,7 @@ export async function leaderboard(options: LeaderboardOptions = {}): Promise<voi
     for (const [name, agg] of rolled) {
       memberTotals.set(name, agg.insertions + agg.deletions);
     }
-    const segMap = calculateSegments(memberTotals);
+    const segMap = calculateSegments(memberTotals, options.segmentThresholds);
     const allowedMembers = new Set<string>();
     for (const [name, seg] of segMap) {
       if (seg === options.segment) allowedMembers.add(name);

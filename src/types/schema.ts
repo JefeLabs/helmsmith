@@ -65,11 +65,16 @@ export const ConfigSchema = z.object({
       churn_max_commits: z.number().optional().default(50),
       /** Maximum concurrent git processes for churn calculations. Default: 3. */
       churn_concurrency: z.number().optional().default(3),
+      /** Percentage of contributors classified as "high" segment. Default: 20. */
+      segment_high_pct: z.number().min(1).max(50).optional().default(20),
+      /** Percentage of contributors classified as "low" segment. Default: 20. */
+      segment_low_pct: z.number().min(1).max(50).optional().default(20),
     })
     .optional()
     .default({
       weeks_back: 12, staleness_minutes: 60, trend_threshold: 0.10,
       churn_window_days: 21, churn_max_commits: 50, churn_concurrency: 3,
+      segment_high_pct: 20, segment_low_pct: 20,
     }),
 });
 
@@ -77,6 +82,7 @@ export const ConfigSchema = z.object({
 export const DEFAULT_SETTINGS: Config['settings'] = {
   weeks_back: 12, staleness_minutes: 60, trend_threshold: 0.10,
   churn_window_days: 21, churn_max_commits: 50, churn_concurrency: 3,
+  segment_high_pct: 20, segment_low_pct: 20,
 };
 
 // ── Data Schemas ────────────────────────────────────────────────────────────

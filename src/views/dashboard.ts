@@ -1152,7 +1152,8 @@ function renderContributionsTab(
         memberTotals.set(bar.label, (memberTotals.get(bar.label) ?? 0) + bar.total);
       }
     }
-    const segMap = calculateSegments(memberTotals);
+    const segThresholds = { high: ctx.config.settings.segment_high_pct ?? 20, low: ctx.config.settings.segment_low_pct ?? 20 };
+    const segMap = calculateSegments(memberTotals, segThresholds);
     for (const g of groups) {
       for (const bar of g.bars) {
         bar.segment = segMap.get(bar.label);
@@ -1166,7 +1167,8 @@ function renderContributionsTab(
       const total = g.bars.reduce((s, b) => s + b.total, 0);
       entityTotals.set(g.groupLabel, total);
     }
-    const segMap = calculateSegments(entityTotals);
+    const segThresholds = { high: ctx.config.settings.segment_high_pct ?? 20, low: ctx.config.settings.segment_low_pct ?? 20 };
+    const segMap = calculateSegments(entityTotals, segThresholds);
     for (const g of groups) {
       const seg = segMap.get(g.groupLabel);
       if (seg) {

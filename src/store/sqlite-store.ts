@@ -26,6 +26,7 @@ export function getDB(): Database.Database {
     _db = new Database(getSQLitePath());
     _db.pragma("journal_mode = WAL");
     _db.pragma("synchronous = NORMAL");
+    _db.pragma("busy_timeout = 5000");
     ensureSchema(_db);
   }
   return _db;
