@@ -3,18 +3,20 @@ import type { UserWeekRepoRecord } from "../types/schema.js";
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
-vi.mock("../store/commits-by-filetype.js", () => ({
-  loadCommitsData: vi.fn(),
+vi.mock("../store/sqlite-store.js", () => ({
+  queryRecords: vi.fn(() => []),
+  loadEnrichmentsSQL: vi.fn(() => ({ version: 1, lastUpdated: new Date().toISOString(), enrichments: {} })),
+  getEnrichmentSQL: vi.fn(),
 }));
 
-import { loadCommitsData } from "../store/commits-by-filetype.js";
+import { queryRecords } from "../store/sqlite-store.js";
 import {
   flattenRecord,
   recordsToCsv,
   exportData,
 } from "../commands/export-data.js";
 
-const mockLoadCommitsData = vi.mocked(loadCommitsData);
+const mockQueryRecords = vi.mocked(queryRecords);
 
 // ── Test Fixtures ────────────────────────────────────────────────────────────
 
@@ -210,11 +212,7 @@ describe("exportData", () => {
   });
 
   it("writes CSV to stdout when no output path given", async () => {
-    mockLoadCommitsData.mockResolvedValue({
-      version: 1,
-      lastUpdated: "2026-02-26T00:00:00Z",
-      records: [makeRecord()],
-    });
+    mockQueryRecords.mockReturnValue([makeRecord()]);
 
     await exportData({});
 
@@ -226,14 +224,10 @@ describe("exportData", () => {
   });
 
   it("preserves all records (no aggregation)", async () => {
-    mockLoadCommitsData.mockResolvedValue({
-      version: 1,
-      lastUpdated: "2026-02-26T00:00:00Z",
-      records: [
-        makeRecord({ repo: "web-app" }),
-        makeRecord({ repo: "api" }),
-      ],
-    });
+    mockQueryRecords.mockReturnValue([
+      makeRecord({ repo: "web-app" }),
+      makeRecord({ repo: "api" }),
+    ]);
 
     await exportData({});
 
@@ -246,14 +240,10 @@ describe("exportData", () => {
   });
 
   it("applies filters before exporting", async () => {
-    mockLoadCommitsData.mockResolvedValue({
-      version: 1,
-      lastUpdated: "2026-02-26T00:00:00Z",
-      records: [
-        makeRecord({ member: "Alice", team: "frontend" }),
-        makeRecord({ member: "Bob", team: "backend" }),
-      ],
-    });
+    mockQueryRecords.mockReturnValue([
+      makeRecord({ member: "Alice", team: "frontend" }),
+      makeRecord({ member: "Bob", team: "backend" }),
+    ]);
 
     await exportData({ filters: { team: "frontend" } });
 
@@ -263,11 +253,7 @@ describe("exportData", () => {
   });
 
   it("shows error when no records exist", async () => {
-    mockLoadCommitsData.mockResolvedValue({
-      version: 1,
-      lastUpdated: "2026-02-26T00:00:00Z",
-      records: [],
-    });
+    mockQueryRecords.mockReturnValue([]);
 
     await exportData({});
 
@@ -279,11 +265,7 @@ describe("exportData", () => {
   });
 
   it("shows error when all records are filtered out", async () => {
-    mockLoadCommitsData.mockResolvedValue({
-      version: 1,
-      lastUpdated: "2026-02-26T00:00:00Z",
-      records: [makeRecord({ team: "frontend" })],
-    });
+    mockQueryRecords.mockReturnValue([makeRecord({ team: "frontend" })]);
 
     await exportData({ filters: { team: "nonexistent" } });
 

@@ -7,7 +7,7 @@ import type { HBarGroup } from '../ui/grouped-hbar-chart.js';
 import { renderLineChart } from '../ui/line-chart.js';
 import { renderLegend } from '../ui/legend.js';
 import { renderHotkeyBar } from '../ui/tab-bar.js';
-import { readKey } from '../ui/keypress.js';
+import { readKey, readKeyWithTimeout } from '../ui/keypress.js';
 import { sparkline } from '../ui/sparkline.js';
 import { rollup } from '../aggregator/engine.js';
 import { filterRecords, getLastNWeeks } from '../aggregator/filters.js';
@@ -386,9 +386,18 @@ export async function trendsView(ctx: ViewContext): Promise<NavigationAction> {
     hotkeys.push({ key: 'Q', label: 'Quit' });
     console.log(renderHotkeyBar(hotkeys));
 
-    // Wait for keypress
+    // Wait for keypress (with timeout to poll for external DB changes)
     try {
-      const key = await readKey();
+      const POLL_INTERVAL_MS = 5_000;
+      const key = ctx.onRefreshData
+        ? await readKeyWithTimeout(POLL_INTERVAL_MS)
+        : await readKey();
+
+      // Timeout — check for external DB changes, then re-render
+      if (key === null) {
+        ctx.onRefreshData?.();
+        continue;
+      }
 
       if (key.name === 'e' && expandMode !== 'team') { expandMode = 'team'; continue; }
       if (key.name === 'g' && expandMode !== 'tag') { expandMode = 'tag'; continue; }

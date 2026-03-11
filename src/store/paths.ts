@@ -37,31 +37,10 @@ export function getConfigPath(): string {
 }
 
 /**
- * Commits data file path: ~/.agentx/gitradar/data/commits-by-filetype.json
+ * Cache directory for raw API responses: ~/.agentx/gitradar/cache/
  */
-export function getCommitsPath(): string {
-  return join(getDataDir(), "commits-by-filetype.json");
-}
-
-/**
- * Scan state file path: ~/.agentx/gitradar/data/scan-state.json
- */
-export function getScanStatePath(): string {
-  return join(getDataDir(), "scan-state.json");
-}
-
-/**
- * Author registry file path: ~/.agentx/gitradar/data/authors.json
- */
-export function getAuthorRegistryPath(): string {
-  return join(getDataDir(), "authors.json");
-}
-
-/**
- * Enrichments data file path: ~/.agentx/gitradar/data/enrichments.json
- */
-export function getEnrichmentsPath(): string {
-  return join(getDataDir(), "enrichments.json");
+export function getCacheDir(): string {
+  return join(getConfigDir(), "cache");
 }
 
 /**

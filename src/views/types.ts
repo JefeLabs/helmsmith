@@ -20,6 +20,8 @@ export interface ViewContext {
   onAddOrg?: (org: Org) => Promise<void>;
   /** Persist updated author registry to disk. */
   onSaveAuthorRegistry?: (registry: AuthorRegistry) => Promise<void>;
+  /** Check if underlying data has changed and reload if so. Returns true if data was refreshed. */
+  onRefreshData?: () => boolean;
 }
 
 export type NavigationAction =

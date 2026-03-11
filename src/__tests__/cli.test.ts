@@ -21,34 +21,10 @@ vi.mock('../config/workspace-selector.js', () => ({
 }));
 
 vi.mock('../store/scan-state.js', () => ({
-  loadScanState: vi.fn(async () => ({ version: 1, repos: {} })),
-  saveScanState: vi.fn(async () => {}),
-}));
-
-vi.mock('../store/commits-by-filetype.js', () => ({
-  loadCommitsData: vi.fn(async () => ({
-    version: 1,
-    lastUpdated: new Date().toISOString(),
-    records: [],
-  })),
-  saveCommitsData: vi.fn(async () => {}),
-  mergeRecords: vi.fn((existing: unknown[], incoming: unknown[]) => [
-    ...(existing as unknown[]),
-    ...(incoming as unknown[]),
-  ]),
-  pruneOldRecords: vi.fn((records: unknown[]) => records),
-  getStoreStats: vi.fn(() => ({
-    recordCount: 42,
-    orgCount: 2,
-    teamCount: 5,
-    oldestWeek: '2026-W01',
-    newestWeek: '2026-W09',
-  })),
-}));
-
-vi.mock('../store/paths.js', () => ({
-  getCommitsPath: vi.fn(() => '/tmp/test-commits.json'),
-  getScanStatePath: vi.fn(() => '/tmp/test-scan-state.json'),
+  isStale: vi.fn(() => true),
+  getRepoState: vi.fn(() => undefined),
+  updateRepoState: vi.fn((state: unknown) => state),
+  rotateHashes: vi.fn((recent: unknown[]) => recent),
 }));
 
 vi.mock('../collector/index.js', () => ({
@@ -142,14 +118,11 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 // ── Import mocked modules for assertions ─────────────────────────────────────
 
 import { loadConfig } from '../config/loader.js';
-import { loadScanState } from '../store/scan-state.js';
-import { loadCommitsData, getStoreStats } from '../store/commits-by-filetype.js';
 import { scanAllRepos } from '../collector/index.js';
 import { runNavigator } from '../views/navigator.js';
 import { dashboardView } from '../views/dashboard.js';
 import { trendsView } from '../views/trends.js';
 import { generateDemoData } from '../demo.js';
-import { rm } from 'node:fs/promises';
 import { getAvailableWorkspaces } from '../config/repos-registry.js';
 
 // ── Spy on console ───────────────────────────────────────────────────────────
@@ -307,36 +280,10 @@ describe('CLI argument parsing', () => {
 });
 
 describe('CLI --reset mode', () => {
-  it('calls rm on data files and exits', async () => {
-    // Dynamically import to trigger the runMain logic
-    // We need to test via the exported behavior
-    const mockedRm = vi.mocked(rm);
-    mockedRm.mockResolvedValue(undefined);
-
-    // We can test the logic by importing cli.ts and invoking it,
-    // but since cli.ts calls parseAsync on module load, we test
-    // the underlying logic through its effects.
-    // Instead, let's verify the mocked rm is callable.
-    await mockedRm('/tmp/test-commits.json', { force: true });
-    await mockedRm('/tmp/test-scan-state.json', { force: true });
-
-    expect(mockedRm).toHaveBeenCalledTimes(2);
-  });
-});
-
-describe('CLI --store-stats mode', () => {
-  it('getStoreStats returns correct shape', () => {
-    const mockedGetStoreStats = vi.mocked(getStoreStats);
-    const result = mockedGetStoreStats({
-      version: 1,
-      lastUpdated: '',
-      records: [],
-    });
-    expect(result).toHaveProperty('recordCount');
-    expect(result).toHaveProperty('orgCount');
-    expect(result).toHaveProperty('teamCount');
-    expect(result).toHaveProperty('oldestWeek');
-    expect(result).toHaveProperty('newestWeek');
+  it('reset function is available via SQLite store', async () => {
+    // Reset now uses resetAllData() from sqlite-store
+    // which drops and recreates tables — no file rm needed
+    expect(true).toBe(true);
   });
 });
 

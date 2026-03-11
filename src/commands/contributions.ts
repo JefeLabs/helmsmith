@@ -1,4 +1,4 @@
-import { loadCommitsData } from '../store/commits-by-filetype.js';
+import { queryRecords } from '../store/sqlite-store.js';
 import {
   filterRecords, getLastNWeeks, getLastNMonths, getLastNQuarters, getLastNYears,
   getCurrentWeek, weekToMonth, weekToQuarter, weekToYear, monthShort,
@@ -216,7 +216,7 @@ export { aggregatePivot };
 // ── Main entry point ─────────────────────────────────────────────────────────
 
 export async function contributions(options: ContributionsOptions = {}): Promise<void> {
-  let records = options.records ?? (await loadCommitsData()).records;
+  let records = options.records ?? queryRecords({});
 
   if (options.filters) {
     records = filterRecords(records, options.filters);

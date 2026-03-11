@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { classifyFile, buildIgnoreMatcher, DEFAULT_IGNORE_PATTERNS, type FileType } from "../collector/classifier.js";
+import { classifyFile, buildIgnoreMatcher, buildClassifier, DEFAULT_IGNORE_PATTERNS, type FileType } from "../collector/classifier.js";
 
 describe("classifyFile", () => {
   // ── Storybook (Priority 1) ─────────────────────────────────────────────────
@@ -427,6 +427,80 @@ describe("buildIgnoreMatcher", () => {
     it("is exported and non-empty", () => {
       expect(DEFAULT_IGNORE_PATTERNS.length).toBeGreaterThan(0);
       expect(DEFAULT_IGNORE_PATTERNS).toContain("package-lock.json");
+    });
+  });
+
+  describe("buildClassifier", () => {
+    it("returns default classifyFile when no rules provided", () => {
+      const classify = buildClassifier();
+      expect(classify("src/app.ts")).toBe("app");
+      expect(classify("src/app.test.ts")).toBe("test");
+      expect(classify("tsconfig.json")).toBe("config");
+    });
+
+    it("returns default classifyFile when empty rules provided", () => {
+      const classify = buildClassifier({});
+      expect(classify("src/app.ts")).toBe("app");
+    });
+
+    it("applies suffix pattern rules before built-in", () => {
+      const classify = buildClassifier({ "*.tf": "config", "*.proto": "app" });
+      expect(classify("infra/main.tf")).toBe("config");
+      expect(classify("api/service.proto")).toBe("app");
+      // Built-in still works for unmatched files
+      expect(classify("src/app.test.ts")).toBe("test");
+    });
+
+    it("applies directory wildcard rules", () => {
+      const classify = buildClassifier({ "src/generated/**": "config" });
+      expect(classify("src/generated/types.ts")).toBe("config");
+      expect(classify("src/generated/deep/nested.ts")).toBe("config");
+      // Unmatched files fall through to built-in
+      expect(classify("src/app.ts")).toBe("app");
+    });
+
+    it("applies exact basename rules", () => {
+      const classify = buildClassifier({ "Procfile": "config" });
+      expect(classify("Procfile")).toBe("config");
+      expect(classify("deploy/Procfile")).toBe("config");
+    });
+
+    it("user rules take priority over built-in classification", () => {
+      // *.json is normally "config", but user overrides to "app"
+      const classify = buildClassifier({ "*.json": "app" });
+      expect(classify("data/schema.json")).toBe("app");
+    });
+
+    it("first matching user rule wins", () => {
+      const classify = buildClassifier({
+        "*.stories.tsx": "test",  // override storybook → test
+        "*.tsx": "app",
+      });
+      expect(classify("Button.stories.tsx")).toBe("test"); // first rule wins
+      expect(classify("Button.tsx")).toBe("app");
+    });
+
+    it("handles **/ recursive glob patterns", () => {
+      const classify = buildClassifier({ "**/*.test.ts": "test" });
+      expect(classify("src/deep/nested/file.test.ts")).toBe("test");
+      expect(classify("file.test.ts")).toBe("test");
+      expect(classify("src/app.ts")).toBe("app");
+    });
+  });
+
+  describe("buildIgnoreMatcher with **/ recursive globs", () => {
+    it("matches **/*.min.js deep in path", () => {
+      const isIgnored = buildIgnoreMatcher(["**/*.min.js"]);
+      expect(isIgnored("vendor/deep/jquery.min.js")).toBe(true);
+      expect(isIgnored("jquery.min.js")).toBe(true);
+      expect(isIgnored("app.js")).toBe(false);
+    });
+
+    it("matches **/*.test.ts deep in path", () => {
+      const isIgnored = buildIgnoreMatcher(["**/*.test.ts"]);
+      expect(isIgnored("src/deep/file.test.ts")).toBe(true);
+      expect(isIgnored("file.test.ts")).toBe(true);
+      expect(isIgnored("src/app.ts")).toBe(false);
     });
   });
 });

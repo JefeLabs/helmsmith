@@ -1,6 +1,4 @@
-import { readFile, writeFile, rename } from "node:fs/promises";
 import type { AuthorRegistry, DiscoveredAuthor } from "../types/schema.js";
-import { getAuthorRegistryPath, ensureDataDir } from "./paths.js";
 
 /**
  * Extract identifier from a git author name.
@@ -10,31 +8,6 @@ import { getAuthorRegistryPath, ensureDataDir } from "./paths.js";
 export function extractIdentifier(name: string): string | undefined {
   const match = name.match(/\(([A-Za-z0-9]+)\)/);
   return match ? match[1] : undefined;
-}
-
-/**
- * Load author registry from disk, or return an empty default.
- */
-export async function loadAuthorRegistry(): Promise<AuthorRegistry> {
-  try {
-    const raw = await readFile(getAuthorRegistryPath(), "utf-8");
-    return JSON.parse(raw) as AuthorRegistry;
-  } catch {
-    return { version: 1, authors: {} };
-  }
-}
-
-/**
- * Atomically save author registry to disk.
- */
-export async function saveAuthorRegistry(
-  registry: AuthorRegistry,
-): Promise<void> {
-  await ensureDataDir();
-  const filePath = getAuthorRegistryPath();
-  const tmpPath = filePath + ".tmp";
-  await writeFile(tmpPath, JSON.stringify(registry, null, 2), "utf-8");
-  await rename(tmpPath, filePath);
 }
 
 /**
@@ -75,7 +48,7 @@ export function mergeDiscoveredAuthors(
     } else {
       // New author
       authors[key] = {
-        email: d.email,
+        email: d.email.toLowerCase(),
         name: d.name,
         identifier,
         firstSeen: d.date,

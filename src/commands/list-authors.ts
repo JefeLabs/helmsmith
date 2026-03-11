@@ -1,4 +1,4 @@
-import { loadAuthorRegistry } from '../store/author-registry.js';
+import { loadAuthorRegistrySQL } from '../store/sqlite-store.js';
 
 export interface ListAuthorsOptions {
   unassigned?: boolean;
@@ -7,7 +7,7 @@ export interface ListAuthorsOptions {
 }
 
 export async function listAuthors(options: ListAuthorsOptions = {}): Promise<void> {
-  const registry = await loadAuthorRegistry();
+  const registry = loadAuthorRegistrySQL();
   let authors = Object.values(registry.authors);
 
   if (options.unassigned) {

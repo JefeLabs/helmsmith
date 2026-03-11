@@ -1,37 +1,11 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { ScanState } from "../types/schema.js";
-
-// ── Mocks ────────────────────────────────────────────────────────────────────
-
-const MOCK_SCAN_STATE_PATH = "/mock/data/scan-state.json";
-
-vi.mock("node:fs/promises", () => ({
-  readFile: vi.fn(),
-  writeFile: vi.fn(async () => undefined),
-  rename: vi.fn(async () => undefined),
-}));
-
-vi.mock("../store/paths.js", () => ({
-  getScanStatePath: () => MOCK_SCAN_STATE_PATH,
-  ensureDataDir: vi.fn(async () => undefined),
-}));
-
-const { readFile, writeFile, rename } = await import("node:fs/promises");
-const { ensureDataDir } = await import("../store/paths.js");
-
-const mockReadFile = vi.mocked(readFile);
-const mockWriteFile = vi.mocked(writeFile);
-const mockRename = vi.mocked(rename);
-const mockEnsureDataDir = vi.mocked(ensureDataDir);
-
-const {
-  loadScanState,
-  saveScanState,
+import {
   getRepoState,
   updateRepoState,
   isStale,
   rotateHashes,
-} = await import("../store/scan-state.js");
+} from "../store/scan-state.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -52,99 +26,6 @@ function makeRepoEntry(overrides?: Partial<ScanState["repos"][string]>) {
     ...overrides,
   };
 }
-
-// ── loadScanState ────────────────────────────────────────────────────────────
-
-describe("loadScanState", () => {
-  beforeEach(() => {
-    mockReadFile.mockReset();
-  });
-
-  it("returns empty state when file does not exist", async () => {
-    mockReadFile.mockRejectedValue(new Error("ENOENT"));
-    const state = await loadScanState();
-    expect(state).toEqual({ version: 1, repos: {} });
-  });
-
-  it("loads and parses existing scan state from disk", async () => {
-    const existing: ScanState = {
-      version: 1,
-      repos: {
-        "my-repo": {
-          lastHash: "deadbeef",
-          lastScanDate: "2026-02-20T10:00:00Z",
-          recentHashes: ["deadbeef", "cafebabe"],
-          recordCount: 42,
-        },
-      },
-    };
-    mockReadFile.mockResolvedValue(JSON.stringify(existing));
-    const state = await loadScanState();
-    expect(state.version).toBe(1);
-    expect(state.repos["my-repo"].lastHash).toBe("deadbeef");
-    expect(state.repos["my-repo"].recentHashes).toHaveLength(2);
-    expect(state.repos["my-repo"].recordCount).toBe(42);
-  });
-});
-
-// ── saveScanState ────────────────────────────────────────────────────────────
-
-describe("saveScanState", () => {
-  beforeEach(() => {
-    mockWriteFile.mockReset();
-    mockRename.mockReset();
-    mockEnsureDataDir.mockReset();
-  });
-
-  it("writes to .tmp then renames atomically", async () => {
-    const state = makeScanState({
-      repos: { "test-repo": makeRepoEntry() },
-    });
-    await saveScanState(state);
-
-    expect(mockEnsureDataDir).toHaveBeenCalled();
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      MOCK_SCAN_STATE_PATH + ".tmp",
-      expect.any(String),
-      "utf-8"
-    );
-    expect(mockRename).toHaveBeenCalledWith(
-      MOCK_SCAN_STATE_PATH + ".tmp",
-      MOCK_SCAN_STATE_PATH
-    );
-  });
-
-  it("round-trips data correctly through save and reload", async () => {
-    const state = makeScanState({
-      repos: {
-        "frontend-app": makeRepoEntry({
-          lastHash: "aaa111",
-          recentHashes: ["aaa111", "bbb222"],
-          recordCount: 100,
-        }),
-      },
-    });
-
-    let savedContent = "";
-    mockWriteFile.mockImplementation(
-      async (_path, content) => {
-        savedContent = content as string;
-      }
-    );
-
-    await saveScanState(state);
-
-    mockReadFile.mockResolvedValue(savedContent);
-    const reloaded = await loadScanState();
-
-    expect(reloaded.repos["frontend-app"].lastHash).toBe("aaa111");
-    expect(reloaded.repos["frontend-app"].recentHashes).toEqual([
-      "aaa111",
-      "bbb222",
-    ]);
-    expect(reloaded.repos["frontend-app"].recordCount).toBe(100);
-  });
-});
 
 // ── getRepoState ─────────────────────────────────────────────────────────────
 
@@ -237,8 +118,6 @@ describe("isStale", () => {
       Date.now() - 60 * 60 * 1000
     ).toISOString();
     const entry = makeRepoEntry({ lastScanDate: exactlyAtThreshold });
-    // Due to time passing between Date.now() calls, this will be slightly stale
-    // so we just check it returns a boolean
     expect(typeof isStale(entry, 60)).toBe("boolean");
   });
 });

@@ -1,4 +1,4 @@
-import { loadCommitsData } from '../store/commits-by-filetype.js';
+import { queryRecords } from '../store/sqlite-store.js';
 import { filterRecords, getLastNWeeks, getCurrentWeek, type Filters } from '../aggregator/filters.js';
 import { rollup } from '../aggregator/engine.js';
 import { fmt } from '../ui/format.js';
@@ -24,7 +24,7 @@ interface RepoRow {
 }
 
 export async function repoActivity(options: RepoActivityOptions = {}): Promise<void> {
-  let records = options.records ?? (await loadCommitsData()).records;
+  let records = options.records ?? queryRecords({});
 
   if (options.filters) {
     records = filterRecords(records, options.filters);

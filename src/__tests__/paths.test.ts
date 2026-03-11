@@ -19,8 +19,6 @@ const {
   getConfigDir,
   getDataDir,
   getConfigPath,
-  getCommitsPath,
-  getScanStatePath,
   ensureDataDir,
 } = await import("../store/paths.js");
 
@@ -74,22 +72,6 @@ describe("getConfigPath", () => {
   it("returns ~/.agentx/gitradar/config.yml", () => {
     expect(getConfigPath()).toBe(
       join(MOCK_HOME, ".agentx", "gitradar", "config.yml")
-    );
-  });
-});
-
-describe("getCommitsPath", () => {
-  it("returns the commits-by-filetype.json path", () => {
-    expect(getCommitsPath()).toBe(
-      join(MOCK_HOME, ".agentx", "gitradar", "data", "commits-by-filetype.json")
-    );
-  });
-});
-
-describe("getScanStatePath", () => {
-  it("returns the scan-state.json path", () => {
-    expect(getScanStatePath()).toBe(
-      join(MOCK_HOME, ".agentx", "gitradar", "data", "scan-state.json")
     );
   });
 });

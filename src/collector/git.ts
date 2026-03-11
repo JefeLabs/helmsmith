@@ -1,19 +1,30 @@
 import { simpleGit } from "simple-git";
+import { spawn } from "node:child_process";
+import { createInterface } from "node:readline";
 import type { UserWeekRepoRecord } from "../types/schema.js";
 import type { AuthorMap } from "./author-map.js";
 import { resolveAuthor } from "./author-map.js";
-import { classifyFile, buildIgnoreMatcher } from "./classifier.js";
+import { classifyFile, buildIgnoreMatcher, buildClassifier } from "./classifier.js";
+import type { FileType } from "./classifier.js";
+
+// Note: spawn is used with array arguments (no shell interpretation),
+// equivalent to simple-git's internal execFile usage. All args are
+// constructed from internal code, never from raw user input.
 
 export type FileStatus = 'A' | 'M' | 'D' | 'R' | 'C' | 'T' | 'unknown';
 
 /**
  * A single parsed commit from git log output.
  */
+export type IntentType = 'feat' | 'fix' | 'refactor' | 'docs' | 'test' | 'chore' | 'other';
+
 export interface ParsedCommit {
   hash: string;
   email: string;
   name: string;
   date: string;
+  subject: string;
+  intent: IntentType;
   files: { insertions: number; deletions: number; path: string; status: FileStatus }[];
 }
 
@@ -38,6 +49,8 @@ export interface ScanOptions {
   }>;
   /** Glob patterns for files to exclude from metrics. Uses defaults if undefined. */
   ignorePatterns?: string[];
+  /** User-defined classification rules: glob pattern → filetype category. Takes priority over built-in rules. */
+  classificationRules?: Record<string, FileType>;
 }
 
 /**
@@ -63,8 +76,25 @@ export interface ScanResult {
 }
 
 /**
- * Detect whether a line is a commit header (hash|email|name|date).
- * A header line has 4+ pipe-separated parts and the first part is a hex hash.
+ * Parse a conventional commit subject into an intent type.
+ * Matches patterns like "feat:", "feat(scope):", "fix!:", etc.
+ * Falls back to "other" for non-conventional commits.
+ */
+const CONVENTIONAL_RE = /^(feat|fix|refactor|docs|test|tests|chore|ci|build|perf|style|revert)(\(.+?\))?[!]?:/i;
+
+export function parseIntent(subject: string): IntentType {
+  const match = CONVENTIONAL_RE.exec(subject.trim());
+  if (!match) return 'other';
+  const prefix = match[1].toLowerCase();
+  if (prefix === 'tests') return 'test';
+  if (prefix === 'ci' || prefix === 'build' || prefix === 'perf' || prefix === 'style' || prefix === 'revert') return 'chore';
+  return prefix as IntentType;
+}
+
+/**
+ * Detect whether a line is a commit header (hash|email|name|date|subject).
+ * A header line has 5+ pipe-separated parts and the first part is a hex hash.
+ * Falls back to 4-part headers for backwards compatibility.
  */
 function isHeaderLine(line: string): boolean {
   const parts = line.split("|");
@@ -79,12 +109,16 @@ const NUMSTAT_RE = /^(\d+|-)\t(\d+|-)\t(.+)$/;
 
 /**
  * Parse git log output produced with:
- *   --format="%H|%ae|%an|%aI" --raw --numstat
+ *   --format="%H|%ae|%an|%aI|%s" --raw --numstat
  *
  * Each commit block has a header line, followed by raw diff lines
  * (:mode mode hash hash status\tpath) and numstat lines
  * (insertions\tdeletions\tpath), with blank lines between sections.
  * Commits are delimited by their header lines rather than blank lines.
+ *
+ * The 5th pipe-separated field is the commit subject line, used to
+ * detect conventional commit intent (feat, fix, refactor, etc.).
+ * Falls back gracefully to "other" if subject is missing (4-field format).
  *
  * Note: --raw is used instead of --name-status because --name-status
  * and --numstat are mutually exclusive on many git versions.
@@ -122,11 +156,31 @@ export function parseGitLogOutput(output: string): ParsedCommit[] {
       pushCurrent();
 
       const parts = trimmed.split("|");
+      // Format: hash|email|name|date|subject (subject may contain |)
+      // Backwards-compatible with old 4-field format (hash|email|name|date)
+      const hash = parts[0];
+      const email = parts[1];
+      let name: string;
+      let date: string;
+      let subject: string;
+      if (parts.length >= 5) {
+        // New format: hash|email|name|date|subject...
+        name = parts[2];
+        date = parts[3];
+        subject = parts.slice(4).join("|"); // subject may contain |
+      } else {
+        // Old format: hash|email|name|date (name may contain |)
+        name = parts.slice(2, -1).join("|");
+        date = parts[parts.length - 1];
+        subject = '';
+      }
       current = {
-        hash: parts[0],
-        email: parts[1],
-        name: parts.slice(2, -1).join("|"), // name may contain |
-        date: parts[parts.length - 1],
+        hash,
+        email,
+        name,
+        date,
+        subject,
+        intent: parseIntent(subject),
         files: [],
       };
       statusMap = new Map();
@@ -179,6 +233,198 @@ export function parseGitLogOutput(output: string): ParsedCommit[] {
 }
 
 /**
+ * Stateful line-by-line parser for git log output.
+ *
+ * Instead of collecting the full output into a string and splitting,
+ * this parser processes one line at a time and yields complete commits
+ * as soon as all their raw-diff and numstat lines have been consumed.
+ *
+ * Usage:
+ *   const parser = new GitLogLineParser();
+ *   for each line:
+ *     const commit = parser.processLine(line);
+ *     if (commit) handle(commit);
+ *   const last = parser.flush();
+ *   if (last) handle(last);
+ */
+export class GitLogLineParser {
+  private current: ParsedCommit | null = null;
+  private statusMap = new Map<string, FileStatus>();
+
+  /**
+   * Feed a single line to the parser.
+   * Returns a completed ParsedCommit when a new header line is encountered
+   * (which finalizes the previous commit), or null if still accumulating.
+   */
+  processLine(line: string): ParsedCommit | null {
+    const trimmed = line.trim();
+    if (trimmed === "") return null;
+
+    if (isHeaderLine(trimmed)) {
+      const completed = this.finalizeCurrent();
+
+      const parts = trimmed.split("|");
+      const hash = parts[0];
+      const email = parts[1];
+      let name: string;
+      let date: string;
+      let subject: string;
+      if (parts.length >= 5) {
+        name = parts[2];
+        date = parts[3];
+        subject = parts.slice(4).join("|");
+      } else {
+        name = parts.slice(2, -1).join("|");
+        date = parts[parts.length - 1];
+        subject = '';
+      }
+      this.current = {
+        hash, email, name, date, subject,
+        intent: parseIntent(subject),
+        files: [],
+      };
+      this.statusMap = new Map();
+      return completed;
+    }
+
+    if (!this.current) return null;
+
+    // Raw diff line
+    const rawMatch = RAW_DIFF_RE.exec(trimmed);
+    if (rawMatch) {
+      const statusChar = rawMatch[1] as FileStatus;
+      const rest = rawMatch[3];
+      if ((statusChar === 'R' || statusChar === 'C') && rest.includes('\t')) {
+        const [oldPath, newPath] = rest.split('\t');
+        this.statusMap.set(oldPath, statusChar);
+        this.statusMap.set(newPath, statusChar);
+      } else {
+        this.statusMap.set(rest, statusChar);
+      }
+      return null;
+    }
+
+    // Numstat line
+    const numMatch = NUMSTAT_RE.exec(trimmed);
+    if (numMatch) {
+      const ins = numMatch[1] === "-" ? 0 : parseInt(numMatch[1], 10) || 0;
+      const del = numMatch[2] === "-" ? 0 : parseInt(numMatch[2], 10) || 0;
+      const filePath = trimmed.split("\t").slice(2).join("\t");
+
+      let lookupPath = filePath;
+      const arrowIdx = filePath.indexOf(" => ");
+      if (arrowIdx !== -1) {
+        lookupPath = filePath.slice(arrowIdx + 4);
+      }
+
+      const status = this.statusMap.get(filePath) ?? this.statusMap.get(lookupPath) ?? 'unknown';
+      this.current.files.push({ insertions: ins, deletions: del, path: filePath, status });
+    }
+
+    return null;
+  }
+
+  /** Flush the last accumulated commit (call after all lines are consumed). */
+  flush(): ParsedCommit | null {
+    return this.finalizeCurrent();
+  }
+
+  private finalizeCurrent(): ParsedCommit | null {
+    if (!this.current) return null;
+    for (const f of this.current.files) {
+      if (f.status === 'unknown') {
+        const s = this.statusMap.get(f.path);
+        if (s) f.status = s;
+      }
+    }
+    const completed = this.current;
+    this.current = null;
+    return completed;
+  }
+}
+
+/**
+ * Spawn `git log` as a child process and stream its stdout line by line.
+ * Returns the total commit count and skipped count after processing all output.
+ *
+ * Each complete commit is immediately fed to processCommitBatch (single-element array)
+ * so memory usage is bounded to one commit at a time rather than the full output.
+ */
+async function streamGitLog(
+  repoPath: string,
+  args: string[],
+  batchArgs: {
+    repoName: string;
+    group: string;
+    authorMap: AuthorMap;
+    recentHashes: Set<string>;
+    recordMap: Map<string, UserWeekRepoRecord>;
+    activeDaysMap: Map<string, Set<string>>;
+    newHashes: string[];
+    rawAuthorsMap: Map<string, RawAuthor>;
+    identifierRules?: ScanOptions["identifierRules"];
+    shouldIgnore?: (filePath: string) => boolean;
+    classify?: (filePath: string) => FileType;
+  },
+): Promise<{ commitCount: number; skippedCount: number }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("git", args, { cwd: repoPath, stdio: ["ignore", "pipe", "pipe"] });
+
+    const parser = new GitLogLineParser();
+    let commitCount = 0;
+    let skippedCount = 0;
+    const stderrChunks: Buffer[] = [];
+
+    const handleCommit = (commit: ParsedCommit) => {
+      commitCount++;
+      skippedCount += processCommitBatch(
+        [commit],
+        batchArgs.repoName,
+        batchArgs.group,
+        batchArgs.authorMap,
+        batchArgs.recentHashes,
+        batchArgs.recordMap,
+        batchArgs.activeDaysMap,
+        batchArgs.newHashes,
+        batchArgs.rawAuthorsMap,
+        batchArgs.identifierRules,
+        batchArgs.shouldIgnore,
+        batchArgs.classify,
+      );
+    };
+
+    const rl = createInterface({ input: child.stdout!, crlfDelay: Infinity });
+
+    rl.on("line", (line) => {
+      const commit = parser.processLine(line);
+      if (commit) handleCommit(commit);
+    });
+
+    child.stderr!.on("data", (chunk: Buffer) => {
+      stderrChunks.push(chunk);
+    });
+
+    child.on("error", (err) => {
+      rl.close();
+      reject(err);
+    });
+
+    child.on("close", (code) => {
+      // Flush the last commit from the parser
+      const last = parser.flush();
+      if (last) handleCommit(last);
+
+      if (code !== 0 && commitCount === 0) {
+        const stderr = Buffer.concat(stderrChunks).toString().trim();
+        reject(new Error(stderr || `git log exited with code ${code}`));
+      } else {
+        resolve({ commitCount, skippedCount });
+      }
+    });
+  });
+}
+
+/**
  * Convert an ISO date string to ISO week format: "YYYY-Www"
  * e.g., "2026-02-25T10:00:00Z" → "2026-W09"
  */
@@ -209,6 +455,13 @@ function emptyFiletype(): UserWeekRepoRecord["filetype"] {
     storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
     doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
   };
+}
+
+/**
+ * Create an empty intent metrics structure.
+ */
+function emptyIntent(): NonNullable<UserWeekRepoRecord["intent"]> {
+  return { feat: 0, fix: 0, refactor: 0, docs: 0, test: 0, chore: 0, other: 0 };
 }
 
 /**
@@ -287,6 +540,7 @@ function processCommitBatch(
   rawAuthorsMap: Map<string, RawAuthor>,
   identifierRules?: ScanOptions["identifierRules"],
   shouldIgnore?: (filePath: string) => boolean,
+  classify?: (filePath: string) => FileType,
 ): number {
   let skipped = 0;
 
@@ -347,6 +601,7 @@ function processCommitBatch(
         group,
         commits: 0,
         activeDays: 0,
+        intent: emptyIntent(),
         filetype: emptyFiletype(),
       });
     }
@@ -354,9 +609,15 @@ function processCommitBatch(
     const record = recordMap.get(key)!;
     record.commits += 1;
 
+    // Accumulate intent from conventional commit prefix
+    if (record.intent) {
+      record.intent[commit.intent] = (record.intent[commit.intent] ?? 0) + 1;
+    }
+
+    const classifyFn = classify ?? classifyFile;
     for (const file of commit.files) {
       if (shouldIgnore?.(file.path)) continue;
-      const category = classifyFile(file.path);
+      const category = classifyFn(file.path);
       record.filetype[category].files += 1;
       if (file.status === 'A') record.filetype[category].filesAdded += 1;
       if (file.status === 'D') record.filetype[category].filesDeleted += 1;
@@ -371,12 +632,13 @@ function processCommitBatch(
 /**
  * Scan a git repository and produce UserWeekRepoRecords.
  *
- * Uses simple-git to run:
- *   git log --since=... --raw --numstat --no-merges --format="%H|%ae|%an|%aI"
+ * Spawns `git log` as a child process and streams its stdout line by line,
+ * processing each commit as soon as its lines are complete. This keeps
+ * memory usage proportional to the accumulator maps (bounded by team size ×
+ * weeks) rather than the full git output string.
  *
  * When `chunkMonths` is set and this is a first-time scan (no `since`),
- * the date range is split into N-month windows so that only one chunk's
- * raw git output is in memory at a time.
+ * the date range is split into N-month windows.
  *
  * Deduplicates against recentHashes, resolves authors, classifies files,
  * and accumulates metrics into per-member/week/repo records.
@@ -385,15 +647,14 @@ export async function scanRepo(
   repoPath: string,
   options: ScanOptions
 ): Promise<ScanResult> {
-  const { repoName, group, authorMap, recentHashes, since, chunkMonths, identifierRules, ignorePatterns } = options;
+  const { repoName, group, authorMap, recentHashes, since, chunkMonths, identifierRules, ignorePatterns, classificationRules } = options;
 
   const shouldIgnore = buildIgnoreMatcher(ignorePatterns);
-  const git = simpleGit(repoPath);
+  const classify = buildClassifier(classificationRules);
   const ranges = buildScanRanges(since, chunkMonths);
 
   // Shared state across all chunks — the recordMap is small (bounded by
-  // members × weeks), so it's safe to keep in memory. Only the raw git
-  // output string is freed between chunks.
+  // members × weeks), so it's safe to keep in memory.
   const recordMap = new Map<string, UserWeekRepoRecord>();
   const activeDaysMap = new Map<string, Set<string>>();
   const rawAuthorsMap = new Map<string, RawAuthor>();
@@ -401,14 +662,21 @@ export async function scanRepo(
   let totalCommitCount = 0;
   let skippedCount = 0;
 
+  const batchArgs = {
+    repoName, group, authorMap, recentHashes,
+    recordMap, activeDaysMap, newHashes, rawAuthorsMap,
+    identifierRules, shouldIgnore, classify,
+  };
+
   for (const range of ranges) {
-    const args = ["log", "--raw", "--numstat", "--no-merges", "--format=%H|%ae|%an|%aI"];
+    const args = ["log", "--raw", "--numstat", "--no-merges", "--format=%H|%ae|%an|%aI|%s"];
     if (range.since) args.splice(1, 0, `--since=${range.since}`);
     if (range.until) args.splice(1, 0, `--until=${range.until}`);
 
-    let output: string;
     try {
-      output = await git.raw(args);
+      const result = await streamGitLog(repoPath, args, batchArgs);
+      totalCommitCount += result.commitCount;
+      skippedCount += result.skippedCount;
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       console.log(`  Warning: git error in ${repoName}: ${msg}`);
@@ -417,16 +685,6 @@ export async function scanRepo(
       }
       continue; // skip this chunk, try next
     }
-
-    const commits = parseGitLogOutput(output);
-    totalCommitCount += commits.length;
-
-    skippedCount += processCommitBatch(
-      commits, repoName, group, authorMap, recentHashes,
-      recordMap, activeDaysMap, newHashes, rawAuthorsMap, identifierRules,
-      shouldIgnore,
-    );
-    // `output` and `commits` go out of scope here → eligible for GC
   }
 
   // Finalize activeDays from the tracked sets
@@ -534,6 +792,115 @@ export async function calculateChurnRate(
         }
       } catch {
         // File may not exist in git history at this point
+      }
+    }
+  }
+
+  if (totalLines === 0) return 0;
+  return Math.round((churnLines / totalLines) * 100);
+}
+
+/**
+ * Fast churn heuristic: estimates churn rate using only 2 git log calls.
+ *
+ * Strategy: Get all commits by author in the period, then get all commits
+ * by anyone in the instability window. Count how many of the author's
+ * file-changes overlap with files that were recently modified.
+ *
+ * Much faster than calculateChurnRate (2 git calls vs N×M), with
+ * slightly less precision (doesn't track exact per-commit window).
+ *
+ * Filters instability-window commits by intent: chore and docs commits
+ * are excluded so that formatting fixes or README edits don't inflate
+ * the churn metric.
+ */
+export async function calculateFastChurnRate(
+  repoPath: string,
+  authorEmail: string,
+  since: string,
+  until: string,
+  instabilityWindowDays = 21,
+): Promise<number> {
+  const git = simpleGit(repoPath);
+
+  // 1. Get all commits by author in period with file changes
+  let authorOutput: string;
+  try {
+    authorOutput = await git.raw([
+      "log",
+      `--since=${since}`,
+      `--until=${until}`,
+      `--author=${authorEmail}`,
+      "--no-merges",
+      "--format=%H",
+      "--numstat",
+    ]);
+  } catch {
+    return 0;
+  }
+
+  if (!authorOutput.trim()) return 0;
+
+  const authorCommits = parseChurnLog(authorOutput);
+  if (authorCommits.length === 0) return 0;
+
+  // 2. Get all file modifications by anyone in the extended window
+  //    (instability window before the period start).
+  //    Include subject so we can filter out low-signal intents.
+  const windowStart = new Date(since);
+  windowStart.setDate(windowStart.getDate() - instabilityWindowDays);
+  const windowSince = windowStart.toISOString().slice(0, 10);
+
+  let allOutput: string;
+  try {
+    allOutput = await git.raw([
+      "log",
+      `--since=${windowSince}`,
+      `--until=${until}`,
+      "--no-merges",
+      "--format=%H|%s",
+      "--name-only",
+    ]);
+  } catch {
+    return 0;
+  }
+
+  // Build a set of files modified in the window (excluding current author's
+  // commits AND excluding chore/docs commits that don't indicate real instability)
+  const authorHashes = new Set(authorCommits.map((c) => c.hash));
+  const recentlyModified = new Set<string>();
+  let currentHash: string | null = null;
+  let skipCurrentCommit = false;
+
+  for (const line of allOutput.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    // Header line: hash|subject
+    const pipeIdx = trimmed.indexOf("|");
+    if (pipeIdx >= 40 && /^[0-9a-f]{40}$/.test(trimmed.slice(0, 40))) {
+      currentHash = trimmed.slice(0, 40);
+      const subject = trimmed.slice(pipeIdx + 1);
+      const intent = parseIntent(subject);
+      skipCurrentCommit = authorHashes.has(currentHash) || intent === "chore" || intent === "docs";
+      continue;
+    }
+
+    if (currentHash && !skipCurrentCommit) {
+      recentlyModified.add(trimmed.toLowerCase());
+    }
+  }
+
+  // 3. Count churn: author's lines in files that were recently modified by others
+  let totalLines = 0;
+  let churnLines = 0;
+
+  for (const commit of authorCommits) {
+    for (const file of commit.files) {
+      const lines = file.insertions + file.deletions;
+      totalLines += lines;
+      if (recentlyModified.has(file.path.toLowerCase())) {
+        churnLines += lines;
       }
     }
   }

@@ -113,7 +113,7 @@ export function getLastNMonths(n: number, fromWeek?: string): string[] {
   const refDate = fromWeek ? isoWeekToMonday(fromWeek) : new Date();
   const months: string[] = [];
   for (let i = n - 1; i >= 0; i--) {
-    const d = new Date(Date.UTC(refDate.getFullYear(), refDate.getMonth() - i, 1));
+    const d = new Date(Date.UTC(refDate.getUTCFullYear(), refDate.getUTCMonth() - i, 1));
     months.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`);
   }
   return months;
@@ -144,8 +144,8 @@ export function monthShort(month: string): string {
  */
 export function getLastNQuarters(n: number, fromWeek?: string): string[] {
   const refDate = fromWeek ? isoWeekToMonday(fromWeek) : new Date();
-  const refQ = Math.floor(refDate.getMonth() / 3); // 0-based
-  const refYear = refDate.getFullYear();
+  const refQ = Math.floor(refDate.getUTCMonth() / 3); // 0-based
+  const refYear = refDate.getUTCFullYear();
   const quarters: string[] = [];
   for (let i = n - 1; i >= 0; i--) {
     let q = refQ - i;
@@ -162,7 +162,7 @@ export function getLastNQuarters(n: number, fromWeek?: string): string[] {
  */
 export function getLastNYears(n: number, fromWeek?: string): string[] {
   const refDate = fromWeek ? isoWeekToMonday(fromWeek) : new Date();
-  const refYear = refDate.getFullYear();
+  const refYear = refDate.getUTCFullYear();
   const years: string[] = [];
   for (let i = n - 1; i >= 0; i--) {
     years.push(String(refYear - i));
@@ -210,7 +210,7 @@ export function isoWeekToDateRange(isoWeek: string): { since: string; until: str
  */
 function dateToISOWeek(date: Date): string {
   // Copy date so we don't mutate the original
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 
   // Set to nearest Thursday: current date + 4 - current day number
   // Make Sunday (0) into 7

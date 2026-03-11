@@ -52,7 +52,18 @@ export function buildIgnoreMatcher(
   for (const pattern of patterns) {
     const p = pattern.toLowerCase();
 
-    if (p.includes("/")) {
+    if (p.startsWith("**/")) {
+      // Recursive glob: "**/*.test.ts" → match the suffix anywhere in the path
+      const suffix = p.slice(3);
+      if (suffix.startsWith("*.") && suffix.lastIndexOf("*") === 0) {
+        const ext = suffix.slice(1);
+        matchers.push((_lower, baseLower) => baseLower.endsWith(ext));
+      } else {
+        const escaped = p.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*");
+        const re = new RegExp(`^${escaped}$`);
+        matchers.push((lower) => re.test(lower));
+      }
+    } else if (p.includes("/")) {
       // Directory pattern like "dist/*" — match path prefix
       const prefix = p.replace(/\/\*$/, "/");
       matchers.push((lower) => lower.startsWith(prefix) || lower.includes(`/${prefix}`));
@@ -81,13 +92,99 @@ export function buildIgnoreMatcher(
 export { DEFAULT_IGNORE_PATTERNS };
 
 /**
- * Classify a file path into one of four categories.
+ * Build a classifier function from user-defined glob→category rules.
+ * Returns a function that checks user rules first, then falls back to
+ * built-in classification. User rules use the same glob syntax as ignore patterns.
+ *
+ * Example rules: { "*.tf": "config", "*.proto": "app", "src/generated/**": "config" }
+ */
+export function buildClassifier(
+  userRules?: Record<string, FileType>,
+): (filePath: string) => FileType {
+  if (!userRules || Object.keys(userRules).length === 0) {
+    return classifyFile;
+  }
+
+  // Pre-compile user rules into fast matchers (same logic as buildIgnoreMatcher)
+  const rules: Array<{ match: (lower: string, baseLower: string) => boolean; category: FileType }> = [];
+
+  for (const [pattern, category] of Object.entries(userRules)) {
+    const p = pattern.toLowerCase();
+
+    if (p.startsWith("**/")) {
+      // Recursive glob: "**/*.test.ts" → match the suffix anywhere in the path
+      const suffix = p.slice(3);
+      if (suffix.startsWith("*.") && suffix.lastIndexOf("*") === 0) {
+        const ext = suffix.slice(1);
+        rules.push({ match: (_lower, baseLower) => baseLower.endsWith(ext), category });
+      } else {
+        const escaped = p.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*");
+        const re = new RegExp(`^${escaped}$`);
+        rules.push({ match: (lower) => re.test(lower), category });
+      }
+    } else if (p.includes("/") && p.endsWith("/**")) {
+      // Directory wildcard: "src/generated/**" matches anything under that dir
+      const prefix = p.slice(0, -2); // "src/generated/"
+      rules.push({
+        match: (lower) => lower.startsWith(prefix) || lower.includes(`/${prefix}`),
+        category,
+      });
+    } else if (p.includes("/")) {
+      // Directory pattern: "dist/*" matches files directly under dist/
+      const prefix = p.replace(/\/\*$/, "/");
+      rules.push({
+        match: (lower) => lower.startsWith(prefix) || lower.includes(`/${prefix}`),
+        category,
+      });
+    } else if (p.startsWith("*.") && p.lastIndexOf("*") === 0) {
+      // Simple suffix: "*.tf" matches any file ending in .tf
+      const suffix = p.slice(1);
+      rules.push({
+        match: (_lower, baseLower) => baseLower.endsWith(suffix),
+        category,
+      });
+    } else if (p.includes("*")) {
+      // General glob: convert to regex
+      const escaped = p.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*");
+      const re = new RegExp(`^${escaped}$`);
+      rules.push({
+        match: (_lower, baseLower) => re.test(baseLower),
+        category,
+      });
+    } else {
+      // Exact basename match
+      rules.push({
+        match: (_lower, baseLower) => baseLower === p,
+        category,
+      });
+    }
+  }
+
+  return (filePath: string): FileType => {
+    const normalized = filePath.replace(/\\/g, "/").toLowerCase();
+    const baseLower = path.basename(normalized).toLowerCase();
+
+    // Check user rules first (first match wins)
+    for (const rule of rules) {
+      if (rule.match(normalized, baseLower)) {
+        return rule.category;
+      }
+    }
+
+    // Fall back to built-in classification
+    return classifyFile(filePath);
+  };
+}
+
+/**
+ * Classify a file path into one of five categories.
  * Ordered rule matching: first match wins.
  *
  * Priority 1: storybook
  * Priority 2: test
  * Priority 3: config
- * Priority 4: app (everything else)
+ * Priority 4: doc
+ * Priority 5: app (everything else)
  */
 export function classifyFile(filePath: string): FileType {
   const normalized = filePath.replace(/\\/g, "/");

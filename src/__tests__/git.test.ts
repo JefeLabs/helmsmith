@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { EventEmitter, PassThrough } from "node:stream";
 import type { AuthorMap, ResolvedAuthor } from "../collector/author-map.js";
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
@@ -15,6 +16,49 @@ vi.mock("simple-git", () => {
   };
 });
 
+// Track spawn calls for assertions
+const spawnCalls: Array<{ cmd: string; args: string[]; opts: Record<string, unknown> }> = [];
+// Queue of outputs or errors for successive spawn calls
+let spawnQueue: Array<string | Error> = [];
+
+/**
+ * Create a fake ChildProcess that emits the given output on stdout,
+ * or emits an error + non-zero exit code if given an Error.
+ * Uses PassThrough streams so readline can consume them properly.
+ */
+function createMockChildProcess(outputOrError: string | Error): EventEmitter & { stdout: PassThrough; stderr: PassThrough } {
+  const child = new EventEmitter() as EventEmitter & { stdout: PassThrough; stderr: PassThrough };
+  child.stdout = new PassThrough();
+  child.stderr = new PassThrough();
+
+  // Schedule emission after event loop tick so listeners can attach first
+  process.nextTick(() => {
+    if (outputOrError instanceof Error) {
+      child.stderr.end(outputOrError.message);
+      child.stdout.end();
+      child.emit("close", 128);
+    } else {
+      child.stderr.end();
+      // Ensure output ends with newline so readline processes the last line
+      const data = outputOrError && !outputOrError.endsWith("\n")
+        ? outputOrError + "\n"
+        : outputOrError;
+      child.stdout.end(data);
+      child.emit("close", 0);
+    }
+  });
+
+  return child;
+}
+
+vi.mock("node:child_process", () => ({
+  spawn: vi.fn((_cmd: string, _args: string[], _opts: Record<string, unknown>) => {
+    spawnCalls.push({ cmd: _cmd, args: _args, opts: _opts });
+    const outputOrError = spawnQueue.length > 0 ? spawnQueue.shift()! : "";
+    return createMockChildProcess(outputOrError);
+  }),
+}));
+
 vi.mock("../collector/classifier.js", () => ({
   classifyFile: vi.fn((filePath: string) => {
     if (filePath.includes(".test.")) return "test";
@@ -23,10 +67,16 @@ vi.mock("../collector/classifier.js", () => ({
     return "app";
   }),
   buildIgnoreMatcher: vi.fn(() => () => false),
+  buildClassifier: vi.fn(() => (filePath: string) => {
+    if (filePath.includes(".test.")) return "test";
+    if (filePath.includes(".stories.")) return "storybook";
+    if (filePath.endsWith(".json") || filePath.endsWith(".yml")) return "config";
+    return "app";
+  }),
   DEFAULT_IGNORE_PATTERNS: [],
 }));
 
-const { parseGitLogOutput, getISOWeek, scanRepo, generateDateChunks, parseChurnLog, sampleEvenly } = await import(
+const { parseGitLogOutput, getISOWeek, scanRepo, generateDateChunks, parseChurnLog, sampleEvenly, parseIntent, calculateFastChurnRate, GitLogLineParser } = await import(
   "../collector/git.js"
 );
 
@@ -218,10 +268,12 @@ describe("getISOWeek", () => {
 describe("scanRepo", () => {
   beforeEach(() => {
     mockRaw.mockReset();
+    spawnCalls.length = 0;
+    spawnQueue = [];
   });
 
   it("produces records for resolved authors", async () => {
-    mockRaw.mockResolvedValue(
+    spawnQueue.push(
       [
         "aaa111|alice@acme.com|Alice Johnson|2026-02-20T10:00:00Z",
         "10\t2\tsrc/index.ts",
@@ -250,7 +302,7 @@ describe("scanRepo", () => {
   });
 
   it("skips commits already in recentHashes", async () => {
-    mockRaw.mockResolvedValue(
+    spawnQueue.push(
       [
         "aaa111|alice@acme.com|Alice Johnson|2026-02-20T10:00:00Z",
         "10\t2\tsrc/index.ts",
@@ -275,7 +327,7 @@ describe("scanRepo", () => {
   });
 
   it("assigns unresolved authors to 'unassigned' org/team", async () => {
-    mockRaw.mockResolvedValue(
+    spawnQueue.push(
       [
         "ccc333|unknown@nowhere.com|Unknown Person|2026-02-22T10:00:00Z",
         "10\t2\tsrc/mystery.ts",
@@ -298,7 +350,7 @@ describe("scanRepo", () => {
   });
 
   it("aggregates multiple commits by same author in same week", async () => {
-    mockRaw.mockResolvedValue(
+    spawnQueue.push(
       [
         "aaa111|alice@acme.com|Alice Johnson|2026-02-23T10:00:00Z",
         "10\t2\tsrc/a.ts",
@@ -324,7 +376,7 @@ describe("scanRepo", () => {
   });
 
   it("passes since option to git log args", async () => {
-    mockRaw.mockResolvedValue("");
+    spawnQueue.push("");
 
     await scanRepo("/repos/frontend", {
       repoName: "frontend",
@@ -334,13 +386,14 @@ describe("scanRepo", () => {
       since: "2026-02-01",
     });
 
-    expect(mockRaw).toHaveBeenCalledWith(
+    expect(spawnCalls).toHaveLength(1);
+    expect(spawnCalls[0].args).toEqual(
       expect.arrayContaining(["--since=2026-02-01"])
     );
   });
 
   it("handles git errors gracefully", async () => {
-    mockRaw.mockRejectedValue(new Error("not a git repository"));
+    spawnQueue.push(new Error("not a git repository"));
 
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
@@ -363,10 +416,9 @@ describe("scanRepo", () => {
 
   it("caps activeDays at 7", async () => {
     // Create 8 commits on different days in the same week
-    // Week 9 of 2026: Mon Feb 23 to Sun Mar 1
     const lines: string[] = [];
     for (let day = 0; day < 8; day++) {
-      const d = 23 + day; // Feb 23-28 + Mar 1-2 (but let's keep in same week range)
+      const d = 23 + day;
       const hash = `h${String(day).padStart(3, "0")}`;
       const dateStr = day < 6
         ? `2026-02-${String(d).padStart(2, "0")}T10:00:00Z`
@@ -375,7 +427,7 @@ describe("scanRepo", () => {
       lines.push("1\t0\tsrc/file.ts");
       if (day < 7) lines.push("");
     }
-    mockRaw.mockResolvedValue(lines.join("\n"));
+    spawnQueue.push(lines.join("\n"));
 
     const result = await scanRepo("/repos/frontend", {
       repoName: "frontend",
@@ -391,15 +443,10 @@ describe("scanRepo", () => {
   });
 
   it("scans in time-based chunks when chunkMonths is set and no since", async () => {
-    // Each call to git.raw returns different commits
-    mockRaw
-      .mockResolvedValueOnce(
-        "aaa111|alice@acme.com|Alice Johnson|2024-03-15T10:00:00Z\n5\t1\tsrc/a.ts"
-      )
-      .mockResolvedValueOnce(
-        "bbb222|alice@acme.com|Alice Johnson|2024-06-20T10:00:00Z\n3\t0\tsrc/b.ts"
-      )
-      .mockResolvedValue(""); // remaining empty chunks
+    // Each spawn call returns different commits; fill queue with enough entries
+    spawnQueue.push("aaa111|alice@acme.com|Alice Johnson|2024-03-15T10:00:00Z\n5\t1\tsrc/a.ts");
+    spawnQueue.push("bbb222|alice@acme.com|Alice Johnson|2024-06-20T10:00:00Z\n3\t0\tsrc/b.ts");
+    // Remaining chunks return empty output (default in mock)
 
     const result = await scanRepo("/repos/frontend", {
       repoName: "frontend",
@@ -409,13 +456,12 @@ describe("scanRepo", () => {
       chunkMonths: 3,
     });
 
-    // Should have called git.raw multiple times (one per 3-month chunk)
-    expect(mockRaw.mock.calls.length).toBeGreaterThan(1);
-    // All git calls should have --since and --until
-    for (const call of mockRaw.mock.calls) {
-      const args = call[0] as string[];
-      expect(args.some((a) => a.startsWith("--since="))).toBe(true);
-      expect(args.some((a) => a.startsWith("--until="))).toBe(true);
+    // Should have spawned multiple times (one per 3-month chunk)
+    expect(spawnCalls.length).toBeGreaterThan(1);
+    // All spawn calls should have --since and --until in args
+    for (const call of spawnCalls) {
+      expect(call.args.some((a) => a.startsWith("--since="))).toBe(true);
+      expect(call.args.some((a) => a.startsWith("--until="))).toBe(true);
     }
 
     // Should still produce merged results across chunks
@@ -425,7 +471,7 @@ describe("scanRepo", () => {
   });
 
   it("does not chunk when since is set (incremental scan)", async () => {
-    mockRaw.mockResolvedValue("");
+    spawnQueue.push("");
 
     await scanRepo("/repos/frontend", {
       repoName: "frontend",
@@ -436,18 +482,15 @@ describe("scanRepo", () => {
       chunkMonths: 3,
     });
 
-    // Should call git.raw exactly once (no chunking for incremental)
-    expect(mockRaw).toHaveBeenCalledTimes(1);
-    expect(mockRaw.mock.calls[0][0]).toContain("--since=2026-02-01");
+    // Should spawn exactly once (no chunking for incremental)
+    expect(spawnCalls).toHaveLength(1);
+    expect(spawnCalls[0].args).toContain("--since=2026-02-01");
   });
 
   it("continues scanning remaining chunks when one chunk errors", async () => {
-    mockRaw
-      .mockRejectedValueOnce(new Error("transient failure"))
-      .mockResolvedValueOnce(
-        "ccc333|alice@acme.com|Alice Johnson|2024-06-15T10:00:00Z\n2\t0\tsrc/c.ts"
-      )
-      .mockResolvedValue("");
+    spawnQueue.push(new Error("transient failure"));
+    spawnQueue.push("ccc333|alice@acme.com|Alice Johnson|2024-06-15T10:00:00Z\n2\t0\tsrc/c.ts");
+    // Remaining chunks return empty output (default in mock)
 
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
@@ -567,5 +610,343 @@ describe("sampleEvenly", () => {
   it("handles n=1", () => {
     const arr = [10, 20, 30];
     expect(sampleEvenly(arr, 1)).toEqual([10]);
+  });
+});
+
+// ── parseIntent ──────────────────────────────────────────────────────────────
+
+describe("parseIntent", () => {
+  it("parses feat prefix", () => {
+    expect(parseIntent("feat: add new button")).toBe("feat");
+  });
+
+  it("parses fix prefix", () => {
+    expect(parseIntent("fix: resolve null pointer")).toBe("fix");
+  });
+
+  it("parses feat with scope", () => {
+    expect(parseIntent("feat(auth): add OAuth support")).toBe("feat");
+  });
+
+  it("parses refactor prefix", () => {
+    expect(parseIntent("refactor: simplify logic")).toBe("refactor");
+  });
+
+  it("parses docs prefix", () => {
+    expect(parseIntent("docs: update README")).toBe("docs");
+  });
+
+  it("parses test prefix", () => {
+    expect(parseIntent("test: add unit tests")).toBe("test");
+  });
+
+  it("maps tests to test", () => {
+    expect(parseIntent("tests: add integration tests")).toBe("test");
+  });
+
+  it("parses chore prefix", () => {
+    expect(parseIntent("chore: bump deps")).toBe("chore");
+  });
+
+  it("maps ci to chore", () => {
+    expect(parseIntent("ci: fix pipeline")).toBe("chore");
+  });
+
+  it("maps build to chore", () => {
+    expect(parseIntent("build: update webpack")).toBe("chore");
+  });
+
+  it("maps perf to chore", () => {
+    expect(parseIntent("perf: optimize query")).toBe("chore");
+  });
+
+  it("handles breaking change indicator", () => {
+    expect(parseIntent("feat!: breaking API change")).toBe("feat");
+  });
+
+  it("handles breaking change with scope", () => {
+    expect(parseIntent("fix(api)!: remove deprecated endpoint")).toBe("fix");
+  });
+
+  it("returns other for non-conventional commits", () => {
+    expect(parseIntent("Update button styling")).toBe("other");
+    expect(parseIntent("WIP")).toBe("other");
+    expect(parseIntent("Merge branch 'main'")).toBe("other");
+  });
+
+  it("is case-insensitive", () => {
+    expect(parseIntent("FEAT: uppercase")).toBe("feat");
+    expect(parseIntent("Fix: mixed case")).toBe("fix");
+  });
+
+  it("handles empty subject", () => {
+    expect(parseIntent("")).toBe("other");
+  });
+});
+
+// ── parseGitLogOutput with subject (5-field format) ──────────────────────────
+
+describe("parseGitLogOutput with subject", () => {
+  it("parses 5-field format and extracts intent", () => {
+    const output = [
+      "abc123|alice@acme.com|Alice|2026-02-20T10:00:00Z|feat: add button",
+      "10\t2\tsrc/button.ts",
+    ].join("\n");
+
+    const commits = parseGitLogOutput(output);
+    expect(commits).toHaveLength(1);
+    expect(commits[0].subject).toBe("feat: add button");
+    expect(commits[0].intent).toBe("feat");
+  });
+
+  it("handles subject with pipe characters", () => {
+    const output = [
+      "abc123|alice@acme.com|Alice|2026-02-20T10:00:00Z|fix: handle a|b case",
+      "5\t1\tsrc/utils.ts",
+    ].join("\n");
+
+    const commits = parseGitLogOutput(output);
+    expect(commits[0].subject).toBe("fix: handle a|b case");
+    expect(commits[0].intent).toBe("fix");
+  });
+
+  it("falls back to other for non-conventional subject", () => {
+    const output = [
+      "abc123|alice@acme.com|Alice|2026-02-20T10:00:00Z|Update styling",
+      "3\t0\tsrc/style.css",
+    ].join("\n");
+
+    const commits = parseGitLogOutput(output);
+    expect(commits[0].intent).toBe("other");
+  });
+
+  it("still parses old 4-field format", () => {
+    const output = [
+      "abc123|alice@acme.com|Alice Johnson|2026-02-20T10:00:00Z",
+      "10\t2\tsrc/index.ts",
+    ].join("\n");
+
+    const commits = parseGitLogOutput(output);
+    expect(commits[0].name).toBe("Alice Johnson");
+    expect(commits[0].subject).toBe("");
+    expect(commits[0].intent).toBe("other");
+  });
+});
+
+// ── GitLogLineParser (streaming parser) ─────────────────────────────────────
+
+describe("GitLogLineParser", () => {
+  it("yields a commit when a new header line arrives", () => {
+    const parser = new GitLogLineParser();
+
+    // First commit lines
+    expect(parser.processLine("abc123|alice@acme.com|Alice|2026-02-20T10:00:00Z|feat: add button")).toBeNull();
+    expect(parser.processLine("10\t2\tsrc/button.ts")).toBeNull();
+
+    // Second header finalizes first commit
+    const commit = parser.processLine("def456|bob@acme.com|Bob|2026-02-21T10:00:00Z|fix: typo");
+    expect(commit).not.toBeNull();
+    expect(commit!.hash).toBe("abc123");
+    expect(commit!.intent).toBe("feat");
+    expect(commit!.files).toHaveLength(1);
+    expect(commit!.files[0].insertions).toBe(10);
+
+    // flush() returns the last commit
+    const last = parser.flush();
+    expect(last).not.toBeNull();
+    expect(last!.hash).toBe("def456");
+    expect(last!.intent).toBe("fix");
+  });
+
+  it("handles blank lines without yielding", () => {
+    const parser = new GitLogLineParser();
+    expect(parser.processLine("")).toBeNull();
+    expect(parser.processLine("   ")).toBeNull();
+  });
+
+  it("produces identical results to parseGitLogOutput", () => {
+    const output = [
+      "aaa111|alice@acme.com|Alice|2026-02-20T10:00:00Z|feat: add feature",
+      ":100644 100644 abcdef 123456 A\tsrc/new.ts",
+      "10\t0\tsrc/new.ts",
+      "",
+      "bbb222|bob@acme.com|Bob|2026-02-21T10:00:00Z|fix: bug",
+      ":100644 100644 abcdef 123456 M\tsrc/old.ts",
+      "3\t1\tsrc/old.ts",
+    ].join("\n");
+
+    // Batch parse
+    const batchCommits = parseGitLogOutput(output);
+
+    // Streaming parse
+    const parser = new GitLogLineParser();
+    const streamCommits: Array<ReturnType<typeof parser.flush>> = [];
+    for (const line of output.split("\n")) {
+      const c = parser.processLine(line);
+      if (c) streamCommits.push(c);
+    }
+    const last = parser.flush();
+    if (last) streamCommits.push(last);
+
+    expect(streamCommits).toHaveLength(batchCommits.length);
+    for (let i = 0; i < batchCommits.length; i++) {
+      expect(streamCommits[i]!.hash).toBe(batchCommits[i].hash);
+      expect(streamCommits[i]!.intent).toBe(batchCommits[i].intent);
+      expect(streamCommits[i]!.files.length).toBe(batchCommits[i].files.length);
+      for (let j = 0; j < batchCommits[i].files.length; j++) {
+        expect(streamCommits[i]!.files[j]).toEqual(batchCommits[i].files[j]);
+      }
+    }
+  });
+
+  it("returns null from flush when no commits were processed", () => {
+    const parser = new GitLogLineParser();
+    expect(parser.flush()).toBeNull();
+  });
+});
+
+// ── calculateFastChurnRate ──────────────────────────────────────────────────
+
+describe("calculateFastChurnRate", () => {
+  beforeEach(() => {
+    mockRaw.mockReset();
+  });
+
+  // Helper: build a git log --format=%H --numstat output for the author step
+  function authorLog(commits: Array<{ hash: string; files: Array<[number, number, string]> }>): string {
+    return commits
+      .map((c) => [c.hash, ...c.files.map(([ins, del, p]) => `${ins}\t${del}\t${p}`)].join("\n"))
+      .join("\n\n");
+  }
+
+  // Helper: build a git log --format=%H|%s --name-only output for the window step
+  function windowLog(commits: Array<{ hash: string; subject: string; files: string[] }>): string {
+    return commits
+      .map((c) => [`${c.hash}|${c.subject}`, ...c.files].join("\n"))
+      .join("\n\n");
+  }
+
+  it("returns 0 when author has no commits", async () => {
+    mockRaw.mockResolvedValueOnce(""); // author log empty
+    const result = await calculateFastChurnRate("/repo", "dev@co.com", "2026-01-01", "2026-02-01");
+    expect(result).toBe(0);
+  });
+
+  it("counts churn when author touches files recently modified by others", async () => {
+    const authorHash = "a".repeat(40);
+    const otherHash = "b".repeat(40);
+
+    // Author touched app.ts (10+5=15 lines) and readme.md (2+1=3 lines)
+    mockRaw.mockResolvedValueOnce(
+      authorLog([{ hash: authorHash, files: [[10, 5, "src/app.ts"], [2, 1, "readme.md"]] }]),
+    );
+
+    // Window: someone else touched app.ts with a feat commit
+    mockRaw.mockResolvedValueOnce(
+      windowLog([{ hash: otherHash, subject: "feat: add feature", files: ["src/app.ts"] }]),
+    );
+
+    const result = await calculateFastChurnRate("/repo", "dev@co.com", "2026-01-01", "2026-02-01");
+    // 15 churn lines out of 18 total = 83%
+    expect(result).toBe(83);
+  });
+
+  it("excludes chore commits from instability window", async () => {
+    const authorHash = "a".repeat(40);
+    const choreHash = "c".repeat(40);
+
+    // Author touched app.ts
+    mockRaw.mockResolvedValueOnce(
+      authorLog([{ hash: authorHash, files: [[10, 5, "src/app.ts"]] }]),
+    );
+
+    // Window: only a chore commit touched app.ts — should be ignored
+    mockRaw.mockResolvedValueOnce(
+      windowLog([{ hash: choreHash, subject: "chore: fix linting", files: ["src/app.ts"] }]),
+    );
+
+    const result = await calculateFastChurnRate("/repo", "dev@co.com", "2026-01-01", "2026-02-01");
+    // chore is filtered out → app.ts not in recentlyModified → 0% churn
+    expect(result).toBe(0);
+  });
+
+  it("excludes docs commits from instability window", async () => {
+    const authorHash = "a".repeat(40);
+    const docsHash = "d".repeat(40);
+
+    mockRaw.mockResolvedValueOnce(
+      authorLog([{ hash: authorHash, files: [[8, 2, "src/utils.ts"]] }]),
+    );
+
+    // Window: only a docs commit touched utils.ts
+    mockRaw.mockResolvedValueOnce(
+      windowLog([{ hash: docsHash, subject: "docs: update jsdoc", files: ["src/utils.ts"] }]),
+    );
+
+    const result = await calculateFastChurnRate("/repo", "dev@co.com", "2026-01-01", "2026-02-01");
+    expect(result).toBe(0);
+  });
+
+  it("includes fix and feat commits in instability window", async () => {
+    const authorHash = "a".repeat(40);
+    const fixHash = "f".repeat(40);
+
+    mockRaw.mockResolvedValueOnce(
+      authorLog([{ hash: authorHash, files: [[10, 5, "src/api.ts"]] }]),
+    );
+
+    mockRaw.mockResolvedValueOnce(
+      windowLog([{ hash: fixHash, subject: "fix: null check", files: ["src/api.ts"] }]),
+    );
+
+    const result = await calculateFastChurnRate("/repo", "dev@co.com", "2026-01-01", "2026-02-01");
+    // fix is substantive → api.ts is in recentlyModified → 100% churn
+    expect(result).toBe(100);
+  });
+
+  it("mixed: counts only files touched by substantive commits", async () => {
+    const authorHash = "a".repeat(40);
+    const choreHash = "c".repeat(40);
+    const featHash = "e".repeat(40);
+
+    // Author touched both files equally (10 lines each)
+    mockRaw.mockResolvedValueOnce(
+      authorLog([{ hash: authorHash, files: [[5, 5, "src/a.ts"], [5, 5, "src/b.ts"]] }]),
+    );
+
+    // Window: chore touched a.ts (ignored), feat touched b.ts (counted)
+    mockRaw.mockResolvedValueOnce(
+      windowLog([
+        { hash: choreHash, subject: "chore: format", files: ["src/a.ts"] },
+        { hash: featHash, subject: "feat: new thing", files: ["src/b.ts"] },
+      ]),
+    );
+
+    const result = await calculateFastChurnRate("/repo", "dev@co.com", "2026-01-01", "2026-02-01");
+    // 10 churn lines (b.ts) out of 20 total = 50%
+    expect(result).toBe(50);
+  });
+
+  it("excludes author's own commits from instability window", async () => {
+    const authorHash = "a".repeat(40);
+
+    mockRaw.mockResolvedValueOnce(
+      authorLog([{ hash: authorHash, files: [[10, 5, "src/app.ts"]] }]),
+    );
+
+    // Window: the author's own commit touched app.ts
+    mockRaw.mockResolvedValueOnce(
+      windowLog([{ hash: authorHash, subject: "feat: my work", files: ["src/app.ts"] }]),
+    );
+
+    const result = await calculateFastChurnRate("/repo", "dev@co.com", "2026-01-01", "2026-02-01");
+    // Author's own commits excluded → 0% churn
+    expect(result).toBe(0);
+  });
+
+  it("returns 0 when git log fails", async () => {
+    mockRaw.mockRejectedValueOnce(new Error("git error"));
+    const result = await calculateFastChurnRate("/repo", "dev@co.com", "2026-01-01", "2026-02-01");
+    expect(result).toBe(0);
   });
 });

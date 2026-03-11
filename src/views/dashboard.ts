@@ -5,7 +5,16 @@ import { writeFile } from 'node:fs/promises';
 import yaml from 'js-yaml';
 import type { ViewContext, NavigationAction } from './types.js';
 import type { UserWeekRepoRecord, EnrichmentStore } from '../types/schema.js';
-import { getEnrichment } from '../store/enrichments.js';
+import type { ProductivityExtensions } from '../types/schema.js';
+
+const defaultEnrichment: ProductivityExtensions = {
+  prs_opened: 0, prs_merged: 0, avg_cycle_hrs: 0, reviews_given: 0, churn_rate_pct: 0,
+  pr_feature: 0, pr_fix: 0, pr_bugfix: 0, pr_chore: 0, pr_hotfix: 0, pr_other: 0,
+};
+
+function getEnrichment(store: EnrichmentStore, key: string): ProductivityExtensions {
+  return store.enrichments[key] ?? defaultEnrichment;
+}
 import { renderGroupedHBarChart } from '../ui/grouped-hbar-chart.js';
 import type { HBarGroup, HBar, DetailLayer } from '../ui/grouped-hbar-chart.js';
 import { renderBanner } from '../ui/banner.js';
@@ -13,7 +22,7 @@ import { renderLegend } from '../ui/legend.js';
 import { renderTabBar, renderHotkeyBar, renderBreadcrumb } from '../ui/tab-bar.js';
 import type { TabDef } from '../ui/tab-bar.js';
 import { renderTable } from '../ui/table.js';
-import { readKey } from '../ui/keypress.js';
+import { readKey, readKeyWithTimeout } from '../ui/keypress.js';
 import { readLine } from '../ui/readline.js';
 import { stackedBar } from '../ui/bar.js';
 import { rollup } from '../aggregator/engine.js';
@@ -1745,9 +1754,19 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
       }
     }
 
-    // Wait for keypress
+    // Wait for keypress (with timeout to poll for external DB changes)
     try {
-      const key = await readKey();
+      const POLL_INTERVAL_MS = 5_000;
+      const key = ctx.onRefreshData
+        ? await readKeyWithTimeout(POLL_INTERVAL_MS)
+        : await readKey();
+
+      // Timeout — check if background process updated the database
+      if (key === null) {
+        ctx.onRefreshData?.();
+        continue; // re-render (with potentially fresh data)
+      }
+
       const action = mapKey(
         key.name, activeTab,
         repoWindowWeeks, leaderboardWindowWeeks, numberedTeams,

@@ -1,6 +1,5 @@
 import { writeFile } from "node:fs/promises";
-import { loadCommitsData } from "../store/commits-by-filetype.js";
-import { loadEnrichments, getEnrichment } from "../store/enrichments.js";
+import { queryRecords, loadEnrichmentsSQL, getEnrichmentSQL } from "../store/sqlite-store.js";
 import { filterRecords, type Filters } from "../aggregator/filters.js";
 import { calculateSegments, type Segment } from "../aggregator/segments.js";
 import type { UserWeekRepoRecord, EnrichmentStore } from "../types/schema.js";
@@ -125,7 +124,8 @@ export function flattenRecord(
   // Enrichment metrics (default to 0 if not enriched)
   if (enrichmentStore) {
     const key = `${r.member}::${r.week}::${r.repo}`;
-    const e = getEnrichment(enrichmentStore, key);
+    const defaultMetrics = { prs_opened: 0, prs_merged: 0, avg_cycle_hrs: 0, reviews_given: 0, churn_rate_pct: 0 };
+    const e = enrichmentStore?.enrichments[key] ?? defaultMetrics;
     flat.prs_opened = e.prs_opened;
     flat.prs_merged = e.prs_merged;
     flat.avg_cycle_hrs = e.avg_cycle_hrs;
@@ -173,8 +173,7 @@ export function recordsToCsv(records: UserWeekRepoRecord[], enrichmentStore?: En
 }
 
 export async function exportData(options: ExportDataOptions): Promise<void> {
-  const data = await loadCommitsData();
-  let records = data.records;
+  let records = queryRecords({});
 
   if (options.filters) {
     records = filterRecords(records, options.filters);
@@ -186,7 +185,7 @@ export async function exportData(options: ExportDataOptions): Promise<void> {
     return;
   }
 
-  const enrichmentStore = await loadEnrichments();
+  const enrichmentStore = loadEnrichmentsSQL();
   const csv = recordsToCsv(records, enrichmentStore);
 
   if (options.output) {

@@ -1,46 +1,13 @@
 import { Command } from 'commander';
-import { rm } from 'node:fs/promises';
 import path from 'node:path';
 import { homedir } from 'node:os';
-import { loadConfig, saveConfig } from './config/loader.js';
 import { detectGitRoot } from './config/git-root.js';
 import {
   loadAllRegistries,
   getAvailableWorkspaces,
-  addReposToWorkspace,
-  removeRepoFromWorkspace,
-  saveReposRegistry,
-  createWorkspace,
 } from './config/repos-registry.js';
-import type { LoadedWorkspace } from './config/repos-registry.js';
-import { scanDirectory } from './collector/dir-scanner.js';
-import { readKey } from './ui/keypress.js';
-import { selectWorkspace } from './config/workspace-selector.js';
-import { loadScanState, saveScanState } from './store/scan-state.js';
-import { loadEnrichments } from './store/enrichments.js';
-import {
-  loadCommitsData,
-  saveCommitsData,
-  mergeRecords,
-  pruneOldRecords,
-  getStoreStats,
-} from './store/commits-by-filetype.js';
-import {
-  loadAuthorRegistry,
-  saveAuthorRegistry,
-  mergeDiscoveredAuthors,
-} from './store/author-registry.js';
-import { getCommitsPath, getScanStatePath, getAuthorRegistryPath, getEnrichmentsPath, getConfigDir, getDataDir, getConfigPath } from './store/paths.js';
-import { scanAllRepos } from './collector/index.js';
-import { getCurrentWeek } from './aggregator/filters.js';
-import { filterRecords } from './aggregator/filters.js';
-import { reattributeRecords } from './collector/author-map.js';
-import { runNavigator } from './views/navigator.js';
-import { dashboardView } from './views/dashboard.js';
-import { trendsView } from './views/trends.js';
-import { generateDemoData } from './demo.js';
-import type { ViewContext } from './views/types.js';
-import type { Config, Org, UserWeekRepoRecord, AuthorRegistry, ScanState } from './types/schema.js';
+import { getConfigPath, getDataDir } from './store/paths.js';
+import { runMain } from './commands/run-main.js';
 
 const program = new Command();
 
@@ -146,16 +113,54 @@ program
   .option('--force-scan', 'Full re-scan, ignore cursors')
   .option('--staleness <min>', 'Override staleness minutes', parseInt)
   .option('-w, --weeks <n>', 'Weeks of history', parseInt)
-  .action(async (cmdOpts: { workspace?: string; forceScan?: boolean; staleness?: number; weeks?: number }) => {
+  .option('--skip-enrich', 'Skip enrichment after scan')
+  .option('--watch [interval]', 'Re-scan periodically (interval in minutes, default: 30)')
+  .action(async (cmdOpts: { workspace?: string; forceScan?: boolean; staleness?: number; weeks?: number; skipEnrich?: boolean; watch?: string | boolean }) => {
     const g = globals();
-    await runMain({
+    const runOpts = {
       ...g,
       workspace: cmdOpts.workspace ?? g.workspace,
       forceScan: cmdOpts.forceScan ?? g.forceScan,
       staleness: cmdOpts.staleness ?? g.staleness,
       weeks: cmdOpts.weeks ?? g.weeks,
+      skipEnrich: cmdOpts.skipEnrich,
       scanOnly: true,
-    });
+    };
+
+    if (cmdOpts.watch !== undefined) {
+      const intervalMin = typeof cmdOpts.watch === 'string' ? parseInt(cmdOpts.watch, 10) : 30;
+      if (isNaN(intervalMin) || intervalMin < 1) {
+        console.error('Error: --watch interval must be a positive integer (minutes).');
+        process.exitCode = 1;
+        return;
+      }
+      const intervalMs = intervalMin * 60 * 1000;
+      console.log(`Background scan mode: scanning every ${Math.round(intervalMs / 60000)} minutes. Press Ctrl+C to stop.`);
+
+      const scan = async () => {
+        const timestamp = new Date().toLocaleTimeString();
+        console.log(`\n[${timestamp}] Scanning...`);
+        try {
+          await runMain(runOpts);
+        } catch (err) {
+          console.error(`  Scan error: ${err instanceof Error ? err.message : err}`);
+        }
+      };
+
+      await scan();
+      const loop = async () => {
+        while (true) {
+          await new Promise(r => setTimeout(r, intervalMs));
+          await scan();
+        }
+      };
+      loop().catch(err => {
+        console.error('Watch loop crashed:', err instanceof Error ? err.message : err);
+        process.exitCode = 1;
+      });
+    } else {
+      await runMain(runOpts);
+    }
   });
 
 // ── gitradar workspace ───────────────────────────────────────────────────────
@@ -415,6 +420,7 @@ data
     await importWorkspace(file);
   });
 
+
 // ── gitradar enrich ──────────────────────────────────────────────────────
 
 program
@@ -424,14 +430,20 @@ program
   .option('--repo <name>', 'Enrich only this repo')
   .option('--force', 'Re-enrich even if data exists')
   .option('--skip-churn', 'Skip churn rate calculation')
+  .option('--deep-churn', 'Use full per-file churn analysis (slower, more precise)')
+  .option('--concurrency <n>', 'Max concurrent GitHub API requests (default: 5)', parseInt)
+  .option('--skip-cache', 'Bypass local GitHub API response cache (force fresh fetch)')
   .option('--workspace <name>', 'Workspace to use for repo paths')
-  .action(async (cmdOpts: { weeks?: number; repo?: string; force?: boolean; skipChurn?: boolean; workspace?: string }) => {
+  .action(async (cmdOpts: { weeks?: number; repo?: string; force?: boolean; skipChurn?: boolean; deepChurn?: boolean; concurrency?: number; skipCache?: boolean; workspace?: string }) => {
     const { enrich: enrichCmd } = await import('./commands/enrich.js');
     await enrichCmd({
       weeks: cmdOpts.weeks,
       repo: cmdOpts.repo,
       force: cmdOpts.force,
       skipChurn: cmdOpts.skipChurn,
+      deepChurn: cmdOpts.deepChurn,
+      concurrency: cmdOpts.concurrency,
+      skipCache: cmdOpts.skipCache,
       config: globals().config,
       workspace: cmdOpts.workspace,
     });
@@ -442,394 +454,6 @@ program
 program.action(async () => {
   await runMain(globals());
 });
-
-// ── Main logic ───────────────────────────────────────────────────────────────
-
-interface RunOptions {
-  config?: string;
-  weeks?: number;
-  team?: string;
-  org?: string;
-  tag?: string;
-  group?: string;
-  demo?: boolean;
-  json?: boolean;
-  forceScan?: boolean;
-  prune?: number;
-  storeStats?: boolean;
-  reset?: boolean;
-  staleness?: number;
-  workspace?: string;
-  scanOnly?: boolean;
-  initialView?: 'dashboard' | 'trends';
-}
-
-async function runMain(opts: RunOptions): Promise<void> {
-  // ── Handle --reset early ─────────────────────────────────────────────────
-  if (opts.reset) {
-    try {
-      await rm(getCommitsPath(), { force: true });
-      await rm(getScanStatePath(), { force: true });
-      await rm(getAuthorRegistryPath(), { force: true });
-      await rm(getEnrichmentsPath(), { force: true });
-      console.log('Data files deleted. Starting fresh.');
-    } catch {
-      console.log('No data files to delete.');
-    }
-    return;
-  }
-
-  // ── Handle --store-stats early ───────────────────────────────────────────
-  if (opts.storeStats) {
-    const commitsDataForStats = await loadCommitsData();
-    const stats = getStoreStats(commitsDataForStats);
-    console.log(`Store stats:`);
-    console.log(`  Records:      ${stats.recordCount}`);
-    console.log(`  Organizations: ${stats.orgCount}`);
-    console.log(`  Teams:         ${stats.teamCount}`);
-    console.log(`  Oldest week:   ${stats.oldestWeek ?? 'n/a'}`);
-    console.log(`  Newest week:   ${stats.newestWeek ?? 'n/a'}`);
-    return;
-  }
-
-  // ── Load config (or generate demo) ───────────────────────────────────────
-
-  let config: Config;
-  let records: UserWeekRepoRecord[];
-  let liveScanState: ScanState | undefined;
-  let authorRegistry: AuthorRegistry | undefined;
-  let commitsData: { version: 1; lastUpdated: string; records: UserWeekRepoRecord[] } | undefined;
-  let selectedWorkspace: LoadedWorkspace | undefined;
-  let resolvedConfigPath: string | undefined;
-
-  if (opts.demo) {
-    const demoData = generateDemoData(opts.weeks ?? 12);
-    config = demoData.config;
-    records = demoData.records;
-    console.log(
-      `Demo mode: ${records.length} records generated ` +
-        `(${config.orgs.length} orgs, ${config.orgs.reduce((n, o) => n + o.teams.length, 0)} teams)`,
-    );
-  } else {
-    // ── Load config.yml for orgs, settings, and workspace preference ─────
-    let configOrgs: Config['orgs'] = [];
-    let configSettings: Config['settings'] = { weeks_back: 12, staleness_minutes: 60, trend_threshold: 0.10 };
-    let configWorkspace: string | undefined;
-    try {
-      const baseConfig = await loadConfig(opts.config);
-      configOrgs = baseConfig.orgs;
-      configSettings = baseConfig.settings;
-      configWorkspace = baseConfig.workspace;
-      resolvedConfigPath = opts.config;
-    } catch {
-      // config.yml missing or invalid — proceed with defaults
-    }
-
-    // ── Discover workspaces ───────────────────────────────────────────────
-    const gitRoot = await detectGitRoot();
-    const registries = await loadAllRegistries(gitRoot ?? undefined);
-    const workspaces = getAvailableWorkspaces(registries);
-
-    if (workspaces.length === 0) {
-      const registryPath = path.join(homedir(), '.agentx', 'repos.yml');
-      console.log('No workspaces found.');
-      console.log(`Create one at ${registryPath}? (y/n) `);
-
-      try {
-        const answer = await readKey();
-        if (answer.name !== 'y') {
-          console.log('Cancelled.');
-          return;
-        }
-      } catch {
-        return; // Ctrl+C
-      }
-
-      const { workspace: ws } = await createWorkspace(registryPath, 'default');
-      workspaces.push(ws);
-      console.log(`Created workspace "default" at ${registryPath}`);
-      console.log('Use D (Add repos) in the Manage tab to add repositories.\n');
-    }
-
-    // Workspace precedence: CLI --workspace > config.yml workspace > prompt
-    const workspaceName = opts.workspace ?? configWorkspace;
-    const selected = await selectWorkspace(workspaces, workspaceName);
-    if (!selected) {
-      console.error('No workspace selected.');
-      process.exitCode = 1;
-      return;
-    }
-
-    selectedWorkspace = selected;
-
-    console.log(
-      `Workspace: ${selected.name} (${selected.repos.length} repos) from ${selected.source.path}`,
-    );
-
-    config = buildConfigFromWorkspace(selected, configOrgs, configSettings);
-
-    // Override weeks_back from CLI if provided
-    if (opts.weeks !== undefined) {
-      config = {
-        ...config,
-        settings: { ...config.settings, weeks_back: opts.weeks },
-      };
-    }
-
-    // Load existing store data
-    const scanState = await loadScanState();
-    commitsData = await loadCommitsData();
-    authorRegistry = await loadAuthorRegistry();
-
-    // Print store summary
-    const stats = getStoreStats(commitsData);
-    const lastScanAgo = getLastScanAgo(scanState);
-    const authorCount = Object.keys(authorRegistry.authors).length;
-    const unassignedCount = Object.values(authorRegistry.authors).filter((a) => !a.org).length;
-    console.log(
-      `Store: ${stats.recordCount} records \u00b7 ` +
-        `${stats.orgCount} orgs \u00b7 ` +
-        `${stats.teamCount} teams \u00b7 ` +
-        `${authorCount} authors` +
-        (unassignedCount > 0 ? ` (${unassignedCount} unassigned)` : '') +
-        ` \u00b7 last scan: ${lastScanAgo}`,
-    );
-
-    // Handle --prune
-    if (opts.prune !== undefined) {
-      const weeksBack = Math.ceil(opts.prune / 7);
-      const pruned = pruneOldRecords(commitsData.records, weeksBack);
-      const removed = commitsData.records.length - pruned.length;
-      await saveCommitsData({ ...commitsData, records: pruned });
-      console.log(`Pruned ${removed} records older than ${opts.prune} days.`);
-
-      if (opts.scanOnly) return;
-    }
-
-    // Scan repos — flush records to disk after each repo to bound memory
-    console.log('');
-    let liveRecords = commitsData.records;
-
-    liveScanState = scanState;
-
-    const result = await scanAllRepos(config, scanState, {
-      forceScan: opts.forceScan,
-      stalenessMinutes: opts.staleness,
-      chunkMonths: 3,
-      authorRegistry,
-      onRepoScanned: async (repoRecords) => {
-        liveRecords = mergeRecords(liveRecords, repoRecords);
-        await saveCommitsData({ ...commitsData!, records: liveRecords });
-      },
-      onScanStateUpdated: async (state) => {
-        liveScanState = state;
-        await saveScanState(state);
-      },
-      onAuthorsDiscovered: async (authors) => {
-        authorRegistry = mergeDiscoveredAuthors(
-          authorRegistry!,
-          authors.map((a) => ({
-            email: a.email,
-            name: a.name,
-            repoName: a.repoName,
-            commitCount: a.commitCount,
-            date: a.lastDate,
-          })),
-        );
-        await saveAuthorRegistry(authorRegistry!);
-      },
-    });
-
-    const newAuthors = Object.values(authorRegistry.authors).filter((a) => !a.org).length;
-    console.log(
-      `\nScan complete: ${result.stats.reposScanned} scanned, ` +
-        `${result.stats.reposSkipped} fresh, ` +
-        `${result.stats.reposMissing} missing \u2192 ` +
-        `+${result.stats.totalRecords} new records` +
-        (newAuthors > 0 ? ` \u00b7 ${newAuthors} unassigned authors` : ''),
-    );
-
-    records = liveRecords;
-
-    // If scan-only mode, exit now
-    if (opts.scanOnly) return;
-  }
-
-  // ── Apply CLI filters ────────────────────────────────────────────────────
-
-  const filters: {
-    org?: string;
-    team?: string;
-    tag?: string;
-    group?: string;
-  } = {};
-  if (opts.org) filters.org = opts.org;
-  if (opts.team) filters.team = opts.team;
-  if (opts.tag) filters.tag = opts.tag;
-  if (opts.group) filters.group = opts.group;
-
-  if (Object.keys(filters).length > 0) {
-    records = filterRecords(records, filters);
-  }
-
-  // ── Handle --json ────────────────────────────────────────────────────────
-
-  if (opts.json) {
-    console.log(JSON.stringify(records, null, 2));
-    return;
-  }
-
-  // ── Reattribute records to reflect latest author assignments ─────────────
-  records = reattributeRecords(records, config, authorRegistry);
-
-  // ── Build ViewContext and launch navigator ───────────────────────────────
-
-  const enrichmentStore = await loadEnrichments();
-
-  const ctx: ViewContext = {
-    config,
-    records,
-    currentWeek: getCurrentWeek(),
-    scanState: liveScanState,
-    authorRegistry,
-    enrichments: enrichmentStore,
-    onScanRepo: async (repoName: string) => {
-      const repoEntry = ctx.config.repos.find(
-        (r) => (r.name ?? r.path.split('/').pop() ?? r.path) === repoName,
-      );
-      if (!repoEntry) throw new Error(`Repo not found: ${repoName}`);
-
-      const singleConfig = { ...ctx.config, repos: [repoEntry] };
-      const currentRegistry = ctx.authorRegistry ?? { version: 1 as const, authors: {} };
-      if (!commitsData) commitsData = await loadCommitsData();
-
-      const freshScanState: ScanState = {
-        version: 1,
-        repos: { ...(ctx.scanState ?? { version: 1 as const, repos: {} }).repos },
-      };
-      delete freshScanState.repos[repoName];
-
-      let currentRecords = ctx.records.filter((r) => r.repo !== repoName);
-      const storedRecords = commitsData.records.filter((r) => r.repo !== repoName);
-      const storedCommitsData = { ...commitsData, records: storedRecords };
-
-      const scanResult = await scanAllRepos(singleConfig, freshScanState, {
-        forceScan: true,
-        chunkMonths: 3,
-        authorRegistry: currentRegistry,
-        onRepoScanned: async (repoRecords) => {
-          currentRecords = mergeRecords(currentRecords, repoRecords);
-          await saveCommitsData({ ...storedCommitsData, records: currentRecords });
-        },
-        onScanStateUpdated: saveScanState,
-        onAuthorsDiscovered: async (authors) => {
-          ctx.authorRegistry = mergeDiscoveredAuthors(
-            ctx.authorRegistry ?? { version: 1 as const, authors: {} },
-            authors.map((a) => ({
-              email: a.email,
-              name: a.name,
-              repoName: a.repoName,
-              commitCount: a.commitCount,
-              date: a.lastDate,
-            })),
-          );
-          await saveAuthorRegistry(ctx.authorRegistry);
-        },
-      });
-
-      ctx.records = currentRecords;
-      ctx.scanState = scanResult.updatedScanState;
-      commitsData = { ...commitsData!, records: currentRecords };
-      return { records: ctx.records, scanState: ctx.scanState };
-    },
-    onScanDir: !selectedWorkspace ? undefined : async (dirPath: string, group: string, depth: number) => {
-      const discovered = await scanDirectory(dirPath, depth);
-      if (discovered.length === 0) return 0;
-
-      const added = addReposToWorkspace(
-        selectedWorkspace!,
-        discovered.map((r) => ({ name: r.name, path: r.path, group })),
-      );
-
-      if (added > 0) {
-        await saveReposRegistry(
-          selectedWorkspace!.source.path,
-          selectedWorkspace!.source.registry,
-        );
-        ctx.config = buildConfigFromWorkspace(
-          selectedWorkspace!,
-          config.orgs,
-          config.settings,
-        );
-      }
-
-      return added;
-    },
-    onRemoveRepo: !selectedWorkspace ? undefined : async (repoName: string) => {
-      removeRepoFromWorkspace(selectedWorkspace!, repoName);
-      await saveReposRegistry(
-        selectedWorkspace!.source.path,
-        selectedWorkspace!.source.registry,
-      );
-    },
-    onAddOrg: async (_org: Org) => {
-      await saveConfig(resolvedConfigPath, { orgs: ctx.config.orgs });
-    },
-    onSaveAuthorRegistry: async (registry) => {
-      await saveAuthorRegistry(registry);
-    },
-  };
-
-  const initial =
-    opts.initialView === 'trends'
-      ? trendsView
-      : dashboardView;
-
-  process.on('SIGINT', () => {
-    console.log('\n');
-    process.exit(0);
-  });
-
-  await runNavigator(initial, ctx);
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function getLastScanAgo(scanState: {
-  repos: Record<string, { lastScanDate: string }>;
-}): string {
-  let latest = 0;
-  for (const r of Object.values(scanState.repos)) {
-    const t = new Date(r.lastScanDate).getTime();
-    if (t > latest) latest = t;
-  }
-  if (latest === 0) return 'never';
-  const minutes = Math.round((Date.now() - latest) / 60000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.round(hours / 24);
-  return `${days}d ago`;
-}
-
-function buildConfigFromWorkspace(
-  ws: LoadedWorkspace,
-  configOrgs: Config['orgs'],
-  configSettings: Config['settings'],
-): Config {
-  return {
-    repos: ws.repos.map((r) => ({
-      path: r.path ?? '',
-      name: r.name,
-      group: r.group,
-    })),
-    orgs: configOrgs,
-    groups: ws.source.registry.groups,
-    tags: ws.source.registry.tags,
-    settings: configSettings,
-  };
-}
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 

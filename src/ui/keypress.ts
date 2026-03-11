@@ -77,3 +77,55 @@ export function readKey(): Promise<KeyEvent> {
     process.stdin.once('data', handler);
   });
 }
+
+/**
+ * Read a single keypress, but give up after `timeoutMs` milliseconds.
+ *
+ * Returns `null` on timeout — the caller can use the idle tick to poll
+ * for external state changes (e.g. database updates from a background
+ * --watch process) and then re-render.
+ */
+export function readKeyWithTimeout(timeoutMs: number): Promise<KeyEvent | null> {
+  return new Promise<KeyEvent | null>((resolve, reject) => {
+    if (!process.stdin.isTTY) {
+      reject(new Error('readKeyWithTimeout requires a TTY stdin'));
+      return;
+    }
+
+    process.stdin.setRawMode(true);
+    process.stdin.resume();
+    process.stdin.setEncoding('utf8');
+
+    let settled = false;
+
+    const cleanup = () => {
+      process.stdin.setRawMode(false);
+      process.stdin.pause();
+      process.stdin.removeListener('data', handler);
+      clearTimeout(timer);
+    };
+
+    const handler = (chunk: string) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      const key = normalizeKey(chunk);
+
+      if (key.name === 'ctrl-c') {
+        reject(new Error('SIGINT'));
+        return;
+      }
+
+      resolve(key);
+    };
+
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(null);
+    }, timeoutMs);
+
+    process.stdin.once('data', handler);
+  });
+}

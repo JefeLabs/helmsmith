@@ -42,6 +42,13 @@ export const ConfigSchema = z.object({
     .record(z.string(), z.object({ label: z.string().optional() }))
     .optional()
     .default({}),
+  /** Custom file classification rules. Patterns are matched before built-in rules (first match wins).
+   *  Each rule maps a glob pattern to a filetype category.
+   *  Example: { "*.tf": "config", "*.proto": "app", "src/generated/**": "config" }
+   */
+  classification: z
+    .record(z.string(), z.enum(["app", "test", "config", "storybook", "doc"]))
+    .optional(),
   settings: z
     .object({
       weeks_back: z.number().optional().default(12),
@@ -81,6 +88,18 @@ export const UserWeekRepoRecordSchema = z.object({
   // Metrics
   commits: z.number(),
   activeDays: z.number(),
+
+  // Semantic intent breakdown (from conventional commit prefixes).
+  // Optional for backwards compatibility with records created before this field existed.
+  intent: z.object({
+    feat: z.number().optional().default(0),
+    fix: z.number().optional().default(0),
+    refactor: z.number().optional().default(0),
+    docs: z.number().optional().default(0),
+    test: z.number().optional().default(0),
+    chore: z.number().optional().default(0),
+    other: z.number().optional().default(0),
+  }).optional(),
 
   // File type breakdown
   filetype: z.object({
@@ -148,6 +167,13 @@ export const ProductivityExtensionsSchema = z.object({
   avg_cycle_hrs: z.number().default(0),
   reviews_given: z.number().default(0),
   churn_rate_pct: z.number().default(0),
+  /** PR branch type counts — parsed from enforced branch naming conventions. */
+  pr_feature: z.number().default(0),
+  pr_fix: z.number().default(0),
+  pr_bugfix: z.number().default(0),
+  pr_chore: z.number().default(0),
+  pr_hotfix: z.number().default(0),
+  pr_other: z.number().default(0),
 });
 
 export const EnrichmentStoreSchema = z.object({

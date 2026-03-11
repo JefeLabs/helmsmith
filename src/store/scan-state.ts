@@ -1,36 +1,9 @@
-import { readFile, writeFile, rename } from "node:fs/promises";
 import type { ScanState } from "../types/schema.js";
-import { getScanStatePath, ensureDataDir } from "./paths.js";
 
 /**
  * Inferred type for a single repo's scan state entry.
  */
 export type RepoScanState = ScanState["repos"][string];
-
-/**
- * Load scan state from disk, or return an empty default if the file
- * does not exist or cannot be parsed.
- */
-export async function loadScanState(): Promise<ScanState> {
-  try {
-    const raw = await readFile(getScanStatePath(), "utf-8");
-    return JSON.parse(raw) as ScanState;
-  } catch {
-    return { version: 1, repos: {} };
-  }
-}
-
-/**
- * Atomically save scan state to disk.
- * Writes to a .tmp file first, then renames to avoid partial writes.
- */
-export async function saveScanState(state: ScanState): Promise<void> {
-  await ensureDataDir();
-  const filePath = getScanStatePath();
-  const tmpPath = filePath + ".tmp";
-  await writeFile(tmpPath, JSON.stringify(state, null, 2), "utf-8");
-  await rename(tmpPath, filePath);
-}
 
 /**
  * Get the scan state for a specific repo, or undefined if not found.
