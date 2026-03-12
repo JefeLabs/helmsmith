@@ -1132,11 +1132,13 @@ export function getStoreStatsSQLFull(): {
 /** Delete all data from all tables. Used by --reset. */
 export function resetAllData(): void {
   const db = getDB();
-  db.prepare("DELETE FROM records").run();
-  db.prepare("DELETE FROM enrichments").run();
-  db.prepare("DELETE FROM scan_state").run();
-  db.prepare("DELETE FROM authors").run();
-  db.prepare("DELETE FROM meta").run();
+  db.transaction(() => {
+    db.prepare("DELETE FROM records").run();
+    db.prepare("DELETE FROM enrichments").run();
+    db.prepare("DELETE FROM scan_state").run();
+    db.prepare("DELETE FROM authors").run();
+    db.prepare("DELETE FROM meta").run();
+  })();
 }
 
 /** Reset the DB connection (for test isolation). */
