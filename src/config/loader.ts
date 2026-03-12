@@ -1,6 +1,7 @@
 import { readFile, writeFile, access, mkdir } from "node:fs/promises";
 import path from "node:path";
 import yaml from "js-yaml";
+import { ZodError } from "zod";
 import { Config, ConfigSchema } from "../types/schema.js";
 import { getConfigPath, expandTilde } from "../store/paths.js";
 
@@ -35,7 +36,16 @@ export async function loadConfig(configPath?: string): Promise<Config> {
   let config: Config;
   try {
     config = ConfigSchema.parse(parsed);
-  } catch {
+  } catch (err) {
+    if (err instanceof ZodError) {
+      const details = err.issues.map((issue) => {
+        const path = issue.path.join('.');
+        return `  - '${path}': ${issue.message}`;
+      });
+      throw new Error(
+        `Config validation failed:\n${details.join('\n')}`,
+      );
+    }
     throw new Error("Config validation error");
   }
 

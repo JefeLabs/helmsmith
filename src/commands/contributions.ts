@@ -6,6 +6,7 @@ import {
 } from '../aggregator/filters.js';
 import { rollup } from '../aggregator/engine.js';
 import type { RolledUp } from '../aggregator/engine.js';
+import { testPct, totalLines } from '../aggregator/metrics.js';
 import { fmt, weekLabel, quarterShort, yearShort } from '../ui/format.js';
 import { calculateSegments, type Segment, type SegmentThresholds } from '../aggregator/segments.js';
 import { printTable, printTitle, printNoData, printJson, printSummary, type Column } from '../ui/cli-renderer.js';
@@ -43,9 +44,8 @@ function rolledUpToRows(rolled: Map<string, RolledUp>): ContributionRow[] {
   const rows: ContributionRow[] = [];
 
   for (const [name, agg] of rolled) {
-    const appLines = agg.filetype.app.insertions + agg.filetype.app.deletions;
-    const testLines = agg.filetype.test.insertions + agg.filetype.test.deletions;
-    const denom = appLines + testLines;
+    const appLines = totalLines(agg.filetype.app);
+    const testLines = totalLines(agg.filetype.test);
 
     rows.push({
       name,
@@ -55,10 +55,10 @@ function rolledUpToRows(rolled: Map<string, RolledUp>): ContributionRow[] {
       deletions: agg.deletions,
       net: agg.netLines,
       files: agg.filesChanged,
-      testPct: denom > 0 ? Math.round((testLines / denom) * 100) : 0,
+      testPct: testPct(agg.filetype),
       appLines,
       testLines,
-      configLines: agg.filetype.config.insertions + agg.filetype.config.deletions,
+      configLines: totalLines(agg.filetype.config),
     });
   }
 

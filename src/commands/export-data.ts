@@ -2,6 +2,7 @@ import { writeFile } from "node:fs/promises";
 import { queryRecords, loadEnrichmentsSQL, getEnrichmentSQL } from "../store/sqlite-store.js";
 import { filterRecords, type Filters } from "../aggregator/filters.js";
 import { calculateSegments, type Segment, type SegmentThresholds } from "../aggregator/segments.js";
+import { testPct } from "../aggregator/metrics.js";
 import type { UserWeekRepoRecord, EnrichmentStore } from "../types/schema.js";
 
 export interface ExportDataOptions {
@@ -115,11 +116,8 @@ export function flattenRecord(
   flat.net_lines = totalIns - totalDel;
   flat.total_files = totalFiles;
 
-  // test% = test lines / (app + test) lines — matches TUI tst% column
-  const appLines = flat.app_lines as number;
-  const testLines = flat.test_lines as number;
-  const denom = appLines + testLines;
-  flat.test_pct = denom > 0 ? Math.round((testLines / denom) * 100) : 0;
+  // test% — canonical calculation from metrics module
+  flat.test_pct = testPct(r.filetype);
 
   // Enrichment metrics (default to 0 if not enriched)
   if (enrichmentStore) {

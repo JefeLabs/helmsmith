@@ -93,6 +93,7 @@ export interface EnrichOptions {
  */
 export class GitRadarEngine {
   config!: Config;
+  /** @deprecated Use queryRecords() for targeted queries instead of bulk loading. */
   records: UserWeekRepoRecord[] = [];
   scanState?: ScanState;
   authorRegistry?: AuthorRegistry;
@@ -271,8 +272,18 @@ export class GitRadarEngine {
         (newAuthors > 0 ? ` \u00b7 ${newAuthors} unassigned authors` : ''),
     );
 
-    // Load records from SQLite for downstream use
-    this.records = queryRecords({});
+    // Auto-prune old records if configured
+    const autoPruneWeeks = this.config.settings.auto_prune_weeks;
+    if (autoPruneWeeks > 0) {
+      const cutoffWeek = getLastNWeeks(autoPruneWeeks + 1, getCurrentWeek())[0];
+      const pruned = pruneRecordsSQL(cutoffWeek);
+      if (pruned > 0) {
+        console.log(`Auto-pruned ${pruned} records older than ${autoPruneWeeks} weeks.`);
+      }
+    }
+
+    // Records are now loaded on-demand by applyFilters() or buildViewContext()
+    // instead of eagerly loading all data into memory after every scan.
   }
 
   // ── Rescan a single repo (used by ViewContext.onScanRepo) ────────────────
@@ -321,9 +332,9 @@ export class GitRadarEngine {
       },
     });
 
-    this.records = queryRecords({});
+    const freshRecords = queryRecords({});
     this.scanState = scanResult.updatedScanState;
-    return { records: this.records, scanState: this.scanState };
+    return { records: freshRecords, scanState: this.scanState };
   }
 
   // ── Directory scanning (used by ViewContext.onScanDir) ───────────────────
@@ -379,13 +390,16 @@ export class GitRadarEngine {
     const weeksBack = options.weeks ?? 4;
     const concurrency = options.concurrency ?? 5;
 
-    const records = this.records.length > 0 ? this.records : queryRecords({});
     const authorRegistry = this.authorRegistry ?? loadAuthorRegistrySQL();
     const authorMap = buildAuthorMap(this.config, authorRegistry);
     const identifierRules = buildIdentifierRules(this.config);
 
     const weeks = getLastNWeeks(weeksBack, getCurrentWeek());
-    const targetRecords = records.filter((r) => weeks.includes(r.week));
+    // Query only the target-period records instead of loading the entire database
+    const targetRecords = queryRecords({
+      weekFrom: weeks[0],
+      weekTo: weeks[weeks.length - 1],
+    });
 
     if (targetRecords.length === 0) {
       console.log("No records found for the target period.");
@@ -696,20 +710,14 @@ export class GitRadarEngine {
   // ── Filtering ────────────────────────────────────────────────────────────
 
   applyFilters(opts: RunOptions): void {
-    const hasFilters = opts.org || opts.team || opts.tag || opts.group;
-
-    if (hasFilters) {
-      // Use SQL filtering — push predicates down to the database
-      this.records = queryRecords({
-        org: opts.org,
-        team: opts.team,
-        tag: opts.tag,
-        group: opts.group,
-      });
-    } else if (this.records.length === 0) {
-      // Load all records if not yet loaded
-      this.records = queryRecords({});
-    }
+    // Always use SQL filtering — push predicates to the database.
+    // This replaces the old pattern of loading all records into memory.
+    this.records = queryRecords({
+      org: opts.org,
+      team: opts.team,
+      tag: opts.tag,
+      group: opts.group,
+    });
   }
 
   // ── ViewContext construction ─────────────────────────────────────────────

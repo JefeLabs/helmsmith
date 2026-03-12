@@ -168,7 +168,7 @@ describe("Functional: Full CLI Pipeline (Engine + SQLite)", () => {
   it("Step 4: engine scan produces records in SQLite with commits and file metrics", async () => {
     const { GitRadarEngine } = await import("../engine/gitradar-engine.js");
     const { DEFAULT_SETTINGS } = await import("../types/schema.js");
-    const { getStoreStatsSQLFull } = await import("../store/sqlite-store.js");
+    const { getStoreStatsSQLFull, queryRecords } = await import("../store/sqlite-store.js");
 
     const config = await loadConfigFromTemp();
     const registry = await loadReposRegistryFromTemp();
@@ -190,15 +190,16 @@ describe("Functional: Full CLI Pipeline (Engine + SQLite)", () => {
     const stats = getStoreStatsSQLFull();
     expect(stats.recordCount).toBeGreaterThan(0);
 
-    // Engine loaded records from SQLite after scan
-    expect(engine.records.length).toBeGreaterThan(0);
+    // Query records from SQLite (engine no longer eagerly loads after scan)
+    const records = queryRecords({});
+    expect(records.length).toBeGreaterThan(0);
 
     // Commits are non-zero
-    const totalCommits = engine.records.reduce((s, r) => s + r.commits, 0);
+    const totalCommits = records.reduce((s, r) => s + r.commits, 0);
     expect(totalCommits).toBeGreaterThan(0);
 
     // File metrics are non-zero (validates --raw --numstat pipeline)
-    const totalInsertions = engine.records.reduce((s, r) => {
+    const totalInsertions = records.reduce((s, r) => {
       return s +
         r.filetype.app.insertions +
         r.filetype.test.insertions +
@@ -207,7 +208,7 @@ describe("Functional: Full CLI Pipeline (Engine + SQLite)", () => {
     }, 0);
     expect(totalInsertions).toBeGreaterThan(0);
 
-    const totalDeletions = engine.records.reduce((s, r) => {
+    const totalDeletions = records.reduce((s, r) => {
       return s +
         r.filetype.app.deletions +
         r.filetype.test.deletions +
@@ -217,7 +218,7 @@ describe("Functional: Full CLI Pipeline (Engine + SQLite)", () => {
     expect(totalDeletions).toBeGreaterThan(0);
 
     // Files counted
-    const totalFiles = engine.records.reduce((s, r) => {
+    const totalFiles = records.reduce((s, r) => {
       return s +
         r.filetype.app.files +
         r.filetype.test.files +
@@ -232,15 +233,16 @@ describe("Functional: Full CLI Pipeline (Engine + SQLite)", () => {
     expect(authorCount).toBeGreaterThan(0);
 
     // Records span multiple repos
-    const reposInRecords = new Set(engine.records.map((r) => r.repo));
+    const allRecords = queryRecords({});
+    const reposInRecords = new Set(allRecords.map((r) => r.repo));
     expect(reposInRecords.size).toBeGreaterThanOrEqual(2);
 
     // Records span multiple weeks
-    const weeksInRecords = new Set(engine.records.map((r) => r.week));
+    const weeksInRecords = new Set(allRecords.map((r) => r.week));
     expect(weeksInRecords.size).toBeGreaterThanOrEqual(1);
 
-    // SQLite record count matches engine.records
-    expect(stats.recordCount).toBe(engine.records.length);
+    // SQLite record count matches queried records
+    expect(stats.recordCount).toBe(allRecords.length);
 
     console.log(
       `  Engine scan: ${stats.recordCount} records in SQLite, ` +

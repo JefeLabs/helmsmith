@@ -69,12 +69,15 @@ export const ConfigSchema = z.object({
       segment_high_pct: z.number().min(1).max(50).optional().default(20),
       /** Percentage of contributors classified as "low" segment. Default: 20. */
       segment_low_pct: z.number().min(1).max(50).optional().default(20),
+      /** Automatically prune records older than this many weeks after each scan.
+       *  Set to 0 to disable auto-pruning. Default: 0 (disabled). */
+      auto_prune_weeks: z.number().min(0).optional().default(0),
     })
     .optional()
     .default({
       weeks_back: 12, staleness_minutes: 60, trend_threshold: 0.10,
       churn_window_days: 21, churn_max_commits: 50, churn_concurrency: 3,
-      segment_high_pct: 20, segment_low_pct: 20,
+      segment_high_pct: 20, segment_low_pct: 20, auto_prune_weeks: 0,
     }),
 });
 
@@ -82,7 +85,7 @@ export const ConfigSchema = z.object({
 export const DEFAULT_SETTINGS: Config['settings'] = {
   weeks_back: 12, staleness_minutes: 60, trend_threshold: 0.10,
   churn_window_days: 21, churn_max_commits: 50, churn_concurrency: 3,
-  segment_high_pct: 20, segment_low_pct: 20,
+  segment_high_pct: 20, segment_low_pct: 20, auto_prune_weeks: 0,
 };
 
 // ── Data Schemas ────────────────────────────────────────────────────────────
@@ -124,6 +127,12 @@ export const UserWeekRepoRecordSchema = z.object({
     chore: z.number().optional().default(0),
     other: z.number().optional().default(0),
   }).optional(),
+
+  // Semantic scope and breaking change tracking (from conventional commit parsing).
+  // breakingChanges: count of commits with "!" breaking marker (e.g. "feat!:", "fix(auth)!:")
+  breakingChanges: z.number().optional(),
+  // scopes: unique conventional commit scopes seen in this record (e.g. ["auth", "api"])
+  scopes: z.array(z.string()).optional(),
 
   // File type breakdown
   filetype: z.object({

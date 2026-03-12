@@ -91,6 +91,10 @@ export interface ParsedCommit {
   date: string;
   subject: string;
   intent: IntentType;
+  /** Conventional commit scope, e.g. "auth" from "feat(auth): ..." */
+  scope?: string;
+  /** True if the commit is a breaking change (e.g. "feat!:" or "feat(auth)!:") */
+  breaking?: boolean;
   files: { insertions: number; deletions: number; path: string; status: FileStatus }[];
 }
 
@@ -142,19 +146,38 @@ export interface ScanResult {
 }
 
 /**
- * Parse a conventional commit subject into an intent type.
- * Matches patterns like "feat:", "feat(scope):", "fix!:", etc.
+ * Parse a conventional commit subject into an intent type, optional scope,
+ * and breaking-change flag.
+ *
+ * Matches patterns like "feat:", "feat(scope):", "fix!:", "feat(auth)!:".
  * Falls back to "other" for non-conventional commits.
  */
-const CONVENTIONAL_RE = /^(feat|fix|refactor|docs|test|tests|chore|ci|build|perf|style|revert)(\(.+?\))?[!]?:/i;
+const CONVENTIONAL_RE = /^(feat|fix|refactor|docs|test|tests|chore|ci|build|perf|style|revert)(\(([^)]+)\))?([!])?:/i;
+
+export interface ParsedIntent {
+  intent: IntentType;
+  scope?: string;
+  breaking: boolean;
+}
 
 export function parseIntent(subject: string): IntentType {
+  return parseConventionalCommit(subject).intent;
+}
+
+export function parseConventionalCommit(subject: string): ParsedIntent {
   const match = CONVENTIONAL_RE.exec(subject.trim());
-  if (!match) return 'other';
+  if (!match) return { intent: 'other', breaking: false };
+
   const prefix = match[1].toLowerCase();
-  if (prefix === 'tests') return 'test';
-  if (prefix === 'ci' || prefix === 'build' || prefix === 'perf' || prefix === 'style' || prefix === 'revert') return 'chore';
-  return prefix as IntentType;
+  const scope = match[3] || undefined;  // capture group 3 = inner scope text
+  const bang = match[4] === '!';
+
+  let intent: IntentType;
+  if (prefix === 'tests') intent = 'test';
+  else if (prefix === 'ci' || prefix === 'build' || prefix === 'perf' || prefix === 'style' || prefix === 'revert') intent = 'chore';
+  else intent = prefix as IntentType;
+
+  return { intent, scope, breaking: bang };
 }
 
 /**
@@ -240,13 +263,16 @@ export function parseGitLogOutput(output: string): ParsedCommit[] {
         date = parts[parts.length - 1];
         subject = '';
       }
+      const parsed = parseConventionalCommit(subject);
       current = {
         hash,
         email,
         name,
         date,
         subject,
-        intent: parseIntent(subject),
+        intent: parsed.intent,
+        scope: parsed.scope,
+        breaking: parsed.breaking,
         files: [],
       };
       statusMap = new Map();
@@ -344,9 +370,12 @@ export class GitLogLineParser {
         date = parts[parts.length - 1];
         subject = '';
       }
+      const parsed = parseConventionalCommit(subject);
       this.current = {
         hash, email, name, date, subject,
-        intent: parseIntent(subject),
+        intent: parsed.intent,
+        scope: parsed.scope,
+        breaking: parsed.breaking,
         files: [],
       };
       this.statusMap = new Map();
@@ -668,6 +697,8 @@ function processCommitBatch(
         commits: 0,
         activeDays: 0,
         intent: emptyIntent(),
+        breakingChanges: 0,
+        scopes: [],
         filetype: emptyFiletype(),
       });
     }
@@ -678,6 +709,14 @@ function processCommitBatch(
     // Accumulate intent from conventional commit prefix
     if (record.intent) {
       record.intent[commit.intent] = (record.intent[commit.intent] ?? 0) + 1;
+    }
+
+    // Accumulate breaking changes and scopes
+    if (commit.breaking) {
+      record.breakingChanges = (record.breakingChanges ?? 0) + 1;
+    }
+    if (commit.scope && !record.scopes?.includes(commit.scope)) {
+      (record.scopes ??= []).push(commit.scope);
     }
 
     const classifyFn = classify ?? classifyFile;

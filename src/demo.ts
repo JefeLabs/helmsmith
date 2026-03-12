@@ -228,6 +228,27 @@ export function generateDemoData(weeks: number = 12): {
             const insPerFile = 10 + Math.floor(rand() * 70);
             const delPerFile = 5 + Math.floor(rand() * 25);
 
+            // Intent distribution: spread commits across conventional types
+            const featCommits = Math.max(0, Math.round(baseCommits * (0.35 + rand() * 0.15)));
+            const fixCommits = Math.max(0, Math.round(baseCommits * (0.15 + rand() * 0.10)));
+            const refactorCommits = Math.max(0, Math.round(baseCommits * (0.05 + rand() * 0.10)));
+            const testCommits = Math.max(0, Math.round(baseCommits * (0.05 + rand() * 0.05)));
+            const choreCommits = Math.max(0, Math.round(baseCommits * (0.05 + rand() * 0.05)));
+            const docsCommits = Math.max(0, Math.round(baseCommits * (0.02 + rand() * 0.05)));
+            const otherCommits = Math.max(0, baseCommits - featCommits - fixCommits - refactorCommits - testCommits - choreCommits - docsCommits);
+
+            // ~8% chance of a breaking change per record, 1-2 breaking commits when it happens
+            const breakingChanges = rand() < 0.08 ? 1 + Math.floor(rand() * 2) : 0;
+
+            // Scopes: pick 0-2 from a small set relevant to the repo
+            const SCOPE_POOL = ['auth', 'api', 'ui', 'db', 'config', 'ci', 'docs', 'core'];
+            const numScopes = Math.floor(rand() * 3);
+            const scopes: string[] = [];
+            for (let s = 0; s < numScopes; s++) {
+              const scope = SCOPE_POOL[Math.floor(rand() * SCOPE_POOL.length)];
+              if (!scopes.includes(scope)) scopes.push(scope);
+            }
+
             records.push({
               member: member.name,
               email: member.email,
@@ -240,6 +261,17 @@ export function generateDemoData(weeks: number = 12): {
               group: repo.group,
               commits: baseCommits,
               activeDays,
+              intent: {
+                feat: featCommits,
+                fix: fixCommits,
+                refactor: refactorCommits,
+                docs: docsCommits,
+                test: testCommits,
+                chore: choreCommits,
+                other: otherCommits,
+              },
+              breakingChanges,
+              scopes,
               filetype: {
                 app: {
                   files: appFiles,

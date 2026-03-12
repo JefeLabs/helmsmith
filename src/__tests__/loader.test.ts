@@ -168,11 +168,11 @@ orgs:
       );
     });
 
-    it("throws 'Config validation error' for schema violations", async () => {
+    it("throws descriptive error for schema violations", async () => {
       mockReadFile.mockResolvedValue(schemaInvalidYaml);
 
       await expect(loadConfig("/path/to/invalid.yml")).rejects.toThrow(
-        "Config validation error"
+        "Config validation failed:"
       );
     });
   });

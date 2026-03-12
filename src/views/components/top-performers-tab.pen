@@ -1,0 +1,351 @@
+{
+  "version": "2.8",
+  "children": [
+    {
+      "type": "frame",
+      "id": "6fF2Z",
+      "x": 0,
+      "y": 0,
+      "name": "Top Performers Tab",
+      "width": 1440,
+      "height": 900,
+      "fill": "$background",
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "ORYHm",
+          "name": "Organism / Banner",
+          "width": "fill_container",
+          "fill": "$secondary",
+          "padding": [
+            16,
+            24
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "iL1H2",
+              "name": "bannerLeft",
+              "gap": 12,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "uHH1X",
+                  "width": 24,
+                  "height": 24,
+                  "iconFontName": "radar",
+                  "iconFontFamily": "Material Symbols Rounded",
+                  "fill": "$primary"
+                },
+                {
+                  "type": "text",
+                  "id": "TH58v",
+                  "fill": "$foreground",
+                  "content": "GITRADAR",
+                  "fontFamily": "Inter",
+                  "fontSize": 18,
+                  "fontWeight": "800",
+                  "letterSpacing": 1
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "uFilb",
+              "name": "bannerRight",
+              "fill": "$muted-foreground",
+              "content": "v0.1.0",
+              "fontFamily": "JetBrains Mono",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "HLJgo",
+          "name": "Organism / Tab Bar",
+          "width": "fill_container",
+          "children": [
+            {
+              "type": "frame",
+              "id": "tRygs",
+              "name": "tab1",
+              "gap": 8,
+              "padding": [
+                12,
+                16
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "uZpQ7",
+                  "fill": "$muted-foreground",
+                  "content": "Contributions",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "fnUP9",
+              "name": "tab2",
+              "gap": 8,
+              "padding": [
+                12,
+                16
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "OoJ6W",
+                  "fill": "$muted-foreground",
+                  "content": "Repo Activity",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "U64Mi",
+              "name": "tab3",
+              "gap": 8,
+              "padding": [
+                12,
+                16
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "xLBIp",
+                  "fill": "$primary",
+                  "content": "Top Performers",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "ZfFf9",
+                  "width": "fill_container",
+                  "height": 2,
+                  "fill": "$primary"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "JlrVt",
+              "name": "tab4",
+              "gap": 8,
+              "padding": [
+                12,
+                16
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "ojunO",
+                  "fill": "$muted-foreground",
+                  "content": "Manage",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "500"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "LJ5X4",
+          "name": "Content",
+          "width": "fill_container",
+          "layout": "vertical",
+          "gap": 24,
+          "padding": 32,
+          "children": [
+            {
+              "type": "frame",
+              "id": "sh2u7",
+              "name": "header",
+              "width": "fill_container",
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Zt2Cq",
+                  "fill": "$foreground",
+                  "content": "Top Performers (Overall)",
+                  "fontFamily": "Inter",
+                  "fontSize": 24,
+                  "fontWeight": "700"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "H60iE",
+              "name": "grid",
+              "width": "fill_container",
+              "gap": 24,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "sPyec",
+                  "name": "col1",
+                  "layout": "vertical",
+                  "gap": 12,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "wrKlz",
+                      "fill": "$primary",
+                      "content": "OVERALL",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "800"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "9bvFk",
+                      "name": "table1",
+                      "width": "fill_container",
+                      "cornerRadius": 8,
+                      "layout": "vertical",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "4gaTw",
+                          "name": "r1",
+                          "padding": [
+                            12,
+                            16
+                          ],
+                          "justifyContent": "space_between",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "JDqsx",
+                              "fill": "$foreground",
+                              "content": "1. Edwin Cruz",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "text",
+                              "id": "XmWlw",
+                              "fill": "$primary",
+                              "content": "2.4K",
+                              "fontFamily": "JetBrains Mono",
+                              "fontSize": 13,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "I2DSG",
+                          "name": "r2",
+                          "padding": [
+                            12,
+                            16
+                          ],
+                          "justifyContent": "space_between",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "EKvnW",
+                              "fill": "$foreground",
+                              "content": "2. Team Member",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "text",
+                              "id": "gFHlS",
+                              "fill": "$muted-foreground",
+                              "content": "1.8K",
+                              "fontFamily": "JetBrains Mono",
+                              "fontSize": 13,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "background": {
+      "type": "color",
+      "value": "#0F172A"
+    },
+    "border": {
+      "type": "color",
+      "value": "#334155"
+    },
+    "destructive": {
+      "type": "color",
+      "value": "#EF4444"
+    },
+    "font-primary": {
+      "type": "string",
+      "value": "Inter"
+    },
+    "font-secondary": {
+      "type": "string",
+      "value": "JetBrains Mono"
+    },
+    "foreground": {
+      "type": "color",
+      "value": "#F8FAFC"
+    },
+    "muted-foreground": {
+      "type": "color",
+      "value": "#94A3B8"
+    },
+    "primary": {
+      "type": "color",
+      "value": "#38BDF8"
+    },
+    "primary-foreground": {
+      "type": "color",
+      "value": "#0F172A"
+    },
+    "radius-m": {
+      "type": "number",
+      "value": 8
+    },
+    "radius-pill": {
+      "type": "number",
+      "value": 999
+    },
+    "secondary": {
+      "type": "color",
+      "value": "#1E293B"
+    }
+  }
+}

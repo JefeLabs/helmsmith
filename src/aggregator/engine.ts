@@ -20,6 +20,7 @@ function emptyRolledUp(): RolledUp {
     filesDeleted: 0,
     activeDays: 0,
     activeMembers: 0,
+    breakingChanges: 0,
     filetype: {
       app: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
       test: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
@@ -59,6 +60,7 @@ export function rollup(
 
     agg.commits += r.commits;
     agg.activeDays += r.activeDays;
+    agg.breakingChanges += r.breakingChanges ?? 0;
 
     for (const ft of FILETYPE_KEYS) {
       const src: FiletypeMetrics = r.filetype[ft];

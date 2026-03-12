@@ -1,0 +1,512 @@
+{
+  "version": "2.8",
+  "children": [
+    {
+      "type": "frame",
+      "id": "slmaK",
+      "x": 0,
+      "y": 0,
+      "name": "Component Library",
+      "fill": "$background",
+      "layout": "vertical",
+      "gap": 40,
+      "padding": 40,
+      "children": [
+        {
+          "type": "frame",
+          "id": "2RJri",
+          "name": "Atoms / Typography",
+          "layout": "vertical",
+          "gap": 16,
+          "children": [
+            {
+              "type": "text",
+              "id": "JdI8U",
+              "fill": "$foreground",
+              "content": "Typography",
+              "fontFamily": "$font-primary",
+              "fontSize": 24,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "wLHiC",
+              "fill": "$foreground",
+              "content": "Heading 1",
+              "fontFamily": "$font-primary",
+              "fontSize": 32,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "z0UFB",
+              "fill": "$foreground",
+              "content": "Heading 2",
+              "fontFamily": "$font-primary",
+              "fontSize": 24,
+              "fontWeight": "600"
+            },
+            {
+              "type": "text",
+              "id": "5abA1",
+              "fill": "$muted-foreground",
+              "content": "Body Mono",
+              "fontFamily": "$font-secondary",
+              "fontSize": 14
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "MVcSc",
+          "name": "Atoms / Icons",
+          "gap": 24,
+          "children": [
+            {
+              "type": "icon_font",
+              "id": "5Py3G",
+              "width": 24,
+              "height": 24,
+              "iconFontName": "home",
+              "iconFontFamily": "lucide",
+              "fill": "$foreground"
+            },
+            {
+              "type": "icon_font",
+              "id": "88Uj6",
+              "width": 24,
+              "height": 24,
+              "iconFontName": "bar-chart-2",
+              "iconFontFamily": "lucide",
+              "fill": "$foreground"
+            },
+            {
+              "type": "icon_font",
+              "id": "LYarM",
+              "width": 24,
+              "height": 24,
+              "iconFontName": "users",
+              "iconFontFamily": "lucide",
+              "fill": "$foreground"
+            },
+            {
+              "type": "icon_font",
+              "id": "JmngQ",
+              "width": 24,
+              "height": 24,
+              "iconFontName": "settings",
+              "iconFontFamily": "lucide",
+              "fill": "$foreground"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "wY6u6",
+          "name": "Molecule / Tab Item / Active",
+          "reusable": true,
+          "gap": 8,
+          "padding": [
+            12,
+            16
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "ZeGyi",
+              "fill": "$primary",
+              "content": "Active Tab",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "600"
+            },
+            {
+              "type": "frame",
+              "id": "eAb4j",
+              "width": "fill_container",
+              "height": 2,
+              "fill": "$primary"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "ox2od",
+          "name": "Molecule / Tab Item / Inactive",
+          "reusable": true,
+          "gap": 8,
+          "padding": [
+            12,
+            16
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "25Mti",
+              "fill": "$muted-foreground",
+              "content": "Inactive Tab",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "fLEz1",
+          "name": "Molecule / Table / Head Cell",
+          "reusable": true,
+          "fill": "$secondary",
+          "padding": [
+            8,
+            12
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "WzsXO",
+              "fill": "$foreground",
+              "content": "Header",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "700"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "ijQDj",
+          "name": "Molecule / Table / Data Cell",
+          "reusable": true,
+          "padding": [
+            8,
+            12
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "LM8YX",
+              "fill": "$muted-foreground",
+              "content": "Value",
+              "fontFamily": "$font-secondary",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "AkHux",
+          "name": "Organism / Banner",
+          "reusable": true,
+          "width": "fill_container",
+          "fill": "$secondary",
+          "padding": [
+            16,
+            24
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "yUCaQ",
+              "name": "bannerLeft",
+              "gap": 12,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "ZBCBT",
+                  "width": 24,
+                  "height": 24,
+                  "iconFontName": "radar",
+                  "iconFontFamily": "Material Symbols Rounded",
+                  "fill": "$primary"
+                },
+                {
+                  "type": "text",
+                  "id": "8st1h",
+                  "fill": "$foreground",
+                  "content": "GITRADAR",
+                  "fontFamily": "Inter",
+                  "fontSize": 18,
+                  "fontWeight": "800",
+                  "letterSpacing": 1
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "llCiu",
+              "name": "bannerRight",
+              "fill": "$muted-foreground",
+              "content": "v0.1.0",
+              "fontFamily": "JetBrains Mono",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "fgCFK",
+          "name": "Organism / Tab Bar",
+          "reusable": true,
+          "width": "fill_container",
+          "children": [
+            {
+              "id": "Jaybi",
+              "type": "ref",
+              "ref": "wY6u6",
+              "descendants": {
+                "ZeGyi": {
+                  "content": "Contributions"
+                }
+              }
+            },
+            {
+              "id": "xDPJ6",
+              "type": "ref",
+              "ref": "ox2od",
+              "descendants": {
+                "25Mti": {
+                  "content": "Repo Activity"
+                }
+              }
+            },
+            {
+              "id": "d3Atn",
+              "type": "ref",
+              "ref": "ox2od",
+              "descendants": {
+                "25Mti": {
+                  "content": "Top Performers"
+                }
+              }
+            },
+            {
+              "id": "otihf",
+              "type": "ref",
+              "ref": "ox2od",
+              "descendants": {
+                "25Mti": {
+                  "content": "Manage"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "a6NzR",
+          "name": "Organism / Table Header",
+          "reusable": true,
+          "width": "fill_container",
+          "children": [
+            {
+              "id": "2LzoW",
+              "type": "ref",
+              "ref": "fLEz1",
+              "width": 200,
+              "descendants": {
+                "WzsXO": {
+                  "content": "Member"
+                }
+              }
+            },
+            {
+              "id": "kS3GA",
+              "type": "ref",
+              "ref": "fLEz1",
+              "descendants": {
+                "WzsXO": {
+                  "content": "Activity"
+                }
+              }
+            },
+            {
+              "id": "UvMR0",
+              "type": "ref",
+              "ref": "fLEz1",
+              "width": 100,
+              "descendants": {
+                "WzsXO": {
+                  "content": "Commits"
+                }
+              }
+            },
+            {
+              "id": "JAZSF",
+              "type": "ref",
+              "ref": "fLEz1",
+              "width": 100,
+              "descendants": {
+                "WzsXO": {
+                  "content": "Net"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "QMWyw",
+          "name": "Molecule / Bar Seg / App",
+          "reusable": true,
+          "width": 40,
+          "height": 12,
+          "fill": "$primary"
+        },
+        {
+          "type": "frame",
+          "id": "mJ2V3",
+          "name": "Molecule / Bar Seg / Test",
+          "reusable": true,
+          "width": 20,
+          "height": 12,
+          "fill": "#10B981"
+        },
+        {
+          "type": "frame",
+          "id": "Vnaqt",
+          "name": "Molecule / Bar Seg / Doc",
+          "reusable": true,
+          "width": 10,
+          "height": 12,
+          "fill": "#F59E0B"
+        },
+        {
+          "type": "frame",
+          "id": "IeO9p",
+          "name": "Organism / HBar Row",
+          "reusable": true,
+          "width": "fill_container",
+          "gap": 12,
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "DTEVc",
+              "name": "label",
+              "fill": "$foreground",
+              "content": "Item Label",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "AU0uA",
+              "name": "barContainer",
+              "clip": true,
+              "height": 12,
+              "cornerRadius": 2,
+              "children": [
+                {
+                  "id": "5UTcr",
+                  "type": "ref",
+                  "ref": "QMWyw",
+                  "width": 100
+                },
+                {
+                  "id": "MCIV1",
+                  "type": "ref",
+                  "ref": "mJ2V3",
+                  "width": 40
+                },
+                {
+                  "id": "iQOXk",
+                  "type": "ref",
+                  "ref": "Vnaqt",
+                  "width": 20
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "naXct",
+              "name": "metrics",
+              "gap": 16,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "36Gof",
+                  "fill": "$muted-foreground",
+                  "content": "124",
+                  "textAlign": "right",
+                  "fontFamily": "JetBrains Mono",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "xlHw3",
+                  "fill": "#10B981",
+                  "content": "+1.2K",
+                  "textAlign": "right",
+                  "fontFamily": "JetBrains Mono",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "background": {
+      "type": "color",
+      "value": "#0F172A"
+    },
+    "border": {
+      "type": "color",
+      "value": "#334155"
+    },
+    "destructive": {
+      "type": "color",
+      "value": "#EF4444"
+    },
+    "font-primary": {
+      "type": "string",
+      "value": "Inter"
+    },
+    "font-secondary": {
+      "type": "string",
+      "value": "JetBrains Mono"
+    },
+    "foreground": {
+      "type": "color",
+      "value": "#F8FAFC"
+    },
+    "muted-foreground": {
+      "type": "color",
+      "value": "#94A3B8"
+    },
+    "primary": {
+      "type": "color",
+      "value": "#38BDF8"
+    },
+    "primary-foreground": {
+      "type": "color",
+      "value": "#0F172A"
+    },
+    "radius-m": {
+      "type": "number",
+      "value": 8
+    },
+    "radius-pill": {
+      "type": "number",
+      "value": 999
+    },
+    "secondary": {
+      "type": "color",
+      "value": "#1E293B"
+    }
+  }
+}

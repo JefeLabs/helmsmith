@@ -87,6 +87,8 @@ function ensureSchema(db: Database.Database): void {
       doc_files_deleted INTEGER NOT NULL DEFAULT 0,
       doc_ins INTEGER NOT NULL DEFAULT 0,
       doc_del INTEGER NOT NULL DEFAULT 0,
+      breaking_changes INTEGER NOT NULL DEFAULT 0,
+      scopes TEXT NOT NULL DEFAULT '[]',
       PRIMARY KEY (member, week, repo)
     );
 
@@ -139,6 +141,7 @@ function ensureSchema(db: Database.Database): void {
 
   // Migrations for existing databases
   migrateEnrichmentBranchColumns(db);
+  migrateRecordsScopeColumns(db);
 }
 
 /** Add pr_branch columns to enrichments if they don't exist (migration v2). */
@@ -154,6 +157,19 @@ function migrateEnrichmentBranchColumns(db: Database.Database): void {
       ALTER TABLE enrichments ADD COLUMN pr_chore INTEGER NOT NULL DEFAULT 0;
       ALTER TABLE enrichments ADD COLUMN pr_hotfix INTEGER NOT NULL DEFAULT 0;
       ALTER TABLE enrichments ADD COLUMN pr_other INTEGER NOT NULL DEFAULT 0;
+    `);
+  }
+}
+
+/** Add breaking_changes and scopes columns to records if they don't exist (migration v3). */
+function migrateRecordsScopeColumns(db: Database.Database): void {
+  const columns = db.pragma("table_info(records)") as Array<{ name: string }>;
+  const colNames = new Set(columns.map((c) => c.name));
+
+  if (!colNames.has("breaking_changes")) {
+    db.exec(`
+      ALTER TABLE records ADD COLUMN breaking_changes INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE records ADD COLUMN scopes TEXT NOT NULL DEFAULT '[]';
     `);
   }
 }
@@ -205,6 +221,8 @@ function recordToRow(r: UserWeekRepoRecord): Record<string, unknown> {
     doc_files_deleted: r.filetype.doc?.filesDeleted ?? 0,
     doc_ins: r.filetype.doc?.insertions ?? 0,
     doc_del: r.filetype.doc?.deletions ?? 0,
+    breaking_changes: r.breakingChanges ?? 0,
+    scopes: JSON.stringify(r.scopes ?? []),
   };
 }
 
@@ -267,6 +285,8 @@ function rowToRecord(row: Record<string, unknown>): UserWeekRepoRecord {
         deletions: row.doc_del as number,
       },
     },
+    breakingChanges: (row.breaking_changes as number) ?? 0,
+    scopes: JSON.parse((row.scopes as string) || '[]'),
   };
 }
 
@@ -325,7 +345,8 @@ export function saveCommitsDataSQL(data: CommitsByFiletype): void {
       test_files, test_files_added, test_files_deleted, test_ins, test_del,
       config_files, config_files_added, config_files_deleted, config_ins, config_del,
       storybook_files, storybook_files_added, storybook_files_deleted, storybook_ins, storybook_del,
-      doc_files, doc_files_added, doc_files_deleted, doc_ins, doc_del
+      doc_files, doc_files_added, doc_files_deleted, doc_ins, doc_del,
+      breaking_changes, scopes
     ) VALUES (
       @member, @email, @org, @org_type, @team, @tag, @week, @repo, @grp,
       @commits, @active_days,
@@ -334,7 +355,8 @@ export function saveCommitsDataSQL(data: CommitsByFiletype): void {
       @test_files, @test_files_added, @test_files_deleted, @test_ins, @test_del,
       @config_files, @config_files_added, @config_files_deleted, @config_ins, @config_del,
       @storybook_files, @storybook_files_added, @storybook_files_deleted, @storybook_ins, @storybook_del,
-      @doc_files, @doc_files_added, @doc_files_deleted, @doc_ins, @doc_del
+      @doc_files, @doc_files_added, @doc_files_deleted, @doc_ins, @doc_del,
+      @breaking_changes, @scopes
     )
     ON CONFLICT (member, week, repo) DO UPDATE SET
       commits = commits + excluded.commits,
@@ -370,7 +392,9 @@ export function saveCommitsDataSQL(data: CommitsByFiletype): void {
       doc_files_added = doc_files_added + excluded.doc_files_added,
       doc_files_deleted = doc_files_deleted + excluded.doc_files_deleted,
       doc_ins = doc_ins + excluded.doc_ins,
-      doc_del = doc_del + excluded.doc_del
+      doc_del = doc_del + excluded.doc_del,
+      breaking_changes = breaking_changes + excluded.breaking_changes,
+      scopes = excluded.scopes
   `);
 
   const insertMany = db.transaction((records: UserWeekRepoRecord[]) => {
@@ -493,6 +517,7 @@ export interface RolledUp {
   filesDeleted: number;
   activeDays: number;
   activeMembers: number;
+  breakingChanges: number;
   filetype: {
     app: FiletypeRollup;
     test: FiletypeRollup;
@@ -601,7 +626,8 @@ export function queryRollup(
       SUM(doc_files_added) as doc_files_added,
       SUM(doc_files_deleted) as doc_files_deleted,
       SUM(doc_ins) as doc_ins,
-      SUM(doc_del) as doc_del
+      SUM(doc_del) as doc_del,
+      SUM(breaking_changes) as breaking_changes
     FROM records
     ${where}
     ${groupByClause}
@@ -664,6 +690,7 @@ export function queryRollup(
       filesChanged,
       filesAdded,
       filesDeleted,
+      breakingChanges: (row.breaking_changes as number) ?? 0,
       filetype: { app, test, config, storybook, doc },
     });
   }
@@ -1004,7 +1031,8 @@ export function upsertRecords(records: UserWeekRepoRecord[]): void {
       test_files, test_files_added, test_files_deleted, test_ins, test_del,
       config_files, config_files_added, config_files_deleted, config_ins, config_del,
       storybook_files, storybook_files_added, storybook_files_deleted, storybook_ins, storybook_del,
-      doc_files, doc_files_added, doc_files_deleted, doc_ins, doc_del
+      doc_files, doc_files_added, doc_files_deleted, doc_ins, doc_del,
+      breaking_changes, scopes
     ) VALUES (
       @member, @email, @org, @org_type, @team, @tag, @week, @repo, @grp,
       @commits, @active_days,
@@ -1013,7 +1041,8 @@ export function upsertRecords(records: UserWeekRepoRecord[]): void {
       @test_files, @test_files_added, @test_files_deleted, @test_ins, @test_del,
       @config_files, @config_files_added, @config_files_deleted, @config_ins, @config_del,
       @storybook_files, @storybook_files_added, @storybook_files_deleted, @storybook_ins, @storybook_del,
-      @doc_files, @doc_files_added, @doc_files_deleted, @doc_ins, @doc_del
+      @doc_files, @doc_files_added, @doc_files_deleted, @doc_ins, @doc_del,
+      @breaking_changes, @scopes
     )
     ON CONFLICT (member, week, repo) DO UPDATE SET
       commits = commits + excluded.commits,
@@ -1049,7 +1078,9 @@ export function upsertRecords(records: UserWeekRepoRecord[]): void {
       doc_files_added = doc_files_added + excluded.doc_files_added,
       doc_files_deleted = doc_files_deleted + excluded.doc_files_deleted,
       doc_ins = doc_ins + excluded.doc_ins,
-      doc_del = doc_del + excluded.doc_del
+      doc_del = doc_del + excluded.doc_del,
+      breaking_changes = breaking_changes + excluded.breaking_changes,
+      scopes = excluded.scopes
   `);
 
   const insertMany = db.transaction((recs: UserWeekRepoRecord[]) => {
