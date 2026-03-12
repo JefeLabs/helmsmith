@@ -887,71 +887,89 @@ export function renderContributionsTab(
   );
   console.log('');
 
-  let groups = pivotEntity
-    ? buildContributionGroupsByEntity(recs, buckets, drillLevel, tagOverlay, ctx.config, enrichments, classifyPerception)
-    : buildContributionGroups(recs, buckets, drillLevel, tagOverlay, ctx.config, enrichments, classifyPerception);
-
-  // Stamp segments onto bars and optionally filter by excluded segments.
-  // Segments are computed per-group (per time bucket in by-time mode, per entity in by-entity mode)
-  // so that each group gets its own 20/60/20 distribution.
-  if (!pivotEntity) {
-    // By-time mode: each group is a time bucket, bars are entities.
-    // Compute segments across all bars using the global (all-bucket) member totals.
-    const memberTotals = new Map<string, number>();
-    for (const g of groups) {
-      for (const bar of g.bars) {
-        memberTotals.set(bar.label, (memberTotals.get(bar.label) ?? 0) + bar.total);
-      }
+  // When drill level is org/team (not user) and segments are being excluded,
+  // pre-filter records at the user level so that excluded-segment users are
+  // removed before aggregation — rather than removing entire orgs/teams.
+  const segThresholds = { high: ctx.config.settings.segment_high_pct ?? 20, low: ctx.config.settings.segment_low_pct ?? 20 };
+  let filteredRecs = recs;
+  let userSegMap: Map<string, Segment> | undefined;
+  if (excludedSegments && excludedSegments.size > 0 && drillLevel !== 'user' && !tagOverlay) {
+    const userTotals = new Map<string, number>();
+    for (const r of recs) {
+      const key = r.member;
+      const total = r.filetype.app.insertions + r.filetype.app.deletions +
+        r.filetype.test.insertions + r.filetype.test.deletions +
+        r.filetype.config.insertions + r.filetype.config.deletions +
+        r.filetype.storybook.insertions + r.filetype.storybook.deletions +
+        (r.filetype.doc?.insertions ?? 0) + (r.filetype.doc?.deletions ?? 0);
+      userTotals.set(key, (userTotals.get(key) ?? 0) + total);
     }
-    const segThresholds = { high: ctx.config.settings.segment_high_pct ?? 20, low: ctx.config.settings.segment_low_pct ?? 20 };
-    const segMap = calculateSegments(memberTotals, segThresholds);
-    for (const g of groups) {
-      for (const bar of g.bars) {
-        bar.segment = segMap.get(bar.label);
-      }
-    }
-  } else {
-    // By-entity mode: each group is an entity, bars are time buckets. No per-bar segmentation.
-    // Segment the entities (groups) themselves by their total across all bars.
-    const entityTotals = new Map<string, number>();
-    for (const g of groups) {
-      const total = g.bars.reduce((s, b) => s + b.total, 0);
-      entityTotals.set(g.groupLabel, total);
-    }
-    const segThresholds = { high: ctx.config.settings.segment_high_pct ?? 20, low: ctx.config.settings.segment_low_pct ?? 20 };
-    const segMap = calculateSegments(entityTotals, segThresholds);
-    for (const g of groups) {
-      const seg = segMap.get(g.groupLabel);
-      if (seg) {
-        // Stamp segment on all bars in this group for display
-        for (const bar of g.bars) {
-          bar.segment = seg;
-        }
-        // Prefix group label with segment indicator
-        const ind = SEGMENT_INDICATORS[seg];
-        g.groupLabel = ind.color(ind.char) + ' ' + g.groupLabel;
-      }
-    }
+    userSegMap = calculateSegments(userTotals, segThresholds);
+    filteredRecs = recs.filter((r) => {
+      const seg = userSegMap!.get(r.member);
+      return !seg || !excludedSegments.has(seg);
+    });
   }
 
-  // Filter by excluded segments
-  if (excludedSegments && excludedSegments.size > 0) {
-    if (!pivotEntity) {
+  let groups = pivotEntity
+    ? buildContributionGroupsByEntity(filteredRecs, buckets, drillLevel, tagOverlay, ctx.config, enrichments, classifyPerception)
+    : buildContributionGroups(filteredRecs, buckets, drillLevel, tagOverlay, ctx.config, enrichments, classifyPerception);
+
+  // Stamp segments onto bars and optionally filter by excluded segments.
+  if (!pivotEntity) {
+    // By-time mode: each group is a time bucket, bars are entities.
+    if (drillLevel === 'user' || tagOverlay) {
+      // At user/tag level, bars represent individuals/tags — segment them directly.
+      const memberTotals = new Map<string, number>();
       for (const g of groups) {
-        g.bars = g.bars.filter((b) => !b.segment || !excludedSegments.has(b.segment));
+        for (const bar of g.bars) {
+          memberTotals.set(bar.label, (memberTotals.get(bar.label) ?? 0) + bar.total);
+        }
       }
-      groups = groups.filter((g) => g.bars.length > 0);
-    } else {
-      // Filter entire entity groups
+      const segMap = calculateSegments(memberTotals, segThresholds);
+      for (const g of groups) {
+        for (const bar of g.bars) {
+          bar.segment = segMap.get(bar.label);
+        }
+      }
+      // Filter bars by excluded segments
+      if (excludedSegments && excludedSegments.size > 0) {
+        for (const g of groups) {
+          g.bars = g.bars.filter((b) => !b.segment || !excludedSegments.has(b.segment));
+        }
+        groups = groups.filter((g) => g.bars.length > 0);
+      }
+    }
+    // For org/team drill level, records were already pre-filtered above — no bar-level segment stamp needed.
+  } else {
+    // By-entity mode: each group is an entity, bars are time buckets. No per-bar segmentation.
+    if (drillLevel === 'user' || tagOverlay) {
+      // Segment the entities (groups) themselves by their total across all bars.
       const entityTotals = new Map<string, number>();
       for (const g of groups) {
-        entityTotals.set(g.groupLabel, g.bars.reduce((s, b) => s + b.total, 0));
+        const total = g.bars.reduce((s, b) => s + b.total, 0);
+        entityTotals.set(g.groupLabel, total);
       }
-      groups = groups.filter((g) => {
-        const seg = g.bars[0]?.segment;
-        return !seg || !excludedSegments.has(seg);
-      });
+      const segMap = calculateSegments(entityTotals, segThresholds);
+      for (const g of groups) {
+        const seg = segMap.get(g.groupLabel);
+        if (seg) {
+          for (const bar of g.bars) {
+            bar.segment = seg;
+          }
+          const ind = SEGMENT_INDICATORS[seg];
+          g.groupLabel = ind.color(ind.char) + ' ' + g.groupLabel;
+        }
+      }
+      // Filter entire entity groups
+      if (excludedSegments && excludedSegments.size > 0) {
+        groups = groups.filter((g) => {
+          const seg = g.bars[0]?.segment;
+          return !seg || !excludedSegments.has(seg);
+        });
+      }
     }
+    // For org/team drill level, records were already pre-filtered above.
   }
 
   // Build an "Avg" summary row from the per-label averages already stamped on bars

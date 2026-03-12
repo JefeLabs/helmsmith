@@ -268,6 +268,63 @@
           ]
         }
       ]
+    },
+    {
+      "type": "frame",
+      "id": "oZHLX",
+      "x": 0,
+      "y": 0,
+      "name": "bannerInst",
+      "width": "fill_container(0)",
+      "fill": "$secondary",
+      "padding": [
+        16,
+        24
+      ],
+      "justifyContent": "space_between",
+      "alignItems": "center",
+      "children": [
+        {
+          "type": "frame",
+          "id": "xufY6",
+          "name": "bannerLeft",
+          "gap": 12,
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon_font",
+              "id": "VByam",
+              "name": "icon",
+              "width": 24,
+              "height": 24,
+              "iconFontName": "radar",
+              "iconFontFamily": "Material Symbols Rounded",
+              "fill": "$primary"
+            },
+            {
+              "type": "text",
+              "id": "ZVjdt",
+              "name": "logoTxt",
+              "fill": "$foreground",
+              "content": "GITRADAR",
+              "fontFamily": "Inter",
+              "fontSize": 18,
+              "fontWeight": "800",
+              "letterSpacing": 1
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "mVhcQ",
+          "name": "bannerRight",
+          "fill": "$muted-foreground",
+          "content": "v0.1.0",
+          "fontFamily": "JetBrains Mono",
+          "fontSize": 12,
+          "fontWeight": "normal"
+        }
+      ]
     }
   ],
   "variables": {
@@ -319,5 +376,10 @@
       "type": "color",
       "value": "#1E293B"
     }
+  },
+  "imports": {
+    "O": "contributions-tab.lib.pen",
+    "E": "pencil:shadcn.lib.pen",
+    "r": "pencil:lunaris.lib.pen"
   }
 }

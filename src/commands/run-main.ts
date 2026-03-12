@@ -60,7 +60,10 @@ export async function runMain(opts: import('../engine/gitradar-engine.js').RunOp
   }
 
   // ── Filtering ─────────────────────────────────────────────────────────
-  engine.applyFilters(opts);
+  // Skip SQL-based filtering in demo mode — demo records are in-memory only.
+  if (!opts.demo) {
+    engine.applyFilters(opts);
+  }
 
   if (opts.json) {
     console.log(JSON.stringify(engine.records, null, 2));
