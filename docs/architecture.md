@@ -6,19 +6,25 @@
 ┌──────────────────────────────────────────────────────────────────┐
 │  CLI (commander)                                                 │
 │  src/cli.ts                                                      │
-│  Parses args, orchestrates startup, applies filters              │
+│  Parses args, routes to subcommands or run-main                  │
 └───────┬──────────────────────────────────────────────────────────┘
+        │
+        ├──► GitRadarEngine (src/engine/gitradar-engine.ts)
+        │    Orchestrates workspace, scanning, enrichment, filtering
         │
         ├──► Config Loader ──► Zod Validation ──► Config
         │    src/config/         src/types/
         │
-        ├──► Collector ──► Store (JSON files)
-        │    src/collector/      src/store/
+        ├──► Collector ──► SQLite Store
+        │    src/collector/      src/store/sqlite-store.ts
+        │
+        ├──► Enricher ──► GitHub API ──► Enrichment Store
+        │    src/commands/enrich.ts     (via octokit)
         │
         ├──► Author Registry ──► Author Map ──► Reattribution
         │    src/store/           src/collector/
         │
-        ├──► Aggregator ──► Rollups, Trends, Leaderboards
+        ├──► Aggregator ──► Rollups, Trends, Leaderboards, Segments
         │    src/aggregator/
         │
         └──► Navigator ──► Views ──► UI Components ──► Terminal
@@ -32,12 +38,8 @@
 The entry point. Uses `commander` to define grouped subcommands and all global flags. Responsibilities:
 
 - Parse and validate CLI arguments
-- Handle early-exit paths (`--reset`, `--store-stats`, `--json`)
-- Load config, store data, author registry
-- Trigger repo scanning
-- Apply filters (`--org`, `--team`, `--tag`, `--group`)
-- Reattribute records against current author assignments
-- Construct `ViewContext` and hand off to the navigator
+- Route to the appropriate subcommand handler
+- Define global flags (`--org`, `--team`, `--tag`, `--group`, `-w`, `--demo`, `--json`, etc.)
 
 #### Subcommand Groups
 
@@ -51,9 +53,27 @@ The entry point. Uses `commander` to define grouped subcommands and all global f
 | `org` | `list`, `add`, `add-team` — manage organizations |
 | `author` | `list`, `assign`, `bulk-assign` — manage authors |
 | `view` | `contributions`, `leaderboard`, `repo-activity`, `trends` — CLI reports |
-| `data` | `export`, `export-csv`, `import` — data portability |
+| `data` | `export`, `export-csv`, `import`, `enrich` — data portability and enrichment |
 
-The CLI layer has no knowledge of UI rendering or data aggregation logic.
+### Engine Layer (`src/engine/gitradar-engine.ts`)
+
+The central orchestrator that replaced scattered startup logic. Manages the full lifecycle:
+
+```
+resolveWorkspace() → loadStores() → scan() → enrich() → applyFilters() → buildViewContext()
+```
+
+Key responsibilities:
+- **Workspace resolution** — selects and validates the active workspace
+- **Store management** — loads config, SQLite database, author registry
+- **Scanning** — coordinates incremental git log scanning across all repos
+- **Enrichment** — triggers GitHub API enrichment for PR metrics
+- **SQL-based filtering** — pushes filter predicates to the database via `queryRecords()`
+- **ViewContext construction** — builds the typed context object for the TUI
+- **Reactive refresh** — `onRefreshData()` detects external database changes (e.g., background `--watch` scans) and reloads data
+- **Auto-pruning** — removes records older than the configured retention window
+
+In demo mode, the engine uses in-memory records from `generateDemoData()` and skips SQL-based filtering.
 
 ### Config Layer (`src/config/loader.ts`)
 
@@ -84,8 +104,8 @@ Responsible for extracting commit data from git repositories and transforming it
 ```
 src/collector/
 ├── index.ts        # Scan coordinator — loops repos, manages staleness
-├── git.ts          # Git log parser — runs git, parses output
-├── classifier.ts   # File classifier — app/test/config/storybook
+├── git.ts          # Git log parser — runs git, parses output, extracts intent/scopes
+├── classifier.ts   # File classifier — app/test/config/storybook/doc
 ├── author-map.ts   # Author resolver — email/name/alias → member identity
 │                   # Also: reattributeRecords() for post-assignment updates
 └── dir-scanner.ts  # Directory scanner — discovers git repos in a path
@@ -102,13 +122,14 @@ parseGitLogOutput()          → ParsedCommit[]
     ▼
 scanRepo()
   ├── resolve author (AuthorMap + IdentifierRules)
-  ├── classify each file           → app | test | config | storybook
+  ├── classify each file           → app | test | config | storybook | doc
   ├── compute ISO week             → "2026-W08"
+  ├── parse conventional commit    → intent, scopes, breaking changes
   ├── deduplicate (recentHashes)   → skip if seen
   └── accumulate by member::week::repo
     │
     ▼
-UserWeekRepoRecord[]         → merged into store
+UserWeekRepoRecord[]         → inserted into SQLite
 ```
 
 #### Author Resolution Chain
@@ -142,24 +163,39 @@ This means a typical session re-scans only repos with new commits.
 
 ### Store Layer (`src/store/`)
 
-Flat-file JSON persistence. No database, no external services.
+SQLite-based persistence with WAL mode for crash safety and concurrent access.
 
 ```
 ~/.agentx/gitradar/
 ├── config.yml                          # User configuration
 └── data/
-    ├── commits-by-filetype.json        # All UserWeekRepoRecords
-    ├── scan-state.json                 # Per-repo scan cursors
+    ├── gitradar.db                     # SQLite database (records, enrichments, scan state, meta)
     └── authors.json                    # Author registry (discovered + assigned)
 ```
 
 ```
 src/store/
-├── paths.ts                # Path constants and ensureDataDir()
-├── commits-by-filetype.ts  # Load, save, merge, prune records
-├── scan-state.ts           # Load, save, update scan cursors
-└── author-registry.ts      # Load, save, merge, assign/unassign authors
+├── sqlite-store.ts     # Main database layer — schema, migrations, CRUD, queries
+├── db-watcher.ts       # Reactive file watcher — AbortSignal on DB changes
+├── paths.ts            # Path constants and ensureDataDir()
+├── scan-state.ts       # Load, save, update scan cursors (SQL-backed)
+└── author-registry.ts  # Load, save, merge, assign/unassign authors
 ```
+
+#### SQLite Schema
+
+| Table | Purpose |
+|-------|---------|
+| `records` | All `UserWeekRepoRecord` data with composite key (member, week, repo) |
+| `enrichments` | PR metrics, cycle time, reviews, churn per member/week/repo |
+| `scan_state` | Per-repo scan cursors (lastHash, lastScanDate, recentHashes) |
+| `meta` | Timestamps for change detection (commitsUpdated, enrichmentsUpdated) |
+
+Key database features:
+- **WAL mode** — enables concurrent reads during background scans
+- **Upsert semantics** — `INSERT OR REPLACE` for idempotent record merging
+- **Transaction wrapping** — atomic batch operations (e.g., `resetAllData`)
+- **Reactive watching** — `DbWatcher` monitors the `.db` and `.db-wal` files for external changes, providing `AbortSignal`s that interrupt the TUI's poll interval for near-instant updates
 
 #### Author Registry (`authors.json`)
 
@@ -186,22 +222,6 @@ Key operations:
 - **`getUnassignedAuthors()`** / **`getAssignedAuthors()`** — Filter queries
 - **`getIdentifierPrefixes()`** — Discover unique prefixes for bulk-assign UX
 
-#### Merge Strategy
-
-New records are merged with existing records by composite key `member::week::repo`:
-- **Existing key** — sum all metrics (commits, insertions, deletions, files, active days capped at 7)
-- **New key** — append as-is
-
-This design supports overlap-safe incremental scans. Scanning the same commit twice won't double-count because metrics are summed by the same key.
-
-#### Atomic Writes
-
-All store files use a write-to-temp-then-rename pattern to prevent corruption on crash:
-
-```
-data → JSON.stringify → write to .tmp file → fs.rename (atomic)
-```
-
 ### Aggregator Layer (`src/aggregator/`)
 
 Pure functions that transform flat records into view-ready structures.
@@ -211,7 +231,9 @@ src/aggregator/
 ├── engine.ts       # rollup() — generic group-by + sum
 ├── filters.ts      # filterRecords(), getCurrentWeek(), getLastNWeeks/Months/Quarters/Years, deltas
 ├── leaderboard.ts  # computeLeaderboard() — top N by category
-└── trends.ts       # computeTrend(), computeRunningAvg()
+├── trends.ts       # computeTrend(), computeRunningAvg()
+├── segments.ts     # calculateSegments() — high/middle/low tier assignment
+└── metrics.ts      # Derived metric calculations (testPct, etc.)
 ```
 
 #### Rollup Engine
@@ -231,9 +253,19 @@ sum all metrics per group
 Map<string, RolledUp>
 ```
 
-`RolledUp` contains: commits, insertions, deletions, netLines, filesChanged, filesAdded, filesDeleted, activeDays, activeMembers (distinct count), and per-filetype breakdowns.
+`RolledUp` contains: commits, insertions, deletions, netLines, filesChanged, filesAdded, filesDeleted, activeDays, activeMembers (distinct count), and per-filetype breakdowns (app, test, config, storybook, doc).
 
 Every view uses `rollup()` with different key functions. The dashboard rolls up by org/team/tag; team detail rolls up by member; trends rolls up by week.
+
+#### Segment Calculation
+
+`calculateSegments(memberTotals, thresholds)` assigns each entity a tier:
+
+- **N ≥ 5**: top `ceil(N × high%)` = high, bottom `ceil(N × low%)` = low, rest = middle
+- **N < 5**: top 1 = high, bottom 1 = low, rest = middle
+- **Zero-value** entries are always "low"
+
+Segments are computed post-filter and reflect the current view, not stored data.
 
 #### Time Bucketing
 
@@ -245,17 +277,9 @@ The aggregator supports four granularity levels:
 
 Each granularity has configurable depth ranges (e.g., 2–24 weeks, 2–12 months).
 
-#### Filter Chain
+#### SQL-Accelerated Rollup
 
-Filters use AND-logic — all specified criteria must match:
-
-```typescript
-filterRecords(records, {
-  weeks: ["2026-W06", "2026-W07", "2026-W08"],
-  org: "Acme Corp",
-  team: "Platform"
-})
-```
+When available, views use `queryRollup()` to push aggregation to the SQLite database for better performance with large datasets, bypassing the in-memory `rollup()` function.
 
 ### Views Layer (`src/views/`)
 
@@ -267,14 +291,18 @@ type ViewFn = (ctx: ViewContext) => Promise<NavigationAction>
 
 ```
 src/views/
-├── types.ts          # ViewContext, NavigationAction, ViewFn type definitions
-├── navigator.ts      # View stack manager (push/pop/replace/quit)
-├── dashboard.ts      # Main 4-tab dashboard (Contributions, Repo Activity, Top Performers, Manage)
-├── manage-tab.ts     # Manage tab section renderers (repos, orgs, authors, groups, tags)
-├── repo-activity.ts  # Repo activity chart builder
-├── team-detail.ts    # Per-team drill-down
-├── member-detail.ts  # Per-member drill-down
-└── trends.ts         # 12-week trend analysis
+├── types.ts                 # ViewContext, NavigationAction, ViewFn type definitions
+├── navigator.ts             # View stack manager (push/pop/replace/quit)
+├── dashboard.ts             # Main 4-tab dashboard (Contributions, Repo Activity, Top Performers, Manage)
+├── manage-tab.ts            # Manage tab section renderers (repos, orgs, authors, groups, tags)
+├── repo-activity.ts         # Repo activity chart builder
+├── team-detail.ts           # Per-team drill-down
+├── member-detail.ts         # Per-member drill-down
+├── trends.ts                # 12-week trend analysis
+└── components/
+    ├── contribution-section.ts    # Contribution chart + detail table rendering
+    ├── repo-activity-section.ts   # Repo activity section rendering
+    └── top-performers-section.ts  # Leaderboard section rendering
 ```
 
 #### Dashboard Architecture
@@ -283,24 +311,12 @@ The dashboard (`dashboard.ts`) manages four tabs with independent state:
 
 | Tab | State Variables |
 |-----|----------------|
-| Contributions | `drillLevel`, `tagOverlay`, `contribGranularity`, `contribDepth`, `contribDetail`, `contribPivotEntity`, `contribHideUnassigned` |
+| Contributions | `drillLevel`, `tagOverlay`, `contribGranularity`, `contribDepth`, `contribTableMode`, `contribPivotEntity`, `contribHideUnassigned`, `contribExcludedSegments`, `contribDetailLayers`, `contribPerUserMode`, `contribLabelWidth` |
 | Repo Activity | `repoWindowWeeks` |
 | Top Performers | `leaderboardWindowWeeks` |
-| Manage | `manageSection`, `manageCursorIdx` |
+| Manage | `manageSection`, `manageRepoIdx`, `manageAuthorIdx` |
 
 The `mapKey()` function translates raw keypresses into semantic actions based on the active tab, and the main loop dispatches each action to update state or trigger side effects (author assignment, repo scanning, etc.).
-
-#### Manage Tab
-
-The Manage tab (`manage-tab.ts`) provides five section renderers:
-
-- **Repos** — Lists configured repos with scan status (fresh/stale/never), last scan time, commit counts
-- **Orgs** — Lists organizations with their teams, member counts, and tags
-- **Authors** — Lists discovered authors grouped by assignment status (assigned/unassigned), with identifier and repo info
-- **Groups** — Lists repo groups and member repos
-- **Tags** — Lists team tags and their associated teams
-
-The manage tab renderers are pure functions (return strings). All mutation logic (assign, unassign, add org, remove team, scan) lives in `dashboard.ts` action handlers.
 
 #### Navigation Model
 
@@ -324,19 +340,19 @@ Each view returns a `NavigationAction`:
 - `{ type: 'replace', view }` — swap the current view (tab switches)
 - `{ type: 'quit' }` — exit the loop
 
-Views are **stateless** — re-rendering from scratch on every navigation action. State lives in the `ViewContext` (config + records + currentWeek), not in the views themselves.
+Views are **stateless** — re-rendering from scratch on every navigation action. State lives in the `ViewContext` (config + records + currentWeek + enrichments), not in the views themselves.
 
 #### View Rendering Pattern
 
 Each view follows the same pattern:
 
 ```
-1. Clear terminal (console.clear())
+1. Clear terminal (process.stdout.write ANSI clear sequence)
 2. Filter records for the relevant scope
 3. Roll up records by the appropriate dimension
 4. Render UI components (charts, tables, banners)
 5. Print all output (console.log)
-6. Wait for keypress (readKey())
+6. Wait for keypress (readKey()) — interruptible via DbWatcher AbortSignal
 7. Return a NavigationAction based on the key
 ```
 
@@ -346,9 +362,9 @@ Pure rendering functions. No state, no side effects beyond returning strings. Ev
 
 ```
 src/ui/
-├── constants.ts           # SEGMENT_DEFS: filetype colors and characters
-├── format.ts              # fmt(), delta(), weekLabel(), monthShort(), quarterShort(), yearShort(), ANSI-aware padding
-├── grouped-hbar-chart.ts  # Grouped stacked horizontal bar chart
+├── constants.ts           # FILETYPE_CHARS, FILETYPE_COLORS, SEGMENT_DEFS, SEGMENT_INDICATORS
+├── format.ts              # fmt(), delta(), weekShort(), monthShort(), quarterShort(), yearShort(), ANSI-aware padding
+├── grouped-hbar-chart.ts  # Grouped stacked horizontal bar chart with detail layers
 ├── avg-output-chart.ts    # Bar chart with running average marker (◈)
 ├── line-chart.ts          # Multi-series line chart (solid/dotted)
 ├── table.ts               # ANSI-aware table with flex columns
@@ -357,11 +373,12 @@ src/ui/
 ├── banner.ts              # Two-line header with separator
 ├── tab-bar.ts             # Tab bar, hotkey bar, and breadcrumb
 ├── legend.ts              # Color legend
+├── cli-renderer.ts        # Reusable output renderer for CLI commands
 ├── keypress.ts            # Raw TTY single-keypress reader
 └── readline.ts            # Line input reader (for text prompts in Manage tab)
 ```
 
-All chart functions accept a `width` parameter (typically `min(process.stdout.columns, 120)`) and scale their output accordingly.
+All chart functions accept a `width` parameter (typically `process.stdout.columns`) and scale their output accordingly.
 
 #### Visual Encoding
 
@@ -373,14 +390,34 @@ Consistent across all components:
 | Test | `▓` (dark shade) | Blue |
 | Config | `░` (light shade) | Yellow |
 | Storybook | `▒` (medium shade) | Magenta |
+| Doc | `▔` (upper bar) | Cyan |
+
+#### Segment Indicators
+
+| Tier | Character | Color |
+|------|-----------|-------|
+| High | `▲` | Green |
+| Middle | `●` | Dim |
+| Low | `▼` | Red |
 
 ### Commands Layer (`src/commands/`)
 
-Non-interactive output functions used by CLI subcommands:
+Handlers for CLI subcommands and the main TUI entry point:
 
 ```
 src/commands/
-└── export-data.ts    # recordsToCsv() — CSV export logic
+├── run-main.ts         # Main entry orchestrator — delegates to GitRadarEngine
+├── contributions.ts    # CLI contributions report with drill-down
+├── repo-activity.ts    # CLI repo activity report
+├── leaderboard.ts      # CLI leaderboard report
+├── export-data.ts      # recordsToCsv() — CSV export logic
+├── enrich.ts           # GitHub enrichment command (PR metrics, churn)
+├── add-org.ts          # Add organization command
+├── assign-author.ts    # Assign/bulk-assign author commands
+├── list-authors.ts     # List authors command
+├── manage-repos.ts     # Repo add/list/remove commands
+├── export.ts           # YAML export command
+└── import.ts           # YAML import command
 ```
 
 ## Type System (`src/types/schema.ts`)
@@ -396,14 +433,30 @@ UserWeekRepoRecord
 ├── Identity: member, email, org, orgType, team, tag
 ├── Dimensions: week ("YYYY-Www"), repo, group
 ├── Metrics: commits, activeDays
-└── Filetype breakdown
-    ├── app:       { files, filesAdded, filesDeleted, insertions, deletions }
-    ├── test:      { files, filesAdded, filesDeleted, insertions, deletions }
-    ├── config:    { files, filesAdded, filesDeleted, insertions, deletions }
-    └── storybook: { files, filesAdded, filesDeleted, insertions, deletions }
+├── Filetype breakdown
+│   ├── app:       { files, filesAdded, filesDeleted, insertions, deletions }
+│   ├── test:      { files, filesAdded, filesDeleted, insertions, deletions }
+│   ├── config:    { files, filesAdded, filesDeleted, insertions, deletions }
+│   ├── storybook: { files, filesAdded, filesDeleted, insertions, deletions }
+│   └── doc:       { files, filesAdded, filesDeleted, insertions, deletions }
+├── Intent (optional)
+│   ├── feat, fix, refactor, docs, test, chore, other (commit counts per type)
+├── breakingChanges: number
+└── scopes: string[]
 ```
 
-This single grain supports all aggregations — rollup by any dimension produces the metrics needed by every view.
+### Enrichment Types
+
+```
+ProductivityExtensions
+├── prs_opened, prs_merged
+├── avg_cycle_hrs, reviews_given
+├── churn_rate_pct
+└── pr_feature, pr_fix, pr_bugfix, pr_chore, pr_hotfix, pr_other
+
+EnrichmentStore
+├── enrichments: Record<string, ProductivityExtensions>   # key: "member::week::repo"
+```
 
 ### Author Registry Type
 
@@ -428,19 +481,27 @@ config.yml + authors.json
 [Author Registry] ──► AuthorRegistry
     │
     ▼
-[Collector] ──git log──► ParsedCommit[] ──classify + resolve──► UserWeekRepoRecord[]
-    │                                           │                      │
-    │                                    [merge authors]               ▼
-    │                                    into registry       [Store: merge + save]
-    │                                                                  │
-    ▼                                                                  ▼
-[Reattribute Records] ──► UserWeekRepoRecord[] (with current org/team)
+[GitRadarEngine]
+  ├── resolveWorkspace() → loadStores()
+  │
+  ├── [Collector] ──git log──► ParsedCommit[]
+  │     ├── classify + resolve ──► UserWeekRepoRecord[]
+  │     ├── parse intent + scopes
+  │     └── [SQLite Store: upsert records]
+  │
+  ├── [Enricher] ──GitHub API──► PR metrics, churn
+  │     └── [SQLite Store: upsert enrichments]
+  │
+  ├── applyFilters() ──SQL predicates──► filtered records
+  │
+  └── buildViewContext() ──► ViewContext
+        ├── reattributeRecords()
+        ├── loadEnrichmentsSQL()
+        ├── DbWatcher (reactive refresh)
+        └── queryRollup (SQL-accelerated aggregation)
     │
     ▼
-[CLI Filters] ──► filtered UserWeekRepoRecord[]
-    │
-    ▼
-[Aggregator] ──rollup──► RolledUp maps, TrendPoints, LeaderboardColumns
+[Aggregator] ──rollup──► RolledUp maps, TrendPoints, LeaderboardColumns, Segments
     │
     ▼
 [Views] ──► UI Components ──► ANSI strings ──► Terminal
@@ -448,11 +509,16 @@ config.yml + authors.json
 
 ## Key Design Decisions
 
-### Flat File Storage Over Database
+### SQLite Over Flat Files
 
-Records are stored as a JSON array. This keeps the tool zero-dependency (no SQLite, no Postgres) and fully portable — the entire dataset is a single file that can be backed up, shared, or deleted trivially.
+Records are stored in a SQLite database using `better-sqlite3`. This provides:
+- **Crash safety** — WAL mode ensures consistency even on unexpected termination
+- **Concurrent access** — background `--watch` scans and the TUI can run simultaneously
+- **SQL-accelerated queries** — `queryRecords()` and `queryRollup()` push predicates to the database
+- **Reactive updates** — `DbWatcher` monitors DB file changes for near-instant TUI refreshes
+- **Atomic operations** — transactions wrap multi-table operations like `resetAllData`
 
-Trade-off: large organizations with many repos may hit performance limits. The `shouldAutoPrune()` function warns at 100K records or 50MB estimated size.
+The `shouldAutoPrune()` function warns at 100K records and supports configurable retention.
 
 ### ISO Week as Time Dimension
 
@@ -470,57 +536,79 @@ Trade-off: every keypress triggers a full re-render. In practice this is imperce
 
 ### File Classification by Convention
 
-Rather than requiring users to configure file categories, the classifier uses path-pattern heuristics (test files end in `.test.ts`, config files end in `.json`, etc.). This works out-of-the-box for the vast majority of projects.
+Rather than requiring users to configure file categories, the classifier uses path-pattern heuristics (test files end in `.test.ts`, config files end in `.json`, etc.). This works out-of-the-box for the vast majority of projects. Five categories: app, test, config, storybook, doc.
+
+### Conventional Commit Parsing
+
+Intent tracking extracts semantic meaning from commit messages following the conventional commits specification. This enables analysis of what *kind* of work teams are doing (features vs. fixes vs. refactoring) beyond just volume metrics.
 
 ### Author Resolution at Scan Time + Reattribution at Startup
 
 Authors are resolved during scanning, but assignments can change after data is stored. The reattribution step on startup ensures records always reflect the latest author registry state. This two-phase approach means:
 - Scanning doesn't need to be re-run when assignments change
-- Records on disk may have stale org/team values, but they're corrected before display
+- Records in SQLite may have stale org/team values, but they're corrected before display
 - Unassigned authors are explicitly tracked (not silently dropped)
+
+### Segment Filtering at User Level
+
+When segment exclusions are applied at the org or team drill level, segments are computed on **individual users** and their records are filtered before aggregation. This prevents entire orgs/teams from disappearing when hiding a tier — instead, the aggregated bars show reduced totals reflecting only the included contributors.
 
 ### Manage Tab as Configuration UI
 
 Rather than requiring users to edit YAML files, the Manage tab provides full CRUD operations for repos, orgs, teams, and authors. All mutations persist to disk immediately, and records are reattributed after every assignment change.
 
+### Engine Decoupling
+
+The `GitRadarEngine` class encapsulates the full data lifecycle (workspace → scan → enrich → filter → context). This separation enables:
+- Clean demo mode (in-memory records without SQL filtering)
+- Background scanning (`--watch` mode)
+- CLI commands that share the same data pipeline as the TUI
+- Future external tool integrations via the engine API
+
 ## Testing Strategy
 
 ```
 src/__tests__/
-├── classifier.test.ts          # 72 tests — every file extension and edge case
-├── git.test.ts                 # 25 tests — parse output, ISO weeks, scan logic
-├── author-map.test.ts          # 17 tests — resolution, aliases, case sensitivity, reattribution
-├── author-registry.test.ts     # 16 tests — merge, assign, unassign, bulk-assign, prefix detection
-├── collector-index.test.ts     # 12 tests — scan coordination, staleness, state updates
-├── engine.test.ts              # 15 tests — rollup aggregation
-├── leaderboard.test.ts         # 10 tests — ranking, categories
-├── trends.test.ts              # 16 tests — trend computation, running averages
-├── table.test.ts               # 25 tests — column sizing, truncation, ANSI
-├── grouped-hbar-chart.test.ts  # 21 tests — chart rendering
-├── avg-output-chart.test.ts    # 11 tests — marker positioning
-├── line-chart.test.ts          # 23 tests — multi-series rendering
-├── sparkline.test.ts           # 8 tests  — block character mapping
-├── bar.test.ts                 # 8 tests  — segment proportions
-├── banner.test.ts              # 6 tests  — header formatting
-├── format.test.ts              # 26 tests — fmt, delta, padding, week/month/quarter labels
-├── views.test.ts               # 52 tests — all view navigation and rendering
-├── navigator.test.ts           # 8 tests  — stack push/pop/replace/quit
-├── cli.test.ts                 # 34 tests — argument parsing, subcommands, grouped commands
-├── loader.test.ts              # 11 tests — config loading, path resolution
-├── schema.test.ts              # 40 tests — Zod schema validation
-├── scan-state.test.ts          # 17 tests — state persistence, staleness
-├── commits-by-filetype.test.ts # 19 tests — merge, prune, auto-prune
-├── demo.test.ts                # 15 tests — synthetic data generation
-├── paths.test.ts               # 13 tests — path utilities, directory creation
-├── dir-scanner.test.ts         # 9 tests  — directory git repo discovery
-├── export-data.test.ts         # 22 tests — CSV export formatting
-├── export.test.ts              # 9 tests  — YAML export portability
-├── import.test.ts              # 23 tests — YAML import, conflict resolution
-├── functional.test.ts          # 19 tests — end-to-end functional tests
-├── git-root.test.ts            # 4 tests  — git root detection
-├── repos-registry.test.ts      # 20 tests — repos registry operations
-├── repos-registry-save.test.ts # 8 tests  — repos registry persistence
-└── workspace-selector.test.ts  # 8 tests  — workspace selection logic
+├── classifier.test.ts          # File extension and path classification
+├── git.test.ts                 # Git log parsing, ISO weeks, scan logic
+├── author-map.test.ts          # Resolution, aliases, case sensitivity, reattribution
+├── author-registry.test.ts     # Merge, assign, unassign, bulk-assign, prefix detection
+├── collector-index.test.ts     # Scan coordination, staleness, state updates
+├── engine.test.ts              # Rollup aggregation
+├── leaderboard.test.ts         # Ranking, categories
+├── trends.test.ts              # Trend computation, running averages
+├── segments.test.ts            # Segment calculation, thresholds, edge cases
+├── filters.test.ts             # Record filtering, time functions
+├── table.test.ts               # Column sizing, truncation, ANSI
+├── grouped-hbar-chart.test.ts  # Chart rendering, detail layers
+├── avg-output-chart.test.ts    # Marker positioning
+├── line-chart.test.ts          # Multi-series rendering
+├── sparkline.test.ts           # Block character mapping
+├── bar.test.ts                 # Segment proportions
+├── banner.test.ts              # Header formatting
+├── format.test.ts              # fmt, delta, padding, week/month/quarter labels
+├── views.test.ts               # All view navigation and rendering
+├── navigator.test.ts           # Stack push/pop/replace/quit
+├── cli.test.ts                 # Argument parsing, subcommands, grouped commands
+├── cli-renderer.test.ts        # Reusable CLI output renderer
+├── loader.test.ts              # Config loading, path resolution
+├── schema.test.ts              # Zod schema validation
+├── scan-state.test.ts          # State persistence, staleness
+├── sqlite-store.test.ts        # SQLite CRUD, migrations, queries
+├── db-watcher.test.ts          # Reactive file watching
+├── demo.test.ts                # Synthetic data generation
+├── paths.test.ts               # Path utilities, directory creation
+├── dir-scanner.test.ts         # Directory git repo discovery
+├── export-data.test.ts         # CSV export formatting
+├── export.test.ts              # YAML export portability
+├── import.test.ts              # YAML import, conflict resolution
+├── functional.test.ts          # End-to-end functional tests
+├── git-root.test.ts            # Git root detection
+├── github.test.ts              # GitHub API mocking, enrichment
+├── repos-registry.test.ts      # Repos registry operations
+├── repos-registry-save.test.ts # Repos registry persistence
+├── workspace-selector.test.ts  # Workspace selection logic
+└── keypress.test.ts            # Key normalization
 ```
 
-**Total: 642 tests, 34 files.** All tests are unit tests using vitest with no external dependencies (git operations are mocked via `simple-git`).
+**Total: 841 tests, 40 files.** All tests are unit tests using vitest with no external dependencies (git operations are mocked via `simple-git`, GitHub API mocked via `octokit`).
