@@ -37,6 +37,8 @@ import {
   getMetaTimestamps,
   queryRollup,
 } from '../store/sqlite-store.js';
+import { DbWatcher } from '../store/db-watcher.js';
+import { getSQLitePath } from '../store/sqlite-store.js';
 import { scanAllRepos } from '../collector/index.js';
 import { getCurrentWeek, getLastNWeeks, isoWeekToDateRange } from '../aggregator/filters.js';
 import { buildAuthorMap, resolveAuthor, buildIdentifierRules, reattributeRecords } from '../collector/author-map.js';
@@ -96,6 +98,13 @@ export class GitRadarEngine {
   authorRegistry?: AuthorRegistry;
   private selectedWorkspace?: LoadedWorkspace;
   private resolvedConfigPath?: string;
+  private dbWatcher?: DbWatcher;
+
+  /** Clean up resources (file watchers, etc.) when the TUI exits. */
+  close(): void {
+    this.dbWatcher?.close();
+    this.dbWatcher = undefined;
+  }
 
   // ── Early-exit commands ──────────────────────────────────────────────────
 
@@ -709,6 +718,10 @@ export class GitRadarEngine {
     this.records = reattributeRecords(this.records, this.config, this.authorRegistry);
     const enrichmentStore = loadEnrichmentsSQL();
 
+    // Start watching the SQLite file for external changes (e.g. background --watch scan)
+    this.dbWatcher = new DbWatcher(getSQLitePath());
+    this.dbWatcher.start();
+
     // Snapshot meta timestamps so onRefreshData can detect external changes
     let lastMeta = getMetaTimestamps();
 
@@ -735,6 +748,9 @@ export class GitRadarEngine {
         this.scanState = ctx.scanState;
         return true;
       },
+      createRefreshSignal: this.dbWatcher
+        ? () => this.dbWatcher!.createSignal()
+        : undefined,
       onScanRepo: async (repoName: string) => {
         const result = await this.rescanRepo(repoName);
         ctx.records = result.records;

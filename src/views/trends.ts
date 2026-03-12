@@ -389,8 +389,9 @@ export async function trendsView(ctx: ViewContext): Promise<NavigationAction> {
     // Wait for keypress (with timeout to poll for external DB changes)
     try {
       const POLL_INTERVAL_MS = 5_000;
+      const signal = ctx.createRefreshSignal?.();
       const key = ctx.onRefreshData
-        ? await readKeyWithTimeout(POLL_INTERVAL_MS)
+        ? await readKeyWithTimeout(POLL_INTERVAL_MS, signal)
         : await readKey();
 
       // Timeout — check for external DB changes, then re-render

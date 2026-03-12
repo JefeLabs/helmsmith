@@ -1756,11 +1756,14 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
       }
     }
 
-    // Wait for keypress (with timeout to poll for external DB changes)
+    // Wait for keypress (with timeout to poll for external DB changes).
+    // When a DbWatcher is active, it aborts the signal on filesystem
+    // changes — interrupting the timeout for near-instant reactivity.
     try {
       const POLL_INTERVAL_MS = 5_000;
+      const signal = ctx.createRefreshSignal?.();
       const key = ctx.onRefreshData
-        ? await readKeyWithTimeout(POLL_INTERVAL_MS)
+        ? await readKeyWithTimeout(POLL_INTERVAL_MS, signal)
         : await readKey();
 
       // Timeout — check if background process updated the database

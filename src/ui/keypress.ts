@@ -79,13 +79,21 @@ export function readKey(): Promise<KeyEvent> {
 }
 
 /**
- * Read a single keypress, but give up after `timeoutMs` milliseconds.
+ * Read a single keypress, but give up after `timeoutMs` milliseconds
+ * or when the optional `signal` is aborted (whichever comes first).
  *
- * Returns `null` on timeout — the caller can use the idle tick to poll
- * for external state changes (e.g. database updates from a background
- * --watch process) and then re-render.
+ * Returns `null` on timeout or abort — the caller can use the idle
+ * tick to poll for external state changes (e.g. database updates
+ * from a background --watch process) and then re-render.
+ *
+ * The `signal` parameter enables reactive TUI updates: a DbWatcher
+ * can abort it when the SQLite file changes, collapsing the poll
+ * latency from `timeoutMs` to near-zero.
  */
-export function readKeyWithTimeout(timeoutMs: number): Promise<KeyEvent | null> {
+export function readKeyWithTimeout(
+  timeoutMs: number,
+  signal?: AbortSignal,
+): Promise<KeyEvent | null> {
   return new Promise<KeyEvent | null>((resolve, reject) => {
     if (!process.stdin.isTTY) {
       reject(new Error('readKeyWithTimeout requires a TTY stdin'));
@@ -103,12 +111,18 @@ export function readKeyWithTimeout(timeoutMs: number): Promise<KeyEvent | null> 
       process.stdin.pause();
       process.stdin.removeListener('data', handler);
       clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+    };
+
+    const settle = () => {
+      if (settled) return false;
+      settled = true;
+      cleanup();
+      return true;
     };
 
     const handler = (chunk: string) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
+      if (!settle()) return;
       const key = normalizeKey(chunk);
 
       if (key.name === 'ctrl-c') {
@@ -120,12 +134,21 @@ export function readKeyWithTimeout(timeoutMs: number): Promise<KeyEvent | null> 
     };
 
     const timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      resolve(null);
+      if (settle()) resolve(null);
     }, timeoutMs);
 
+    const onAbort = () => {
+      if (settle()) resolve(null);
+    };
+
+    // If already aborted, resolve immediately
+    if (signal?.aborted) {
+      settle();
+      resolve(null);
+      return;
+    }
+
+    signal?.addEventListener('abort', onAbort, { once: true });
     process.stdin.once('data', handler);
   });
 }

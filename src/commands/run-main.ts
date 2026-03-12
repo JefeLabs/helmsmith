@@ -80,5 +80,9 @@ export async function runMain(opts: import('../engine/gitradar-engine.js').RunOp
     process.exit(0);
   });
 
-  await runNavigator(initial, ctx);
+  try {
+    await runNavigator(initial, ctx);
+  } finally {
+    engine.close();
+  }
 }

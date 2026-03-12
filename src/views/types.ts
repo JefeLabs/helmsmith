@@ -26,6 +26,9 @@ export interface ViewContext {
   onSaveAuthorRegistry?: (registry: AuthorRegistry) => Promise<void>;
   /** Check if underlying data has changed and reload if so. Returns true if data was refreshed. */
   onRefreshData?: () => boolean;
+  /** Create an AbortSignal that fires when the database file changes on disk.
+   *  Pass to readKeyWithTimeout to interrupt the poll interval immediately. */
+  createRefreshSignal?: () => AbortSignal;
 }
 
 export type NavigationAction =
