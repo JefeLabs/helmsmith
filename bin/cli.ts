@@ -14,10 +14,30 @@ import {
   getWorkflows,
   loadCatalog,
 } from "../lib/index.js";
+import { resolveInstallPlan } from "../lib/resolve.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const packageRoot = join(__dirname, "..", "..");
+
+/**
+ * Find the package root by walking up looking for `catalog.json`. Handles
+ * both layouts: `dist/bin/cli.js` (published) and `bin/cli.ts` (dev via
+ * tsx). Mirrors the same trick used by `findCatalogPath` in lib/index.ts.
+ */
+function findPackageRoot(): string {
+  let dir = __dirname;
+  for (let i = 0; i < 5; i++) {
+    if (existsSync(join(dir, "catalog.json"))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  throw new Error(
+    `skillzkit package root not found searching upward from ${__dirname}`
+  );
+}
+
+const packageRoot = findPackageRoot();
 
 const cli = cac("skillzkit");
 
@@ -30,6 +50,7 @@ interface ListOptions {
 interface InstallOptions {
   target?: string;
   force?: boolean;
+  dryRun?: boolean;
 }
 interface UiOptions {
   target?: string;
@@ -102,36 +123,96 @@ cli
   });
 
 cli
-  .command("install", "Copy .claude/commands and .claude/skills into the target project")
+  .command(
+    "install [...slugs]",
+    "Install all catalog items (no args), OR specific items + transitive deps when slugs given"
+  )
   .option("--target <path>", "Target directory (default: current working directory)")
-  .option("--force", "Overwrite even if target .claude/commands/core already exists")
-  .action((options: InstallOptions) => {
+  .option("--force", "Overwrite existing files in the target")
+  .option("--dry-run", "Print the resolved install plan without copying files")
+  .action((slugs: string[], options: InstallOptions) => {
     const target = options.target ? options.target : process.cwd();
     const targetClaude = join(target, ".claude");
-    const targetCore = join(targetClaude, "commands", "core");
 
-    if (existsSync(targetCore) && !options.force) {
-      console.error(
-        `Refusing to install: ${targetCore} already exists. Use --force to overwrite.`
-      );
+    // No slugs → original blanket-install behavior (commands + skills wholesale).
+    // SKILLs (routers) and commands both ship into the standard .claude/ tree.
+    if (!slugs || slugs.length === 0) {
+      const targetCore = join(targetClaude, "commands", "core");
+      if (existsSync(targetCore) && !options.force) {
+        console.error(
+          `Refusing to install: ${targetCore} already exists. Use --force to overwrite, ` +
+            `or pass specific slugs to install just those + their dependencies.`
+        );
+        process.exit(1);
+      }
+      const sourceCommands = join(packageRoot, ".claude", "commands");
+      const sourceSkills = join(packageRoot, ".claude", "skills");
+      copyDir(sourceCommands, join(targetClaude, "commands"));
+      copyDir(sourceSkills, join(targetClaude, "skills"));
+      console.log(`✓ Installed (blanket) to ${targetClaude}`);
+      console.log("");
+      console.log("Next steps:");
+      console.log("  /core:tools:setup           — install/verify local tools");
+      console.log("  /core:integrations:setup    — configure remote services");
+      console.log("  /core:frameworks:init       — detect framework bindings");
+      console.log("  /core:workflows:_index      — see the workflow decision tree");
+      return;
+    }
+
+    // Selective install: walk references[] for transitive deps.
+    const { plan, missing } = resolveInstallPlan(slugs);
+
+    if (missing.length > 0) {
+      console.error(`✗ Unknown slugs (${missing.length}):`);
+      for (const m of missing) console.error(`    ${m}`);
+      console.error("");
+      console.error(`Run 'skillzkit list' to see all available items.`);
       process.exit(1);
     }
 
-    const sourceCommands = join(packageRoot, ".claude", "commands");
-    const sourceSkills = join(packageRoot, ".claude", "skills");
-    const targetCommands = join(targetClaude, "commands");
-    const targetSkills = join(targetClaude, "skills");
+    if (plan.length === 0) {
+      console.error(`✗ Nothing to install (no slugs resolved).`);
+      process.exit(1);
+    }
 
-    copyDir(sourceCommands, targetCommands);
-    copyDir(sourceSkills, targetSkills);
+    if (options.dryRun) {
+      console.log(`Install plan (${plan.length} items, ${slugs.length} requested):`);
+      for (const item of plan) {
+        const trace = item.requestedBy ? `   ← via ${item.requestedBy}` : "   (requested)";
+        console.log(`  [${item.kind.padEnd(8)}] ${item.slug}${trace}`);
+      }
+      console.log("");
+      console.log("Re-run without --dry-run to actually copy files.");
+      return;
+    }
 
-    console.log(`✓ Installed to ${targetClaude}`);
+    let written = 0;
+    let skipped = 0;
+    for (const item of plan) {
+      const subdir = item.kind === "skill" ? "skills" : "commands";
+      const sourcePath = join(packageRoot, ".claude", subdir, item.path);
+      const destPath = join(targetClaude, subdir, item.path);
+
+      if (existsSync(destPath) && !options.force) {
+        skipped++;
+        continue;
+      }
+      mkdirSync(dirname(destPath), { recursive: true });
+      copyFileSync(sourcePath, destPath);
+      written++;
+    }
+
+    console.log(`✓ Installed ${written} item(s) to ${targetClaude}`);
+    if (skipped > 0) {
+      console.log(`  (${skipped} skipped — already exist; pass --force to overwrite)`);
+    }
     console.log("");
-    console.log("Next steps:");
-    console.log("  /core:tools:setup           — install/verify local tools");
-    console.log("  /core:integrations:setup    — configure remote services");
-    console.log("  /core:frameworks:init       — detect framework bindings");
-    console.log("  /core:workflows:_index      — see the workflow decision tree");
+    console.log("Requested:");
+    for (const slug of slugs) console.log(`  - ${slug}`);
+    if (plan.length > slugs.length) {
+      console.log("");
+      console.log(`Plus ${plan.length - slugs.length} transitive dep(s).`);
+    }
   });
 
 cli
