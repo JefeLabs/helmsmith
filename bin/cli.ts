@@ -20,6 +20,7 @@ import {
   type ResolvedItem,
 } from "../lib/resolve.js";
 import { installSlugs } from "../lib/install.js";
+import { runDoctor } from "../lib/doctor.js";
 import { suggestNext, type ActiveWorkflowState } from "../lib/suggest.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -357,6 +358,47 @@ cli
       }
     },
   );
+
+cli
+  .command(
+    "doctor",
+    "Health check the kit — broken references, orphan files, frontmatter completeness, prerequisite resolution",
+  )
+  .option("--errors-only", "Show only error-severity findings")
+  .action((options: { errorsOnly?: boolean }) => {
+    const findings = runDoctor(packageRoot);
+    const filtered = options.errorsOnly
+      ? findings.filter((f) => f.severity === "error")
+      : findings;
+
+    if (filtered.length === 0) {
+      console.log("✓ No issues found.");
+      return;
+    }
+
+    const counts = {
+      error: findings.filter((f) => f.severity === "error").length,
+      warning: findings.filter((f) => f.severity === "warning").length,
+      info: findings.filter((f) => f.severity === "info").length,
+    };
+
+    for (const severity of ["error", "warning", "info"] as const) {
+      const subset = filtered.filter((f) => f.severity === severity);
+      if (subset.length === 0) continue;
+      const tag =
+        severity === "error" ? "✗" : severity === "warning" ? "⚠" : "ℹ";
+      console.log(`\n${tag} ${severity.toUpperCase()} (${subset.length})`);
+      for (const f of subset) {
+        console.log(`  ${f.source}`);
+        console.log(`    ${f.message}`);
+      }
+    }
+
+    console.log(
+      `\n${counts.error} error(s), ${counts.warning} warning(s), ${counts.info} info`,
+    );
+    if (counts.error > 0) process.exit(1);
+  });
 
 cli
   .command("version", "Print the package version")
