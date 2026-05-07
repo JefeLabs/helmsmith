@@ -60,4 +60,15 @@ export const BUILT_IN_CATALOG: Record<string, CatalogEntry> = {
     description: "Audio/video processing",
     packages: { brew: "ffmpeg", apt: "ffmpeg", winget: "Gyan.FFmpeg" },
   },
+  acli: {
+    description: "Atlassian CLI — Jira / Confluence / Bitbucket Cloud (used by @agentx/pritty's jira-cli adapter)",
+    packages: {
+      // Atlassian distributes via their own brew tap; brew auto-taps
+      // when given the full <tap>/<formula> identifier.
+      brew: "atlassian-labs/acli/acli",
+      // apt + winget: Atlassian doesn't currently publish official
+      // packages there. Users on those platforms install manually
+      // from https://developer.atlassian.com/cloud/acli/.
+    },
+  },
 };

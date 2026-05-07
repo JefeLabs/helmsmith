@@ -79,14 +79,14 @@ export async function buildAdapter(
       const { JiraRestAdapter } = await import("./jira-rest.js");
       return new JiraRestAdapter(config);
     }
-    case "jira-cli":
-      throw new Error(
-        "jira-cli adapter not yet implemented — use jira-rest for now.",
-      );
-    case "linear":
-      throw new Error(
-        "linear adapter not yet implemented — use jira-rest for now.",
-      );
+    case "jira-cli": {
+      const { JiraCliAdapter } = await import("./jira-cli.js");
+      return new JiraCliAdapter();
+    }
+    case "linear": {
+      const { LinearAdapter } = await import("./linear.js");
+      return new LinearAdapter(config);
+    }
   }
 }
 
