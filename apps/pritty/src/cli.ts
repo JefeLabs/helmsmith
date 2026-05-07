@@ -1,17 +1,24 @@
 /**
- * Pritty CLI. Phase 1 surface: auth, init, categorize. Commit/pr/rebase/
- * hooks land in follow-up phases — wired here as stubs that print a
- * "coming soon" message so users learn the command exists.
+ * Pritty CLI. Phase-2 surface: auth, init, categorize, commit.
+ * pr/rebase/hooks land in follow-up phases — wired as CLI stubs so
+ * users learn the surface exists.
  */
 
 import { Command } from "commander";
 import chalk from "chalk";
+import { confirm } from "@inquirer/prompts";
+import ora from "ora";
 import { writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { simpleGit } from "simple-git";
+import { generateCommitMessages, type CommitMessage } from "./ai.js";
 import { getAuthPath, login as authLogin, logout as authLogout, readAuth } from "./auth.js";
 import { defaultStarterConfig, loadConfig } from "./config.js";
-import { categorize, mergeCategories } from "./categorizer.js";
+import {
+  categorize,
+  mergeCategories,
+  UNKNOWN_CATEGORY,
+} from "./categorizer.js";
+import { createGit } from "./git.js";
 
 const program = new Command();
 
@@ -105,11 +112,10 @@ program
   .option("--all", "Include unstaged + untracked files too")
   .action(async (options: { all?: boolean }) => {
     const config = loadConfig();
-    const git = simpleGit(process.cwd());
-    const status = await git.status();
+    const git = createGit();
     const files = options.all
-      ? [...status.staged, ...status.modified, ...status.not_added]
-      : [...status.staged];
+      ? await git.getAllChanged()
+      : await git.getStaged();
 
     if (files.length === 0) {
       console.log(chalk.dim("No staged files. (Use --all to include modified/untracked.)"));
@@ -135,11 +141,138 @@ const stubMessage = (cmdName: string) =>
 
 program
   .command("commit")
-  .description("AI-generated commit messages per category (coming soon)")
-  .action(() => {
-    console.log(stubMessage("commit"));
-    process.exit(2);
-  });
+  .description("Generate AI commit messages per category and commit each group")
+  .option("--auto-approve", "Skip the confirmation prompt before committing")
+  .option("--dry-run", "Show the plan without making any commits")
+  .option("--commit-style <style>", "conventional | gitmoji | angular | simple")
+  .action(
+    async (options: {
+      autoApprove?: boolean;
+      dryRun?: boolean;
+      commitStyle?: string;
+    }) => {
+      const config = loadConfig();
+      // CLI flags override config
+      if (options.commitStyle) {
+        const valid = ["conventional", "gitmoji", "angular", "simple"];
+        if (!valid.includes(options.commitStyle)) {
+          console.error(
+            chalk.red(
+              `✗ Invalid --commit-style. Valid: ${valid.join(", ")}`,
+            ),
+          );
+          process.exit(1);
+        }
+        config.commitStyle = options.commitStyle as typeof config.commitStyle;
+      }
+
+      const git = createGit();
+
+      // 1. Find staged files
+      const staged = await git.getStaged();
+      if (staged.length === 0) {
+        console.log(
+          chalk.dim(
+            "No staged files. Stage what you want to commit with `git add` first.",
+          ),
+        );
+        return;
+      }
+
+      // 2. Categorize
+      const categories = mergeCategories(config.categories);
+      const grouped = categorize(staged, categories);
+      const nonEmpty = Object.entries(grouped).filter(
+        ([, files]) => files.length > 0,
+      );
+
+      console.log(chalk.cyan(`Staged files (${staged.length}) — by category:`));
+      for (const [name, files] of nonEmpty) {
+        const tag =
+          name === UNKNOWN_CATEGORY ? chalk.yellow(name) : chalk.green(name);
+        console.log(`  ${tag} ${chalk.dim(`(${files.length})`)}`);
+        for (const f of files) console.log(`    ${chalk.dim(f)}`);
+      }
+      console.log("");
+
+      // 3. Generate AI commit messages
+      const spinner = ora({ text: "Generating commit messages...", color: "cyan" }).start();
+      let plan: CommitMessage[];
+      try {
+        const diff = await git.getStagedDiff();
+        plan = await generateCommitMessages(grouped, diff, config);
+        spinner.succeed(`Generated ${plan.length} commit message(s)`);
+      } catch (err) {
+        spinner.fail((err as Error).message);
+        process.exit(1);
+      }
+
+      // 4. Show plan
+      console.log("");
+      console.log(chalk.cyan("Commit plan:"));
+      for (const c of plan) {
+        console.log(
+          `  ${chalk.bold(c.category)}  ${chalk.dim(`(${c.files.length} files)`)}`,
+        );
+        console.log(`    ${chalk.green(c.message)}`);
+        if (c.body) {
+          for (const line of c.body.split("\n")) {
+            console.log(`    ${chalk.dim(line)}`);
+          }
+        }
+      }
+      console.log("");
+
+      // 5. Dry-run exits here
+      if (options.dryRun) {
+        console.log(
+          chalk.yellow("Dry-run — no commits made. Re-run without --dry-run to apply."),
+        );
+        return;
+      }
+
+      // 6. Confirm (skippable)
+      if (!options.autoApprove) {
+        const ok = await confirm({
+          message: `Create ${plan.length} commit(s) above?`,
+          default: true,
+        });
+        if (!ok) {
+          console.log(chalk.dim("Aborted. No commits made."));
+          return;
+        }
+      }
+
+      // 7. Commit each group
+      // We need to stage only the files for the current group between
+      // commits. Simplest robust approach: reset all staged, then
+      // re-stage per group. But that's destructive on user's index.
+      // Safer: rely on the existing index for the first commit, then
+      // for subsequent groups, stage their files explicitly. Since
+      // every file in `plan[*].files` is already staged (came from
+      // git.getStaged()), `git add` is idempotent.
+      let committed = 0;
+      for (const c of plan) {
+        try {
+          // Path-restricted commit (`git commit -- <files>`) — only
+          // this group's files end up in this commit, even though all
+          // groups' files are currently in the index. Avoids the
+          // unstage-then-restage dance.
+          const fullMessage = c.body ? `${c.message}\n\n${c.body}` : c.message;
+          await git.commit(fullMessage, c.files);
+          committed++;
+          console.log(chalk.green(`✓ committed ${c.category}: ${c.message}`));
+        } catch (err) {
+          console.error(
+            chalk.red(`✗ failed to commit ${c.category}: ${(err as Error).message}`),
+          );
+          process.exit(1);
+        }
+      }
+
+      console.log(chalk.green(`\n✓ ${committed} commit(s) created.`));
+    },
+  );
 
 program
   .command("pr")

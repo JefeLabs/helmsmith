@@ -21,3 +21,11 @@ export {
   categorize,
   mergeCategories,
 } from "./categorizer.js";
+
+export {
+  type CommitMessage,
+  buildAdapter,
+  generateCommitMessages,
+} from "./ai.js";
+
+export { createGit, type GitOps } from "./git.js";

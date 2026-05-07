@@ -1,0 +1,120 @@
+/**
+ * AI client — wraps @agentx/agent-adapter to deliver pritty-shaped
+ * operations (commit messages, PR titles, rebase plans, outlier
+ * detection). v1 supports Copilot only via the device-flow auth path;
+ * OpenAI / Anthropic fallbacks land when consumer demand justifies
+ * them. The PRD specifies the cascade — implementation is gated on
+ * whether the agent-adapter wraps each provider's auth needs the same
+ * way (Copilot uses authPath; the others use API keys).
+ */
+
+import { CopilotChatAdapter } from "@agentx/agent-adapter";
+import { getAuthPath, readAuth } from "./auth.js";
+import type { CategorizedFiles } from "./categorizer.js";
+import type { Config } from "./config.js";
+
+export interface CommitMessage {
+  category: string;
+  message: string; // first line, e.g. "feat(api): add /users endpoint"
+  body?: string; // optional body paragraph
+  files: string[];
+}
+
+/**
+ * Build a chat adapter for the active provider. Throws when no
+ * provider is configured — caller should print actionable next steps
+ * (`pritty auth login`).
+ */
+export async function buildAdapter(model: string): Promise<CopilotChatAdapter> {
+  const auth = await readAuth();
+  if (!auth.providers["github-copilot"]?.apiKey) {
+    throw new Error(
+      "No AI provider configured. Run `pritty auth login` to authenticate via GitHub Copilot Device Flow.",
+    );
+  }
+  return new CopilotChatAdapter({
+    authPath: getAuthPath(),
+    model,
+  });
+}
+
+/**
+ * Strip markdown code-fences and trim whitespace. The Copilot models
+ * sometimes wrap JSON output in ```json ... ``` even when the prompt
+ * forbids it; this is the standard escape hatch.
+ */
+function unwrapJson(raw: string): string {
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenced) return fenced[1].trim();
+  return raw.trim();
+}
+
+const COMMIT_STYLE_GUIDES: Record<Config["commitStyle"], string> = {
+  conventional:
+    "Format: `<type>(<scope>): <subject>` where type is one of feat|fix|refactor|test|docs|chore|build|ci|perf|style and scope is the affected area in lowercase. Subject is imperative mood, lowercase, no trailing period, max 70 chars.",
+  gitmoji:
+    "Format: `<emoji> <type>: <subject>`. Use ✨ for feat, 🐛 for fix, ♻️ for refactor, ✅ for test, 📝 for docs, 🧹 for chore.",
+  angular:
+    "Format: `<type>(<scope>): <subject>` per the Angular commit guidelines. Body explains WHY, not what.",
+  simple:
+    "One short imperative sentence describing the change. No prefix, no scope. Max 70 chars.",
+};
+
+/**
+ * Generate one commit message per non-empty category. The model
+ * returns JSON which we strip-and-parse. Validation is best-effort:
+ * if the model returns a malformed shape, we surface the raw output
+ * with the parse error rather than crashing.
+ */
+export async function generateCommitMessages(
+  groups: CategorizedFiles,
+  diff: string,
+  config: Config,
+): Promise<CommitMessage[]> {
+  const adapter = await buildAdapter(config.model);
+
+  // Filter empty buckets so the model doesn't hallucinate messages
+  // for them. Bucket the unknown into its own category — the human
+  // probably wants to review those manually.
+  const nonEmpty = Object.entries(groups).filter(([, files]) => files.length > 0);
+  if (nonEmpty.length === 0) return [];
+
+  const filesByCategory = nonEmpty
+    .map(([cat, files]) => `## ${cat}\n${files.map((f) => `  - ${f}`).join("\n")}`)
+    .join("\n\n");
+
+  const styleGuide = COMMIT_STYLE_GUIDES[config.commitStyle];
+
+  const system = [
+    "You are an expert engineer writing git commit messages for a developer.",
+    `Produce one commit message per file category. ${styleGuide}`,
+    "Return strict JSON: an array of objects with keys `category`, `message`, `body` (optional), `files` (the input files for that category).",
+    "Do not wrap the output in markdown code fences. Do not include any prose before or after the JSON.",
+  ].join("\n");
+
+  const user = [
+    "Here are the categorized files:",
+    filesByCategory,
+    "",
+    "Here is the staged diff:",
+    "```diff",
+    diff.length > 12000 ? `${diff.slice(0, 12000)}\n... (truncated)` : diff,
+    "```",
+  ].join("\n");
+
+  const raw = await adapter.invoke({ system, user });
+  const cleaned = unwrapJson(raw);
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch (err) {
+    throw new Error(
+      `AI returned non-JSON output:\n${cleaned}\n\nParse error: ${(err as Error).message}`,
+    );
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error(`AI returned non-array output: ${cleaned}`);
+  }
+  return parsed as CommitMessage[];
+}
