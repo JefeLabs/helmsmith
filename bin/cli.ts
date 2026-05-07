@@ -15,6 +15,7 @@ import {
   loadCatalog,
 } from "../lib/index.js";
 import { resolveInstallPlan } from "../lib/resolve.js";
+import { suggestNext, type ActiveWorkflowState } from "../lib/suggest.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -214,6 +215,58 @@ cli
       console.log(`Plus ${plan.length - slugs.length} transitive dep(s).`);
     }
   });
+
+cli
+  .command(
+    "suggest <slug>",
+    "Suggest next tasks or workflows after completing <slug>",
+  )
+  .option("--limit <n>", "Maximum suggestions to print (default 8)")
+  .option(
+    "--state <path>",
+    "Path to .pencil-workflow-state.json for active-workflow signal",
+  )
+  .action(
+    (
+      slug: string,
+      options: { limit?: string; state?: string },
+    ) => {
+      const limit = options.limit ? Number.parseInt(options.limit, 10) : 8;
+
+      let activeWorkflowState: ActiveWorkflowState | undefined;
+      if (options.state && existsSync(options.state)) {
+        try {
+          const parsed = JSON.parse(readFileSync(options.state, "utf8"));
+          if (parsed?.active?.workflow) {
+            activeWorkflowState = {
+              workflow: parsed.active.workflow,
+              currentStep: parsed.active.currentStep,
+            };
+          }
+        } catch (err) {
+          console.error(
+            `Could not read workflow state at ${options.state}: ${
+              (err as Error).message
+            }`,
+          );
+        }
+      }
+
+      const suggestions = suggestNext(slug, { limit, activeWorkflowState });
+      if (suggestions.length === 0) {
+        console.log(`No suggestions found for ${slug}.`);
+        return;
+      }
+
+      console.log(`\nNext steps after ${slug}:\n`);
+      for (const s of suggestions) {
+        const tag = s.kind === "workflow" ? "[workflow]" : "[task]    ";
+        console.log(`  ${tag}  ${s.slug}`);
+        console.log(`            ${s.rationale} (score: ${s.score.toFixed(2)})`);
+        console.log("");
+      }
+    },
+  );
 
 cli
   .command("version", "Print the package version")

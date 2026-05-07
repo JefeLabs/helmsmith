@@ -26,6 +26,13 @@ export interface Command {
    * Used to derive the dependency graph for cascade selection.
    */
   references: string[];
+  /**
+   * Inverse of `references` — slugs of items whose body mentions this one.
+   * Computed at catalog-build time so consumers (CLI suggest, agents
+   * reading catalog.json directly) can answer "what builds on X?"
+   * without re-traversing every body.
+   */
+  referencedBy: string[];
   body: string;
   frontmatter: Frontmatter;
 }
@@ -75,4 +82,30 @@ export interface Catalog {
   commands: Command[];
   skills: Skill[];
   workflows: Workflow[];
+}
+
+/**
+ * One suggested next-step for a completed slug. Returned by
+ * `suggestNext()` and printed by `skillzkit suggest`.
+ *
+ * `kind` distinguishes a single-shot task (run once, reports done) from
+ * a workflow (multi-phase, persists state). Surfacing this lets the
+ * caller decide whether to commit to a long-running thing or pick a
+ * quick follow-up.
+ *
+ * `reason` is the structural relationship that produced this candidate;
+ * `rationale` is the human-readable form of the same fact, ready to
+ * print or hand to an agent.
+ */
+export type NextReason =
+  | "consumes-X" // candidate's body references the completed slug
+  | "wraps-X" // candidate is a workflow whose body references the completed slug
+  | "next-in-active-workflow"; // positional next step in the active workflow
+
+export interface NextSuggestion {
+  slug: string;
+  kind: "command" | "workflow";
+  reason: NextReason;
+  score: number;
+  rationale: string;
 }

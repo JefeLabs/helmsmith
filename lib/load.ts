@@ -114,7 +114,7 @@ export function loadCommands(commandsRoot: string): Command[] {
   // First pass: build the slug index so reference extraction can filter
   // matches to only real catalog commands.
   const knownSlugs = new Set(files.map((f) => pathToSlashCommand(f.relativePath)));
-  return files.map((file) => {
+  const commands: Command[] = files.map((file) => {
     const slug = pathToSlashCommand(file.relativePath);
     const fm = file.frontmatter;
     const segments = file.relativePath.split(sep);
@@ -137,10 +137,30 @@ export function loadCommands(commandsRoot: string): Command[] {
       argumentHint: asString(fm["argument-hint"]),
       allowedTools: asStringArray(fm["allowed-tools"]),
       references: extractReferences(file.body, knownSlugs),
+      // Filled in by the second pass below — start empty so the field is
+      // always present on the returned object (TS narrowing wins).
+      referencedBy: [],
       body: file.body,
       frontmatter: fm,
     };
   });
+
+  // Second pass: invert the references graph. For every command X and
+  // every slug Y in X.references, append X.slug to Y.referencedBy.
+  // O(n*r) where n = commands and r = avg references per command —
+  // both small in practice.
+  const bySlug = new Map(commands.map((c) => [c.slug, c]));
+  for (const cmd of commands) {
+    for (const ref of cmd.references) {
+      if (ref === cmd.slug) continue; // skip self-loops (a doc citing its own slug)
+      const target = bySlug.get(ref);
+      if (target && !target.referencedBy.includes(cmd.slug)) {
+        target.referencedBy.push(cmd.slug);
+      }
+    }
+  }
+  for (const cmd of commands) cmd.referencedBy.sort();
+  return commands;
 }
 
 export function loadSkills(skillsRoot: string, commands: Command[]): Skill[] {
