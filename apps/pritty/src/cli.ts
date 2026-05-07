@@ -10,7 +10,13 @@ import { confirm, editor } from "@inquirer/prompts";
 import ora from "ora";
 import { writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { generateCommitMessages, generatePR, type CommitMessage } from "./ai.js";
+import {
+  generateCommitMessages,
+  generatePR,
+  type CommitMessage,
+  type TicketContext,
+} from "./ai.js";
+import { detectTicket, ticketLink } from "./ticket.js";
 import {
   addLabels,
   createPR,
@@ -26,6 +32,41 @@ import {
   UNKNOWN_CATEGORY,
 } from "./categorizer.js";
 import { createGit } from "./git.js";
+
+/**
+ * Resolve the active ticket context from config + branch name. When
+ * config.ticket is unset, returns undefined (no enrichment, no gate).
+ * When set, detects the ticket from the branch; if `validate: true`
+ * and no ticket found, exits 1 with a clear message — no interactive
+ * prompt, no override flag.
+ */
+function resolveTicketContext(
+  config: ReturnType<typeof loadConfig>,
+  branch: string,
+): TicketContext | undefined {
+  if (!config.ticket) return undefined;
+  const ticket = detectTicket(branch, config.ticket.pattern);
+  if (config.ticket.validate && !ticket) {
+    console.error(
+      chalk.red(
+        `✗ Branch "${branch}" has no ticket reference matching pattern ${config.ticket.pattern}.`,
+      ),
+    );
+    console.error(
+      chalk.dim(
+        `  Rename your branch to include a ticket (e.g. feature/PROJ-123-foo)`,
+      ),
+    );
+    console.error(
+      chalk.dim(`  or set ticket.validate: false in .pritty.json.`),
+    );
+    process.exit(1);
+  }
+  return {
+    ticket,
+    link: ticketLink(ticket, config.ticket.linkTemplate),
+  };
+}
 
 /**
  * Parse text from $EDITOR back into { subject/title, body }. Standard
@@ -190,6 +231,12 @@ program
 
       const git = createGit();
 
+      // Resolve ticket context up front — gate fires (and exits)
+      // before any AI call when validate: true and branch lacks a
+      // ticket. Saves an API roundtrip and gives instant feedback.
+      const branch = await git.getCurrentBranch();
+      const ticketCtx = resolveTicketContext(config, branch);
+
       // 1. Find staged files
       const staged = await git.getStaged();
       if (staged.length === 0) {
@@ -222,7 +269,7 @@ program
       let plan: CommitMessage[];
       try {
         const diff = await git.getStagedDiff();
-        plan = await generateCommitMessages(grouped, diff, config);
+        plan = await generateCommitMessages(grouped, diff, config, ticketCtx);
         spinner.succeed(`Generated ${plan.length} commit message(s)`);
       } catch (err) {
         spinner.fail((err as Error).message);
@@ -343,6 +390,7 @@ program
 
       // 1. Resolve branch + remote → owner/repo
       const branch = await git.getCurrentBranch();
+      const ticketCtx = resolveTicketContext(config, branch);
       const remoteUrl = await git.getRemoteUrl();
       if (!remoteUrl) {
         console.error(
@@ -432,6 +480,7 @@ program
           commits,
           { branch, base: effectiveBase, owner: repo.owner, repo: repo.repo },
           config,
+          ticketCtx,
         );
         spinner.succeed("PR description ready");
       } catch (err) {

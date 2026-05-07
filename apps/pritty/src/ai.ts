@@ -12,6 +12,12 @@ import { CopilotChatAdapter } from "@agentx/agent-adapter";
 import { getAuthPath, readAuth } from "./auth.js";
 import type { CategorizedFiles } from "./categorizer.js";
 import type { Config } from "./config.js";
+import { ticketPromptGuidance } from "./ticket.js";
+
+export interface TicketContext {
+  ticket: string | null;
+  link?: string | undefined;
+}
 
 export interface CommitMessage {
   category: string;
@@ -70,6 +76,7 @@ export async function generateCommitMessages(
   groups: CategorizedFiles,
   diff: string,
   config: Config,
+  ticket?: TicketContext,
 ): Promise<CommitMessage[]> {
   const adapter = await buildAdapter(config.model);
 
@@ -85,12 +92,17 @@ export async function generateCommitMessages(
 
   const styleGuide = COMMIT_STYLE_GUIDES[config.commitStyle];
 
+  const ticketGuidance = ticket
+    ? ticketPromptGuidance(ticket.ticket, ticket.link)
+    : "";
+
   const system = [
     "You are an expert engineer writing git commit messages for a developer.",
     `Produce one commit message per file category. ${styleGuide}`,
     "Return strict JSON: an array of objects with keys `category`, `message`, `body` (optional), `files` (the input files for that category).",
     "Do not wrap the output in markdown code fences. Do not include any prose before or after the JSON.",
-  ].join("\n");
+    ticketGuidance,
+  ].filter((s) => s.length > 0).join("\n");
 
   const user = [
     "Here are the categorized files:",
@@ -141,6 +153,7 @@ export async function generatePR(
   commits: readonly CommitSummary[],
   meta: { branch: string; base: string; owner: string; repo: string },
   config: Config,
+  ticket?: TicketContext,
 ): Promise<PRDraft> {
   if (commits.length === 0) {
     throw new Error("No commits between base and head — nothing to PR.");
@@ -152,6 +165,10 @@ export async function generatePR(
     .map((c) => `  - ${c.hash.slice(0, 7)}  ${c.subject}`)
     .join("\n");
 
+  const ticketGuidance = ticket
+    ? ticketPromptGuidance(ticket.ticket, ticket.link)
+    : "";
+
   const system = [
     "You are an expert engineer writing a pull-request description.",
     "Return strict JSON: { title: string, body: string, labels: string[] }.",
@@ -159,7 +176,8 @@ export async function generatePR(
     "Body: markdown. Open with a one-paragraph summary of the change. Add a `## Why` section explaining motivation. Add a `## Test plan` checklist when there are non-trivial code changes.",
     "Labels: lowercase, kebab-case, derived from commit types when present (feat → enhancement; fix → bug; docs → documentation; refactor → refactor; test → testing). Empty array is fine.",
     "Do not wrap output in markdown code fences. Do not include any prose outside the JSON.",
-  ].join("\n");
+    ticketGuidance,
+  ].filter((s) => s.length > 0).join("\n");
 
   const user = [
     `Repository: ${meta.owner}/${meta.repo}`,

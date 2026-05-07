@@ -34,6 +34,13 @@ export {
 export { createGit, parseGitHubRemote, type GitOps } from "./git.js";
 
 export {
+  detectTicket,
+  ticketLink,
+  ticketPromptGuidance,
+  type TicketConfig,
+} from "./ticket.js";
+
+export {
   type CreatePROptions,
   type OpenPRSummary,
   type PRResult,

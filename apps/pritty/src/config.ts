@@ -9,6 +9,12 @@ import { join } from "node:path";
 import { load as parseYaml } from "js-yaml";
 import { z } from "zod";
 
+export const TicketSchema = z.object({
+  pattern: z.string(),
+  linkTemplate: z.string().optional(),
+  validate: z.boolean().default(false),
+});
+
 export const ConfigSchema = z.object({
   model: z.string().default("gpt-4o"),
   baseBranch: z.string().default("main"),
@@ -22,6 +28,7 @@ export const ConfigSchema = z.object({
   prePush: z.array(z.string()).default([]),
   skipHooks: z.boolean().default(false),
   categories: z.record(z.string(), z.array(z.string())).optional(),
+  ticket: TicketSchema.optional(),
   rebaseStrategy: z
     .enum(["interactive", "squash", "fixup", "auto"])
     .default("interactive"),
