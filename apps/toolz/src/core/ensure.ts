@@ -274,10 +274,15 @@ function finalizeStatus(
   if (!status.version) {
     return { ...status, versionTooLow: true };
   }
-  const coerced = semver.coerce(status.version);
-  if (!coerced) {
+  // Coerce both sides so `--min-version 22` (not strict semver) and
+  // tool versions like `22.20.0-beta1` both compare correctly. If
+  // either side is unparseable, treat as "too low" so the caller sees
+  // a clear failure instead of a thrown error.
+  const coercedCurrent = semver.coerce(status.version);
+  const coercedMin = semver.coerce(minVersion);
+  if (!coercedCurrent || !coercedMin) {
     return { ...status, versionTooLow: true };
   }
-  const ok = semver.gte(coerced, minVersion);
+  const ok = semver.gte(coercedCurrent, coercedMin);
   return { ...status, versionTooLow: !ok };
 }

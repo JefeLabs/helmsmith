@@ -1,7 +1,7 @@
 /**
  * ToolZ CLI entry. Commander.js per agentx-toolbox stack convention.
- * Phase 1+2 surface area: `platform`, `check`. More commands land in
- * later phases (install, list, register, doctor, etc.).
+ * Phase 1-7 surface: platform, check, install, uninstall, list,
+ * register, deregister, ensure, doctor.
  */
 
 import { Command } from "commander";
@@ -16,12 +16,12 @@ import {
   runDoctor,
 } from "./core/index.js";
 import {
-  getRegisteredTool,
   isRegistered,
   listRegisteredTools,
   registerTool,
   unregisterTool,
 } from "./config/index.js";
+import { dim, fail, heading, info, ok, printBanner, warn } from "./ui/index.js";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -70,12 +70,12 @@ program
         ...(options.versionFlag ? { versionFlag: options.versionFlag } : {}),
       });
       if (!result.installed) {
-        console.log(`✗ ${tool} — not installed`);
+        console.log(fail(`${tool} — not installed`));
         process.exit(1);
       }
-      console.log(`✓ ${tool}`);
-      console.log(`  path:    ${result.path}`);
-      console.log(`  version: ${result.version ?? "(unparseable)"}`);
+      console.log(ok(tool));
+      console.log(dim(`  path:    ${result.path}`));
+      console.log(dim(`  version: ${result.version ?? "(unparseable)"}`));
     },
   );
 
@@ -122,11 +122,11 @@ program
       console.log(`Installing ${tool} via ${adapter.name} (${resolved.packageName})...`);
       const result = await adapter.install(resolved.packageName);
       if (!result.success) {
-        console.error(`✗ Install failed: ${result.error ?? "unknown error"}`);
+        console.error(fail(`Install failed: ${result.error ?? "unknown error"}`));
         if (result.stderr) console.error(result.stderr);
         process.exit(1);
       }
-      console.log(`✓ Installed ${tool}`);
+      console.log(ok(`Installed ${tool}`));
       if (result.stdout.trim()) console.log(result.stdout.trim());
 
       // Probe the freshly-installed binary and record it in the
@@ -168,10 +168,10 @@ program
       console.log(`Uninstalling ${tool} via ${adapter.name}...`);
       const result = await adapter.uninstall(resolved.packageName);
       if (!result.success) {
-        console.error(`✗ Uninstall failed: ${result.error ?? "unknown error"}`);
+        console.error(fail(`Uninstall failed: ${result.error ?? "unknown error"}`));
         process.exit(1);
       }
-      console.log(`✓ Uninstalled ${tool}`);
+      console.log(ok(`Uninstalled ${tool}`));
       unregisterTool(tool);
     },
   );
@@ -183,24 +183,26 @@ program
   .action((options: { catalog?: boolean }) => {
     if (options.catalog) {
       const names = catalogToolNames();
-      console.log(`Catalog (${names.length} tools):\n`);
+      console.log(heading(`Catalog (${names.length} tools)`));
+      console.log("");
       for (const name of names) {
         const entry = BUILT_IN_CATALOG[name];
         const desc = entry?.description ?? "(no description)";
-        console.log(`  ${name.padEnd(12)} — ${desc}`);
+        console.log(`  ${name.padEnd(12)} ${dim(`— ${desc}`)}`);
       }
       return;
     }
     const registered = listRegisteredTools();
     if (registered.length === 0) {
-      console.log("No tools registered. Run `toolz install <tool>` or `toolz register <tool>`.");
+      console.log(dim("No tools registered. Run `toolz install <tool>` or `toolz register <tool>`."));
       return;
     }
-    console.log(`Registered tools (${registered.length}):\n`);
+    console.log(heading(`Registered tools (${registered.length})`));
+    console.log("");
     for (const { name, entry } of registered) {
       const via = entry.installed_via ? ` via ${entry.installed_via}` : " (manual)";
       const ver = entry.version ?? "?";
-      console.log(`  ${name.padEnd(12)} ${ver.padEnd(10)} ${entry.path}${via}`);
+      console.log(`  ${name.padEnd(12)} ${ver.padEnd(10)} ${dim(entry.path + via)}`);
     }
   });
 
@@ -210,7 +212,7 @@ program
   .action(async (tool: string) => {
     const check = await checkTool(tool);
     if (!check.installed) {
-      console.error(`✗ ${tool} is not on PATH. Install it first, then register.`);
+      console.error(fail(`${tool} is not on PATH. Install it first, then register.`));
       process.exit(1);
     }
     registerTool(tool, {
@@ -219,7 +221,7 @@ program
       installed_via: null, // manually registered
       installed_at: null, // unknown — we didn't install it
     });
-    console.log(`✓ Registered ${tool} ${check.version ?? ""} at ${check.path}`);
+    console.log(ok(`Registered ${tool} ${check.version ?? ""} at ${check.path}`));
   });
 
 program
@@ -227,11 +229,11 @@ program
   .description("Remove a tool from the registry (does NOT uninstall)")
   .action((tool: string) => {
     if (!isRegistered(tool)) {
-      console.error(`✗ ${tool} is not registered.`);
+      console.error(fail(`${tool} is not registered.`));
       process.exit(1);
     }
     unregisterTool(tool);
-    console.log(`✓ Deregistered ${tool}`);
+    console.log(ok(`Deregistered ${tool}`));
   });
 
 program
@@ -269,29 +271,33 @@ program
       let anyStale = false;
       for (const status of statuses) {
         if (status.error) {
-          console.error(`✗ ${status.name}: ${status.error}`);
+          console.error(fail(`${status.name}: ${status.error}`));
           anyMissing = true;
           continue;
         }
         if (!status.installed) {
           console.error(
-            `✗ ${status.name}: not installed${
-              opts.autoInstall ? " (install also failed)" : "; pass --auto-install to attempt install"
-            }`,
+            fail(
+              `${status.name}: not installed${
+                opts.autoInstall ? " (install also failed)" : "; pass --auto-install to attempt install"
+              }`,
+            ),
           );
           anyMissing = true;
           continue;
         }
         if (status.versionTooLow) {
           console.error(
-            `⚠ ${status.name} ${status.version ?? "(unknown)"}: below minVersion ${opts.minVersion}`,
+            warn(
+              `${status.name} ${status.version ?? "(unknown)"}: below minVersion ${opts.minVersion}`,
+            ),
           );
           anyStale = true;
           continue;
         }
         if (!options.silent) {
           console.log(
-            `✓ ${status.name} ${status.version ?? ""} (${status.source})`,
+            ok(`${status.name} ${status.version ?? ""} ${dim(`(${status.source})`)}`),
           );
         }
       }
@@ -318,7 +324,7 @@ program
     }
 
     if (filtered.length === 0) {
-      console.log("✓ No issues found.");
+      console.log(ok("No issues found."));
       return;
     }
 
@@ -331,12 +337,17 @@ program
     for (const severity of ["error", "warning", "info"] as const) {
       const subset = filtered.filter((f) => f.severity === severity);
       if (subset.length === 0) continue;
-      const tag = severity === "error" ? "✗" : severity === "warning" ? "⚠" : "ℹ";
-      console.log(`\n${tag} ${severity.toUpperCase()} (${subset.length})`);
+      const styled =
+        severity === "error"
+          ? fail(`${severity.toUpperCase()} (${subset.length})`)
+          : severity === "warning"
+            ? warn(`${severity.toUpperCase()} (${subset.length})`)
+            : info(`${severity.toUpperCase()} (${subset.length})`);
+      console.log(`\n${styled}`);
       for (const f of subset) {
-        console.log(`  ${f.tool} [${f.code}]`);
+        console.log(`  ${f.tool} ${dim(`[${f.code}]`)}`);
         console.log(`    ${f.message}`);
-        if (f.fix) console.log(`    → ${f.fix}`);
+        if (f.fix) console.log(dim(`    → ${f.fix}`));
       }
     }
 
@@ -345,6 +356,14 @@ program
     );
     if (counts.error > 0) process.exit(1);
   });
+
+// Bare invocation (no subcommand, no --help, no --version) → branded
+// banner + command hints. Commander's default is silent; this gives
+// users a friendlier landing.
+if (process.argv.length <= 2) {
+  printBanner(readVersion());
+  process.exit(0);
+}
 
 program.parseAsync(process.argv).catch((err) => {
   console.error(err);
