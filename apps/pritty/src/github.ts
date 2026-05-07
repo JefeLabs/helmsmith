@@ -94,6 +94,30 @@ export async function addLabels(
 }
 
 /**
+ * Request reviewers on an existing PR. Splits user reviewers from
+ * team reviewers per Octokit's API shape. No-op when both lists
+ * are empty. GitHub silently ignores invalid reviewers (deleted
+ * users, teams the bot can't see); we don't try to validate ahead.
+ */
+export async function requestReviewers(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  users: readonly string[],
+  teams: readonly string[],
+): Promise<void> {
+  if (users.length === 0 && teams.length === 0) return;
+  const client = await octokit();
+  await client.rest.pulls.requestReviewers({
+    owner,
+    repo,
+    pull_number: prNumber,
+    ...(users.length > 0 ? { reviewers: [...users] } : {}),
+    ...(teams.length > 0 ? { team_reviewers: [...teams] } : {}),
+  });
+}
+
+/**
  * List open PRs whose head matches `<owner>:<branch>`. Used to warn
  * about duplicate PR creation before the workflow proceeds. Empty
  * array if none are open.

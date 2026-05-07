@@ -48,6 +48,14 @@ export {
 } from "./pr-template.js";
 
 export {
+  findCodeowners,
+  parseCodeowners,
+  resolveReviewers,
+  type CodeownersRule,
+  type ResolvedReviewers,
+} from "./codeowners.js";
+
+export {
   buildAdapter as buildTicketAdapter,
   deriveLinkTemplate,
   type JiraCliValidation,
@@ -77,4 +85,5 @@ export {
   createPR,
   getDefaultBranch,
   listOpenPRsForHead,
+  requestReviewers,
 } from "./github.js";

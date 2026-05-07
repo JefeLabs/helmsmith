@@ -29,6 +29,8 @@ export interface GitOps {
   push(branch: string, opts?: { setUpstream?: boolean }): Promise<void>;
   /** Commits reachable from `head` but not from `base`. Newest first. */
   log(base: string, head?: string): Promise<Array<{ hash: string; subject: string }>>;
+  /** Files changed between base..head (defaults to base..HEAD). */
+  changedFilesBetween(base: string, head?: string): Promise<string[]>;
   /** URL of the `origin` remote, or null if not set. */
   getRemoteUrl(): Promise<string | null>;
   /**
@@ -107,6 +109,22 @@ export function createGit(cwd: string = process.cwd()): GitOps {
         return typeof url === "string" ? url.trim() : null;
       } catch {
         return null;
+      }
+    },
+
+    async changedFilesBetween(
+      base: string,
+      head?: string,
+    ): Promise<string[]> {
+      const range = head ? `${base}..${head}` : `${base}..HEAD`;
+      try {
+        const result = await git.diff(["--name-only", range]);
+        return result
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter((line) => line.length > 0);
+      } catch {
+        return [];
       }
     },
 

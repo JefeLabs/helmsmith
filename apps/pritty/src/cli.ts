@@ -34,8 +34,14 @@ import {
   createPR,
   getDefaultBranch,
   listOpenPRsForHead,
+  requestReviewers,
 } from "./github.js";
 import { parseGitHubRemote } from "./git.js";
+import {
+  findCodeowners,
+  parseCodeowners,
+  resolveReviewers,
+} from "./codeowners.js";
 import { getAuthPath, login as authLogin, logout as authLogout, readAuth } from "./auth.js";
 import { defaultStarterConfig, loadConfig } from "./config.js";
 import {
@@ -760,6 +766,36 @@ program
               `⚠ Couldn't apply labels: ${(err as Error).message}`,
             ),
           );
+        }
+      }
+
+      // 11. Auto-request reviewers from CODEOWNERS, if present
+      const codeownersContent = findCodeowners();
+      if (codeownersContent) {
+        const rules = parseCodeowners(codeownersContent);
+        const changedFiles = await git.changedFilesBetween(effectiveBase);
+        const reviewers = resolveReviewers(changedFiles, rules);
+        if (reviewers.users.length > 0 || reviewers.teams.length > 0) {
+          try {
+            await requestReviewers(
+              repo.owner,
+              repo.repo,
+              result.number,
+              reviewers.users,
+              reviewers.teams,
+            );
+            const summary = [
+              ...reviewers.users.map((u) => `@${u}`),
+              ...reviewers.teams.map((t) => `@${repo.owner}/${t}`),
+            ].join(", ");
+            console.log(chalk.dim(`  Requested reviewers: ${summary}`));
+          } catch (err) {
+            console.error(
+              chalk.yellow(
+                `⚠ Couldn't request reviewers: ${(err as Error).message}`,
+              ),
+            );
+          }
         }
       }
 
