@@ -16,7 +16,7 @@ import {
   type CommitMessage,
   type TicketContext,
 } from "./ai.js";
-import { detectTicket, ticketLink } from "./ticket.js";
+import { detectTicket, findRecentTicket, ticketLink } from "./ticket.js";
 import {
   addLabels,
   createPR,
@@ -34,18 +34,55 @@ import {
 import { createGit } from "./git.js";
 
 /**
- * Resolve the active ticket context from config + branch name. When
- * config.ticket is unset, returns undefined (no enrichment, no gate).
- * When set, detects the ticket from the branch; if `validate: true`
- * and no ticket found, exits 1 with a clear message — no interactive
- * prompt, no override flag.
+ * Resolve the active ticket context from config + branch + history.
+ *
+ * Resolution chain:
+ *   1. Detect from branch name → use silently
+ *   2. If `inferFromCommits: true` and no branch ticket: scan recent
+ *      commits on this branch
+ *      a. If most recent ticket is within `freshWindowHours` → use silently
+ *      b. If older than that → prompt y/N (default N) before reusing
+ *   3. If `validate: true` and still no ticket → fast-fail
+ *   4. Otherwise return whatever ticket was resolved (possibly null)
+ *
+ * The async signature is required because the inference path may
+ * shell out to git log and may prompt the user.
  */
-function resolveTicketContext(
+async function resolveTicketContext(
   config: ReturnType<typeof loadConfig>,
   branch: string,
-): TicketContext | undefined {
+  git: ReturnType<typeof createGit>,
+): Promise<TicketContext | undefined> {
   if (!config.ticket) return undefined;
-  const ticket = detectTicket(branch, config.ticket.pattern);
+
+  // 1. Branch-name detection — fastest path, no IO
+  let ticket = detectTicket(branch, config.ticket.pattern);
+
+  // 2. Recent-commit fallback (opt-in)
+  if (!ticket && config.ticket.inferFromCommits) {
+    const commits = await git.recentCommitsOnBranch(20);
+    const recent = findRecentTicket(commits, config.ticket.pattern);
+    if (recent) {
+      const fresh = recent.ageHours <= config.ticket.freshWindowHours;
+      if (fresh) {
+        ticket = recent.ticket;
+        console.log(
+          chalk.dim(
+            `  (using ${ticket} from recent commit "${recent.fromSubject}", ${formatAge(recent.ageHours)} ago)`,
+          ),
+        );
+      } else {
+        // Stale — ask before reusing
+        const useIt = await confirm({
+          message: `Reuse ticket ${recent.ticket} from commit ${formatAge(recent.ageHours)} ago ("${truncateSubject(recent.fromSubject, 50)}")?`,
+          default: false,
+        });
+        if (useIt) ticket = recent.ticket;
+      }
+    }
+  }
+
+  // 3. Validation gate
   if (config.ticket.validate && !ticket) {
     console.error(
       chalk.red(
@@ -62,10 +99,21 @@ function resolveTicketContext(
     );
     process.exit(1);
   }
+
   return {
     ticket,
     link: ticketLink(ticket, config.ticket.linkTemplate),
   };
+}
+
+function formatAge(hours: number): string {
+  if (hours < 1) return `${Math.round(hours * 60)}m`;
+  if (hours < 48) return `${Math.round(hours)}h`;
+  return `${Math.round(hours / 24)}d`;
+}
+
+function truncateSubject(s: string, max: number): string {
+  return s.length <= max ? s : s.slice(0, max - 1) + "…";
 }
 
 /**
@@ -235,7 +283,7 @@ program
       // before any AI call when validate: true and branch lacks a
       // ticket. Saves an API roundtrip and gives instant feedback.
       const branch = await git.getCurrentBranch();
-      const ticketCtx = resolveTicketContext(config, branch);
+      const ticketCtx = await resolveTicketContext(config, branch, git);
 
       // 1. Find staged files
       const staged = await git.getStaged();
@@ -390,7 +438,7 @@ program
 
       // 1. Resolve branch + remote → owner/repo
       const branch = await git.getCurrentBranch();
-      const ticketCtx = resolveTicketContext(config, branch);
+      const ticketCtx = await resolveTicketContext(config, branch, git);
       const remoteUrl = await git.getRemoteUrl();
       if (!remoteUrl) {
         console.error(

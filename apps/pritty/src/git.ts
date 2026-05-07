@@ -31,6 +31,15 @@ export interface GitOps {
   log(base: string, head?: string): Promise<Array<{ hash: string; subject: string }>>;
   /** URL of the `origin` remote, or null if not set. */
   getRemoteUrl(): Promise<string | null>;
+  /**
+   * Most recent commits on the current branch. Used by ticket
+   * inference to find ticket references in commits authored on this
+   * branch within a freshness window. Returns subject + ISO date for
+   * each.
+   */
+  recentCommitsOnBranch(
+    limit: number,
+  ): Promise<Array<{ hash: string; subject: string; dateISO: string }>>;
 }
 
 export function createGit(cwd: string = process.cwd()): GitOps {
@@ -98,6 +107,21 @@ export function createGit(cwd: string = process.cwd()): GitOps {
         return typeof url === "string" ? url.trim() : null;
       } catch {
         return null;
+      }
+    },
+
+    async recentCommitsOnBranch(
+      limit: number,
+    ): Promise<Array<{ hash: string; subject: string; dateISO: string }>> {
+      try {
+        const result = await git.log({ maxCount: limit });
+        return result.all.map((c) => ({
+          hash: c.hash,
+          subject: c.message,
+          dateISO: c.date,
+        }));
+      } catch {
+        return [];
       }
     },
   };

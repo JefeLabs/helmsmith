@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { detectTicket, ticketLink, ticketPromptGuidance } from "./ticket.js";
+import {
+  detectTicket,
+  findRecentTicket,
+  ticketLink,
+  ticketPromptGuidance,
+} from "./ticket.js";
 
 describe("detectTicket", () => {
   it("finds Jira-style tickets in branch names", () => {
@@ -50,6 +55,60 @@ describe("ticketLink", () => {
     expect(ticketLink("PROJ-1", "{ticket}/edit/{ticket}")).toBe(
       "PROJ-1/edit/PROJ-1",
     );
+  });
+});
+
+describe("findRecentTicket", () => {
+  const now = new Date("2026-05-08T12:00:00Z");
+
+  it("returns null on empty history", () => {
+    expect(findRecentTicket([], "[A-Z]+-\\d+", now)).toBeNull();
+  });
+
+  it("returns null when no commit references a ticket", () => {
+    expect(
+      findRecentTicket(
+        [
+          { subject: "feat: add login", dateISO: "2026-05-08T11:00:00Z" },
+          { subject: "fix: typo", dateISO: "2026-05-07T11:00:00Z" },
+        ],
+        "[A-Z]+-\\d+",
+        now,
+      ),
+    ).toBeNull();
+  });
+
+  it("returns the first ticket-bearing commit (newest-first ordering)", () => {
+    const result = findRecentTicket(
+      [
+        { subject: "feat(api): add /users PROJ-456", dateISO: "2026-05-08T11:00:00Z" },
+        { subject: "feat(auth): add login PROJ-123", dateISO: "2026-05-07T11:00:00Z" },
+      ],
+      "[A-Z]+-\\d+",
+      now,
+    );
+    expect(result?.ticket).toBe("PROJ-456");
+  });
+
+  it("computes ageHours correctly", () => {
+    const result = findRecentTicket(
+      [{ subject: "PROJ-1: foo", dateISO: "2026-05-08T06:00:00Z" }],
+      "[A-Z]+-\\d+",
+      now,
+    );
+    expect(result?.ageHours).toBeCloseTo(6, 1);
+  });
+
+  it("ignores commits with malformed timestamps", () => {
+    const result = findRecentTicket(
+      [
+        { subject: "PROJ-1: bad date", dateISO: "not-a-date" },
+        { subject: "PROJ-2: good", dateISO: "2026-05-08T11:00:00Z" },
+      ],
+      "[A-Z]+-\\d+",
+      now,
+    );
+    expect(result?.ticket).toBe("PROJ-2");
   });
 });
 

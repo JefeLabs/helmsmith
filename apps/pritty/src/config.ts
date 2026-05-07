@@ -13,6 +13,8 @@ export const TicketSchema = z.object({
   pattern: z.string(),
   linkTemplate: z.string().optional(),
   validate: z.boolean().default(false),
+  inferFromCommits: z.boolean().default(false),
+  freshWindowHours: z.number().positive().default(24),
 });
 
 export const ConfigSchema = z.object({

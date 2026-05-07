@@ -19,6 +19,19 @@ export interface TicketConfig {
   linkTemplate?: string;
   /** When true, fast-fail if no ticket is detected on the branch. */
   validate?: boolean;
+  /**
+   * When true, fall back to scanning recent commits for a ticket
+   * reference if the branch name has none. Within `freshWindowHours`
+   * the inferred ticket is reused silently; outside that window
+   * pritty asks (default N) before reusing.
+   */
+  inferFromCommits?: boolean;
+  /**
+   * Hours-since-now window in which a ticket from a previous commit
+   * is reused without prompting. Beyond it, pritty prompts. Default
+   * 24 — covers "yesterday's work", under "last week's work".
+   */
+  freshWindowHours?: number;
 }
 
 /**
@@ -55,6 +68,41 @@ export function ticketLink(
 ): string | undefined {
   if (!ticket || !template) return undefined;
   return template.replace(/\{ticket\}/g, ticket);
+}
+
+/**
+ * Recent-commit ticket inference. Walks the supplied commits in
+ * order, returns the first ticket-bearing commit's reference and how
+ * old (in hours) it is. Caller decides what to do with the result —
+ * silent reuse if `ageHours` is within their fresh window, otherwise
+ * prompt.
+ *
+ * Pure function — takes commit list as input rather than calling git
+ * directly, so tests can feed synthetic commits without filesystem
+ * setup.
+ */
+export interface RecentTicketResult {
+  ticket: string;
+  ageHours: number;
+  /** Subject of the commit the ticket was found in (for the prompt). */
+  fromSubject: string;
+}
+
+export function findRecentTicket(
+  commits: ReadonlyArray<{ subject: string; dateISO: string }>,
+  pattern: string,
+  now: Date = new Date(),
+): RecentTicketResult | null {
+  for (const c of commits) {
+    const ticket = detectTicket(c.subject, pattern);
+    if (!ticket) continue;
+    const date = new Date(c.dateISO);
+    if (Number.isNaN(date.getTime())) continue;
+    const ageMs = now.getTime() - date.getTime();
+    const ageHours = ageMs / (1000 * 60 * 60);
+    return { ticket, ageHours, fromSubject: c.subject };
+  }
+  return null;
 }
 
 /**
