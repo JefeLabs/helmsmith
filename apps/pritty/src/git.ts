@@ -25,6 +25,12 @@ export interface GitOps {
    * commits everything staged.
    */
   commit(message: string, files?: string[]): Promise<void>;
+  /** Push the current branch. setUpstream=true on first push. */
+  push(branch: string, opts?: { setUpstream?: boolean }): Promise<void>;
+  /** Commits reachable from `head` but not from `base`. Newest first. */
+  log(base: string, head?: string): Promise<Array<{ hash: string; subject: string }>>;
+  /** URL of the `origin` remote, or null if not set. */
+  getRemoteUrl(): Promise<string | null>;
 }
 
 export function createGit(cwd: string = process.cwd()): GitOps {
@@ -69,5 +75,49 @@ export function createGit(cwd: string = process.cwd()): GitOps {
         await git.commit(message);
       }
     },
+
+    async push(branch: string, opts: { setUpstream?: boolean } = {}): Promise<void> {
+      const args = ["origin", branch];
+      if (opts.setUpstream) args.push("-u");
+      await git.push(args);
+    },
+
+    async log(base: string, head?: string): Promise<Array<{ hash: string; subject: string }>> {
+      const range = head ? `${base}..${head}` : `${base}..HEAD`;
+      const result = await git.log({ from: base, to: head ?? "HEAD" }).catch(async () => {
+        // Fall back to raw range syntax — some repos don't have the
+        // upstream-tracking config simple-git's .log() expects.
+        return await git.log([range]);
+      });
+      return result.all.map((c) => ({ hash: c.hash, subject: c.message }));
+    },
+
+    async getRemoteUrl(): Promise<string | null> {
+      try {
+        const url = await git.remote(["get-url", "origin"]);
+        return typeof url === "string" ? url.trim() : null;
+      } catch {
+        return null;
+      }
+    },
   };
+}
+
+/**
+ * Parse owner/repo out of a GitHub remote URL. Handles both
+ * https://github.com/owner/repo(.git) and git@github.com:owner/repo(.git)
+ * forms. Returns null when the URL doesn't look like GitHub.
+ */
+export function parseGitHubRemote(
+  url: string,
+): { owner: string; repo: string } | null {
+  const httpsMatch = url.match(
+    /https:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/,
+  );
+  if (httpsMatch) return { owner: httpsMatch[1], repo: httpsMatch[2] };
+
+  const sshMatch = url.match(/git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/);
+  if (sshMatch) return { owner: sshMatch[1], repo: sshMatch[2] };
+
+  return null;
 }

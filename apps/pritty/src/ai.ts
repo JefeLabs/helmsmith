@@ -118,3 +118,74 @@ export async function generateCommitMessages(
   }
   return parsed as CommitMessage[];
 }
+
+export interface PRDraft {
+  title: string;
+  body: string;
+  labels: string[];
+}
+
+export interface CommitSummary {
+  hash: string;
+  subject: string;
+}
+
+/**
+ * Generate a pull-request title + body + labels from a commit list.
+ * The AI sees the commits and the branch metadata; it returns a single
+ * JSON object (not an array). Title is short imperative; body
+ * explains scope / motivation / testing; labels are inferred from
+ * commit-type prefixes when present (feat/fix/refactor/docs/...).
+ */
+export async function generatePR(
+  commits: readonly CommitSummary[],
+  meta: { branch: string; base: string; owner: string; repo: string },
+  config: Config,
+): Promise<PRDraft> {
+  if (commits.length === 0) {
+    throw new Error("No commits between base and head — nothing to PR.");
+  }
+
+  const adapter = await buildAdapter(config.model);
+
+  const commitList = commits
+    .map((c) => `  - ${c.hash.slice(0, 7)}  ${c.subject}`)
+    .join("\n");
+
+  const system = [
+    "You are an expert engineer writing a pull-request description.",
+    "Return strict JSON: { title: string, body: string, labels: string[] }.",
+    "Title: short imperative summary, max 70 chars, no trailing period.",
+    "Body: markdown. Open with a one-paragraph summary of the change. Add a `## Why` section explaining motivation. Add a `## Test plan` checklist when there are non-trivial code changes.",
+    "Labels: lowercase, kebab-case, derived from commit types when present (feat → enhancement; fix → bug; docs → documentation; refactor → refactor; test → testing). Empty array is fine.",
+    "Do not wrap output in markdown code fences. Do not include any prose outside the JSON.",
+  ].join("\n");
+
+  const user = [
+    `Repository: ${meta.owner}/${meta.repo}`,
+    `Branch: ${meta.branch} → ${meta.base}`,
+    `Commits (${commits.length}):`,
+    commitList,
+  ].join("\n");
+
+  const raw = await adapter.invoke({ system, user });
+  const cleaned = unwrapJson(raw);
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch (err) {
+    throw new Error(
+      `AI returned non-JSON output:\n${cleaned}\n\nParse error: ${(err as Error).message}`,
+    );
+  }
+  const draft = parsed as Partial<PRDraft>;
+  if (!draft.title || !draft.body) {
+    throw new Error(`AI returned malformed PR draft: ${cleaned}`);
+  }
+  return {
+    title: draft.title,
+    body: draft.body,
+    labels: Array.isArray(draft.labels) ? draft.labels : [],
+  };
+}

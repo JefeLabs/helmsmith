@@ -24,8 +24,21 @@ export {
 
 export {
   type CommitMessage,
+  type CommitSummary,
+  type PRDraft,
   buildAdapter,
   generateCommitMessages,
+  generatePR,
 } from "./ai.js";
 
-export { createGit, type GitOps } from "./git.js";
+export { createGit, parseGitHubRemote, type GitOps } from "./git.js";
+
+export {
+  type CreatePROptions,
+  type OpenPRSummary,
+  type PRResult,
+  addLabels,
+  createPR,
+  getDefaultBranch,
+  listOpenPRsForHead,
+} from "./github.js";
