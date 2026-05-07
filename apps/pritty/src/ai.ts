@@ -12,6 +12,10 @@ import { CopilotChatAdapter } from "@agentx/agent-adapter";
 import { getAuthPath, readAuth } from "./auth.js";
 import type { CategorizedFiles } from "./categorizer.js";
 import type { Config } from "./config.js";
+import {
+  type PullRequestTemplate,
+  templatePromptGuidance,
+} from "./pr-template.js";
 import { ticketPromptGuidance } from "./ticket.js";
 
 export interface TicketContext {
@@ -156,6 +160,7 @@ export async function generatePR(
   meta: { branch: string; base: string; owner: string; repo: string },
   config: Config,
   ticket?: TicketContext,
+  template?: PullRequestTemplate | null,
 ): Promise<PRDraft> {
   if (commits.length === 0) {
     throw new Error("No commits between base and head — nothing to PR.");
@@ -170,15 +175,25 @@ export async function generatePR(
   const ticketGuidance = ticket
     ? ticketPromptGuidance(ticket.ticket, ticket.link, ticket.title)
     : "";
+  const templateGuidance = templatePromptGuidance(template ?? null);
+
+  // When the repo provides a PR template, defer to it for the body
+  // structure rather than imposing pritty's default sections. The
+  // template's headings + checkboxes are what the team has agreed on;
+  // we just fill them in.
+  const bodyInstruction = template
+    ? "Body: markdown. Use the PR template provided below as the structure — keep its headings, fill its sections."
+    : "Body: markdown. Open with a one-paragraph summary of the change. Add a `## Why` section explaining motivation. Add a `## Test plan` checklist when there are non-trivial code changes.";
 
   const system = [
     "You are an expert engineer writing a pull-request description.",
     "Return strict JSON: { title: string, body: string, labels: string[] }.",
     "Title: short imperative summary, max 70 chars, no trailing period.",
-    "Body: markdown. Open with a one-paragraph summary of the change. Add a `## Why` section explaining motivation. Add a `## Test plan` checklist when there are non-trivial code changes.",
+    bodyInstruction,
     "Labels: lowercase, kebab-case, derived from commit types when present (feat → enhancement; fix → bug; docs → documentation; refactor → refactor; test → testing). Empty array is fine.",
     "Do not wrap output in markdown code fences. Do not include any prose outside the JSON.",
     ticketGuidance,
+    templateGuidance,
   ].filter((s) => s.length > 0).join("\n");
 
   const user = [

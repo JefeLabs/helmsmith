@@ -42,6 +42,12 @@ export {
 } from "./ticket.js";
 
 export {
+  findPullRequestTemplate,
+  templatePromptGuidance,
+  type PullRequestTemplate,
+} from "./pr-template.js";
+
+export {
   buildAdapter as buildTicketAdapter,
   deriveLinkTemplate,
   type JiraCliValidation,

@@ -17,6 +17,7 @@ import {
   type TicketContext,
 } from "./ai.js";
 import { detectTicket, findRecentTicket, ticketLink } from "./ticket.js";
+import { findPullRequestTemplate } from "./pr-template.js";
 import {
   buildAdapter,
   deriveLinkTemplate,
@@ -630,7 +631,20 @@ program
       }
       console.log("");
 
-      // 4. AI-generate title + body + labels
+      // 4. AI-generate title + body + labels.
+      // PR template (if present) is auto-detected from the GitHub
+      // convention paths; passed to the AI as authoritative body
+      // structure so generated content fits the team's existing PR
+      // shape instead of pritty's default headings.
+      const template = findPullRequestTemplate();
+      if (template) {
+        console.log(
+          chalk.dim(
+            `  (using PR template: ${template.path}${template.truncated ? " — truncated" : ""})`,
+          ),
+        );
+      }
+
       const spinner = ora({ text: "Generating PR description...", color: "cyan" }).start();
       let draft;
       try {
@@ -639,6 +653,7 @@ program
           { branch, base: effectiveBase, owner: repo.owner, repo: repo.repo },
           config,
           ticketCtx,
+          template,
         );
         spinner.succeed("PR description ready");
       } catch (err) {
