@@ -12,6 +12,13 @@ import {
   checkTool,
   resolvePackageName,
 } from "./core/index.js";
+import {
+  getRegisteredTool,
+  isRegistered,
+  listRegisteredTools,
+  registerTool,
+  unregisterTool,
+} from "./config/index.js";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -118,6 +125,19 @@ program
       }
       console.log(`✓ Installed ${tool}`);
       if (result.stdout.trim()) console.log(result.stdout.trim());
+
+      // Probe the freshly-installed binary and record it in the
+      // registry so subsequent `toolz list` and `toolz check` calls
+      // see consistent state.
+      const check = await checkTool(tool);
+      if (check.installed) {
+        registerTool(tool, {
+          version: check.version,
+          path: check.path!,
+          installed_via: adapter.name,
+          installed_at: new Date().toISOString(),
+        });
+      }
     },
   );
 
@@ -149,19 +169,66 @@ program
         process.exit(1);
       }
       console.log(`✓ Uninstalled ${tool}`);
+      unregisterTool(tool);
     },
   );
 
 program
-  .command("catalog")
-  .description("List every canonical tool name known to the built-in catalog")
-  .action(() => {
-    const names = catalogToolNames();
-    console.log(`Built-in catalog (${names.length} tools):\n`);
-    for (const name of names) {
-      const entry = BUILT_IN_CATALOG[name];
-      console.log(`  ${name.padEnd(12)} — ${entry.description}`);
+  .command("list")
+  .description("List tools registered in the local registry")
+  .option("--catalog", "List every tool in the built-in catalog instead")
+  .action((options: { catalog?: boolean }) => {
+    if (options.catalog) {
+      const names = catalogToolNames();
+      console.log(`Catalog (${names.length} tools):\n`);
+      for (const name of names) {
+        const entry = BUILT_IN_CATALOG[name];
+        const desc = entry?.description ?? "(no description)";
+        console.log(`  ${name.padEnd(12)} — ${desc}`);
+      }
+      return;
     }
+    const registered = listRegisteredTools();
+    if (registered.length === 0) {
+      console.log("No tools registered. Run `toolz install <tool>` or `toolz register <tool>`.");
+      return;
+    }
+    console.log(`Registered tools (${registered.length}):\n`);
+    for (const { name, entry } of registered) {
+      const via = entry.installed_via ? ` via ${entry.installed_via}` : " (manual)";
+      const ver = entry.version ?? "?";
+      console.log(`  ${name.padEnd(12)} ${ver.padEnd(10)} ${entry.path}${via}`);
+    }
+  });
+
+program
+  .command("register <tool>")
+  .description("Register an already-installed tool in the local registry")
+  .action(async (tool: string) => {
+    const check = await checkTool(tool);
+    if (!check.installed) {
+      console.error(`✗ ${tool} is not on PATH. Install it first, then register.`);
+      process.exit(1);
+    }
+    registerTool(tool, {
+      version: check.version,
+      path: check.path!,
+      installed_via: null, // manually registered
+      installed_at: null, // unknown — we didn't install it
+    });
+    console.log(`✓ Registered ${tool} ${check.version ?? ""} at ${check.path}`);
+  });
+
+program
+  .command("deregister <tool>")
+  .description("Remove a tool from the registry (does NOT uninstall)")
+  .action((tool: string) => {
+    if (!isRegistered(tool)) {
+      console.error(`✗ ${tool} is not registered.`);
+      process.exit(1);
+    }
+    unregisterTool(tool);
+    console.log(`✓ Deregistered ${tool}`);
   });
 
 program.parseAsync(process.argv).catch((err) => {

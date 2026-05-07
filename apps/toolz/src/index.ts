@@ -38,3 +38,18 @@ export type {
   Platform,
   PlatformInfo,
 } from "./platform/index.js";
+
+export {
+  ensureToolzDir,
+  getRegistryPath,
+  getRegisteredTool,
+  getToolzDir,
+  getUserCatalogPath,
+  isRegistered,
+  listRegisteredTools,
+  loadRegistry,
+  registerTool,
+  saveRegistry,
+  unregisterTool,
+} from "./config/index.js";
+export type { Registry, RegistryToolEntry } from "./config/index.js";
