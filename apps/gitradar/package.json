@@ -1,7 +1,7 @@
 {
-  "name": "gitradar",
+  "name": "@agentx/gitradar",
   "version": "0.1.0",
-  "description": "Terminal-based TUI analytics tool for git contribution data",
+  "description": "Terminal-based TUI analytics tool for git contribution data. Part of the agentx-toolbox monorepo.",
   "type": "module",
   "bin": {
     "gitradar": "dist/cli.js"
@@ -9,9 +9,16 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsx src/cli.ts",
-    "test": "vitest",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ecruz165/agentx-toolbox.git",
+    "directory": "apps/gitradar"
+  },
+  "license": "UNLICENSED",
   "dependencies": {
     "@inquirer/prompts": "^8.2.0",
     "better-sqlite3": "^12.6.2",
