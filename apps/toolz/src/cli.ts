@@ -13,6 +13,7 @@ import {
   ensureTool,
   ensureTools,
   resolvePackageName,
+  runDoctor,
 } from "./core/index.js";
 import {
   getRegisteredTool,
@@ -298,6 +299,52 @@ program
       if (anyMissing || anyStale) process.exit(1);
     },
   );
+
+program
+  .command("doctor")
+  .description("Validate the registry against reality — detects stale paths, version drift, removed packages")
+  .option("--errors-only", "Show only error-severity findings")
+  .option("--json", "Emit findings as JSON for scripting")
+  .action(async (options: { errorsOnly?: boolean; json?: boolean }) => {
+    const findings = await runDoctor();
+    const filtered = options.errorsOnly
+      ? findings.filter((f) => f.severity === "error")
+      : findings;
+
+    if (options.json) {
+      console.log(JSON.stringify(filtered, null, 2));
+      if (findings.some((f) => f.severity === "error")) process.exit(1);
+      return;
+    }
+
+    if (filtered.length === 0) {
+      console.log("✓ No issues found.");
+      return;
+    }
+
+    const counts = {
+      error: findings.filter((f) => f.severity === "error").length,
+      warning: findings.filter((f) => f.severity === "warning").length,
+      info: findings.filter((f) => f.severity === "info").length,
+    };
+
+    for (const severity of ["error", "warning", "info"] as const) {
+      const subset = filtered.filter((f) => f.severity === severity);
+      if (subset.length === 0) continue;
+      const tag = severity === "error" ? "✗" : severity === "warning" ? "⚠" : "ℹ";
+      console.log(`\n${tag} ${severity.toUpperCase()} (${subset.length})`);
+      for (const f of subset) {
+        console.log(`  ${f.tool} [${f.code}]`);
+        console.log(`    ${f.message}`);
+        if (f.fix) console.log(`    → ${f.fix}`);
+      }
+    }
+
+    console.log(
+      `\n${counts.error} error(s), ${counts.warning} warning(s), ${counts.info} info`,
+    );
+    if (counts.error > 0) process.exit(1);
+  });
 
 program.parseAsync(process.argv).catch((err) => {
   console.error(err);

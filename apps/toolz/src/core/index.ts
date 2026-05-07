@@ -15,3 +15,6 @@ export type { CatalogEntry, ResolvedPackage } from "./tool-resolver.js";
 
 export { ensureTool, ensureTools } from "./ensure.js";
 export type { EnsureOptions, EnsureSource, ToolStatus } from "./ensure.js";
+
+export { runDoctor } from "./doctor.js";
+export type { DoctorFinding, DoctorSeverity } from "./doctor.js";

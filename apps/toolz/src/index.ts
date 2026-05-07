@@ -18,9 +18,12 @@ export {
   getVersion,
   isInstalled,
   resolvePackageName,
+  runDoctor,
 } from "./core/index.js";
 export type {
   CatalogEntry,
+  DoctorFinding,
+  DoctorSeverity,
   EnsureOptions,
   EnsureSource,
   ResolvedPackage,
