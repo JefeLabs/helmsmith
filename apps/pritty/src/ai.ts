@@ -17,6 +17,8 @@ import { ticketPromptGuidance } from "./ticket.js";
 export interface TicketContext {
   ticket: string | null;
   link?: string | undefined;
+  /** Ticket title from the live adapter, when validation is configured. */
+  title?: string | undefined;
 }
 
 export interface CommitMessage {
@@ -93,7 +95,7 @@ export async function generateCommitMessages(
   const styleGuide = COMMIT_STYLE_GUIDES[config.commitStyle];
 
   const ticketGuidance = ticket
-    ? ticketPromptGuidance(ticket.ticket, ticket.link)
+    ? ticketPromptGuidance(ticket.ticket, ticket.link, ticket.title)
     : "";
 
   const system = [
@@ -166,7 +168,7 @@ export async function generatePR(
     .join("\n");
 
   const ticketGuidance = ticket
-    ? ticketPromptGuidance(ticket.ticket, ticket.link)
+    ? ticketPromptGuidance(ticket.ticket, ticket.link, ticket.title)
     : "";
 
   const system = [

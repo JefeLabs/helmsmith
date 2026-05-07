@@ -9,12 +9,48 @@ import { join } from "node:path";
 import { load as parseYaml } from "js-yaml";
 import { z } from "zod";
 
+// ── Per-adapter validation configs (discriminated union by `type`)
+const JiraRestValidationSchema = z.object({
+  type: z.literal("jira-rest"),
+  baseUrl: z.string().url(),
+  emailEnv: z.string().default("JIRA_EMAIL"),
+  tokenEnv: z.string().default("JIRA_API_TOKEN"),
+});
+
+const JiraCliValidationSchema = z.object({
+  type: z.literal("jira-cli"),
+});
+
+const LinearValidationSchema = z.object({
+  type: z.literal("linear"),
+  apiKeyEnv: z.string().default("LINEAR_API_KEY"),
+});
+
+export const ValidationSchema = z.discriminatedUnion("type", [
+  JiraRestValidationSchema,
+  JiraCliValidationSchema,
+  LinearValidationSchema,
+]);
+
 export const TicketSchema = z.object({
   pattern: z.string(),
   linkTemplate: z.string().optional(),
   validate: z.boolean().default(false),
   inferFromCommits: z.boolean().default(false),
   freshWindowHours: z.number().positive().default(24),
+  /**
+   * Live validation against an external ticket system. When unset,
+   * pritty does pattern-based detection only. When set, the
+   * configured adapter resolves ticket existence (cached forever
+   * until `pritty cache clear`).
+   */
+  validation: ValidationSchema.optional(),
+  /**
+   * When the live adapter says the ticket doesn't exist:
+   *   true  → fast-fail (gate fires).
+   *   false → warn, proceed (default — adapter outages don't block).
+   */
+  validateStrict: z.boolean().default(false),
 });
 
 export const ConfigSchema = z.object({

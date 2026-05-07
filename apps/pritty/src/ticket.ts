@@ -108,12 +108,16 @@ export function findRecentTicket(
 /**
  * Build the AI-prompt enrichment text for a detected ticket. Returns
  * empty string when no ticket — caller can concat unconditionally.
+ * When `title` is provided (from a live adapter), embeds it so the
+ * AI can write more contextual commit messages and PR bodies.
  */
 export function ticketPromptGuidance(
   ticket: string | null,
   link: string | undefined,
+  title?: string | undefined,
 ): string {
   if (!ticket) return "";
+  const titleText = title ? ` — "${title}"` : "";
   const linkText = link ? ` (${link})` : "";
-  return `\nReference ticket: ${ticket}${linkText}. Include "Refs: ${ticket}" as a commit footer line, and mention the ticket in any PR body you generate.`;
+  return `\nReference ticket: ${ticket}${titleText}${linkText}. Include "Refs: ${ticket}" as a commit footer line, and mention the ticket in any PR body you generate.`;
 }

@@ -18,6 +18,17 @@ import {
 } from "./ai.js";
 import { detectTicket, findRecentTicket, ticketLink } from "./ticket.js";
 import {
+  buildAdapter,
+  deriveLinkTemplate,
+  type ValidationResult,
+} from "./adapters/index.js";
+import {
+  clearCache,
+  getCachedTicket,
+  getCachePath,
+  setCachedTicket,
+} from "./adapters/cache.js";
+import {
   addLabels,
   createPR,
   getDefaultBranch,
@@ -82,7 +93,7 @@ async function resolveTicketContext(
     }
   }
 
-  // 3. Validation gate
+  // 3. Validation gate (pattern level)
   if (config.ticket.validate && !ticket) {
     console.error(
       chalk.red(
@@ -100,9 +111,87 @@ async function resolveTicketContext(
     process.exit(1);
   }
 
+  // 4. Live validation via adapter (cached). Only fires when both a
+  //    ticket is present AND `validation` is configured. Cache hits
+  //    short-circuit; misses call the adapter and persist the result.
+  let title: string | undefined;
+  let resolvedLink = ticketLink(ticket, config.ticket.linkTemplate);
+  if (ticket && config.ticket.validation) {
+    const validation = config.ticket.validation;
+    const cached = getCachedTicket(ticket, validation.type);
+    let result: ValidationResult | null;
+    if (cached) {
+      result = {
+        exists: cached.exists,
+        ...(cached.title ? { title: cached.title } : {}),
+        ...(cached.status ? { status: cached.status } : {}),
+        ...(cached.url ? { url: cached.url } : {}),
+      };
+    } else {
+      try {
+        const adapter = await buildAdapter(validation);
+        result = await adapter.validate(ticket);
+      } catch (err) {
+        console.error(
+          chalk.yellow(
+            `⚠ Ticket validation failed: ${(err as Error).message}`,
+          ),
+        );
+        result = null;
+      }
+      if (result) {
+        setCachedTicket(ticket, validation.type, {
+          exists: result.exists,
+          ...(result.title ? { title: result.title } : {}),
+          ...(result.status ? { status: result.status } : {}),
+          ...(result.url ? { url: result.url } : {}),
+        });
+      }
+    }
+
+    if (result) {
+      if (!result.exists && config.ticket.validateStrict) {
+        console.error(
+          chalk.red(
+            `✗ ${ticket} not found in ${validation.type}: ${result.error ?? "ticket missing"}`,
+          ),
+        );
+        console.error(
+          chalk.dim(`  Set ticket.validateStrict: false to proceed anyway.`),
+        );
+        process.exit(1);
+      }
+      if (!result.exists) {
+        console.log(
+          chalk.yellow(
+            `⚠ ${ticket} not found in ${validation.type}; proceeding anyway.`,
+          ),
+        );
+      } else {
+        title = result.title;
+        if (result.url) resolvedLink = result.url;
+      }
+    } else {
+      // Adapter returned null (network/credentials issue). Don't
+      // block — note it and let the AI proceed with the bare ticket.
+      console.log(
+        chalk.dim(
+          `  (couldn't verify ${ticket} via ${validation.type}; using anyway)`,
+        ),
+      );
+    }
+  }
+
+  // Auto-derive link template when only validation config is set
+  if (!resolvedLink && config.ticket.validation && ticket) {
+    const derived = deriveLinkTemplate(config.ticket.validation);
+    resolvedLink = ticketLink(ticket, derived);
+  }
+
   return {
     ticket,
-    link: ticketLink(ticket, config.ticket.linkTemplate),
+    link: resolvedLink,
+    title,
   };
 }
 
@@ -240,6 +329,27 @@ program
       console.log(chalk.cyan(`${name}  ${chalk.dim(`(${list.length})`)}`));
       for (const file of list) console.log(`  ${file}`);
     }
+  });
+
+// ─── cache ────────────────────────────────────────────────────────────
+
+const cache = program
+  .command("cache")
+  .description("Manage the validated-ticket cache (~/.pritty/cache.json)");
+
+cache
+  .command("clear")
+  .description("Wipe the validated-ticket cache")
+  .action(() => {
+    clearCache();
+    console.log(chalk.green(`✓ Cleared ${getCachePath()}`));
+  });
+
+cache
+  .command("path")
+  .description("Print the cache file path (useful for inspection / scripting)")
+  .action(() => {
+    console.log(getCachePath());
   });
 
 // ─── stubs (commit, pr, rebase, hooks) ────────────────────────────────

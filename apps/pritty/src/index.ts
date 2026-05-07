@@ -35,10 +35,33 @@ export { createGit, parseGitHubRemote, type GitOps } from "./git.js";
 
 export {
   detectTicket,
+  findRecentTicket,
   ticketLink,
   ticketPromptGuidance,
   type TicketConfig,
 } from "./ticket.js";
+
+export {
+  buildAdapter as buildTicketAdapter,
+  deriveLinkTemplate,
+  type JiraCliValidation,
+  type JiraRestValidation,
+  type LinearValidation,
+  type TicketSystemAdapter,
+  type ValidationConfig,
+  type ValidationResult,
+  type ValidationType,
+} from "./adapters/index.js";
+
+export {
+  clearCache,
+  getCachePath,
+  getCachedTicket,
+  readCache,
+  setCachedTicket,
+  type CacheEntry,
+  type CacheFile,
+} from "./adapters/cache.js";
 
 export {
   type CreatePROptions,
