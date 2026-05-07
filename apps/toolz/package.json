@@ -1,0 +1,53 @@
+{
+  "name": "@agentx/toolz",
+  "version": "0.0.1",
+  "description": "ToolZ — cross-platform tool manager for the AgentX ecosystem. Detects, installs, and registers CLI dependencies.",
+  "type": "module",
+  "bin": {
+    "toolz": "./bin/toolz.mjs"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "bin",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "semver": "^7.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/semver": "^7.5.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.5"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ecruz165/agentx-toolbox.git",
+    "directory": "apps/toolz"
+  },
+  "license": "UNLICENSED"
+}
