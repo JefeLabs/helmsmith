@@ -1,0 +1,64 @@
+{
+  "name": "@agentx/pritty",
+  "version": "0.0.1",
+  "description": "Pretty PRs, zero effort. AI-powered CLI that categorizes staged files, generates conventional commits, and creates pull requests with human-in-the-loop approval.",
+  "type": "module",
+  "bin": {
+    "pritty": "./bin/pritty.mjs"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "bin",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx src/cli.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@agentx/agent-adapter": "*",
+    "@agentx/agent-auth": "*",
+    "@inquirer/prompts": "^8.2.0",
+    "chalk": "^5.6.2",
+    "cli-table3": "^0.6.5",
+    "commander": "^12.1.0",
+    "js-yaml": "^4.1.0",
+    "minimatch": "^10.0.1",
+    "octokit": "^4.0.2",
+    "ora": "^8.1.0",
+    "simple-git": "^3.27.0",
+    "zod": "^3.25.32"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.10.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.5"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ecruz165/agentx-toolbox.git",
+    "directory": "apps/pritty"
+  },
+  "license": "UNLICENSED"
+}
