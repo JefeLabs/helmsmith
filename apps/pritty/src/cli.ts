@@ -6,7 +6,7 @@
 
 import { Command } from "commander";
 import chalk from "chalk";
-import { confirm } from "@inquirer/prompts";
+import { confirm, editor } from "@inquirer/prompts";
 import ora from "ora";
 import { writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
@@ -26,6 +26,21 @@ import {
   UNKNOWN_CATEGORY,
 } from "./categorizer.js";
 import { createGit } from "./git.js";
+
+/**
+ * Parse text from $EDITOR back into { subject/title, body }. Standard
+ * conventional-commit / PR format: first line is the subject, blank
+ * line(s), then body. Tolerant of users who skip the blank-line rule.
+ */
+function splitTitleBody(text: string): { title: string; body: string } {
+  const lines = text.split("\n");
+  const title = (lines[0] ?? "").trim();
+  let i = 1;
+  // Skip blank separators after the title
+  while (i < lines.length && lines[i]!.trim() === "") i++;
+  const body = lines.slice(i).join("\n").trimEnd();
+  return { title, body };
+}
 
 const program = new Command();
 
@@ -230,6 +245,36 @@ program
       }
       console.log("");
 
+      // 4.5. Optional per-commit editing — default N so the wrap-up
+      // stays fast. Skipped entirely under --auto-approve and --dry-run.
+      if (!options.autoApprove && !options.dryRun) {
+        for (let i = 0; i < plan.length; i++) {
+          const c = plan[i]!;
+          const wantEdit = await confirm({
+            message: `Edit message for ${c.category}?`,
+            default: false,
+          });
+          if (!wantEdit) continue;
+          const fullMessage = c.body ? `${c.message}\n\n${c.body}` : c.message;
+          const edited = await editor({
+            message: `Editing ${c.category} commit message`,
+            default: fullMessage,
+          });
+          const { title: nextMessage, body: nextBody } = splitTitleBody(edited);
+          if (nextMessage.length === 0) {
+            console.log(
+              chalk.yellow("⚠ Empty message — keeping original."),
+            );
+            continue;
+          }
+          plan[i] = {
+            ...c,
+            message: nextMessage,
+            body: nextBody.length > 0 ? nextBody : undefined,
+          };
+        }
+      }
+
       // 5. Dry-run exits here
       if (options.dryRun) {
         console.log(
@@ -406,6 +451,28 @@ program
         console.log(`  ${chalk.dim("Labels: ")}${draft.labels.join(", ")}`);
       }
       console.log("");
+
+      // 5.5. Optional editor pass — default N so the wrap-up stays
+      // fast. Skipped under --auto-approve / --dry-run.
+      if (!options.autoApprove && !options.dryRun) {
+        const wantEdit = await confirm({
+          message: "Edit PR title or body?",
+          default: false,
+        });
+        if (wantEdit) {
+          const combined = `${draft.title}\n\n${draft.body}`;
+          const edited = await editor({
+            message: "Editing PR (first line = title, blank line, then body)",
+            default: combined,
+          });
+          const { title: nextTitle, body: nextBody } = splitTitleBody(edited);
+          if (nextTitle.length === 0) {
+            console.log(chalk.yellow("⚠ Empty title — keeping original."));
+          } else {
+            draft = { ...draft, title: nextTitle, body: nextBody };
+          }
+        }
+      }
 
       // 6. Dry-run exits here
       if (options.dryRun) {
