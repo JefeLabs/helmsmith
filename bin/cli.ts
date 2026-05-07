@@ -501,25 +501,59 @@ function summarizePlan(plan: readonly ResolvedItem[]): string {
 }
 
 /**
- * Substring-match the unknown slug against every known identifier in
- * the catalog. Used to suggest a likely-typo correction when an install
- * arg fails to resolve. Cheap and good enough for "did you mean" hints
- * at this catalog size — no Levenshtein needed.
+ * Levenshtein edit distance — minimum number of single-char insertions,
+ * deletions, or substitutions to transform `a` into `b`. Two-row
+ * optimization (O(n) memory) since the catalog has hundreds of slugs
+ * and we run this against each.
+ */
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  let curr = new Array<number>(b.length + 1);
+  for (let i = 1; i <= a.length; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
+    }
+    [prev, curr] = [curr, prev];
+  }
+  return prev[b.length];
+}
+
+/**
+ * Edit-distance suggest for an unknown slug. Compares both the full
+ * slug and just the leaf segment (last colon-piece) — a typo deep in
+ * a long slug should still surface a hint. Threshold is 2 edits or
+ * 1/3 the input length, whichever is larger, so short slugs require
+ * tighter matches and long slugs tolerate more.
  */
 function findNearMisses(unknown: string): string[] {
   const q = unknown.toLowerCase();
-  // Match on the leaf segment too — if user typed "pixelmach" we still
-  // want to find "core:tools:pixelmatch" via the leaf "pixelmatch".
-  const leaf = q.split(":").pop() ?? q;
-  const candidates: string[] = [];
+  const qLeaf = q.split(":").pop() ?? q;
+  const tolerance = Math.max(2, Math.floor(q.length / 3));
+
+  const scored: Array<{ id: string; distance: number }> = [];
+
   for (const c of getCommands()) {
     const slug = c.slug.toLowerCase();
-    if (slug.includes(leaf) || slug.includes(q)) candidates.push(c.slug);
+    const slugLeaf = slug.split(":").pop() ?? slug;
+    const dFull = levenshtein(q, slug);
+    const dLeaf = levenshtein(qLeaf, slugLeaf);
+    const distance = Math.min(dFull, dLeaf);
+    if (distance <= tolerance) scored.push({ id: c.slug, distance });
   }
   for (const s of getSkills()) {
-    if (s.name.toLowerCase().includes(leaf)) candidates.push(s.name);
+    const distance = levenshtein(q, s.name.toLowerCase());
+    if (distance <= tolerance) scored.push({ id: s.name, distance });
   }
-  return candidates;
+
+  return scored
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, 5)
+    .map((entry) => entry.id);
 }
 
 function printItem(kind: string, identifier: string, description: string, body: string) {
