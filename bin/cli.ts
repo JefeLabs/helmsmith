@@ -15,6 +15,7 @@ import {
   loadCatalog,
 } from "../lib/index.js";
 import { resolveInstallPlan } from "../lib/resolve.js";
+import { installSlugs } from "../lib/install.js";
 import { suggestNext, type ActiveWorkflowState } from "../lib/suggest.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -187,26 +188,24 @@ cli
       return;
     }
 
-    let written = 0;
-    let skipped = 0;
-    for (const item of plan) {
-      const subdir = item.kind === "skill" ? "skills" : "commands";
-      const sourcePath = join(packageRoot, ".claude", subdir, item.path);
-      const destPath = join(targetClaude, subdir, item.path);
+    // Hand the plan's slug set to the shared installer so the CLI and
+    // TUI install paths produce identical output: always-install infra
+    // (audit, workflows, skills, _context) + runtime manifests for any
+    // picked tools/integrations.
+    const planSlugs = new Set(plan.map((p) => p.slug));
+    const result = installSlugs(planSlugs, loadCatalog(), packageRoot, target, {
+      force: options.force,
+    });
 
-      if (existsSync(destPath) && !options.force) {
-        skipped++;
-        continue;
-      }
-      mkdirSync(dirname(destPath), { recursive: true });
-      copyFileSync(sourcePath, destPath);
-      written++;
+    console.log(`✓ Installed ${result.installedFiles} file(s) to ${targetClaude}`);
+    if (result.skippedExisting > 0) {
+      console.log(
+        `  (${result.skippedExisting} skipped — already exist; pass --force to overwrite)`,
+      );
     }
-
-    console.log(`✓ Installed ${written} item(s) to ${targetClaude}`);
-    if (skipped > 0) {
-      console.log(`  (${skipped} skipped — already exist; pass --force to overwrite)`);
-    }
+    console.log(
+      `  Includes ${result.alwaysInstalledCount} always-install infra files (audit, workflows, _context) + all skills.`,
+    );
     console.log("");
     console.log("Requested:");
     for (const slug of slugs) console.log(`  - ${slug}`);

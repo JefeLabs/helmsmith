@@ -43,10 +43,23 @@ export interface ResolveResult {
 }
 
 /**
- * Walk the dependency graph for each requested slug. Skills' references
- * point at slash-command slugs (commands/workflows), so a skill's deps
- * are always commands/workflows. Commands and workflows can reference
- * other commands/workflows — those edges produce the transitive plan.
+ * Walk the dependency graph for each requested slug. Cascade rules
+ * mirror the TUI's resolveCascade in tui/state.ts so a `skillzkit
+ * install <slug>` and a TUI install of the same item produce the
+ * same closure:
+ *
+ *   - SKILL seed → walk all refs unconditionally. Skills are routers;
+ *     their refs ARE the commands they route to, so requesting a skill
+ *     means "give me this skill plus its routed commands."
+ *
+ *   - WORKFLOW seed → walk refs but skip `core:*` (tools/integrations
+ *     are picked separately, not auto-pulled) and only propagate
+ *     further when the referenced item is itself a workflow. Non-
+ *     workflow refs are added once but don't recursively cascade.
+ *
+ *   - COMMAND seed → don't cascade at all. A command body that
+ *     mentions other commands is documentation, not a runtime
+ *     dependency.
  */
 export function resolveInstallPlan(requested: readonly string[]): ResolveResult {
   const plan: ResolvedItem[] = [];
@@ -78,11 +91,18 @@ export function resolveInstallPlan(requested: readonly string[]): ResolveResult 
       ...(requestedBy ? { requestedBy } : {}),
     });
 
-    for (const ref of found.item.references) {
-      if (!seen.has(ref)) {
+    if (found.kind === "skill") {
+      for (const ref of found.item.references) {
+        if (!seen.has(ref)) queue.push({ slug: ref, requestedBy: slug });
+      }
+    } else if (found.kind === "workflow") {
+      for (const ref of found.item.references) {
+        if (ref.startsWith("core:")) continue;
+        if (seen.has(ref)) continue;
         queue.push({ slug: ref, requestedBy: slug });
       }
     }
+    // Commands don't cascade.
   }
 
   return { plan, missing };
