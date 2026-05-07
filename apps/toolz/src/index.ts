@@ -12,6 +12,8 @@ export {
   BUILT_IN_CATALOG,
   catalogToolNames,
   checkTool,
+  ensureTool,
+  ensureTools,
   getPath,
   getVersion,
   isInstalled,
@@ -19,8 +21,11 @@ export {
 } from "./core/index.js";
 export type {
   CatalogEntry,
+  EnsureOptions,
+  EnsureSource,
   ResolvedPackage,
   ToolCheckResult,
+  ToolStatus,
 } from "./core/index.js";
 
 export {

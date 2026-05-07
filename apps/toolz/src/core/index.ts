@@ -12,3 +12,6 @@ export {
   resolvePackageName,
 } from "./tool-resolver.js";
 export type { CatalogEntry, ResolvedPackage } from "./tool-resolver.js";
+
+export { ensureTool, ensureTools } from "./ensure.js";
+export type { EnsureOptions, EnsureSource, ToolStatus } from "./ensure.js";

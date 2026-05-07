@@ -10,6 +10,8 @@ import {
   BUILT_IN_CATALOG,
   catalogToolNames,
   checkTool,
+  ensureTool,
+  ensureTools,
   resolvePackageName,
 } from "./core/index.js";
 import {
@@ -230,6 +232,72 @@ program
     unregisterTool(tool);
     console.log(`✓ Deregistered ${tool}`);
   });
+
+program
+  .command("ensure <tools...>")
+  .description("Ensure one or more tools are installed; install missing ones if --auto-install")
+  .option("--min-version <version>", "Minimum acceptable semver (single tool only)")
+  .option("--auto-install", "Install missing tools automatically (default: report and exit non-zero)")
+  .option("--silent", "Suppress progress logs (errors still print)")
+  .option("--via <manager>", "Force a specific package manager")
+  .action(
+    async (
+      tools: string[],
+      options: {
+        minVersion?: string;
+        autoInstall?: boolean;
+        silent?: boolean;
+        via?: string;
+      },
+    ) => {
+      const opts = {
+        ...(options.minVersion ? { minVersion: options.minVersion } : {}),
+        ...(options.autoInstall !== undefined
+          ? { autoInstall: options.autoInstall }
+          : {}),
+        ...(options.silent !== undefined ? { silent: options.silent } : {}),
+        ...(options.via ? { via: options.via as never } : {}),
+      };
+
+      const statuses =
+        tools.length === 1
+          ? [await ensureTool(tools[0], opts)]
+          : await ensureTools(tools, opts);
+
+      let anyMissing = false;
+      let anyStale = false;
+      for (const status of statuses) {
+        if (status.error) {
+          console.error(`✗ ${status.name}: ${status.error}`);
+          anyMissing = true;
+          continue;
+        }
+        if (!status.installed) {
+          console.error(
+            `✗ ${status.name}: not installed${
+              opts.autoInstall ? " (install also failed)" : "; pass --auto-install to attempt install"
+            }`,
+          );
+          anyMissing = true;
+          continue;
+        }
+        if (status.versionTooLow) {
+          console.error(
+            `⚠ ${status.name} ${status.version ?? "(unknown)"}: below minVersion ${opts.minVersion}`,
+          );
+          anyStale = true;
+          continue;
+        }
+        if (!options.silent) {
+          console.log(
+            `✓ ${status.name} ${status.version ?? ""} (${status.source})`,
+          );
+        }
+      }
+
+      if (anyMissing || anyStale) process.exit(1);
+    },
+  );
 
 program.parseAsync(process.argv).catch((err) => {
   console.error(err);
