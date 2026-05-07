@@ -53,6 +53,7 @@ interface ListOptions {
   skills?: boolean;
   workflows?: boolean;
   kind?: "command" | "workflow" | "context";
+  tree?: boolean;
 }
 interface InstallOptions {
   target?: string;
@@ -69,7 +70,13 @@ cli
   .option("--skills", "Show only skills")
   .option("--workflows", "Show only workflows")
   .option("--kind <kind>", "Filter commands by kind: command|workflow|context")
+  .option("--tree", "Render commands hierarchically by slug namespace")
   .action((options: ListOptions) => {
+    if (options.tree) {
+      console.log(renderTreeView());
+      return;
+    }
+
     const showAll = !options.commands && !options.skills && !options.workflows;
 
     if (showAll || options.commands) {
@@ -411,6 +418,61 @@ cli.help();
 cli.version("0.1.0");
 
 cli.parse();
+
+/**
+ * Render the catalog as an indented tree, deriving hierarchy from
+ * slug structure (each colon-segment becomes a level). Sorted
+ * alphabetically. Emits ancestor "namespace/" headers when crossing
+ * into a new branch, then leaf rows showing the full slug + a
+ * truncated description. Skills appended as a flat trailing section
+ * (they don't follow the slug-namespace convention).
+ */
+function renderTreeView(): string {
+  const cmds = getCommands()
+    .filter((c) => c.kind !== "context")
+    .sort((a, b) => a.slug.localeCompare(b.slug));
+
+  const out: string[] = [];
+  const lastPath: string[] = [];
+
+  for (const cmd of cmds) {
+    const parts = cmd.slug.split(":");
+    const ancestors = parts.slice(0, -1);
+
+    let common = 0;
+    while (
+      common < ancestors.length &&
+      common < lastPath.length &&
+      ancestors[common] === lastPath[common]
+    ) {
+      common++;
+    }
+
+    for (let i = common; i < ancestors.length; i++) {
+      out.push(`${"  ".repeat(i)}${ancestors[i]}/`);
+    }
+
+    const indent = "  ".repeat(ancestors.length);
+    const tag = cmd.kind === "workflow" ? "[wf]" : "    ";
+    out.push(
+      `${indent}${tag} /${cmd.slug}  —  ${truncate(cmd.description, 70)}`,
+    );
+
+    lastPath.length = 0;
+    lastPath.push(...ancestors);
+  }
+
+  const skills = getSkills();
+  if (skills.length > 0) {
+    out.push("");
+    out.push(`Skills (${skills.length})`);
+    for (const s of skills) {
+      out.push(`  ${s.name}  —  ${truncate(s.description, 70)}`);
+    }
+  }
+
+  return out.join("\n");
+}
 
 function truncate(text: string, max: number): string {
   if (text.length <= max) return text;
