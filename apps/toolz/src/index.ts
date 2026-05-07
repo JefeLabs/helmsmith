@@ -8,13 +8,32 @@
  * `ensureTools`, registry CRUD.
  */
 
-export { checkTool, getPath, getVersion, isInstalled } from "./core/index.js";
-export type { ToolCheckResult } from "./core/index.js";
+export {
+  BUILT_IN_CATALOG,
+  catalogToolNames,
+  checkTool,
+  getPath,
+  getVersion,
+  isInstalled,
+  resolvePackageName,
+} from "./core/index.js";
+export type {
+  CatalogEntry,
+  ResolvedPackage,
+  ToolCheckResult,
+} from "./core/index.js";
 
-export { detectPlatform, resetPlatformCache } from "./platform/index.js";
+export {
+  adapters,
+  detectPlatform,
+  resetPlatformCache,
+  selectAdapter,
+} from "./platform/index.js";
 export type {
   Architecture,
+  InstallResult,
   LinuxFamily,
+  PackageManagerAdapter,
   PackageManagerType,
   Platform,
   PlatformInfo,

@@ -6,3 +6,5 @@ export type {
   Platform,
   PlatformInfo,
 } from "./types.js";
+export type { InstallResult, PackageManagerAdapter } from "./package-managers.js";
+export { adapters, selectAdapter } from "./adapters/index.js";
