@@ -164,56 +164,87 @@ function extractReferencesInOrder(body: string): string[] {
 // ─── Ranking ──────────────────────────────────────────────────────────
 
 /**
- * Merge raw candidates into a final ranked list of NextSuggestion.
+ * Per-reason base weight. The numbers express *confidence* that this
+ * candidate is the right next step, not magnitude of importance:
  *
- * Inputs you have to work with (per RawCandidate):
- *   - slug:       the candidate's identifier
- *   - kind:       "command" (single task) or "workflow" (multi-phase)
- *   - reason:     "consumes-X" | "wraps-X" | "next-in-active-workflow"
- *   - rationale:  pre-formatted human string
+ *   - next-in-active-workflow → 1.0  (positional ground truth from
+ *                                     the runtime workflow state file)
+ *   - wraps-X                 → 0.5  (a multi-phase commitment that
+ *                                     bundles the completed slug as
+ *                                     one of its steps)
+ *   - consumes-X              → 0.3  (one of potentially many tasks
+ *                                     that mention the completed slug)
+ */
+const REASON_WEIGHTS: Record<NextReason, number> = {
+  "next-in-active-workflow": 1.0,
+  "wraps-X": 0.5,
+  "consumes-X": 0.3,
+};
+
+/** Bonus added per additional signal firing on the same candidate. */
+const MULTI_SIGNAL_BONUS = 0.1;
+
+/**
+ * Merge raw candidates into a ranked NextSuggestion list. The same
+ * slug may appear multiple times (e.g. a workflow could be BOTH
+ * `wraps-X` AND `next-in-active-workflow`); group by slug, take the
+ * highest-weight reason as primary, add a small bonus per extra
+ * signal, and combine the rationale strings so the user sees every
+ * reason this candidate scored.
  *
- * The same `slug` may appear multiple times (e.g. a workflow could be
- * BOTH `wraps-X` AND `next-in-active-workflow`). Decide how to merge:
- *   - Pick the highest-priority reason and drop the others?
- *   - Keep all reasons and surface as one entry with combined rationale?
- *   - Boost the score when multiple signals fire on the same candidate?
- *
- * Suggested starting weights (feel free to ignore):
- *   "next-in-active-workflow"  → strongest (you're literally mid-flow)
- *   "wraps-X"                  → medium-strong (committing to a workflow
- *                                 is a bigger ask than running a task)
- *   "consumes-X"               → baseline
- *
- * Other knobs to consider:
- *   - Penalize candidates whose slug is itself a `_context` or `_index`
- *     entry (these aren't runnable) — though gatherReverseDeps already
- *     filters those.
- *   - Boost candidates whose `outcome` frontmatter is non-empty (they
- *     declare what they produce, which means they're well-described).
- *   - When the candidate is a workflow, its NextSuggestion.slug should
- *     be the qualifiedName form (e.g. "product:greenfield"), which the
- *     CLI/agent passes to /core:workflows:manage start.
- *
- * Return the suggestions sorted by `score` descending (highest first).
- *
- * TODO(you): implement this — see the comments above for the inputs and
- * trade-offs. Replace the placeholder return below.
+ * Sorting: score desc, workflows-before-commands at score ties (the
+ * workflow unlocks a multi-phase flow for the same numeric confidence,
+ * so it's the bigger payoff), then alphabetical for stable output.
  */
 function rankSuggestions(raw: RawCandidate[]): NextSuggestion[] {
-  // ────────── PLACEHOLDER ranking — REPLACE ME ──────────
-  // Naive: dedup by slug (last-wins), uniform score of 1, preserve
-  // gather order. This is just to make the wiring runnable end-to-end;
-  // it produces inconsistent results when multiple signals fire.
-  const bySlug = new Map<string, NextSuggestion>();
+  // Group by slug so multi-signal candidates collapse to one row.
+  const groups = new Map<string, RawCandidate[]>();
   for (const c of raw) {
-    bySlug.set(c.slug, {
-      slug: c.slug,
-      kind: c.kind,
-      reason: c.reason,
-      score: 1,
-      rationale: c.rationale,
+    const list = groups.get(c.slug) ?? [];
+    list.push(c);
+    groups.set(c.slug, list);
+  }
+
+  const ranked: NextSuggestion[] = [];
+  for (const [slug, candidates] of groups) {
+    // Sort the candidate's signals by reason weight; the strongest is
+    // the "primary" reason that drives kind/reason fields and leads
+    // the rationale string.
+    const sorted = [...candidates].sort(
+      (a, b) => REASON_WEIGHTS[b.reason] - REASON_WEIGHTS[a.reason],
+    );
+    const primary = sorted[0];
+
+    // Confidence = max base + (n-1) * bonus, clamped to [0, 1] so
+    // score stays interpretable as a probability-shaped number.
+    const score = Math.min(
+      1.0,
+      REASON_WEIGHTS[primary.reason] +
+        (sorted.length - 1) * MULTI_SIGNAL_BONUS,
+    );
+
+    const rationale =
+      sorted.length === 1
+        ? primary.rationale
+        : `${primary.rationale}. Also: ${sorted
+            .slice(1)
+            .map((c) => c.rationale.toLowerCase())
+            .join("; ")}`;
+
+    ranked.push({
+      slug,
+      kind: primary.kind,
+      reason: primary.reason,
+      score,
+      rationale,
     });
   }
-  return Array.from(bySlug.values());
-  // ─────────────────────────────────────────────────────
+
+  ranked.sort((a, b) => {
+    if (a.score !== b.score) return b.score - a.score;
+    if (a.kind !== b.kind) return a.kind === "workflow" ? -1 : 1;
+    return a.slug.localeCompare(b.slug);
+  });
+
+  return ranked;
 }
