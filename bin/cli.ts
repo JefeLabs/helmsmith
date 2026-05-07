@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { dirname, join, relative } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { cac } from "cac";
 import {
@@ -14,7 +14,11 @@ import {
   getWorkflows,
   loadCatalog,
 } from "../lib/index.js";
-import { expandGroupIds, resolveInstallPlan } from "../lib/resolve.js";
+import {
+  expandGroupIds,
+  resolveInstallPlan,
+  type ResolvedItem,
+} from "../lib/resolve.js";
 import { installSlugs } from "../lib/install.js";
 import { suggestNext, type ActiveWorkflowState } from "../lib/suggest.js";
 
@@ -182,8 +186,9 @@ cli
     const target = options.target ? options.target : process.cwd();
     const targetClaude = join(target, ".claude");
 
-    // No slugs → original blanket-install behavior (commands + skills wholesale).
-    // SKILLs (routers) and commands both ship into the standard .claude/ tree.
+    // No slugs → blanket install. Treat it as "every non-context command,"
+    // route through the same installSlugs() primitive so manifests get
+    // written and skills get copied just like the selective path.
     if (!slugs || slugs.length === 0) {
       const targetCore = join(targetClaude, "commands", "core");
       if (existsSync(targetCore) && !options.force) {
@@ -193,11 +198,21 @@ cli
         );
         process.exit(1);
       }
-      const sourceCommands = join(packageRoot, ".claude", "commands");
-      const sourceSkills = join(packageRoot, ".claude", "skills");
-      copyDir(sourceCommands, join(targetClaude, "commands"));
-      copyDir(sourceSkills, join(targetClaude, "skills"));
-      console.log(`✓ Installed (blanket) to ${targetClaude}`);
+      const catalog = loadCatalog();
+      const allSlugs = new Set(
+        catalog.commands.filter((c) => c.kind !== "context").map((c) => c.slug),
+      );
+      const result = installSlugs(allSlugs, catalog, packageRoot, target, {
+        force: options.force,
+      });
+      console.log(
+        `✓ Installed ${result.installedFiles} file(s) to ${targetClaude}`,
+      );
+      if (result.skippedExisting > 0) {
+        console.log(
+          `  (${result.skippedExisting} skipped — already exist; pass --force to overwrite)`,
+        );
+      }
       console.log("");
       console.log("Next steps:");
       console.log("  /core:tools:setup           — install/verify local tools");
@@ -217,7 +232,19 @@ cli
       console.error(`✗ Unknown slugs (${missing.length}):`);
       for (const m of missing) console.error(`    ${m}`);
       console.error("");
-      console.error(`Run 'skillzkit list' to see all available items.`);
+      // Offer a near-miss hint when a single unknown slug looks like it
+      // could be a typo (matches as a substring of one or more known
+      // slugs). For multi-arg cases or when no near-miss exists, fall
+      // back to the generic discovery hint.
+      const hint = missing.length === 1 ? findNearMisses(missing[0]) : [];
+      if (hint.length > 0) {
+        console.error(`Did you mean:`);
+        for (const h of hint.slice(0, 5)) console.error(`    ${h}`);
+        console.error("");
+      }
+      console.error(
+        `Run 'skillzkit search <query>' or 'skillzkit list' to find available items.`,
+      );
       process.exit(1);
     }
 
@@ -229,11 +256,15 @@ cli
     if (options.dryRun) {
       const expansionNote =
         expanded.length !== slugs.length
-          ? ` (${slugs.length} arg(s) expanded to ${expanded.length} slugs)`
+          ? ` — ${slugs.length} arg(s) expanded to ${expanded.length} slugs`
           : "";
       console.log(
-        `Install plan (${plan.length} items${expansionNote}):`,
+        `Install plan: ${summarizePlan(plan)} (${plan.length} files)${expansionNote}`,
       );
+      console.log(
+        `  + always-installed: infra (audit, workflows, _context) + all skills + runtime manifests`,
+      );
+      console.log("");
       for (const item of plan) {
         const trace = item.requestedBy
           ? `   ← via ${item.requestedBy}`
@@ -344,6 +375,49 @@ function truncate(text: string, max: number): string {
   return text.slice(0, max - 1) + "…";
 }
 
+/**
+ * Format a plan as a one-line "N workflows, M commands, K skills"
+ * summary. Skips zero-count categories so the line stays compact.
+ */
+function summarizePlan(plan: readonly ResolvedItem[]): string {
+  const counts: Record<ResolvedItem["kind"], number> = {
+    command: 0,
+    workflow: 0,
+    skill: 0,
+  };
+  for (const item of plan) counts[item.kind]++;
+  const parts: string[] = [];
+  if (counts.workflow)
+    parts.push(`${counts.workflow} workflow${counts.workflow === 1 ? "" : "s"}`);
+  if (counts.command)
+    parts.push(`${counts.command} command${counts.command === 1 ? "" : "s"}`);
+  if (counts.skill)
+    parts.push(`${counts.skill} skill${counts.skill === 1 ? "" : "s"}`);
+  return parts.length > 0 ? parts.join(", ") : "(empty)";
+}
+
+/**
+ * Substring-match the unknown slug against every known identifier in
+ * the catalog. Used to suggest a likely-typo correction when an install
+ * arg fails to resolve. Cheap and good enough for "did you mean" hints
+ * at this catalog size — no Levenshtein needed.
+ */
+function findNearMisses(unknown: string): string[] {
+  const q = unknown.toLowerCase();
+  // Match on the leaf segment too — if user typed "pixelmach" we still
+  // want to find "core:tools:pixelmatch" via the leaf "pixelmatch".
+  const leaf = q.split(":").pop() ?? q;
+  const candidates: string[] = [];
+  for (const c of getCommands()) {
+    const slug = c.slug.toLowerCase();
+    if (slug.includes(leaf) || slug.includes(q)) candidates.push(c.slug);
+  }
+  for (const s of getSkills()) {
+    if (s.name.toLowerCase().includes(leaf)) candidates.push(s.name);
+  }
+  return candidates;
+}
+
 function printItem(kind: string, identifier: string, description: string, body: string) {
   console.log(`# ${kind}: ${identifier}`);
   console.log("");
@@ -387,17 +461,3 @@ function launchTui(targetDir: string) {
   process.exit(result.status ?? 1);
 }
 
-function copyDir(source: string, dest: string) {
-  if (!existsSync(source)) return;
-  mkdirSync(dest, { recursive: true });
-  for (const entry of readdirSync(source)) {
-    const srcPath = join(source, entry);
-    const destPath = join(dest, entry);
-    const stat = statSync(srcPath);
-    if (stat.isDirectory()) {
-      copyDir(srcPath, destPath);
-    } else if (stat.isFile()) {
-      copyFileSync(srcPath, destPath);
-    }
-  }
-}
