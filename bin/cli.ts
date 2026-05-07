@@ -14,7 +14,7 @@ import {
   getWorkflows,
   loadCatalog,
 } from "../lib/index.js";
-import { resolveInstallPlan } from "../lib/resolve.js";
+import { expandGroupIds, resolveInstallPlan } from "../lib/resolve.js";
 import { installSlugs } from "../lib/install.js";
 import { suggestNext, type ActiveWorkflowState } from "../lib/suggest.js";
 
@@ -96,6 +96,52 @@ cli
   });
 
 cli
+  .command(
+    "search <query>",
+    "Find commands, workflows, and skills whose slug or description matches",
+  )
+  .option("--limit <n>", "Maximum results per kind (default 10)")
+  .action((query: string, options: { limit?: string }) => {
+    const limit = options.limit ? Number.parseInt(options.limit, 10) : 10;
+    const q = query.toLowerCase();
+    const matches = (haystack: string) => haystack.toLowerCase().includes(q);
+
+    const cmds = getCommands().filter(
+      (c) => c.kind === "command" && (matches(c.slug) || matches(c.description)),
+    );
+    const wfs = getWorkflows().filter(
+      (w) => matches(w.qualifiedName) || matches(w.description),
+    );
+    const skls = getSkills().filter(
+      (s) => matches(s.name) || matches(s.description),
+    );
+
+    if (cmds.length + wfs.length + skls.length === 0) {
+      console.log(`No matches for "${query}".`);
+      return;
+    }
+
+    if (cmds.length > 0) {
+      console.log(`\nCommands (${cmds.length}${cmds.length > limit ? `, showing ${limit}` : ""})`);
+      for (const c of cmds.slice(0, limit)) {
+        console.log(`  /${c.slug}  —  ${truncate(c.description, 80)}`);
+      }
+    }
+    if (wfs.length > 0) {
+      console.log(`\nWorkflows (${wfs.length}${wfs.length > limit ? `, showing ${limit}` : ""})`);
+      for (const w of wfs.slice(0, limit)) {
+        console.log(`  ${w.qualifiedName}  —  ${truncate(w.description, 80)}`);
+      }
+    }
+    if (skls.length > 0) {
+      console.log(`\nSkills (${skls.length}${skls.length > limit ? `, showing ${limit}` : ""})`);
+      for (const s of skls.slice(0, limit)) {
+        console.log(`  ${s.name}  —  ${truncate(s.description, 80)}`);
+      }
+    }
+  });
+
+cli
   .command("show <slug>", "Print one command, skill, or workflow body by slug or name")
   .action((slug: string) => {
     const cmd = getCommand(slug);
@@ -127,7 +173,7 @@ cli
 cli
   .command(
     "install [...slugs]",
-    "Install all catalog items (no args), OR specific items + transitive deps when slugs given"
+    "Install all catalog items (no args), OR specific slugs/groups + transitive deps. Accepts: bare persona (product/engineer/market), wildcard prefix (core:tools:*, product:strategy:*), exact slug (core:tools:npm), or skill name (skillzkit-product-router)."
   )
   .option("--target <path>", "Target directory (default: current working directory)")
   .option("--force", "Overwrite existing files in the target")
@@ -161,8 +207,11 @@ cli
       return;
     }
 
-    // Selective install: walk references[] for transitive deps.
-    const { plan, missing } = resolveInstallPlan(slugs);
+    // Selective install. First expand group-form picks (bare personas,
+    // `prefix:*` wildcards) to concrete slugs, then walk the references
+    // graph for transitive deps per the cascade rules in resolve.ts.
+    const expanded = expandGroupIds(slugs);
+    const { plan, missing } = resolveInstallPlan(expanded);
 
     if (missing.length > 0) {
       console.error(`✗ Unknown slugs (${missing.length}):`);
@@ -178,9 +227,17 @@ cli
     }
 
     if (options.dryRun) {
-      console.log(`Install plan (${plan.length} items, ${slugs.length} requested):`);
+      const expansionNote =
+        expanded.length !== slugs.length
+          ? ` (${slugs.length} arg(s) expanded to ${expanded.length} slugs)`
+          : "";
+      console.log(
+        `Install plan (${plan.length} items${expansionNote}):`,
+      );
       for (const item of plan) {
-        const trace = item.requestedBy ? `   ← via ${item.requestedBy}` : "   (requested)";
+        const trace = item.requestedBy
+          ? `   ← via ${item.requestedBy}`
+          : "   (requested)";
         console.log(`  [${item.kind.padEnd(8)}] ${item.slug}${trace}`);
       }
       console.log("");
@@ -209,9 +266,12 @@ cli
     console.log("");
     console.log("Requested:");
     for (const slug of slugs) console.log(`  - ${slug}`);
-    if (plan.length > slugs.length) {
+    if (expanded.length !== slugs.length) {
+      console.log(`  → expanded to ${expanded.length} slugs`);
+    }
+    if (plan.length > expanded.length) {
       console.log("");
-      console.log(`Plus ${plan.length - slugs.length} transitive dep(s).`);
+      console.log(`Plus ${plan.length - expanded.length} transitive dep(s).`);
     }
   });
 

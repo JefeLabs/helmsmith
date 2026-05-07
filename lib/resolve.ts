@@ -19,9 +19,53 @@
  * how strict to be.
  */
 
-import { getCommand, getSkill, getWorkflow } from "./index.js";
+import { getCommand, getCommands, getSkill, getWorkflow } from "./index.js";
 
 export type ResolvedKind = "command" | "workflow" | "skill";
+
+/**
+ * Expand group-form picks to their constituent slugs. Lets a CLI user
+ * say "install everything in this namespace" without enumerating each
+ * leaf. Forms accepted:
+ *
+ *   - `product` / `engineer` / `market`   → all non-context commands in
+ *                                            that persona's namespace
+ *   - `<prefix>:*`                         → all non-context commands
+ *                                            whose slug starts with
+ *                                            `<prefix>:`. Examples:
+ *                                            `core:tools:*`,
+ *                                            `product:strategy:*`,
+ *                                            `core:frameworks:heroui:*`.
+ *   - any other string                     → passed through verbatim
+ *                                            (real slug or skill name —
+ *                                            resolveInstallPlan validates)
+ *
+ * Returns a deduped array; original ordering of the inputs is not
+ * preserved (Set semantics).
+ */
+export function expandGroupIds(picks: readonly string[]): string[] {
+  const slugs = new Set<string>();
+  const personas = new Set(["product", "engineer", "market"]);
+  for (const pick of picks) {
+    if (personas.has(pick)) {
+      for (const cmd of getCommands()) {
+        if (cmd.slug.startsWith(`${pick}:`) && cmd.kind !== "context") {
+          slugs.add(cmd.slug);
+        }
+      }
+    } else if (pick.endsWith(":*")) {
+      const prefix = pick.slice(0, -1); // keep trailing colon
+      for (const cmd of getCommands()) {
+        if (cmd.slug.startsWith(prefix) && cmd.kind !== "context") {
+          slugs.add(cmd.slug);
+        }
+      }
+    } else {
+      slugs.add(pick);
+    }
+  }
+  return Array.from(slugs);
+}
 
 export interface ResolvedItem {
   kind: ResolvedKind;
