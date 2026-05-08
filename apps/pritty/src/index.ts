@@ -26,9 +26,13 @@ export {
   type CommitMessage,
   type CommitSummary,
   type PRDraft,
+  type RebaseAction,
+  type RebasePlan,
+  type RebaseStep,
   buildAdapter,
   generateCommitMessages,
   generatePR,
+  generateRebasePlan,
 } from "./ai.js";
 
 export { createGit, parseGitHubRemote, type GitOps } from "./git.js";

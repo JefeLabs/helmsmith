@@ -224,3 +224,135 @@ export async function generatePR(
     labels: Array.isArray(draft.labels) ? draft.labels : [],
   };
 }
+
+export type RebaseAction = "pick" | "reword" | "squash" | "fixup" | "drop";
+
+export interface RebaseStep {
+  hash: string;
+  /** What git should do with this commit. */
+  action: RebaseAction;
+  /** New message when action === "reword" or first "squash" of a group. */
+  message?: string;
+  /** AI's short reason — shown in the plan preview, not used by git. */
+  rationale?: string;
+}
+
+export interface RebasePlan {
+  /** Steps in OLDEST-first order (git rebase TODO order). */
+  steps: RebaseStep[];
+  /** Single-paragraph human summary for the preview. */
+  summary: string;
+}
+
+const REBASE_STRATEGY_GUIDES: Record<Config["rebaseStrategy"], string> = {
+  interactive:
+    "Propose a clean history. Combine WIP / fixup commits into their parents (fixup), squash closely related commits (squash with a new message), reword unclear messages (reword), drop trivial revert-undo commits when safe (drop). Default action is `pick` (keep as-is).",
+  squash:
+    "Squash ALL commits into a single commit. First step is `pick`; every subsequent step is `squash`. Provide a clean combined `message` on the first step that summarizes the whole change.",
+  fixup:
+    "Absorb WIP / fixup commits into their parents using `fixup`. Keep meaningful commits as `pick` and don't combine independent features. The result should drop noise without changing the logical commit count of real work.",
+  auto:
+    "Decide per commit what's right: `pick` (keep), `squash` (combine with new message), `fixup` (combine, drop message), `reword` (improve message), or `drop` (remove). Aim for a clean, narrative history.",
+};
+
+/**
+ * Generate a rebase plan over a commit range. Returns steps in
+ * OLDEST-FIRST order (matches git rebase TODO conventions). The AI
+ * sees the full commit list and a strategy guide; it returns a
+ * structured plan we validate before showing the user.
+ *
+ * Validation enforced here (not the AI's responsibility):
+ *   - Every step references a hash in the input set
+ *   - First step's action is `pick` (git rejects squash/fixup as the
+ *     first step — there's nothing to fold into)
+ *   - All input hashes appear in the output (otherwise git would
+ *     silently drop them)
+ */
+export async function generateRebasePlan(
+  commits: readonly { hash: string; subject: string }[],
+  strategy: Config["rebaseStrategy"],
+  config: Config,
+): Promise<RebasePlan> {
+  if (commits.length === 0) {
+    throw new Error("No commits to rebase.");
+  }
+
+  const adapter = await buildAdapter(config.model);
+
+  // Git rebase TODOs are oldest-first; commits arrive newest-first
+  // from `git log`. Reverse to match the conventional order so the
+  // AI plans in the same direction it'll be executed.
+  const ordered = [...commits].reverse();
+  const commitList = ordered
+    .map((c, i) => `  ${i + 1}. ${c.hash.slice(0, 7)}  ${c.subject}`)
+    .join("\n");
+
+  const styleGuide = REBASE_STRATEGY_GUIDES[strategy];
+
+  const system = [
+    "You are an expert engineer planning an interactive git rebase.",
+    `Strategy: ${strategy}. ${styleGuide}`,
+    "Return strict JSON: { steps: [{ hash, action, message?, rationale? }], summary }.",
+    "  - hash: full SHA from the input list",
+    "  - action: one of pick | reword | squash | fixup | drop",
+    "  - message: required for reword and (when used) the FIRST step of a squash run",
+    "  - rationale: short reason for the action (for human preview only)",
+    "Steps must be in the SAME order as the input (oldest-first). Every input commit must appear exactly once.",
+    "First step's action MUST be pick — git rejects squash/fixup with no parent to fold into.",
+    "Do not wrap output in markdown code fences. Do not include any prose outside the JSON.",
+  ].join("\n");
+
+  const user = [
+    `Rebase plan needed for ${commits.length} commit(s):`,
+    commitList,
+  ].join("\n");
+
+  const raw = await adapter.invoke({ system, user });
+  const cleaned = unwrapJson(raw);
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch (err) {
+    throw new Error(
+      `AI returned non-JSON rebase plan:\n${cleaned}\n\nParse error: ${(err as Error).message}`,
+    );
+  }
+  const plan = parsed as Partial<RebasePlan>;
+  if (!Array.isArray(plan.steps)) {
+    throw new Error(`AI returned malformed rebase plan: missing steps[]`);
+  }
+
+  // Validate: every input hash present, in order, no extras
+  const inputHashes = ordered.map((c) => c.hash);
+  if (plan.steps.length !== inputHashes.length) {
+    throw new Error(
+      `Plan has ${plan.steps.length} steps but rebase covers ${inputHashes.length} commits.`,
+    );
+  }
+  for (let i = 0; i < plan.steps.length; i++) {
+    const s = plan.steps[i]!;
+    if (!s.hash || !inputHashes.some((h) => h.startsWith(s.hash) || s.hash.startsWith(h))) {
+      throw new Error(`Plan step ${i + 1} references unknown hash: ${s.hash}`);
+    }
+    if (
+      s.action !== "pick" &&
+      s.action !== "reword" &&
+      s.action !== "squash" &&
+      s.action !== "fixup" &&
+      s.action !== "drop"
+    ) {
+      throw new Error(`Plan step ${i + 1} has invalid action: ${s.action}`);
+    }
+  }
+  if (plan.steps[0]!.action !== "pick") {
+    throw new Error(
+      `Plan's first step must be 'pick' (got '${plan.steps[0]!.action}'). git rebase rejects squash/fixup with no parent.`,
+    );
+  }
+
+  return {
+    steps: plan.steps as RebaseStep[],
+    summary: typeof plan.summary === "string" ? plan.summary : "",
+  };
+}

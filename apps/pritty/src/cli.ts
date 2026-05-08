@@ -13,7 +13,10 @@ import { join } from "node:path";
 import {
   generateCommitMessages,
   generatePR,
+  generateRebasePlan,
   type CommitMessage,
+  type RebasePlan,
+  type RebaseStep,
   type TicketContext,
 } from "./ai.js";
 import { detectTicket, findRecentTicket, ticketLink } from "./ticket.js";
@@ -213,6 +216,45 @@ function truncateSubject(s: string, max: number): string {
 }
 
 /**
+ * Render a rebase plan as the TODO file git expects (oldest-first,
+ * one action per line). When a step has a message and the action
+ * permits one (reword / squash / pick — git ignores it on fixup /
+ * drop), we append it after the hash so the rebase TODO carries the
+ * intended subject. The actual message edit happens during the
+ * rebase itself when git pauses on `reword`.
+ */
+function renderRebaseTodo(steps: readonly RebaseStep[]): string {
+  const lines: string[] = [];
+  for (const step of steps) {
+    if (step.action === "drop") {
+      // git accepts a literal "drop <hash>" line; comment it for the
+      // human reading the TODO file.
+      lines.push(`drop ${step.hash}`);
+      continue;
+    }
+    const trail = step.message ? ` ${step.message}` : "";
+    lines.push(`${step.action} ${step.hash}${trail}`);
+  }
+  return lines.join("\n") + "\n";
+}
+
+/** Color the action verb in the plan preview. */
+function colorAction(action: RebaseStep["action"]): string {
+  switch (action) {
+    case "pick":
+      return chalk.green("pick   ");
+    case "reword":
+      return chalk.cyan("reword ");
+    case "squash":
+      return chalk.yellow("squash ");
+    case "fixup":
+      return chalk.yellow("fixup  ");
+    case "drop":
+      return chalk.red("drop   ");
+  }
+}
+
+/**
  * Parse text from $EDITOR back into { subject/title, body }. Standard
  * conventional-commit / PR format: first line is the subject, blank
  * line(s), then body. Tolerant of users who skip the blank-line rule.
@@ -359,13 +401,7 @@ cache
     console.log(getCachePath());
   });
 
-// ─── stubs (commit, pr, rebase, hooks) ────────────────────────────────
-
-const stubMessage = (cmdName: string) =>
-  chalk.yellow(
-    `⚠ \`pritty ${cmdName}\` is not implemented yet. Tracked in the implementation plan; ` +
-      `the auth + categorize surface ships first so the foundation is testable.`,
-  );
+// ─── commit / pr / rebase ─────────────────────────────────────────────
 
 program
   .command("commit")
@@ -806,19 +842,163 @@ program
 
 program
   .command("rebase")
-  .description("AI-planned interactive rebase (coming soon)")
-  .action(() => {
-    console.log(stubMessage("rebase"));
-    process.exit(2);
-  });
+  .description("AI-planned interactive rebase over commits ahead of base branch")
+  .option(
+    "--strategy <strategy>",
+    "interactive | squash | fixup | auto (default: interactive, or config.rebaseStrategy)",
+  )
+  .option("--base <branch>", "Base ref to rebase onto (default: config.baseBranch or main)")
+  .option("--dry-run", "Show the plan; do NOT touch git")
+  .action(
+    async (options: {
+      strategy?: string;
+      base?: string;
+      dryRun?: boolean;
+    }) => {
+      const config = loadConfig();
+      const git = createGit();
 
-program
-  .command("hooks")
-  .description("Interactive pre-commit / pre-push hook selection (coming soon)")
-  .action(() => {
-    console.log(stubMessage("hooks"));
-    process.exit(2);
-  });
+      // Strategy resolution: CLI flag > config > default
+      const validStrategies = ["interactive", "squash", "fixup", "auto"] as const;
+      const strategy = (options.strategy as
+        | (typeof validStrategies)[number]
+        | undefined) ?? config.rebaseStrategy;
+      if (!validStrategies.includes(strategy)) {
+        console.error(
+          chalk.red(
+            `✗ Invalid --strategy "${strategy}". Valid: ${validStrategies.join(", ")}`,
+          ),
+        );
+        process.exit(1);
+      }
+
+      // Preflight: working tree must be clean. Rebase rewrites
+      // history; uncommitted work would get caught in the crossfire.
+      if (!options.dryRun && !(await git.isWorkingTreeClean())) {
+        console.error(
+          chalk.red(
+            "✗ Working tree not clean. Stash or commit your changes before rebasing.",
+          ),
+        );
+        process.exit(1);
+      }
+
+      // Preflight: refuse to rebase shared default-ish branches.
+      const branch = await git.getCurrentBranch();
+      const protectedBranches = ["main", "master", "develop"];
+      if (protectedBranches.includes(branch)) {
+        console.error(
+          chalk.red(
+            `✗ Refusing to rebase ${branch} — that's a shared branch. Switch to a feature branch first.`,
+          ),
+        );
+        process.exit(1);
+      }
+
+      const base = options.base ?? config.baseBranch;
+      const commits = await git.log(base);
+      if (commits.length === 0) {
+        console.log(
+          chalk.dim(
+            `No commits between ${base} and ${branch}. Nothing to rebase.`,
+          ),
+        );
+        return;
+      }
+      if (commits.length === 1) {
+        console.log(
+          chalk.dim(
+            `Only one commit ahead of ${base} — nothing to consolidate.`,
+          ),
+        );
+        return;
+      }
+
+      console.log(
+        chalk.cyan(
+          `Rebasing ${commits.length} commit(s) on ${branch} → ${base}  ${chalk.dim(`(strategy: ${strategy})`)}`,
+        ),
+      );
+      for (const c of commits) {
+        console.log(`  ${chalk.dim(c.hash.slice(0, 7))}  ${c.subject}`);
+      }
+      console.log("");
+
+      // Generate plan
+      const spinner = ora({ text: "Generating rebase plan...", color: "cyan" }).start();
+      let plan: RebasePlan;
+      try {
+        plan = await generateRebasePlan(commits, strategy, config);
+        spinner.succeed("Plan ready");
+      } catch (err) {
+        spinner.fail((err as Error).message);
+        process.exit(1);
+      }
+
+      // Show plan (oldest-first matches git rebase TODO order)
+      console.log("");
+      console.log(chalk.cyan("Plan (oldest first):"));
+      for (const step of plan.steps) {
+        const tag = colorAction(step.action);
+        const message = step.message ? ` — ${chalk.green(step.message)}` : "";
+        const rationale = step.rationale ? ` ${chalk.dim(`(${step.rationale})`)}` : "";
+        console.log(
+          `  ${tag} ${chalk.dim(step.hash.slice(0, 7))}${message}${rationale}`,
+        );
+      }
+      if (plan.summary) {
+        console.log("");
+        console.log(chalk.dim(`Summary: ${plan.summary}`));
+      }
+      console.log("");
+
+      if (options.dryRun) {
+        console.log(
+          chalk.yellow(
+            "Dry-run — git not touched. Re-run without --dry-run to execute.",
+          ),
+        );
+        return;
+      }
+
+      // Always require explicit confirmation — no --auto-approve for
+      // rebase. Destructive operations get the friction they deserve.
+      const ok = await confirm({
+        message: chalk.yellow(
+          `This will rewrite history on ${branch}. Proceed?`,
+        ),
+        default: false,
+      });
+      if (!ok) {
+        console.log(chalk.dim("Aborted. No changes made."));
+        return;
+      }
+
+      // Execute via GIT_SEQUENCE_EDITOR
+      const todoContent = renderRebaseTodo(plan.steps);
+      const execSpinner = ora({
+        text: `Rebasing on ${base}...`,
+        color: "cyan",
+      }).start();
+      const result = await git.rebaseWithPlan(base, todoContent);
+      if (result.ok) {
+        execSpinner.succeed("Rebase complete");
+      } else {
+        execSpinner.fail("Rebase failed");
+        console.error("");
+        console.error(chalk.red(result.output));
+        console.error("");
+        console.error(
+          chalk.yellow(
+            "Your branch is now in a paused rebase state.\n" +
+              "  Resolve conflicts, then `git rebase --continue`\n" +
+              "  Or undo entirely:                `git rebase --abort`",
+          ),
+        );
+        process.exit(1);
+      }
+    },
+  );
 
 program.parseAsync(process.argv).catch((err) => {
   console.error(chalk.red(err instanceof Error ? err.message : String(err)));
