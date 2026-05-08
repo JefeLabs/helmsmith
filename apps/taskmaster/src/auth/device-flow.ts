@@ -1,5 +1,9 @@
 import chalk from 'chalk';
 import {
+  fetchGitHubUsername,
+  loginGitHubCopilot,
+} from '@agentx/agent-auth';
+import {
   COPILOT_CLIENT_ID,
   GITHUB_DEVICE_CODE_URL,
   GITHUB_TOKEN_URL,
@@ -120,27 +124,39 @@ async function fetchUsername(githubToken: string): Promise<string> {
  * 4. Fetch username
  * 5. Store credentials
  */
+/**
+ * Run the GitHub Copilot Device Flow + persist credentials to
+ * taskmaster's auth.json.
+ *
+ * Migrated to delegate the OAuth Device Flow steps to
+ * `@agentx/agent-auth`'s `loginGitHubCopilot` (the toolbox-shared
+ * implementation; same flow, same client id, fewer copies). Username
+ * fetch and credential persistence stay in taskmaster because the
+ * auth.json schema (with multi-provider `active_provider` etc.) is
+ * taskmaster-specific.
+ *
+ * The `requestDeviceCode` and `pollForToken` helpers above remain
+ * exported in case any internal code relies on them — but the public
+ * `login()` entry point no longer touches them.
+ */
 export async function login(): Promise<{ username: string }> {
-  const deviceCode = await requestDeviceCode();
-
   console.log();
   console.log(chalk.bold('  Login with GitHub Copilot'));
   console.log();
-  console.log(`  Open: ${chalk.cyan(deviceCode.verification_uri)}`);
-  console.log(`  Enter code: ${chalk.bold.yellow(deviceCode.user_code)}`);
-  console.log();
-  console.log(chalk.dim('  Waiting for authorization...'));
 
-  const githubToken = await pollForToken(
-    deviceCode.device_code,
-    deviceCode.interval,
-    deviceCode.expires_in,
-  );
+  const result = await loginGitHubCopilot({
+    onPrompt: ({ verificationUri, userCode }) => {
+      console.log(`  Open: ${chalk.cyan(verificationUri)}`);
+      console.log(`  Enter code: ${chalk.bold.yellow(userCode)}`);
+      console.log();
+      console.log(chalk.dim('  Waiting for authorization...'));
+    },
+  });
 
-  const username = await fetchUsername(githubToken);
+  const username = await fetchGitHubUsername(result.apiKey);
 
   await writeAuthCredentials({
-    github_token: githubToken,
+    github_token: result.apiKey,
     username,
   });
 
