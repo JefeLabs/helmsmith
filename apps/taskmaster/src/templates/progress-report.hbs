@@ -1,0 +1,19 @@
+# Progress Report
+
+## Overall Progress
+
+{{progress-bar progress.done progress.total}}
+
+| Metric | Count |
+|--------|-------|
+| Total | {{progress.total}} |
+| Done | {{progress.done}} |
+| In Progress | {{progress.inProgress}} |
+| Blocked | {{progress.blocked}} |
+| Pending | {{progress.pending}} |
+
+## Tasks
+
+{{#each tasks}}
+- {{status-badge status}} **{{id}}** — {{title}}
+{{/each}}

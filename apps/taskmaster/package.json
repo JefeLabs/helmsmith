@@ -1,0 +1,58 @@
+{
+  "name": "taskmaster",
+  "version": "0.1.0",
+  "description": "CLI-based project task generator with complexity scoring and auto-decomposition",
+  "type": "module",
+  "bin": {
+    "taskmaster": "./bin/taskmaster.js"
+  },
+  "main": "./dist/cli.js",
+  "files": [
+    "dist/",
+    "bin/",
+    "src/templates/",
+    "src/context/"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "prepublishOnly": "npm run build",
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "vitest run tests/integration/",
+    "test:e2e": "vitest run tests/e2e/"
+  },
+  "keywords": [
+    "cli",
+    "task",
+    "project",
+    "complexity",
+    "scoring"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@inquirer/prompts": "^8.2.1",
+    "chalk": "^5.6.2",
+    "cli-table3": "^0.6.5",
+    "commander": "^14.0.3",
+    "handlebars": "^4.7.8",
+    "js-yaml": "^4.1.1",
+    "marked": "^17.0.2",
+    "marked-terminal": "^7.3.0",
+    "proper-lockfile": "^4.1.2",
+    "tree-sitter-wasms": "^0.1.13",
+    "web-tree-sitter": "^0.25.10",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^25.2.3",
+    "@types/proper-lockfile": "^4.1.4",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}

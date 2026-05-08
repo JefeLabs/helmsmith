@@ -1,0 +1,45 @@
+title: E-Commerce Platform Plan
+tasks:
+  - title: Product Catalog
+    description: Build the product catalog with search and filtering capabilities.
+    priority: high
+    tags:
+      - backend
+      - database
+    children:
+      - title: Product Model
+        description: Define the product data model with variants and pricing.
+      - title: Search Engine
+        description: Implement full-text search using Elasticsearch.
+        priority: critical
+        tags:
+          - search
+      - title: Category Management
+        description: Build hierarchical category tree with CRUD operations.
+  - title: Shopping Cart
+    description: Implement shopping cart with persistence and guest checkout support.
+    priority: high
+    tags:
+      - frontend
+      - backend
+    children:
+      - title: Cart State Management
+        description: Build cart state with local storage and server sync.
+      - title: Guest Checkout
+        description: Allow purchases without user registration.
+  - title: Payment Processing
+    description: Integrate Stripe for payment processing with PCI compliance.
+    priority: critical
+    tags:
+      - backend
+      - security
+  - title: Order Management
+    description: Build order lifecycle from placement to fulfillment.
+    tags:
+      - backend
+  - title: Admin Dashboard
+    description: Create admin interface for managing products, orders, and customers.
+    priority: medium
+    tags:
+      - frontend
+      - admin

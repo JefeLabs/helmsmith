@@ -1,0 +1,49 @@
+# Project Summary
+
+> Generated: {{generatedAt}}
+
+## Overall Progress
+
+{{progress-bar taskCounts.closed taskCounts.total}}
+
+| Category | Count |
+|----------|-------|
+| Total | {{taskCounts.total}} |
+| Open | {{taskCounts.open}} |
+| Active | {{taskCounts.active}} |
+| Closed | {{taskCounts.closed}} |
+
+## Complexity Distribution
+
+| Band | Count |
+|------|-------|
+| Low (1-3) | {{complexity.low}} |
+| Medium (4-6) | {{complexity.medium}} |
+| High (7-10) | {{complexity.high}} |
+| **Average** | **{{complexity.average}}** |
+
+## Readiness
+
+| State | Count |
+|-------|-------|
+| Ready | {{readiness.ready}} |
+| Blocked | {{readiness.blocked}} |
+| Pending | {{readiness.pending}} |
+
+{{#if skillCoverage.length}}
+## Skill Coverage
+
+| Skill | Tasks |
+|-------|-------|
+{{#each skillCoverage}}
+| `{{skill}}` | {{count}} |
+{{/each}}
+{{/if}}
+
+{{#if blockedAlerts.length}}
+## Blocked Task Alerts
+
+{{#each blockedAlerts}}
+- **{{id}}** — {{title}} — waiting on: {{#each waitingOn}}`{{this}}`{{#unless @last}}, {{/unless}}{{/each}}
+{{/each}}
+{{/if}}

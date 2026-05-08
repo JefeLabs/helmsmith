@@ -1,0 +1,85 @@
+{
+  "summary": "An e-commerce platform with user authentication, product catalog, and order management.",
+  "components": [
+    {
+      "name": "auth-service",
+      "description": "Handles user authentication and authorization",
+      "techStack": ["TypeScript", "Express", "JWT"],
+      "layer": "backend",
+      "patterns": ["middleware", "token-based auth"],
+      "entryPoints": ["src/auth/index.ts"]
+    },
+    {
+      "name": "product-catalog",
+      "description": "Product listing, search, and management",
+      "techStack": ["TypeScript", "Express", "PostgreSQL"],
+      "layer": "backend",
+      "patterns": ["repository pattern", "REST API"],
+      "entryPoints": ["src/products/index.ts"]
+    },
+    {
+      "name": "order-service",
+      "description": "Order creation, payment, and fulfillment",
+      "techStack": ["TypeScript", "Express", "Stripe"],
+      "layer": "backend",
+      "patterns": ["saga pattern"],
+      "entryPoints": ["src/orders/index.ts"]
+    },
+    {
+      "name": "web-frontend",
+      "description": "Customer-facing web application",
+      "techStack": ["React", "TypeScript", "Tailwind"],
+      "layer": "frontend",
+      "patterns": ["component-based", "SPA"],
+      "entryPoints": ["src/app/index.tsx"]
+    }
+  ],
+  "interfaces": [
+    {
+      "from": "web-frontend",
+      "to": "auth-service",
+      "type": "REST",
+      "description": "Login, register, token refresh"
+    },
+    {
+      "from": "web-frontend",
+      "to": "product-catalog",
+      "type": "REST",
+      "description": "Product listing and search"
+    },
+    {
+      "from": "order-service",
+      "to": "product-catalog",
+      "type": "internal",
+      "description": "Verify product availability and pricing"
+    }
+  ],
+  "dataSources": [
+    {
+      "name": "users-db",
+      "type": "postgres",
+      "ownerComponent": "auth-service",
+      "description": "User accounts and credentials"
+    },
+    {
+      "name": "products-db",
+      "type": "postgres",
+      "ownerComponent": "product-catalog",
+      "description": "Product catalog data"
+    }
+  ],
+  "crossCuttingConcerns": [
+    {
+      "name": "security",
+      "scope": "All API endpoints",
+      "relatedComponents": ["auth-service", "product-catalog", "order-service"],
+      "implementationNotes": "JWT-based auth middleware on all routes"
+    },
+    {
+      "name": "logging",
+      "scope": "All services",
+      "relatedComponents": ["auth-service", "product-catalog", "order-service", "web-frontend"],
+      "implementationNotes": "Structured JSON logging with correlation IDs"
+    }
+  ]
+}

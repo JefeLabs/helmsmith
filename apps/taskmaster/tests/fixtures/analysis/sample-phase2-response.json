@@ -1,0 +1,86 @@
+{
+  "tasks": [
+    {
+      "title": "Implement Auth Service",
+      "description": "Build the authentication and authorization service with JWT-based auth",
+      "type": "task",
+      "priority": "critical",
+      "dependencies": [],
+      "requiredSkills": ["backend", "auth"],
+      "tags": ["component:auth-service", "layer:backend"],
+      "children": [
+        {
+          "title": "Set up user database schema",
+          "description": "Create PostgreSQL schema for users table",
+          "type": "subtask",
+          "priority": "critical",
+          "dependencies": [],
+          "requiredSkills": ["database"],
+          "tags": ["datasource:users-db"],
+          "children": []
+        },
+        {
+          "title": "Implement JWT token generation",
+          "description": "Create token generation and validation middleware",
+          "type": "subtask",
+          "priority": "high",
+          "dependencies": ["Set up user database schema"],
+          "requiredSkills": ["backend", "auth"],
+          "tags": [],
+          "children": []
+        }
+      ]
+    },
+    {
+      "title": "Implement Product Catalog",
+      "description": "Build product listing, search, and management",
+      "type": "task",
+      "priority": "high",
+      "dependencies": ["Implement Auth Service"],
+      "requiredSkills": ["backend", "database"],
+      "tags": ["component:product-catalog", "layer:backend"],
+      "children": [
+        {
+          "title": "Create product API endpoints",
+          "description": "REST API for CRUD operations on products",
+          "type": "subtask",
+          "priority": "high",
+          "dependencies": [],
+          "requiredSkills": ["backend", "api-design"],
+          "tags": [],
+          "children": []
+        }
+      ]
+    },
+    {
+      "title": "Implement Order Service",
+      "description": "Build order creation, payment integration, and fulfillment",
+      "type": "task",
+      "priority": "high",
+      "dependencies": ["Implement Product Catalog", "Implement Auth Service"],
+      "requiredSkills": ["backend"],
+      "tags": ["component:order-service", "layer:backend"],
+      "children": []
+    },
+    {
+      "title": "Build Web Frontend",
+      "description": "Customer-facing React SPA",
+      "type": "task",
+      "priority": "medium",
+      "dependencies": ["Implement Auth Service", "Implement Product Catalog"],
+      "requiredSkills": ["frontend"],
+      "tags": ["component:web-frontend", "layer:frontend"],
+      "children": []
+    },
+    {
+      "title": "Implement Security Middleware",
+      "description": "JWT auth middleware, CORS, rate limiting across all services",
+      "type": "task",
+      "priority": "medium",
+      "dependencies": ["Implement Auth Service"],
+      "requiredSkills": ["backend", "auth"],
+      "tags": ["concern:security"],
+      "children": []
+    }
+  ]
+}
