@@ -17,7 +17,8 @@
   "files": [
     "dist",
     "bin",
-    "README.md"
+    "README.md",
+    "SKILL.md"
   ],
   "scripts": {
     "build": "tsup",

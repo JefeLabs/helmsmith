@@ -71,4 +71,17 @@ export const BUILT_IN_CATALOG: Record<string, CatalogEntry> = {
       // from https://developer.atlassian.com/cloud/acli/.
     },
   },
+  pritty: {
+    description:
+      "AI-powered commit & PR CLI — categorize staged files, generate conventional commits, open PRs, all with human-in-the-loop. Part of agentx-toolbox.",
+    packages: {
+      // Once @agentx/pritty is published to npm, all package
+      // managers can install it via npm. Today this entry is a
+      // forward-compatible declaration; before publish, users
+      // workspace-link from agentx-toolbox.
+      brew: "@agentx/pritty",
+      apt: "@agentx/pritty",
+      winget: "@agentx/pritty",
+    },
+  },
 };
