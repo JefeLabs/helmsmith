@@ -8,7 +8,7 @@ import { Command } from "commander";
 import chalk from "chalk";
 import { confirm, editor } from "@inquirer/prompts";
 import ora from "ora";
-import { writeFileSync, existsSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   generateCommitMessages,
@@ -238,6 +238,101 @@ function renderRebaseTodo(steps: readonly RebaseStep[]): string {
   return lines.join("\n") + "\n";
 }
 
+/**
+ * Slash-command template bodies dropped by `pritty init` into the
+ * repo's `.claude/commands/` directory. Each is a Claude Code
+ * command file: when the user types `/commit` or `/pr` in Claude
+ * Code, the agent reads this body and runs the corresponding
+ * `pritty` invocation via the Bash tool.
+ */
+const CLAUDE_COMMANDS: Record<string, string> = {
+  commit: `---
+description: Generate AI commit messages per category and commit each group via pritty.
+allowed-tools: Bash
+argument-hint: "[--auto-approve] [--dry-run] [--commit-style conventional|gitmoji|angular|simple]"
+---
+
+Run \`pritty commit\` in the current repo. Pass any flags the user provides through.
+
+The command will:
+1. Read staged files (run \`git add\` first if needed)
+2. Categorize them via .pritty.json's category map
+3. Generate per-category commit messages via AI
+4. Show the plan and confirm before committing
+5. Optionally let the user edit each message
+6. Create one commit per category using path-restricted \`git commit -- <files>\`
+
+If pritty isn't installed, suggest \`npm install -g @agentx/pritty\` (or workspace-link from agentx-toolbox).
+`,
+
+  pr: `---
+description: Generate AI pull-request title + body via pritty, push, and open the PR on GitHub.
+allowed-tools: Bash
+argument-hint: "[--base <branch>] [--auto-approve] [--dry-run]"
+---
+
+Run \`pritty pr\` in the current repo. Pass any flags the user provides through.
+
+The command will:
+1. Resolve the current branch + origin remote → owner/repo
+2. Find commits between base and HEAD
+3. Auto-detect .github/PULL_REQUEST_TEMPLATE.md if present
+4. Generate title + body + labels via AI
+5. Show preview and confirm
+6. Push the branch (-u on first push)
+7. Create the PR via Octokit
+8. Apply labels + auto-request reviewers from .github/CODEOWNERS
+
+If \`pr\` reports a config issue (no GitHub token, no remote), surface the message verbatim and suggest running \`pritty auth login\` first.
+`,
+};
+
+/**
+ * VS Code Copilot Chat prompt files dropped by \`pritty init\` into
+ * \`.github/prompts/\`. When the user types \`/commit\` or \`/pr\` in
+ * Copilot Chat (or selects via the prompt picker), the agent runs
+ * these instructions.
+ */
+const COPILOT_PROMPTS: Record<string, string> = {
+  commit: `---
+name: commit
+description: Generate AI commit messages per category and commit each group via pritty
+---
+
+Run \`pritty commit\` in the integrated terminal. This will:
+
+1. Read staged files (\`git add\` your changes first)
+2. Categorize them per the project's .pritty.json
+3. Generate one commit message per file category using AI
+4. Show the plan; press Enter to accept or \`y\` to edit any message
+5. Commit each category as a separate path-restricted commit
+
+Useful flags:
+  \`--dry-run\` — show the plan without committing
+  \`--auto-approve\` — skip the confirmation prompts
+  \`--commit-style conventional|gitmoji|angular|simple\` — override the project default
+`,
+
+  pr: `---
+name: pr
+description: Generate AI pull-request title + body and open it on GitHub via pritty
+---
+
+Run \`pritty pr\` in the integrated terminal. This will:
+
+1. Detect the current branch + GitHub remote
+2. Generate a title, body (filling \`.github/pull_request_template.md\` when present), and labels via AI
+3. Show the preview; press Enter to confirm
+4. Push the branch and create the PR via the GitHub API
+5. Auto-request reviewers from \`.github/CODEOWNERS\`
+
+Useful flags:
+  \`--base <branch>\` — override the base branch (defaults to repo's default)
+  \`--dry-run\` — preview without pushing or creating the PR
+  \`--auto-approve\` — skip confirmations
+`,
+};
+
 /** Color the action verb in the plan preview. */
 function colorAction(action: RebaseStep["action"]): string {
   switch (action) {
@@ -339,19 +434,93 @@ auth
 
 program
   .command("init")
-  .description("Write a starter .pritty.json to the current directory")
-  .option("--force", "Overwrite an existing .pritty.json")
-  .action((options: { force?: boolean }) => {
-    const path = join(process.cwd(), ".pritty.json");
-    if (existsSync(path) && !options.force) {
-      console.error(
-        chalk.red(`✗ ${path} already exists. Pass --force to overwrite.`),
+  .description(
+    "Write a starter .pritty.json + Claude Code / VS Code Copilot slash commands. Skips integration files outside a git repo.",
+  )
+  .option("--force", "Overwrite existing files")
+  .option("--no-claude", "Skip writing .claude/commands/{commit,pr}.md")
+  .option("--no-copilot", "Skip writing .github/prompts/{commit,pr}.prompt.md")
+  .action(
+    (options: { force?: boolean; claude?: boolean; copilot?: boolean }) => {
+      const cwd = process.cwd();
+      const force = options.force ?? false;
+      const includeClaude = options.claude !== false;
+      const includeCopilot = options.copilot !== false;
+      const inGitRepo = existsSync(join(cwd, ".git"));
+
+      let written = 0;
+      let skipped = 0;
+
+      // 1. .pritty.json (always)
+      const configPath = join(cwd, ".pritty.json");
+      if (existsSync(configPath) && !force) {
+        console.log(chalk.dim(`· skipped ${configPath} (exists; --force to overwrite)`));
+        skipped++;
+      } else {
+        writeFileSync(
+          configPath,
+          JSON.stringify(defaultStarterConfig(), null, 2) + "\n",
+        );
+        console.log(chalk.green(`✓ ${configPath}`));
+        written++;
+      }
+
+      // 2. Claude Code slash commands (in git repos only)
+      if (includeClaude && inGitRepo) {
+        const claudeDir = join(cwd, ".claude", "commands");
+        for (const [name, body] of Object.entries(CLAUDE_COMMANDS)) {
+          const path = join(claudeDir, `${name}.md`);
+          if (existsSync(path) && !force) {
+            console.log(chalk.dim(`· skipped ${path} (exists; --force to overwrite)`));
+            skipped++;
+            continue;
+          }
+          mkdirSync(claudeDir, { recursive: true });
+          writeFileSync(path, body);
+          console.log(chalk.green(`✓ ${path}`));
+          written++;
+        }
+      }
+
+      // 3. VS Code Copilot Chat prompts (in git repos only)
+      if (includeCopilot && inGitRepo) {
+        const promptDir = join(cwd, ".github", "prompts");
+        for (const [name, body] of Object.entries(COPILOT_PROMPTS)) {
+          const path = join(promptDir, `${name}.prompt.md`);
+          if (existsSync(path) && !force) {
+            console.log(chalk.dim(`· skipped ${path} (exists; --force to overwrite)`));
+            skipped++;
+            continue;
+          }
+          mkdirSync(promptDir, { recursive: true });
+          writeFileSync(path, body);
+          console.log(chalk.green(`✓ ${path}`));
+          written++;
+        }
+      }
+
+      // 4. Summary
+      if (!inGitRepo && (includeClaude || includeCopilot)) {
+        console.log(
+          chalk.dim(
+            `\nNot a git repository (no .git/ found) — skipped Claude Code & Copilot integration files.`,
+          ),
+        );
+      }
+      console.log("");
+      console.log(
+        chalk.cyan(
+          `${written} written, ${skipped} skipped${force ? " (force overwrites enabled)" : ""}`,
+        ),
       );
-      process.exit(1);
-    }
-    writeFileSync(path, JSON.stringify(defaultStarterConfig(), null, 2) + "\n");
-    console.log(chalk.green(`✓ Wrote ${path}`));
-  });
+      if (inGitRepo && (includeClaude || includeCopilot)) {
+        console.log("");
+        console.log(chalk.dim("Try it:"));
+        if (includeClaude) console.log(chalk.dim("  Claude Code:  /commit  /pr"));
+        if (includeCopilot) console.log(chalk.dim("  VS Code Chat: /commit  /pr"));
+      }
+    },
+  );
 
 // ─── categorize ───────────────────────────────────────────────────────
 

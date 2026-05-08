@@ -9,9 +9,23 @@ export default defineConfig({
   sourcemap: true,
   splitting: false,
   shims: false,
-  // Bundle workspace deps directly. Their package.json `exports` point
-  // at .ts source (no built dist/), so leaving them externalized would
-  // make Node try to import .ts files at runtime and fail. Bundling
-  // them in keeps the CLI self-contained.
+  // Bundle ONLY workspace deps (@agentx/*). Their package.json
+  // exports point at .ts source, so they need to be inlined to be
+  // consumable from a built JS bundle. Everything else stays as a
+  // runtime require — npm-installed at the consumer's node_modules.
+  //
+  // Why externalize the rest: transitive deps via agent-adapter
+  // (@anthropic-ai, @langchain) and pritty's own (octokit, etc.)
+  // include CJS modules with dynamic require() calls. Bundling them
+  // breaks at runtime ("Dynamic require of X not supported"). Leaving
+  // them external means Node loads them from node_modules using
+  // their published forms (CJS or ESM, doesn't matter — Node handles
+  // either at runtime).
   noExternal: [/^@agentx\//],
+  external: [
+    // Any unscoped npm package (`octokit`, `commander`, `ora`, etc.)
+    /^[^@./]/,
+    // Any scoped package that isn't @agentx/* (excluded via lookahead)
+    /^@(?!agentx\/)/,
+  ],
 });
