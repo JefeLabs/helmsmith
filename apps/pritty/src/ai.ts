@@ -8,7 +8,16 @@
  * way (Copilot uses authPath; the others use API keys).
  */
 
-import { CopilotChatAdapter } from "@agentx/agent-adapter";
+import {
+  ClaudeSdkAdapter,
+  CopilotChatAdapter,
+  OpenAiChatAdapter,
+} from "@agentx/agent-adapter";
+import type {
+  Credential,
+  CredentialBroker,
+  Provider,
+} from "@agentx/agent-auth";
 import { getAuthPath, readAuth } from "./auth.js";
 import type { CategorizedFiles } from "./categorizer.js";
 import type { Config } from "./config.js";
@@ -17,6 +26,24 @@ import {
   templatePromptGuidance,
 } from "./pr-template.js";
 import { ticketPromptGuidance } from "./ticket.js";
+
+/** Anthropic / OpenAI adapters expect a CredentialBroker; this is
+ *  the env-var-only variant pritty uses for those two providers. */
+class EnvBroker implements CredentialBroker {
+  constructor(private readonly envVarName: string) {}
+  async getCredential(provider: Provider): Promise<Credential> {
+    const apiKey = process.env[this.envVarName];
+    if (!apiKey) {
+      throw new Error(
+        `${this.envVarName} not set; required for provider "${provider}"`,
+      );
+    }
+    return { provider, apiKey, source: "env" };
+  }
+}
+
+/** Common adapter interface — every provider implements .invoke(). */
+type ChatAdapter = CopilotChatAdapter | ClaudeSdkAdapter | OpenAiChatAdapter;
 
 export interface TicketContext {
   ticket: string | null;
@@ -33,21 +60,72 @@ export interface CommitMessage {
 }
 
 /**
- * Build a chat adapter for the active provider. Throws when no
- * provider is configured — caller should print actionable next steps
- * (`pritty auth login`).
+ * Try to build the named provider's chat adapter. Returns null when
+ * the provider isn't configured on this machine (Copilot has no
+ * auth.json entry, env var is unset). Caller chains primary +
+ * fallbacks and decides what to do when nothing works.
  */
-export async function buildAdapter(model: string): Promise<CopilotChatAdapter> {
-  const auth = await readAuth();
-  if (!auth.providers["github-copilot"]?.apiKey) {
-    throw new Error(
-      "No AI provider configured. Run `pritty auth login` to authenticate via GitHub Copilot Device Flow.",
-    );
+async function tryBuildProvider(
+  name: Config["provider"],
+  config: Config,
+): Promise<ChatAdapter | null> {
+  switch (name) {
+    case "copilot": {
+      const auth = await readAuth();
+      if (!auth.providers["github-copilot"]?.apiKey) return null;
+      return new CopilotChatAdapter({
+        authPath: getAuthPath(),
+        model: config.model,
+      });
+    }
+    case "anthropic": {
+      if (!process.env[config.anthropicKeyEnv]) return null;
+      return new ClaudeSdkAdapter({
+        broker: new EnvBroker(config.anthropicKeyEnv),
+        model: config.model,
+      });
+    }
+    case "openai": {
+      if (!process.env[config.openaiKeyEnv]) return null;
+      return new OpenAiChatAdapter({
+        broker: new EnvBroker(config.openaiKeyEnv),
+        model: config.model,
+      });
+    }
   }
-  return new CopilotChatAdapter({
-    authPath: getAuthPath(),
-    model,
-  });
+}
+
+/**
+ * Resolve an AI provider per the user's `provider` + `fallback`
+ * config. Default is `copilot` with no fallback — preserves the
+ * Copilot-only behavior pritty had before this option existed.
+ *
+ * Tries the primary first; iterates the fallback list (skipping
+ * dupes) only when primary is unconfigured. Throws a single clear
+ * error when nothing is configured, naming every provider tried and
+ * how to set each one up.
+ */
+export async function buildAdapter(config: Config): Promise<ChatAdapter> {
+  const primary = await tryBuildProvider(config.provider, config);
+  if (primary) return primary;
+
+  for (const fb of config.fallback) {
+    if (fb === config.provider) continue;
+    const adapter = await tryBuildProvider(fb, config);
+    if (adapter) return adapter;
+  }
+
+  const tried = [config.provider, ...config.fallback];
+  const dedupedTried = [...new Set(tried)];
+  throw new Error(
+    [
+      `No AI provider available. Tried: ${dedupedTried.join(", ")}.`,
+      "Configure one:",
+      `  copilot:    pritty auth login`,
+      `  anthropic:  set ${config.anthropicKeyEnv}`,
+      `  openai:     set ${config.openaiKeyEnv}`,
+    ].join("\n"),
+  );
 }
 
 /**
@@ -84,7 +162,7 @@ export async function generateCommitMessages(
   config: Config,
   ticket?: TicketContext,
 ): Promise<CommitMessage[]> {
-  const adapter = await buildAdapter(config.model);
+  const adapter = await buildAdapter(config);
 
   // Filter empty buckets so the model doesn't hallucinate messages
   // for them. Bucket the unknown into its own category — the human
@@ -166,7 +244,7 @@ export async function generatePR(
     throw new Error("No commits between base and head — nothing to PR.");
   }
 
-  const adapter = await buildAdapter(config.model);
+  const adapter = await buildAdapter(config);
 
   const commitList = commits
     .map((c) => `  - ${c.hash.slice(0, 7)}  ${c.subject}`)
@@ -277,7 +355,7 @@ export async function generateRebasePlan(
     throw new Error("No commits to rebase.");
   }
 
-  const adapter = await buildAdapter(config.model);
+  const adapter = await buildAdapter(config);
 
   // Git rebase TODOs are oldest-first; commits arrive newest-first
   // from `git log`. Reverse to match the conventional order so the

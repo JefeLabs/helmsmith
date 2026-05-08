@@ -96,6 +96,44 @@ Override the storage path with `PRITTY_HOME=<dir>`. The same primitive
 backs gittyup, future AgentX CLIs, etc. — change auth in one place,
 every consumer inherits the change.
 
+## AI providers
+
+Default is **GitHub Copilot** via the device-flow login at
+`~/.pritty/auth.json`. Pick a different primary or set up a fallback
+chain in `.pritty.json`:
+
+```jsonc
+{
+  "provider": "copilot",                    // default; or "anthropic" / "openai"
+  "fallback": [],                           // empty by default — opt in here
+  "anthropicKeyEnv": "ANTHROPIC_API_KEY",   // env var to read the key from
+  "openaiKeyEnv": "OPENAI_API_KEY"          // (these are also the defaults)
+}
+```
+
+Choosing a non-Copilot provider:
+
+```jsonc
+{ "provider": "anthropic" }    // requires ANTHROPIC_API_KEY in env
+{ "provider": "openai" }       // requires OPENAI_API_KEY in env
+```
+
+Fallback chain — try primary, then walk `fallback` in order until one
+is configured. This is opt-in (default `fallback: []` means "primary
+or nothing"):
+
+```jsonc
+{
+  "provider": "copilot",
+  "fallback": ["anthropic", "openai"]
+}
+```
+
+When nothing is configured pritty fails with a clear error naming
+every provider tried and how to set each one up. Provider choice is
+explicit — pritty doesn't auto-detect based on which env vars happen
+to be present.
+
 ## Stack
 
 Per [agentx-toolbox stack conventions](../../README.md):

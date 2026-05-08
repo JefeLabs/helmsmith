@@ -53,6 +53,8 @@ export const TicketSchema = z.object({
   validateStrict: z.boolean().default(false),
 });
 
+export const ProviderSchema = z.enum(["copilot", "anthropic", "openai"]);
+
 export const ConfigSchema = z.object({
   model: z.string().default("gpt-4o"),
   baseBranch: z.string().default("main"),
@@ -62,6 +64,20 @@ export const ConfigSchema = z.object({
   commitStyle: z
     .enum(["conventional", "gitmoji", "angular", "simple"])
     .default("conventional"),
+  /**
+   * Primary AI provider. `copilot` (default) uses the OAuth Device
+   * Flow login at ~/.pritty/auth.json. `anthropic` reads the API key
+   * from `anthropicKeyEnv`; `openai` from `openaiKeyEnv`.
+   */
+  provider: ProviderSchema.default("copilot"),
+  /**
+   * Fallback providers tried (in order) if the primary isn't
+   * configured on this machine. Default: empty (no fallback). Set
+   * explicitly to opt into multi-provider behavior.
+   */
+  fallback: z.array(ProviderSchema).default([]),
+  anthropicKeyEnv: z.string().default("ANTHROPIC_API_KEY"),
+  openaiKeyEnv: z.string().default("OPENAI_API_KEY"),
   preCommit: z.array(z.string()).default([]),
   prePush: z.array(z.string()).default([]),
   skipHooks: z.boolean().default(false),
