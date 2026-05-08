@@ -1,5 +1,5 @@
 /**
- * AI client — wraps @agentx/agent-adapter to deliver pritty-shaped
+ * AI client — wraps @ecruz165/agent-adapter to deliver pritty-shaped
  * operations (commit messages, PR titles, rebase plans, outlier
  * detection). v1 supports Copilot only via the device-flow auth path;
  * OpenAI / Anthropic fallbacks land when consumer demand justifies
@@ -12,12 +12,12 @@ import {
   ClaudeSdkAdapter,
   CopilotChatAdapter,
   OpenAiChatAdapter,
-} from "@agentx/agent-adapter";
+} from "@ecruz165/agent-adapter";
 import type {
   Credential,
   CredentialBroker,
   Provider,
-} from "@agentx/agent-auth";
+} from "@ecruz165/agent-auth";
 import { getAuthPath, readAuth } from "./auth.js";
 import type { CategorizedFiles } from "./categorizer.js";
 import type { Config } from "./config.js";

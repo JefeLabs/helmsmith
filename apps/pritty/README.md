@@ -5,8 +5,8 @@ files by purpose, generates conventional commits, and creates pull
 requests — with pluggable hooks and human-in-the-loop approval.
 
 Part of the [agentx-toolbox](../..) monorepo. Auth + multi-agent
-adapters live in shared packages (`@agentx/agent-auth`,
-`@agentx/agent-adapter`) so pritty doesn't reinvent OAuth or LLM
+adapters live in shared packages (`@ecruz165/agent-auth`,
+`@ecruz165/agent-adapter`) so pritty doesn't reinvent OAuth or LLM
 provider routing.
 
 ## Status
@@ -16,12 +16,12 @@ This is a **phased build** following the
 
 | Phase | Status |
 |---|---|
-| Auth (login / logout / status via `@agentx/agent-auth`) | ✅ |
+| Auth (login / logout / status via `@ecruz165/agent-auth`) | ✅ |
 | Config (.pritty.json + Zod schema) | ✅ |
 | Categorizer (default + custom glob categories) | ✅ |
 | `pritty init` starter config | ✅ |
 | `pritty categorize` (read-only file bucketing) | ✅ |
-| AI client (multi-provider via `@agentx/agent-adapter`) | ⏳ |
+| AI client (multi-provider via `@ecruz165/agent-adapter`) | ⏳ |
 | `pritty commit` (per-category AI commit messages) | ⏳ |
 | `pritty pr` (AI-generated PR title + body) | ⏳ |
 | `pritty rebase` (AI-planned rebase) | ⏳ |
@@ -83,7 +83,7 @@ when a file could match both — otherwise `src/foo.test.ts` lands in
 
 ## Auth
 
-Pritty's auth layer is a thin wrapper around `@agentx/agent-auth`:
+Pritty's auth layer is a thin wrapper around `@ecruz165/agent-auth`:
 
 - `pritty auth login` runs GitHub OAuth Device Flow with the public
   Copilot client ID. The token is persisted to `~/.pritty/auth.json`
