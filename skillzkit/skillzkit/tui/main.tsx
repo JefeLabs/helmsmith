@@ -598,6 +598,20 @@ const App = () => {
     if (key.ctrl && key.name === "c") process.exit(0);
     if (key.name === "q" && focusRef.current !== "search") process.exit(0);
 
+    // `n` exits with code 42, which the parent CLI's `ui` action
+    // interprets as "user wants to contribute." The CLI then prompts
+    // for a path interactively (so the PIN entry uses real
+    // promptHidden), runs the contribute flow, and re-launches the
+    // TUI. Avoid eating `n` while search is focused (typed char) or
+    // while team mode is unavailable.
+    if (
+      key.name === "n" &&
+      focusRef.current !== "search" &&
+      config?.mode === "team"
+    ) {
+      process.exit(42);
+    }
+
     if (key.name === "tab") {
       setFocus((f) =>
         f === "search" ? "catalog" : f === "catalog" ? "install" : f === "install" ? "sync" : "search"
@@ -990,6 +1004,9 @@ const App = () => {
           <text content="space: toggle / tab: switch focus" style={{ fg: "#666666" }} />
           <text content="c or y: copy slash command" style={{ fg: "#666666" }} />
           <text content="enter: activate button / q: quit" style={{ fg: "#666666" }} />
+          {config?.mode === "team" && (
+            <text content="n: contribute new artifact" style={{ fg: "#666666" }} />
+          )}
           <text content="[*] = locked transitive dep" style={{ fg: "#666666" }} />
           <text content="[o] / [O] = partial / full" style={{ fg: "#666666" }} />
         </box>

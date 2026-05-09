@@ -32,6 +32,15 @@ import {
   writeConfig,
   type SkillzkitConfig,
 } from "../lib/init/config.js";
+import {
+  runContribute,
+  type ContributeRunArgs,
+} from "../lib/init/contribute-flow.js";
+import { SkillzkitApiError } from "../lib/api/client.js";
+import type {
+  ContributionKind,
+  ReviewFinding,
+} from "../lib/api/contracts.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -269,7 +278,20 @@ cli
         process.exit(1);
       }
     }
-    launchTui(options.target ?? process.cwd());
+    // Loop on the contribute marker: TUI exits with code 42 when the
+    // user presses `n`. We then run the contribute flow interactively
+    // (terminal handed back from TUI to Node), and re-launch the TUI
+    // afterward. Any other status (0 for clean exit, anything else
+    // for error) ends the loop.
+    const targetDir = options.target ?? process.cwd();
+    let status: number | null;
+    do {
+      status = launchTui(targetDir);
+      if (status === TUI_EXIT_CONTRIBUTE) {
+        await runContributeFromTui();
+      }
+    } while (status === TUI_EXIT_CONTRIBUTE);
+    process.exit(status ?? 1);
   });
 
 cli
@@ -597,6 +619,86 @@ cli
         console.log(`✓ Updated ${field} → ${value}`);
         console.log(`  ${configPath()}`);
       } catch (err) {
+        console.error(`✗ ${(err as Error).message}`);
+        process.exit(1);
+      }
+    },
+  );
+
+cli
+  .command(
+    "contribute <path>",
+    "Submit a new contribution. <path> is a .md file (command/workflow) or a directory containing SKILL.md (skill bundle). Requires team mode + a valid PIN.",
+  )
+  .option("--kind <kind>", "Override inferred kind: command | workflow | skill")
+  .option("--slug <slug>", "Override inferred slug (e.g. core:tools:my-thing)")
+  .option(
+    "--bump <level>",
+    "Version bump level: major | minor | patch (default: patch)",
+  )
+  .option("--changelog <message>", "Note describing this version's changes")
+  .action(
+    async (
+      path: string,
+      options: {
+        kind?: string;
+        slug?: string;
+        bump?: string;
+        changelog?: string;
+      },
+    ) => {
+      try {
+        if (!configExists()) {
+          console.error(
+            `No skillzkit config found. Run \`skillzkit init --mode team\` first.`,
+          );
+          process.exit(1);
+        }
+        const kind = options.kind as ContributionKind | undefined;
+        if (kind && kind !== "command" && kind !== "workflow" && kind !== "skill") {
+          console.error(`Invalid --kind: ${options.kind}. Must be command, workflow, or skill.`);
+          process.exit(1);
+        }
+        const bump = options.bump as ContributeRunArgs["versionBump"];
+        if (
+          bump !== undefined &&
+          bump !== "major" &&
+          bump !== "minor" &&
+          bump !== "patch"
+        ) {
+          console.error(`Invalid --bump: ${options.bump}. Must be major, minor, or patch.`);
+          process.exit(1);
+        }
+
+        const result = await runContribute({
+          inputPath: path,
+          kindOverride: kind,
+          slugOverride: options.slug,
+          versionBump: bump,
+          changelog: options.changelog,
+          pinProvider: () =>
+            promptHidden(
+              "PIN to decrypt API key (set during `skillzkit init`): ",
+            ),
+        });
+
+        console.log("");
+        console.log(`✓ Accepted ${result.kind}:${result.slug}@${result.version}`);
+        console.log(`  Contribution id: ${result.id}`);
+        console.log("");
+        console.log("This version is stored but NOT yet promoted to live.");
+        console.log("A maintainer can promote via:");
+        console.log(
+          `  curl -X POST -H "Authorization: Bearer <admin-key>" \\`,
+        );
+        console.log(
+          `    <api-url>/api/v1/contributions/${encodeURIComponent(result.id)}/promote`,
+        );
+      } catch (err) {
+        if (err instanceof SkillzkitApiError) {
+          renderApiError(err);
+          process.exit(1);
+        }
         console.error(`✗ ${(err as Error).message}`);
         process.exit(1);
       }
@@ -979,6 +1081,48 @@ async function gatherInitOptions(
   return { mode, email, apiUrl, apiKey, pin };
 }
 
+/**
+ * Render a SkillzkitApiError from the contribute flow with extra
+ * detail per known error code. Validation findings get printed
+ * grouped by axis + severity so the user sees exactly what to fix.
+ */
+function renderApiError(err: SkillzkitApiError): void {
+  console.error(`✗ ${err.message}`);
+  if (err.code === "validation_failed") {
+    const findings = (err.details as { findings?: ReviewFinding[] } | undefined)?.findings;
+    if (findings && findings.length > 0) {
+      console.error("");
+      console.error("Validation findings:");
+      const bySeverity: Record<string, ReviewFinding[]> = {
+        high: [],
+        medium: [],
+        low: [],
+      };
+      for (const f of findings) bySeverity[f.severity]?.push(f);
+      for (const sev of ["high", "medium", "low"] as const) {
+        const items = bySeverity[sev];
+        if (items.length === 0) continue;
+        console.error(`  ${sev.toUpperCase()} (${items.length}):`);
+        for (const f of items) {
+          const ref = f.fileRef ? ` [${f.fileRef}]` : "";
+          console.error(`    - ${f.axis}: ${f.message}${ref}`);
+        }
+      }
+    }
+  } else if (err.code === "author_mismatch") {
+    const owner = (err.details as { ownerAuthorId?: string } | undefined)?.ownerAuthorId;
+    if (owner) {
+      console.error(`  Slug owner: ${owner}`);
+    }
+  } else if (err.code === "slug_conflict") {
+    console.error("  Bump the version (--bump major|minor|patch) and try again.");
+  } else if (err.code === "unauthorized") {
+    console.error("  Check your API key and PIN. Re-run `skillzkit init` to re-authenticate.");
+  } else if (err.code === "network_error") {
+    console.error("  Check connectivity, or run `skillzkit config apiUrl <url>` if the URL changed.");
+  }
+}
+
 function printItem(kind: string, identifier: string, description: string, body: string) {
   console.log(`# ${kind}: ${identifier}`);
   console.log("");
@@ -994,7 +1138,15 @@ function printItem(kind: string, identifier: string, description: string, body: 
  * Bun is required because @opentui/core uses Bun-native FFI; it does not
  * load under Node's ESM loader.
  */
-function launchTui(targetDir: string) {
+/**
+ * Special exit code the TUI uses to signal "user requested
+ * contribute mode." The `ui` action loops on this status: on each 42,
+ * run the contribute prompts, then re-launch the TUI. Any other
+ * non-zero status is a real exit / error.
+ */
+const TUI_EXIT_CONTRIBUTE = 42;
+
+function launchTui(targetDir: string): number | null {
   const requireFromHere = createRequire(import.meta.url);
   const bunPkgJsonPath = requireFromHere.resolve("bun/package.json");
   const bunPkg = JSON.parse(readFileSync(bunPkgJsonPath, "utf8"));
@@ -1019,6 +1171,59 @@ function launchTui(targetDir: string) {
     stdio: "inherit",
     env: { ...process.env, SKILLZKIT_TARGET: targetDir },
   });
-  process.exit(result.status ?? 1);
+  return result.status;
+}
+
+/**
+ * Run the contribute flow interactively after the TUI exits with
+ * the contribute marker. Asks for the path, then delegates to
+ * runContribute() which prompts for PIN and submits via the API.
+ * Errors are printed but do not exit - the parent loop re-launches
+ * the TUI either way.
+ */
+async function runContributeFromTui(): Promise<void> {
+  console.log("");
+  console.log("Contribute - submit a new artifact");
+  console.log("");
+  let inputPath: string;
+  try {
+    inputPath = (
+      await prompt(
+        "Path to .md file (command/workflow) or skill directory (with SKILL.md): ",
+      )
+    ).trim();
+  } finally {
+    closePrompts();
+  }
+  if (!inputPath) {
+    console.log("Cancelled.");
+    return;
+  }
+  try {
+    const result = await runContribute({
+      inputPath,
+      pinProvider: () =>
+        promptHidden(
+          "PIN to decrypt API key (set during `skillzkit init`): ",
+        ),
+    });
+    console.log("");
+    console.log(`✓ Accepted ${result.kind}:${result.slug}@${result.version}`);
+    console.log(`  Contribution id: ${result.id}`);
+    console.log("");
+    console.log("Press Enter to return to the catalog browser.");
+    await prompt("");
+    closePrompts();
+  } catch (err) {
+    if (err instanceof SkillzkitApiError) {
+      renderApiError(err);
+    } else {
+      console.error(`✗ ${(err as Error).message}`);
+    }
+    console.log("");
+    console.log("Press Enter to return to the catalog browser.");
+    await prompt("");
+    closePrompts();
+  }
 }
 
