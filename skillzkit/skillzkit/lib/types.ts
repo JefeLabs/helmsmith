@@ -33,6 +33,19 @@ export interface Command {
    * without re-traversing every body.
    */
   referencedBy: string[];
+  /**
+   * Orthogonal discovery metadata — used by `skillzkit search` and
+   * `skillzkit list --tag <name>` to find artifacts across persona AND
+   * topic boundaries. Tags do NOT affect router membership or install
+   * cascade; the slug's path stays the only structural identity. A tag
+   * like "accessibility" can legitimately appear on commands in
+   * product:design:*, product:ux:*, engineer:architecture:*, and
+   * engineer:maintenance:* simultaneously — each artifact still owns
+   * its own persona-specific framing. Governed two-tier: a curated
+   * "core" set in TAGS.md plus free-form "extension" tags flagged by
+   * doctor for visibility.
+   */
+  tags?: string[];
   body: string;
   frontmatter: Frontmatter;
 }
@@ -45,6 +58,8 @@ export interface Skill {
   description: string;
   /** Slash commands referenced in this skill's body */
   references: string[];
+  /** See Command.tags — same orthogonal discovery role for skills. */
+  tags?: string[];
   body: string;
   frontmatter: Frontmatter;
 }
@@ -71,6 +86,9 @@ export interface Workflow {
   prerequisites?: string[];
   /** Slash commands referenced in this workflow's body */
   references: string[];
+  /** See Command.tags — workflow tags are inherited from the underlying
+   *  command's frontmatter at catalog-build time. */
+  tags?: string[];
   body: string;
   frontmatter: Frontmatter;
 }

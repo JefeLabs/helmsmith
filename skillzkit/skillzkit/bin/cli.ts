@@ -22,6 +22,16 @@ import {
 import { installSlugs } from "../lib/install.js";
 import { runDoctor } from "../lib/doctor.js";
 import { suggestNext, type ActiveWorkflowState } from "../lib/suggest.js";
+import { collectTagCounts, loadCoreTags } from "../lib/tags.js";
+import { runInit, type InitOptions } from "../lib/init/init.js";
+import { closePrompts, prompt, promptHidden } from "../lib/init/prompt.js";
+import {
+  configExists,
+  configPath,
+  readConfig,
+  writeConfig,
+  type SkillzkitConfig,
+} from "../lib/init/config.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -54,6 +64,7 @@ interface ListOptions {
   workflows?: boolean;
   kind?: "command" | "workflow" | "context";
   tree?: boolean;
+  tag?: string;
 }
 interface InstallOptions {
   target?: string;
@@ -71,6 +82,10 @@ cli
   .option("--workflows", "Show only workflows")
   .option("--kind <kind>", "Filter commands by kind: command|workflow|context")
   .option("--tree", "Render commands hierarchically by slug namespace")
+  .option(
+    "--tag <name>",
+    "Filter to artifacts carrying this tag (cross-persona discovery)",
+  )
   .action((options: ListOptions) => {
     if (options.tree) {
       console.log(renderTreeView());
@@ -78,10 +93,14 @@ cli
     }
 
     const showAll = !options.commands && !options.skills && !options.workflows;
+    const hasTag = (tags: string[] | undefined) =>
+      !options.tag || (tags ?? []).includes(options.tag);
 
     if (showAll || options.commands) {
-      const commands = getCommands().filter((c) =>
-        options.kind ? c.kind === options.kind : c.kind === "command"
+      const commands = getCommands().filter(
+        (c) =>
+          (options.kind ? c.kind === options.kind : c.kind === "command") &&
+          hasTag(c.tags),
       );
       console.log(`\n=== Commands (${commands.length}) ===`);
       for (const cmd of commands) {
@@ -90,7 +109,7 @@ cli
     }
 
     if (showAll || options.workflows) {
-      const workflows = getWorkflows();
+      const workflows = getWorkflows().filter((w) => hasTag(w.tags));
       console.log(`\n=== Workflows (${workflows.length}) ===`);
       for (const wf of workflows) {
         const dur = wf.estimatedDuration ? ` (${wf.estimatedDuration})` : "";
@@ -99,7 +118,7 @@ cli
     }
 
     if (showAll || options.skills) {
-      const skills = getSkills();
+      const skills = getSkills().filter((s) => hasTag(s.tags));
       console.log(`\n=== Skills (${skills.length}) ===`);
       for (const skill of skills) {
         console.log(`  ${skill.name}  —  ${truncate(skill.description, 80)}`);
@@ -117,15 +136,26 @@ cli
     const limit = options.limit ? Number.parseInt(options.limit, 10) : 10;
     const q = query.toLowerCase();
     const matches = (haystack: string) => haystack.toLowerCase().includes(q);
+    // Tags are an additional search axis — searching for "accessibility"
+    // surfaces artifacts tagged accessibility regardless of where they
+    // live in the persona tree, complementing slug/description matches.
+    const matchesAnyTag = (tags: string[] | undefined) =>
+      (tags ?? []).some(matches);
 
     const cmds = getCommands().filter(
-      (c) => c.kind === "command" && (matches(c.slug) || matches(c.description)),
+      (c) =>
+        c.kind === "command" &&
+        (matches(c.slug) || matches(c.description) || matchesAnyTag(c.tags)),
     );
     const wfs = getWorkflows().filter(
-      (w) => matches(w.qualifiedName) || matches(w.description),
+      (w) =>
+        matches(w.qualifiedName) ||
+        matches(w.description) ||
+        matchesAnyTag(w.tags),
     );
     const skls = getSkills().filter(
-      (s) => matches(s.name) || matches(s.description),
+      (s) =>
+        matches(s.name) || matches(s.description) || matchesAnyTag(s.tags),
     );
 
     if (cmds.length + wfs.length + skls.length === 0) {
@@ -176,9 +206,69 @@ cli
   });
 
 cli
+  .command(
+    "serve",
+    "Run the skillzkit REST API locally (Bun-backed). Defaults to fs:auto storage against this repo.",
+  )
+  .option("--port <port>", "Listen port (default: 3000)")
+  .option(
+    "--storage <spec>",
+    "Storage backend: memory | fs:<path> | fs-persistent:<path> | s3:<bucket> (default: fs:auto)",
+  )
+  .action((options: { port?: string; storage?: string }) => {
+    const requireFromHere = createRequire(import.meta.url);
+    const bunPkgJsonPath = requireFromHere.resolve("bun/package.json");
+    const bunPkg = JSON.parse(readFileSync(bunPkgJsonPath, "utf8"));
+    const bunBinRel =
+      typeof bunPkg.bin === "string" ? bunPkg.bin : bunPkg.bin?.bun;
+    if (!bunBinRel) {
+      console.error("Could not resolve bundled Bun binary.");
+      process.exit(1);
+    }
+    const bunBin = join(dirname(bunPkgJsonPath), bunBinRel);
+    const serverEntry = join(packageRoot, "server", "bun.ts");
+    if (!existsSync(serverEntry)) {
+      console.error(`Server entry not found at ${serverEntry}.`);
+      process.exit(1);
+    }
+    const result = spawnSync(bunBin, [serverEntry], {
+      stdio: "inherit",
+      env: {
+        ...process.env,
+        SKILLZKIT_STORAGE: options.storage ?? process.env.SKILLZKIT_STORAGE ?? "fs:auto",
+        PORT: options.port ?? process.env.PORT ?? "3000",
+      },
+    });
+    process.exit(result.status ?? 1);
+  });
+
+cli
   .command("ui", "Launch the interactive installer (requires bundled Bun runtime)")
   .option("--target <path>", "Target directory (default: current working directory)")
-  .action((options: UiOptions) => {
+  .action(async (options: UiOptions) => {
+    // First-run integration: if no config exists, walk the user
+    // through `skillzkit init` interactively before spawning the TUI.
+    // Reuses the same gatherInitOptions + runInit flow as `skillzkit
+    // init` so the captured fields (mode, email, optional team
+    // settings) are identical regardless of entry point.
+    if (!configExists()) {
+      console.log("");
+      console.log("First-time setup — let's configure skillzkit.");
+      console.log("");
+      try {
+        const opts = await gatherInitOptions({});
+        const result = runInit(opts);
+        console.log(`\n✓ Created ${result.path}`);
+        console.log(`  Mode: ${result.config.mode}`);
+        console.log("");
+        console.log("Launching skillzkit ui...");
+        console.log("");
+      } catch (err) {
+        console.error(`\n✗ Setup failed: ${(err as Error).message}`);
+        console.error("Run \`skillzkit init\` to retry.");
+        process.exit(1);
+      }
+    }
     launchTui(options.target ?? process.cwd());
   });
 
@@ -408,10 +498,170 @@ cli
   });
 
 cli
+  .command(
+    "init",
+    "First-run setup — creates ~/.agentx/skillzkit/config.json. Interactive when called without args; pass flags to skip prompts.",
+  )
+  .option("--mode <mode>", "standalone | team")
+  .option("--email <email>", "Your email (required, used for local artifact attribution and team-mode identity)")
+  .option("--api-url <url>", "Team mode: skillzkit API base URL")
+  .option("--api-key <key>", "Team mode: API key from agentx-controlplane")
+  .option("--pin <pin>", "Team mode: PIN that encrypts the API key at rest (min 6 chars)")
+  .option("--force", "Overwrite an existing config")
+  .action(async (cliOpts: Partial<InitOptions> & { force?: boolean }) => {
+    try {
+      // Refuse to overwrite without --force BEFORE any prompts run —
+      // saves the user from typing through the whole flow only to be
+      // told "config already exists, --force required."
+      if (configExists() && !cliOpts.force) {
+        console.error(
+          `Config already exists at ${configPath()}.`,
+        );
+        console.error(
+          `  Pass --force to overwrite, or run \`skillzkit config\` to view/edit fields.`,
+        );
+        process.exit(1);
+      }
+
+      const opts = await gatherInitOptions(cliOpts);
+      const result = runInit({ ...opts, force: cliOpts.force });
+
+      console.log(
+        `\n✓ ${result.overwrote ? "Updated" : "Created"} ${result.path}`,
+      );
+      console.log("");
+      if (result.config.mode === "standalone") {
+        console.log("Mode: standalone (using bundled skills)");
+        console.log("Next:");
+        console.log("  skillzkit list                  — browse the catalog");
+        console.log("  skillzkit ui                    — interactive picker");
+        console.log("  skillzkit install <slug>        — install a slug into your project");
+      } else {
+        console.log(`Mode: team`);
+        console.log(`API:  ${result.config.team.apiUrl}`);
+        console.log(`Key:  ${result.config.team.keyMasked}  (encrypted at rest)`);
+        console.log("");
+        console.log("Next:");
+        console.log("  skillzkit ui                    — browse the team catalog");
+        console.log("  skillzkit config                — view current configuration");
+      }
+    } catch (err) {
+      console.error(`✗ ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+cli
+  .command(
+    "config [field] [value]",
+    "View or update one config field. `skillzkit config` shows all; `skillzkit config email new@x.com` updates that field.",
+  )
+  .option(
+    "--show-secrets",
+    "Reveal the encrypted-blob fields (the plaintext API key is never stored or shown)",
+  )
+  .action(
+    (
+      field: string | undefined,
+      value: string | undefined,
+      options: { showSecrets?: boolean },
+    ) => {
+      try {
+        if (!configExists()) {
+          console.error(
+            `No config found. Run \`skillzkit init\` to create one.`,
+          );
+          process.exit(1);
+        }
+        const config = readConfig();
+
+        if (!field) {
+          printConfig(config, !!options.showSecrets);
+          return;
+        }
+        if (!value) {
+          // Single-field read: e.g. `skillzkit config email`
+          const single = readField(config, field);
+          if (single === undefined) {
+            console.error(
+              `Field "${field}" is not set on this config (mode=${config.mode})`,
+            );
+            process.exit(1);
+          }
+          console.log(single);
+          return;
+        }
+        // Set
+        const updated = setField(config, field, value);
+        writeConfig(updated);
+        console.log(`✓ Updated ${field} → ${value}`);
+        console.log(`  ${configPath()}`);
+      } catch (err) {
+        console.error(`✗ ${(err as Error).message}`);
+        process.exit(1);
+      }
+    },
+  );
+
+cli
   .command("version", "Print the package version")
   .action(() => {
     const catalog = loadCatalog();
     console.log(catalog.packageVersion);
+  });
+
+cli
+  .command(
+    "tags",
+    "List every tag in the catalog with usage counts, split into core (TAGS.md whitelist) and extension (free-form, candidates for promotion)",
+  )
+  .action(() => {
+    const catalog = loadCatalog();
+    const core = loadCoreTags(packageRoot);
+    const counts = collectTagCounts(catalog);
+
+    if (counts.size === 0) {
+      console.log(
+        "No tags found in the catalog. Add `tags: [...]` to artifact frontmatter; see TAGS.md for the curated core list.",
+      );
+      return;
+    }
+
+    // Split tags into core (in TAGS.md) and extension (everything else),
+    // sorted by descending usage count then alphabetically. Showing
+    // counts inline gives you a quick read on which extensions are
+    // accumulating enough usage to deserve promotion.
+    const used = new Set(counts.keys());
+    const allTags = Array.from(new Set([...core, ...used])).sort();
+    const coreUsed = allTags.filter((t) => core.has(t));
+    const extensions = allTags.filter((t) => !core.has(t));
+    const byCount = (a: string, b: string) =>
+      (counts.get(b) ?? 0) - (counts.get(a) ?? 0) || a.localeCompare(b);
+
+    console.log(`\n=== Core tags (${coreUsed.length}) ===`);
+    if (coreUsed.length === 0) {
+      console.log("  (TAGS.md present but no core tags found in the catalog)");
+    }
+    for (const tag of coreUsed.sort(byCount)) {
+      const n = counts.get(tag) ?? 0;
+      const marker = n === 0 ? " (unused)" : "";
+      console.log(`  ${tag.padEnd(20)} ${n} use${n === 1 ? "" : "s"}${marker}`);
+    }
+
+    console.log(`\n=== Extension tags (${extensions.length}) ===`);
+    if (extensions.length === 0) {
+      console.log("  (no extension tags in use)");
+    }
+    for (const tag of extensions.sort(byCount)) {
+      const n = counts.get(tag) ?? 0;
+      console.log(`  ${tag.padEnd(20)} ${n} use${n === 1 ? "" : "s"}`);
+    }
+
+    if (extensions.length > 0) {
+      console.log(
+        "\nExtension tags with broad usage (≥5 artifacts, ≥2 personas) are candidates for promotion into TAGS.md core. See TAGS.md for the criteria.",
+      );
+    }
   });
 
 cli.help();
@@ -554,6 +804,179 @@ function findNearMisses(unknown: string): string[] {
     .sort((a, b) => a.distance - b.distance)
     .slice(0, 5)
     .map((entry) => entry.id);
+}
+
+/**
+ * Render the current config to stdout. Plaintext API key is NEVER
+ * shown (it isn't stored). The masked version is always shown. The
+ * encrypted-blob fields are hidden by default; --show-secrets reveals
+ * them so a user can verify what's on disk without grep-and-jq.
+ */
+function printConfig(config: SkillzkitConfig, showSecrets: boolean): void {
+  console.log(`# skillzkit config`);
+  console.log(`# ${configPath()}`);
+  console.log("");
+  console.log(`mode       = ${config.mode}`);
+  console.log(`email      = ${config.email}`);
+  console.log(`createdAt  = ${config.createdAt}`);
+  console.log(`updatedAt  = ${config.updatedAt}`);
+  if (config.mode === "team") {
+    console.log("");
+    console.log(`team.apiUrl    = ${config.team.apiUrl}`);
+    console.log(`team.keyMasked = ${config.team.keyMasked}`);
+    if (showSecrets) {
+      // Show the encrypted blob's bookkeeping fields so a user can
+      // verify their config matches what they expect. The plaintext
+      // key is not in this output — it isn't stored anywhere.
+      const blob = config.team.keyEncrypted;
+      console.log(`team.keyEncrypted.kdf       = ${blob.kdf}`);
+      console.log(
+        `team.keyEncrypted.kdfParams = N=${blob.kdfParams.N}, r=${blob.kdfParams.r}, p=${blob.kdfParams.p}`,
+      );
+      console.log(`team.keyEncrypted.salt      = ${blob.salt}`);
+      console.log(`team.keyEncrypted.iv        = ${blob.iv}`);
+      console.log(`team.keyEncrypted.authTag   = ${blob.authTag}`);
+      console.log(
+        `team.keyEncrypted.ciphertext = <${blob.ciphertext.length} chars base64>`,
+      );
+    }
+  }
+}
+
+/**
+ * Read a single field by dotted-path name. Returns undefined when the
+ * field isn't applicable to this config's mode (e.g., asking for
+ * `team.apiUrl` on a standalone config).
+ */
+function readField(config: SkillzkitConfig, field: string): string | undefined {
+  switch (field) {
+    case "mode":
+      return config.mode;
+    case "email":
+      return config.email;
+    case "createdAt":
+      return config.createdAt;
+    case "updatedAt":
+      return config.updatedAt;
+    case "team.apiUrl":
+    case "apiUrl":
+      return config.mode === "team" ? config.team.apiUrl : undefined;
+    case "team.keyMasked":
+    case "keyMasked":
+      return config.mode === "team" ? config.team.keyMasked : undefined;
+    default:
+      throw new Error(
+        `Unknown field "${field}". Try one of: mode, email, apiUrl, keyMasked`,
+      );
+  }
+}
+
+/**
+ * Update a single field. The settable surface is intentionally small:
+ * email (when safe — see below) and team.apiUrl. Anything that would
+ * invalidate the encrypted key (changing email on team mode, changing
+ * the API key, switching modes) is refused with a pointer to
+ * `skillzkit init --force`. Treating those as a single atomic re-init
+ * is safer than half-updating the on-disk state.
+ */
+function setField(
+  config: SkillzkitConfig,
+  field: string,
+  value: string,
+): SkillzkitConfig {
+  switch (field) {
+    case "email": {
+      // On team mode, the email is part of the encryption passphrase.
+      // Changing it would orphan the encrypted key blob — there's no
+      // way to decrypt it without the original email. Refuse and
+      // direct the user to a full re-init that re-encrypts.
+      if (config.mode === "team") {
+        throw new Error(
+          `Changing email on a team-mode config would invalidate your encrypted API key (the email is part of the encryption passphrase). Use \`skillzkit init --force\` to change email and re-enter your API key + PIN.`,
+        );
+      }
+      return { ...config, email: value };
+    }
+    case "team.apiUrl":
+    case "apiUrl": {
+      if (config.mode !== "team") {
+        throw new Error(
+          `apiUrl is only valid on team-mode configs. Run \`skillzkit init --force\` to switch modes.`,
+        );
+      }
+      try {
+        new URL(value);
+      } catch {
+        throw new Error(`Invalid URL "${value}"`);
+      }
+      return {
+        ...config,
+        team: { ...config.team, apiUrl: value },
+      };
+    }
+    case "mode":
+      throw new Error(
+        `Mode change requires a full re-init (encryption + key collection). Run \`skillzkit init --force --mode ${value}\`.`,
+      );
+    default:
+      throw new Error(
+        `Field "${field}" is not settable. Settable fields: email, apiUrl. Use \`skillzkit init --force\` for anything else.`,
+      );
+  }
+}
+
+/**
+ * Fill in any init fields the user didn't pass via CLI args by
+ * prompting interactively. Designed so passing every flag results in
+ * zero prompts (good for scripts, CI), while passing nothing walks
+ * the user through every required field (good for first-time setup).
+ *
+ * Mode is asked first because it gates which subsequent fields are
+ * required — team mode needs apiUrl/apiKey/pin; standalone doesn't.
+ */
+async function gatherInitOptions(
+  cli: Partial<InitOptions> & { force?: boolean },
+): Promise<InitOptions> {
+  console.log("");
+  console.log("skillzkit setup");
+  console.log("");
+
+  let mode: "standalone" | "team";
+  if (cli.mode === "standalone" || cli.mode === "team") {
+    mode = cli.mode;
+  } else {
+    const answer = (
+      await prompt(
+        "Mode? (1) standalone — use bundled skills  (2) team — connect to a shared API: ",
+      )
+    ).trim();
+    if (answer === "1" || answer.toLowerCase().startsWith("s")) {
+      mode = "standalone";
+    } else if (answer === "2" || answer.toLowerCase().startsWith("t")) {
+      mode = "team";
+    } else {
+      throw new Error(`Mode must be "standalone" or "team"`);
+    }
+  }
+
+  const email = cli.email ?? (await prompt("Email: ")).trim();
+
+  if (mode === "standalone") {
+    // Close the shared readline interface so node can exit cleanly
+    // (or so the TUI launched after init can claim stdin).
+    closePrompts();
+    return { mode, email };
+  }
+
+  // Team-only fields. apiUrl is the last visible prompt; promptHidden
+  // closes readline internally before switching to raw mode.
+  const apiUrl =
+    cli.apiUrl ?? (await prompt("API URL (e.g. https://skillz.example.com): ")).trim();
+  const apiKey =
+    cli.apiKey ?? (await promptHidden("API key (from agentx-controlplane): ")).trim();
+  const pin = cli.pin ?? (await promptHidden("PIN (min 6 chars, used to encrypt key at rest): "));
+
+  return { mode, email, apiUrl, apiKey, pin };
 }
 
 function printItem(kind: string, identifier: string, description: string, body: string) {

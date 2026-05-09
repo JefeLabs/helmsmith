@@ -8,6 +8,9 @@ import type { Catalog } from "../lib/types.js";
 import { getInterfaces } from "../lib/interfaces.js";
 import { resolveCascade, summarize } from "./state.js";
 import { installSelection } from "./install.js";
+import { tryReadConfig } from "../lib/init/config.js";
+import { SkillzkitApiClient, SkillzkitApiError } from "../lib/api/client.js";
+import type { CatalogIndex } from "../lib/api/contracts.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -21,9 +24,54 @@ function findPackageRoot(): string {
   throw new Error("catalog.json not found from " + __dirname);
 }
 
-const packageRoot = findPackageRoot();
-const catalog: Catalog = JSON.parse(readFileSync(join(packageRoot, "catalog.json"), "utf8"));
+/**
+ * Pad a CatalogIndex (summaries from the API) into a full Catalog
+ * shape (with body strings). The TUI's existing rendering code
+ * doesn't read the body field, so empty bodies are fine — we only
+ * need the shape to satisfy the Catalog type. This adapter lets
+ * team mode and standalone mode share the same downstream code.
+ */
+function indexToCatalog(index: CatalogIndex): Catalog {
+  return {
+    version: index.version,
+    generatedAt: index.generatedAt,
+    packageVersion: index.packageVersion,
+    commands: index.commands.map((s) => ({ ...s, body: "" })),
+    skills: index.skills.map((s) => ({ ...s, body: "" })),
+    workflows: index.workflows.map((s) => ({ ...s, body: "" })),
+  };
+}
+
+// Top-level await on Bun: load the catalog from the right source.
+// In standalone mode (or no config), read the bundled catalog.json
+// off disk; in team mode, fetch the index from the configured API.
+// A failed remote fetch exits the TUI cleanly with a clear remediation
+// message — we don't want to drop into an empty TUI and confuse the user.
+const config = tryReadConfig();
 const targetDir = process.env.SKILLZKIT_TARGET || process.cwd();
+
+let catalog: Catalog;
+if (config?.mode === "team") {
+  process.stdout.write(
+    `Loading catalog from ${config.team.apiUrl}...\n`,
+  );
+  try {
+    const client = new SkillzkitApiClient({ baseUrl: config.team.apiUrl });
+    const index = await client.getCatalog();
+    catalog = indexToCatalog(index);
+  } catch (err) {
+    const apiErr = err as SkillzkitApiError;
+    process.stderr.write(
+      `\n✗ Could not load catalog from ${config.team.apiUrl}\n` +
+        `  ${apiErr.message}\n\n` +
+        `  Check connectivity, or run \`skillzkit config apiUrl <new-url>\` to fix the URL.\n`,
+    );
+    process.exit(1);
+  }
+} else {
+  const packageRoot = findPackageRoot();
+  catalog = JSON.parse(readFileSync(join(packageRoot, "catalog.json"), "utf8"));
+}
 
 type Section = "persona" | "framework" | "integration" | "tool";
 
@@ -753,6 +801,17 @@ const App = () => {
   const moreAbove = scrollOffset > 0;
   const moreBelow = scrollEnd < totalCount;
   const activeItem = filteredItems[cursor] ?? filteredItems[0] ?? ITEMS[0];
+  // Pull tags from the underlying catalog record for the active row.
+  // CatalogItem ids match command slugs and skill names (groups have
+  // synthetic ids like "topic:..." that won't match — they show no
+  // tags, which is correct).
+  const activeTags = ((): string[] => {
+    const cmd = catalog.commands.find((c) => c.slug === activeItem.id);
+    if (cmd?.tags?.length) return cmd.tags;
+    const skill = catalog.skills.find((s) => s.name === activeItem.id);
+    if (skill?.tags?.length) return skill.tags;
+    return [];
+  })();
 
   return (
     // Outer container: drop the all-sides padding that was inheriting 1
@@ -874,6 +933,19 @@ const App = () => {
               style={{ fg: "#CCCCCC", attributes: 2 /* DIM */ }}
             />
           </box>
+
+          {/* Tags — orthogonal discovery metadata. Cross-persona/topic
+              search axis surfaced inline so users see what topical
+              concerns the active artifact carries beyond its position
+              in the persona tree. Hidden when no tags. */}
+          {activeTags.length > 0 && (
+            <box style={{ flexShrink: 0, height: 1, marginBottom: 1 }}>
+              <text
+                content={`Tags: ${activeTags.join(" · ")}`}
+                style={{ fg: "#888888", attributes: 2 /* DIM */ }}
+              />
+            </box>
+          )}
 
           {/* Selection summary */}
           <text content="Selection summary" style={{ fg: "#FFFF00", attributes: 1 }} />

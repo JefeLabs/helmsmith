@@ -140,6 +140,7 @@ export function loadCommands(commandsRoot: string): Command[] {
       // Filled in by the second pass below — start empty so the field is
       // always present on the returned object (TS narrowing wins).
       referencedBy: [],
+      tags: asStringArray(fm.tags),
       body: file.body,
       frontmatter: fm,
     };
@@ -180,6 +181,7 @@ export function loadSkills(skillsRoot: string, commands: Command[]): Skill[] {
         path: relative(skillsRoot, skillFile),
         description: asString(fm.description) ?? "",
         references: extractReferences(parsed.body, knownSlugs),
+        tags: asStringArray(fm.tags),
         body: parsed.body,
         frontmatter: fm,
       });
@@ -215,6 +217,7 @@ export function deriveWorkflows(commands: Command[]): Workflow[] {
         phases: asNumber(fm.phases),
         prerequisites: asStringArray(fm.prerequisites),
         references: cmd.references,
+        tags: cmd.tags,
         body: cmd.body,
         frontmatter: fm,
       };

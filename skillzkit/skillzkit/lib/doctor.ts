@@ -20,6 +20,7 @@ import {
   getWorkflows,
   loadCatalog,
 } from "./index.js";
+import { loadCoreTags } from "./tags.js";
 
 export interface Finding {
   severity: "error" | "warning" | "info";
@@ -190,8 +191,79 @@ export function runDoctor(packageRoot: string): Finding[] {
     }
   }
 
+  // ─── 6. Tag format + two-tier (TAGS.md) ────────────────────────────
+  // Tags are orthogonal discovery metadata (see TAGS.md). Two checks:
+  // format conformance (error — blocks contribution) and core-vs-
+  // extension membership (info — visibility into vocabulary drift, not
+  // a blocker). Workflows derive tags from the underlying command, so
+  // skip them to avoid duplicate findings.
+  const coreTags = loadCoreTags(packageRoot);
+  if (coreTags.size === 0) {
+    findings.push({
+      severity: "warning",
+      source: "TAGS.md",
+      message: `Could not load core tag whitelist from TAGS.md — all tags will be reported as extensions`,
+    });
+  }
+  for (const cmd of catalog.commands) {
+    if (cmd.kind === "context") continue;
+    findings.push(...validateTags(cmd.slug, cmd.tags, coreTags));
+  }
+  for (const skill of catalog.skills) {
+    findings.push(...validateTags(skill.name, skill.tags, coreTags));
+  }
+
   return findings;
 }
+
+/**
+ * Validate a single artifact's tags. Returns findings, never throws.
+ *
+ * Errors: format violation (lowercase, hyphenated, max 24 chars,
+ * starts with a letter) — blocks contribution.
+ * Warnings: duplicate tag in the same array.
+ * Info: tag isn't in TAGS.md's `## Core tags` section — surfaces
+ * vocabulary drift without blocking. Frequent extensions become
+ * candidates for promotion into core via PR.
+ */
+const TAG_FORMAT = /^[a-z][a-z0-9-]{0,23}$/;
+function validateTags(
+  source: string,
+  tags: string[] | undefined,
+  coreTags: Set<string>,
+): Finding[] {
+  if (!tags || tags.length === 0) return [];
+  const out: Finding[] = [];
+  const seen = new Set<string>();
+  for (const tag of tags) {
+    if (seen.has(tag)) {
+      out.push({
+        severity: "warning",
+        source,
+        message: `Duplicate tag \`${tag}\``,
+      });
+      continue;
+    }
+    seen.add(tag);
+    if (!TAG_FORMAT.test(tag)) {
+      out.push({
+        severity: "error",
+        source,
+        message: `Tag \`${tag}\` violates format — must be lowercase, hyphen-separated, ASCII letters/digits only, start with a letter, max 24 chars`,
+      });
+      continue;
+    }
+    if (coreTags.size > 0 && !coreTags.has(tag)) {
+      out.push({
+        severity: "info",
+        source,
+        message: `Tag \`${tag}\` is an extension (not in TAGS.md core list) — promote to core if used widely`,
+      });
+    }
+  }
+  return out;
+}
+
 
 // ─── helpers ──────────────────────────────────────────────────────────
 
