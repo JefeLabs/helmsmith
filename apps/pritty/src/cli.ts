@@ -9,8 +9,9 @@
  * monorepo finds verb logic in a predictable place across every
  * app.
  */
-import { Command } from "commander";
+import { createCli } from "@ecruz165/cli-kit";
 import chalk from "chalk";
+import { prittyAuthProvider } from "./auth-provider.js";
 import { runAuthLogin } from "./commands/auth-login.js";
 import { runAuthLogout } from "./commands/auth-logout.js";
 import { runAuthStatus } from "./commands/auth-status.js";
@@ -18,35 +19,46 @@ import { runCacheClear } from "./commands/cache-clear.js";
 import { runCachePath } from "./commands/cache-path.js";
 import { runCategorize } from "./commands/categorize.js";
 import { runCommit } from "./commands/commit.js";
+import { runConnect } from "./commands/connect.js";
 import { runInit } from "./commands/init.js";
 import { runPr } from "./commands/pr.js";
 import { runRebase } from "./commands/rebase.js";
 
-const program = new Command();
-
-program
-  .name("pritty")
-  .description("Pretty PRs, zero effort.")
-  .version("0.0.1");
+// Only destructure `program` — `auth` is already used below as the
+// commander subcommand variable for `pritty auth ...`. The injected
+// AuthProvider is reachable via cli-kit if a future handler needs it.
+const { program } = createCli({
+  name: "pritty",
+  version: "0.0.1",
+  description: "Pretty PRs, zero effort.",
+  auth: prittyAuthProvider,
+});
 
 // ─── auth ─────────────────────────────────────────────────────────────
 
-const auth = program.command("auth").description("Manage GitHub Copilot authentication");
+const authCmd = program.command("auth").description("Manage GitHub Copilot authentication");
 
-auth
+authCmd
   .command("login")
   .description("Run the GitHub Device Flow and persist credentials")
   .action(() => runAuthLogin());
 
-auth
+authCmd
   .command("logout")
   .description("Remove the local auth file")
   .action(() => runAuthLogout());
 
-auth
+authCmd
   .command("status")
   .description("Show authentication status")
   .action(() => runAuthStatus());
+
+// ─── connect (interactive TUI) ────────────────────────────────────────
+
+program
+  .command("connect")
+  .description("Open the interactive connections view (TUI)")
+  .action(() => runConnect());
 
 // ─── init ─────────────────────────────────────────────────────────────
 

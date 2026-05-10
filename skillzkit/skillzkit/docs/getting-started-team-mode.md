@@ -176,7 +176,7 @@ on the host.
 ### 2.1 Install the CLI
 
 ```bash
-npm install -g @agentx/skillzkit
+npm install -g @ecruz165/skillzkit
 ```
 
 (Same install as standalone mode.)

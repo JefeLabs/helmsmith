@@ -1,4 +1,4 @@
-# 🔧 @agentx/toolz
+# 🔧 @ecruz165/toolz
 
 Cross-platform tool manager for the AgentX ecosystem. Detects whether a
 CLI tool is installed, parses its version, installs missing tools via
@@ -25,10 +25,10 @@ toolz doctor                         # Reconcile registry vs reality
 
 ## Programmatic API
 
-The primary consumer of `@agentx/toolz` is **other AgentX packages**:
+The primary consumer of `@ecruz165/toolz` is **other AgentX packages**:
 
 ```typescript
-import { ensureTool, ensureTools } from "@agentx/toolz";
+import { ensureTool, ensureTools } from "@ecruz165/toolz";
 
 // One tool, fail if missing
 const status = await ensureTool("git", { minVersion: "2.40.0" });
@@ -129,8 +129,8 @@ The implementation plan walks through 7 phases:
 ```bash
 # From the toolbox root:
 npm install
-npm test --workspace=@agentx/toolz
-npm run build --workspace=@agentx/toolz
+npm test --workspace=@ecruz165/toolz
+npm run build --workspace=@ecruz165/toolz
 
 # From this directory:
 npm test

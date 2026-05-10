@@ -3,11 +3,11 @@ import { defineConfig } from "tsup";
 export default defineConfig({
   entry: ["src/cli.ts"],
   format: ["esm"],
-  target: "node20",
+  target: "es2022",
   dts: true,
   shims: true,
   clean: true,
   banner: {
-    js: "#!/usr/bin/env node",
+    js: "#!/usr/bin/env bun",
   },
 });

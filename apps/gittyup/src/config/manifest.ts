@@ -1,0 +1,251 @@
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { join, dirname, resolve, isAbsolute } from 'node:path';
+import { homedir } from 'node:os';
+import yaml from 'js-yaml';
+import { ManifestSchema } from './schema.js';
+import type { Manifest, RepoConfig, RepoGroup } from './schema.js';
+import { APP_NAME, APP_CONFIG_DIR, APP_REPO_URL, MANIFEST_FILENAME } from './branding.js';
+import { detectGitRoot, getRepoConfigHome } from '../utils/git.js';
+import type { ConfigLocation, ResolvedConfig } from '../utils/location.js';
+
+const DEFAULT_PR_TEMPLATE = [
+  '## {{operation}} from `{{source_branch}}` → `{{target_branch}}`',
+  '',
+  '**Repo:** {{repo_name}}',
+  '**Operation:** {{operation}}',
+  '**Commits:** {{commit_count}}',
+  '',
+  '---',
+  `_Created by [${APP_NAME}](${APP_REPO_URL})_`,
+].join('\n');
+
+/**
+ * Resolve the manifest path and config location without loading or parsing.
+ * Used by the postAction hook to display the config path cheaply.
+ */
+export function resolveManifestPath(): ResolvedConfig {
+  const gitRoot = detectGitRoot();
+
+  // 1. Check repo-local config
+  if (gitRoot) {
+    const repoDir = getRepoConfigHome(gitRoot);
+    const repoManifest = join(repoDir, MANIFEST_FILENAME);
+    if (existsSync(repoManifest)) {
+      return { location: 'repo', configDir: repoDir, manifestPath: repoManifest, gitRoot };
+    }
+  }
+
+  // 2. Walk up from CWD looking for a bare manifest (backwards compat)
+  let dir = process.cwd();
+  while (true) {
+    const candidate = join(dir, MANIFEST_FILENAME);
+    if (existsSync(candidate)) {
+      return { location: 'home', configDir: dir, manifestPath: candidate, gitRoot };
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+
+  // 3. Fall back to global config directory
+  return {
+    location: 'home',
+    configDir: APP_CONFIG_DIR,
+    manifestPath: join(APP_CONFIG_DIR, MANIFEST_FILENAME),
+    gitRoot,
+  };
+}
+
+/**
+ * Manages the gittyup.yaml manifest file.
+ * Handles loading, validation (via Zod), saving, and repo/group CRUD.
+ */
+export class ManifestManager {
+  private manifest: Manifest;
+  private filePath: string;
+  private _configLocation: ConfigLocation;
+  private _configDir: string;
+
+  constructor(filePath?: string) {
+    if (filePath) {
+      this.filePath = filePath;
+      this._configDir = dirname(filePath);
+      this._configLocation = filePath.startsWith(APP_CONFIG_DIR) ? 'home' : 'repo';
+    } else {
+      const resolved = resolveManifestPath();
+      this.filePath = resolved.manifestPath;
+      this._configDir = resolved.configDir;
+      this._configLocation = resolved.location;
+    }
+    this.manifest = this.load();
+  }
+
+  // ─── Discovery ─────────────────────────────────────────────────────
+
+  get configLocation(): ConfigLocation {
+    return this._configLocation;
+  }
+
+  get configDir(): string {
+    return this._configDir;
+  }
+
+  // ─── Load / Save ──────────────────────────────────────────────────
+
+  private load(): Manifest {
+    if (!existsSync(this.filePath)) {
+      return ManifestSchema.parse({
+        settings: { pr_template: DEFAULT_PR_TEMPLATE },
+      });
+    }
+    const raw = readFileSync(this.filePath, 'utf-8');
+    const parsed = yaml.load(raw);
+    return ManifestSchema.parse(parsed);
+  }
+
+  /** Write the manifest back to disk as YAML. */
+  save(): void {
+    const content = yaml.dump(this.manifest, {
+      indent: 2,
+      lineWidth: 100,
+      noRefs: true,
+    });
+    writeFileSync(this.filePath, content, 'utf-8');
+  }
+
+  get data(): Manifest {
+    return this.manifest;
+  }
+
+  get manifestPath(): string {
+    return this.filePath;
+  }
+
+  // ─── Init ─────────────────────────────────────────────────────────
+
+  /** Create a new manifest file. Throws if one already exists. */
+  static init(dir?: string): ManifestManager {
+    const targetDir = dir ?? APP_CONFIG_DIR;
+    mkdirSync(targetDir, { recursive: true });
+    const filePath = join(targetDir, MANIFEST_FILENAME);
+
+    if (existsSync(filePath)) {
+      throw new Error(`Manifest already exists at ${filePath}`);
+    }
+
+    const manifest = ManifestSchema.parse({
+      workspace: targetDir,
+      settings: { pr_template: DEFAULT_PR_TEMPLATE },
+    });
+
+    const content = yaml.dump(manifest, { indent: 2, lineWidth: 100 });
+    writeFileSync(filePath, content, 'utf-8');
+
+    return new ManifestManager(filePath);
+  }
+
+  // ─── Workspace Resolution ─────────────────────────────────────────
+
+  /** Resolve a repo path relative to the workspace root. */
+  resolveRepoPath(repoPath: string): string {
+    if (isAbsolute(repoPath)) return repoPath;
+    const ws = this.manifest.workspace;
+    const base = ws.startsWith('~')
+      ? ws.replace('~', homedir())
+      : isAbsolute(ws)
+        ? ws
+        : resolve(dirname(this.filePath), ws);
+    return resolve(base, repoPath);
+  }
+
+  // ─── Repo Management ──────────────────────────────────────────────
+
+  /** Add a repo to a group. Creates the group if it doesn't exist. */
+  addRepo(groupName: string, repo: RepoConfig, groupDescription?: string): void {
+    if (!this.manifest.groups[groupName]) {
+      this.manifest.groups[groupName] = { repos: [], description: groupDescription };
+    }
+    const group = this.manifest.groups[groupName];
+    if (group.repos.find((r) => r.name === repo.name)) {
+      throw new Error(`Repo "${repo.name}" already exists in group "${groupName}"`);
+    }
+    group.repos.push(repo);
+  }
+
+  /** Remove a repo from a group by name. */
+  removeRepo(groupName: string, repoName: string): void {
+    const group = this.manifest.groups[groupName];
+    if (!group) throw new Error(`Group "${groupName}" not found`);
+    const idx = group.repos.findIndex((r) => r.name === repoName);
+    if (idx === -1) throw new Error(`Repo "${repoName}" not found in group "${groupName}"`);
+    group.repos.splice(idx, 1);
+  }
+
+  // ─── Group Management ─────────────────────────────────────────────
+
+  /** Get a single group by name, or undefined. */
+  getGroup(name: string): RepoGroup | undefined {
+    const g = this.manifest.groups[name];
+    if (!g) return undefined;
+    return { name, repos: g.repos, description: g.description };
+  }
+
+  /** Get all groups as resolved RepoGroup objects. */
+  getGroups(): RepoGroup[] {
+    return Object.entries(this.manifest.groups).map(([name, g]) => ({
+      name,
+      repos: g.repos,
+      description: g.description,
+    }));
+  }
+
+  /** Flatten all repos across groups, each annotated with its group name. */
+  getAllRepos(): Array<RepoConfig & { group: string }> {
+    const repos: Array<RepoConfig & { group: string }> = [];
+    for (const [groupName, group] of Object.entries(this.manifest.groups)) {
+      for (const repo of group.repos) {
+        repos.push({ ...repo, group: groupName });
+      }
+    }
+    return repos;
+  }
+
+  /** Get all repos that have a specific tag. */
+  getReposByTag(tag: string): Array<RepoConfig & { group: string }> {
+    return this.getAllRepos().filter((repo) => repo.tags.includes(tag));
+  }
+
+  /** Get all unique tags across all repos. */
+  getAllTags(): string[] {
+    const tags = new Set<string>();
+    for (const repo of this.getAllRepos()) {
+      for (const tag of repo.tags) {
+        tags.add(tag);
+      }
+    }
+    return Array.from(tags).sort();
+  }
+
+  /** Create a new empty group. Throws if it already exists. */
+  createGroup(name: string, description?: string): void {
+    if (this.manifest.groups[name]) {
+      throw new Error(`Group "${name}" already exists`);
+    }
+    this.manifest.groups[name] = { repos: [], description };
+  }
+
+  /** Remove a group entirely. Throws if not found. */
+  removeGroup(name: string): void {
+    if (!this.manifest.groups[name]) {
+      throw new Error(`Group "${name}" not found`);
+    }
+    delete this.manifest.groups[name];
+  }
+
+  // ─── Settings ──────────────────────────────────────────────────────
+
+  /** Merge partial settings into the current settings. */
+  updateSettings(updates: Partial<Manifest['settings']>): void {
+    this.manifest.settings = { ...this.manifest.settings, ...updates };
+  }
+}

@@ -3,11 +3,12 @@
  * in `src/commands/<verb>.ts`. Matches gitradar's per-verb-file
  * pattern across the agentx-toolbox monorepo.
  */
-import { Command } from "commander";
+import { createCli } from "@ecruz165/cli-kit";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { runCheck } from "./commands/check.js";
+import { runConnect } from "./commands/connect.js";
 import { runDeregister } from "./commands/deregister.js";
 import { runDoctorCommand } from "./commands/doctor.js";
 import { runEnsure } from "./commands/ensure.js";
@@ -26,7 +27,7 @@ function readVersion(): string {
   for (let dir = __dirname, i = 0; i < 4; i++, dir = dirname(dir)) {
     try {
       const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
-      if (pkg.name === "@agentx/toolz") return pkg.version as string;
+      if (pkg.name === "@ecruz165/toolz") return pkg.version as string;
     } catch {
       /* keep walking */
     }
@@ -34,12 +35,15 @@ function readVersion(): string {
   return "0.0.0";
 }
 
-const program = new Command();
-
-program
-  .name("toolz")
-  .description("ToolZ — cross-platform tool manager for AgentX")
-  .version(readVersion());
+// No `auth` wired today — toolz's current commands (check, install,
+// ensure, register, etc.) don't make agent calls. When the planned
+// "add new tools via agent" feature lands, wire a toolzAuthProvider
+// here against @ecruz165/agent-auth — same pattern as pritty.
+const { program } = createCli({
+  name: "toolz",
+  version: readVersion(),
+  description: "ToolZ — cross-platform tool manager for AgentX",
+});
 
 program
   .command("platform")
@@ -114,6 +118,11 @@ program
   .action((options: { errorsOnly?: boolean; json?: boolean }) =>
     runDoctorCommand(options),
   );
+
+program
+  .command("connect")
+  .description("Open the interactive connections view (TUI)")
+  .action(() => runConnect());
 
 // Bare invocation (no subcommand, no --help, no --version) → branded
 // banner + command hints. Commander's default is silent; this gives

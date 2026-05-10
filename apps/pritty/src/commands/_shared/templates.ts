@@ -28,7 +28,7 @@ The command will:
 5. Optionally let the user edit each message
 6. Create one commit per category using path-restricted \`git commit -- <files>\`
 
-If pritty isn't installed, suggest \`npm install -g @agentx/pritty\` (or workspace-link from agentx-toolbox).
+If pritty isn't installed, suggest \`npm install -g @ecruz165/pritty\` (or workspace-link from agentx-toolbox).
 `,
 
   pr: `---
@@ -116,8 +116,8 @@ Before running any pritty command, check:
 1. **Working in a git repo** — \`.git/\` exists. If not, suggest
    \`git init\` first.
 2. **pritty is installed** — \`which pritty\` succeeds. If not,
-   suggest \`npm install -g @agentx/pritty\` (or
-   \`toolz install pritty\` if the user has @agentx/toolz set up).
+   suggest \`npm install -g @ecruz165/pritty\` (or
+   \`toolz install pritty\` if the user has @ecruz165/toolz set up).
 3. **User has authenticated** — \`pritty auth status\` shows a
    provider. If not, suggest \`pritty auth login\` (Copilot) or
    setting an API key (\`ANTHROPIC_API_KEY\` / \`OPENAI_API_KEY\`).

@@ -1,18 +1,20 @@
 {
-  "name": "@agentx/skillzkit",
+  "name": "@ecruz165/skillzkit",
   "version": "0.1.0",
   "description": "AgentX skillzkit — commands, skills, and workflows for Claude Code. Part of the agentx-toolbox monorepo.",
   "type": "module",
   "bin": {
-    "skillzkit": "./dist/bin/cli.js"
+    "skillzkit": "./bin/skillzkit.mjs"
   },
+  "main": "./dist/cli.js",
   "exports": {
     ".": {
-      "types": "./dist/lib/index.d.ts",
-      "import": "./dist/lib/index.js"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     }
   },
   "files": [
+    "bin",
     "dist",
     "catalog.json",
     ".claude/commands",
@@ -21,18 +23,23 @@
   ],
   "scripts": {
     "catalog": "tsx scripts/generate-catalog.ts",
-    "build": "npm run catalog && tsc",
+    "build": "npm run catalog && tsup",
     "build:lambda": "npm run catalog && tsx scripts/build-lambda.ts",
     "test": "npm run catalog && vitest run",
     "test:watch": "vitest",
+    "test:e2e": "npm run catalog && vitest run tests/e2e",
+    "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build",
-    "cli": "tsx bin/cli.ts"
+    "cli": "tsx src/cli.ts"
   },
   "dependencies": {
+    "@ecruz165/cli-kit": "*",
+    "@ecruz165/skillzkit-types": "*",
+    "@ecruz165/tui-view-components": "*",
     "@opentui/core": "^0.2.2",
     "@opentui/react": "^0.2.2",
     "bun": "^1.3.13",
-    "cac": "^6.7.14",
+    "commander": "^14.0.3",
     "gray-matter": "^4.0.3",
     "hono": "^4.6.0",
     "react": "^19.2.0",
@@ -41,6 +48,7 @@
   "devDependencies": {
     "@types/node": "^22.10.0",
     "esbuild": "^0.27.0",
+    "tsup": "^8.5.1",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
     "vitest": "^4.1.5"

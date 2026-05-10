@@ -1,0 +1,21 @@
+# Sample ~/.agentx/theme/myapp.yaml
+#
+# Per-app overrides. Structure mirrors the resolved Theme — touch
+# only the tokens you want to change. The loader rejects this file
+# if it sees base00..base0F (those belong in default.yaml).
+
+colors:
+  # Make this app's primary stand out from the default
+  primary: "#ff79c6"
+
+  # Override a specific syntax color
+  syntax:
+    keyword: "#bd93f9"
+
+# Bigger button padding for this app specifically
+components:
+  button:
+    sizes:
+      md:
+        paddingX: 3
+        paddingY: 1

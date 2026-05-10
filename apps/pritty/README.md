@@ -1,4 +1,4 @@
-# 🎀 @agentx/pritty
+# 🎀 @ecruz165/pritty
 
 **Pretty PRs, zero effort.** AI-powered CLI that categorizes staged
 files by purpose, generates conventional commits, and creates pull
@@ -49,7 +49,7 @@ import {
   login, readAuth, logout,
   loadConfig,
   categorize, mergeCategories, DEFAULT_CATEGORIES,
-} from "@agentx/pritty";
+} from "@ecruz165/pritty";
 
 // Use pritty's primitives in other tools without spawning the CLI.
 const config = loadConfig();
@@ -151,8 +151,8 @@ Per [agentx-toolbox stack conventions](../../README.md):
 ```bash
 # from toolbox root:
 npm install
-npm test --workspace=@agentx/pritty
-npm run build --workspace=@agentx/pritty
+npm test --workspace=@ecruz165/pritty
+npm run build --workspace=@ecruz165/pritty
 
 # from this directory:
 npm test

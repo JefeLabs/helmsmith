@@ -1,4 +1,4 @@
-import { Command } from 'commander';
+import { createCli } from '@ecruz165/cli-kit';
 import path from 'node:path';
 import { homedir } from 'node:os';
 import { detectGitRoot } from './config/git-root.js';
@@ -8,8 +8,15 @@ import {
 } from './config/repos-registry.js';
 import { getConfigPath, getDataDir } from './store/paths.js';
 import { runMain } from './commands/run-main.js';
+import { runConnect } from './commands/connect.js';
 
-const program = new Command();
+// gitradar is read-only analytics with a TUI — no auth needed.
+// noopAuthProvider stays as the default; commands never call getToken.
+const { program } = createCli({
+  name: 'gitradar',
+  version: '0.1.0',
+  description: 'Terminal-based TUI analytics for git contribution data',
+});
 
 /** Shorthand to read global options from the root program. */
 function globals() {
@@ -37,11 +44,8 @@ function globalFilters() {
   return { org: g.org, team: g.team, tag: g.tag, group: g.group };
 }
 
-program
-  .name('gitradar')
-  .description('Terminal-based TUI analytics for git contribution data')
-  .version('0.1.0')
-  .enablePositionalOptions();
+// name/description/version handled by createCli above.
+program.enablePositionalOptions();
 
 // ── Global options ───────────────────────────────────────────────────────────
 
@@ -454,6 +458,11 @@ program
 program.action(async () => {
   await runMain(globals());
 });
+
+program
+  .command('connect')
+  .description('Open the interactive connections view (TUI)')
+  .action(() => runConnect());
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 

@@ -102,7 +102,7 @@ files).
 pritty's primitives are exported as a library:
 
 ```typescript
-import { categorize, loadConfig, login } from "@agentx/pritty";
+import { categorize, loadConfig, login } from "@ecruz165/pritty";
 ```
 
 Other AgentX tools (and your own scripts) can reuse the categorizer,
@@ -145,7 +145,7 @@ either — it inherits improvements as the platform evolves.
 The fastest path:
 
 ```bash
-npm install -g @agentx/pritty
+npm install -g @ecruz165/pritty
 pritty auth login                    # GitHub Device Flow
 pritty init                          # writes .pritty.json
 pritty categorize                    # try the file categorizer

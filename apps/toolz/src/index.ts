@@ -1,8 +1,8 @@
 /**
- * Public API for `@agentx/toolz`. Other AgentX packages import from
+ * Public API for `@ecruz165/toolz`. Other AgentX packages import from
  * here:
  *
- *   import { checkTool, detectPlatform } from "@agentx/toolz";
+ *   import { checkTool, detectPlatform } from "@ecruz165/toolz";
  *
  * Future additions (per the implementation plan): `ensureTool`,
  * `ensureTools`, registry CRUD.

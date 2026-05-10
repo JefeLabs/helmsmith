@@ -2,8 +2,18 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "."
+    "rootDir": "./src",
+    "jsx": "react-jsx",
+    "jsxImportSource": "@opentui/react",
+    "allowImportingTsExtensions": true,
+    "noEmit": true
   },
-  "include": ["lib/**/*", "bin/**/*", "scripts/**/*"],
-  "exclude": ["node_modules", "dist", ".claude", "**/*.test.ts"]
+  "include": ["src/**/*"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".claude",
+    "**/*.test.ts",
+    "src/tui/**"
+  ]
 }

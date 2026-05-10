@@ -155,7 +155,7 @@ Format:
 ### Standalone
 
 ```bash
-npm install -g @agentx/skillzkit
+npm install -g @ecruz165/skillzkit
 skillzkit init                       # interactive setup; mode=standalone
 skillzkit ui                         # browse the bundled catalog
 ```

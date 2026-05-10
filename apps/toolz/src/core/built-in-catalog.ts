@@ -61,7 +61,7 @@ export const BUILT_IN_CATALOG: Record<string, CatalogEntry> = {
     packages: { brew: "ffmpeg", apt: "ffmpeg", winget: "Gyan.FFmpeg" },
   },
   acli: {
-    description: "Atlassian CLI — Jira / Confluence / Bitbucket Cloud (used by @agentx/pritty's jira-cli adapter)",
+    description: "Atlassian CLI — Jira / Confluence / Bitbucket Cloud (used by @ecruz165/pritty's jira-cli adapter)",
     packages: {
       // Atlassian distributes via their own brew tap; brew auto-taps
       // when given the full <tap>/<formula> identifier.
@@ -75,13 +75,13 @@ export const BUILT_IN_CATALOG: Record<string, CatalogEntry> = {
     description:
       "AI-powered commit & PR CLI — categorize staged files, generate conventional commits, open PRs, all with human-in-the-loop. Part of agentx-toolbox.",
     packages: {
-      // Once @agentx/pritty is published to npm, all package
+      // Once @ecruz165/pritty is published to npm, all package
       // managers can install it via npm. Today this entry is a
       // forward-compatible declaration; before publish, users
       // workspace-link from agentx-toolbox.
-      brew: "@agentx/pritty",
-      apt: "@agentx/pritty",
-      winget: "@agentx/pritty",
+      brew: "@ecruz165/pritty",
+      apt: "@ecruz165/pritty",
+      winget: "@ecruz165/pritty",
     },
   },
 };

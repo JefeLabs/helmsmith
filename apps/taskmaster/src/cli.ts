@@ -1,4 +1,4 @@
-import { Command } from 'commander';
+import { createCli } from '@ecruz165/cli-kit';
 import chalk from 'chalk';
 import {
   CLI_BIN_NAME,
@@ -58,16 +58,21 @@ import { executeScan } from './commands/scan.js';
 import { executeParse } from './commands/parse.js';
 import { executeInit } from './commands/init.js';
 import { registerRebrand } from './commands/rebrand.js';
+import { runConnect } from './commands/connect.js';
 import yaml from 'js-yaml';
 import Table from 'cli-table3';
 
-const program = new Command();
+// No `auth` wired — taskmaster resolves auth per-project via
+// `resolveActiveAuth(config.ai.provider)` (multi-provider with PKCE
+// state for Anthropic Claude.ai subscription, broader than cli-kit's
+// AuthProvider contract). cli-kit still provides the bootstrap.
+const { program } = createCli({
+  name: CLI_BIN_NAME,
+  version: CLI_VERSION,
+  description: CLI_DESCRIPTION,
+});
 
-program
-  .name(CLI_BIN_NAME)
-  .description(CLI_DESCRIPTION)
-  .version(CLI_VERSION)
-  .option('--project <name>', 'Target a specific project without switching active');
+program.option('--project <name>', 'Target a specific project without switching active');
 
 // --- Placeholder handler ---
 function notImplemented(cmdName: string) {
@@ -1784,6 +1789,11 @@ blueprint
       process.exitCode = 1;
     }
   });
+
+program
+  .command('connect')
+  .description('Open the interactive connections view (TUI)')
+  .action(() => runConnect());
 
 // Hidden commands
 registerRebrand(program);

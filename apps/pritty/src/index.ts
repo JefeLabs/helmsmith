@@ -1,5 +1,5 @@
 /**
- * @agentx/pritty — public API for programmatic consumers.
+ * @ecruz165/pritty — public API for programmatic consumers.
  * Phase-1 surface: auth + config + categorizer. The commit/pr/rebase
  * orchestrators are added in follow-up phases.
  */

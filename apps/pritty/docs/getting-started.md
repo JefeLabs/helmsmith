@@ -15,7 +15,7 @@ table in [executive-overview.md](executive-overview.md).
 ## 1. Install
 
 ```bash
-npm install -g @agentx/pritty
+npm install -g @ecruz165/pritty
 ```
 
 Verify:
@@ -316,7 +316,7 @@ cosmiconfig discovers any of: `.pritty.json`, `.prittyrc`,
 The programmatic API is exported:
 
 ```typescript
-import { categorize, loadConfig } from "@agentx/pritty";
+import { categorize, loadConfig } from "@ecruz165/pritty";
 
 const config = loadConfig();
 const buckets = categorize(stagedFiles, config.categories);
