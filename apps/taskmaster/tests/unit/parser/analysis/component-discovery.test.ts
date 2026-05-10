@@ -1,12 +1,12 @@
-import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
-  discoverComponents,
-  resolveWorkspaces,
-  extractNpmCommands,
   detectFrameworks,
+  discoverComponents,
+  extractNpmCommands,
+  resolveWorkspaces,
 } from '../../../../src/parser/analysis/component-discovery.js';
 
 describe('discoverComponents', () => {
@@ -104,13 +104,13 @@ describe('discoverComponents', () => {
     // Root has no src/, so only workspace components are discovered
     expect(components).toHaveLength(2);
 
-    const apiComp = components.find(c => c.id === 'api');
+    const apiComp = components.find((c) => c.id === 'api');
     expect(apiComp).toBeDefined();
     expect(apiComp!.name).toBe('@myorg/api');
     expect(apiComp!.howToBuild).toBe('npm run build');
     expect(apiComp!.howToTest).toBe('npm test');
 
-    const webComp = components.find(c => c.id === 'web');
+    const webComp = components.find((c) => c.id === 'web');
     expect(webComp).toBeDefined();
     expect(webComp!.name).toBe('@myorg/web');
     expect(webComp!.howToBuild).toBe('npm run build');
@@ -143,7 +143,7 @@ describe('discoverComponents', () => {
 
     // Should include root + workspace package
     expect(components).toHaveLength(2);
-    const rootComp = components.find(c => c.rootPath === tmpDir);
+    const rootComp = components.find((c) => c.rootPath === tmpDir);
     expect(rootComp).toBeDefined();
     expect(rootComp!.name).toBe('tooling-mono');
   });
@@ -205,10 +205,7 @@ describe('discoverComponents', () => {
   it('discovers Rust workspace with members', async () => {
     tmpDir = mkdtempSync(join(tmpdir(), 'comp-disc-rust-ws-'));
 
-    writeFileSync(
-      join(tmpDir, 'Cargo.toml'),
-      '[workspace]\nmembers = [\n  "crates/*"\n]\n',
-    );
+    writeFileSync(join(tmpDir, 'Cargo.toml'), '[workspace]\nmembers = [\n  "crates/*"\n]\n');
 
     mkdirSync(join(tmpDir, 'crates'), { recursive: true });
     mkdirSync(join(tmpDir, 'crates', 'core'));
@@ -230,7 +227,7 @@ describe('discoverComponents', () => {
     const components = await discoverComponents(tmpDir);
 
     expect(components).toHaveLength(2);
-    const names = components.map(c => c.name).sort();
+    const names = components.map((c) => c.name).sort();
     expect(names).toEqual(['mylib-cli', 'mylib-core']);
   });
 
@@ -238,10 +235,7 @@ describe('discoverComponents', () => {
     tmpDir = mkdtempSync(join(tmpdir(), 'comp-disc-jvm-'));
     writeFileSync(join(tmpDir, 'pom.xml'), '<project></project>');
     mkdirSync(join(tmpDir, 'src', 'main', 'java'), { recursive: true });
-    writeFileSync(
-      join(tmpDir, 'src', 'main', 'java', 'App.java'),
-      'public class App {}',
-    );
+    writeFileSync(join(tmpDir, 'src', 'main', 'java', 'App.java'), 'public class App {}');
 
     const components = await discoverComponents(tmpDir);
 
@@ -258,10 +252,7 @@ describe('discoverComponents', () => {
     tmpDir = mkdtempSync(join(tmpdir(), 'comp-disc-gradle-'));
     writeFileSync(join(tmpDir, 'build.gradle'), 'apply plugin: "java"');
     mkdirSync(join(tmpDir, 'src', 'main', 'java'), { recursive: true });
-    writeFileSync(
-      join(tmpDir, 'src', 'main', 'java', 'App.java'),
-      'public class App {}',
-    );
+    writeFileSync(join(tmpDir, 'src', 'main', 'java', 'App.java'), 'public class App {}');
 
     const components = await discoverComponents(tmpDir);
 
@@ -317,18 +308,15 @@ describe('discoverComponents', () => {
     const components = await discoverComponents(tmpDir);
 
     // Should only have the Node component, not the Makefile one
-    const makeComp = components.find(c => c.tags.includes('build:make'));
+    const makeComp = components.find((c) => c.tags.includes('build:make'));
     expect(makeComp).toBeUndefined();
-    const nodeComp = components.find(c => c.tags.includes('build:npm'));
+    const nodeComp = components.find((c) => c.tags.includes('build:npm'));
     expect(nodeComp).toBeDefined();
   });
 
   it('handles scoped package names correctly', async () => {
     tmpDir = mkdtempSync(join(tmpdir(), 'comp-disc-scoped-'));
-    writeFileSync(
-      join(tmpDir, 'package.json'),
-      JSON.stringify({ name: '@my-org/cool-package' }),
-    );
+    writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({ name: '@my-org/cool-package' }));
 
     const components = await discoverComponents(tmpDir);
 
@@ -465,10 +453,7 @@ describe('resolveWorkspaces', () => {
     mkdirSync(join(tmpDir, 'packages', 'alpha'), { recursive: true });
     mkdirSync(join(tmpDir, 'packages', 'beta'), { recursive: true });
 
-    const dirs = await resolveWorkspaces(
-      { workspaces: ['packages/*'] },
-      tmpDir,
-    );
+    const dirs = await resolveWorkspaces({ workspaces: ['packages/*'] }, tmpDir);
 
     expect(dirs).toHaveLength(2);
     expect(dirs.sort()).toEqual([
@@ -481,10 +466,7 @@ describe('resolveWorkspaces', () => {
     tmpDir = mkdtempSync(join(tmpdir(), 'ws-resolve-obj-'));
     mkdirSync(join(tmpDir, 'libs', 'shared'), { recursive: true });
 
-    const dirs = await resolveWorkspaces(
-      { workspaces: { packages: ['libs/*'] } },
-      tmpDir,
-    );
+    const dirs = await resolveWorkspaces({ workspaces: { packages: ['libs/*'] } }, tmpDir);
 
     expect(dirs).toHaveLength(1);
     expect(dirs[0]).toBe(join(tmpDir, 'libs', 'shared'));
@@ -510,10 +492,7 @@ describe('resolveWorkspaces', () => {
     tmpDir = mkdtempSync(join(tmpdir(), 'ws-resolve-literal-'));
     mkdirSync(join(tmpDir, 'tools', 'linter'), { recursive: true });
 
-    const dirs = await resolveWorkspaces(
-      { workspaces: ['tools/linter'] },
-      tmpDir,
-    );
+    const dirs = await resolveWorkspaces({ workspaces: ['tools/linter'] }, tmpDir);
 
     expect(dirs).toHaveLength(1);
     expect(dirs[0]).toBe(join(tmpDir, 'tools', 'linter'));
@@ -522,10 +501,7 @@ describe('resolveWorkspaces', () => {
   it('skips nonexistent workspace directories', async () => {
     tmpDir = mkdtempSync(join(tmpdir(), 'ws-resolve-miss-'));
 
-    const dirs = await resolveWorkspaces(
-      { workspaces: ['does-not-exist/*'] },
-      tmpDir,
-    );
+    const dirs = await resolveWorkspaces({ workspaces: ['does-not-exist/*'] }, tmpDir);
 
     expect(dirs).toEqual([]);
   });

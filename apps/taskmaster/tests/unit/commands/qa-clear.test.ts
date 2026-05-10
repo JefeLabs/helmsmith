@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
-import type { TaskNode, StateDefinition } from '../../../src/config/schema.js';
-import { STANDARD_PRESET } from '../../../src/config/state-presets.js';
+import { describe, expect, it } from 'vitest';
 import { executeQAClear, executeQAClearBatch } from '../../../src/commands/qa-clear.js';
+import type { StateDefinition, TaskNode } from '../../../src/config/schema.js';
+import { STANDARD_PRESET } from '../../../src/config/state-presets.js';
 
 const STATES: StateDefinition[] = [...STANDARD_PRESET];
 
@@ -106,11 +106,15 @@ describe('executeQAClearBatch', () => {
       makeTask({ id: 'T-3', tags: ['qa-review-needed', 'qa-failed-source'] }),
     ];
 
-    const result = executeQAClearBatch(tasks, [
-      { taskId: 'T-1' },
-      { taskId: 'T-2', note: 'Tests pass' },
-      { taskId: 'T-3', reporter: 'dev-agent' },
-    ], STATES);
+    const result = executeQAClearBatch(
+      tasks,
+      [
+        { taskId: 'T-1' },
+        { taskId: 'T-2', note: 'Tests pass' },
+        { taskId: 'T-3', reporter: 'dev-agent' },
+      ],
+      STATES,
+    );
 
     expect(result.entries).toHaveLength(3);
     expect(result.errors).toHaveLength(0);
@@ -129,14 +133,9 @@ describe('executeQAClearBatch', () => {
   });
 
   it('handles mix of valid and invalid task IDs', () => {
-    const tasks = [
-      makeTask({ id: 'T-1', tags: ['qa-review-needed'] }),
-    ];
+    const tasks = [makeTask({ id: 'T-1', tags: ['qa-review-needed'] })];
 
-    const result = executeQAClearBatch(tasks, [
-      { taskId: 'T-1' },
-      { taskId: 'T-999' },
-    ], STATES);
+    const result = executeQAClearBatch(tasks, [{ taskId: 'T-1' }, { taskId: 'T-999' }], STATES);
 
     expect(result.entries).toHaveLength(1);
     expect(result.errors).toHaveLength(1);
@@ -151,10 +150,7 @@ describe('executeQAClearBatch', () => {
       makeTask({ id: 'T-2', tags: [] }),
     ];
 
-    const result = executeQAClearBatch(tasks, [
-      { taskId: 'T-1' },
-      { taskId: 'T-2' },
-    ], STATES);
+    const result = executeQAClearBatch(tasks, [{ taskId: 'T-1' }, { taskId: 'T-2' }], STATES);
 
     expect(result.entries[0].tagRemoved).toBe(true);
     expect(result.entries[1].tagRemoved).toBe(false);
@@ -163,9 +159,7 @@ describe('executeQAClearBatch', () => {
   });
 
   it('preserves other tags', () => {
-    const tasks = [
-      makeTask({ id: 'T-1', tags: ['important', 'qa-review-needed', 'v2'] }),
-    ];
+    const tasks = [makeTask({ id: 'T-1', tags: ['important', 'qa-review-needed', 'v2'] })];
 
     const result = executeQAClearBatch(tasks, [{ taskId: 'T-1' }], STATES);
 

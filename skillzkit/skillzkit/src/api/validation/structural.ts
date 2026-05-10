@@ -17,7 +17,7 @@ import type {
   ContributionKind,
   CreateContributionRequest,
   ReviewFinding,
-} from "../contracts.js";
+} from '../contracts.js';
 
 /** Slash-command slug regex: lowercase, segment-separated by colons,
  *  each segment starts with a letter and may contain digits/hyphens.
@@ -69,32 +69,28 @@ export function validateStructural(
 
 /* ── slug / name format ──────────────────────────────────────── */
 
-function validateSlug(
-  kind: ContributionKind,
-  slug: string,
-  findings: ReviewFinding[],
-): void {
+function validateSlug(kind: ContributionKind, slug: string, findings: ReviewFinding[]): void {
   if (!slug || slug.length === 0) {
     findings.push({
-      severity: "high",
-      axis: "structural",
+      severity: 'high',
+      axis: 'structural',
       message: `Missing slug/name`,
     });
     return;
   }
 
-  if (kind === "skill") {
+  if (kind === 'skill') {
     if (!SKILL_NAME_REGEX.test(slug)) {
       findings.push({
-        severity: "high",
-        axis: "structural",
+        severity: 'high',
+        axis: 'structural',
         message: `Skill name "${slug}" does not match \`[a-z][a-z0-9-]*\` — lowercase letters, digits, hyphens; must start with a letter`,
       });
     }
   } else if (!COMMAND_SLUG_REGEX.test(slug)) {
     findings.push({
-      severity: "high",
-      axis: "structural",
+      severity: 'high',
+      axis: 'structural',
       message: `${kind} slug "${slug}" does not match \`<segment>(:<segment>)+\` — colon-separated lowercase segments (e.g., "product:strategy:scaffold")`,
     });
   }
@@ -115,27 +111,27 @@ function requiredFor(kind: ContributionKind): RequiredField[] {
   // skillzkit-author skill body for the source of truth.
   const common: RequiredField[] = [
     {
-      key: "description",
-      predicate: (v) => typeof v === "string" && v.trim().length > 0,
-      hint: "non-empty string describing what this artifact does",
+      key: 'description',
+      predicate: (v) => typeof v === 'string' && v.trim().length > 0,
+      hint: 'non-empty string describing what this artifact does',
     },
   ];
-  if (kind === "workflow") {
+  if (kind === 'workflow') {
     return [
       ...common,
       {
-        key: "outcome",
-        predicate: (v) => typeof v === "string" && v.trim().length > 0,
+        key: 'outcome',
+        predicate: (v) => typeof v === 'string' && v.trim().length > 0,
         hint: 'imperative verb + outcome, e.g. "Apply a brand refresh"',
       },
     ];
   }
-  if (kind === "skill") {
+  if (kind === 'skill') {
     return [
       ...common,
       {
-        key: "name",
-        predicate: (v) => typeof v === "string" && SKILL_NAME_REGEX.test(v),
+        key: 'name',
+        predicate: (v) => typeof v === 'string' && SKILL_NAME_REGEX.test(v),
         hint: "lowercase identifier matching the skill's directory name",
       },
     ];
@@ -152,14 +148,14 @@ function validateRequiredFrontmatter(
     const value = fm[field.key];
     if (value === undefined || value === null) {
       findings.push({
-        severity: "high",
-        axis: "structural",
+        severity: 'high',
+        axis: 'structural',
         message: `Missing frontmatter field \`${field.key}\` (${field.hint})`,
       });
     } else if (!field.predicate(value)) {
       findings.push({
-        severity: "high",
-        axis: "structural",
+        severity: 'high',
+        axis: 'structural',
         message: `Frontmatter field \`${field.key}\` is invalid — expected ${field.hint}`,
       });
     }
@@ -177,15 +173,18 @@ function validateTags(
   if (raw === undefined || raw === null) return;
 
   let tags: string[];
-  if (Array.isArray(raw) && raw.every((t) => typeof t === "string")) {
+  if (Array.isArray(raw) && raw.every((t) => typeof t === 'string')) {
     tags = raw;
-  } else if (typeof raw === "string") {
+  } else if (typeof raw === 'string') {
     // Comma-separated form, mirroring the loader's tolerance
-    tags = raw.split(",").map((s) => s.trim()).filter(Boolean);
+    tags = raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
   } else {
     findings.push({
-      severity: "high",
-      axis: "structural",
+      severity: 'high',
+      axis: 'structural',
       message: `Frontmatter \`tags\` must be an array of strings or a comma-separated string`,
     });
     return;
@@ -195,8 +194,8 @@ function validateTags(
   for (const tag of tags) {
     if (seen.has(tag)) {
       findings.push({
-        severity: "medium",
-        axis: "structural",
+        severity: 'medium',
+        axis: 'structural',
         message: `Duplicate tag \`${tag}\``,
       });
       continue;
@@ -204,16 +203,16 @@ function validateTags(
     seen.add(tag);
     if (!TAG_REGEX.test(tag)) {
       findings.push({
-        severity: "high",
-        axis: "structural",
+        severity: 'high',
+        axis: 'structural',
         message: `Tag \`${tag}\` violates format — must be lowercase, hyphen-separated, ASCII letters/digits only, max 24 chars`,
       });
       continue;
     }
     if (coreTags.size > 0 && !coreTags.has(tag)) {
       findings.push({
-        severity: "low",
-        axis: "structural",
+        severity: 'low',
+        axis: 'structural',
         message: `Tag \`${tag}\` is an extension (not in TAGS.md core list) — fine, but flagged for vocabulary visibility`,
       });
     }
@@ -235,15 +234,15 @@ function validateReferences(
   ]);
 
   for (const file of req.files) {
-    if (!file.path.endsWith(".md")) continue;
+    if (!file.path.endsWith('.md')) continue;
     for (const match of file.content.matchAll(REFERENCE_REGEX)) {
-      const ref = match[1].replace(/[.,;:)\]*]+$/, "");
-      if (ref.includes("*")) continue; // wildcards aren't required to resolve
+      const ref = match[1].replace(/[.,;:)\]*]+$/, '');
+      if (ref.includes('*')) continue; // wildcards aren't required to resolve
       if (ref === req.slug) continue; // self-references are intentional
       if (!knownSlugs.has(ref)) {
         findings.push({
-          severity: "medium",
-          axis: "structural",
+          severity: 'medium',
+          axis: 'structural',
           message: `Body cites \`/${ref}\` but no such slug exists in the current catalog`,
           fileRef: file.path,
         });
@@ -259,11 +258,11 @@ function validateBodyLength(
   findings: ReviewFinding[],
 ): void {
   for (const file of files) {
-    if (!file.path.endsWith(".md")) continue;
+    if (!file.path.endsWith('.md')) continue;
     if (file.content.length > MAX_BODY_LENGTH) {
       findings.push({
-        severity: "high",
-        axis: "structural",
+        severity: 'high',
+        axis: 'structural',
         message: `Body of \`${file.path}\` is ${file.content.length} bytes; max ${MAX_BODY_LENGTH}. Consider splitting into separate artifacts.`,
         fileRef: file.path,
       });

@@ -16,17 +16,10 @@
  * fix-resubmit-fix-resubmit.
  */
 
-import type {
-  CatalogIndex,
-  CreateContributionRequest,
-  ReviewFinding,
-} from "./contracts.js";
-import { validateStructural } from "./validation/structural.js";
-import { validateFileBundle } from "./validation/files.js";
-import {
-  type ContributionReviewer,
-  shouldBlock,
-} from "./validation/reviewer.js";
+import type { CatalogIndex, CreateContributionRequest, ReviewFinding } from './contracts.js';
+import { validateFileBundle } from './validation/files.js';
+import { type ContributionReviewer, shouldBlock } from './validation/reviewer.js';
+import { validateStructural } from './validation/structural.js';
 
 export interface ValidateContributionOptions {
   catalog: CatalogIndex | null;
@@ -83,10 +76,10 @@ export async function validateContribution(
       // medium-severity so the operator sees it and can fall back
       // to layer-1/2-only acceptance until the reviewer recovers.
       findings.push({
-        severity: "medium",
-        axis: "quality",
+        severity: 'medium',
+        axis: 'quality',
         message: `Agent reviewer error: ${
-          (err as Error).message ?? "unknown"
+          (err as Error).message ?? 'unknown'
         }. Layers 1+2 still validated successfully.`,
       });
     }
@@ -100,15 +93,15 @@ export async function validateContribution(
 
 /* ── public re-exports for callers ───────────────────────────── */
 
-export { validateStructural } from "./validation/structural.js";
-export { validateFileBundle } from "./validation/files.js";
+export { validateFileBundle } from './validation/files.js';
 export {
-  type ContributionReviewer,
-  type ReviewInput,
   type AdapterLike,
-  type AgentAdapterReviewerOptions,
   AgentAdapterReviewer,
+  type AgentAdapterReviewerOptions,
+  type ContributionReviewer,
   MockReviewer,
   parseFindings,
+  type ReviewInput,
   shouldBlock,
-} from "./validation/reviewer.js";
+} from './validation/reviewer.js';
+export { validateStructural } from './validation/structural.js';

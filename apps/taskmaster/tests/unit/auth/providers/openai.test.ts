@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock token-manager
 vi.mock('../../../../src/auth/token-manager.js', () => ({
@@ -122,7 +122,7 @@ describe('OpenAIProvider', () => {
       expect(body.stream).toBe(false);
 
       const headers = opts!.headers as Record<string, string>;
-      expect(headers['Authorization']).toBe('Bearer oai_valid_token');
+      expect(headers.Authorization).toBe('Bearer oai_valid_token');
 
       fetchSpy.mockRestore();
     });
@@ -147,7 +147,7 @@ describe('OpenAIProvider', () => {
 
       const headers = fetchSpy.mock.calls[0][1]!.headers as Record<string, string>;
       // Env var takes priority over stored token
-      expect(headers['Authorization']).toBe('Bearer sk-env-api-key');
+      expect(headers.Authorization).toBe('Bearer sk-env-api-key');
 
       fetchSpy.mockRestore();
     });
@@ -155,9 +155,9 @@ describe('OpenAIProvider', () => {
     it('throws when not authenticated', async () => {
       mockedReadAuthFile.mockResolvedValue({ active_provider: 'openai' });
 
-      await expect(
-        provider.callAI([{ role: 'user', content: 'test' }], 'gpt-4o'),
-      ).rejects.toThrow('Not authenticated');
+      await expect(provider.callAI([{ role: 'user', content: 'test' }], 'gpt-4o')).rejects.toThrow(
+        'Not authenticated',
+      );
     });
 
     it('throws on API error', async () => {
@@ -170,9 +170,9 @@ describe('OpenAIProvider', () => {
         new Response('Bad Request', { status: 400 }),
       );
 
-      await expect(
-        provider.callAI([{ role: 'user', content: 'test' }], 'gpt-4o'),
-      ).rejects.toThrow('OpenAI API error (400)');
+      await expect(provider.callAI([{ role: 'user', content: 'test' }], 'gpt-4o')).rejects.toThrow(
+        'OpenAI API error (400)',
+      );
 
       vi.restoreAllMocks();
     });
@@ -183,7 +183,8 @@ describe('OpenAIProvider', () => {
         openai: { access_token: 'oai_token' },
       });
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
         .mockResolvedValueOnce(
           new Response('Rate limited', {
             status: 429,
@@ -199,10 +200,7 @@ describe('OpenAIProvider', () => {
           ),
         );
 
-      const result = await provider.callAI(
-        [{ role: 'user', content: 'test' }],
-        'gpt-4o',
-      );
+      const result = await provider.callAI([{ role: 'user', content: 'test' }], 'gpt-4o');
 
       expect(result.choices[0].message.content).toBe('ok after retry');
       expect(fetchSpy).toHaveBeenCalledTimes(2);
@@ -233,7 +231,8 @@ describe('OpenAIProvider', () => {
           },
         });
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
         // First fetch: refresh token exchange
         .mockResolvedValueOnce(
           new Response(
@@ -255,24 +254,21 @@ describe('OpenAIProvider', () => {
           ),
         );
 
-      const result = await provider.callAI(
-        [{ role: 'user', content: 'test' }],
-        'gpt-4o',
-      );
+      const result = await provider.callAI([{ role: 'user', content: 'test' }], 'gpt-4o');
 
       expect(result.choices[0].message.content).toBe('ok');
 
       // Verify refresh token was exchanged
       const refreshCall = fetchSpy.mock.calls[0];
       expect(refreshCall[0]).toBe('https://auth.openai.com/oauth/token');
-      const refreshBody = (refreshCall[1]!.body as string);
+      const refreshBody = refreshCall[1]!.body as string;
       expect(refreshBody).toContain('grant_type=refresh_token');
       expect(refreshBody).toContain('refresh_token=refresh_123');
 
       // Verify API call used the refreshed token
       const apiCall = fetchSpy.mock.calls[1];
       const headers = apiCall[1]!.headers as Record<string, string>;
-      expect(headers['Authorization']).toBe('Bearer refreshed_token');
+      expect(headers.Authorization).toBe('Bearer refreshed_token');
 
       // Verify auth file was updated
       expect(mockedWriteAuthFile).toHaveBeenCalled();
@@ -384,9 +380,9 @@ describe('OpenAIProvider', () => {
         },
       });
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-        new Response('', { status: 200 }),
-      );
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(new Response('', { status: 200 }));
 
       await provider.logout();
 

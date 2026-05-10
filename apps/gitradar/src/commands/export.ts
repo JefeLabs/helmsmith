@@ -1,8 +1,8 @@
-import { select } from "@inquirer/prompts";
-import yaml from "js-yaml";
-import { loadAllRegistries, getAvailableWorkspaces } from "../config/repos-registry.js";
-import { detectGitRoot } from "../config/git-root.js";
-import type { LoadedWorkspace } from "../config/repos-registry.js";
+import { select } from '@inquirer/prompts';
+import yaml from 'js-yaml';
+import { detectGitRoot } from '../config/git-root.js';
+import type { LoadedWorkspace } from '../config/repos-registry.js';
+import { getAvailableWorkspaces, loadAllRegistries } from '../config/repos-registry.js';
 
 /**
  * Export a workspace as portable YAML to stdout.
@@ -15,7 +15,7 @@ export async function exportWorkspace(): Promise<void> {
   const workspaces = getAvailableWorkspaces(registries);
 
   if (workspaces.length === 0) {
-    console.error("No workspaces found. Create ~/.agentx/repos.yml first.");
+    console.error('No workspaces found. Create ~/.agentx/repos.yml first.');
     process.exitCode = 1;
     return;
   }
@@ -27,12 +27,12 @@ export async function exportWorkspace(): Promise<void> {
   } else {
     // Build choices grouped by source
     const choices = workspaces.map((w) => ({
-      name: `${w.name}${w.label ? ` — ${w.label}` : ""} (${w.repos.length} repos) [${w.source.type}]`,
+      name: `${w.name}${w.label ? ` — ${w.label}` : ''} (${w.repos.length} repos) [${w.source.type}]`,
       value: w,
     }));
 
     selected = await select<LoadedWorkspace>({
-      message: "Select workspace to export:",
+      message: 'Select workspace to export:',
       choices,
     });
   }
@@ -40,7 +40,7 @@ export async function exportWorkspace(): Promise<void> {
   // 3. Strip paths and build portable output
   const portableRepos = selected.repos.map((r) => {
     const portable: Record<string, unknown> = { name: r.name };
-    if (r.group && r.group !== "default") portable.group = r.group;
+    if (r.group && r.group !== 'default') portable.group = r.group;
     if (r.tags && r.tags.length > 0) portable.tags = r.tags;
     return portable;
   });

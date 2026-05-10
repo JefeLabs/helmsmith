@@ -1,20 +1,44 @@
-import { readdir, stat, readFile } from 'node:fs/promises';
-import { join, relative, extname } from 'node:path';
+import { readdir, readFile, stat } from 'node:fs/promises';
+import { extname, join } from 'node:path';
 import type { CodebaseScanResult } from './types.js';
 
 const IGNORED_DIRS = new Set([
-  'node_modules', '.git', 'dist', 'build', 'target', 'vendor',
-  '__pycache__', '.next', '.nuxt', '.output', 'coverage',
-  '.turbo', '.vercel', '.cache', 'tmp', '.tmp',
+  'node_modules',
+  '.git',
+  'dist',
+  'build',
+  'target',
+  'vendor',
+  '__pycache__',
+  '.next',
+  '.nuxt',
+  '.output',
+  'coverage',
+  '.turbo',
+  '.vercel',
+  '.cache',
+  'tmp',
+  '.tmp',
 ]);
 
 const MAX_DEPTH = 4;
 
 const MANIFEST_FILES = new Set([
-  'package.json', 'tsconfig.json', 'Cargo.toml', 'go.mod', 'go.sum',
-  'Dockerfile', 'docker-compose.yml', 'docker-compose.yaml',
-  '.github/workflows', 'Makefile', 'pyproject.toml', 'requirements.txt',
-  'pom.xml', 'build.gradle', 'build.gradle.kts',
+  'package.json',
+  'tsconfig.json',
+  'Cargo.toml',
+  'go.mod',
+  'go.sum',
+  'Dockerfile',
+  'docker-compose.yml',
+  'docker-compose.yaml',
+  '.github/workflows',
+  'Makefile',
+  'pyproject.toml',
+  'requirements.txt',
+  'pom.xml',
+  'build.gradle',
+  'build.gradle.kts',
 ]);
 
 /**
@@ -31,6 +55,7 @@ async function walkDirectory(
 ): Promise<void> {
   if (depth > MAX_DEPTH) return;
 
+  // biome-ignore lint/suspicious/noImplicitAnyLet: assigned in try/catch below
   let entries;
   try {
     entries = await readdir(currentPath, { withFileTypes: true });
@@ -93,7 +118,7 @@ async function readManifest(filePath: string, name: string): Promise<string> {
     }
 
     // Truncate large files
-    return content.length > 2000 ? content.substring(0, 2000) + '\n...(truncated)' : content;
+    return content.length > 2000 ? `${content.substring(0, 2000)}\n...(truncated)` : content;
   } catch {
     return '(could not read)';
   }
@@ -116,7 +141,7 @@ function detectPatterns(
   }
 
   // Docker
-  if (manifests.some(m => m.startsWith('Dockerfile') || m.startsWith('docker-compose'))) {
+  if (manifests.some((m) => m.startsWith('Dockerfile') || m.startsWith('docker-compose'))) {
     patterns.push('docker');
   }
 

@@ -1,16 +1,22 @@
-import { createCliRenderer } from "@opentui/core";
-import { createRoot, useKeyboard, useOnResize, useRenderer, useTerminalDimensions } from "@opentui/react";
-import { useMemo, useRef, useState } from "react";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
-import { readFileSync, existsSync } from "node:fs";
-import type { Catalog } from "../types.js";
-import { getInterfaces } from "../interfaces.js";
-import { resolveCascade, summarize } from "./state.js";
-import { installSelection } from "./install.js";
-import { tryReadConfig } from "../init/config.js";
-import { SkillzkitApiClient, SkillzkitApiError } from "../api/client.js";
-import type { CatalogIndex } from "../api/contracts.js";
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createCliRenderer } from '@opentui/core';
+import {
+  createRoot,
+  useKeyboard,
+  useOnResize,
+  useRenderer,
+  useTerminalDimensions,
+} from '@opentui/react';
+import { useMemo, useRef, useState } from 'react';
+import { SkillzkitApiClient, SkillzkitApiError } from '../api/client.js';
+import type { CatalogIndex } from '../api/contracts.js';
+import { tryReadConfig } from '../init/config.js';
+import { getInterfaces } from '../interfaces.js';
+import type { Catalog } from '../types.js';
+import { installSelection } from './install.js';
+import { resolveCascade, summarize } from './state.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -18,10 +24,10 @@ const __dirname = dirname(__filename);
 function findPackageRoot(): string {
   let dir = __dirname;
   for (let i = 0; i < 5; i++) {
-    if (existsSync(join(dir, "catalog.json"))) return dir;
+    if (existsSync(join(dir, 'catalog.json'))) return dir;
     dir = dirname(dir);
   }
-  throw new Error("catalog.json not found from " + __dirname);
+  throw new Error(`catalog.json not found from ${__dirname}`);
 }
 
 /**
@@ -36,9 +42,9 @@ function indexToCatalog(index: CatalogIndex): Catalog {
     version: index.version,
     generatedAt: index.generatedAt,
     packageVersion: index.packageVersion,
-    commands: index.commands.map((s) => ({ ...s, body: "" })),
-    skills: index.skills.map((s) => ({ ...s, body: "" })),
-    workflows: index.workflows.map((s) => ({ ...s, body: "" })),
+    commands: index.commands.map((s) => ({ ...s, body: '' })),
+    skills: index.skills.map((s) => ({ ...s, body: '' })),
+    workflows: index.workflows.map((s) => ({ ...s, body: '' })),
   };
 }
 
@@ -51,10 +57,8 @@ const config = tryReadConfig();
 const targetDir = process.env.SKILLZKIT_TARGET || process.cwd();
 
 let catalog: Catalog;
-if (config?.mode === "team") {
-  process.stdout.write(
-    `Loading catalog from ${config.team.apiUrl}...\n`,
-  );
+if (config?.mode === 'team') {
+  process.stdout.write(`Loading catalog from ${config.team.apiUrl}...\n`);
   try {
     const client = new SkillzkitApiClient({ baseUrl: config.team.apiUrl });
     const index = await client.getCatalog();
@@ -70,10 +74,10 @@ if (config?.mode === "team") {
   }
 } else {
   const packageRoot = findPackageRoot();
-  catalog = JSON.parse(readFileSync(join(packageRoot, "catalog.json"), "utf8"));
+  catalog = JSON.parse(readFileSync(join(packageRoot, 'catalog.json'), 'utf8'));
 }
 
-type Section = "persona" | "framework" | "integration" | "tool";
+type Section = 'persona' | 'framework' | 'integration' | 'tool';
 
 interface CatalogItem {
   id: string;
@@ -84,7 +88,7 @@ interface CatalogItem {
   /** Supported invocation interfaces; empty for personas/frameworks. */
   interfaces: string[];
   /** If set, this item is a child of a persona; renders indented in the tree. */
-  parentPersonaId?: "product" | "engineer" | "market";
+  parentPersonaId?: 'product' | 'engineer' | 'market';
   /** If set, this item is nested under a topic area within a persona. */
   parentTopicId?: string;
   /** If set, this item is a leaf task under a sub-namespace folder
@@ -101,39 +105,103 @@ interface CatalogItem {
 }
 
 interface TopicArea {
-  id: string;          // "topic:product:strategy"
-  label: string;       // "Strategy"
-  personaId: "product" | "engineer" | "market";
-  prefix: string;      // "product:strategy:" — slugs starting with this belong
+  id: string; // "topic:product:strategy"
+  label: string; // "Strategy"
+  personaId: 'product' | 'engineer' | 'market';
+  prefix: string; // "product:strategy:" — slugs starting with this belong
   description: string;
 }
 
 const TOPIC_AREAS: TopicArea[] = [
   // product
-  { id: "topic:product:strategy", label: "Strategy", personaId: "product", prefix: "product:strategy:",
-    description: "Briefs, scaffolding, research, editorial style, SEO, brand workflows, token extraction." },
-  { id: "topic:product:design", label: "Design", personaId: "product", prefix: "product:design:",
-    description: ".pen file design work — foundations (colors/typography/spaces/icons), patterns, page templates." },
-  { id: "topic:product:ux", label: "UX", personaId: "product", prefix: "product:ux:",
-    description: "Personas (traditional + JTBD), journeys (customer / user-flow / service-blueprint), stories, story maps." },
+  {
+    id: 'topic:product:strategy',
+    label: 'Strategy',
+    personaId: 'product',
+    prefix: 'product:strategy:',
+    description:
+      'Briefs, scaffolding, research, editorial style, SEO, brand workflows, token extraction.',
+  },
+  {
+    id: 'topic:product:design',
+    label: 'Design',
+    personaId: 'product',
+    prefix: 'product:design:',
+    description:
+      '.pen file design work — foundations (colors/typography/spaces/icons), patterns, page templates.',
+  },
+  {
+    id: 'topic:product:ux',
+    label: 'UX',
+    personaId: 'product',
+    prefix: 'product:ux:',
+    description:
+      'Personas (traditional + JTBD), journeys (customer / user-flow / service-blueprint), stories, story maps.',
+  },
   // engineer
-  { id: "topic:engineer:architecture", label: "Architecture", personaId: "engineer", prefix: "engineer:architecture:",
-    description: "ADRs, capability introduction, architecture reviews, C4 diagrams, data models, API contracts, integration patterns." },
-  { id: "topic:engineer:maintenance", label: "Maintenance", personaId: "engineer", prefix: "engineer:maintenance:",
-    description: "Dependency upgrades by ecosystem (npm/Maven/Gradle/infra), atomic-design / Biome / dedup / Storybook-drift remediation, polyglot cycles." },
+  {
+    id: 'topic:engineer:architecture',
+    label: 'Architecture',
+    personaId: 'engineer',
+    prefix: 'engineer:architecture:',
+    description:
+      'ADRs, capability introduction, architecture reviews, C4 diagrams, data models, API contracts, integration patterns.',
+  },
+  {
+    id: 'topic:engineer:maintenance',
+    label: 'Maintenance',
+    personaId: 'engineer',
+    prefix: 'engineer:maintenance:',
+    description:
+      'Dependency upgrades by ecosystem (npm/Maven/Gradle/infra), atomic-design / Biome / dedup / Storybook-drift remediation, polyglot cycles.',
+  },
   // market
-  { id: "topic:market:tone", label: "Tone", personaId: "market", prefix: "market:tone:",
-    description: "Brand voice — explore N candidates, refine the established voice, test copy against it." },
-  { id: "topic:market:email", label: "Email", personaId: "market", prefix: "market:email:",
-    description: "Newsletter, promotional, transactional, welcome, multi-step nurture sequences." },
-  { id: "topic:market:ads", label: "Ads", personaId: "market", prefix: "market:ads:",
-    description: "Paid search, display, social, video, retargeting, ad–landing pairing." },
-  { id: "topic:market:social", label: "Social", personaId: "market", prefix: "market:social:",
-    description: "Organic posts on LinkedIn / X / Instagram / Facebook / TikTok plus cross-channel campaign coordination." },
-  { id: "topic:market:pr", label: "PR", personaId: "market", prefix: "market:pr:",
-    description: "Press releases, downloadable media kit, journalist outreach, newsroom page coordination." },
-  { id: "topic:market:workflows", label: "Campaigns", personaId: "market", prefix: "market:workflows:",
-    description: "Launch, seasonal, reactivation campaigns plus annual + monthly marketing calendar workflows." },
+  {
+    id: 'topic:market:tone',
+    label: 'Tone',
+    personaId: 'market',
+    prefix: 'market:tone:',
+    description:
+      'Brand voice — explore N candidates, refine the established voice, test copy against it.',
+  },
+  {
+    id: 'topic:market:email',
+    label: 'Email',
+    personaId: 'market',
+    prefix: 'market:email:',
+    description: 'Newsletter, promotional, transactional, welcome, multi-step nurture sequences.',
+  },
+  {
+    id: 'topic:market:ads',
+    label: 'Ads',
+    personaId: 'market',
+    prefix: 'market:ads:',
+    description: 'Paid search, display, social, video, retargeting, ad–landing pairing.',
+  },
+  {
+    id: 'topic:market:social',
+    label: 'Social',
+    personaId: 'market',
+    prefix: 'market:social:',
+    description:
+      'Organic posts on LinkedIn / X / Instagram / Facebook / TikTok plus cross-channel campaign coordination.',
+  },
+  {
+    id: 'topic:market:pr',
+    label: 'PR',
+    personaId: 'market',
+    prefix: 'market:pr:',
+    description:
+      'Press releases, downloadable media kit, journalist outreach, newsroom page coordination.',
+  },
+  {
+    id: 'topic:market:workflows',
+    label: 'Campaigns',
+    personaId: 'market',
+    prefix: 'market:workflows:',
+    description:
+      'Launch, seasonal, reactivation campaigns plus annual + monthly marketing calendar workflows.',
+  },
 ];
 
 // Interfaces (cli/mcp/rest) live in lib/interfaces.ts so the install
@@ -142,18 +210,18 @@ const TOPIC_AREAS: TopicArea[] = [
 
 const PERSONA_DESCRIPTIONS: Record<string, string> = {
   product:
-    "Product strategy, UX research, and visual design as one role — personas, journeys, stories, story maps, design briefs, foundations, patterns, page templates.",
+    'Product strategy, UX research, and visual design as one role — personas, journeys, stories, story maps, design briefs, foundations, patterns, page templates.',
   engineer:
-    "Architecture (ADRs, diagrams, data models, API design) and maintenance (dependency upgrades for npm / Maven / Gradle / infra; component remediation).",
+    'Architecture (ADRs, diagrams, data models, API design) and maintenance (dependency upgrades for npm / Maven / Gradle / infra; component remediation).',
   market:
-    "Brand voice, email content (newsletter / promo / nurture), ad copy (search / display / social), organic social posts, PR, and campaign coordination.",
+    'Brand voice, email content (newsletter / promo / nurture), ad copy (search / display / social), organic social posts, PR, and campaign coordination.',
 };
 
 const FRAMEWORK_DESCRIPTIONS: Record<string, string> = {
-  "frameworks:heroui":
-    "HeroUI v3 + Tailwind v4 React component generation from Pencil .pen files. Cascade: HeroUI → react-aria-components → react-aria hooks → custom WAI-ARIA.",
-  "frameworks:storybook":
-    "Storybook story generation, verification (a11y, health, screenshots, interactions), migration, and Chromatic integration health.",
+  'frameworks:heroui':
+    'HeroUI v3 + Tailwind v4 React component generation from Pencil .pen files. Cascade: HeroUI → react-aria-components → react-aria hooks → custom WAI-ARIA.',
+  'frameworks:storybook':
+    'Storybook story generation, verification (a11y, health, screenshots, interactions), migration, and Chromatic integration health.',
 };
 
 function uniqueLeaves(prefix: string): string[] {
@@ -161,9 +229,10 @@ function uniqueLeaves(prefix: string): string[] {
   for (const cmd of catalog.commands) {
     if (!cmd.slug.startsWith(prefix)) continue;
     const rest = cmd.slug.slice(prefix.length);
-    const leaf = rest.split(":")[0];
-    if (leaf.startsWith("_")) continue;
-    if (leaf === "declare" || leaf === "manifest" || leaf === "setup" || leaf === "credentials") continue;
+    const leaf = rest.split(':')[0];
+    if (leaf.startsWith('_')) continue;
+    if (leaf === 'declare' || leaf === 'manifest' || leaf === 'setup' || leaf === 'credentials')
+      continue;
     leaves.add(leaf);
   }
   return Array.from(leaves).sort();
@@ -171,21 +240,21 @@ function uniqueLeaves(prefix: string): string[] {
 
 function descFor(slug: string): string {
   const cmd = catalog.commands.find((c) => c.slug === slug);
-  return cmd?.description ?? "";
+  return cmd?.description ?? '';
 }
 
 function buildPersonaWithTopics(
-  personaId: "product" | "engineer" | "market",
-  label: string
+  personaId: 'product' | 'engineer' | 'market',
+  label: string,
 ): CatalogItem[] {
   const items: CatalogItem[] = [];
   const personaCmdCount = catalog.commands.filter(
-    (c) => c.slug.startsWith(`${personaId}:`) && c.kind !== "context"
+    (c) => c.slug.startsWith(`${personaId}:`) && c.kind !== 'context',
   ).length;
   items.push({
     id: personaId,
     label,
-    section: "persona",
+    section: 'persona',
     badge: `(${personaCmdCount} items)`,
     description: PERSONA_DESCRIPTIONS[personaId],
     interfaces: [],
@@ -194,15 +263,13 @@ function buildPersonaWithTopics(
   const topics = TOPIC_AREAS.filter((t) => t.personaId === personaId);
   for (const topic of topics) {
     const topicCmds = catalog.commands.filter(
-      (c) => c.slug.startsWith(topic.prefix) && c.kind !== "context"
+      (c) => c.slug.startsWith(topic.prefix) && c.kind !== 'context',
     );
-    const topicWorkflows = catalog.workflows.filter((w) =>
-      w.commandSlug.startsWith(topic.prefix)
-    );
+    const topicWorkflows = catalog.workflows.filter((w) => w.commandSlug.startsWith(topic.prefix));
     items.push({
       id: topic.id,
       label: topic.label,
-      section: "persona",
+      section: 'persona',
       badge: `(${topicCmds.length} items)`,
       description: topic.description,
       interfaces: [],
@@ -220,8 +287,8 @@ function buildPersonaWithTopics(
           // "Apply a brand refresh" instead of the slug "brand-refresh".
           // Falls back to the slug when a workflow hasn't declared one yet.
           label: wf.outcome ?? wf.slug,
-          section: "persona",
-          badge: "",
+          section: 'persona',
+          badge: '',
           description: wf.description || `${personaId}:${wf.slug} workflow`,
           interfaces: [],
           parentPersonaId: personaId,
@@ -234,16 +301,16 @@ function buildPersonaWithTopics(
       // (e.g. journeys/, personas/, stories/, story-maps/ under UX) so
       // users can see and pick the underlying primitives. Topics like
       // UX live here.
-      const topicSegCount = topic.prefix.split(":").filter(Boolean).length;
+      const topicSegCount = topic.prefix.split(':').filter(Boolean).length;
       const subnsMap = new Map<string, typeof topicCmds>();
       const directTasks: typeof topicCmds = [];
       for (const cmd of topicCmds) {
-        const parts = cmd.slug.split(":");
+        const parts = cmd.slug.split(':');
         if (parts.length === topicSegCount + 1) {
           directTasks.push(cmd);
         } else if (parts.length >= topicSegCount + 2) {
           const key = parts[topicSegCount];
-          if (key === "workflows") continue; // already handled above
+          if (key === 'workflows') continue; // already handled above
           if (!subnsMap.has(key)) subnsMap.set(key, []);
           subnsMap.get(key)!.push(cmd);
         }
@@ -251,15 +318,17 @@ function buildPersonaWithTopics(
       for (const [key, tasks] of subnsMap) {
         const subnsId = `subns:${topic.prefix}${key}`;
         const subnsLabel = key
-          .split("-")
+          .split('-')
           .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-          .join(" ");
+          .join(' ');
         items.push({
           id: subnsId,
           label: subnsLabel,
-          section: "persona",
+          section: 'persona',
           badge: `(${tasks.length} items)`,
-          description: SUBNS_DESCRIPTIONS[subnsId] ?? `${tasks.length} tasks under ${topic.label} → ${subnsLabel}.`,
+          description:
+            SUBNS_DESCRIPTIONS[subnsId] ??
+            `${tasks.length} tasks under ${topic.label} → ${subnsLabel}.`,
           interfaces: [],
           parentPersonaId: personaId,
           parentTopicId: topic.id,
@@ -268,9 +337,9 @@ function buildPersonaWithTopics(
         for (const task of tasks) {
           items.push({
             id: task.slug,
-            label: task.outcome ?? task.slug.split(":").pop()!,
-            section: "persona",
-            badge: "",
+            label: task.outcome ?? task.slug.split(':').pop()!,
+            section: 'persona',
+            badge: '',
             description: task.description,
             interfaces: [],
             parentPersonaId: personaId,
@@ -282,9 +351,9 @@ function buildPersonaWithTopics(
       for (const task of directTasks) {
         items.push({
           id: task.slug,
-          label: task.outcome ?? task.slug.split(":").pop()!,
-          section: "persona",
-          badge: "",
+          label: task.outcome ?? task.slug.split(':').pop()!,
+          section: 'persona',
+          badge: '',
           description: task.description,
           interfaces: [],
           parentPersonaId: personaId,
@@ -297,70 +366,75 @@ function buildPersonaWithTopics(
 }
 
 const SUBNS_DESCRIPTIONS: Record<string, string> = {
-  "subns:product:ux:journeys":
-    "Customer journeys, user flows, service blueprints, and pain-point tracking across them.",
-  "subns:product:ux:personas":
-    "Traditional persona definitions and Jobs-to-be-Done statements with priority ranking.",
-  "subns:product:ux:stories":
-    "User stories with Given/When/Then acceptance criteria and persona/pain-point references.",
-  "subns:product:ux:story-maps":
-    "Backbone-based story maps anchored to a journey, with release slicing.",
+  'subns:product:ux:journeys':
+    'Customer journeys, user flows, service blueprints, and pain-point tracking across them.',
+  'subns:product:ux:personas':
+    'Traditional persona definitions and Jobs-to-be-Done statements with priority ranking.',
+  'subns:product:ux:stories':
+    'User stories with Given/When/Then acceptance criteria and persona/pain-point references.',
+  'subns:product:ux:story-maps':
+    'Backbone-based story maps anchored to a journey, with release slicing.',
 };
 
 const PERSONA_ITEMS: CatalogItem[] = [
-  ...buildPersonaWithTopics("product", "Product"),
-  ...buildPersonaWithTopics("engineer", "Engineer"),
-  ...buildPersonaWithTopics("market", "Market"),
+  ...buildPersonaWithTopics('product', 'Product'),
+  ...buildPersonaWithTopics('engineer', 'Engineer'),
+  ...buildPersonaWithTopics('market', 'Market'),
 ];
 
 const FRAMEWORK_ITEMS: CatalogItem[] = [
   {
-    id: "frameworks:heroui",
-    label: "HeroUI v3",
-    section: "framework",
-    badge: "",
-    description: FRAMEWORK_DESCRIPTIONS["frameworks:heroui"],
+    id: 'frameworks:heroui',
+    label: 'HeroUI v3',
+    section: 'framework',
+    badge: '',
+    description: FRAMEWORK_DESCRIPTIONS['frameworks:heroui'],
     interfaces: [],
   },
   {
-    id: "frameworks:storybook",
-    label: "Storybook",
-    section: "framework",
-    badge: "",
-    description: FRAMEWORK_DESCRIPTIONS["frameworks:storybook"],
+    id: 'frameworks:storybook',
+    label: 'Storybook',
+    section: 'framework',
+    badge: '',
+    description: FRAMEWORK_DESCRIPTIONS['frameworks:storybook'],
     interfaces: [],
   },
 ];
 
-const INTEGRATION_ITEMS: CatalogItem[] = uniqueLeaves("core:integrations:").map((leaf) => ({
+const INTEGRATION_ITEMS: CatalogItem[] = uniqueLeaves('core:integrations:').map((leaf) => ({
   id: `core:integrations:${leaf}`,
   label: leaf,
-  section: "integration",
-  badge: "",
+  section: 'integration',
+  badge: '',
   description: descFor(`core:integrations:${leaf}`),
   interfaces: getInterfaces(`core:integrations:${leaf}`).map((i) => i.toUpperCase()),
 }));
 
-const TOOL_ITEMS: CatalogItem[] = uniqueLeaves("core:tools:").map((leaf) => ({
+const TOOL_ITEMS: CatalogItem[] = uniqueLeaves('core:tools:').map((leaf) => ({
   id: `core:tools:${leaf}`,
   label: leaf,
-  section: "tool",
-  badge: "",
+  section: 'tool',
+  badge: '',
   description: descFor(`core:tools:${leaf}`),
   interfaces: getInterfaces(`core:tools:${leaf}`).map((i) => i.toUpperCase()),
 }));
 
-const ITEMS: CatalogItem[] = [...PERSONA_ITEMS, ...FRAMEWORK_ITEMS, ...INTEGRATION_ITEMS, ...TOOL_ITEMS];
+const ITEMS: CatalogItem[] = [
+  ...PERSONA_ITEMS,
+  ...FRAMEWORK_ITEMS,
+  ...INTEGRATION_ITEMS,
+  ...TOOL_ITEMS,
+];
 
 const SECTION_LABEL: Record<Section, string> = {
-  persona: "Personas",
-  framework: "Frameworks",
-  integration: "Integrations",
-  tool: "Tools",
+  persona: 'Personas',
+  framework: 'Frameworks',
+  integration: 'Integrations',
+  tool: 'Tools',
 };
 
-type Focus = "search" | "catalog" | "install" | "sync";
-type Status = "browsing" | "done" | "synced" | "error";
+type Focus = 'search' | 'catalog' | 'install' | 'sync';
+type Status = 'browsing' | 'done' | 'synced' | 'error';
 
 /**
  * Map a catalog row to the slash command a user would actually type.
@@ -376,15 +450,15 @@ type Status = "browsing" | "done" | "synced" | "error";
 function truncate(text: string, max: number): string {
   if (text.length <= max) return text;
   const slice = text.slice(0, max);
-  const lastSpace = slice.lastIndexOf(" ");
-  return (lastSpace > max - 30 ? slice.slice(0, lastSpace) : slice) + "…";
+  const lastSpace = slice.lastIndexOf(' ');
+  return `${lastSpace > max - 30 ? slice.slice(0, lastSpace) : slice}…`;
 }
 
 function commandForItem(item: CatalogItem): string | null {
-  if (item.section === "persona" && !item.parentPersonaId) return null; // persona row
+  if (item.section === 'persona' && !item.parentPersonaId) return null; // persona row
   if (item.isTopicArea) return null; // topic aggregator row
   if (item.isSubnamespace) return null; // sub-namespace folder row
-  if (item.section === "framework") {
+  if (item.section === 'framework') {
     // framework UI ids are "frameworks:heroui"; the actual command prefix
     // lives under core (e.g., /core:frameworks:heroui:build-components).
     // Copy the namespace so the user can tab-complete from there.
@@ -394,7 +468,7 @@ function commandForItem(item: CatalogItem): string | null {
   return `/${item.id}`;
 }
 
-type ParentState = "none" | "partial" | "full";
+type ParentState = 'none' | 'partial' | 'full';
 
 /**
  * For a parent row (persona or topic), report how its workflow-leaf
@@ -408,7 +482,7 @@ type ParentState = "none" | "partial" | "full";
 function getParentSelectionState(
   item: CatalogItem,
   picks: Set<string>,
-  items: CatalogItem[]
+  items: CatalogItem[],
 ): ParentState {
   let leaves: CatalogItem[];
   if (item.isSubnamespace) {
@@ -418,22 +492,17 @@ function getParentSelectionState(
     // Topic — count workflow children + task leaves under sub-namespaces
     // belonging to this topic. Sub-namespace folder rows themselves are
     // not leaves, so they're skipped.
-    leaves = items.filter(
-      (c) => c.parentTopicId === item.id && !c.isSubnamespace,
-    );
-  } else if (item.section === "persona" && !item.parentPersonaId) {
+    leaves = items.filter((c) => c.parentTopicId === item.id && !c.isSubnamespace);
+  } else if (item.section === 'persona' && !item.parentPersonaId) {
     // Persona — count all leaves across its topics (excludes the topic
     // and sub-namespace grouping rows themselves).
     leaves = items.filter(
-      (c) =>
-        c.parentPersonaId === item.id &&
-        !!c.parentTopicId &&
-        !c.isSubnamespace,
+      (c) => c.parentPersonaId === item.id && !!c.parentTopicId && !c.isSubnamespace,
     );
   } else {
-    return "none";
+    return 'none';
   }
-  if (leaves.length === 0) return "none";
+  if (leaves.length === 0) return 'none';
 
   let count = 0;
   for (const leaf of leaves) {
@@ -444,9 +513,9 @@ function getParentSelectionState(
       (leaf.parentPersonaId !== undefined && picks.has(leaf.parentPersonaId));
     if (effective) count++;
   }
-  if (count === 0) return "none";
-  if (count === leaves.length) return "full";
-  return "partial";
+  if (count === 0) return 'none';
+  if (count === leaves.length) return 'full';
+  return 'partial';
 }
 
 interface FilterResult {
@@ -468,7 +537,7 @@ function filterItems(items: CatalogItem[], query: string): FilterResult {
   const isGroupHeader = (item: CatalogItem) =>
     item.isTopicArea ||
     item.isSubnamespace ||
-    (item.section === "persona" && !item.parentPersonaId);
+    (item.section === 'persona' && !item.parentPersonaId);
 
   const directMatches = new Set<string>();
   for (const item of items) {
@@ -502,16 +571,16 @@ const App = () => {
 
   const [picks, setPicks] = useState<Set<string>>(new Set());
   const [cursor, setCursor] = useState(0);
-  const [focus, setFocus] = useState<Focus>("catalog");
-  const [status, setStatus] = useState<Status>("browsing");
-  const [resultMsg, setResultMsg] = useState<string>("");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [focus, setFocus] = useState<Focus>('catalog');
+  const [status, setStatus] = useState<Status>('browsing');
+  const [resultMsg, setResultMsg] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const resolved = useMemo(() => resolveCascade(picks, catalog), [picks]);
   const summary = useMemo(() => summarize(resolved, catalog), [resolved]);
   const { items: filteredItems, directMatches } = useMemo(
     () => filterItems(ITEMS, searchQuery),
-    [searchQuery]
+    [searchQuery],
   );
   // Direct-match count rolled up per ancestor — drives filtered badge text
   // on persona/topic rows so "Strategy (8 wf)" becomes "Strategy (3 matching)"
@@ -525,7 +594,8 @@ const App = () => {
       if (item.parentSubnamespaceId)
         map.set(item.parentSubnamespaceId, (map.get(item.parentSubnamespaceId) ?? 0) + 1);
       if (item.parentTopicId) map.set(item.parentTopicId, (map.get(item.parentTopicId) ?? 0) + 1);
-      if (item.parentPersonaId) map.set(item.parentPersonaId, (map.get(item.parentPersonaId) ?? 0) + 1);
+      if (item.parentPersonaId)
+        map.set(item.parentPersonaId, (map.get(item.parentPersonaId) ?? 0) + 1);
     }
     return map;
   }, [directMatches]);
@@ -577,26 +647,26 @@ const App = () => {
 
   function doInstall(force: boolean) {
     if (picks.size === 0) {
-      setResultMsg("Pick at least one item first.");
-      setStatus("error");
+      setResultMsg('Pick at least one item first.');
+      setStatus('error');
       return;
     }
     try {
       const result = installSelection(resolved, catalog, packageRoot, targetDir, { force });
       setResultMsg(
-        `${result.installedFiles} files ${force ? "synced" : "installed"}, ${result.skippedExisting} skipped`
+        `${result.installedFiles} files ${force ? 'synced' : 'installed'}, ${result.skippedExisting} skipped`,
       );
-      setStatus(force ? "synced" : "done");
+      setStatus(force ? 'synced' : 'done');
     } catch (e) {
       setResultMsg(String(e instanceof Error ? e.message : e));
-      setStatus("error");
+      setStatus('error');
     }
   }
 
   useKeyboard((key) => {
     // Quit guard: avoid eating 'q' when search is focused (it'd be a typed char)
-    if (key.ctrl && key.name === "c") process.exit(0);
-    if (key.name === "q" && focusRef.current !== "search") process.exit(0);
+    if (key.ctrl && key.name === 'c') process.exit(0);
+    if (key.name === 'q' && focusRef.current !== 'search') process.exit(0);
 
     // `n` exits with code 42, which the parent CLI's `ui` action
     // interprets as "user wants to contribute." The CLI then prompts
@@ -604,37 +674,39 @@ const App = () => {
     // promptHidden), runs the contribute flow, and re-launches the
     // TUI. Avoid eating `n` while search is focused (typed char) or
     // while team mode is unavailable.
-    if (
-      key.name === "n" &&
-      focusRef.current !== "search" &&
-      config?.mode === "team"
-    ) {
+    if (key.name === 'n' && focusRef.current !== 'search' && config?.mode === 'team') {
       process.exit(42);
     }
 
-    if (key.name === "tab") {
+    if (key.name === 'tab') {
       setFocus((f) =>
-        f === "search" ? "catalog" : f === "catalog" ? "install" : f === "install" ? "sync" : "search"
+        f === 'search'
+          ? 'catalog'
+          : f === 'catalog'
+            ? 'install'
+            : f === 'install'
+              ? 'sync'
+              : 'search',
       );
       return;
     }
 
     const currentFocus = focusRef.current;
     // Search input owns its own keys via the <input> component's onInput.
-    if (currentFocus === "search") return;
+    if (currentFocus === 'search') return;
 
     const items = filteredItemsRef.current;
-    if (currentFocus === "catalog") {
+    if (currentFocus === 'catalog') {
       if (items.length === 0) return;
-      if (key.name === "up" || key.name === "k") {
+      if (key.name === 'up' || key.name === 'k') {
         setCursor((c) => Math.max(0, c - 1));
-      } else if (key.name === "down" || key.name === "j") {
+      } else if (key.name === 'down' || key.name === 'j') {
         setCursor((c) => Math.min(items.length - 1, c + 1));
-      } else if (key.name === "g") {
+      } else if (key.name === 'g') {
         setCursor(0);
-      } else if (key.name === "G") {
+      } else if (key.name === 'G') {
         setCursor(items.length - 1);
-      } else if (key.name === "space") {
+      } else if (key.name === 'space') {
         const id = items[cursorRef.current]?.id;
         if (!id) return;
         setPicks((prev) => {
@@ -643,9 +715,9 @@ const App = () => {
           else next.add(id);
           return next;
         });
-        setStatus("browsing");
-        setResultMsg("");
-      } else if (key.name === "c" || key.name === "y") {
+        setStatus('browsing');
+        setResultMsg('');
+      } else if (key.name === 'c' || key.name === 'y') {
         // Yank (vim-style 'y' or 'c' for copy) the active item's slash
         // command to the system clipboard via OSC52. Works locally and
         // over SSH in OSC52-capable terminals (iTerm2, Kitty, wezterm,
@@ -655,16 +727,16 @@ const App = () => {
         const cmd = commandForItem(item);
         if (!cmd) {
           setResultMsg(`${item.label} is a grouping, not a command — pick a child row.`);
-          setStatus("error");
+          setStatus('error');
           return;
         }
         const ok = renderer.copyToClipboardOSC52(cmd);
         setResultMsg(ok ? `Copied ${cmd}` : `Clipboard not supported by this terminal`);
-        setStatus(ok ? "done" : "error");
+        setStatus(ok ? 'done' : 'error');
       }
-    } else if (currentFocus === "install" && (key.name === "return" || key.name === "space")) {
+    } else if (currentFocus === 'install' && (key.name === 'return' || key.name === 'space')) {
       doInstall(false);
-    } else if (currentFocus === "sync" && (key.name === "return" || key.name === "space")) {
+    } else if (currentFocus === 'sync' && (key.name === 'return' || key.name === 'space')) {
       doInstall(true);
     }
   });
@@ -674,8 +746,8 @@ const App = () => {
     const locked = new Set<string>();
     for (const item of ITEMS) {
       if (picks.has(item.id)) continue;
-      if (["product", "engineer", "market"].includes(item.id)) continue;
-      if (item.id.startsWith("frameworks:")) continue;
+      if (['product', 'engineer', 'market'].includes(item.id)) continue;
+      if (item.id.startsWith('frameworks:')) continue;
       if (resolved.locked.has(item.id)) locked.add(item.id);
     }
     return locked;
@@ -695,20 +767,20 @@ const App = () => {
       lastSection = item.section;
       if (visibleRowsRendered.length > 0) {
         visibleRowsRendered.push(
-          <box key={`sp-${realIdx}`} style={{ alignSelf: "stretch", height: 1, flexShrink: 0 }}>
+          <box key={`sp-${realIdx}`} style={{ alignSelf: 'stretch', height: 1, flexShrink: 0 }}>
             <text content=" " />
-          </box>
+          </box>,
         );
       }
       visibleRowsRendered.push(
-        <box key={`hdr-${realIdx}`} style={{ alignSelf: "stretch", height: 1, flexShrink: 0 }}>
-          <text content={SECTION_LABEL[item.section]} style={{ fg: "#FFFF00", attributes: 1 }} />
-        </box>
+        <box key={`hdr-${realIdx}`} style={{ alignSelf: 'stretch', height: 1, flexShrink: 0 }}>
+          <text content={SECTION_LABEL[item.section]} style={{ fg: '#FFFF00', attributes: 1 }} />
+        </box>,
       );
     }
     const isSelected = picks.has(item.id);
     const isLocked = lockedIds.has(item.id);
-    const isCursor = focus === "catalog" && realIdx === cursor;
+    const isCursor = focus === 'catalog' && realIdx === cursor;
     // A nested item is auto-selected if any of its ancestors is picked.
     const isAutoByParent =
       (item.parentSubnamespaceId ? picks.has(item.parentSubnamespaceId) : false) ||
@@ -718,56 +790,56 @@ const App = () => {
     const isParentRow =
       item.isTopicArea ||
       item.isSubnamespace ||
-      (item.section === "persona" && !item.parentPersonaId);
+      (item.section === 'persona' && !item.parentPersonaId);
     // Parent rows show partial vs full coverage of their workflow leaves
     // via [o] (some) / [O] (all) glyphs. Leaves keep [x] (picked) / [*]
     // (auto-locked or transitive). A directly-picked parent counts as full.
     const parentState: ParentState = isParentRow
       ? isSelected
-        ? "full"
+        ? 'full'
         : getParentSelectionState(item, picks, ITEMS)
-      : "none";
+      : 'none';
     const checkbox = isParentRow
-      ? parentState === "full"
-        ? "[O]"
-        : parentState === "partial"
-        ? "[o]"
-        : "[ ]"
+      ? parentState === 'full'
+        ? '[O]'
+        : parentState === 'partial'
+          ? '[o]'
+          : '[ ]'
       : isAutoByParent || isLocked
-      ? "[*]"
-      : effectivelySelected
-      ? "[x]"
-      : "[ ]";
-    const cursorMark = isCursor ? "> " : "  ";
+        ? '[*]'
+        : effectivelySelected
+          ? '[x]'
+          : '[ ]';
+    const cursorMark = isCursor ? '> ' : '  ';
     // Indent by depth — 4 levels:
     //   0 = persona, 1 = topic, 2 = workflow OR sub-namespace folder,
     //   3 = task under sub-namespace.
     const depth = item.parentSubnamespaceId
       ? 3
       : item.parentTopicId
-      ? 2
-      : item.parentPersonaId
-      ? 1
-      : 0;
+        ? 2
+        : item.parentPersonaId
+          ? 1
+          : 0;
     // 2 cells per level keeps the tree readable while preserving ~4 extra
     // cells for workflow names at depth 2.
-    const treeIndent = "  ".repeat(depth);
+    const treeIndent = '  '.repeat(depth);
     const fg = isCursor
-      ? "#FFFFFF"
-      : isParentRow && parentState === "partial"
-      ? "#FFAA00"
-      : isParentRow && parentState === "full"
-      ? "#00FF00"
-      : isAutoByParent || isLocked
-      ? "#FFAA00"
-      : effectivelySelected
-      ? "#00FF00"
-      : isParentRow || item.isWorkflow
-      ? "#AAAAAA" // structure (grouping + workflows): lighter — the
-                  // tree skeleton + multi-step orchestrators read as
+      ? '#FFFFFF'
+      : isParentRow && parentState === 'partial'
+        ? '#FFAA00'
+        : isParentRow && parentState === 'full'
+          ? '#00FF00'
+          : isAutoByParent || isLocked
+            ? '#FFAA00'
+            : effectivelySelected
+              ? '#00FF00'
+              : isParentRow || item.isWorkflow
+                ? '#AAAAAA' // structure (grouping + workflows): lighter — the
+                : // tree skeleton + multi-step orchestrators read as
                   // primary scaffolding
-      : "#666666"; // content (tasks + leaf items): darker — recede
-                  // as detail until the cursor lands on one
+                  '#666666'; // content (tasks + leaf items): darker — recede
+    // as detail until the cursor lands on one
     // Parent rows show a filtered count instead of the static "(N items, M wf)"
     // when a search has narrowed the children below them — gives a true picture
     // of what's actually visible under that branch.
@@ -776,11 +848,10 @@ const App = () => {
         ? `(${matchesPerParent.get(item.id)} matching)`
         : null;
     const ifaceText =
-      filteredBadge ??
-      (item.interfaces.length > 0 ? item.interfaces.join(" / ") : item.badge);
+      filteredBadge ?? (item.interfaces.length > 0 ? item.interfaces.join(' / ') : item.badge);
     // Workflow rows get a trailing `(w)` so users can tell a multi-step
     // orchestrator from a one-shot task at a glance. Tasks render unmarked.
-    const workflowMark = item.isWorkflow ? " (w)" : "";
+    const workflowMark = item.isWorkflow ? ' (w)' : '';
     // Only pad the label when an iface/badge follows; otherwise let the
     // label flow naturally (workflows have no badge — padding wastes cells).
     const labelText = ifaceText
@@ -791,12 +862,12 @@ const App = () => {
     // via bold — bold was reading as "loud" against the dim surroundings.
     const attributes = isCursor ? 0 : 2 /* DIM */;
     visibleRowsRendered.push(
-      <box key={item.id} style={{ alignSelf: "stretch", height: 1, flexShrink: 0 }}>
+      <box key={item.id} style={{ alignSelf: 'stretch', height: 1, flexShrink: 0 }}>
         <text
           content={`${cursorMark}${treeIndent}${checkbox} ${labelText}`}
           style={{ fg, attributes }}
         />
-      </box>
+      </box>,
     );
   });
 
@@ -806,9 +877,12 @@ const App = () => {
   // when the filter shrinks the visible item count.
   while (visibleRowsRendered.length < itemBudget) {
     visibleRowsRendered.push(
-      <box key={`pad-${visibleRowsRendered.length}`} style={{ alignSelf: "stretch", height: 1, flexShrink: 0 }}>
+      <box
+        key={`pad-${visibleRowsRendered.length}`}
+        style={{ alignSelf: 'stretch', height: 1, flexShrink: 0 }}
+      >
         <text content=" " />
-      </box>
+      </box>,
     );
   }
 
@@ -834,7 +908,7 @@ const App = () => {
     // separating it from the rest of the UI.
     <box
       style={{
-        flexDirection: "column",
+        flexDirection: 'column',
         paddingRight: 1,
         paddingBottom: 1,
         flexGrow: 1,
@@ -848,8 +922,8 @@ const App = () => {
           cursor moved. The slick font is 4 rows tall. ═══ */}
       <box
         style={{
-          flexDirection: "row",
-          alignItems: "flex-end",
+          flexDirection: 'row',
+          alignItems: 'flex-end',
           marginTop: 2,
           marginBottom: 1,
           height: 4,
@@ -858,93 +932,93 @@ const App = () => {
       >
         <ascii-font text="SkillzKit" font="slick" fg="#00FFFF" />
         <text content="   " />
-        <text content="v0.1.0" style={{ fg: "#888888" }} />
+        <text content="v0.1.0" style={{ fg: '#888888' }} />
       </box>
 
       {/* ═══ ROW 2 — search bar (no border; left-aligned with Catalog label) ═══ */}
       <box
         style={{
-          flexDirection: "row",
+          flexDirection: 'row',
           marginBottom: 1,
           height: 1,
         }}
       >
         <text
           content="Search: "
-          style={{ fg: focus === "search" ? "#00FFFF" : "#FFFF00", attributes: 1 }}
+          style={{ fg: focus === 'search' ? '#00FFFF' : '#FFFF00', attributes: 1 }}
         />
         <input
           placeholder="type to filter catalog (workflows, integrations, tools, frameworks)..."
-          focused={focus === "search"}
+          focused={focus === 'search'}
           onInput={(value: string) => {
             setSearchQuery(value);
             setCursor(0);
           }}
-          style={{ flexGrow: 1, focusedBackgroundColor: "#000000" }}
+          style={{ flexGrow: 1, focusedBackgroundColor: '#000000' }}
         />
       </box>
 
       {/* ═══ ROW 3 — two columns ═══ */}
-      <box style={{ flexDirection: "row", flexGrow: 1 }}>
+      <box style={{ flexDirection: 'row', flexGrow: 1 }}>
         {/* LEFT — catalog (fills height, scrollable) */}
-        <box style={{ flexDirection: "column", flexGrow: 1, marginRight: 2 }}>
+        <box style={{ flexDirection: 'column', flexGrow: 1, marginRight: 2 }}>
           <text
             content={
               searchQuery.trim()
                 ? `Catalog  (${directMatches.size} matching "${searchQuery}", ${cursor + 1}/${totalCount} visible)`
                 : `Catalog  (${cursor + 1}/${totalCount})`
             }
-            style={{ fg: "#FFFF00", attributes: 1 }}
+            style={{ fg: '#FFFF00', attributes: 1 }}
           />
           <box
             style={{
               flexGrow: 1,
               border: true,
-              borderColor: focus === "catalog" ? "#00FFFF" : "#444444",
+              borderColor: focus === 'catalog' ? '#00FFFF' : '#444444',
               padding: 1,
-              flexDirection: "column",
+              flexDirection: 'column',
             }}
           >
             {/* Always render indicator rows so the catalog row count stays
                 stable regardless of scroll position. Conditional rendering
                 here would shift the items by 1 cell when scrolling reaches
                 an edge, displacing rows the user expected to be visible. */}
-            <box style={{ alignSelf: "stretch", height: 1, flexShrink: 0 }}>
-              <text content={moreAbove ? "  ^ more above" : " "} style={{ fg: "#666666" }} />
+            <box style={{ alignSelf: 'stretch', height: 1, flexShrink: 0 }}>
+              <text content={moreAbove ? '  ^ more above' : ' '} style={{ fg: '#666666' }} />
             </box>
             {visibleRowsRendered}
-            <box style={{ alignSelf: "stretch", height: 1, flexShrink: 0 }}>
-              <text content={moreBelow ? "  v more below" : " "} style={{ fg: "#666666" }} />
+            <box style={{ alignSelf: 'stretch', height: 1, flexShrink: 0 }}>
+              <text content={moreBelow ? '  v more below' : ' '} style={{ fg: '#666666' }} />
             </box>
           </box>
         </box>
 
         {/* RIGHT — description + summary + buttons */}
-        <box style={{ flexDirection: "column", width: 40 }}>
+        <box style={{ flexDirection: 'column', width: 40 }}>
           {/* Description of active component — title + id pinned with
               flexShrink: 0 so a long description below can never push them
               off-screen. marginTop on the title gives a row of breathing
               room above so it doesn't sit flush with the column edge. */}
           <box style={{ flexShrink: 0, height: 1, marginTop: 1 }}>
-            <text content={activeItem.label} style={{ fg: "#00FFFF", attributes: 1 }} />
+            <text content={activeItem.label} style={{ fg: '#00FFFF', attributes: 1 }} />
           </box>
           <box style={{ flexShrink: 0, height: 1 }}>
-            <text content={activeItem.id} style={{ fg: "#666666" }} />
+            <text content={activeItem.id} style={{ fg: '#666666' }} />
           </box>
           <box
             style={{
               border: true,
-              borderColor: "#444444",
+              borderColor: '#444444',
               padding: 1,
-              flexDirection: "column",
+              flexDirection: 'column',
               marginBottom: 1,
               maxHeight: 12,
               flexShrink: 1,
             }}
           >
             <text
-              content={truncate(activeItem.description || "(no description)", 220)}
-              style={{ fg: "#CCCCCC", attributes: 2 /* DIM */ }}
+              content={truncate(activeItem.description || '(no description)', 220)}
+              style={{ fg: '#CCCCCC', attributes: 2 /* DIM */ }}
             />
           </box>
 
@@ -955,60 +1029,79 @@ const App = () => {
           {activeTags.length > 0 && (
             <box style={{ flexShrink: 0, height: 1, marginBottom: 1 }}>
               <text
-                content={`Tags: ${activeTags.join(" · ")}`}
-                style={{ fg: "#888888", attributes: 2 /* DIM */ }}
+                content={`Tags: ${activeTags.join(' · ')}`}
+                style={{ fg: '#888888', attributes: 2 /* DIM */ }}
               />
             </box>
           )}
 
           {/* Selection summary */}
-          <text content="Selection summary" style={{ fg: "#FFFF00", attributes: 1 }} />
+          <text content="Selection summary" style={{ fg: '#FFFF00', attributes: 1 }} />
           <box
             style={{
               border: true,
-              borderColor: "#444444",
+              borderColor: '#444444',
               padding: 1,
-              flexDirection: "column",
+              flexDirection: 'column',
               marginBottom: 1,
             }}
           >
-            <text content={`Personas:        ${summary.personas}`} style={{ attributes: 2 /* DIM */ }} />
+            <text
+              content={`Personas:        ${summary.personas}`}
+              style={{ attributes: 2 /* DIM */ }}
+            />
             <text content={`Workflows:       ${summary.workflows}`} style={{ attributes: 2 }} />
             <text content={`Commands:        ${summary.commands}`} style={{ attributes: 2 }} />
-            <text content={`Picked items:    ${summary.totalFiles}`} style={{ fg: summary.totalFiles > 0 ? "#00FF00" : "#888888", attributes: 2 }} />
-            <text content={`+ infrastructure (audit, workflows, skills)`} style={{ fg: "#888888", attributes: 2 }} />
+            <text
+              content={`Picked items:    ${summary.totalFiles}`}
+              style={{ fg: summary.totalFiles > 0 ? '#00FF00' : '#888888', attributes: 2 }}
+            />
+            <text
+              content={`+ infrastructure (audit, workflows, skills)`}
+              style={{ fg: '#888888', attributes: 2 }}
+            />
           </box>
 
           {/* Target + buttons */}
-          <text content={`Target: ${targetDir}/.claude/`} style={{ fg: "#888888" }} />
+          <text content={`Target: ${targetDir}/.claude/`} style={{ fg: '#888888' }} />
           <text content="" />
-          <box style={{ flexDirection: "row" }}>
-            <Button label="Install" focused={focus === "install"} disabled={picks.size === 0} accent="#00FF00" />
+          <box style={{ flexDirection: 'row' }}>
+            <Button
+              label="Install"
+              focused={focus === 'install'}
+              disabled={picks.size === 0}
+              accent="#00FF00"
+            />
             <text content="  " />
-            <Button label="Sync" focused={focus === "sync"} disabled={picks.size === 0} accent="#FFAA00" />
+            <Button
+              label="Sync"
+              focused={focus === 'sync'}
+              disabled={picks.size === 0}
+              accent="#FFAA00"
+            />
           </box>
 
-          {status !== "browsing" && (
+          {status !== 'browsing' && (
             <>
               <text content="" />
               <text
-                content={status === "error" ? `✗ ${resultMsg}` : `✓ ${resultMsg}`}
-                style={{ fg: status === "error" ? "#FF0000" : "#00FF00" }}
+                content={status === 'error' ? `✗ ${resultMsg}` : `✓ ${resultMsg}`}
+                style={{ fg: status === 'error' ? '#FF0000' : '#00FF00' }}
               />
             </>
           )}
 
           <text content="" />
-          <text content="up/down or jk: navigate" style={{ fg: "#666666" }} />
-          <text content="g / G: top / bottom" style={{ fg: "#666666" }} />
-          <text content="space: toggle / tab: switch focus" style={{ fg: "#666666" }} />
-          <text content="c or y: copy slash command" style={{ fg: "#666666" }} />
-          <text content="enter: activate button / q: quit" style={{ fg: "#666666" }} />
-          {config?.mode === "team" && (
-            <text content="n: contribute new artifact" style={{ fg: "#666666" }} />
+          <text content="up/down or jk: navigate" style={{ fg: '#666666' }} />
+          <text content="g / G: top / bottom" style={{ fg: '#666666' }} />
+          <text content="space: toggle / tab: switch focus" style={{ fg: '#666666' }} />
+          <text content="c or y: copy slash command" style={{ fg: '#666666' }} />
+          <text content="enter: activate button / q: quit" style={{ fg: '#666666' }} />
+          {config?.mode === 'team' && (
+            <text content="n: contribute new artifact" style={{ fg: '#666666' }} />
           )}
-          <text content="[*] = locked transitive dep" style={{ fg: "#666666" }} />
-          <text content="[o] / [O] = partial / full" style={{ fg: "#666666" }} />
+          <text content="[*] = locked transitive dep" style={{ fg: '#666666' }} />
+          <text content="[o] / [O] = partial / full" style={{ fg: '#666666' }} />
         </box>
       </box>
     </box>
@@ -1023,10 +1116,18 @@ interface ButtonProps {
 }
 
 const Button = ({ label, focused, disabled, accent }: ButtonProps) => {
-  const fg = disabled ? "#555555" : focused ? "#000000" : accent;
+  const fg = disabled ? '#555555' : focused ? '#000000' : accent;
   const bg = focused && !disabled ? accent : undefined;
   return (
-    <box style={{ border: true, borderColor: focused ? accent : "#444444", paddingLeft: 2, paddingRight: 2, backgroundColor: bg }}>
+    <box
+      style={{
+        border: true,
+        borderColor: focused ? accent : '#444444',
+        paddingLeft: 2,
+        paddingRight: 2,
+        backgroundColor: bg,
+      }}
+    >
       <text content={label} style={{ fg, attributes: focused ? 1 : 0 }} />
     </box>
   );

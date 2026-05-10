@@ -1,5 +1,5 @@
-import { checkTool } from "../core/index.js";
-import { dim, fail, ok } from "../ui/index.js";
+import { checkTool } from '../core/index.js';
+import { dim, fail, ok } from '../ui/index.js';
 
 export interface CheckOptions {
   versionFlag?: string;
@@ -9,10 +9,7 @@ export interface CheckOptions {
  * Check whether a CLI tool is installed; show its path and parsed
  * version. Exits 1 if not installed.
  */
-export async function runCheck(
-  tool: string,
-  options: CheckOptions = {},
-): Promise<void> {
+export async function runCheck(tool: string, options: CheckOptions = {}): Promise<void> {
   const result = await checkTool(tool, {
     ...(options.versionFlag ? { versionFlag: options.versionFlag } : {}),
   });
@@ -22,5 +19,5 @@ export async function runCheck(
   }
   console.log(ok(tool));
   console.log(dim(`  path:    ${result.path}`));
-  console.log(dim(`  version: ${result.version ?? "(unparseable)"}`));
+  console.log(dim(`  version: ${result.version ?? '(unparseable)'}`));
 }

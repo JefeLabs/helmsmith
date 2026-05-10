@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { calculateSegments, type Segment } from '../aggregator/segments.js';
 
 // Helper to convert Map to plain object for easier assertions
@@ -23,14 +23,23 @@ describe('calculateSegments', () => {
   });
 
   it('handles 2 members: top=high, bottom=low', () => {
-    const result = calculateSegments(new Map([['alice', 200], ['bob', 50]]));
+    const result = calculateSegments(
+      new Map([
+        ['alice', 200],
+        ['bob', 50],
+      ]),
+    );
     expect(toObj(result)).toEqual({ alice: 'high', bob: 'low' });
   });
 
   it('handles 3 members (N<5): top 1=high, bottom 1=low, rest=middle', () => {
-    const result = calculateSegments(new Map([
-      ['alice', 300], ['bob', 200], ['charlie', 100],
-    ]));
+    const result = calculateSegments(
+      new Map([
+        ['alice', 300],
+        ['bob', 200],
+        ['charlie', 100],
+      ]),
+    );
     expect(toObj(result)).toEqual({
       alice: 'high',
       bob: 'middle',
@@ -39,9 +48,14 @@ describe('calculateSegments', () => {
   });
 
   it('handles 4 members (N<5): top 1=high, bottom 1=low, rest=middle', () => {
-    const result = calculateSegments(new Map([
-      ['alice', 400], ['bob', 300], ['charlie', 200], ['dave', 100],
-    ]));
+    const result = calculateSegments(
+      new Map([
+        ['alice', 400],
+        ['bob', 300],
+        ['charlie', 200],
+        ['dave', 100],
+      ]),
+    );
     expect(toObj(result)).toEqual({
       alice: 'high',
       bob: 'middle',
@@ -52,9 +66,15 @@ describe('calculateSegments', () => {
 
   it('handles exactly 5 members with 20/60/20 split', () => {
     // ceil(5 * 0.20) = 1 high, 1 low, 3 middle
-    const result = calculateSegments(new Map([
-      ['a', 500], ['b', 400], ['c', 300], ['d', 200], ['e', 100],
-    ]));
+    const result = calculateSegments(
+      new Map([
+        ['a', 500],
+        ['b', 400],
+        ['c', 300],
+        ['d', 200],
+        ['e', 100],
+      ]),
+    );
     expect(toObj(result)).toEqual({
       a: 'high',
       b: 'middle',
@@ -94,18 +114,28 @@ describe('calculateSegments', () => {
   });
 
   it('zero-value members are always low regardless of position', () => {
-    const result = calculateSegments(new Map([
-      ['alice', 500], ['bob', 300], ['charlie', 200],
-      ['dave', 100], ['eve', 0],
-    ]));
+    const result = calculateSegments(
+      new Map([
+        ['alice', 500],
+        ['bob', 300],
+        ['charlie', 200],
+        ['dave', 100],
+        ['eve', 0],
+      ]),
+    );
     expect(result.get('eve')).toBe('low');
   });
 
   it('multiple zero-value members are all low', () => {
-    const result = calculateSegments(new Map([
-      ['alice', 500], ['bob', 300], ['charlie', 0],
-      ['dave', 0], ['eve', 0],
-    ]));
+    const result = calculateSegments(
+      new Map([
+        ['alice', 500],
+        ['bob', 300],
+        ['charlie', 0],
+        ['dave', 0],
+        ['eve', 0],
+      ]),
+    );
     expect(result.get('charlie')).toBe('low');
     expect(result.get('dave')).toBe('low');
     expect(result.get('eve')).toBe('low');
@@ -125,9 +155,15 @@ describe('calculateSegments', () => {
   });
 
   it('handles all members with equal values', () => {
-    const result = calculateSegments(new Map([
-      ['a', 100], ['b', 100], ['c', 100], ['d', 100], ['e', 100],
-    ]));
+    const result = calculateSegments(
+      new Map([
+        ['a', 100],
+        ['b', 100],
+        ['c', 100],
+        ['d', 100],
+        ['e', 100],
+      ]),
+    );
     // With equal values, positions are arbitrary but all 5 must be categorized
     const segments = [...result.values()];
     expect(segments.filter((s) => s === 'high').length).toBe(1);

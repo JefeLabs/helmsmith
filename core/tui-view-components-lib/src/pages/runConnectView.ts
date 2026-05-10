@@ -13,11 +13,11 @@
  *   );
  */
 
-import { createElement } from "react";
-import type { Connection } from "../connection.ts";
-import { ConnectView } from "./ConnectView.tsx";
-import { AgentxThemeProvider } from "../theme/AgentxThemeProvider.tsx";
-import { KeyboardProvider } from "../keyboard/registry.tsx";
+import { createElement } from 'react';
+import type { Connection } from '../connection.ts';
+import { KeyboardProvider } from '../keyboard/registry.tsx';
+import { AgentxThemeProvider } from '../theme/AgentxThemeProvider.tsx';
+import { ConnectView } from './ConnectView.tsx';
 
 export interface RunConnectViewOptions {
   appName: string;
@@ -38,12 +38,10 @@ export interface RunConnectViewOptions {
  * + `@opentui/react`'s `createRoot`, dynamically imported so the
  * theme subsystem stays usable in non-TUI contexts.
  */
-export async function runConnectView(
-  opts: RunConnectViewOptions,
-): Promise<void> {
+export async function runConnectView(opts: RunConnectViewOptions): Promise<void> {
   const [{ createCliRenderer }, { createRoot }] = await Promise.all([
-    import("@opentui/core"),
-    import("@opentui/react"),
+    import('@opentui/core'),
+    import('@opentui/react'),
   ]);
 
   const renderer = await createCliRenderer();
@@ -69,6 +67,9 @@ export async function runConnectView(
       resolve();
     };
 
+    // Pass children as the third arg to createElement (idiomatic React)
+    // rather than as a `children` prop. This is what JSX desugars to and
+    // is what biome's noChildrenProp rule expects.
     const tree = createElement(
       AgentxThemeProvider,
       {
@@ -76,15 +77,17 @@ export async function runConnectView(
         fallbackThemeName: opts.fallbackThemeName,
         themeDir: opts.themeDir,
         watch: true,
-        children: createElement(KeyboardProvider, {
-          children: createElement(ConnectView, {
-            appName: opts.appName,
-            required: opts.required,
-            optional: opts.optional,
-            onQuit: cleanup,
-          }),
-        }),
       },
+      createElement(
+        KeyboardProvider,
+        null,
+        createElement(ConnectView, {
+          appName: opts.appName,
+          required: opts.required,
+          optional: opts.optional,
+          onQuit: cleanup,
+        }),
+      ),
     );
     root.render(tree);
   });

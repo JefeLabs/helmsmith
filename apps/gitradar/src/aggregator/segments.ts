@@ -1,8 +1,8 @@
 export type Segment = 'high' | 'middle' | 'low';
 
 export interface SegmentThresholds {
-  high: number;  // percentage for top tier (default 20)
-  low: number;   // percentage for bottom tier (default 20)
+  high: number; // percentage for top tier (default 20)
+  low: number; // percentage for bottom tier (default 20)
 }
 
 /**

@@ -1,16 +1,16 @@
 import chalk from 'chalk';
-import type { ViewContext, NavigationAction } from './types.js';
-import type { UserWeekRepoRecord } from '../types/schema.js';
-import { renderGroupedHBarChart } from '../ui/grouped-hbar-chart.js';
-import type { HBarGroup, HBar } from '../ui/grouped-hbar-chart.js';
-import { renderBanner } from '../ui/banner.js';
-import { renderLegend } from '../ui/legend.js';
-import { renderHotkeyBar } from '../ui/tab-bar.js';
-import { readKey } from '../ui/keypress.js';
 import { rollup } from '../aggregator/engine.js';
 import { filterRecords, getLastNWeeks } from '../aggregator/filters.js';
+import type { UserWeekRepoRecord } from '../types/schema.js';
+import { renderBanner } from '../ui/banner.js';
 import { SEGMENT_DEFS } from '../ui/constants.js';
 import { fmt, weekShort } from '../ui/format.js';
+import type { HBar, HBarGroup } from '../ui/grouped-hbar-chart.js';
+import { renderGroupedHBarChart } from '../ui/grouped-hbar-chart.js';
+import { readKey } from '../ui/keypress.js';
+import { renderLegend } from '../ui/legend.js';
+import { renderHotkeyBar } from '../ui/tab-bar.js';
+import type { NavigationAction, ViewContext } from './types.js';
 
 type WindowSize = 4 | 8 | 12;
 
@@ -34,8 +34,9 @@ export function buildRepoOrgGroups(
 
   // Collect all repos with activity, sorted by total descending
   const repoTotals = rollup(windowRecords, (r) => r.repo);
-  const sortedRepos = [...repoTotals.entries()]
-    .sort((a, b) => (b[1].insertions + b[1].deletions) - (a[1].insertions + a[1].deletions));
+  const sortedRepos = [...repoTotals.entries()].sort(
+    (a, b) => b[1].insertions + b[1].deletions - (a[1].insertions + a[1].deletions),
+  );
 
   // Find repo group label from config
   const repoGroupMap = new Map<string, string>();
@@ -69,7 +70,10 @@ export function buildRepoOrgGroups(
           { key: 'app', value: agg.filetype.app.insertions + agg.filetype.app.deletions },
           { key: 'test', value: agg.filetype.test.insertions + agg.filetype.test.deletions },
           { key: 'config', value: agg.filetype.config.insertions + agg.filetype.config.deletions },
-          { key: 'storybook', value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions },
+          {
+            key: 'storybook',
+            value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions,
+          },
           { key: 'doc', value: agg.filetype.doc.insertions + agg.filetype.doc.deletions },
         ],
         total: agg.insertions + agg.deletions,
@@ -85,9 +89,7 @@ export function buildRepoOrgGroups(
     if (bars.length === 0) continue;
 
     const repoGroup = repoGroupMap.get(repoName);
-    const groupLabel = repoGroup
-      ? `${repoName} ${chalk.dim(`[${repoGroup}]`)}`
-      : repoName;
+    const groupLabel = repoGroup ? `${repoName} ${chalk.dim(`[${repoGroup}]`)}` : repoName;
 
     groups.push({
       groupLabel,
@@ -129,9 +131,7 @@ export async function repoActivityView(ctx: ViewContext): Promise<NavigationActi
       SEGMENT_DEFS.map((d) => ({ label: d.label, color: d.color, char: d.char })),
       { inline: true },
     );
-    console.log(
-      chalk.bold(`Contribution by Repo (${WINDOW_LABELS[windowWeeks]})`) + '  ' + legend,
-    );
+    console.log(`${chalk.bold(`Contribution by Repo (${WINDOW_LABELS[windowWeeks]})`)}  ${legend}`);
     console.log('');
 
     const groups = buildRepoOrgGroups(ctx.records, weeks, ctx.config);
@@ -147,12 +147,11 @@ export async function repoActivityView(ctx: ViewContext): Promise<NavigationActi
 
     // Summary line
     const totalRepos = groups.length;
-    const totalLines = groups.reduce(
-      (sum, g) => sum + g.bars.reduce((s, b) => s + b.total, 0),
-      0,
-    );
+    const totalLines = groups.reduce((sum, g) => sum + g.bars.reduce((s, b) => s + b.total, 0), 0);
     console.log(
-      chalk.dim(`  ${totalRepos} repos · ${fmt(totalLines)} lines changed over ${WINDOW_LABELS[windowWeeks]}`),
+      chalk.dim(
+        `  ${totalRepos} repos · ${fmt(totalLines)} lines changed over ${WINDOW_LABELS[windowWeeks]}`,
+      ),
     );
     console.log('');
 
@@ -169,9 +168,18 @@ export async function repoActivityView(ctx: ViewContext): Promise<NavigationActi
     try {
       const key = await readKey();
 
-      if (key.name === '1' && windowWeeks !== 4) { windowWeeks = 4; continue; }
-      if (key.name === '2' && windowWeeks !== 8) { windowWeeks = 8; continue; }
-      if (key.name === '3' && windowWeeks !== 12) { windowWeeks = 12; continue; }
+      if (key.name === '1' && windowWeeks !== 4) {
+        windowWeeks = 4;
+        continue;
+      }
+      if (key.name === '2' && windowWeeks !== 8) {
+        windowWeeks = 8;
+        continue;
+      }
+      if (key.name === '3' && windowWeeks !== 12) {
+        windowWeeks = 12;
+        continue;
+      }
       if (key.name === 'b') return { type: 'pop' };
       if (key.name === 'q') return { type: 'quit' };
     } catch {

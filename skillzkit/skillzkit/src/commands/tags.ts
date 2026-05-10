@@ -1,6 +1,6 @@
-import { loadCatalog } from "../index.js";
-import { collectTagCounts, loadCoreTags } from "../tags.js";
-import { findPackageRoot } from "./_shared/package-root.js";
+import { loadCatalog } from '../index.js';
+import { collectTagCounts, loadCoreTags } from '../tags.js';
+import { findPackageRoot } from './_shared/package-root.js';
 
 /**
  * List every tag in the catalog with usage counts, split into core
@@ -17,7 +17,7 @@ export function runTags(): void {
 
   if (counts.size === 0) {
     console.log(
-      "No tags found in the catalog. Add `tags: [...]` to artifact frontmatter; see TAGS.md for the curated core list.",
+      'No tags found in the catalog. Add `tags: [...]` to artifact frontmatter; see TAGS.md for the curated core list.',
     );
     return;
   }
@@ -35,28 +35,26 @@ export function runTags(): void {
 
   console.log(`\n=== Core tags (${coreUsed.length}) ===`);
   if (coreUsed.length === 0) {
-    console.log("  (TAGS.md present but no core tags found in the catalog)");
+    console.log('  (TAGS.md present but no core tags found in the catalog)');
   }
   for (const tag of coreUsed.sort(byCount)) {
     const n = counts.get(tag) ?? 0;
-    const marker = n === 0 ? " (unused)" : "";
-    console.log(
-      `  ${tag.padEnd(20)} ${n} use${n === 1 ? "" : "s"}${marker}`,
-    );
+    const marker = n === 0 ? ' (unused)' : '';
+    console.log(`  ${tag.padEnd(20)} ${n} use${n === 1 ? '' : 's'}${marker}`);
   }
 
   console.log(`\n=== Extension tags (${extensions.length}) ===`);
   if (extensions.length === 0) {
-    console.log("  (no extension tags in use)");
+    console.log('  (no extension tags in use)');
   }
   for (const tag of extensions.sort(byCount)) {
     const n = counts.get(tag) ?? 0;
-    console.log(`  ${tag.padEnd(20)} ${n} use${n === 1 ? "" : "s"}`);
+    console.log(`  ${tag.padEnd(20)} ${n} use${n === 1 ? '' : 's'}`);
   }
 
   if (extensions.length > 0) {
     console.log(
-      "\nExtension tags with broad usage (≥5 artifacts, ≥2 personas) are candidates for promotion into TAGS.md core. See TAGS.md for the criteria.",
+      '\nExtension tags with broad usage (≥5 artifacts, ≥2 personas) are candidates for promotion into TAGS.md core. See TAGS.md for the criteria.',
     );
   }
 }

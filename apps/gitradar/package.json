@@ -21,8 +21,8 @@
   },
   "license": "UNLICENSED",
   "dependencies": {
-    "@ecruz165/cli-kit": "*",
-    "@ecruz165/tui-view-components": "*",
+    "@ecruz165/cli-kit": "workspace:*",
+    "@ecruz165/tui-view-components": "workspace:*",
     "@inquirer/prompts": "^8.2.0",
     "better-sqlite3": "^12.6.2",
     "bun": "^1.3.13",

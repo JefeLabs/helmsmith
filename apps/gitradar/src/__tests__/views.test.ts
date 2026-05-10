@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { DEFAULT_SETTINGS } from '../types/schema.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Config, UserWeekRepoRecord } from '../types/schema.js';
-import type { ViewContext, NavigationAction, ViewFn } from '../views/types.js';
-import { computeWeeksToShow } from '../views/dashboard.js';
+import { DEFAULT_SETTINGS } from '../types/schema.js';
 import type { KeyEvent } from '../ui/keypress.js';
+import { computeWeeksToShow } from '../views/dashboard.js';
+import type { NavigationAction, ViewContext, ViewFn } from '../views/types.js';
 
 // ── Mock readKey (replaces @inquirer/prompts select) ────────────────────────
 vi.mock('../ui/keypress.js', () => ({
@@ -11,6 +11,7 @@ vi.mock('../ui/keypress.js', () => ({
 }));
 
 import { readKey } from '../ui/keypress.js';
+
 const mockedReadKey = vi.mocked(readKey);
 
 /** Helper: create a KeyEvent for a named key */
@@ -66,9 +67,7 @@ function makeSampleConfig(): Config {
           {
             name: 'Product',
             tag: 'feature',
-            members: [
-              { name: 'Eva Jones', email: 'eva@company.com', aliases: [] },
-            ],
+            members: [{ name: 'Eva Jones', email: 'eva@company.com', aliases: [] }],
           },
         ],
       },
@@ -79,9 +78,7 @@ function makeSampleConfig(): Config {
           {
             name: 'Frontend Squad',
             tag: 'feature',
-            members: [
-              { name: 'Leo Garcia', email: 'leo@consultant.com', aliases: [] },
-            ],
+            members: [{ name: 'Leo Garcia', email: 'leo@consultant.com', aliases: [] }],
           },
         ],
       },
@@ -104,17 +101,91 @@ function makeSampleRecords(): UserWeekRepoRecord[] {
 
   for (const week of weeks) {
     // Alice - Platform
-    records.push(makeRecord({ member: 'Alice Chen', team: 'Platform', org: 'Team A', orgType: 'core', tag: 'infrastructure', week, repo: 'frontend-app', commits: 10 + Math.floor(Math.random() * 5) }));
-    records.push(makeRecord({ member: 'Alice Chen', team: 'Platform', org: 'Team A', orgType: 'core', tag: 'infrastructure', week, repo: 'api-server', group: 'backend', commits: 5 }));
+    records.push(
+      makeRecord({
+        member: 'Alice Chen',
+        team: 'Platform',
+        org: 'Team A',
+        orgType: 'core',
+        tag: 'infrastructure',
+        week,
+        repo: 'frontend-app',
+        commits: 10 + Math.floor(Math.random() * 5),
+      }),
+    );
+    records.push(
+      makeRecord({
+        member: 'Alice Chen',
+        team: 'Platform',
+        org: 'Team A',
+        orgType: 'core',
+        tag: 'infrastructure',
+        week,
+        repo: 'api-server',
+        group: 'backend',
+        commits: 5,
+      }),
+    );
 
     // Bob - Platform
-    records.push(makeRecord({ member: 'Bob Kumar', email: 'bob@company.com', team: 'Platform', org: 'Team A', orgType: 'core', tag: 'infrastructure', week, repo: 'api-server', group: 'backend', commits: 8 }));
+    records.push(
+      makeRecord({
+        member: 'Bob Kumar',
+        email: 'bob@company.com',
+        team: 'Platform',
+        org: 'Team A',
+        orgType: 'core',
+        tag: 'infrastructure',
+        week,
+        repo: 'api-server',
+        group: 'backend',
+        commits: 8,
+      }),
+    );
 
     // Eva - Product
-    records.push(makeRecord({ member: 'Eva Jones', email: 'eva@company.com', team: 'Product', org: 'Team A', orgType: 'core', tag: 'feature', week, repo: 'frontend-app', commits: 12, filetype: { app: { files: 8, filesAdded: 0, filesDeleted: 0, insertions: 300, deletions: 80 }, test: { files: 4, filesAdded: 0, filesDeleted: 0, insertions: 120, deletions: 40 }, config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 }, storybook: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 30, deletions: 10 }, doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 } } }));
+    records.push(
+      makeRecord({
+        member: 'Eva Jones',
+        email: 'eva@company.com',
+        team: 'Product',
+        org: 'Team A',
+        orgType: 'core',
+        tag: 'feature',
+        week,
+        repo: 'frontend-app',
+        commits: 12,
+        filetype: {
+          app: { files: 8, filesAdded: 0, filesDeleted: 0, insertions: 300, deletions: 80 },
+          test: { files: 4, filesAdded: 0, filesDeleted: 0, insertions: 120, deletions: 40 },
+          config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+          storybook: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 30, deletions: 10 },
+          doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+        },
+      }),
+    );
 
     // Leo - Frontend Squad
-    records.push(makeRecord({ member: 'Leo Garcia', email: 'leo@consultant.com', team: 'Frontend Squad', org: 'Team B', orgType: 'consultant', tag: 'feature', week, repo: 'frontend-app', commits: 6, filetype: { app: { files: 4, filesAdded: 0, filesDeleted: 0, insertions: 150, deletions: 40 }, test: { files: 2, filesAdded: 0, filesDeleted: 0, insertions: 60, deletions: 20 }, config: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 10, deletions: 5 }, storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 }, doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 } } }));
+    records.push(
+      makeRecord({
+        member: 'Leo Garcia',
+        email: 'leo@consultant.com',
+        team: 'Frontend Squad',
+        org: 'Team B',
+        orgType: 'consultant',
+        tag: 'feature',
+        week,
+        repo: 'frontend-app',
+        commits: 6,
+        filetype: {
+          app: { files: 4, filesAdded: 0, filesDeleted: 0, insertions: 150, deletions: 40 },
+          test: { files: 2, filesAdded: 0, filesDeleted: 0, insertions: 60, deletions: 20 },
+          config: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 10, deletions: 5 },
+          storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+          doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+        },
+      }),
+    );
   }
 
   return records;
@@ -219,7 +290,7 @@ describe('Dashboard View', () => {
     const ctx = makeSampleContext();
 
     mockedReadKey
-      .mockResolvedValueOnce(key('r'))  // switch to repo_activity tab
+      .mockResolvedValueOnce(key('r')) // switch to repo_activity tab
       .mockResolvedValueOnce(key('q')); // quit
 
     const result = await dashboardView(ctx);
@@ -249,9 +320,7 @@ describe('Dashboard View', () => {
     const ctx = makeSampleContext();
 
     // Press down arrow to drill org → team, then quit
-    mockedReadKey
-      .mockResolvedValueOnce(key('down'))
-      .mockResolvedValueOnce(key('q'));
+    mockedReadKey.mockResolvedValueOnce(key('down')).mockResolvedValueOnce(key('q'));
 
     const result = await dashboardView(ctx);
     expect(result).toEqual({ type: 'quit' });
@@ -268,9 +337,7 @@ describe('Dashboard View', () => {
     });
 
     // Default is weekly, press - to go coarser (week → month), then quit
-    mockedReadKey
-      .mockResolvedValueOnce(key('-'))
-      .mockResolvedValueOnce(key('q'));
+    mockedReadKey.mockResolvedValueOnce(key('-')).mockResolvedValueOnce(key('q'));
 
     const result = await dashboardView(ctx);
     expect(result).toEqual({ type: 'quit' });
@@ -291,8 +358,8 @@ describe('Dashboard View', () => {
 
     // - to month, then + back to week, then quit
     mockedReadKey
-      .mockResolvedValueOnce(key('-'))   // week → month
-      .mockResolvedValueOnce(key('+'))   // month → week
+      .mockResolvedValueOnce(key('-')) // week → month
+      .mockResolvedValueOnce(key('+')) // month → week
       .mockResolvedValueOnce(key('q'));
 
     await dashboardView(ctx);
@@ -312,9 +379,7 @@ describe('Dashboard View', () => {
     });
 
     // Press right arrow to extend (12 → 14 weeks), then quit
-    mockedReadKey
-      .mockResolvedValueOnce(key('right'))
-      .mockResolvedValueOnce(key('q'));
+    mockedReadKey.mockResolvedValueOnce(key('right')).mockResolvedValueOnce(key('q'));
 
     await dashboardView(ctx);
 
@@ -332,9 +397,7 @@ describe('Dashboard View', () => {
     });
 
     // Press left arrow to shrink (12 → 10 weeks), then quit
-    mockedReadKey
-      .mockResolvedValueOnce(key('left'))
-      .mockResolvedValueOnce(key('q'));
+    mockedReadKey.mockResolvedValueOnce(key('left')).mockResolvedValueOnce(key('q'));
 
     await dashboardView(ctx);
 
@@ -353,8 +416,8 @@ describe('Dashboard View', () => {
 
     // Press D to open submenu, then T for table view, then quit
     mockedReadKey
-      .mockResolvedValueOnce(key('d'))  // open detail submenu
-      .mockResolvedValueOnce(key('t'))  // choose table
+      .mockResolvedValueOnce(key('d')) // open detail submenu
+      .mockResolvedValueOnce(key('t')) // choose table
       .mockResolvedValueOnce(key('q'));
 
     await dashboardView(ctx);
@@ -379,10 +442,10 @@ describe('Dashboard View', () => {
 
     // Press D→T for table, then D→Esc back to compact, then quit
     mockedReadKey
-      .mockResolvedValueOnce(key('d'))  // open detail submenu
-      .mockResolvedValueOnce(key('t'))  // choose table
-      .mockResolvedValueOnce(key('d'))  // open detail submenu again
-      .mockResolvedValueOnce(key('escape'))  // Esc → back to compact
+      .mockResolvedValueOnce(key('d')) // open detail submenu
+      .mockResolvedValueOnce(key('t')) // choose table
+      .mockResolvedValueOnce(key('d')) // open detail submenu again
+      .mockResolvedValueOnce(key('escape')) // Esc → back to compact
       .mockResolvedValueOnce(key('q'));
 
     await dashboardView(ctx);
@@ -403,8 +466,8 @@ describe('Dashboard View', () => {
 
     // Press D to open submenu, then P for PRs view, then quit
     mockedReadKey
-      .mockResolvedValueOnce(key('d'))  // open detail submenu
-      .mockResolvedValueOnce(key('p'))  // choose PRs
+      .mockResolvedValueOnce(key('d')) // open detail submenu
+      .mockResolvedValueOnce(key('p')) // choose PRs
       .mockResolvedValueOnce(key('q'));
 
     await dashboardView(ctx);
@@ -427,7 +490,7 @@ describe('Dashboard View', () => {
 
     // Press U to toggle per-user mode, then quit
     mockedReadKey
-      .mockResolvedValueOnce(key('u'))  // toggle per-user
+      .mockResolvedValueOnce(key('u')) // toggle per-user
       .mockResolvedValueOnce(key('q'));
 
     await dashboardView(ctx);
@@ -460,8 +523,8 @@ describe('Dashboard View', () => {
     const ctx = makeSampleContext();
 
     mockedReadKey
-      .mockResolvedValueOnce(key('t'))  // tag overlay on
-      .mockResolvedValueOnce(key('t'))  // tag overlay off
+      .mockResolvedValueOnce(key('t')) // tag overlay on
+      .mockResolvedValueOnce(key('t')) // tag overlay off
       .mockResolvedValueOnce(key('q')); // quit
 
     const result = await dashboardView(ctx);
@@ -669,8 +732,8 @@ describe('Trends View', () => {
     const ctx = makeSampleContext();
 
     mockedReadKey
-      .mockResolvedValueOnce(key('e'))  // expand by team
-      .mockResolvedValueOnce(key('g'))  // expand by tag
+      .mockResolvedValueOnce(key('e')) // expand by team
+      .mockResolvedValueOnce(key('g')) // expand by tag
       .mockResolvedValueOnce(key('b')); // back
 
     const result = await trendsView(ctx);
@@ -714,8 +777,8 @@ describe('Trends View', () => {
     const ctx = makeSampleContext();
 
     mockedReadKey
-      .mockResolvedValueOnce(key('e'))  // expand by team
-      .mockResolvedValueOnce(key('o'))  // collapse to org
+      .mockResolvedValueOnce(key('e')) // expand by team
+      .mockResolvedValueOnce(key('o')) // collapse to org
       .mockResolvedValueOnce(key('q')); // quit
 
     const result = await trendsView(ctx);

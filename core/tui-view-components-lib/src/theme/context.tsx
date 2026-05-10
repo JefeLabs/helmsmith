@@ -5,8 +5,8 @@
  * into the same value.
  */
 
-import { createContext } from "react";
-import type { Theme } from "./types.ts";
+import { createContext } from 'react';
+import type { Theme } from './types.ts';
 
 export interface ThemeContextValue {
   /** The currently-resolved theme. */

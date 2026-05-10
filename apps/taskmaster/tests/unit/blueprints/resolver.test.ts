@@ -1,10 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import { REST_API_BLUEPRINT } from '../../../src/blueprints/archetypes/rest-api.js';
 import {
-  resolveBlueprint,
   groupByUrgency,
+  resolveBlueprint,
   validateNonNegotiables,
 } from '../../../src/blueprints/resolver.js';
-import { REST_API_BLUEPRINT } from '../../../src/blueprints/archetypes/rest-api.js';
 import type { ApplicationBlueprint, BlueprintConcern } from '../../../src/blueprints/types.js';
 
 describe('resolveBlueprint', () => {
@@ -91,7 +91,13 @@ describe('resolveBlueprint', () => {
       ],
       conditionalRules: [],
       nonNegotiableBundle: ['c1'], // c1 is non-negotiable
-      detectionHints: { patterns: [], frameworks: [], capabilities: [], fileIndicators: [], weight: 0.5 },
+      detectionHints: {
+        patterns: [],
+        frameworks: [],
+        capabilities: [],
+        fileIndicators: [],
+        weight: 0.5,
+      },
     };
 
     const resolved = resolveBlueprint(testBlueprint, {});
@@ -140,12 +146,12 @@ describe('groupByUrgency', () => {
     ];
 
     const groups = groupByUrgency(concerns);
-    expect(groups['upfront']).toHaveLength(1);
-    expect(groups['upfront'][0].id).toBe('a');
+    expect(groups.upfront).toHaveLength(1);
+    expect(groups.upfront[0].id).toBe('a');
     expect(groups['pattern-first']).toHaveLength(1);
     expect(groups['pattern-first'][0].id).toBe('b');
-    expect(groups['deferred']).toHaveLength(1);
-    expect(groups['deferred'][0].id).toBe('c');
+    expect(groups.deferred).toHaveLength(1);
+    expect(groups.deferred[0].id).toBe('c');
   });
 
   it('returns empty arrays for tiers with no concerns', () => {
@@ -164,9 +170,9 @@ describe('groupByUrgency', () => {
     ];
 
     const groups = groupByUrgency(concerns);
-    expect(groups['upfront']).toHaveLength(1);
+    expect(groups.upfront).toHaveLength(1);
     expect(groups['pattern-first']).toEqual([]);
-    expect(groups['deferred']).toEqual([]);
+    expect(groups.deferred).toEqual([]);
   });
 });
 
@@ -203,7 +209,13 @@ describe('validateNonNegotiables', () => {
     ],
     conditionalRules: [],
     nonNegotiableBundle: ['c1', 'c2'],
-    detectionHints: { patterns: [], frameworks: [], capabilities: [], fileIndicators: [], weight: 0.5 },
+    detectionHints: {
+      patterns: [],
+      frameworks: [],
+      capabilities: [],
+      fileIndicators: [],
+      weight: 0.5,
+    },
   };
 
   it('returns empty array when all non-negotiables are present', () => {

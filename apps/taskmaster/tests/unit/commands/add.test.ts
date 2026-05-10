@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import type { TaskNode, ProjectConfig } from '../../../src/config/schema.js';
+import { describe, expect, it } from 'vitest';
 import { executeAdd } from '../../../src/commands/add.js';
+import type { ProjectConfig, TaskNode } from '../../../src/config/schema.js';
 
 function makeTask(overrides: Partial<TaskNode> = {}): TaskNode {
   return {
@@ -73,9 +73,9 @@ describe('executeAdd', () => {
     const tasks = [makeTask({ id: '1' })];
     const config = makeConfig();
 
-    await expect(
-      executeAdd(tasks, config, { title: 'Orphan', parent: '999' }),
-    ).rejects.toThrow('Parent task "999" not found.');
+    await expect(executeAdd(tasks, config, { title: 'Orphan', parent: '999' })).rejects.toThrow(
+      'Parent task "999" not found.',
+    );
   });
 
   it('uses default type from style hierarchy when not specified', async () => {
@@ -147,9 +147,9 @@ describe('executeAdd', () => {
     const tasks: TaskNode[] = [];
     const config = makeConfig({ style: 'task-only' });
 
-    await expect(
-      executeAdd(tasks, config, { title: 'Bad type', type: 'epic' }),
-    ).rejects.toThrow('Invalid task type "epic"');
+    await expect(executeAdd(tasks, config, { title: 'Bad type', type: 'epic' })).rejects.toThrow(
+      'Invalid task type "epic"',
+    );
   });
 
   it('throws for invalid priority', async () => {

@@ -1,12 +1,8 @@
-import type { Catalog } from "../types.js";
-import {
-  installSlugs,
-  type InstallOptions,
-  type InstallResult,
-} from "../install.js";
-import type { ResolvedSelection } from "./state.js";
+import { type InstallOptions, type InstallResult, installSlugs } from '../install.js';
+import type { Catalog } from '../types.js';
+import type { ResolvedSelection } from './state.js';
 
-export type { InstallResult } from "../install.js";
+export type { InstallResult } from '../install.js';
 
 /**
  * TUI adapter over the shared `installSlugs()` primitive in lib/install.ts.

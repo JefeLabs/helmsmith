@@ -12,25 +12,17 @@
  * forms.
  */
 
-import {
-  existsSync,
-  readFileSync,
-  readdirSync,
-  statSync,
-} from "node:fs";
-import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
-import matter from "gray-matter";
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import matter from 'gray-matter';
+import { SkillzkitApiClient } from '../api/client.js';
 import type {
   ContributionFile,
   ContributionKind,
   CreateContributionRequest,
-} from "../api/contracts.js";
-import {
-  SkillzkitApiClient,
-  SkillzkitApiError,
-} from "../api/client.js";
-import { decryptApiKey } from "./crypto.js";
-import { readConfig } from "./config.js";
+} from '../api/contracts.js';
+import { readConfig } from './config.js';
+import { decryptApiKey } from './crypto.js';
 
 /* ── Reading from disk ──────────────────────────────────────── */
 
@@ -52,15 +44,15 @@ export interface LoadedBundle {
 }
 
 const ALLOWED_COMPANION_EXTS = new Set([
-  ".md",
-  ".py",
-  ".sh",
-  ".ts",
-  ".js",
-  ".json",
-  ".yaml",
-  ".yml",
-  ".toml",
+  '.md',
+  '.py',
+  '.sh',
+  '.ts',
+  '.js',
+  '.json',
+  '.yaml',
+  '.yml',
+  '.toml',
 ]);
 
 /**
@@ -69,9 +61,7 @@ const ALLOWED_COMPANION_EXTS = new Set([
  *   - A directory containing SKILL.md (skill contribution)
  */
 export function readBundle(inputPath: string, cwd = process.cwd()): LoadedBundle {
-  const resolvedPath = isAbsolute(inputPath)
-    ? inputPath
-    : resolve(cwd, inputPath);
+  const resolvedPath = isAbsolute(inputPath) ? inputPath : resolve(cwd, inputPath);
 
   if (!existsSync(resolvedPath)) {
     throw new Error(`Path not found: ${resolvedPath}`);
@@ -82,7 +72,7 @@ export function readBundle(inputPath: string, cwd = process.cwd()): LoadedBundle
     return loadSkillBundle(resolvedPath);
   }
   if (stat.isFile()) {
-    if (!resolvedPath.endsWith(".md")) {
+    if (!resolvedPath.endsWith('.md')) {
       throw new Error(
         `Single-file contributions must be .md (command or workflow). For skills, point at the directory containing SKILL.md.`,
       );
@@ -93,7 +83,7 @@ export function readBundle(inputPath: string, cwd = process.cwd()): LoadedBundle
 }
 
 function loadSingleFile(filePath: string): LoadedBundle {
-  const raw = readFileSync(filePath, "utf8");
+  const raw = readFileSync(filePath, 'utf8');
   const parsed = matter(raw);
   const primaryPath = basename(filePath);
   return {
@@ -112,20 +102,18 @@ function loadSingleFile(filePath: string): LoadedBundle {
 }
 
 function loadSkillBundle(dir: string): LoadedBundle {
-  const skillMdPath = join(dir, "SKILL.md");
+  const skillMdPath = join(dir, 'SKILL.md');
   if (!existsSync(skillMdPath)) {
-    throw new Error(
-      `Directory ${dir} has no SKILL.md - skill bundles require it at the root.`,
-    );
+    throw new Error(`Directory ${dir} has no SKILL.md - skill bundles require it at the root.`);
   }
   const files: ContributionFile[] = [];
   for (const entry of walkBundle(dir)) {
     files.push({
       path: entry.relPath,
-      content: readFileSync(entry.absPath, "utf8"),
+      content: readFileSync(entry.absPath, 'utf8'),
     });
   }
-  const skillRaw = readFileSync(skillMdPath, "utf8");
+  const skillRaw = readFileSync(skillMdPath, 'utf8');
   const parsed = matter(skillRaw);
   return {
     resolvedPath: dir,
@@ -133,7 +121,7 @@ function loadSkillBundle(dir: string): LoadedBundle {
     files,
     frontmatter: parsed.data ?? {},
     primaryBody: parsed.content.trimStart(),
-    primaryPath: "SKILL.md",
+    primaryPath: 'SKILL.md',
   };
 }
 
@@ -147,8 +135,8 @@ function walkBundle(root: string): BundleEntry[] {
   function recurse(dir: string) {
     for (const name of readdirSync(dir)) {
       // Skip hidden files / typical noise
-      if (name.startsWith(".")) continue;
-      if (name === "node_modules" || name === "dist") continue;
+      if (name.startsWith('.')) continue;
+      if (name === 'node_modules' || name === 'dist') continue;
       const absPath = join(dir, name);
       const stat = statSync(absPath);
       if (stat.isDirectory()) {
@@ -156,8 +144,8 @@ function walkBundle(root: string): BundleEntry[] {
         continue;
       }
       if (!stat.isFile()) continue;
-      const dotIdx = name.lastIndexOf(".");
-      const ext = dotIdx === -1 ? "" : name.slice(dotIdx);
+      const dotIdx = name.lastIndexOf('.');
+      const ext = dotIdx === -1 ? '' : name.slice(dotIdx);
       if (!ALLOWED_COMPANION_EXTS.has(ext)) continue;
       out.push({ absPath, relPath: relative(root, absPath) });
     }
@@ -184,31 +172,27 @@ export interface InferredIdentity {
  * If the heuristic can't infer, returns null and the caller must
  * accept --slug / --kind from the user explicitly.
  */
-export function inferSlugAndKind(
-  bundle: LoadedBundle,
-): InferredIdentity | null {
+export function inferSlugAndKind(bundle: LoadedBundle): InferredIdentity | null {
   if (bundle.isDirectory) {
     return {
-      kind: "skill",
+      kind: 'skill',
       slug: basename(bundle.resolvedPath),
     };
   }
   // Single .md - look for the commands/ root
   const segments = bundle.resolvedPath.split(sep);
-  const commandsIdx = segments.lastIndexOf("commands");
+  const commandsIdx = segments.lastIndexOf('commands');
   if (commandsIdx === -1) return null;
   const after = segments.slice(commandsIdx + 1);
   if (after.length === 0) return null;
 
   // Drop the .md extension on the last segment
   const last = after[after.length - 1];
-  if (!last.endsWith(".md")) return null;
+  if (!last.endsWith('.md')) return null;
   after[after.length - 1] = last.slice(0, -3);
 
-  const slug = after.join(":");
-  const kind: ContributionKind = after.includes("workflows")
-    ? "workflow"
-    : "command";
+  const slug = after.join(':');
+  const kind: ContributionKind = after.includes('workflows') ? 'workflow' : 'command';
   return { kind, slug };
 }
 
@@ -222,7 +206,7 @@ export interface SubmitArgs {
   /** Base URL of the API. */
   apiUrl: string;
   /** Optional bump hint - patch by default. */
-  versionBump?: "major" | "minor" | "patch";
+  versionBump?: 'major' | 'minor' | 'patch';
   /** Optional changelog message. */
   changelog?: string;
 }
@@ -259,7 +243,7 @@ export interface ContributeRunArgs {
   kindOverride?: ContributionKind;
   /** Override slug (same conditions as kindOverride). */
   slugOverride?: string;
-  versionBump?: "major" | "minor" | "patch";
+  versionBump?: 'major' | 'minor' | 'patch';
   changelog?: string;
   /** Provider for the PIN. The CLI passes a function that calls
    *  promptHidden; tests pass a fixed string. */
@@ -267,7 +251,7 @@ export interface ContributeRunArgs {
 }
 
 export interface ContributeRunResult {
-  status: "accepted";
+  status: 'accepted';
   id: string;
   slug: string;
   kind: ContributionKind;
@@ -281,11 +265,9 @@ export interface ContributeRunResult {
  * step that fails - the CLI handler maps thrown errors to user-
  * friendly messages (or to SkillzkitApiError findings on 422).
  */
-export async function runContribute(
-  args: ContributeRunArgs,
-): Promise<ContributeRunResult> {
+export async function runContribute(args: ContributeRunArgs): Promise<ContributeRunResult> {
   const config = readConfig();
-  if (config.mode !== "team") {
+  if (config.mode !== 'team') {
     throw new Error(
       `Contribute requires team mode; current config is mode=${config.mode}. Run \`skillzkit init --force --mode team\` to switch.`,
     );
@@ -326,10 +308,10 @@ export async function runContribute(
       changelog: args.changelog,
     });
     if (!response.version) {
-      throw new Error("Server returned a response without a version");
+      throw new Error('Server returned a response without a version');
     }
     return {
-      status: "accepted",
+      status: 'accepted',
       id: response.id,
       slug: response.slug,
       kind: response.kind,
@@ -338,6 +320,6 @@ export async function runContribute(
   } finally {
     // Best-effort scrubbing of the plaintext key - the JS engine
     // may keep it interned but we drop the local reference ASAP.
-    plaintextKey = "";
+    plaintextKey = '';
   }
 }

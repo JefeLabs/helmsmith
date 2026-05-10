@@ -1,8 +1,8 @@
-import simpleGit, { type SimpleGit, type StatusResult } from 'simple-git';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { RepoBranchState, RepoState, ConflictFile } from '../config/schema.js';
+import simpleGit, { type SimpleGit, type StatusResult } from 'simple-git';
 import { APP_NAME } from '../config/branding.js';
+import type { ConflictFile, RepoBranchState, RepoState } from '../config/schema.js';
 
 /**
  * Low-level git operations for a single repository.
@@ -39,7 +39,10 @@ export class GitOperations {
       let behind = 0;
       try {
         const revList = await this.git.raw([
-          'rev-list', '--left-right', '--count', `${branchName}...${tracking}`,
+          'rev-list',
+          '--left-right',
+          '--count',
+          `${branchName}...${tracking}`,
         ]);
         const [a, b] = revList.trim().split(/\s+/).map(Number);
         ahead = a ?? 0;
@@ -65,8 +68,13 @@ export class GitOperations {
       };
     } catch {
       return {
-        branch: branchName, ahead: 0, behind: 0, hasConflicts: false,
-        isDirty: false, lastCommit: 'error', lastCommitDate: 'error',
+        branch: branchName,
+        ahead: 0,
+        behind: 0,
+        hasConflicts: false,
+        isDirty: false,
+        lastCommit: 'error',
+        lastCommitDate: 'error',
       };
     }
   }
@@ -84,18 +92,28 @@ export class GitOperations {
       for (const [alias, branchName] of Object.entries(branchAliases)) {
         try {
           branches[alias] = await this.getBranchState(branchName);
-        } catch { /* branch may not exist locally */ }
+        } catch {
+          /* branch may not exist locally */
+        }
       }
 
       const status = await this.git.status();
       return {
-        name, group, path: this.repoPath, currentBranch,
-        branches, hasUnresolved: status.conflicted.length > 0,
+        name,
+        group,
+        path: this.repoPath,
+        currentBranch,
+        branches,
+        hasUnresolved: status.conflicted.length > 0,
       };
     } catch (err) {
       return {
-        name, group, path: this.repoPath, currentBranch: 'unknown',
-        branches: {}, hasUnresolved: false,
+        name,
+        group,
+        path: this.repoPath,
+        currentBranch: 'unknown',
+        branches: {},
+        hasUnresolved: false,
         error: err instanceof Error ? err.message : String(err),
       };
     }
@@ -178,7 +196,9 @@ export class GitOperations {
       let content = '';
       try {
         content = readFileSync(fullPath, 'utf-8');
-      } catch { continue; }
+      } catch {
+        continue;
+      }
 
       const { ours, theirs, base } = this.parseConflictMarkers(content);
       files.push({ path: filePath, oursContent: ours, theirsContent: theirs, baseContent: base });
@@ -188,7 +208,9 @@ export class GitOperations {
 
   private parseConflictMarkers(content: string): { ours: string; theirs: string; base: string } {
     const lines = content.split('\n');
-    let ours = '', theirs = '', base = '';
+    let ours = '',
+      theirs = '',
+      base = '';
     let section: 'none' | 'ours' | 'base' | 'theirs' = 'none';
 
     for (const line of lines) {
@@ -196,9 +218,9 @@ export class GitOperations {
       else if (line.startsWith('|||||||')) section = 'base';
       else if (line.startsWith('=======')) section = 'theirs';
       else if (line.startsWith('>>>>>>>')) section = 'none';
-      else if (section === 'ours') ours += line + '\n';
-      else if (section === 'base') base += line + '\n';
-      else if (section === 'theirs') theirs += line + '\n';
+      else if (section === 'ours') ours += `${line}\n`;
+      else if (section === 'base') base += `${line}\n`;
+      else if (section === 'theirs') theirs += `${line}\n`;
     }
     return { ours: ours.trimEnd(), theirs: theirs.trimEnd(), base: base.trimEnd() };
   }
@@ -238,7 +260,10 @@ export class GitOperations {
   ): Promise<Array<{ hash: string; date: string; message: string; author: string }>> {
     const log = await this.git.log({ maxCount, from: branch });
     return log.all.map((c) => ({
-      hash: c.hash, date: c.date, message: c.message, author: c.author_name,
+      hash: c.hash,
+      date: c.date,
+      message: c.message,
+      author: c.author_name,
     }));
   }
 
@@ -248,7 +273,9 @@ export class GitOperations {
     try {
       await this.git.raw(['rev-parse', '--verify', name]);
       return true;
-    } catch { return false; }
+    } catch {
+      return false;
+    }
   }
 
   async checkout(branch: string): Promise<void> {

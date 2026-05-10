@@ -1,11 +1,11 @@
-import { describe, it, expect } from 'vitest';
-import type { TaskNode, StateDefinition } from '../../../src/config/schema.js';
+import { describe, expect, it } from 'vitest';
+import type { StateDefinition, TaskNode } from '../../../src/config/schema.js';
 import { STANDARD_PRESET } from '../../../src/config/state-presets.js';
 import {
-  aggregateSummary,
   aggregateComplexity,
-  aggregateProgress,
   aggregateDependencies,
+  aggregateProgress,
+  aggregateSummary,
   generateMermaidSyntax,
 } from '../../../src/reports/aggregator.js';
 
@@ -56,9 +56,9 @@ describe('aggregateComplexity', () => {
       makeTask({ id: 'E', complexity: 10 }),
     ];
     const result = aggregateComplexity(tasks);
-    expect(result.summary.low).toBe(2);   // 1, 3
+    expect(result.summary.low).toBe(2); // 1, 3
     expect(result.summary.medium).toBe(1); // 5
-    expect(result.summary.high).toBe(2);   // 7, 10
+    expect(result.summary.high).toBe(2); // 7, 10
   });
 
   it('computes correct average', () => {
@@ -87,23 +87,17 @@ describe('aggregateComplexity', () => {
     const parent = makeTask({
       id: 'P',
       complexity: 8,
-      children: [
-        makeTask({ id: 'C1', complexity: 2 }),
-        makeTask({ id: 'C2', complexity: 4 }),
-      ],
+      children: [makeTask({ id: 'C1', complexity: 2 }), makeTask({ id: 'C2', complexity: 4 })],
     });
     const result = aggregateComplexity([parent]);
     expect(result.tasks).toHaveLength(3);
-    expect(result.summary.high).toBe(1);   // P = 8
-    expect(result.summary.low).toBe(1);    // C1 = 2
+    expect(result.summary.high).toBe(1); // P = 8
+    expect(result.summary.low).toBe(1); // C1 = 2
     expect(result.summary.medium).toBe(1); // C2 = 4
   });
 
   it('handles all tasks with same score', () => {
-    const tasks = [
-      makeTask({ id: 'A', complexity: 5 }),
-      makeTask({ id: 'B', complexity: 5 }),
-    ];
+    const tasks = [makeTask({ id: 'A', complexity: 5 }), makeTask({ id: 'B', complexity: 5 })];
     const result = aggregateComplexity(tasks);
     expect(result.summary).toEqual({ low: 0, medium: 2, high: 0, average: 5 });
   });
@@ -115,14 +109,19 @@ describe('aggregateProgress', () => {
   it('returns zeros for empty task array', () => {
     const result = aggregateProgress([], STATES);
     expect(result.progress).toEqual({
-      total: 0, done: 0, inProgress: 0, blocked: 0, pending: 0, percentage: 0,
+      total: 0,
+      done: 0,
+      inProgress: 0,
+      blocked: 0,
+      pending: 0,
+      percentage: 0,
     });
   });
 
   it('counts tasks by category correctly', () => {
     const tasks = [
-      makeTask({ id: 'A', status: 'done' }),       // closed
-      makeTask({ id: 'B', status: 'done' }),       // closed
+      makeTask({ id: 'A', status: 'done' }), // closed
+      makeTask({ id: 'B', status: 'done' }), // closed
       makeTask({ id: 'C', status: 'in-progress' }), // active
       makeTask({ id: 'D', status: 'todo', readiness: 'blocked' }), // open + blocked
       makeTask({ id: 'E', status: 'todo', readiness: 'pending' }), // open + pending
@@ -137,10 +136,7 @@ describe('aggregateProgress', () => {
   });
 
   it('computes 100% when all tasks are done', () => {
-    const tasks = [
-      makeTask({ id: 'A', status: 'done' }),
-      makeTask({ id: 'B', status: 'done' }),
-    ];
+    const tasks = [makeTask({ id: 'A', status: 'done' }), makeTask({ id: 'B', status: 'done' })];
     const result = aggregateProgress(tasks, STATES);
     expect(result.progress.percentage).toBe(100);
     expect(result.progress.done).toBe(2);
@@ -182,10 +178,7 @@ describe('aggregateDependencies', () => {
   });
 
   it('shows isolated nodes when no dependencies exist', () => {
-    const tasks = [
-      makeTask({ id: 'A' }),
-      makeTask({ id: 'B' }),
-    ];
+    const tasks = [makeTask({ id: 'A' }), makeTask({ id: 'B' })];
     const result = aggregateDependencies(tasks);
     expect(result.mermaidSyntax).toContain('A["A"]');
     expect(result.mermaidSyntax).toContain('B["B"]');
@@ -277,14 +270,14 @@ describe('aggregateSummary', () => {
 
     // Task counts
     expect(result.taskCounts.total).toBe(4);
-    expect(result.taskCounts.closed).toBe(1);  // A = done
-    expect(result.taskCounts.active).toBe(1);  // B = in-progress
-    expect(result.taskCounts.open).toBe(2);    // C, D = todo
+    expect(result.taskCounts.closed).toBe(1); // A = done
+    expect(result.taskCounts.active).toBe(1); // B = in-progress
+    expect(result.taskCounts.open).toBe(2); // C, D = todo
 
     // Complexity
-    expect(result.complexity.low).toBe(2);    // A=2, D=3
+    expect(result.complexity.low).toBe(2); // A=2, D=3
     expect(result.complexity.medium).toBe(1); // B=5
-    expect(result.complexity.high).toBe(1);   // C=8
+    expect(result.complexity.high).toBe(1); // C=8
     expect(result.complexity.average).toBe(4.5); // (2+5+8+3)/4 = 4.5
 
     // Skill coverage (sorted by count desc)
@@ -293,7 +286,7 @@ describe('aggregateSummary', () => {
     expect(result.skillCoverage[2]).toEqual({ skill: 'database', count: 1 });
 
     // Readiness (only non-closed tasks)
-    expect(result.readiness.ready).toBe(1);   // B
+    expect(result.readiness.ready).toBe(1); // B
     expect(result.readiness.blocked).toBe(1); // C
     expect(result.readiness.pending).toBe(1); // D
 
@@ -332,9 +325,9 @@ describe('aggregateSummary', () => {
 
     const result = aggregateSummary([parent], STATES);
     expect(result.taskCounts.total).toBe(3);
-    expect(result.taskCounts.closed).toBe(1);  // P.1
-    expect(result.taskCounts.active).toBe(1);  // P
-    expect(result.taskCounts.open).toBe(1);    // P.2
+    expect(result.taskCounts.closed).toBe(1); // P.1
+    expect(result.taskCounts.active).toBe(1); // P
+    expect(result.taskCounts.open).toBe(1); // P.2
     expect(result.skillCoverage).toContainEqual({ skill: 'devops', count: 2 });
     expect(result.skillCoverage).toContainEqual({ skill: 'testing', count: 1 });
   });

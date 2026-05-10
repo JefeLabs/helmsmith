@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { TaskNode } from '../../../src/config/schema.js';
 import { findClosestMatch, validateSkills } from '../../../src/skills/validation.js';
 
@@ -82,9 +82,7 @@ describe('validateSkills', () => {
   });
 
   it('reports skills not in vocabulary', () => {
-    const tasks = [
-      makeTask({ id: '1', requiredSkills: ['backend', 'graphql'] }),
-    ];
+    const tasks = [makeTask({ id: '1', requiredSkills: ['backend', 'graphql'] })];
     const issues = validateSkills(tasks, vocabulary);
     expect(issues).toHaveLength(1);
     expect(issues[0].taskId).toBe('1');
@@ -92,18 +90,14 @@ describe('validateSkills', () => {
   });
 
   it('provides closest match suggestion when available', () => {
-    const tasks = [
-      makeTask({ id: '1', requiredSkills: ['back'] }),
-    ];
+    const tasks = [makeTask({ id: '1', requiredSkills: ['back'] })];
     const issues = validateSkills(tasks, vocabulary);
     expect(issues).toHaveLength(1);
     expect(issues[0].suggestion).toBe('backend');
   });
 
   it('returns null suggestion when no close match exists', () => {
-    const tasks = [
-      makeTask({ id: '1', requiredSkills: ['kubernetes'] }),
-    ];
+    const tasks = [makeTask({ id: '1', requiredSkills: ['kubernetes'] })];
     const issues = validateSkills(tasks, vocabulary);
     expect(issues).toHaveLength(1);
     expect(issues[0].suggestion).toBeNull();
@@ -130,9 +124,7 @@ describe('validateSkills', () => {
   });
 
   it('handles tasks with empty requiredSkills', () => {
-    const tasks = [
-      makeTask({ id: '1', requiredSkills: [] }),
-    ];
+    const tasks = [makeTask({ id: '1', requiredSkills: [] })];
     const issues = validateSkills(tasks, vocabulary);
     expect(issues).toEqual([]);
   });

@@ -1,11 +1,11 @@
-import { appendFileSync, mkdirSync, existsSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import chalk from 'chalk';
-import type { ChatCompletionMessage, ChatCompletionResponse } from './types.js';
+import { getTaskmasterHome } from '../utils/home.js';
 import type { AIProviderName } from './provider.js';
 import { getProvider } from './provider-registry.js';
 import { readAuthFile } from './token-manager.js';
-import { getTaskmasterHome } from '../utils/home.js';
+import type { ChatCompletionMessage, ChatCompletionResponse } from './types.js';
 
 /**
  * Unified AI call dispatcher. Resolves the provider and calls its AI endpoint.
@@ -35,10 +35,12 @@ export async function callAI(
   // Post-call console output
   const usage = response.usage;
   if (usage) {
-    const latencyStr = latencyMs >= 1000
-      ? `${(latencyMs / 1000).toFixed(1)}s`
-      : `${latencyMs}ms`;
-    console.error(chalk.dim(`  [${name}:${model}] ${usage.input_tokens} in / ${usage.output_tokens} out (${latencyStr})`));
+    const latencyStr = latencyMs >= 1000 ? `${(latencyMs / 1000).toFixed(1)}s` : `${latencyMs}ms`;
+    console.error(
+      chalk.dim(
+        `  [${name}:${model}] ${usage.input_tokens} in / ${usage.output_tokens} out (${latencyStr})`,
+      ),
+    );
   }
 
   // Append to JSONL log (best-effort, never throws)
@@ -54,7 +56,7 @@ export async function callAI(
 function logUsage(
   provider: string,
   model: string,
-  messageCount: number,
+  _messageCount: number,
   usage: ChatCompletionResponse['usage'],
   latencyMs: number,
   caller?: string,
@@ -82,7 +84,7 @@ function logUsage(
       content_types: usage?.content_types ?? ['text'],
     };
 
-    appendFileSync(logPath, JSON.stringify(entry) + '\n');
+    appendFileSync(logPath, `${JSON.stringify(entry)}\n`);
   } catch {
     // Telemetry must never break the caller
   }

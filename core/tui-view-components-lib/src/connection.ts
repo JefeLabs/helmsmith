@@ -19,7 +19,7 @@
  *   user's local state.
  */
 
-export type ConnectionState = "connected" | "expired" | "disconnected";
+export type ConnectionState = 'connected' | 'expired' | 'disconnected';
 
 export interface ConnectionStatus {
   state: ConnectionState;
@@ -62,7 +62,7 @@ export function noopConnection(opts: {
     displayName: opts.displayName,
     description: opts.description,
     async getStatus() {
-      return { state: opts.state ?? "disconnected" };
+      return { state: opts.state ?? 'disconnected' };
     },
     async login() {
       throw new Error(

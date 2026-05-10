@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock @inquirer/prompts
 vi.mock('@inquirer/prompts', () => ({
@@ -31,15 +31,9 @@ vi.mock('../../../src/utils/projects.js', () => ({
   listAllProjects: vi.fn().mockResolvedValue({ active: null, activeLocation: null, projects: [] }),
 }));
 
-import {
-  input,
-  select,
-  checkbox,
-  confirm,
-  number as numberPrompt,
-} from '@inquirer/prompts';
-import { runInitWizard, type InitWizardResult } from '../../../src/prompts/init-wizard.js';
+import { checkbox, confirm, input, number as numberPrompt, select } from '@inquirer/prompts';
 import { resetDefaultsCache } from '../../../src/prompts/factory.js';
+import { type InitWizardResult, runInitWizard } from '../../../src/prompts/init-wizard.js';
 
 const mockInput = vi.mocked(input);
 const mockSelect = vi.mocked(select);
@@ -195,10 +189,7 @@ describe('init-wizard', () => {
     mockNumber.mockResolvedValueOnce(5);
     mockNumber.mockResolvedValueOnce(8);
 
-    const result = await runInitWizard(
-      { location: 'home', gitignore: false },
-      { gitRoot: null },
-    );
+    const result = await runInitWizard({ location: 'home', gitignore: false }, { gitRoot: null });
 
     expect(result.skills).toEqual(['backend', 'graphql', 'security']);
   });
@@ -219,10 +210,7 @@ describe('init-wizard', () => {
     mockNumber.mockResolvedValueOnce(5);
     mockNumber.mockResolvedValueOnce(8);
 
-    const result = await runInitWizard(
-      { location: 'home', gitignore: false },
-      { gitRoot: null },
-    );
+    const result = await runInitWizard({ location: 'home', gitignore: false }, { gitRoot: null });
 
     // Should deduplicate
     expect(result.skills).toEqual(['backend', 'frontend', 'graphql']);
@@ -253,7 +241,12 @@ describe('init-wizard', () => {
       active: 'existing-project',
       activeLocation: 'home',
       projects: [
-        { name: 'existing-project', location: 'home', created: '2026-01-01', description: 'Existing' },
+        {
+          name: 'existing-project',
+          location: 'home',
+          created: '2026-01-01',
+          description: 'Existing',
+        },
       ],
     });
 

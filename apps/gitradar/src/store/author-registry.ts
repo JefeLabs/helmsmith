@@ -1,4 +1,4 @@
-import type { AuthorRegistry, DiscoveredAuthor } from "../types/schema.js";
+import type { AuthorRegistry, DiscoveredAuthor } from '../types/schema.js';
 
 /**
  * Extract identifier from a git author name.
@@ -89,10 +89,7 @@ export function assignAuthor(
  * Unassign an author (clear org and team).
  * Returns the updated registry.
  */
-export function unassignAuthor(
-  registry: AuthorRegistry,
-  email: string,
-): AuthorRegistry {
+export function unassignAuthor(registry: AuthorRegistry, email: string): AuthorRegistry {
   const key = email.toLowerCase();
   const existing = registry.authors[key];
   if (!existing) return registry;
@@ -124,7 +121,7 @@ export function assignByIdentifierPrefix(
     if (author.org) continue; // skip already-assigned
 
     const matches =
-      (author.identifier && author.identifier.toUpperCase().startsWith(upperPrefix)) ||
+      author.identifier?.toUpperCase().startsWith(upperPrefix) ||
       author.email.toUpperCase().includes(upperPrefix) ||
       author.name.toUpperCase().includes(upperPrefix);
 
@@ -140,18 +137,14 @@ export function assignByIdentifierPrefix(
 /**
  * Get all unassigned authors from the registry.
  */
-export function getUnassignedAuthors(
-  registry: AuthorRegistry,
-): DiscoveredAuthor[] {
+export function getUnassignedAuthors(registry: AuthorRegistry): DiscoveredAuthor[] {
   return Object.values(registry.authors).filter((a) => !a.org);
 }
 
 /**
  * Get all assigned authors from the registry.
  */
-export function getAssignedAuthors(
-  registry: AuthorRegistry,
-): DiscoveredAuthor[] {
+export function getAssignedAuthors(registry: AuthorRegistry): DiscoveredAuthor[] {
   return Object.values(registry.authors).filter((a) => !!a.org);
 }
 
@@ -163,10 +156,7 @@ export function getIdentifierPrefixes(
   registry: AuthorRegistry,
   prefixLength: number = 2,
 ): Map<string, { count: number; assigned: number; unassigned: number }> {
-  const prefixes = new Map<
-    string,
-    { count: number; assigned: number; unassigned: number }
-  >();
+  const prefixes = new Map<string, { count: number; assigned: number; unassigned: number }>();
 
   for (const author of Object.values(registry.authors)) {
     if (!author.identifier) continue;

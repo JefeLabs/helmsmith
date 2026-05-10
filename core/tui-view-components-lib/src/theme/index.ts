@@ -10,9 +10,82 @@
  * full file-resolution model.
  */
 
+export type { AgentxThemeProviderProps } from './AgentxThemeProvider.tsx';
+// React provider
+export { AgentxThemeProvider } from './AgentxThemeProvider.tsx';
+export type {
+  AgentxLoadOptions,
+  AgentxLoadResult,
+  DiscoveredFile,
+  PersistAgentxThemeOptions,
+  WatchAgentxOptions,
+} from './agentx.ts';
+// AgentX file-resolution layer
+export {
+  agentxThemeDir,
+  DEFAULT_FILE_BASENAME,
+  findThemeFile,
+  listAgentxThemeFiles,
+  loadAgentxTheme,
+  persistAgentxTheme,
+  watchAgentxTheme,
+} from './agentx.ts';
+// File loading + base16
+export {
+  applyOverride,
+  applyOverrideFile,
+  deepMerge,
+  loadBase16File,
+  loadOverrideFile,
+  loadThemeFile,
+  loadTintyArtifact,
+  parseYaml,
+  themeFromBase16,
+} from './base16.ts';
+export type { ThemeContextValue } from './context.tsx';
+// Context (for advanced consumers building custom providers)
+export { ThemeContext } from './context.tsx';
+export type {
+  KeyEvent,
+  KeyMatcher,
+  ThemeKeybindingsOptions,
+  ThemeSwitcher as ThemeSwitcherApi,
+} from './hooks.ts';
+// Hooks
+export {
+  useTheme,
+  useThemeColors,
+  useThemeKeybindings,
+  useThemeKeyHandlers,
+  useThemeSwitcher,
+  useThemeTokens,
+} from './hooks.ts';
+// Bundled themes
+export {
+  builtInThemes,
+  catppuccinLatte,
+  catppuccinMocha,
+  defaultThemeName,
+  rosePine,
+  tokyoNight,
+} from './themes/index.ts';
+// Theme construction
+export { defineTheme, themeFromPalette } from './tokens.ts';
 // Type contract
 export type {
   Base16Palette,
+  BorderStyle,
+  BorderTokens,
+  BoxComponent,
+  ButtonComponent,
+  ButtonSizeStyle,
+  DeepPartial,
+  InputComponent,
+  PanelComponent,
+  SpacingKey,
+  SpacingScale,
+  SyntaxColors,
+  TextComponent,
   Theme,
   ThemeAppearance,
   ThemeColors,
@@ -21,87 +94,7 @@ export type {
   Typography,
   TypographyPreset,
   TypographyStyle,
-  SpacingScale,
-  SpacingKey,
-  BorderStyle,
-  BorderTokens,
-  SyntaxColors,
-  BoxComponent,
-  TextComponent,
-  ButtonComponent,
-  ButtonSizeStyle,
-  InputComponent,
-  PanelComponent,
-  DeepPartial,
-} from "./types.ts";
-
-// Theme construction
-export { defineTheme, themeFromPalette } from "./tokens.ts";
-
-// File loading + base16
-export {
-  parseYaml,
-  themeFromBase16,
-  loadThemeFile,
-  loadOverrideFile,
-  applyOverride,
-  applyOverrideFile,
-  loadBase16File,
-  loadTintyArtifact,
-  deepMerge,
-} from "./base16.ts";
-
-// Bundled themes
-export {
-  rosePine,
-  tokyoNight,
-  catppuccinMocha,
-  catppuccinLatte,
-  builtInThemes,
-  defaultThemeName,
-} from "./themes/index.ts";
-
-// AgentX file-resolution layer
-export {
-  agentxThemeDir,
-  loadAgentxTheme,
-  persistAgentxTheme,
-  watchAgentxTheme,
-  listAgentxThemeFiles,
-  findThemeFile,
-  DEFAULT_FILE_BASENAME,
-} from "./agentx.ts";
-export type {
-  AgentxLoadOptions,
-  AgentxLoadResult,
-  WatchAgentxOptions,
-  PersistAgentxThemeOptions,
-  DiscoveredFile,
-} from "./agentx.ts";
-
-// React provider
-export { AgentxThemeProvider } from "./AgentxThemeProvider.tsx";
-export type { AgentxThemeProviderProps } from "./AgentxThemeProvider.tsx";
-
-// Context (for advanced consumers building custom providers)
-export { ThemeContext } from "./context.tsx";
-export type { ThemeContextValue } from "./context.tsx";
-
-// Hooks
-export {
-  useTheme,
-  useThemeTokens,
-  useThemeColors,
-  useThemeSwitcher,
-  useThemeKeyHandlers,
-  useThemeKeybindings,
-} from "./hooks.ts";
-export type {
-  ThemeSwitcher as ThemeSwitcherApi,
-  ThemeKeybindingsOptions,
-  KeyEvent,
-  KeyMatcher,
-} from "./hooks.ts";
+} from './types.ts';
 
 // Note: themed primitives (Box, Text, Heading, Button, Input) live
 // in `atoms/`, Panel in `molecules/`, and the ThemeSwitcher picker

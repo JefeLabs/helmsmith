@@ -1,4 +1,4 @@
-import chalk from "chalk";
+import chalk from 'chalk';
 
 /**
  * Format a number for compact display.
@@ -22,10 +22,10 @@ export function fmt(n: number): string {
  */
 export function delta(curr: number, prev: number): string {
   if (prev === 0 && curr === 0) {
-    return chalk.dim("\u2500 0%");
+    return chalk.dim('\u2500 0%');
   }
   if (prev === 0) {
-    return chalk.green("\u25B2 new");
+    return chalk.green('\u25B2 new');
   }
 
   const pct = Math.round(((curr - prev) / prev) * 100);
@@ -36,7 +36,7 @@ export function delta(curr: number, prev: number): string {
   if (pct < 0) {
     return chalk.red(`\u25BC ${Math.abs(pct)}%`);
   }
-  return chalk.dim("\u2500 0%");
+  return chalk.dim('\u2500 0%');
 }
 
 /**
@@ -64,18 +64,18 @@ export function weekLabel(w: string): string {
   monday.setDate(mondayOfWeek1.getDate() + (week - 1) * 7);
 
   const months = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
 
   return `${months[monday.getMonth()]} ${monday.getDate()}`;
@@ -110,14 +110,14 @@ export function yearShort(year: string): string {
   return `'${year.slice(2)}`;
 }
 
-// eslint-disable-next-line no-control-regex
+// biome-ignore lint/suspicious/noControlCharactersInRegex: \x1b is the ANSI escape code (deliberate)
 const ANSI_REGEX = /\x1b\[[0-9;]*m/g;
 
 /**
  * Strip ANSI escape codes from a string.
  */
 export function stripAnsi(s: string): string {
-  return s.replace(ANSI_REGEX, "");
+  return s.replace(ANSI_REGEX, '');
 }
 
 /**
@@ -129,7 +129,7 @@ export function padRight(s: string, n: number): string {
   if (visibleLength >= n) {
     return s;
   }
-  return s + " ".repeat(n - visibleLength);
+  return s + ' '.repeat(n - visibleLength);
 }
 
 /**
@@ -141,5 +141,5 @@ export function padLeft(s: string, n: number): string {
   if (visibleLength >= n) {
     return s;
   }
-  return " ".repeat(n - visibleLength) + s;
+  return ' '.repeat(n - visibleLength) + s;
 }

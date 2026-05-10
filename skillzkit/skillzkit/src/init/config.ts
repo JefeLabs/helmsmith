@@ -28,14 +28,9 @@
  *   beat opaque parse failures.
  */
 
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
-import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, join } from 'node:path';
 
 /** Scrypt KDF parameters bundled with each encrypted blob so we can
  *  rotate them in the future without breaking older configs. The
@@ -62,7 +57,7 @@ export interface EncryptedBlob {
   /** Random salt for the KDF (16 bytes), base64. */
   salt: string;
   /** KDF identifier — only "scrypt" supported in v1. */
-  kdf: "scrypt";
+  kdf: 'scrypt';
   /** Parameters used at encryption time. */
   kdfParams: ScryptParams;
 }
@@ -86,11 +81,11 @@ interface BaseConfig {
 }
 
 export interface StandaloneConfig extends BaseConfig {
-  mode: "standalone";
+  mode: 'standalone';
 }
 
 export interface TeamConfig extends BaseConfig {
-  mode: "team";
+  mode: 'team';
   team: TeamSettings;
 }
 
@@ -106,7 +101,7 @@ export type SkillzkitConfig = StandaloneConfig | TeamConfig;
  */
 export function configPath(): string {
   if (process.env.SKILLZKIT_CONFIG) return process.env.SKILLZKIT_CONFIG;
-  return join(homedir(), ".agentx", "skillzkit", "config.json");
+  return join(homedir(), '.agentx', 'skillzkit', 'config.json');
 }
 
 export function configExists(): boolean {
@@ -123,13 +118,11 @@ export function configExists(): boolean {
 export function readConfig(): SkillzkitConfig {
   const path = configPath();
   if (!existsSync(path)) {
-    throw new Error(
-      `No skillzkit config found at ${path}. Run \`skillzkit init\` to create one.`,
-    );
+    throw new Error(`No skillzkit config found at ${path}. Run \`skillzkit init\` to create one.`);
   }
   let raw: unknown;
   try {
-    raw = JSON.parse(readFileSync(path, "utf8"));
+    raw = JSON.parse(readFileSync(path, 'utf8'));
   } catch (err) {
     throw new Error(
       `Could not parse ${path} as JSON: ${(err as Error).message}. ` +
@@ -169,7 +162,7 @@ export function writeConfig(config: SkillzkitConfig): void {
     ...config,
     updatedAt: new Date().toISOString(),
   };
-  writeFileSync(path, JSON.stringify(stamped, null, 2) + "\n", {
+  writeFileSync(path, `${JSON.stringify(stamped, null, 2)}\n`, {
     mode: 0o600,
   });
 }
@@ -181,12 +174,9 @@ export function writeConfig(config: SkillzkitConfig): void {
  * Errors include the offending path so user can fix their file by
  * hand if something is missing.
  */
-export function validateConfig(
-  raw: unknown,
-  source = "<input>",
-): SkillzkitConfig {
+export function validateConfig(raw: unknown, source = '<input>'): SkillzkitConfig {
   if (!isPlainObject(raw)) {
-    throw configError(source, "expected JSON object at top level");
+    throw configError(source, 'expected JSON object at top level');
   }
   if (raw.version !== 1) {
     throw configError(
@@ -195,30 +185,30 @@ export function validateConfig(
     );
   }
   const email = raw.email;
-  if (typeof email !== "string" || email.length === 0) {
+  if (typeof email !== 'string' || email.length === 0) {
     throw configError(source, `missing or empty \`email\``);
   }
   const createdAt = raw.createdAt;
   const updatedAt = raw.updatedAt;
-  if (typeof createdAt !== "string" || typeof updatedAt !== "string") {
+  if (typeof createdAt !== 'string' || typeof updatedAt !== 'string') {
     throw configError(source, `\`createdAt\` and \`updatedAt\` must be ISO strings`);
   }
 
-  if (raw.mode === "standalone") {
-    if ("team" in raw && raw.team !== undefined) {
+  if (raw.mode === 'standalone') {
+    if ('team' in raw && raw.team !== undefined) {
       throw configError(
         source,
         `mode=standalone but \`team\` is set — standalone configs must not carry team settings`,
       );
     }
-    return { version: 1, mode: "standalone", email, createdAt, updatedAt };
+    return { version: 1, mode: 'standalone', email, createdAt, updatedAt };
   }
 
-  if (raw.mode === "team") {
+  if (raw.mode === 'team') {
     const team = validateTeamSettings(raw.team, source);
     return {
       version: 1,
-      mode: "team",
+      mode: 'team',
       email,
       team,
       createdAt,
@@ -236,10 +226,10 @@ function validateTeamSettings(raw: unknown, source: string): TeamSettings {
   if (!isPlainObject(raw)) {
     throw configError(source, `mode=team requires a \`team\` object`);
   }
-  if (typeof raw.apiUrl !== "string" || raw.apiUrl.length === 0) {
+  if (typeof raw.apiUrl !== 'string' || raw.apiUrl.length === 0) {
     throw configError(source, `\`team.apiUrl\` must be a non-empty string`);
   }
-  if (typeof raw.keyMasked !== "string" || raw.keyMasked.length === 0) {
+  if (typeof raw.keyMasked !== 'string' || raw.keyMasked.length === 0) {
     throw configError(source, `\`team.keyMasked\` must be a non-empty string`);
   }
   const blob = validateEncryptedBlob(raw.keyEncrypted, source);
@@ -250,12 +240,12 @@ function validateEncryptedBlob(raw: unknown, source: string): EncryptedBlob {
   if (!isPlainObject(raw)) {
     throw configError(source, `\`team.keyEncrypted\` must be an object`);
   }
-  for (const field of ["ciphertext", "iv", "authTag", "salt"] as const) {
-    if (typeof raw[field] !== "string") {
+  for (const field of ['ciphertext', 'iv', 'authTag', 'salt'] as const) {
+    if (typeof raw[field] !== 'string') {
       throw configError(source, `\`team.keyEncrypted.${field}\` must be base64 string`);
     }
   }
-  if (raw.kdf !== "scrypt") {
+  if (raw.kdf !== 'scrypt') {
     throw configError(
       source,
       `\`team.keyEncrypted.kdf\` must be "scrypt", got ${JSON.stringify(raw.kdf)}`,
@@ -265,12 +255,9 @@ function validateEncryptedBlob(raw: unknown, source: string): EncryptedBlob {
   if (!isPlainObject(params)) {
     throw configError(source, `\`team.keyEncrypted.kdfParams\` must be an object`);
   }
-  for (const field of ["N", "r", "p"] as const) {
-    if (typeof params[field] !== "number" || !Number.isInteger(params[field])) {
-      throw configError(
-        source,
-        `\`team.keyEncrypted.kdfParams.${field}\` must be an integer`,
-      );
+  for (const field of ['N', 'r', 'p'] as const) {
+    if (typeof params[field] !== 'number' || !Number.isInteger(params[field])) {
+      throw configError(source, `\`team.keyEncrypted.kdfParams.${field}\` must be an integer`);
     }
   }
   return {
@@ -278,7 +265,7 @@ function validateEncryptedBlob(raw: unknown, source: string): EncryptedBlob {
     iv: raw.iv as string,
     authTag: raw.authTag as string,
     salt: raw.salt as string,
-    kdf: "scrypt",
+    kdf: 'scrypt',
     kdfParams: {
       N: params.N as number,
       r: params.r as number,
@@ -288,7 +275,7 @@ function validateEncryptedBlob(raw: unknown, source: string): EncryptedBlob {
 }
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
 function configError(source: string, message: string): Error {

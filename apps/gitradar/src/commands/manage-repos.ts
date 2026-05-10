@@ -1,9 +1,13 @@
-import path from 'node:path';
-import { homedir } from 'node:os';
-import { loadAllRegistries, getAvailableWorkspaces, addReposToWorkspace, removeRepoFromWorkspace, saveReposRegistry } from '../config/repos-registry.js';
-import { detectGitRoot } from '../config/git-root.js';
-import { selectWorkspace } from '../config/workspace-selector.js';
 import { scanDirectory } from '../collector/dir-scanner.js';
+import { detectGitRoot } from '../config/git-root.js';
+import {
+  addReposToWorkspace,
+  getAvailableWorkspaces,
+  loadAllRegistries,
+  removeRepoFromWorkspace,
+  saveReposRegistry,
+} from '../config/repos-registry.js';
+import { selectWorkspace } from '../config/workspace-selector.js';
 import { expandTilde } from '../store/paths.js';
 
 export interface AddReposOptions {

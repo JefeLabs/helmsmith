@@ -1,20 +1,15 @@
 import { randomBytes } from 'node:crypto';
 import chalk from 'chalk';
-import type { AIProvider, AIModelEntry } from '../provider.js';
+import { CLI_BIN_NAME } from '../../config/branding.js';
+import { generateCodeChallenge, openBrowser, waitForCallback } from '../oauth-pkce.js';
+import type { AIModelEntry, AIProvider } from '../provider.js';
+import { readAuthFile, writeAuthFile } from '../token-manager.js';
 import type {
   ChatCompletionMessage,
   ChatCompletionResponse,
   OAuthCredentials,
   TokenUsage,
 } from '../types.js';
-import { readAuthFile, writeAuthFile } from '../token-manager.js';
-import {
-  generateCodeVerifier,
-  generateCodeChallenge,
-  waitForCallback,
-  openBrowser,
-} from '../oauth-pkce.js';
-import { CLI_BIN_NAME } from '../../config/branding.js';
 
 // --- OpenAI OAuth constants (matches Codex CLI's registered client) ---
 const OPENAI_AUTH_URL = 'https://auth.openai.com/oauth/authorize';
@@ -33,25 +28,37 @@ const OPENAI_KNOWN_MODELS: AIModelEntry[] = [
     id: 'gpt-4.1',
     name: 'GPT-4.1',
     description: '1M in / 32K out — best for large docs',
-    capabilities: { type: 'chat', limits: { max_prompt_tokens: 1_000_000, max_output_tokens: 32_768 } },
+    capabilities: {
+      type: 'chat',
+      limits: { max_prompt_tokens: 1_000_000, max_output_tokens: 32_768 },
+    },
   },
   {
     id: 'gpt-4o',
     name: 'GPT-4o',
     description: '128K in / 16K out — fast, capable',
-    capabilities: { type: 'chat', limits: { max_prompt_tokens: 128_000, max_output_tokens: 16_384 } },
+    capabilities: {
+      type: 'chat',
+      limits: { max_prompt_tokens: 128_000, max_output_tokens: 16_384 },
+    },
   },
   {
     id: 'gpt-4o-mini',
     name: 'GPT-4o Mini',
     description: '128K in / 16K out — low cost',
-    capabilities: { type: 'chat', limits: { max_prompt_tokens: 128_000, max_output_tokens: 16_384 } },
+    capabilities: {
+      type: 'chat',
+      limits: { max_prompt_tokens: 128_000, max_output_tokens: 16_384 },
+    },
   },
   {
     id: 'o3-mini',
     name: 'o3-mini',
     description: '200K in / 100K out — reasoning model',
-    capabilities: { type: 'chat', limits: { max_prompt_tokens: 200_000, max_output_tokens: 100_000 } },
+    capabilities: {
+      type: 'chat',
+      limits: { max_prompt_tokens: 200_000, max_output_tokens: 100_000 },
+    },
   },
 ];
 
@@ -179,10 +186,7 @@ export class OpenAIProvider implements AIProvider {
     return null;
   }
 
-  async callAI(
-    messages: ChatCompletionMessage[],
-    model: string,
-  ): Promise<ChatCompletionResponse> {
+  async callAI(messages: ChatCompletionMessage[], model: string): Promise<ChatCompletionResponse> {
     const accessToken = await this.resolveAccessToken();
 
     if (!accessToken) {
@@ -222,9 +226,7 @@ export class OpenAIProvider implements AIProvider {
 
     if (!response.ok) {
       const body = await response.text().catch(() => '');
-      throw new Error(
-        `OpenAI API error (${response.status}): ${body || response.statusText}`,
-      );
+      throw new Error(`OpenAI API error (${response.status}): ${body || response.statusText}`);
     }
 
     return this.normalizeResponse(response);

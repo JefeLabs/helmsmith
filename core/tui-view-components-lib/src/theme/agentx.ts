@@ -22,30 +22,27 @@
 import {
   copyFileSync,
   existsSync,
+  type FSWatcher,
   mkdirSync,
   readdirSync,
   unlinkSync,
   watch,
   writeFileSync,
-  type FSWatcher,
-} from "node:fs";
-import { homedir } from "node:os";
-import { extname, join } from "node:path";
-import type { Theme } from "./types.ts";
-import { rosePine } from "./themes/rose-pine.ts";
-import {
-  applyOverrideFile,
-  loadThemeFile,
-} from "./base16.ts";
+} from 'node:fs';
+import { homedir } from 'node:os';
+import { extname, join } from 'node:path';
+import { applyOverrideFile, loadThemeFile } from './base16.ts';
+import { rosePine } from './themes/rose-pine.ts';
+import type { Theme } from './types.ts';
 
-const SUPPORTED_EXTS = [".yaml", ".yml", ".json"] as const;
+const SUPPORTED_EXTS = ['.yaml', '.yml', '.json'] as const;
 type SupportedExt = (typeof SUPPORTED_EXTS)[number];
 
-export const DEFAULT_FILE_BASENAME = "default";
+export const DEFAULT_FILE_BASENAME = 'default';
 
 /** `~/.agentx/theme` — overridable for tests via `AGENTX_THEME_DIR`. */
 export function agentxThemeDir(): string {
-  return process.env["AGENTX_THEME_DIR"] ?? join(homedir(), ".agentx", "theme");
+  return process.env.AGENTX_THEME_DIR ?? join(homedir(), '.agentx', 'theme');
 }
 
 /**
@@ -100,9 +97,7 @@ export function loadAgentxTheme(opts: AgentxLoadOptions = {}): AgentxLoadResult 
       theme = loadThemeFile(defaultFile.path);
       sources.push(defaultFile.path);
     } catch (err) {
-      console.warn(
-        `[agentx-theme] Could not load ${defaultFile.path}: ${(err as Error).message}`,
-      );
+      console.warn(`[agentx-theme] Could not load ${defaultFile.path}: ${(err as Error).message}`);
     }
   }
 
@@ -114,9 +109,7 @@ export function loadAgentxTheme(opts: AgentxLoadOptions = {}): AgentxLoadResult 
         theme = applyOverrideFile(theme, appFile.path);
         sources.push(appFile.path);
       } catch (err) {
-        console.warn(
-          `[agentx-theme] Could not apply ${appFile.path}: ${(err as Error).message}`,
-        );
+        console.warn(`[agentx-theme] Could not apply ${appFile.path}: ${(err as Error).message}`);
       }
     }
   }
@@ -143,21 +136,18 @@ export interface PersistAgentxThemeOptions {
   themeDir?: string;
 }
 
-export function persistAgentxTheme(
-  theme: Theme,
-  opts: PersistAgentxThemeOptions = {},
-): void {
+export function persistAgentxTheme(theme: Theme, opts: PersistAgentxThemeOptions = {}): void {
   const dir = opts.themeDir ?? agentxThemeDir();
   try {
     mkdirSync(dir, { recursive: true });
 
     const target = join(dir, `${DEFAULT_FILE_BASENAME}.json`);
     const definition = themeToDefinition(theme);
-    writeFileSync(target, JSON.stringify(definition, null, 2) + "\n", "utf8");
+    writeFileSync(target, `${JSON.stringify(definition, null, 2)}\n`, 'utf8');
 
     // If there's a YAML default sitting alongside, neutralize it so
     // the JSON we just wrote wins on next load.
-    for (const ext of [".yaml", ".yml"] as const) {
+    for (const ext of ['.yaml', '.yml'] as const) {
       const stale = join(dir, `${DEFAULT_FILE_BASENAME}${ext}`);
       if (existsSync(stale)) {
         try {
@@ -170,9 +160,7 @@ export function persistAgentxTheme(
       }
     }
   } catch (err) {
-    console.warn(
-      `[agentx-theme] Could not persist theme: ${(err as Error).message}`,
-    );
+    console.warn(`[agentx-theme] Could not persist theme: ${(err as Error).message}`);
   }
 }
 
@@ -200,7 +188,7 @@ function themeToDefinition(theme: Theme): Record<string, unknown> {
   };
 }
 
-function stripPaletteAndSyntax(colors: Theme["colors"]): Record<string, unknown> {
+function stripPaletteAndSyntax(colors: Theme['colors']): Record<string, unknown> {
   const { palette: _p, syntax, ...rest } = colors;
   return { ...rest, syntax };
 }
@@ -258,9 +246,7 @@ export function watchAgentxTheme(
       reload(filename ? String(filename) : null);
     });
   } catch (err) {
-    console.warn(
-      `[agentx-theme] Could not watch ${dir}: ${(err as Error).message}`,
-    );
+    console.warn(`[agentx-theme] Could not watch ${dir}: ${(err as Error).message}`);
     return () => {};
   }
 

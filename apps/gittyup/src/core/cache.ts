@@ -1,8 +1,16 @@
-import { readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
 import { createHash } from 'node:crypto';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { join } from 'node:path';
 import chalk from 'chalk';
 import { APP_CACHE_DIR } from '../config/branding.js';
+
 const DEFAULT_TTL_MS = 5 * 60 * 1000;
 
 interface CacheEntry<T> {
@@ -46,10 +54,15 @@ export class CliCache {
     try {
       const entry = JSON.parse(readFileSync(fp, 'utf-8')) as CacheEntry<T>;
       const now = Date.now();
-      if (now > entry.expiresAt) { unlinkSync(fp); return { hit: false }; }
+      if (now > entry.expiresAt) {
+        unlinkSync(fp);
+        return { hit: false };
+      }
       return { hit: true, data: entry.data, ageMs: now - entry.timestamp };
     } catch {
-      try { unlinkSync(fp); } catch {}
+      try {
+        unlinkSync(fp);
+      } catch {}
       return { hit: false };
     }
   }
@@ -57,8 +70,12 @@ export class CliCache {
   set<T>(key: string, data: T, meta: { command: string; args: string[] }): void {
     const now = Date.now();
     const entry: CacheEntry<T> = {
-      key, command: meta.command, args: meta.args,
-      timestamp: now, expiresAt: now + this.ttlMs, data,
+      key,
+      command: meta.command,
+      args: meta.args,
+      timestamp: now,
+      expiresAt: now + this.ttlMs,
+      data,
     };
     writeFileSync(this.filePath(key), JSON.stringify(entry, null, 2), 'utf-8');
   }
@@ -73,8 +90,14 @@ export class CliCache {
       const fp = join(this.cacheDir, file);
       try {
         const entry = JSON.parse(readFileSync(fp, 'utf-8')) as CacheEntry<unknown>;
-        if (now > entry.expiresAt) { unlinkSync(fp); removed++; }
-      } catch { unlinkSync(fp); removed++; }
+        if (now > entry.expiresAt) {
+          unlinkSync(fp);
+          removed++;
+        }
+      } catch {
+        unlinkSync(fp);
+        removed++;
+      }
     }
     return removed;
   }
@@ -95,7 +118,11 @@ export class CliCache {
   static printCacheNotice(ageMs: number): void {
     const ageSec = Math.floor(ageMs / 1000);
     const remaining = Math.max(0, 300 - ageSec);
-    console.log(chalk.dim(`  ⚡ Cached result (${ageSec}s ago, expires in ${remaining}s). Use -f to force refresh.\n`));
+    console.log(
+      chalk.dim(
+        `  ⚡ Cached result (${ageSec}s ago, expires in ${remaining}s). Use -f to force refresh.\n`,
+      ),
+    );
   }
 }
 

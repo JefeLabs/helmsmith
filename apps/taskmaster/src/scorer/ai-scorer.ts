@@ -1,9 +1,9 @@
-import type { TaskNode } from '../config/schema.js';
-import type { ScoredResult, ScoringProvider } from './types.js';
-import { HeuristicScorer } from './heuristic.js';
 import { callAI } from '../auth/call-ai.js';
 import type { AIProviderName } from '../auth/provider.js';
 import type { ChatCompletionMessage } from '../auth/types.js';
+import type { TaskNode } from '../config/schema.js';
+import { HeuristicScorer } from './heuristic.js';
+import type { ScoredResult, ScoringProvider } from './types.js';
 
 /** Weight for AI score in the blended result. */
 const AI_WEIGHT = 0.7;
@@ -125,7 +125,9 @@ export class AIScorer implements ScoringProvider {
       }
 
       // Blend: 70% AI + 30% heuristic
-      const blendedScore = Math.round(AI_WEIGHT * aiResult.score + HEURISTIC_WEIGHT * heuristicResult.score);
+      const blendedScore = Math.round(
+        AI_WEIGHT * aiResult.score + HEURISTIC_WEIGHT * heuristicResult.score,
+      );
       const finalScore = Math.max(1, Math.min(10, blendedScore));
 
       return {

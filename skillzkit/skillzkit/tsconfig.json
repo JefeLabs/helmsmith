@@ -9,11 +9,5 @@
     "noEmit": true
   },
   "include": ["src/**/*"],
-  "exclude": [
-    "node_modules",
-    "dist",
-    ".claude",
-    "**/*.test.ts",
-    "src/tui/**"
-  ]
+  "exclude": ["node_modules", "dist", ".claude", "**/*.test.ts", "src/tui/**"]
 }

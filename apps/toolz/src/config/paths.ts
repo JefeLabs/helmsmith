@@ -10,25 +10,25 @@
  * everywhere.
  */
 
-import { homedir } from "node:os";
-import { mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 /** Resolve the ToolZ root directory — env override or `~/.agentx/toolz/`. */
 export function getToolzDir(): string {
   const override = process.env.AGENTX_TOOLZ_DIR;
   if (override) return override;
-  return join(homedir(), ".agentx", "toolz");
+  return join(homedir(), '.agentx', 'toolz');
 }
 
 /** Path to the registry YAML — installed tools + metadata. */
 export function getRegistryPath(): string {
-  return join(getToolzDir(), "registry.yaml");
+  return join(getToolzDir(), 'registry.yaml');
 }
 
 /** Path to the user-extension catalog YAML — merges with built-in. */
 export function getUserCatalogPath(): string {
-  return join(getToolzDir(), "catalog.yaml");
+  return join(getToolzDir(), 'catalog.yaml');
 }
 
 /**

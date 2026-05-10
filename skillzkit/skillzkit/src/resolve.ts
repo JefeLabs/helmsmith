@@ -19,9 +19,9 @@
  * how strict to be.
  */
 
-import { getCommand, getCommands, getSkill, getWorkflow } from "./index.js";
+import { getCommand, getCommands, getSkill, getWorkflow } from './index.js';
 
-export type ResolvedKind = "command" | "workflow" | "skill";
+export type ResolvedKind = 'command' | 'workflow' | 'skill';
 
 /**
  * Expand group-form picks to their constituent slugs. Lets a CLI user
@@ -45,18 +45,18 @@ export type ResolvedKind = "command" | "workflow" | "skill";
  */
 export function expandGroupIds(picks: readonly string[]): string[] {
   const slugs = new Set<string>();
-  const personas = new Set(["product", "engineer", "market"]);
+  const personas = new Set(['product', 'engineer', 'market']);
   for (const pick of picks) {
     if (personas.has(pick)) {
       for (const cmd of getCommands()) {
-        if (cmd.slug.startsWith(`${pick}:`) && cmd.kind !== "context") {
+        if (cmd.slug.startsWith(`${pick}:`) && cmd.kind !== 'context') {
           slugs.add(cmd.slug);
         }
       }
-    } else if (pick.endsWith(":*")) {
+    } else if (pick.endsWith(':*')) {
       const prefix = pick.slice(0, -1); // keep trailing colon
       for (const cmd of getCommands()) {
-        if (cmd.slug.startsWith(prefix) && cmd.kind !== "context") {
+        if (cmd.slug.startsWith(prefix) && cmd.kind !== 'context') {
           slugs.add(cmd.slug);
         }
       }
@@ -112,9 +112,7 @@ export function resolveInstallPlan(requested: readonly string[]): ResolveResult 
 
   // Queue carries [slug, requestedBy?] so we can attribute transitive deps
   // to the user-requested slug that pulled them in.
-  const queue: Array<{ slug: string; requestedBy?: string }> = requested.map(
-    (slug) => ({ slug })
-  );
+  const queue: Array<{ slug: string; requestedBy?: string }> = requested.map((slug) => ({ slug }));
 
   while (queue.length > 0) {
     const { slug, requestedBy } = queue.shift()!;
@@ -135,13 +133,13 @@ export function resolveInstallPlan(requested: readonly string[]): ResolveResult 
       ...(requestedBy ? { requestedBy } : {}),
     });
 
-    if (found.kind === "skill") {
+    if (found.kind === 'skill') {
       for (const ref of found.item.references) {
         if (!seen.has(ref)) queue.push({ slug: ref, requestedBy: slug });
       }
-    } else if (found.kind === "workflow") {
+    } else if (found.kind === 'workflow') {
       for (const ref of found.item.references) {
-        if (ref.startsWith("core:")) continue;
+        if (ref.startsWith('core:')) continue;
         if (seen.has(ref)) continue;
         queue.push({ slug: ref, requestedBy: slug });
       }
@@ -171,13 +169,11 @@ interface NormalizedItem {
  * `product:greenfield`) — we redirect to the underlying command so the
  * file path resolves correctly. Skills are looked up by name.
  */
-function findItem(
-  slug: string
-): { kind: ResolvedKind; item: NormalizedItem } | undefined {
+function findItem(slug: string): { kind: ResolvedKind; item: NormalizedItem } | undefined {
   const cmd = getCommand(slug);
   if (cmd) {
     return {
-      kind: cmd.kind === "workflow" ? "workflow" : "command",
+      kind: cmd.kind === 'workflow' ? 'workflow' : 'command',
       item: { path: cmd.path, body: cmd.body, references: cmd.references },
     };
   }
@@ -187,14 +183,14 @@ function findItem(
     const underlying = getCommand(wf.commandSlug);
     if (!underlying) return undefined;
     return {
-      kind: "workflow",
+      kind: 'workflow',
       item: { path: underlying.path, body: wf.body, references: wf.references },
     };
   }
   const skill = getSkill(slug);
   if (skill) {
     return {
-      kind: "skill",
+      kind: 'skill',
       item: { path: skill.path, body: skill.body, references: skill.references },
     };
   }

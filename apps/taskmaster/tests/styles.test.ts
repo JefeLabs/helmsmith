@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { PROJECT_STYLES, STYLE_NAMES, getStyle, getValidTypes } from '../src/config/styles.js';
+import { describe, expect, it } from 'vitest';
+import { getStyle, getValidTypes, STYLE_NAMES } from '../src/config/styles.js';
 
 describe('project styles', () => {
   it('defines 4 styles', () => {

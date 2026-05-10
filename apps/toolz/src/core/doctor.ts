@@ -18,24 +18,20 @@
  * require confirmation).
  */
 
-import { existsSync } from "node:fs";
-import { adapters } from "../platform/adapters/index.js";
-import { listRegisteredTools } from "../config/registry.js";
-import { checkTool, getPath } from "./tool-checker.js";
-import { resolvePackageName } from "./tool-resolver.js";
+import { existsSync } from 'node:fs';
+import { listRegisteredTools } from '../config/registry.js';
+import { adapters } from '../platform/adapters/index.js';
+import { checkTool, getPath } from './tool-checker.js';
+import { resolvePackageName } from './tool-resolver.js';
 
-export type DoctorSeverity = "error" | "warning" | "info";
+export type DoctorSeverity = 'error' | 'warning' | 'info';
 
 export interface DoctorFinding {
   severity: DoctorSeverity;
   /** The registered tool name the finding applies to. */
   tool: string;
   /** Stable identifier for the kind of finding (for filtering / scripts). */
-  code:
-    | "path-missing"
-    | "path-drift"
-    | "version-drift"
-    | "pkg-removed";
+  code: 'path-missing' | 'path-drift' | 'version-drift' | 'pkg-removed';
   /** Human-readable description. */
   message: string;
   /** Suggested next action (free-form). */
@@ -49,9 +45,9 @@ export async function runDoctor(): Promise<DoctorFinding[]> {
     // 1. Path still exists?
     if (!existsSync(entry.path)) {
       findings.push({
-        severity: "error",
+        severity: 'error',
         tool: name,
-        code: "path-missing",
+        code: 'path-missing',
         message: `Registered path doesn't exist: ${entry.path}`,
         fix: `Run 'toolz deregister ${name}' if uninstalled, or 'toolz register ${name}' if reinstalled elsewhere.`,
       });
@@ -63,9 +59,9 @@ export async function runDoctor(): Promise<DoctorFinding[]> {
     const currentPath = await getPath(name);
     if (currentPath && currentPath !== entry.path) {
       findings.push({
-        severity: "warning",
+        severity: 'warning',
         tool: name,
-        code: "path-drift",
+        code: 'path-drift',
         message: `PATH now resolves ${name} to ${currentPath} (registered: ${entry.path})`,
         fix: `Run 'toolz register ${name}' to refresh the registry entry.`,
       });
@@ -73,15 +69,11 @@ export async function runDoctor(): Promise<DoctorFinding[]> {
 
     // 3. Version drift — re-probe and compare
     const probed = await checkTool(name);
-    if (
-      probed.version &&
-      entry.version &&
-      probed.version !== entry.version
-    ) {
+    if (probed.version && entry.version && probed.version !== entry.version) {
       findings.push({
-        severity: "info",
+        severity: 'info',
         tool: name,
-        code: "version-drift",
+        code: 'version-drift',
         message: `Version drifted: registered ${entry.version} → current ${probed.version}`,
         fix: `Run 'toolz register ${name}' to refresh.`,
       });
@@ -93,14 +85,12 @@ export async function runDoctor(): Promise<DoctorFinding[]> {
       if (adapter && (await adapter.isAvailable())) {
         const resolved = resolvePackageName(name, entry.installed_via);
         if (resolved) {
-          const stillInstalled = await adapter.isPackageInstalled(
-            resolved.packageName,
-          );
+          const stillInstalled = await adapter.isPackageInstalled(resolved.packageName);
           if (!stillInstalled) {
             findings.push({
-              severity: "error",
+              severity: 'error',
               tool: name,
-              code: "pkg-removed",
+              code: 'pkg-removed',
               message: `Registered as installed via ${entry.installed_via}, but ${entry.installed_via} reports ${resolved.packageName} is not installed.`,
               fix: `Run 'toolz deregister ${name}' to clear the stale entry, or reinstall via 'toolz install ${name}'.`,
             });

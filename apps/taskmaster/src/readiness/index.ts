@@ -1,31 +1,31 @@
 export {
-  flattenTasks,
-  buildTaskMap,
   buildDag,
+  buildTaskMap,
   detectDanglingRefs,
   fixCycles,
   fixDanglingRefs,
+  flattenTasks,
 } from './dag.js';
 
 export {
-  recomputeAllReadiness,
   applyReadiness,
   buildDelegationManifest,
   findNextTask,
+  recomputeAllReadiness,
   runValidation,
 } from './resolver.js';
 
 export type {
+  BlockedTaskEntry,
   DagEdge,
   DagResult,
-  OrphanResult,
-  ReadinessResult,
+  DelegationManifest,
   FixAction,
-  ValidationReport,
-  ReadyTaskEntry,
-  BlockedTaskEntry,
   ManifestSummary,
   ManifestSummaryWithQA,
+  OrphanResult,
   QAFailedTaskEntry,
-  DelegationManifest,
+  ReadinessResult,
+  ReadyTaskEntry,
+  ValidationReport,
 } from './types.js';

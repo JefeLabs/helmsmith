@@ -51,9 +51,7 @@ export function validateTransition(
   if (!validNames.includes(toStatus)) {
     return {
       valid: false,
-      error:
-        `Invalid target state "${toStatus}". ` +
-        `Valid states: ${validNames.join(', ')}`,
+      error: `Invalid target state "${toStatus}". ` + `Valid states: ${validNames.join(', ')}`,
     };
   }
 

@@ -24,10 +24,10 @@
  * three providers" template.
  */
 
-import type { ReactNode } from "react";
-import { AgentxThemeProvider } from "../theme/AgentxThemeProvider.tsx";
-import { KeyboardProvider } from "../keyboard/registry.tsx";
-import { FocusManager } from "../focus/manager.tsx";
+import type { ReactNode } from 'react';
+import { FocusManager } from '../focus/manager.tsx';
+import { KeyboardProvider } from '../keyboard/registry.tsx';
+import { AgentxThemeProvider } from '../theme/AgentxThemeProvider.tsx';
 
 export interface AppShellProps {
   /** App identifier — drives the per-app theme override filename. */

@@ -10,11 +10,11 @@
  * the consumer's @opentui version supports.
  */
 
-import type { ReactNode } from "react";
-import { useThemeTokens } from "../theme/hooks.ts";
-import type { TypographyPreset } from "../theme/types.ts";
+import type { ReactNode } from 'react';
+import { useThemeTokens } from '../theme/hooks.ts';
+import type { TypographyPreset } from '../theme/types.ts';
 
-export type TextVariant = "body" | "muted" | "subtle" | "inverted" | "accent";
+export type TextVariant = 'body' | 'muted' | 'subtle' | 'inverted' | 'accent';
 
 export interface TextProps {
   variant?: TextVariant;
@@ -28,15 +28,7 @@ export interface TextProps {
   [extraProp: string]: unknown;
 }
 
-export function Text({
-  variant = "body",
-  preset,
-  color,
-  bg,
-  style,
-  children,
-  ...rest
-}: TextProps) {
+export function Text({ variant = 'body', preset, color, bg, style, children, ...rest }: TextProps) {
   const theme = useThemeTokens();
   const v = theme.components.text.variants[variant];
   const p = preset ? theme.typography[preset] : undefined;

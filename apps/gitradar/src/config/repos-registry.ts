@@ -1,14 +1,14 @@
-import { readFile, writeFile, access, mkdir } from "node:fs/promises";
-import path from "node:path";
-import { homedir } from "node:os";
-import yaml from "js-yaml";
-import { ReposRegistrySchema, type ReposRegistry, type WorkspaceRepo } from "../types/schema.js";
-import { expandTilde } from "../store/paths.js";
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import path from 'node:path';
+import yaml from 'js-yaml';
+import { expandTilde } from '../store/paths.js';
+import { type ReposRegistry, ReposRegistrySchema, type WorkspaceRepo } from '../types/schema.js';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export interface RegistrySource {
-  type: "global" | "project";
+  type: 'global' | 'project';
   path: string;
   registry: ReposRegistry;
 }
@@ -35,7 +35,7 @@ export async function loadReposRegistry(registryPath: string): Promise<ReposRegi
     return null; // File doesn't exist — not an error
   }
 
-  const raw = await readFile(resolved, "utf-8");
+  const raw = await readFile(resolved, 'utf-8');
 
   let parsed: unknown;
   try {
@@ -75,11 +75,11 @@ export async function loadAllRegistries(gitRoot?: string): Promise<RegistrySourc
   const sources: RegistrySource[] = [];
 
   // Global registry
-  const globalPath = path.join(homedir(), ".agentx", "repos.yml");
+  const globalPath = path.join(homedir(), '.agentx', 'repos.yml');
   try {
     const globalRegistry = await loadReposRegistry(globalPath);
     if (globalRegistry) {
-      sources.push({ type: "global", path: globalPath, registry: globalRegistry });
+      sources.push({ type: 'global', path: globalPath, registry: globalRegistry });
     }
   } catch (err) {
     console.warn(`Warning: ${err instanceof Error ? err.message : String(err)}`);
@@ -87,11 +87,11 @@ export async function loadAllRegistries(gitRoot?: string): Promise<RegistrySourc
 
   // Project-level registry
   if (gitRoot) {
-    const projectPath = path.join(gitRoot, ".agentx", "repos.yml");
+    const projectPath = path.join(gitRoot, '.agentx', 'repos.yml');
     try {
       const projectRegistry = await loadReposRegistry(projectPath);
       if (projectRegistry) {
-        sources.push({ type: "project", path: projectPath, registry: projectRegistry });
+        sources.push({ type: 'project', path: projectPath, registry: projectRegistry });
       }
     } catch (err) {
       console.warn(`Warning: ${err instanceof Error ? err.message : String(err)}`);
@@ -143,7 +143,7 @@ export async function createWorkspace(
   await saveReposRegistry(registryPath, registry);
 
   const source: RegistrySource = {
-    type: "global",
+    type: 'global',
     path: expandTilde(registryPath),
     registry,
   };
@@ -174,7 +174,7 @@ export async function saveReposRegistry(
     noRefs: true,
     quotingType: '"',
   });
-  await writeFile(resolved, content, "utf-8");
+  await writeFile(resolved, content, 'utf-8');
 }
 
 /**
@@ -213,10 +213,7 @@ export function addReposToWorkspace(
  * Remove a repo from a workspace by name.
  * Returns true if the repo was found and removed.
  */
-export function removeRepoFromWorkspace(
-  workspace: LoadedWorkspace,
-  repoName: string,
-): boolean {
+export function removeRepoFromWorkspace(workspace: LoadedWorkspace, repoName: string): boolean {
   const idx = workspace.repos.findIndex((r) => r.name === repoName);
   if (idx === -1) return false;
 

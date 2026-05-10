@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { renderToMarkdown, resetEngine } from '../../../src/generator/index.js';
 import { makeTask, sampleTasks } from '../../fixtures/tasks.js';
 
@@ -137,9 +137,7 @@ describe('complexity-report.hbs template', () => {
   });
 
   it('marks high complexity tasks for decomposition', () => {
-    const tasks = [
-      makeTask({ id: 'T-1', title: 'Hard task', complexity: 8 }),
-    ];
+    const tasks = [makeTask({ id: 'T-1', title: 'Hard task', complexity: 8 })];
     const summary = { low: 0, medium: 0, high: 1, average: 8 };
 
     const md = renderToMarkdown('complexity-report', { tasks, summary });
@@ -147,9 +145,7 @@ describe('complexity-report.hbs template', () => {
   });
 
   it('marks low complexity tasks as implementation-ready', () => {
-    const tasks = [
-      makeTask({ id: 'T-1', title: 'Easy task', complexity: 2 }),
-    ];
+    const tasks = [makeTask({ id: 'T-1', title: 'Easy task', complexity: 2 })];
     const summary = { low: 1, medium: 0, high: 0, average: 2 };
 
     const md = renderToMarkdown('complexity-report', { tasks, summary });

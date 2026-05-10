@@ -21,23 +21,19 @@
  * tools to call in setup paths without try/catch noise.
  */
 
-import semver from "semver";
-import {
-  getRegisteredTool,
-  isRegistered,
-  registerTool,
-} from "../config/registry.js";
-import { selectAdapter } from "../platform/adapters/index.js";
-import type { PackageManagerAdapter } from "../platform/package-managers.js";
-import type { PackageManagerType } from "../platform/types.js";
-import { checkTool } from "./tool-checker.js";
-import { resolvePackageName } from "./tool-resolver.js";
+import semver from 'semver';
+import { getRegisteredTool, isRegistered, registerTool } from '../config/registry.js';
+import { selectAdapter } from '../platform/adapters/index.js';
+import type { PackageManagerAdapter } from '../platform/package-managers.js';
+import type { PackageManagerType } from '../platform/types.js';
+import { checkTool } from './tool-checker.js';
+import { resolvePackageName } from './tool-resolver.js';
 
 export type EnsureSource =
-  | "registry" // hit the registry fast path
-  | "found-on-path" // not in registry, but found via tool-checker
-  | "fresh-install" // installed during this call
-  | "missing"; // not installed; autoInstall was false
+  | 'registry' // hit the registry fast path
+  | 'found-on-path' // not in registry, but found via tool-checker
+  | 'fresh-install' // installed during this call
+  | 'missing'; // not installed; autoInstall was false
 
 export interface EnsureOptions {
   /** Minimum acceptable semver. Compared with semver.gte. */
@@ -77,10 +73,7 @@ export interface ToolStatus {
   error?: string;
 }
 
-export async function ensureTool(
-  name: string,
-  options: EnsureOptions = {},
-): Promise<ToolStatus> {
+export async function ensureTool(name: string, options: EnsureOptions = {}): Promise<ToolStatus> {
   const opts = { autoInstall: false, silent: false, ...options };
 
   // 1. Registry fast path
@@ -106,7 +99,7 @@ export async function ensureTool(
         version: probed.version,
         path: probed.path,
         registeredAt: new Date().toISOString(),
-        source: "found-on-path",
+        source: 'found-on-path',
         versionTooLow: false,
       },
       opts.minVersion,
@@ -121,14 +114,14 @@ export async function ensureTool(
       version: null,
       path: null,
       registeredAt: null,
-      source: "missing",
+      source: 'missing',
       versionTooLow: false,
     };
   }
 
   // autoInstall — pick adapter, resolve, install, register
   const adapter = opts.via
-    ? (await import("../platform/adapters/index.js")).adapters[opts.via]
+    ? (await import('../platform/adapters/index.js')).adapters[opts.via]
     : await selectAdapter();
 
   if (!adapter) {
@@ -138,11 +131,11 @@ export async function ensureTool(
       version: null,
       path: null,
       registeredAt: null,
-      source: "missing",
+      source: 'missing',
       versionTooLow: false,
       error: opts.via
         ? `Requested package manager "${opts.via}" is not implemented or not available on this host.`
-        : "No package manager available on this host.",
+        : 'No package manager available on this host.',
     };
   }
 
@@ -155,9 +148,10 @@ export async function ensureTools(
 ): Promise<ToolStatus[]> {
   const entries: Array<[string, EnsureOptions]> = Array.isArray(names)
     ? names.map((n) => [n, sharedOptions])
-    : Object.entries(names).map(
-        ([n, opts]): [string, EnsureOptions] => [n, { ...sharedOptions, ...opts }],
-      );
+    : Object.entries(names).map(([n, opts]): [string, EnsureOptions] => [
+        n,
+        { ...sharedOptions, ...opts },
+      ]);
 
   // Sequential — adapter calls touch shell + filesystem; parallelism
   // doesn't buy much and serializes nicer log output.
@@ -182,7 +176,7 @@ function checkRegistry(name: string): ToolStatus | null {
     version: entry.version,
     path: entry.path,
     registeredAt: entry.registered_at,
-    source: "registry",
+    source: 'registry',
     versionTooLow: false,
   };
 }
@@ -200,7 +194,7 @@ async function doInstall(
       version: null,
       path: null,
       registeredAt: null,
-      source: "missing",
+      source: 'missing',
       versionTooLow: false,
       error: `${name} is not in the catalog, or has no entry for ${adapter.name}.`,
     };
@@ -218,9 +212,9 @@ async function doInstall(
       version: null,
       path: null,
       registeredAt: null,
-      source: "missing",
+      source: 'missing',
       versionTooLow: false,
-      error: `Install failed: ${result.error ?? "unknown error"}`,
+      error: `Install failed: ${result.error ?? 'unknown error'}`,
     };
   }
 
@@ -233,9 +227,10 @@ async function doInstall(
       version: null,
       path: null,
       registeredAt: null,
-      source: "missing",
+      source: 'missing',
       versionTooLow: false,
-      error: "Install reported success but the binary isn't on PATH. Check the package manager output.",
+      error:
+        "Install reported success but the binary isn't on PATH. Check the package manager output.",
     };
   }
 
@@ -253,7 +248,7 @@ async function doInstall(
       version: probed.version,
       path: probed.path,
       registeredAt: new Date().toISOString(),
-      source: "fresh-install",
+      source: 'fresh-install',
       versionTooLow: false,
     },
     opts.minVersion,
@@ -266,10 +261,7 @@ async function doInstall(
  * or with versionTooLow=true when the current version is below the
  * threshold. Unparseable versions count as "low" so callers see it.
  */
-function finalizeStatus(
-  status: ToolStatus,
-  minVersion: string | undefined,
-): ToolStatus {
+function finalizeStatus(status: ToolStatus, minVersion: string | undefined): ToolStatus {
   if (!minVersion || !status.installed) return status;
   if (!status.version) {
     return { ...status, versionTooLow: true };

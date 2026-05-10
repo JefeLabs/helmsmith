@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  inferLayerFromPath,
-  inferLayerFromAST,
   inferLayer,
+  inferLayerFromAST,
+  inferLayerFromPath,
 } from '../../../../src/parser/analysis/layer-inference.js';
 
 // --- Helper to build mock tree-sitter nodes ---
@@ -234,104 +234,76 @@ describe('inferLayerFromAST', () => {
   // --- API / Route patterns ---
 
   it('detects app.get() as api', () => {
-    const root = makeRoot(
-      makeNode('expression_statement', "app.get('/api/users', handler)"),
-    );
+    const root = makeRoot(makeNode('expression_statement', "app.get('/api/users', handler)"));
     expect(inferLayerFromAST(root, 'typescript', 'src/server.ts')).toBe('api');
   });
 
   it('detects app.post() as api', () => {
-    const root = makeRoot(
-      makeNode('call_expression', "app.post('/api/users', handler)"),
-    );
+    const root = makeRoot(makeNode('call_expression', "app.post('/api/users', handler)"));
     expect(inferLayerFromAST(root, 'typescript', 'src/server.ts')).toBe('api');
   });
 
   it('detects router.put() as api', () => {
-    const root = makeRoot(
-      makeNode('call_expression', "router.put('/api/items/:id', handler)"),
-    );
+    const root = makeRoot(makeNode('call_expression', "router.put('/api/items/:id', handler)"));
     expect(inferLayerFromAST(root, 'typescript', 'src/routes.ts')).toBe('api');
   });
 
   it('detects router.delete() as api', () => {
-    const root = makeRoot(
-      makeNode('expression_statement', "router.delete('/items/:id', handler)"),
-    );
+    const root = makeRoot(makeNode('expression_statement', "router.delete('/items/:id', handler)"));
     expect(inferLayerFromAST(root, 'typescript', 'src/routes.ts')).toBe('api');
   });
 
   it('detects app.use() as api', () => {
-    const root = makeRoot(
-      makeNode('call_expression', "app.use('/api', apiRouter)"),
-    );
+    const root = makeRoot(makeNode('call_expression', "app.use('/api', apiRouter)"));
     expect(inferLayerFromAST(root, 'typescript', 'src/app.ts')).toBe('api');
   });
 
   // --- Test patterns ---
 
   it('detects describe() as tests', () => {
-    const root = makeRoot(
-      makeNode('expression_statement', "describe('my test suite', () => {})"),
-    );
+    const root = makeRoot(makeNode('expression_statement', "describe('my test suite', () => {})"));
     expect(inferLayerFromAST(root, 'typescript', 'src/foo.ts')).toBe('tests');
   });
 
   it('detects it() as tests', () => {
-    const root = makeRoot(
-      makeNode('call_expression', "it('should work', () => {})"),
-    );
+    const root = makeRoot(makeNode('call_expression', "it('should work', () => {})"));
     expect(inferLayerFromAST(root, 'typescript', 'src/foo.ts')).toBe('tests');
   });
 
   it('detects test() as tests', () => {
-    const root = makeRoot(
-      makeNode('call_expression', "test('adds 1 + 2', () => {})"),
-    );
+    const root = makeRoot(makeNode('call_expression', "test('adds 1 + 2', () => {})"));
     expect(inferLayerFromAST(root, 'typescript', 'src/foo.ts')).toBe('tests');
   });
 
   it('detects Go Test function as tests', () => {
-    const root = makeRoot(
-      makeNode('function_declaration', 'func TestAddition(t *testing.T) {}'),
-    );
+    const root = makeRoot(makeNode('function_declaration', 'func TestAddition(t *testing.T) {}'));
     expect(inferLayerFromAST(root, 'go', 'add_test.go')).toBe('tests');
   });
 
   it('detects Rust #[test] attribute as tests', () => {
-    const root = makeRoot(
-      makeNode('attribute_item', '#[test]'),
-    );
+    const root = makeRoot(makeNode('attribute_item', '#[test]'));
     expect(inferLayerFromAST(root, 'rust', 'src/lib.rs')).toBe('tests');
   });
 
   // --- CLI patterns ---
 
   it('detects new Command() as cli', () => {
-    const root = makeRoot(
-      makeNode('new_expression', "new Command('serve')"),
-    );
+    const root = makeRoot(makeNode('new_expression', "new Command('serve')"));
     expect(inferLayerFromAST(root, 'typescript', 'src/cli.ts')).toBe('cli');
   });
 
   it('detects program.command() as cli', () => {
-    const root = makeRoot(
-      makeNode('call_expression', "program.command('init')"),
-    );
+    const root = makeRoot(makeNode('call_expression', "program.command('init')"));
     expect(inferLayerFromAST(root, 'typescript', 'src/main.ts')).toBe('cli');
   });
 
   it('detects program.parse() as cli', () => {
-    const root = makeRoot(
-      makeNode('expression_statement', 'program.parse(process.argv)'),
-    );
+    const root = makeRoot(makeNode('expression_statement', 'program.parse(process.argv)'));
     expect(inferLayerFromAST(root, 'typescript', 'bin/index.ts')).toBe('cli');
   });
 
   it('detects argparse import as cli', () => {
-    const root = makeRoot(
-      makeNode('import_statement', "import argparse from 'argparse'"),
-    );
+    const root = makeRoot(makeNode('import_statement', "import argparse from 'argparse'"));
     expect(inferLayerFromAST(root, 'typescript', 'src/cli.ts')).toBe('cli');
   });
 
@@ -347,9 +319,7 @@ describe('inferLayerFromAST', () => {
   // --- No match ---
 
   it('returns null when no AST signal is found', () => {
-    const root = makeRoot(
-      makeNode('lexical_declaration', "const x = 42"),
-    );
+    const root = makeRoot(makeNode('lexical_declaration', 'const x = 42'));
     expect(inferLayerFromAST(root, 'typescript', 'src/foo.ts')).toBeNull();
   });
 
@@ -374,16 +344,12 @@ describe('inferLayerFromAST', () => {
 describe('inferLayer', () => {
   it('uses AST result when AST detects a layer', () => {
     // Path says "infra" (src/parser/foo.ts), but AST says "api"
-    const root = makeRoot(
-      makeNode('call_expression', "app.get('/users', handler)"),
-    );
+    const root = makeRoot(makeNode('call_expression', "app.get('/users', handler)"));
     expect(inferLayer('src/parser/foo.ts', root, 'typescript')).toBe('api');
   });
 
   it('falls back to path when AST returns null', () => {
-    const root = makeRoot(
-      makeNode('lexical_declaration', 'const x = 42'),
-    );
+    const root = makeRoot(makeNode('lexical_declaration', 'const x = 42'));
     expect(inferLayer('src/routes/users.ts', root, 'typescript')).toBe('api');
   });
 
@@ -396,16 +362,12 @@ describe('inferLayer', () => {
   });
 
   it('AST test detection overrides path-based infra', () => {
-    const root = makeRoot(
-      makeNode('call_expression', "describe('suite', () => {})"),
-    );
+    const root = makeRoot(makeNode('call_expression', "describe('suite', () => {})"));
     expect(inferLayer('src/utils/helper.ts', root, 'typescript')).toBe('tests');
   });
 
   it('AST cli detection overrides path-based default', () => {
-    const root = makeRoot(
-      makeNode('new_expression', "new Command('run')"),
-    );
+    const root = makeRoot(makeNode('new_expression', "new Command('run')"));
     expect(inferLayer('src/main.ts', root, 'typescript')).toBe('cli');
   });
 });

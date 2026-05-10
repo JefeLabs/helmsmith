@@ -9,11 +9,9 @@
  * organisms.
  */
 
-export { Panel } from "./Panel.tsx";
-export type { PanelProps } from "./Panel.tsx";
-
-export { Spinner } from "./Spinner.tsx";
-export type { SpinnerProps } from "./Spinner.tsx";
-
-export { KeybindingsBar } from "./KeybindingsBar.tsx";
-export type { KeybindingsBarProps } from "./KeybindingsBar.tsx";
+export type { KeybindingsBarProps } from './KeybindingsBar.tsx';
+export { KeybindingsBar } from './KeybindingsBar.tsx';
+export type { PanelProps } from './Panel.tsx';
+export { Panel } from './Panel.tsx';
+export type { SpinnerProps } from './Spinner.tsx';
+export { Spinner } from './Spinner.tsx';

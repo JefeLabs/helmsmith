@@ -6,11 +6,11 @@
  * renders a percentage after the label.
  */
 
-import { useEffect, useState } from "react";
-import { Box } from "../atoms/Box.tsx";
-import { Text } from "../atoms/Text.tsx";
+import { useEffect, useState } from 'react';
+import { Box } from '../atoms/Box.tsx';
+import { Text } from '../atoms/Text.tsx';
 
-const FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+const FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
 export interface SpinnerProps {
   label?: string;
@@ -32,15 +32,10 @@ export function Spinner({ label, progress, intervalMs = 80, style }: SpinnerProp
   }, [intervalMs]);
 
   const pct =
-    progress !== undefined
-      ? `${Math.round(Math.max(0, Math.min(1, progress)) * 100)}%`
-      : null;
+    progress !== undefined ? `${Math.round(Math.max(0, Math.min(1, progress)) * 100)}%` : null;
 
   return (
-    <Box
-      variant="transparent"
-      style={{ flexDirection: "row", gap: 1, ...style }}
-    >
+    <Box variant="transparent" style={{ flexDirection: 'row', gap: 1, ...style }}>
       <Text variant="accent">{FRAMES[frame]}</Text>
       {label ? <Text>{label}</Text> : null}
       {pct ? <Text variant="muted">{pct}</Text> : null}

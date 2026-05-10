@@ -1,25 +1,25 @@
-import { readFile, writeFile, unlink, mkdir } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import chalk from 'chalk';
+import { APP_CONFIG_DIR_DISPLAY, CLI_BIN_NAME } from '../config/branding.js';
 import { getHomePath } from '../utils/home.js';
-import { CLI_BIN_NAME, APP_CONFIG_DIR_DISPLAY } from '../config/branding.js';
 import {
-  AuthCredentialsSchema,
-  AuthFileSchema,
-  COPILOT_TOKEN_URL,
-  COPILOT_CHAT_URL,
-  COPILOT_MODELS_URL,
-  EDITOR_VERSION,
-  TOKEN_REFRESH_THRESHOLD,
   type AuthCredentials,
+  AuthCredentialsSchema,
   type AuthFile,
-  type CopilotTokenResponse,
+  AuthFileSchema,
   type ChatCompletionMessage,
   type ChatCompletionResponse,
-  type TokenSource,
+  COPILOT_CHAT_URL,
+  COPILOT_MODELS_URL,
+  COPILOT_TOKEN_URL,
   type CopilotModelEntry,
+  type CopilotTokenResponse,
+  EDITOR_VERSION,
+  TOKEN_REFRESH_THRESHOLD,
+  type TokenSource,
 } from './types.js';
 
 const AUTH_FILE = 'auth.json';
@@ -242,9 +242,7 @@ export async function callCopilot(
 
   if (!response.ok) {
     const body = await response.text().catch(() => '');
-    throw new Error(
-      `Copilot API error (${response.status}): ${body || response.statusText}`,
-    );
+    throw new Error(`Copilot API error (${response.status}): ${body || response.statusText}`);
   }
 
   return (await response.json()) as ChatCompletionResponse;
@@ -277,7 +275,7 @@ export async function fetchCopilotModels(): Promise<CopilotModelEntry[] | null> 
       return null;
     }
 
-    const data = await response.json() as { data?: CopilotModelEntry[] };
+    const data = (await response.json()) as { data?: CopilotModelEntry[] };
     return Array.isArray(data.data) ? data.data : null;
   } catch {
     return null;
@@ -314,16 +312,14 @@ export async function requireGitHubToken(): Promise<TokenSource> {
 
   // Try git credential helper
   const gitToken = await new Promise<string | null>((resolve) => {
-    const child = execFile(
-      'git',
-      ['credential', 'fill'],
-      { timeout: 5000 },
-      (err, stdout) => {
-        if (err) { resolve(null); return; }
-        const match = stdout.match(/password=(.+)/);
-        resolve(match ? match[1].trim() : null);
-      },
-    );
+    const child = execFile('git', ['credential', 'fill'], { timeout: 5000 }, (err, stdout) => {
+      if (err) {
+        resolve(null);
+        return;
+      }
+      const match = stdout.match(/password=(.+)/);
+      resolve(match ? match[1].trim() : null);
+    });
     child.stdin?.write('protocol=https\nhost=github.com\n\n');
     child.stdin?.end();
   });
@@ -332,9 +328,7 @@ export async function requireGitHubToken(): Promise<TokenSource> {
     return { token: gitToken, source: 'auth.json' as const };
   }
 
-  throw new Error(
-    `No GitHub token found. Run "${CLI_BIN_NAME} auth login" or set GITHUB_TOKEN.`,
-  );
+  throw new Error(`No GitHub token found. Run "${CLI_BIN_NAME} auth login" or set GITHUB_TOKEN.`);
 }
 
 /**

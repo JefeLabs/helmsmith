@@ -1,20 +1,18 @@
+import { resolveActiveAuth } from '../auth/call-ai.js';
+import { AI_PROVIDERS, type AIModelEntry, type AIProviderName } from '../auth/provider.js';
+import { getProvider } from '../auth/provider-registry.js';
+import { PRESET_NAMES, STATE_PRESETS } from '../config/state-presets.js';
+import { PROJECT_STYLES, STYLE_NAMES } from '../config/styles.js';
+import { AI_TOOLING_CHOICES, type AITooling, INSTRUCTION_FILES } from '../context/index.js';
+import type { ProjectLocation } from '../utils/location.js';
+import { listAllProjects } from '../utils/projects.js';
 import {
+  checkboxWithDefaults,
+  confirmPrompt,
   inputWithDefault,
   listWithDefault,
-  checkboxWithDefaults,
   numberWithDefault,
-  confirmPrompt,
 } from './factory.js';
-import { STYLE_NAMES, PROJECT_STYLES } from '../config/styles.js';
-import { PRESET_NAMES, STATE_PRESETS } from '../config/state-presets.js';
-import { resolveActiveAuth } from '../auth/call-ai.js';
-import { getProvider } from '../auth/provider-registry.js';
-import { AI_PROVIDERS, type AIProviderName, type AIModelEntry } from '../auth/provider.js';
-import type { ProjectLocation, ResolvedProject } from '../utils/location.js';
-import type { TaggedProjectEntry } from '../utils/projects.js';
-import { listAllProjects } from '../utils/projects.js';
-import { formatProjectRef } from '../utils/location.js';
-import { INSTRUCTION_FILES, AI_TOOLING_CHOICES, type AITooling } from '../context/index.js';
 
 const DEFAULT_SKILLS = [
   'backend',
@@ -32,17 +30,17 @@ const DEFAULT_SKILLS = [
  * so we keep curated fallbacks for popular models.
  */
 const KNOWN_MODEL_META: Record<string, { inputTokens: string; outputTokens: string }> = {
-  'gpt-4.1':            { inputTokens: '1M',   outputTokens: '32K' },
-  'gpt-4o':             { inputTokens: '128K',  outputTokens: '16K' },
-  'gpt-4o-mini':        { inputTokens: '128K',  outputTokens: '16K' },
-  'gpt-4':              { inputTokens: '8K',    outputTokens: '8K' },
-  'gpt-3.5-turbo':      { inputTokens: '16K',   outputTokens: '4K' },
-  'claude-sonnet-4.5':  { inputTokens: '200K',  outputTokens: '16K' },
-  'claude-opus-4.5':    { inputTokens: '200K',  outputTokens: '32K' },
-  'claude-haiku-4.5':   { inputTokens: '200K',  outputTokens: '8K' },
-  'gpt-5.1-codex':      { inputTokens: '1M',    outputTokens: '32K' },
-  'o3-mini':            { inputTokens: '200K',  outputTokens: '100K' },
-  'o1':                 { inputTokens: '200K',  outputTokens: '100K' },
+  'gpt-4.1': { inputTokens: '1M', outputTokens: '32K' },
+  'gpt-4o': { inputTokens: '128K', outputTokens: '16K' },
+  'gpt-4o-mini': { inputTokens: '128K', outputTokens: '16K' },
+  'gpt-4': { inputTokens: '8K', outputTokens: '8K' },
+  'gpt-3.5-turbo': { inputTokens: '16K', outputTokens: '4K' },
+  'claude-sonnet-4.5': { inputTokens: '200K', outputTokens: '16K' },
+  'claude-opus-4.5': { inputTokens: '200K', outputTokens: '32K' },
+  'claude-haiku-4.5': { inputTokens: '200K', outputTokens: '8K' },
+  'gpt-5.1-codex': { inputTokens: '1M', outputTokens: '32K' },
+  'o3-mini': { inputTokens: '200K', outputTokens: '100K' },
+  o1: { inputTokens: '200K', outputTokens: '100K' },
 };
 
 /** Format a token count for display (e.g. 1048576 → "1M", 32768 → "32K"). */
@@ -61,10 +59,10 @@ function describeModel(entry: AIModelEntry): string {
 
   const input = limits?.max_prompt_tokens
     ? formatTokens(limits.max_prompt_tokens)
-    : known?.inputTokens ?? '?';
+    : (known?.inputTokens ?? '?');
   const output = limits?.max_output_tokens
     ? formatTokens(limits.max_output_tokens)
-    : known?.outputTokens ?? '?';
+    : (known?.outputTokens ?? '?');
 
   return `${input} in / ${output} out`;
 }
@@ -77,8 +75,8 @@ interface ModelChoice {
 
 /** Hardcoded fallback list when API is unavailable. */
 const FALLBACK_MODELS: ModelChoice[] = [
-  { name: 'gpt-4.1',  value: 'gpt-4.1',  description: '1M in / 32K out — best for large docs' },
-  { name: 'gpt-4o',   value: 'gpt-4o',   description: '128K in / 16K out — fast, capable' },
+  { name: 'gpt-4.1', value: 'gpt-4.1', description: '1M in / 32K out — best for large docs' },
+  { name: 'gpt-4o', value: 'gpt-4o', description: '128K in / 16K out — fast, capable' },
   { name: 'gpt-4o-mini', value: 'gpt-4o-mini', description: '128K in / 16K out — low cost' },
 ];
 
@@ -123,9 +121,10 @@ export async function runInitWizard(
       const switchChoices: Array<{ name: string; value: string }> = [
         { name: 'Create a new project', value: '__new__' },
         ...allProjects.projects.map((p) => {
-          const marker = p.name === allProjects.active && p.location === allProjects.activeLocation
-            ? ' (active)'
-            : '';
+          const marker =
+            p.name === allProjects.active && p.location === allProjects.activeLocation
+              ? ' (active)'
+              : '';
           return {
             name: `Switch to "${p.name}" [${p.location}]${marker}`,
             value: `${p.location}:${p.name}`,
@@ -193,10 +192,17 @@ export async function runInitWizard(
     location = opts.location;
   } else if (gitRoot) {
     const locationChoices = [
-      { name: `In this repository (${gitRoot}/.agentx/taskmaster/)`, value: 'repo' as ProjectLocation },
+      {
+        name: `In this repository (${gitRoot}/.agentx/taskmaster/)`,
+        value: 'repo' as ProjectLocation,
+      },
       { name: 'In user home (~/.agentx/taskmaster/)', value: 'home' as ProjectLocation },
     ];
-    location = await listWithDefault('__storageLocation', 'Where should project data be stored?', locationChoices);
+    location = await listWithDefault(
+      '__storageLocation',
+      'Where should project data be stored?',
+      locationChoices,
+    );
   } else {
     location = 'home';
   }
@@ -210,7 +216,11 @@ export async function runInitWizard(
       { name: 'No \u2014 add .agentx/ to .gitignore (private to you)', value: 'yes' },
       { name: 'Yes \u2014 track in git (shared with team)', value: 'no' },
     ];
-    const choice = await listWithDefault('__gitignore', 'Include taskmaster data in source control?', gitignoreChoices);
+    const choice = await listWithDefault(
+      '__gitignore',
+      'Include taskmaster data in source control?',
+      gitignoreChoices,
+    );
     gitignore = choice === 'yes';
   } else {
     gitignore = false;
@@ -238,8 +248,7 @@ export async function runInitWizard(
     };
   });
   const statePreset =
-    opts?.statePreset ??
-    (await listWithDefault('statusPreset', 'Status preset:', presetChoices));
+    opts?.statePreset ?? (await listWithDefault('statusPreset', 'Status preset:', presetChoices));
 
   // Step 5: Skill vocabulary (checkbox + optional custom entry)
   const skillChoices = DEFAULT_SKILLS.map((s) => ({ name: s, value: s }));
@@ -274,10 +283,19 @@ export async function runInitWizard(
     provider = opts.provider;
   } else {
     const providerChoices = AI_PROVIDERS.map((p) => ({
-      name: p === 'copilot' ? 'GitHub Copilot' : p === 'anthropic' ? 'Anthropic Claude' : 'OpenAI ChatGPT',
+      name:
+        p === 'copilot'
+          ? 'GitHub Copilot'
+          : p === 'anthropic'
+            ? 'Anthropic Claude'
+            : 'OpenAI ChatGPT',
       value: p,
     }));
-    provider = await listWithDefault('provider', 'AI provider:', providerChoices) as AIProviderName;
+    provider = (await listWithDefault(
+      'provider',
+      'AI provider:',
+      providerChoices,
+    )) as AIProviderName;
   }
 
   // Step 7: AI model selection (provider-aware, live from API when authenticated)

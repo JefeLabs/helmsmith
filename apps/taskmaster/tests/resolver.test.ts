@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { existsSync, rmSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { resolveProject, resolveProjectOrThrow } from '../src/config/resolver.js';
 import { bootstrapHome, bootstrapRepoHome } from '../src/utils/home.js';
 import { createProject, switchProject } from '../src/utils/projects.js';
-import { resolveProject, resolveProjectOrThrow } from '../src/config/resolver.js';
 
 const TEST_DIR = join(tmpdir(), `agentx-test-resolver-${Date.now()}`);
 

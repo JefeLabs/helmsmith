@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { generateCodeVerifier, generateCodeChallenge } from '../../../src/auth/oauth-pkce.js';
+import { describe, expect, it } from 'vitest';
+import { generateCodeChallenge, generateCodeVerifier } from '../../../src/auth/oauth-pkce.js';
 
 describe('oauth-pkce', () => {
   describe('generateCodeVerifier', () => {

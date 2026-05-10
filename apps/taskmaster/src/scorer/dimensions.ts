@@ -3,19 +3,88 @@ import type { TaskNode } from '../config/schema.js';
 // --- Keyword category definitions ---
 
 const SCOPE_CATEGORIES: Record<string, readonly string[]> = {
-  ui: ['ui', 'frontend', 'component', 'page', 'form', 'button', 'modal', 'layout', 'css', 'style', 'responsive', 'view'],
+  ui: [
+    'ui',
+    'frontend',
+    'component',
+    'page',
+    'form',
+    'button',
+    'modal',
+    'layout',
+    'css',
+    'style',
+    'responsive',
+    'view',
+  ],
   backend: ['api', 'endpoint', 'server', 'route', 'middleware', 'controller', 'service', 'handler'],
-  data: ['database', 'schema', 'migration', 'model', 'query', 'orm', 'sql', 'table', 'index', 'storage'],
-  infrastructure: ['deploy', 'ci/cd', 'docker', 'kubernetes', 'monitoring', 'logging', 'pipeline', 'hosting'],
-  authSecurity: ['auth', 'authentication', 'authorization', 'oauth', 'token', 'permission', 'encryption', 'rbac', 'cors'],
+  data: [
+    'database',
+    'schema',
+    'migration',
+    'model',
+    'query',
+    'orm',
+    'sql',
+    'table',
+    'index',
+    'storage',
+  ],
+  infrastructure: [
+    'deploy',
+    'ci/cd',
+    'docker',
+    'kubernetes',
+    'monitoring',
+    'logging',
+    'pipeline',
+    'hosting',
+  ],
+  authSecurity: [
+    'auth',
+    'authentication',
+    'authorization',
+    'oauth',
+    'token',
+    'permission',
+    'encryption',
+    'rbac',
+    'cors',
+  ],
   testing: ['test', 'coverage', 'e2e', 'integration', 'unit', 'mock', 'fixture', 'assertion'],
 } as const;
 
 const DEPTH_CATEGORIES: Record<string, readonly string[]> = {
   infrastructure: ['deploy', 'ci/cd', 'docker', 'kubernetes', 'scaling', 'load balancer', 'cdn'],
-  security: ['oauth', 'encryption', 'rbac', 'vulnerability', 'cors', 'token', 'credential', 'certificate'],
-  performance: ['caching', 'optimization', 'load balancing', 'indexing', 'latency', 'throughput', 'profiling'],
-  integration: ['api', 'webhook', 'third-party', 'sdk', 'protocol', 'upstream', 'downstream', 'external'],
+  security: [
+    'oauth',
+    'encryption',
+    'rbac',
+    'vulnerability',
+    'cors',
+    'token',
+    'credential',
+    'certificate',
+  ],
+  performance: [
+    'caching',
+    'optimization',
+    'load balancing',
+    'indexing',
+    'latency',
+    'throughput',
+    'profiling',
+  ],
+  integration: [
+    'api',
+    'webhook',
+    'third-party',
+    'sdk',
+    'protocol',
+    'upstream',
+    'downstream',
+    'external',
+  ],
   dataArchitecture: ['migration', 'schema design', 'replication', 'sharding', 'backup', 'etl'],
 } as const;
 
@@ -54,10 +123,10 @@ const VAGUENESS_INDICATORS: readonly string[] = [
 ] as const;
 
 const SPECIFICITY_PATTERNS: readonly RegExp[] = [
-  /\d+/,                           // numbers
-  /[\w-]+\.\w{1,5}/,              // file references (e.g., schema.ts, config.yaml)
+  /\d+/, // numbers
+  /[\w-]+\.\w{1,5}/, // file references (e.g., schema.ts, config.yaml)
   /[a-z][a-zA-Z]+[A-Z][a-zA-Z]*/, // camelCase identifiers
-  /[a-z]+_[a-z]+/,                // snake_case identifiers
+  /[a-z]+_[a-z]+/, // snake_case identifiers
 ] as const;
 
 const SPECIFICITY_VERBS: readonly string[] = [

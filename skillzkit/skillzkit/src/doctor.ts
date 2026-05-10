@@ -12,18 +12,13 @@
  *   - CI gate against contribution PRs.
  */
 
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative, sep } from "node:path";
-import {
-  getCommands,
-  getSkills,
-  getWorkflows,
-  loadCatalog,
-} from "./index.js";
-import { loadCoreTags } from "./tags.js";
+import { readdirSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { loadCatalog } from './index.js';
+import { loadCoreTags } from './tags.js';
 
 export interface Finding {
-  severity: "error" | "warning" | "info";
+  severity: 'error' | 'warning' | 'info';
   /** File path or slug the finding is anchored to. */
   source: string;
   message: string;
@@ -52,11 +47,11 @@ export function runDoctor(packageRoot: string): Finding[] {
   // error, just a missing edge in the graph.
   for (const cmd of catalog.commands) {
     for (const match of cmd.body.matchAll(REFERENCE_REGEX)) {
-      const ref = match[1].replace(/[.,;:)\]*]+$/, "");
-      if (ref.includes("*")) continue; // wildcards aren't meant to resolve
+      const ref = match[1].replace(/[.,;:)\]*]+$/, '');
+      if (ref.includes('*')) continue; // wildcards aren't meant to resolve
       if (!knownSlugs.has(ref)) {
         findings.push({
-          severity: "warning",
+          severity: 'warning',
           source: cmd.slug,
           message: `Body cites \`/${ref}\` but no such slug exists in catalog`,
         });
@@ -65,11 +60,11 @@ export function runDoctor(packageRoot: string): Finding[] {
   }
   for (const skill of catalog.skills) {
     for (const match of skill.body.matchAll(REFERENCE_REGEX)) {
-      const ref = match[1].replace(/[.,;:)\]*]+$/, "");
-      if (ref.includes("*")) continue;
+      const ref = match[1].replace(/[.,;:)\]*]+$/, '');
+      if (ref.includes('*')) continue;
       if (!knownSlugs.has(ref)) {
         findings.push({
-          severity: "warning",
+          severity: 'warning',
           source: skill.name,
           message: `Skill body cites \`/${ref}\` but no such slug exists in catalog`,
         });
@@ -82,14 +77,14 @@ export function runDoctor(packageRoot: string): Finding[] {
   // A file that exists on disk but isn't indexed means catalog
   // generation skipped it (parse error, missing frontmatter) or it
   // landed in a path the loader doesn't traverse.
-  const commandsRoot = join(packageRoot, ".claude", "commands");
-  const skillsRoot = join(packageRoot, ".claude", "skills");
+  const commandsRoot = join(packageRoot, '.claude', 'commands');
+  const skillsRoot = join(packageRoot, '.claude', 'skills');
   const cmdPathSet = new Set(catalog.commands.map((c) => c.path));
   for (const file of walkMd(commandsRoot)) {
     const rel = relative(commandsRoot, file);
     if (!cmdPathSet.has(rel)) {
       findings.push({
-        severity: "error",
+        severity: 'error',
         source: rel,
         message: `File exists on disk but not in catalog. Run \`npm run catalog\` to refresh; if it still doesn't appear, check the frontmatter parses cleanly.`,
       });
@@ -100,21 +95,19 @@ export function runDoctor(packageRoot: string): Finding[] {
   for (const entry of safeReaddir(skillsRoot)) {
     const dir = join(skillsRoot, entry);
     if (!safeIsDir(dir)) continue;
-    const skillFile = join(dir, "SKILL.md");
+    const skillFile = join(dir, 'SKILL.md');
     if (!safeExists(skillFile)) {
       findings.push({
-        severity: "error",
+        severity: 'error',
         source: entry,
         message: `.claude/skills/${entry}/ has no SKILL.md`,
       });
       continue;
     }
-    const indexed = catalog.skills.some(
-      (s) => s.path === relative(skillsRoot, skillFile),
-    );
+    const indexed = catalog.skills.some((s) => s.path === relative(skillsRoot, skillFile));
     if (!indexed) {
       findings.push({
-        severity: "error",
+        severity: 'error',
         source: entry,
         message: `Skill SKILL.md exists but isn't in catalog. Check the frontmatter parses cleanly.`,
       });
@@ -126,10 +119,10 @@ export function runDoctor(packageRoot: string): Finding[] {
   // right pane. Workflows without an `outcome` fall back to slug for
   // the row label, which reads less naturally.
   for (const cmd of catalog.commands) {
-    if (cmd.kind === "context") continue;
+    if (cmd.kind === 'context') continue;
     if (!cmd.description || cmd.description.trim().length === 0) {
       findings.push({
-        severity: "warning",
+        severity: 'warning',
         source: cmd.slug,
         message: `Empty description frontmatter`,
       });
@@ -138,7 +131,7 @@ export function runDoctor(packageRoot: string): Finding[] {
   for (const skill of catalog.skills) {
     if (!skill.description || skill.description.trim().length === 0) {
       findings.push({
-        severity: "warning",
+        severity: 'warning',
         source: skill.name,
         message: `Empty description frontmatter`,
       });
@@ -147,7 +140,7 @@ export function runDoctor(packageRoot: string): Finding[] {
   for (const wf of catalog.workflows) {
     if (!wf.outcome) {
       findings.push({
-        severity: "info",
+        severity: 'info',
         source: wf.qualifiedName,
         message: `Workflow has no \`outcome\` frontmatter — TUI will use slug for the row label`,
       });
@@ -170,7 +163,7 @@ export function runDoctor(packageRoot: string): Finding[] {
         catalog.commands.some((c) => c.slug === prereq);
       if (!resolves) {
         findings.push({
-          severity: "error",
+          severity: 'error',
           source: wf.qualifiedName,
           message: `Prerequisite \`${prereq}\` looks like a slug but doesn't resolve to a known workflow or command`,
         });
@@ -184,7 +177,7 @@ export function runDoctor(packageRoot: string): Finding[] {
   for (const cmd of catalog.commands) {
     if (cmd.references.includes(cmd.slug)) {
       findings.push({
-        severity: "info",
+        severity: 'info',
         source: cmd.slug,
         message: `Body cites its own slug — usually intentional (a doc referring to itself), but flagged for awareness`,
       });
@@ -200,13 +193,13 @@ export function runDoctor(packageRoot: string): Finding[] {
   const coreTags = loadCoreTags(packageRoot);
   if (coreTags.size === 0) {
     findings.push({
-      severity: "warning",
-      source: "TAGS.md",
+      severity: 'warning',
+      source: 'TAGS.md',
       message: `Could not load core tag whitelist from TAGS.md — all tags will be reported as extensions`,
     });
   }
   for (const cmd of catalog.commands) {
-    if (cmd.kind === "context") continue;
+    if (cmd.kind === 'context') continue;
     findings.push(...validateTags(cmd.slug, cmd.tags, coreTags));
   }
   for (const skill of catalog.skills) {
@@ -238,7 +231,7 @@ function validateTags(
   for (const tag of tags) {
     if (seen.has(tag)) {
       out.push({
-        severity: "warning",
+        severity: 'warning',
         source,
         message: `Duplicate tag \`${tag}\``,
       });
@@ -247,7 +240,7 @@ function validateTags(
     seen.add(tag);
     if (!TAG_FORMAT.test(tag)) {
       out.push({
-        severity: "error",
+        severity: 'error',
         source,
         message: `Tag \`${tag}\` violates format — must be lowercase, hyphen-separated, ASCII letters/digits only, start with a letter, max 24 chars`,
       });
@@ -255,7 +248,7 @@ function validateTags(
     }
     if (coreTags.size > 0 && !coreTags.has(tag)) {
       out.push({
-        severity: "info",
+        severity: 'info',
         source,
         message: `Tag \`${tag}\` is an extension (not in TAGS.md core list) — promote to core if used widely`,
       });
@@ -263,7 +256,6 @@ function validateTags(
   }
   return out;
 }
-
 
 // ─── helpers ──────────────────────────────────────────────────────────
 
@@ -274,7 +266,7 @@ function walkMd(root: string): string[] {
     for (const entry of safeReaddir(dir)) {
       const full = join(dir, entry);
       if (safeIsDir(full)) recurse(full);
-      else if (full.endsWith(".md")) out.push(full);
+      else if (full.endsWith('.md')) out.push(full);
     }
   }
   recurse(root);

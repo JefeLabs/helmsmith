@@ -1,10 +1,10 @@
 import chalk from 'chalk';
-import type { ViewContext } from './types.js';
-import type { ScanState } from '../types/schema.js';
-import { renderTable } from '../ui/table.js';
-import { fmt } from '../ui/format.js';
-import { isStale } from '../store/scan-state.js';
 import { getIdentifierPrefixes } from '../store/author-registry.js';
+import { isStale } from '../store/scan-state.js';
+import type { ScanState } from '../types/schema.js';
+import { fmt } from '../ui/format.js';
+import { renderTable } from '../ui/table.js';
+import type { ViewContext } from './types.js';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -84,10 +84,7 @@ export function renderReposSection(
   return { output: table, repoNames };
 }
 
-export function renderOrgsSection(
-  ctx: ViewContext,
-  termCols: number,
-): string {
+export function renderOrgsSection(ctx: ViewContext, termCols: number): string {
   const rows: Record<string, any>[] = [];
   const groupSeparators: number[] = [];
 
@@ -142,9 +139,7 @@ interface MergedAuthor {
   repoCount: number;
 }
 
-function mergeAuthorsByName(
-  registry: import('../types/schema.js').AuthorRegistry,
-): MergedAuthor[] {
+function mergeAuthorsByName(registry: import('../types/schema.js').AuthorRegistry): MergedAuthor[] {
   const byName = new Map<string, MergedAuthor & { _repos: Set<string> }>();
 
   for (const author of Object.values(registry.authors)) {
@@ -187,7 +182,10 @@ export function renderAuthorsSection(
 ): { output: string; authorEmailGroups: string[][] } {
   const registry = ctx.authorRegistry;
   if (!registry || Object.keys(registry.authors).length === 0) {
-    return { output: chalk.dim('  No authors discovered yet. Scan repos first.'), authorEmailGroups: [] };
+    return {
+      output: chalk.dim('  No authors discovered yet. Scan repos first.'),
+      authorEmailGroups: [],
+    };
   }
 
   const merged = mergeAuthorsByName(registry);
@@ -214,7 +212,8 @@ export function renderAuthorsSection(
     lastWasUnassigned = isUnassigned;
 
     const isSelected = selectedIdx !== undefined && rows.length === selectedIdx;
-    const emailHint = author.emails.length > 1 ? chalk.dim(` (${author.emails.length} emails)`) : '';
+    const emailHint =
+      author.emails.length > 1 ? chalk.dim(` (${author.emails.length} emails)`) : '';
 
     rows.push({
       cursor: isSelected ? chalk.cyan('\u25B6') : ' ',
@@ -248,12 +247,13 @@ export function renderAuthorsSection(
   if (prefixes.size > 0) {
     const parts: string[] = [];
     for (const [prefix, info] of [...prefixes.entries()].sort((a, b) => b[1].count - a[1].count)) {
-      const status = info.unassigned > 0
-        ? chalk.yellow(`${info.unassigned} unassigned`)
-        : chalk.green('all assigned');
+      const status =
+        info.unassigned > 0
+          ? chalk.yellow(`${info.unassigned} unassigned`)
+          : chalk.green('all assigned');
       parts.push(`${chalk.cyan(prefix)}: ${info.count} authors (${status})`);
     }
-    prefixSummary = '\n' + chalk.dim('  Identifier prefixes: ') + parts.join(chalk.dim('  \u00b7  '));
+    prefixSummary = `\n${chalk.dim('  Identifier prefixes: ')}${parts.join(chalk.dim('  \u00b7  '))}`;
   }
 
   const uniqueAuthors = merged.length;
@@ -261,19 +261,20 @@ export function renderAuthorsSection(
   const assigned = merged.filter((a) => !!a.org).length;
   const unassigned = uniqueAuthors - assigned;
 
-  const footer = table + '\n' +
+  const footer =
+    table +
+    '\n' +
     chalk.dim('  ') +
-    chalk.green(`${assigned} assigned`) + chalk.dim('  ') +
-    chalk.yellow(`${unassigned} unassigned`) + chalk.dim(`  (${uniqueAuthors} authors, ${totalEmails} emails)`) +
+    chalk.green(`${assigned} assigned`) +
+    chalk.dim('  ') +
+    chalk.yellow(`${unassigned} unassigned`) +
+    chalk.dim(`  (${uniqueAuthors} authors, ${totalEmails} emails)`) +
     prefixSummary;
 
   return { output: footer, authorEmailGroups };
 }
 
-export function renderGroupsSection(
-  ctx: ViewContext,
-  termCols: number,
-): string {
+export function renderGroupsSection(ctx: ViewContext, termCols: number): string {
   const groups = ctx.config.groups ?? {};
   const groupNames = Object.keys(groups);
 
@@ -310,10 +311,7 @@ export function renderGroupsSection(
   });
 }
 
-export function renderTagsSection(
-  ctx: ViewContext,
-  termCols: number,
-): string {
+export function renderTagsSection(ctx: ViewContext, termCols: number): string {
   const tags = ctx.config.tags ?? {};
   const tagNames = Object.keys(tags);
 
@@ -361,11 +359,16 @@ export function renderManageTab(
   selectedRepoIdx?: number,
   selectedAuthorIdx?: number,
 ): { repoNames: string[]; authorEmailGroups: string[][] } {
-  const sectionLabel = activeSection === 'repos' ? 'Repositories & Scan State'
-    : activeSection === 'orgs' ? 'Organizations & Teams'
-    : activeSection === 'authors' ? 'Discovered Authors'
-    : activeSection === 'groups' ? 'Repo Groups'
-    : 'Tags';
+  const sectionLabel =
+    activeSection === 'repos'
+      ? 'Repositories & Scan State'
+      : activeSection === 'orgs'
+        ? 'Organizations & Teams'
+        : activeSection === 'authors'
+          ? 'Discovered Authors'
+          : activeSection === 'groups'
+            ? 'Repo Groups'
+            : 'Tags';
 
   console.log(chalk.bold(sectionLabel));
   console.log('');
@@ -390,17 +393,23 @@ export function renderManageTab(
         for (const repo of ctx.config.repos) {
           const name = repo.name ?? repo.path.split('/').pop() ?? repo.path;
           const rs = scanState.repos[name];
-          if (!rs) { neverCount++; continue; }
+          if (!rs) {
+            neverCount++;
+            continue;
+          }
           if (isStale(rs, stalenessMin)) staleCount++;
           else freshCount++;
         }
         console.log('');
         console.log(
           chalk.dim('  ') +
-          chalk.green(`${freshCount} fresh`) + chalk.dim('  ') +
-          chalk.yellow(`${staleCount} stale`) + chalk.dim('  ') +
-          chalk.dim(`${neverCount} never scanned`) + chalk.dim('  ') +
-          chalk.dim(`(${totalRepos} total repos, staleness: ${stalenessMin}m)`),
+            chalk.green(`${freshCount} fresh`) +
+            chalk.dim('  ') +
+            chalk.yellow(`${staleCount} stale`) +
+            chalk.dim('  ') +
+            chalk.dim(`${neverCount} never scanned`) +
+            chalk.dim('  ') +
+            chalk.dim(`(${totalRepos} total repos, staleness: ${stalenessMin}m)`),
         );
       }
       break;

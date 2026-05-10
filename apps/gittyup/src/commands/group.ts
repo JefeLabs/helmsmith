@@ -1,5 +1,5 @@
-import type { Command } from 'commander';
 import chalk from 'chalk';
+import type { Command } from 'commander';
 import { ManifestManager } from '../config/manifest.js';
 
 export function registerGroup(program: Command): void {

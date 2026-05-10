@@ -1,60 +1,58 @@
-import { describe, expect, it } from "vitest";
-import { suggestNext } from "./suggest.js";
+import { describe, expect, it } from 'vitest';
+import { suggestNext } from './suggest.js';
 
-describe("suggestNext", () => {
-  it("returns empty for an unknown slug", () => {
-    const result = suggestNext("nope:does:not:exist");
+describe('suggestNext', () => {
+  it('returns empty for an unknown slug', () => {
+    const result = suggestNext('nope:does:not:exist');
     expect(result).toEqual([]);
   });
 
-  it("scores reverse-dep suggestions at the baseline weight (0.3)", () => {
+  it('scores reverse-dep suggestions at the baseline weight (0.3)', () => {
     // playwright has reverse-deps (e.g. pixelmatch) but isn't wrapped by
     // any workflow that lists it directly — so all signals are
     // consumes-X at 0.3.
-    const result = suggestNext("core:tools:playwright", { limit: 3 });
+    const result = suggestNext('core:tools:playwright', { limit: 3 });
     expect(result.length).toBeGreaterThan(0);
     // Every suggestion is a single-signal consumes-X, so score === 0.3
     for (const s of result) {
       expect(s.score).toBeCloseTo(0.3, 5);
-      expect(s.reason).toBe("consumes-X");
+      expect(s.reason).toBe('consumes-X');
     }
   });
 
-  it("scores workflow-wrapper suggestions at 0.5 above reverse-dep baselines", () => {
+  it('scores workflow-wrapper suggestions at 0.5 above reverse-dep baselines', () => {
     // buttons is referenced by product:greenfield (wraps-X at 0.5) AND
     // by reverse-dep tasks (consumes-X at 0.3). The workflow should
     // sort first.
-    const result = suggestNext("core:frameworks:heroui:components:buttons");
+    const result = suggestNext('core:frameworks:heroui:components:buttons');
     expect(result.length).toBeGreaterThan(1);
-    const workflow = result.find((s) => s.kind === "workflow");
+    const workflow = result.find((s) => s.kind === 'workflow');
     expect(workflow).toBeDefined();
     expect(workflow!.score).toBeGreaterThanOrEqual(0.5);
-    expect(workflow!.reason).toBe("wraps-X");
+    expect(workflow!.reason).toBe('wraps-X');
   });
 
-  it("scores active-workflow positional next at 1.0", () => {
-    const result = suggestNext("core:frameworks:heroui:components:buttons", {
+  it('scores active-workflow positional next at 1.0', () => {
+    const result = suggestNext('core:frameworks:heroui:components:buttons', {
       activeWorkflowState: {
-        workflow: "product:greenfield",
-        currentStep: "buttons",
+        workflow: 'product:greenfield',
+        currentStep: 'buttons',
       },
     });
-    const positional = result.find(
-      (s) => s.reason === "next-in-active-workflow",
-    );
+    const positional = result.find((s) => s.reason === 'next-in-active-workflow');
     expect(positional).toBeDefined();
     expect(positional!.score).toBeCloseTo(1.0, 5);
     // It should sort first (highest score)
     expect(result[0]).toBe(positional);
   });
 
-  it("respects the limit option", () => {
-    const result = suggestNext("product:strategy:scaffold", { limit: 2 });
+  it('respects the limit option', () => {
+    const result = suggestNext('product:strategy:scaffold', { limit: 2 });
     expect(result.length).toBeLessThanOrEqual(2);
   });
 
-  it("sorts by score descending, workflows above commands at score ties", () => {
-    const result = suggestNext("core:frameworks:heroui:components:buttons");
+  it('sorts by score descending, workflows above commands at score ties', () => {
+    const result = suggestNext('core:frameworks:heroui:components:buttons');
     for (let i = 1; i < result.length; i++) {
       const prev = result[i - 1];
       const curr = result[i];
@@ -63,19 +61,19 @@ describe("suggestNext", () => {
       if (prev.score !== curr.score) {
         expect(prev.score).toBeGreaterThan(curr.score);
       } else if (prev.kind !== curr.kind) {
-        expect(prev.kind).toBe("workflow");
-        expect(curr.kind).toBe("command");
+        expect(prev.kind).toBe('workflow');
+        expect(curr.kind).toBe('command');
       } else {
         expect(prev.slug.localeCompare(curr.slug)).toBeLessThanOrEqual(0);
       }
     }
   });
 
-  it("clamps score to [0, 1] when multiple signals fire", () => {
-    const result = suggestNext("core:frameworks:heroui:components:buttons", {
+  it('clamps score to [0, 1] when multiple signals fire', () => {
+    const result = suggestNext('core:frameworks:heroui:components:buttons', {
       activeWorkflowState: {
-        workflow: "product:greenfield",
-        currentStep: "buttons",
+        workflow: 'product:greenfield',
+        currentStep: 'buttons',
       },
     });
     for (const s of result) {

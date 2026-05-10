@@ -1,13 +1,13 @@
 import type { TaskNode } from '../config/schema.js';
-import type { ScoredResult, ScoringProvider, ScoreBreakdown } from './types.js';
-import { DEFAULT_WEIGHTS } from './types.js';
 import {
-  analyzeScopeBreadth,
-  analyzeTechnicalDepth,
-  analyzeDependencyCount,
   analyzeAmbiguity,
   analyzeCrossCutting,
+  analyzeDependencyCount,
+  analyzeScopeBreadth,
+  analyzeTechnicalDepth,
 } from './dimensions.js';
+import type { ScoreBreakdown, ScoredResult, ScoringProvider } from './types.js';
+import { DEFAULT_WEIGHTS } from './types.js';
 
 /**
  * Determine the complexity label from a 1-10 score.

@@ -16,26 +16,17 @@
  * the default file.
  */
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
-import { ThemeContext, type ThemeContextValue } from "./context.tsx";
-import {
-  agentxThemeDir,
-  loadAgentxTheme,
-  persistAgentxTheme,
-  watchAgentxTheme,
-} from "./agentx.ts";
-import { applyOverrideFile } from "./base16.ts";
-import { builtInThemes, defaultThemeName } from "./themes/index.ts";
-import type { Theme, ThemeAppearance } from "./types.ts";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { agentxThemeDir, loadAgentxTheme, persistAgentxTheme, watchAgentxTheme } from './agentx.ts';
+import { ThemeContext, type ThemeContextValue } from './context.tsx';
+import { builtInThemes, defaultThemeName } from './themes/index.ts';
+import type { Theme, ThemeAppearance } from './types.ts';
 
 export interface AgentxThemeProviderProps {
-  children: ReactNode;
+  /** React children. Marked optional so consumers can use either JSX
+   *  (`<AgentxThemeProvider>{...}</AgentxThemeProvider>`) or createElement
+   *  with the third-arg children form. */
+  children?: ReactNode;
 
   /** App identifier — drives the per-app override filename. */
   appName?: string;
@@ -81,9 +72,8 @@ export function AgentxThemeProvider({
   // Hot reload
   useEffect(() => {
     if (!watch) return;
-    return watchAgentxTheme(
-      { appName, fallback, themeDir: dir },
-      ({ theme: next }) => setResolved(next),
+    return watchAgentxTheme({ appName, fallback, themeDir: dir }, ({ theme: next }) =>
+      setResolved(next),
     );
   }, [watch, appName, dir, fallback]);
 
@@ -117,7 +107,7 @@ export function AgentxThemeProvider({
   }, [themes, resolved.name, setTheme]);
 
   const toggleAppearance = useCallback(() => {
-    const target: ThemeAppearance = resolved.appearance === "dark" ? "light" : "dark";
+    const target: ThemeAppearance = resolved.appearance === 'dark' ? 'light' : 'dark';
     const candidate = Object.values(themes).find((t) => t.appearance === target);
     if (candidate) setTheme(candidate.name);
   }, [themes, resolved.appearance, setTheme]);
@@ -134,7 +124,5 @@ export function AgentxThemeProvider({
     [resolved, themes, setTheme, cycleTheme, toggleAppearance],
   );
 
-  return (
-    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
-  );
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

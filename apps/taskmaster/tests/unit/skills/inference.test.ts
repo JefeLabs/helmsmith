@@ -1,6 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { TaskNode } from '../../../src/config/schema.js';
-import type { ProjectConfig } from '../../../src/config/schema.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ProjectConfig, TaskNode } from '../../../src/config/schema.js';
 
 // Mock the auth modules before importing inference
 vi.mock('../../../src/auth/call-ai.js', () => ({
@@ -8,17 +7,17 @@ vi.mock('../../../src/auth/call-ai.js', () => ({
   resolveActiveAuth: vi.fn(),
 }));
 
+import { callAI, resolveActiveAuth } from '../../../src/auth/call-ai.js';
 import {
-  getEffectiveVocabulary,
-  inferSkillsByKeyword,
   buildSkillInferencePrompt,
-  parseSkillInferenceResponse,
-  inferSkillsForTask,
+  getEffectiveVocabulary,
   inferSkills,
+  inferSkillsByKeyword,
+  inferSkillsForTask,
   inheritSkills,
+  parseSkillInferenceResponse,
 } from '../../../src/skills/inference.js';
 import { BUILT_IN_SKILLS } from '../../../src/skills/types.js';
-import { callAI, resolveActiveAuth } from '../../../src/auth/call-ai.js';
 
 const mockedCallAI = vi.mocked(callAI);
 const mockedResolveActiveAuth = vi.mocked(resolveActiveAuth);

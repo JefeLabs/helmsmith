@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import { detectFormat, parsePlan } from '../../../src/parser/index.js';
 import type { ParseOptions } from '../../../src/parser/types.js';
 

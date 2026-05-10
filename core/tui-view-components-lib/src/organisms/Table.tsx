@@ -63,19 +63,19 @@
 
 import {
   memo,
+  type ReactNode,
+  type Ref,
   useCallback,
   useEffect,
   useImperativeHandle,
   useMemo,
   useState,
-  type ReactNode,
-  type Ref,
-} from "react";
-import { Box } from "../atoms/Box.tsx";
-import { Text } from "../atoms/Text.tsx";
-import { useThemeTokens } from "../theme/hooks.ts";
-import { useKeybinding } from "../keyboard/registry.ts";
-import { useFocus } from "../focus/manager.tsx";
+} from 'react';
+import { Box } from '../atoms/Box.tsx';
+import { Text } from '../atoms/Text.tsx';
+import { useFocus } from '../focus/manager.tsx';
+import { useKeybinding } from '../keyboard/registry.ts';
+import { useThemeTokens } from '../theme/hooks.ts';
 
 export interface TableColumn<T> {
   /** Field id. Used as React key per cell + as the property accessor
@@ -86,7 +86,7 @@ export interface TableColumn<T> {
   /** Fixed column width in characters. */
   width: number;
   /** Alignment of the cell content. Default: "left". */
-  align?: "left" | "center" | "right";
+  align?: 'left' | 'center' | 'right';
   /** Custom cell renderer. Defaults to `String(row[key])`. */
   render?: (row: T, rowIndex: number) => ReactNode;
   /** Long-form description shown in `<TableHelp>`. Authoring this
@@ -148,11 +148,11 @@ export type RowKey<T> = keyof T | ((row: T) => string);
  *                under the cursor changes when other rows move past.
  */
 export type TableReorderStrategy<T> =
-  | { mode: "stable" }
+  | { mode: 'stable' }
   | {
-      mode: "sort";
+      mode: 'sort';
       compare: (a: T, b: T) => number;
-      cursorFollow?: "row" | "index";
+      cursorFollow?: 'row' | 'index';
     };
 
 export interface TableProps<T> {
@@ -187,7 +187,7 @@ export interface TableProps<T> {
    *  the table showing the focused row. */
   renderDetail?: (row: T, index: number) => ReactNode;
   /** Layout for the detail pane. Default: "right". */
-  detailPosition?: "right" | "bottom";
+  detailPosition?: 'right' | 'bottom';
 
   /** Stable id for the focus manager. Default: "table". */
   focusId?: string;
@@ -205,29 +205,25 @@ export interface TableProps<T> {
 }
 
 const ALIGN_TO_FLEX = {
-  left: "flex-start",
-  center: "center",
-  right: "flex-end",
+  left: 'flex-start',
+  center: 'center',
+  right: 'flex-end',
 } as const;
 
-function resolveCell<T>(
-  row: T,
-  rowIndex: number,
-  col: TableColumn<T>,
-): ReactNode {
+function resolveCell<T>(row: T, rowIndex: number, col: TableColumn<T>): ReactNode {
   if (col.render) return col.render(row, rowIndex);
   const value = (row as Record<string, unknown>)[col.key];
-  if (value === null || value === undefined) return "";
+  if (value === null || value === undefined) return '';
   return String(value);
 }
 
 function makeKeyOf<T>(rowKey: RowKey<T>): (row: T) => string {
-  if (typeof rowKey === "function") return rowKey;
+  if (typeof rowKey === 'function') return rowKey;
   return (row: T) => String((row as Record<string, unknown>)[rowKey as string]);
 }
 
-function toKeySet(input: string | string[] | undefined): Set<string> | "all" {
-  if (input === undefined) return "all";
+function toKeySet(input: string | string[] | undefined): Set<string> | 'all' {
+  if (input === undefined) return 'all';
   return new Set(Array.isArray(input) ? input : [input]);
 }
 
@@ -237,27 +233,27 @@ function toKeySet(input: string | string[] | undefined): Set<string> | "all" {
 
 function Cell({
   width,
-  align = "left",
+  align = 'left',
   children,
   bold = false,
   variant,
 }: {
   width: number;
-  align?: "left" | "center" | "right";
+  align?: 'left' | 'center' | 'right';
   children: ReactNode;
   bold?: boolean;
-  variant?: "muted" | "subtle" | "accent" | "body";
+  variant?: 'muted' | 'subtle' | 'accent' | 'body';
 }) {
   return (
     <Box
       variant="transparent"
       style={{
         width,
-        flexDirection: "row",
+        flexDirection: 'row',
         justifyContent: ALIGN_TO_FLEX[align],
       }}
     >
-      <Text variant={variant ?? "body"} preset={bold ? "label" : undefined}>
+      <Text variant={variant ?? 'body'} preset={bold ? 'label' : undefined}>
         {children}
       </Text>
     </Box>
@@ -272,27 +268,21 @@ interface RowProps<T> {
   pinned?: boolean;
 }
 
-function RowImpl<T>({
-  row,
-  index,
-  columns,
-  highlighted,
-  pinned,
-}: RowProps<T>) {
+function RowImpl<T>({ row, index, columns, highlighted, pinned }: RowProps<T>) {
   const cursorMarkerWidth = 2;
   return (
     <Box
-      variant={highlighted ? "panel" : "transparent"}
+      variant={highlighted ? 'panel' : 'transparent'}
       style={{
-        flexDirection: "row",
+        flexDirection: 'row',
         gap: 1,
         paddingLeft: 1,
         paddingRight: 1,
       }}
     >
       <Box variant="transparent" style={{ width: cursorMarkerWidth }}>
-        <Text variant={highlighted ? "accent" : "subtle"}>
-          {highlighted ? "▸" : pinned ? "•" : " "}
+        <Text variant={highlighted ? 'accent' : 'subtle'}>
+          {highlighted ? '▸' : pinned ? '•' : ' '}
         </Text>
       </Box>
       {columns.map((col) => (
@@ -300,7 +290,7 @@ function RowImpl<T>({
           key={col.key}
           width={col.width}
           align={col.align}
-          variant={highlighted ? "accent" : pinned ? "muted" : "body"}
+          variant={highlighted ? 'accent' : pinned ? 'muted' : 'body'}
         >
           {resolveCell(row, index, col)}
         </Cell>
@@ -332,18 +322,16 @@ function SkeletonRowImpl<T>({ columns, highlighted }: SkeletonRowProps<T>) {
   const cursorMarkerWidth = 2;
   return (
     <Box
-      variant={highlighted ? "panel" : "transparent"}
+      variant={highlighted ? 'panel' : 'transparent'}
       style={{
-        flexDirection: "row",
+        flexDirection: 'row',
         gap: 1,
         paddingLeft: 1,
         paddingRight: 1,
       }}
     >
       <Box variant="transparent" style={{ width: cursorMarkerWidth }}>
-        <Text variant={highlighted ? "accent" : "subtle"}>
-          {highlighted ? "▸" : " "}
-        </Text>
+        <Text variant={highlighted ? 'accent' : 'subtle'}>{highlighted ? '▸' : ' '}</Text>
       </Box>
       {columns.map((col) => {
         // Bar of dim chars at ~70% of the column width feels less
@@ -351,7 +339,7 @@ function SkeletonRowImpl<T>({ columns, highlighted }: SkeletonRowProps<T>) {
         const barWidth = Math.max(2, Math.floor(col.width * 0.7));
         return (
           <Cell key={col.key} width={col.width} align="left" variant="subtle">
-            {"━".repeat(barWidth)}
+            {'━'.repeat(barWidth)}
           </Cell>
         );
       })}
@@ -369,11 +357,11 @@ function HeaderRowImpl<T>({ columns }: { columns: TableColumn<T>[] }) {
   const theme = useThemeTokens();
   const cursorMarkerWidth = 2;
   return (
-    <Box variant="transparent" style={{ flexDirection: "column" }}>
+    <Box variant="transparent" style={{ flexDirection: 'column' }}>
       <Box
         variant="transparent"
         style={{
-          flexDirection: "row",
+          flexDirection: 'row',
           gap: 1,
           paddingLeft: 1,
           paddingRight: 1,
@@ -388,13 +376,9 @@ function HeaderRowImpl<T>({ columns }: { columns: TableColumn<T>[] }) {
           </Cell>
         ))}
       </Box>
-      <Box variant="transparent" style={{ flexDirection: "row" }}>
+      <Box variant="transparent" style={{ flexDirection: 'row' }}>
         <Text color={theme.colors.border}>
-          {"─".repeat(
-            cursorMarkerWidth +
-              2 +
-              columns.reduce((sum, c) => sum + c.width + 1, 0),
-          )}
+          {'─'.repeat(cursorMarkerWidth + 2 + columns.reduce((sum, c) => sum + c.width + 1, 0))}
         </Text>
       </Box>
     </Box>
@@ -420,8 +404,8 @@ export function Table<T>({
   onSelect,
   onCancel,
   renderDetail,
-  detailPosition = "right",
-  focusId = "table",
+  detailPosition = 'right',
+  focusId = 'table',
   alwaysCapture = false,
   initialIndex = 0,
   value,
@@ -544,7 +528,7 @@ export function Table<T>({
       },
       clearLoading(keyOrKeys) {
         const targets = toKeySet(keyOrKeys);
-        if (targets === "all") {
+        if (targets === 'all') {
           setLoadingKeys((prev) => (prev.size === 0 ? prev : new Set()));
           return;
         }
@@ -572,7 +556,7 @@ export function Table<T>({
   // order when stable). Re-evaluated on every rowMap change.
   const orderedKeys = useMemo(() => {
     const keys = Array.from(rowMap.keys());
-    if (!reorder || reorder.mode === "stable") return keys;
+    if (!reorder || reorder.mode === 'stable') return keys;
     return [...keys].sort((a, b) => {
       const ra = rowMap.get(a);
       const rb = rowMap.get(b);
@@ -581,10 +565,7 @@ export function Table<T>({
     });
   }, [rowMap, reorder]);
 
-  const orderedRows = useMemo(
-    () => orderedKeys.map((k) => rowMap.get(k)!),
-    [orderedKeys, rowMap],
-  );
+  const orderedRows = useMemo(() => orderedKeys.map((k) => rowMap.get(k)!), [orderedKeys, rowMap]);
 
   const bodyStart = pinFirstRow ? 1 : 0;
   const navigableKeys = orderedKeys.slice(bodyStart);
@@ -595,13 +576,10 @@ export function Table<T>({
   // key (default) by re-resolving its index, OR stays at the index
   // (cursorFollow === "index") by leaving internalIdx unchanged.
   const cursorFollow =
-    reorder && reorder.mode === "sort" ? reorder.cursorFollow ?? "row" : "index";
+    reorder && reorder.mode === 'sort' ? (reorder.cursorFollow ?? 'row') : 'index';
 
   const [internalIdx, setInternalIdx] = useState(
-    Math.max(
-      0,
-      Math.min(initialIndex - bodyStart, Math.max(navigableRows.length - 1, 0)),
-    ),
+    Math.max(0, Math.min(initialIndex - bodyStart, Math.max(navigableRows.length - 1, 0))),
   );
   const [anchoredKey, setAnchoredKey] = useState<string | null>(
     () => navigableKeys[internalIdx] ?? null,
@@ -619,7 +597,7 @@ export function Table<T>({
   //   "index" — leave internalIdx alone; clamp if out of range.
   useEffect(() => {
     if (navigableKeys.length === 0) return;
-    if (cursorFollow === "row" && anchoredKey) {
+    if (cursorFollow === 'row' && anchoredKey) {
       const newIdx = navigableKeys.indexOf(anchoredKey);
       if (newIdx >= 0 && newIdx !== idx) {
         setInternalIdx(newIdx);
@@ -637,7 +615,7 @@ export function Table<T>({
       setAnchoredKey(currKey);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigableKeys, cursorFollow]);
+  }, [navigableKeys, cursorFollow, idx, anchoredKey]);
 
   const move = useCallback(
     (delta: 1 | -1) => {
@@ -653,22 +631,22 @@ export function Table<T>({
   );
 
   const enabled = selectable && (isFocused || alwaysCapture);
-  useKeybinding("up", "navigate", () => move(-1), { enabled, hidden: true });
-  useKeybinding("down", "navigate", () => move(1), { enabled, hidden: true });
-  useKeybinding("k", "navigate", () => move(-1), { enabled, hidden: true });
-  useKeybinding("j", "navigate", () => move(1), { enabled, hidden: true });
+  useKeybinding('up', 'navigate', () => move(-1), { enabled, hidden: true });
+  useKeybinding('down', 'navigate', () => move(1), { enabled, hidden: true });
+  useKeybinding('k', 'navigate', () => move(-1), { enabled, hidden: true });
+  useKeybinding('j', 'navigate', () => move(1), { enabled, hidden: true });
   useKeybinding(
-    (k) => k.name === "return" || k.name === "enter",
-    "select",
+    (k) => k.name === 'return' || k.name === 'enter',
+    'select',
     () => {
       const row = navigableRows[idx];
       if (row !== undefined) onSelect?.(row, idx + bodyStart);
     },
-    { enabled, keyDisplay: "↵" },
+    { enabled, keyDisplay: '↵' },
   );
-  useKeybinding("escape", "cancel", () => onCancel?.(), {
+  useKeybinding('escape', 'cancel', () => onCancel?.(), {
     enabled: enabled && Boolean(onCancel),
-    keyDisplay: "esc",
+    keyDisplay: 'esc',
   });
 
   const focusedRow = useMemo(
@@ -679,13 +657,7 @@ export function Table<T>({
   // Render
   const renderBodyRow = (row: T, key: string, i: number) => {
     if (loadingKeys.has(key)) {
-      return (
-        <SkeletonRow
-          key={key}
-          columns={columns}
-          highlighted={selectable && i === idx}
-        />
-      );
+      return <SkeletonRow key={key} columns={columns} highlighted={selectable && i === idx} />;
     }
     return (
       <Row
@@ -699,48 +671,31 @@ export function Table<T>({
   };
 
   const tableContent = (
-    <Box
-      variant="transparent"
-      style={{ flexDirection: "column", gap: 0, ...style }}
-    >
+    <Box variant="transparent" style={{ flexDirection: 'column', gap: 0, ...style }}>
       {pinHeader ? <HeaderRow columns={columns} /> : null}
 
       {pinFirstRow && orderedRows.length > 0 ? (
         loadingKeys.has(orderedKeys[0]!) ? (
           <SkeletonRow key={orderedKeys[0]} columns={columns} />
         ) : (
-          <Row
-            key={orderedKeys[0]!}
-            row={orderedRows[0]!}
-            index={0}
-            columns={columns}
-            pinned
-          />
+          <Row key={orderedKeys[0]!} row={orderedRows[0]!} index={0} columns={columns} pinned />
         )
       ) : null}
 
-      <Box variant="transparent" style={{ flexDirection: "column" }}>
-        {navigableRows.map((row, i) =>
-          renderBodyRow(row, navigableKeys[i]!, i),
-        )}
+      <Box variant="transparent" style={{ flexDirection: 'column' }}>
+        {navigableRows.map((row, i) => renderBodyRow(row, navigableKeys[i]!, i))}
 
-        {/* Synthetic skeleton placeholders for "loading more" UX. */}
+        {/* Synthetic skeleton placeholders for "loading more" UX.
+         *  Index keys are correct here — placeholders have no identity,
+         *  so React reusing slot N across renders is desirable. */}
         {Array.from({ length: placeholderCount }).map((_, i) => (
-          <SkeletonRow
-            key={`__skel_${i}`}
-            columns={columns}
-          />
+          // biome-ignore lint/suspicious/noArrayIndexKey: placeholders intentionally indexed
+          <SkeletonRow key={`__skel_${i}`} columns={columns} />
         ))}
       </Box>
 
       {footerRow ? (
-        <Row
-          key="__footer__"
-          row={footerRow}
-          index={orderedRows.length}
-          columns={columns}
-          pinned
-        />
+        <Row key="__footer__" row={footerRow} index={orderedRows.length} columns={columns} pinned />
       ) : null}
     </Box>
   );
@@ -748,7 +703,7 @@ export function Table<T>({
   if (!renderDetail || !selectable) return tableContent;
 
   const detailPane = focusedRow ? (
-    <Box variant="panel" padding="md" style={{ flexDirection: "column" }}>
+    <Box variant="panel" padding="md" style={{ flexDirection: 'column' }}>
       {renderDetail(focusedRow, idx + bodyStart)}
     </Box>
   ) : null;
@@ -757,7 +712,7 @@ export function Table<T>({
     <Box
       variant="transparent"
       style={{
-        flexDirection: detailPosition === "bottom" ? "column" : "row",
+        flexDirection: detailPosition === 'bottom' ? 'column' : 'row',
         gap: 1,
       }}
     >

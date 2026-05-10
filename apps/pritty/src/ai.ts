@@ -8,24 +8,13 @@
  * way (Copilot uses authPath; the others use API keys).
  */
 
-import {
-  ClaudeSdkAdapter,
-  CopilotChatAdapter,
-  OpenAiChatAdapter,
-} from "@ecruz165/agent-adapter";
-import type {
-  Credential,
-  CredentialBroker,
-  Provider,
-} from "@ecruz165/agent-auth";
-import { getAuthPath, readAuth } from "./auth.js";
-import type { CategorizedFiles } from "./categorizer.js";
-import type { Config } from "./config.js";
-import {
-  type PullRequestTemplate,
-  templatePromptGuidance,
-} from "./pr-template.js";
-import { ticketPromptGuidance } from "./ticket.js";
+import { ClaudeSdkAdapter, CopilotChatAdapter, OpenAiChatAdapter } from '@ecruz165/agent-adapter';
+import type { Credential, CredentialBroker, Provider } from '@ecruz165/agent-auth';
+import { getAuthPath, readAuth } from './auth.js';
+import type { CategorizedFiles } from './categorizer.js';
+import type { Config } from './config.js';
+import { type PullRequestTemplate, templatePromptGuidance } from './pr-template.js';
+import { ticketPromptGuidance } from './ticket.js';
 
 /** Anthropic / OpenAI adapters expect a CredentialBroker; this is
  *  the env-var-only variant pritty uses for those two providers. */
@@ -34,11 +23,9 @@ class EnvBroker implements CredentialBroker {
   async getCredential(provider: Provider): Promise<Credential> {
     const apiKey = process.env[this.envVarName];
     if (!apiKey) {
-      throw new Error(
-        `${this.envVarName} not set; required for provider "${provider}"`,
-      );
+      throw new Error(`${this.envVarName} not set; required for provider "${provider}"`);
     }
-    return { provider, apiKey, source: "env" };
+    return { provider, apiKey, source: 'env' };
   }
 }
 
@@ -66,26 +53,26 @@ export interface CommitMessage {
  * fallbacks and decides what to do when nothing works.
  */
 async function tryBuildProvider(
-  name: Config["provider"],
+  name: Config['provider'],
   config: Config,
 ): Promise<ChatAdapter | null> {
   switch (name) {
-    case "copilot": {
+    case 'copilot': {
       const auth = await readAuth();
-      if (!auth.providers["github-copilot"]?.apiKey) return null;
+      if (!auth.providers['github-copilot']?.apiKey) return null;
       return new CopilotChatAdapter({
         authPath: getAuthPath(),
         model: config.model,
       });
     }
-    case "anthropic": {
+    case 'anthropic': {
       if (!process.env[config.anthropicKeyEnv]) return null;
       return new ClaudeSdkAdapter({
         broker: new EnvBroker(config.anthropicKeyEnv),
         model: config.model,
       });
     }
-    case "openai": {
+    case 'openai': {
       if (!process.env[config.openaiKeyEnv]) return null;
       return new OpenAiChatAdapter({
         broker: new EnvBroker(config.openaiKeyEnv),
@@ -119,12 +106,12 @@ export async function buildAdapter(config: Config): Promise<ChatAdapter> {
   const dedupedTried = [...new Set(tried)];
   throw new Error(
     [
-      `No AI provider available. Tried: ${dedupedTried.join(", ")}.`,
-      "Configure one:",
+      `No AI provider available. Tried: ${dedupedTried.join(', ')}.`,
+      'Configure one:',
       `  copilot:    pritty auth login`,
       `  anthropic:  set ${config.anthropicKeyEnv}`,
       `  openai:     set ${config.openaiKeyEnv}`,
-    ].join("\n"),
+    ].join('\n'),
   );
 }
 
@@ -139,15 +126,14 @@ function unwrapJson(raw: string): string {
   return raw.trim();
 }
 
-const COMMIT_STYLE_GUIDES: Record<Config["commitStyle"], string> = {
+const COMMIT_STYLE_GUIDES: Record<Config['commitStyle'], string> = {
   conventional:
-    "Format: `<type>(<scope>): <subject>` where type is one of feat|fix|refactor|test|docs|chore|build|ci|perf|style and scope is the affected area in lowercase. Subject is imperative mood, lowercase, no trailing period, max 70 chars.",
+    'Format: `<type>(<scope>): <subject>` where type is one of feat|fix|refactor|test|docs|chore|build|ci|perf|style and scope is the affected area in lowercase. Subject is imperative mood, lowercase, no trailing period, max 70 chars.',
   gitmoji:
-    "Format: `<emoji> <type>: <subject>`. Use ✨ for feat, 🐛 for fix, ♻️ for refactor, ✅ for test, 📝 for docs, 🧹 for chore.",
+    'Format: `<emoji> <type>: <subject>`. Use ✨ for feat, 🐛 for fix, ♻️ for refactor, ✅ for test, 📝 for docs, 🧹 for chore.',
   angular:
-    "Format: `<type>(<scope>): <subject>` per the Angular commit guidelines. Body explains WHY, not what.",
-  simple:
-    "One short imperative sentence describing the change. No prefix, no scope. Max 70 chars.",
+    'Format: `<type>(<scope>): <subject>` per the Angular commit guidelines. Body explains WHY, not what.',
+  simple: 'One short imperative sentence describing the change. No prefix, no scope. Max 70 chars.',
 };
 
 /**
@@ -171,32 +157,34 @@ export async function generateCommitMessages(
   if (nonEmpty.length === 0) return [];
 
   const filesByCategory = nonEmpty
-    .map(([cat, files]) => `## ${cat}\n${files.map((f) => `  - ${f}`).join("\n")}`)
-    .join("\n\n");
+    .map(([cat, files]) => `## ${cat}\n${files.map((f) => `  - ${f}`).join('\n')}`)
+    .join('\n\n');
 
   const styleGuide = COMMIT_STYLE_GUIDES[config.commitStyle];
 
   const ticketGuidance = ticket
     ? ticketPromptGuidance(ticket.ticket, ticket.link, ticket.title)
-    : "";
+    : '';
 
   const system = [
-    "You are an expert engineer writing git commit messages for a developer.",
+    'You are an expert engineer writing git commit messages for a developer.',
     `Produce one commit message per file category. ${styleGuide}`,
-    "Return strict JSON: an array of objects with keys `category`, `message`, `body` (optional), `files` (the input files for that category).",
-    "Do not wrap the output in markdown code fences. Do not include any prose before or after the JSON.",
+    'Return strict JSON: an array of objects with keys `category`, `message`, `body` (optional), `files` (the input files for that category).',
+    'Do not wrap the output in markdown code fences. Do not include any prose before or after the JSON.',
     ticketGuidance,
-  ].filter((s) => s.length > 0).join("\n");
+  ]
+    .filter((s) => s.length > 0)
+    .join('\n');
 
   const user = [
-    "Here are the categorized files:",
+    'Here are the categorized files:',
     filesByCategory,
-    "",
-    "Here is the staged diff:",
-    "```diff",
+    '',
+    'Here is the staged diff:',
+    '```diff',
     diff.length > 12000 ? `${diff.slice(0, 12000)}\n... (truncated)` : diff,
-    "```",
-  ].join("\n");
+    '```',
+  ].join('\n');
 
   const raw = await adapter.invoke({ system, user });
   const cleaned = unwrapJson(raw);
@@ -241,18 +229,16 @@ export async function generatePR(
   template?: PullRequestTemplate | null,
 ): Promise<PRDraft> {
   if (commits.length === 0) {
-    throw new Error("No commits between base and head — nothing to PR.");
+    throw new Error('No commits between base and head — nothing to PR.');
   }
 
   const adapter = await buildAdapter(config);
 
-  const commitList = commits
-    .map((c) => `  - ${c.hash.slice(0, 7)}  ${c.subject}`)
-    .join("\n");
+  const commitList = commits.map((c) => `  - ${c.hash.slice(0, 7)}  ${c.subject}`).join('\n');
 
   const ticketGuidance = ticket
     ? ticketPromptGuidance(ticket.ticket, ticket.link, ticket.title)
-    : "";
+    : '';
   const templateGuidance = templatePromptGuidance(template ?? null);
 
   // When the repo provides a PR template, defer to it for the body
@@ -260,26 +246,28 @@ export async function generatePR(
   // template's headings + checkboxes are what the team has agreed on;
   // we just fill them in.
   const bodyInstruction = template
-    ? "Body: markdown. Use the PR template provided below as the structure — keep its headings, fill its sections."
-    : "Body: markdown. Open with a one-paragraph summary of the change. Add a `## Why` section explaining motivation. Add a `## Test plan` checklist when there are non-trivial code changes.";
+    ? 'Body: markdown. Use the PR template provided below as the structure — keep its headings, fill its sections.'
+    : 'Body: markdown. Open with a one-paragraph summary of the change. Add a `## Why` section explaining motivation. Add a `## Test plan` checklist when there are non-trivial code changes.';
 
   const system = [
-    "You are an expert engineer writing a pull-request description.",
-    "Return strict JSON: { title: string, body: string, labels: string[] }.",
-    "Title: short imperative summary, max 70 chars, no trailing period.",
+    'You are an expert engineer writing a pull-request description.',
+    'Return strict JSON: { title: string, body: string, labels: string[] }.',
+    'Title: short imperative summary, max 70 chars, no trailing period.',
     bodyInstruction,
-    "Labels: lowercase, kebab-case, derived from commit types when present (feat → enhancement; fix → bug; docs → documentation; refactor → refactor; test → testing). Empty array is fine.",
-    "Do not wrap output in markdown code fences. Do not include any prose outside the JSON.",
+    'Labels: lowercase, kebab-case, derived from commit types when present (feat → enhancement; fix → bug; docs → documentation; refactor → refactor; test → testing). Empty array is fine.',
+    'Do not wrap output in markdown code fences. Do not include any prose outside the JSON.',
     ticketGuidance,
     templateGuidance,
-  ].filter((s) => s.length > 0).join("\n");
+  ]
+    .filter((s) => s.length > 0)
+    .join('\n');
 
   const user = [
     `Repository: ${meta.owner}/${meta.repo}`,
     `Branch: ${meta.branch} → ${meta.base}`,
     `Commits (${commits.length}):`,
     commitList,
-  ].join("\n");
+  ].join('\n');
 
   const raw = await adapter.invoke({ system, user });
   const cleaned = unwrapJson(raw);
@@ -303,7 +291,7 @@ export async function generatePR(
   };
 }
 
-export type RebaseAction = "pick" | "reword" | "squash" | "fixup" | "drop";
+export type RebaseAction = 'pick' | 'reword' | 'squash' | 'fixup' | 'drop';
 
 export interface RebaseStep {
   hash: string;
@@ -322,15 +310,14 @@ export interface RebasePlan {
   summary: string;
 }
 
-const REBASE_STRATEGY_GUIDES: Record<Config["rebaseStrategy"], string> = {
+const REBASE_STRATEGY_GUIDES: Record<Config['rebaseStrategy'], string> = {
   interactive:
-    "Propose a clean history. Combine WIP / fixup commits into their parents (fixup), squash closely related commits (squash with a new message), reword unclear messages (reword), drop trivial revert-undo commits when safe (drop). Default action is `pick` (keep as-is).",
+    'Propose a clean history. Combine WIP / fixup commits into their parents (fixup), squash closely related commits (squash with a new message), reword unclear messages (reword), drop trivial revert-undo commits when safe (drop). Default action is `pick` (keep as-is).',
   squash:
-    "Squash ALL commits into a single commit. First step is `pick`; every subsequent step is `squash`. Provide a clean combined `message` on the first step that summarizes the whole change.",
+    'Squash ALL commits into a single commit. First step is `pick`; every subsequent step is `squash`. Provide a clean combined `message` on the first step that summarizes the whole change.',
   fixup:
     "Absorb WIP / fixup commits into their parents using `fixup`. Keep meaningful commits as `pick` and don't combine independent features. The result should drop noise without changing the logical commit count of real work.",
-  auto:
-    "Decide per commit what's right: `pick` (keep), `squash` (combine with new message), `fixup` (combine, drop message), `reword` (improve message), or `drop` (remove). Aim for a clean, narrative history.",
+  auto: "Decide per commit what's right: `pick` (keep), `squash` (combine with new message), `fixup` (combine, drop message), `reword` (improve message), or `drop` (remove). Aim for a clean, narrative history.",
 };
 
 /**
@@ -348,11 +335,11 @@ const REBASE_STRATEGY_GUIDES: Record<Config["rebaseStrategy"], string> = {
  */
 export async function generateRebasePlan(
   commits: readonly { hash: string; subject: string }[],
-  strategy: Config["rebaseStrategy"],
+  strategy: Config['rebaseStrategy'],
   config: Config,
 ): Promise<RebasePlan> {
   if (commits.length === 0) {
-    throw new Error("No commits to rebase.");
+    throw new Error('No commits to rebase.');
   }
 
   const adapter = await buildAdapter(config);
@@ -363,27 +350,24 @@ export async function generateRebasePlan(
   const ordered = [...commits].reverse();
   const commitList = ordered
     .map((c, i) => `  ${i + 1}. ${c.hash.slice(0, 7)}  ${c.subject}`)
-    .join("\n");
+    .join('\n');
 
   const styleGuide = REBASE_STRATEGY_GUIDES[strategy];
 
   const system = [
-    "You are an expert engineer planning an interactive git rebase.",
+    'You are an expert engineer planning an interactive git rebase.',
     `Strategy: ${strategy}. ${styleGuide}`,
-    "Return strict JSON: { steps: [{ hash, action, message?, rationale? }], summary }.",
-    "  - hash: full SHA from the input list",
-    "  - action: one of pick | reword | squash | fixup | drop",
-    "  - message: required for reword and (when used) the FIRST step of a squash run",
-    "  - rationale: short reason for the action (for human preview only)",
-    "Steps must be in the SAME order as the input (oldest-first). Every input commit must appear exactly once.",
+    'Return strict JSON: { steps: [{ hash, action, message?, rationale? }], summary }.',
+    '  - hash: full SHA from the input list',
+    '  - action: one of pick | reword | squash | fixup | drop',
+    '  - message: required for reword and (when used) the FIRST step of a squash run',
+    '  - rationale: short reason for the action (for human preview only)',
+    'Steps must be in the SAME order as the input (oldest-first). Every input commit must appear exactly once.',
     "First step's action MUST be pick — git rejects squash/fixup with no parent to fold into.",
-    "Do not wrap output in markdown code fences. Do not include any prose outside the JSON.",
-  ].join("\n");
+    'Do not wrap output in markdown code fences. Do not include any prose outside the JSON.',
+  ].join('\n');
 
-  const user = [
-    `Rebase plan needed for ${commits.length} commit(s):`,
-    commitList,
-  ].join("\n");
+  const user = [`Rebase plan needed for ${commits.length} commit(s):`, commitList].join('\n');
 
   const raw = await adapter.invoke({ system, user });
   const cleaned = unwrapJson(raw);
@@ -414,16 +398,16 @@ export async function generateRebasePlan(
       throw new Error(`Plan step ${i + 1} references unknown hash: ${s.hash}`);
     }
     if (
-      s.action !== "pick" &&
-      s.action !== "reword" &&
-      s.action !== "squash" &&
-      s.action !== "fixup" &&
-      s.action !== "drop"
+      s.action !== 'pick' &&
+      s.action !== 'reword' &&
+      s.action !== 'squash' &&
+      s.action !== 'fixup' &&
+      s.action !== 'drop'
     ) {
       throw new Error(`Plan step ${i + 1} has invalid action: ${s.action}`);
     }
   }
-  if (plan.steps[0]!.action !== "pick") {
+  if (plan.steps[0]!.action !== 'pick') {
     throw new Error(
       `Plan's first step must be 'pick' (got '${plan.steps[0]!.action}'). git rebase rejects squash/fixup with no parent.`,
     );
@@ -431,6 +415,6 @@ export async function generateRebasePlan(
 
   return {
     steps: plan.steps as RebaseStep[],
-    summary: typeof plan.summary === "string" ? plan.summary : "",
+    summary: typeof plan.summary === 'string' ? plan.summary : '',
   };
 }

@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
-import type { TaskNode, StateDefinition } from '../../../src/config/schema.js';
+import { describe, expect, it } from 'vitest';
+import { cascadeStatus, executeSetStatus } from '../../../src/commands/set-status.js';
+import type { StateDefinition, TaskNode } from '../../../src/config/schema.js';
 import { STANDARD_PRESET } from '../../../src/config/state-presets.js';
-import { executeSetStatus, cascadeStatus } from '../../../src/commands/set-status.js';
 
 const STATES: StateDefinition[] = [...STANDARD_PRESET];
 
@@ -92,16 +92,16 @@ describe('executeSetStatus', () => {
 
   it('throws for non-existent task', () => {
     const tasks = [makeTask({ id: '1' })];
-    expect(() =>
-      executeSetStatus(tasks, '999', 'done', STATES, false),
-    ).toThrow('Task "999" not found.');
+    expect(() => executeSetStatus(tasks, '999', 'done', STATES, false)).toThrow(
+      'Task "999" not found.',
+    );
   });
 
   it('throws for invalid target state', () => {
     const tasks = [makeTask({ id: '1' })];
-    expect(() =>
-      executeSetStatus(tasks, '1', 'invalid-state', STATES, false),
-    ).toThrow('Invalid target state "invalid-state"');
+    expect(() => executeSetStatus(tasks, '1', 'invalid-state', STATES, false)).toThrow(
+      'Invalid target state "invalid-state"',
+    );
   });
 
   it('force bypasses transition validation', () => {
@@ -167,12 +167,8 @@ describe('executeSetStatus', () => {
 
   it('rejects closed transition when qa-review-needed tag is present', () => {
     const tasks = [makeTask({ id: '1', status: 'review', tags: ['qa-review-needed'] })];
-    expect(() =>
-      executeSetStatus(tasks, '1', 'done', STATES, false),
-    ).toThrow('qa-review-needed');
-    expect(() =>
-      executeSetStatus(tasks, '1', 'done', STATES, false),
-    ).toThrow("qa-clear");
+    expect(() => executeSetStatus(tasks, '1', 'done', STATES, false)).toThrow('qa-review-needed');
+    expect(() => executeSetStatus(tasks, '1', 'done', STATES, false)).toThrow('qa-clear');
   });
 
   it('allows non-closed transition when qa-review-needed tag is present', () => {

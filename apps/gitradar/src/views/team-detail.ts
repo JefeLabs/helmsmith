@@ -1,21 +1,20 @@
 import chalk from 'chalk';
-import type { ViewContext, NavigationAction } from './types.js';
-import type { UserWeekRepoRecord } from '../types/schema.js';
-import { renderBanner } from '../ui/banner.js';
-import { renderAvgOutputChart } from '../ui/avg-output-chart.js';
-import type { AvgOutputBar } from '../ui/avg-output-chart.js';
-import { renderLineChart } from '../ui/line-chart.js';
-import { renderTable } from '../ui/table.js';
-import { renderLegend } from '../ui/legend.js';
-import { renderHotkeyBar } from '../ui/tab-bar.js';
-import { readKey } from '../ui/keypress.js';
-import { stackedBar } from '../ui/bar.js';
 import { rollup } from '../aggregator/engine.js';
-import { filterRecords, getLastNWeeks, computeDeltas } from '../aggregator/filters.js';
-import { computeRunningAvg } from '../aggregator/trends.js';
-import { SEGMENT_DEFS, FILETYPE_COLORS, FILETYPE_CHARS } from '../ui/constants.js';
-import { fmt, weekShort, delta } from '../ui/format.js';
+import { computeDeltas, filterRecords, getLastNWeeks } from '../aggregator/filters.js';
+import type { UserWeekRepoRecord } from '../types/schema.js';
+import type { AvgOutputBar } from '../ui/avg-output-chart.js';
+import { renderAvgOutputChart } from '../ui/avg-output-chart.js';
+import { renderBanner } from '../ui/banner.js';
+import { stackedBar } from '../ui/bar.js';
+import { FILETYPE_CHARS, FILETYPE_COLORS, SEGMENT_DEFS } from '../ui/constants.js';
+import { delta, fmt, weekShort } from '../ui/format.js';
+import { readKey } from '../ui/keypress.js';
+import { renderLegend } from '../ui/legend.js';
+import { renderLineChart } from '../ui/line-chart.js';
+import { renderHotkeyBar } from '../ui/tab-bar.js';
+import { renderTable } from '../ui/table.js';
 import { memberDetailView } from './member-detail.js';
+import type { NavigationAction, ViewContext } from './types.js';
 
 /**
  * Build per-member avg output bars for a team.
@@ -42,10 +41,14 @@ function buildMemberAvgBars(
     for (const r of windowRecords) {
       const ft = r.filetype;
       windowTotal +=
-        ft.app.insertions + ft.app.deletions +
-        ft.test.insertions + ft.test.deletions +
-        ft.config.insertions + ft.config.deletions +
-        ft.storybook.insertions + ft.storybook.deletions;
+        ft.app.insertions +
+        ft.app.deletions +
+        ft.test.insertions +
+        ft.test.deletions +
+        ft.config.insertions +
+        ft.config.deletions +
+        ft.storybook.insertions +
+        ft.storybook.deletions;
     }
     const runningAvg = activeWeeks.size > 0 ? windowTotal / activeWeeks.size : 0;
 
@@ -56,7 +59,10 @@ function buildMemberAvgBars(
         { key: 'app', value: agg.filetype.app.insertions + agg.filetype.app.deletions },
         { key: 'test', value: agg.filetype.test.insertions + agg.filetype.test.deletions },
         { key: 'config', value: agg.filetype.config.insertions + agg.filetype.config.deletions },
-        { key: 'storybook', value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions },
+        {
+          key: 'storybook',
+          value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions,
+        },
         { key: 'doc', value: agg.filetype.doc.insertions + agg.filetype.doc.deletions },
       ],
       total: totalLines,
@@ -90,10 +96,15 @@ function buildMemberActivitySeries(
       const weekMemberRecords = memberRecords.filter((r) => r.week === week);
       let total = 0;
       for (const r of weekMemberRecords) {
-        total += r.filetype.app.insertions + r.filetype.app.deletions +
-          r.filetype.test.insertions + r.filetype.test.deletions +
-          r.filetype.config.insertions + r.filetype.config.deletions +
-          r.filetype.storybook.insertions + r.filetype.storybook.deletions;
+        total +=
+          r.filetype.app.insertions +
+          r.filetype.app.deletions +
+          r.filetype.test.insertions +
+          r.filetype.test.deletions +
+          r.filetype.config.insertions +
+          r.filetype.config.deletions +
+          r.filetype.storybook.insertions +
+          r.filetype.storybook.deletions;
       }
       return total;
     });
@@ -123,7 +134,10 @@ function buildMembersTableData(
   // Get previous week for delta
   const prevWeeks = getLastNWeeks(2, currentWeek);
   const prevWeek = prevWeeks.length >= 2 ? prevWeeks[0] : null;
-  let prevRolled: Map<string, ReturnType<typeof rollup> extends Map<string, infer V> ? V : never> | null = null;
+  let prevRolled: Map<
+    string,
+    ReturnType<typeof rollup> extends Map<string, infer V> ? V : never
+  > | null = null;
   if (prevWeek) {
     const prevRecords = filterRecords(records, { weeks: [prevWeek], team: teamName });
     prevRolled = rollup(prevRecords, (r) => r.member);
@@ -134,7 +148,7 @@ function buildMembersTableData(
     const totalLines = agg.insertions + agg.deletions;
     const prevAgg = prevRolled?.get(member);
     const prevTotal = prevAgg ? prevAgg.insertions + prevAgg.deletions : 0;
-    const deltas = prevAgg ? computeDeltas(agg, prevAgg) : null;
+    const _deltas = prevAgg ? computeDeltas(agg, prevAgg) : null;
 
     rows.push({
       name: member,
@@ -149,12 +163,13 @@ function buildMembersTableData(
         storybook: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions,
         doc: agg.filetype.doc.insertions + agg.filetype.doc.deletions,
       },
-      delta: prevTotal > 0 || totalLines > 0 ? delta(totalLines, prevTotal) : chalk.dim('\u2500 0%'),
+      delta:
+        prevTotal > 0 || totalLines > 0 ? delta(totalLines, prevTotal) : chalk.dim('\u2500 0%'),
     });
   }
 
   // Sort by total lines descending
-  rows.sort((a, b) => (b.insertions + b.deletions) - (a.insertions + a.deletions));
+  rows.sort((a, b) => b.insertions + b.deletions - (a.insertions + a.deletions));
 
   return rows;
 }
@@ -162,11 +177,7 @@ function buildMembersTableData(
 /**
  * Build repos table data for the current week and team.
  */
-function buildReposTableData(
-  records: UserWeekRepoRecord[],
-  teamName: string,
-  currentWeek: string,
-) {
+function buildReposTableData(records: UserWeekRepoRecord[], teamName: string, currentWeek: string) {
   const weekRecords = filterRecords(records, { weeks: [currentWeek], team: teamName });
   const repoRolled = rollup(weekRecords, (r) => r.repo);
 
@@ -178,10 +189,15 @@ function buildReposTableData(
     const memberTotals = new Map<string, number>();
     let repoGroup = '';
     for (const r of repoMemberRecords) {
-      const total = r.filetype.app.insertions + r.filetype.app.deletions +
-        r.filetype.test.insertions + r.filetype.test.deletions +
-        r.filetype.config.insertions + r.filetype.config.deletions +
-        r.filetype.storybook.insertions + r.filetype.storybook.deletions;
+      const total =
+        r.filetype.app.insertions +
+        r.filetype.app.deletions +
+        r.filetype.test.insertions +
+        r.filetype.test.deletions +
+        r.filetype.config.insertions +
+        r.filetype.config.deletions +
+        r.filetype.storybook.insertions +
+        r.filetype.storybook.deletions;
       memberTotals.set(r.member, (memberTotals.get(r.member) ?? 0) + total);
       repoGroup = r.group;
     }
@@ -252,9 +268,7 @@ export async function teamDetailView(
     SEGMENT_DEFS.map((d) => ({ label: d.label, color: d.color, char: d.char })),
     { inline: true },
   );
-  console.log(
-    chalk.bold(`File Type by Member (${weekShort(ctx.currentWeek)})`) + '  ' + legend,
-  );
+  console.log(`${chalk.bold(`File Type by Member (${weekShort(ctx.currentWeek)})`)}  ${legend}`);
   console.log(chalk.dim('  \u25C8 = 3mo avg'));
   console.log('');
 
@@ -269,11 +283,7 @@ export async function teamDetailView(
   console.log('');
 
   // Section 2: Member activity line chart (12 weeks)
-  const { series, xLabels } = buildMemberActivitySeries(
-    ctx.records,
-    teamName,
-    ctx.currentWeek,
-  );
+  const { series, xLabels } = buildMemberActivitySeries(ctx.records, teamName, ctx.currentWeek);
   if (series.length > 0) {
     console.log(chalk.bold('Member Activity (12 weeks)'));
     console.log('');
@@ -296,8 +306,20 @@ export async function teamDetailView(
       columns: [
         { key: 'name', label: 'Name', minWidth: 12 },
         { key: 'commits', label: 'Commits', align: 'right', minWidth: 7 },
-        { key: 'insertions', label: '+Ins', align: 'right', minWidth: 6, format: (v) => chalk.green(fmt(v)) },
-        { key: 'deletions', label: '-Del', align: 'right', minWidth: 6, format: (v) => chalk.red(fmt(v)) },
+        {
+          key: 'insertions',
+          label: '+Ins',
+          align: 'right',
+          minWidth: 6,
+          format: (v) => chalk.green(fmt(v)),
+        },
+        {
+          key: 'deletions',
+          label: '-Del',
+          align: 'right',
+          minWidth: 6,
+          format: (v) => chalk.red(fmt(v)),
+        },
         { key: 'net', label: 'Net', align: 'right', minWidth: 6, format: (v) => fmt(v) },
         {
           key: 'breakdown',
@@ -309,7 +331,11 @@ export async function teamDetailView(
                 { value: v.app, color: FILETYPE_COLORS.app, char: FILETYPE_CHARS.app },
                 { value: v.test, color: FILETYPE_COLORS.test, char: FILETYPE_CHARS.test },
                 { value: v.config, color: FILETYPE_COLORS.config, char: FILETYPE_CHARS.config },
-                { value: v.storybook, color: FILETYPE_COLORS.storybook, char: FILETYPE_CHARS.storybook },
+                {
+                  value: v.storybook,
+                  color: FILETYPE_COLORS.storybook,
+                  char: FILETYPE_CHARS.storybook,
+                },
               ],
               15,
             ),
@@ -331,8 +357,20 @@ export async function teamDetailView(
       columns: [
         { key: 'repo', label: 'Repo', minWidth: 14 },
         { key: 'commits', label: 'Commits', align: 'right', minWidth: 7 },
-        { key: 'insertions', label: '+Ins', align: 'right', minWidth: 6, format: (v) => chalk.green(fmt(v)) },
-        { key: 'deletions', label: '-Del', align: 'right', minWidth: 6, format: (v) => chalk.red(fmt(v)) },
+        {
+          key: 'insertions',
+          label: '+Ins',
+          align: 'right',
+          minWidth: 6,
+          format: (v) => chalk.green(fmt(v)),
+        },
+        {
+          key: 'deletions',
+          label: '-Del',
+          align: 'right',
+          minWidth: 6,
+          format: (v) => chalk.red(fmt(v)),
+        },
         { key: 'topContributor', label: 'Top Contributor', minWidth: 15 },
         { key: 'group', label: 'Group', minWidth: 8 },
       ],

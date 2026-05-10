@@ -1,10 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { ProjectConfig } from '../../../src/config/schema.js';
 import {
-  getConfigValue,
-  validateConfigValue,
   applyConfigValue,
   CONFIG_KEYS,
+  getConfigValue,
+  validateConfigValue,
 } from '../../../src/prompts/config-editor.js';
 
 const sampleConfig: ProjectConfig = {

@@ -1,5 +1,5 @@
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
-import { join, basename, extname } from 'node:path';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { basename, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Handlebars from 'handlebars';
 import { marked } from 'marked';
@@ -8,11 +8,11 @@ import { registerHelpers } from './helpers.js';
 
 // Re-export types
 export type {
-  TaskListContext,
-  TaskDetailContext,
   ComplexityReportContext,
-  ProgressReportContext,
   DependencyGraphContext,
+  ProgressReportContext,
+  TaskDetailContext,
+  TaskListContext,
 } from './types.js';
 
 // --- State ---
@@ -48,7 +48,7 @@ function getBuiltinTemplatesDir(): string {
   }
 
   throw new Error(
-    `Built-in templates directory not found. Searched:\n${candidates.map(c => `  - ${c}`).join('\n')}`,
+    `Built-in templates directory not found. Searched:\n${candidates.map((c) => `  - ${c}`).join('\n')}`,
   );
 }
 
@@ -160,10 +160,7 @@ export function compileTemplate(templateName: string): HandlebarsTemplateDelegat
 /**
  * Render a template to a markdown string.
  */
-export function renderToMarkdown(
-  templateName: string,
-  context: Record<string, unknown>,
-): string {
+export function renderToMarkdown(templateName: string, context: Record<string, unknown>): string {
   const template = compileTemplate(templateName);
   return template(context, {
     allowProtoPropertiesByDefault: true,
@@ -174,10 +171,7 @@ export function renderToMarkdown(
 /**
  * Render a template to ANSI terminal output via marked + marked-terminal.
  */
-export function renderToTerminal(
-  templateName: string,
-  context: Record<string, unknown>,
-): string {
+export function renderToTerminal(templateName: string, context: Record<string, unknown>): string {
   const markdown = renderToMarkdown(templateName, context);
   return markdownToTerminal(markdown);
 }

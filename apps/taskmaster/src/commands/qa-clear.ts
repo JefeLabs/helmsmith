@@ -1,6 +1,6 @@
-import type { TaskNode, StateDefinition, QAFeedbackEntry } from '../config/schema.js';
+import type { QAFeedbackEntry, StateDefinition, TaskNode } from '../config/schema.js';
 import { findTaskById } from '../config/state-engine.js';
-import { recomputeAllReadiness, applyReadiness } from '../readiness/index.js';
+import { applyReadiness, recomputeAllReadiness } from '../readiness/index.js';
 
 export interface QAClearOpts {
   reporter?: string;

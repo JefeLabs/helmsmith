@@ -1,6 +1,6 @@
 import type { TaskNode } from '../config/schema.js';
-import type { BlueprintConcern, ConcernUrgency } from './types.js';
 import { groupByUrgency } from './resolver.js';
+import type { BlueprintConcern, ConcernUrgency } from './types.js';
 
 interface TierConfig {
   title: string;

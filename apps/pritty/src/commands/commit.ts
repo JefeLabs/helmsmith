@@ -1,19 +1,12 @@
-import chalk from "chalk";
-import { confirm, editor } from "@inquirer/prompts";
-import ora from "ora";
-import {
-  generateCommitMessages,
-  type CommitMessage,
-} from "../ai.js";
-import {
-  categorize,
-  mergeCategories,
-  UNKNOWN_CATEGORY,
-} from "../categorizer.js";
-import { loadConfig } from "../config.js";
-import { createGit } from "../git.js";
-import { resolveTicketContext } from "./_shared/ticket-context.js";
-import { splitTitleBody } from "./_shared/format.js";
+import { confirm, editor } from '@inquirer/prompts';
+import chalk from 'chalk';
+import ora from 'ora';
+import { type CommitMessage, generateCommitMessages } from '../ai.js';
+import { categorize, mergeCategories, UNKNOWN_CATEGORY } from '../categorizer.js';
+import { loadConfig } from '../config.js';
+import { createGit } from '../git.js';
+import { splitTitleBody } from './_shared/format.js';
+import { resolveTicketContext } from './_shared/ticket-context.js';
 
 export interface CommitOptions {
   autoApprove?: boolean;
@@ -30,13 +23,9 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
   const config = loadConfig();
   // CLI flags override config
   if (options.commitStyle) {
-    const valid = ["conventional", "gitmoji", "angular", "simple"];
+    const valid = ['conventional', 'gitmoji', 'angular', 'simple'];
     if (!valid.includes(options.commitStyle)) {
-      console.error(
-        chalk.red(
-          `✗ Invalid --commit-style. Valid: ${valid.join(", ")}`,
-        ),
-      );
+      console.error(chalk.red(`✗ Invalid --commit-style. Valid: ${valid.join(', ')}`));
       process.exit(1);
     }
     config.commitStyle = options.commitStyle as typeof config.commitStyle;
@@ -53,32 +42,25 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
   // 1. Find staged files
   const staged = await git.getStaged();
   if (staged.length === 0) {
-    console.log(
-      chalk.dim(
-        "No staged files. Stage what you want to commit with `git add` first.",
-      ),
-    );
+    console.log(chalk.dim('No staged files. Stage what you want to commit with `git add` first.'));
     return;
   }
 
   // 2. Categorize
   const categories = mergeCategories(config.categories);
   const grouped = categorize(staged, categories);
-  const nonEmpty = Object.entries(grouped).filter(
-    ([, files]) => files.length > 0,
-  );
+  const nonEmpty = Object.entries(grouped).filter(([, files]) => files.length > 0);
 
   console.log(chalk.cyan(`Staged files (${staged.length}) — by category:`));
   for (const [name, files] of nonEmpty) {
-    const tag =
-      name === UNKNOWN_CATEGORY ? chalk.yellow(name) : chalk.green(name);
+    const tag = name === UNKNOWN_CATEGORY ? chalk.yellow(name) : chalk.green(name);
     console.log(`  ${tag} ${chalk.dim(`(${files.length})`)}`);
     for (const f of files) console.log(`    ${chalk.dim(f)}`);
   }
-  console.log("");
+  console.log('');
 
   // 3. Generate AI commit messages
-  const spinner = ora({ text: "Generating commit messages...", color: "cyan" }).start();
+  const spinner = ora({ text: 'Generating commit messages...', color: 'cyan' }).start();
   let plan: CommitMessage[];
   try {
     const diff = await git.getStagedDiff();
@@ -90,20 +72,18 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
   }
 
   // 4. Show plan
-  console.log("");
-  console.log(chalk.cyan("Commit plan:"));
+  console.log('');
+  console.log(chalk.cyan('Commit plan:'));
   for (const c of plan) {
-    console.log(
-      `  ${chalk.bold(c.category)}  ${chalk.dim(`(${c.files.length} files)`)}`,
-    );
+    console.log(`  ${chalk.bold(c.category)}  ${chalk.dim(`(${c.files.length} files)`)}`);
     console.log(`    ${chalk.green(c.message)}`);
     if (c.body) {
-      for (const line of c.body.split("\n")) {
+      for (const line of c.body.split('\n')) {
         console.log(`    ${chalk.dim(line)}`);
       }
     }
   }
-  console.log("");
+  console.log('');
 
   // 4.5. Optional per-commit editing — default N so the wrap-up
   // stays fast. Skipped under --auto-approve and --dry-run.
@@ -122,7 +102,7 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
       });
       const { title: nextMessage, body: nextBody } = splitTitleBody(edited);
       if (nextMessage.length === 0) {
-        console.log(chalk.yellow("⚠ Empty message — keeping original."));
+        console.log(chalk.yellow('⚠ Empty message — keeping original.'));
         continue;
       }
       plan[i] = {
@@ -135,11 +115,7 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
 
   // 5. Dry-run exits here
   if (options.dryRun) {
-    console.log(
-      chalk.yellow(
-        "Dry-run — no commits made. Re-run without --dry-run to apply.",
-      ),
-    );
+    console.log(chalk.yellow('Dry-run — no commits made. Re-run without --dry-run to apply.'));
     return;
   }
 
@@ -150,7 +126,7 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
       default: true,
     });
     if (!ok) {
-      console.log(chalk.dim("Aborted. No commits made."));
+      console.log(chalk.dim('Aborted. No commits made.'));
       return;
     }
   }
@@ -164,11 +140,7 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
       committed++;
       console.log(chalk.green(`✓ committed ${c.category}: ${c.message}`));
     } catch (err) {
-      console.error(
-        chalk.red(
-          `✗ failed to commit ${c.category}: ${(err as Error).message}`,
-        ),
-      );
+      console.error(chalk.red(`✗ failed to commit ${c.category}: ${(err as Error).message}`));
       process.exit(1);
     }
   }

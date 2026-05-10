@@ -29,8 +29,9 @@
  * no separate doc source to drift from the runtime config.
  */
 
-import { useKeybinding } from "../keyboard/registry.tsx";
-import { Table, type TableColumn } from "./Table.tsx";
+import { useKeybinding } from '../keyboard/registry.tsx';
+import { Panel } from '../molecules/Panel.tsx';
+import { Table, type TableColumn } from './Table.tsx';
 
 export interface TableHelpProps<T> {
   /** The columns to document. Same array passed to `<Table columns={...}>`. */
@@ -56,57 +57,55 @@ interface HelpRow {
   description: string;
 }
 
-const HELP_COLUMNS_BASE = [
+const _HELP_COLUMNS_BASE = [
   {
-    key: "column",
-    label: "Column",
-    description: "The header label as it appears in the data table.",
+    key: 'column',
+    label: 'Column',
+    description: 'The header label as it appears in the data table.',
   },
   {
-    key: "type",
-    label: "Type",
-    description: "Width and alignment hints from the column definition.",
+    key: 'type',
+    label: 'Type',
+    description: 'Width and alignment hints from the column definition.',
   },
   {
-    key: "description",
-    label: "Description",
-    description: "What the column displays and how it should be read.",
+    key: 'description',
+    label: 'Description',
+    description: 'What the column displays and how it should be read.',
   },
 ] as const;
 
 function describeType<T>(col: TableColumn<T>): string {
-  const align = col.align ?? "left";
+  const align = col.align ?? 'left';
   return `w=${col.width} · ${align}`;
 }
 
 export function TableHelp<T>({
   columns,
-  title = "Column reference",
+  title = 'Column reference',
   labelWidth = 22,
   descriptionWidth = 60,
   intro,
   onClose,
-  closeKey = "escape",
+  closeKey = 'escape',
 }: TableHelpProps<T>) {
   // Register the close keybinding (only when onClose is provided).
-  useKeybinding(
-    closeKey,
-    "close help",
-    () => onClose?.(),
-    { hidden: !onClose, keyDisplay: closeKey === "escape" ? "esc" : closeKey },
-  );
+  useKeybinding(closeKey, 'close help', () => onClose?.(), {
+    hidden: !onClose,
+    keyDisplay: closeKey === 'escape' ? 'esc' : closeKey,
+  });
 
   const helpRows: HelpRow[] = columns.map((col) => ({
     id: col.key,
     column: col.label,
     type: describeType(col),
-    description: col.description ?? "(no description)",
+    description: col.description ?? '(no description)',
   }));
 
   const helpColumns: TableColumn<HelpRow>[] = [
-    { key: "column", label: "Column", width: labelWidth },
-    { key: "type", label: "Type", width: 14 },
-    { key: "description", label: "Description", width: descriptionWidth },
+    { key: 'column', label: 'Column', width: labelWidth },
+    { key: 'type', label: 'Type', width: 14 },
+    { key: 'description', label: 'Description', width: descriptionWidth },
   ];
 
   // If intro is provided, prepend a synthetic row showing it spanning
@@ -115,9 +114,9 @@ export function TableHelp<T>({
   const rowsWithIntro: HelpRow[] = intro
     ? [
         {
-          id: "__intro__",
-          column: "About",
-          type: "",
+          id: '__intro__',
+          column: 'About',
+          type: '',
           description: intro,
         },
         ...helpRows,
@@ -125,12 +124,14 @@ export function TableHelp<T>({
     : helpRows;
 
   return (
-    <Table
-      rows={rowsWithIntro}
-      columns={helpColumns}
-      rowKey="id"
-      pinHeader
-      pinFirstRow={Boolean(intro)}
-    />
+    <Panel title={title} padding="md">
+      <Table
+        rows={rowsWithIntro}
+        columns={helpColumns}
+        rowKey="id"
+        pinHeader
+        pinFirstRow={Boolean(intro)}
+      />
+    </Panel>
   );
 }

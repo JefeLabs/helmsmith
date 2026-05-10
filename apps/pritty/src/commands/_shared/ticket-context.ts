@@ -13,21 +13,14 @@
  *   4. Otherwise return whatever ticket was resolved (possibly null)
  */
 
-import chalk from "chalk";
-import { confirm } from "@inquirer/prompts";
-import type { TicketContext } from "../../ai.js";
-import {
-  buildAdapter,
-  deriveLinkTemplate,
-  type ValidationResult,
-} from "../../adapters/index.js";
-import {
-  getCachedTicket,
-  setCachedTicket,
-} from "../../adapters/cache.js";
-import { detectTicket, findRecentTicket, ticketLink } from "../../ticket.js";
-import { type loadConfig } from "../../config.js";
-import { type createGit } from "../../git.js";
+import { confirm } from '@inquirer/prompts';
+import chalk from 'chalk';
+import { getCachedTicket, setCachedTicket } from '../../adapters/cache.js';
+import { buildAdapter, deriveLinkTemplate, type ValidationResult } from '../../adapters/index.js';
+import type { TicketContext } from '../../ai.js';
+import { type loadConfig } from '../../config.js';
+import { type createGit } from '../../git.js';
+import { detectTicket, findRecentTicket, ticketLink } from '../../ticket.js';
 
 export async function resolveTicketContext(
   config: ReturnType<typeof loadConfig>,
@@ -70,13 +63,9 @@ export async function resolveTicketContext(
       ),
     );
     console.error(
-      chalk.dim(
-        `  Rename your branch to include a ticket (e.g. feature/PROJ-123-foo)`,
-      ),
+      chalk.dim(`  Rename your branch to include a ticket (e.g. feature/PROJ-123-foo)`),
     );
-    console.error(
-      chalk.dim(`  or set ticket.validate: false in .pritty.json.`),
-    );
+    console.error(chalk.dim(`  or set ticket.validate: false in .pritty.json.`));
     process.exit(1);
   }
 
@@ -100,11 +89,7 @@ export async function resolveTicketContext(
         const adapter = await buildAdapter(validation);
         result = await adapter.validate(ticket);
       } catch (err) {
-        console.error(
-          chalk.yellow(
-            `⚠ Ticket validation failed: ${(err as Error).message}`,
-          ),
-        );
+        console.error(chalk.yellow(`⚠ Ticket validation failed: ${(err as Error).message}`));
         result = null;
       }
       if (result) {
@@ -121,30 +106,22 @@ export async function resolveTicketContext(
       if (!result.exists && config.ticket.validateStrict) {
         console.error(
           chalk.red(
-            `✗ ${ticket} not found in ${validation.type}: ${result.error ?? "ticket missing"}`,
+            `✗ ${ticket} not found in ${validation.type}: ${result.error ?? 'ticket missing'}`,
           ),
         );
-        console.error(
-          chalk.dim(`  Set ticket.validateStrict: false to proceed anyway.`),
-        );
+        console.error(chalk.dim(`  Set ticket.validateStrict: false to proceed anyway.`));
         process.exit(1);
       }
       if (!result.exists) {
         console.log(
-          chalk.yellow(
-            `⚠ ${ticket} not found in ${validation.type}; proceeding anyway.`,
-          ),
+          chalk.yellow(`⚠ ${ticket} not found in ${validation.type}; proceeding anyway.`),
         );
       } else {
         title = result.title;
         if (result.url) resolvedLink = result.url;
       }
     } else {
-      console.log(
-        chalk.dim(
-          `  (couldn't verify ${ticket} via ${validation.type}; using anyway)`,
-        ),
-      );
+      console.log(chalk.dim(`  (couldn't verify ${ticket} via ${validation.type}; using anyway)`));
     }
   }
 
@@ -167,5 +144,5 @@ function formatAge(hours: number): string {
 }
 
 function truncateSubject(s: string, max: number): string {
-  return s.length <= max ? s : s.slice(0, max - 1) + "…";
+  return s.length <= max ? s : `${s.slice(0, max - 1)}…`;
 }

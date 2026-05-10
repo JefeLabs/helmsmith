@@ -27,11 +27,11 @@
 import {
   type S3GetResult,
   type S3Like,
-  type S3PutOptions,
-  type S3PutResult,
   S3NotFoundError,
   S3PreconditionFailedError,
-} from "./s3.js";
+  type S3PutOptions,
+  type S3PutResult,
+} from './s3.js';
 
 export interface CreateS3LikeOptions {
   /** Required - S3 bucket name. */
@@ -58,11 +58,7 @@ export interface CreateS3LikeOptions {
 interface AwsLikeClient {
   send(command: AwsLikeCommand): Promise<AwsLikeResponse>;
 }
-interface AwsLikeCommand {
-  // Marker interface; AWS SDK commands are class instances we just
-  // pass through to .send(). Concrete construction happens via the
-  // dynamically-imported command classes below.
-}
+type AwsLikeCommand = Record<string, unknown>;
 interface AwsLikeResponse {
   Body?: AwsLikeBody;
   ETag?: string;
@@ -80,15 +76,10 @@ interface AwsLikeBody {
  * `@aws-sdk/client-s3` via dynamic import; throws a clear error if
  * the SDK isn't installed.
  */
-export async function createS3LikeFromAwsClient(
-  options: CreateS3LikeOptions,
-): Promise<S3Like> {
+export async function createS3LikeFromAwsClient(options: CreateS3LikeOptions): Promise<S3Like> {
   let aws: {
     S3Client: new (config: { region?: string }) => AwsLikeClient;
-    GetObjectCommand: new (input: {
-      Bucket: string;
-      Key: string;
-    }) => AwsLikeCommand;
+    GetObjectCommand: new (input: { Bucket: string; Key: string }) => AwsLikeCommand;
     PutObjectCommand: new (input: {
       Bucket: string;
       Key: string;
@@ -103,18 +94,17 @@ export async function createS3LikeFromAwsClient(
     // statically resolve the import at compile time. The SDK is an
     // OPTIONAL runtime dep - users who never select the S3 backend
     // shouldn't be forced to install ~5MB of AWS code.
-    const moduleName = "@aws-sdk/client-s3";
+    const moduleName = '@aws-sdk/client-s3';
     aws = (await import(moduleName)) as unknown as typeof aws;
   } catch {
     throw new Error(
-      "S3 backend requires `@aws-sdk/client-s3` to be installed. " +
-        "Run `npm install @aws-sdk/client-s3` and retry.",
+      'S3 backend requires `@aws-sdk/client-s3` to be installed. ' +
+        'Run `npm install @aws-sdk/client-s3` and retry.',
     );
   }
 
   const client: AwsLikeClient =
-    (options.client as AwsLikeClient | undefined) ??
-    new aws.S3Client({ region: options.region });
+    (options.client as AwsLikeClient | undefined) ?? new aws.S3Client({ region: options.region });
   const bucket = options.bucket;
   const { GetObjectCommand, PutObjectCommand } = aws;
 
@@ -124,9 +114,7 @@ export async function createS3LikeFromAwsClient(
         const response = (await client.send(
           new GetObjectCommand({ Bucket: bucket, Key: key }),
         )) as AwsLikeResponse;
-        const body = response.Body
-          ? await response.Body.transformToString("utf-8")
-          : "";
+        const body = response.Body ? await response.Body.transformToString('utf-8') : '';
         return { body, etag: stripQuotes(response.ETag) };
       } catch (err) {
         if (isAwsNotFound(err)) {
@@ -136,18 +124,14 @@ export async function createS3LikeFromAwsClient(
       }
     },
 
-    async putObject(
-      key: string,
-      body: string,
-      options: S3PutOptions = {},
-    ): Promise<S3PutResult> {
+    async putObject(key: string, body: string, options: S3PutOptions = {}): Promise<S3PutResult> {
       try {
         const response = (await client.send(
           new PutObjectCommand({
             Bucket: bucket,
             Key: key,
             Body: body,
-            ContentType: "application/json",
+            ContentType: 'application/json',
             IfMatch: options.ifMatch,
             IfNoneMatch: options.ifNoneMatch,
           }),
@@ -187,17 +171,17 @@ function stripQuotes(etag: string | undefined): string | undefined {
  * SDK-agnostic.
  */
 function isAwsNotFound(err: unknown): boolean {
-  if (err && typeof err === "object") {
+  if (err && typeof err === 'object') {
     const name = (err as { name?: string }).name;
-    return name === "NoSuchKey" || name === "NotFound";
+    return name === 'NoSuchKey' || name === 'NotFound';
   }
   return false;
 }
 
 function isAwsPreconditionFailed(err: unknown): boolean {
-  if (err && typeof err === "object") {
+  if (err && typeof err === 'object') {
     const e = err as { name?: string; $metadata?: { httpStatusCode?: number } };
-    if (e.name === "PreconditionFailed") return true;
+    if (e.name === 'PreconditionFailed') return true;
     if (e.$metadata?.httpStatusCode === 412) return true;
   }
   return false;

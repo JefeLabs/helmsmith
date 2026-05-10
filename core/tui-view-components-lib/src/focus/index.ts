@@ -10,5 +10,5 @@
  * just call useFocus(id) and react to isFocused changes.
  */
 
-export { FocusManager, useFocus, useFocusController } from "./manager.tsx";
-export type { FocusManagerProps, UseFocusResult } from "./manager.tsx";
+export type { FocusManagerProps, UseFocusResult } from './manager.tsx';
+export { FocusManager, useFocus, useFocusController } from './manager.tsx';

@@ -1,13 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  validateEntryPointCoverage,
   applyValidation,
   generateValidationWarnings,
+  validateEntryPointCoverage,
 } from '../../../../src/parser/analysis/entrypoint-validation.js';
 import type {
-  EntryPointIndex,
   ComponentIndex,
   EntryPoint,
+  EntryPointIndex,
   EntryPointTrace,
 } from '../../../../src/parser/analysis/types.js';
 
@@ -16,7 +16,7 @@ function makeComponentIndex(ids: string[]): ComponentIndex {
     version: 1,
     repoRoot: '/test',
     generatedAt: '2026-01-01T00:00:00Z',
-    components: ids.map(id => ({
+    components: ids.map((id) => ({
       id,
       name: id,
       rootPath: `/test/${id}`,
@@ -112,10 +112,7 @@ describe('validateEntryPointCoverage', () => {
   it('identifies entry points without traces', () => {
     const componentIndex = makeComponentIndex(['api', 'worker']);
     const epIndex = makeIndex(
-      [
-        makeEntryPoint('ep:api:get', 'api'),
-        makeEntryPoint('ep:worker:process', 'worker'),
-      ],
+      [makeEntryPoint('ep:api:get', 'api'), makeEntryPoint('ep:worker:process', 'worker')],
       [makeTrace('ep:api:get', ['api'])],
     );
 

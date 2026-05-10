@@ -1,21 +1,40 @@
-import { readdir, stat, readFile } from 'node:fs/promises';
-import { join, relative, extname, dirname } from 'node:path';
-import type {
-  SourceSymbol, FileAnalysis, SourceAnalysisResult,
-  EnhancedSourceSymbol, EnhancedFileAnalysis, BuildComponent,
-  SymbolKind, SymbolVisibility, PragmaticLayer,
-} from './types.js';
-import { detectLanguage, resolveGrammarPath, isSupportedExtension } from './grammars.js';
+import { readdir, readFile, stat } from 'node:fs/promises';
+import { dirname, join, relative } from 'node:path';
 import type { SupportedLanguage } from './grammars.js';
+import { detectLanguage, isSupportedExtension, resolveGrammarPath } from './grammars.js';
 import { inferLayer } from './layer-inference.js';
+import type {
+  BuildComponent,
+  EnhancedFileAnalysis,
+  EnhancedSourceSymbol,
+  FileAnalysis,
+  PragmaticLayer,
+  SourceAnalysisResult,
+  SourceSymbol,
+  SymbolKind,
+  SymbolVisibility,
+} from './types.js';
 
 const MAX_FILES = 500;
 const MAX_FILE_SIZE = 100 * 1024; // 100KB
 
 const IGNORED_DIRS = new Set([
-  'node_modules', '.git', 'dist', 'build', 'target', 'vendor',
-  '__pycache__', '.next', '.nuxt', '.output', 'coverage',
-  '.turbo', '.vercel', '.cache', 'tmp', '.tmp',
+  'node_modules',
+  '.git',
+  'dist',
+  'build',
+  'target',
+  'vendor',
+  '__pycache__',
+  '.next',
+  '.nuxt',
+  '.output',
+  'coverage',
+  '.turbo',
+  '.vercel',
+  '.cache',
+  'tmp',
+  '.tmp',
 ]);
 
 // Lazy-loaded tree-sitter module and grammar cache
@@ -42,7 +61,9 @@ async function initParser(): Promise<typeof import('web-tree-sitter').Parser> {
  * Load a grammar WASM file for the given language.
  * Caches loaded grammars to avoid repeated file reads.
  */
-async function loadGrammar(language: SupportedLanguage): Promise<import('web-tree-sitter').Language> {
+async function loadGrammar(
+  language: SupportedLanguage,
+): Promise<import('web-tree-sitter').Language> {
   const cached = grammarCache.get(language);
   if (cached) return cached;
 
@@ -65,6 +86,7 @@ async function collectSourceFiles(
 ): Promise<void> {
   if (files.length >= MAX_FILES || depth > 6) return;
 
+  // biome-ignore lint/suspicious/noImplicitAnyLet: assigned in try/catch below
   let entries;
   try {
     entries = await readdir(currentPath, { withFileTypes: true });
@@ -144,9 +166,11 @@ function extractGoSymbols(
         const nameNode = findChild(specNode, 'type_identifier');
         if (nameNode) {
           const name = nameNode.text;
-          const typeBody = findChild(specNode, 'struct_type') ? 'class'
-            : findChild(specNode, 'interface_type') ? 'interface'
-            : 'type';
+          const typeBody = findChild(specNode, 'struct_type')
+            ? 'class'
+            : findChild(specNode, 'interface_type')
+              ? 'interface'
+              : 'type';
           symbols.push({
             name,
             kind: typeBody as SourceSymbol['kind'],
@@ -269,13 +293,20 @@ function extractCSharpSymbols(
 
   function walkCSharp(nodes: TreeNode[]): void {
     for (const node of nodes) {
-      if (node.type === 'class_declaration' || node.type === 'interface_declaration' || node.type === 'enum_declaration') {
+      if (
+        node.type === 'class_declaration' ||
+        node.type === 'interface_declaration' ||
+        node.type === 'enum_declaration'
+      ) {
         const hasPublic = hasModifier(node, 'public');
         const nameNode = findChild(node, 'identifier');
         if (nameNode) {
-          const kind = node.type === 'class_declaration' ? 'class'
-            : node.type === 'interface_declaration' ? 'interface'
-            : 'enum';
+          const kind =
+            node.type === 'class_declaration'
+              ? 'class'
+              : node.type === 'interface_declaration'
+                ? 'interface'
+                : 'enum';
           symbols.push({
             name: nameNode.text,
             kind: kind as SourceSymbol['kind'],
@@ -345,7 +376,7 @@ interface TreeNode {
 }
 
 function findChild(node: TreeNode, type: string): TreeNode | null {
-  for (const child of (node.namedChildren ?? node.children ?? [])) {
+  for (const child of node.namedChildren ?? node.children ?? []) {
     if (child.type === type) return child;
   }
   return null;
@@ -353,7 +384,7 @@ function findChild(node: TreeNode, type: string): TreeNode | null {
 
 function getDeclaration(exportNode: TreeNode): TreeNode | null {
   // export_statement wraps the actual declaration
-  for (const child of (exportNode.namedChildren ?? exportNode.children ?? [])) {
+  for (const child of exportNode.namedChildren ?? exportNode.children ?? []) {
     if (child.type !== 'export' && child.type !== 'default') {
       return child;
     }
@@ -362,14 +393,14 @@ function getDeclaration(exportNode: TreeNode): TreeNode | null {
 }
 
 function hasVisibilityModifier(node: TreeNode): boolean {
-  for (const child of (node.namedChildren ?? node.children ?? [])) {
+  for (const child of node.namedChildren ?? node.children ?? []) {
     if (child.type === 'visibility_modifier') return true;
   }
   return false;
 }
 
 function hasModifier(node: TreeNode, modifier: string): boolean {
-  for (const child of (node.namedChildren ?? node.children ?? [])) {
+  for (const child of node.namedChildren ?? node.children ?? []) {
     if (child.type === 'modifiers') {
       return child.text.includes(modifier);
     }
@@ -440,10 +471,7 @@ function extractSymbolFromNode(
  * Analyze a single source file with tree-sitter.
  * Returns the extracted symbols.
  */
-async function analyzeFile(
-  filePath: string,
-  language: SupportedLanguage,
-): Promise<FileAnalysis> {
+async function analyzeFile(filePath: string, language: SupportedLanguage): Promise<FileAnalysis> {
   const Parser = await initParser();
   const grammar = await loadGrammar(language);
 
@@ -506,7 +534,7 @@ function formatSummary(files: FileAnalysis[], rootPath: string): string {
     const relPath = relative(rootPath, file.path);
     const dir = dirname(relPath);
     const existing = byDir.get(dir) ?? [];
-    existing.push(...file.symbols.filter(s => s.exported));
+    existing.push(...file.symbols.filter((s) => s.exported));
     byDir.set(dir, existing);
   }
 
@@ -560,7 +588,7 @@ export async function analyzeSource(rootPath: string): Promise<SourceAnalysisRes
   }
 
   // Aggregate public API (all exported symbols)
-  const publicApi = files.flatMap(f => f.symbols.filter(s => s.exported));
+  const publicApi = files.flatMap((f) => f.symbols.filter((s) => s.exported));
 
   // Format summary
   const summary = formatSummary(files, rootPath);
@@ -603,18 +631,18 @@ function extractSignatureDisplay(node: PositionedTreeNode): string | undefined {
   // For const/let/var declarations, take just the first line
   if (node.type === 'lexical_declaration' || node.type === 'variable_declaration') {
     const line = text.split('\n')[0].trim();
-    return line.length > 200 ? line.slice(0, 200) + '...' : line;
+    return line.length > 200 ? `${line.slice(0, 200)}...` : line;
   }
 
   // Truncate at first opening brace (function/class body)
   const braceIdx = text.indexOf('{');
   if (braceIdx > 0) {
     const sig = text.slice(0, braceIdx).trim();
-    return sig.length > 200 ? sig.slice(0, 200) + '...' : sig;
+    return sig.length > 200 ? `${sig.slice(0, 200)}...` : sig;
   }
 
   const line = text.split('\n')[0].trim();
-  return line.length > 200 ? line.slice(0, 200) + '...' : line;
+  return line.length > 200 ? `${line.slice(0, 200)}...` : line;
 }
 
 /**
@@ -745,7 +773,7 @@ function extractDeclName(node: TreeNode): string | null {
     case 'lexical_declaration':
     case 'variable_declaration': {
       const d = findChild(node, 'variable_declarator');
-      return d ? findChild(d, 'identifier')?.text ?? null : null;
+      return d ? (findChild(d, 'identifier')?.text ?? null) : null;
     }
 
     case 'type_declaration': {
@@ -853,23 +881,28 @@ async function analyzeFileEnhanced(
   const layer = inferLayer(relPath, tree.rootNode, language);
   const component = findOwnerComponent(filePath, components);
   const isEntrypoint = component
-    ? component.entrypoints.some(ep => relPath === ep || relPath.endsWith(ep))
+    ? component.entrypoints.some((ep) => relPath === ep || relPath.endsWith(ep))
     : false;
   const componentTags = component?.tags ?? [];
 
   // Match legacy symbols to AST nodes for position/doc/sig extraction
   const nodeMap = matchSymbolsToNodes(tree.rootNode, language);
 
-  const enhancedSymbols: EnhancedSourceSymbol[] = legacySymbols.map(sym => {
+  const enhancedSymbols: EnhancedSourceSymbol[] = legacySymbols.map((sym) => {
     const astNode = nodeMap.get(sym.name);
     const kind = enrichKind(sym.kind, layer, language);
-    const visibility = inferVisibilityFromLanguage(language, sym.exported, astNode ?? ({} as TreeNode));
+    const visibility = inferVisibilityFromLanguage(
+      language,
+      sym.exported,
+      astNode ?? ({} as TreeNode),
+    );
     const tags = buildEnhancedTags(kind, layer, isEntrypoint, componentTags);
 
     // Extract signature from the declaration node (inside export_statement if applicable)
-    const sigNode = astNode?.type === 'export_statement'
-      ? (getDeclaration(astNode) as PositionedTreeNode ?? astNode)
-      : astNode;
+    const sigNode =
+      astNode?.type === 'export_statement'
+        ? ((getDeclaration(astNode) as PositionedTreeNode) ?? astNode)
+        : astNode;
     const sig = sigNode ? extractSignatureDisplay(sigNode) : undefined;
     // Extract doc from the outer node (comment is before the export_statement)
     const doc = astNode ? extractDocSummary(astNode) : undefined;
@@ -946,16 +979,17 @@ export async function analyzeSourceEnhanced(
     }
   }
 
-  const publicApi = legacyFiles.flatMap(f => f.symbols.filter(s => s.exported));
+  const publicApi = legacyFiles.flatMap((f) => f.symbols.filter((s) => s.exported));
   const summary = formatSummary(legacyFiles, rootPath);
 
   return {
     legacy: {
       files: legacyFiles,
       publicApi,
-      summary: filePaths.length >= MAX_FILES
-        ? `Warning: Only ${MAX_FILES} of ${filePaths.length}+ source files were analyzed.\n\n${summary}`
-        : summary,
+      summary:
+        filePaths.length >= MAX_FILES
+          ? `Warning: Only ${MAX_FILES} of ${filePaths.length}+ source files were analyzed.\n\n${summary}`
+          : summary,
     },
     enhanced: enhancedFiles,
   };

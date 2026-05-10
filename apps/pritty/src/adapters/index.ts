@@ -15,10 +15,10 @@
  * block the dev's commit. Strict mode is opt-in at the CLI layer.
  */
 
-export type ValidationType = "jira-rest" | "jira-cli" | "linear";
+export type ValidationType = 'jira-rest' | 'jira-cli' | 'linear';
 
 export interface JiraRestValidation {
-  type: "jira-rest";
+  type: 'jira-rest';
   /** Atlassian instance URL, e.g. https://yourorg.atlassian.net */
   baseUrl: string;
   /** Env var name for the user email. Default: `JIRA_EMAIL`. */
@@ -28,19 +28,16 @@ export interface JiraRestValidation {
 }
 
 export interface JiraCliValidation {
-  type: "jira-cli";
+  type: 'jira-cli';
 }
 
 export interface LinearValidation {
-  type: "linear";
+  type: 'linear';
   /** Env var name for the API key. Default: `LINEAR_API_KEY`. */
   apiKeyEnv: string;
 }
 
-export type ValidationConfig =
-  | JiraRestValidation
-  | JiraCliValidation
-  | LinearValidation;
+export type ValidationConfig = JiraRestValidation | JiraCliValidation | LinearValidation;
 
 export interface ValidationResult {
   exists: boolean;
@@ -71,20 +68,18 @@ export interface TicketSystemAdapter {
  * config's type isn't yet implemented — caller should handle that
  * with a clear error message at config-load time.
  */
-export async function buildAdapter(
-  config: ValidationConfig,
-): Promise<TicketSystemAdapter> {
+export async function buildAdapter(config: ValidationConfig): Promise<TicketSystemAdapter> {
   switch (config.type) {
-    case "jira-rest": {
-      const { JiraRestAdapter } = await import("./jira-rest.js");
+    case 'jira-rest': {
+      const { JiraRestAdapter } = await import('./jira-rest.js');
       return new JiraRestAdapter(config);
     }
-    case "jira-cli": {
-      const { JiraCliAdapter } = await import("./jira-cli.js");
+    case 'jira-cli': {
+      const { JiraCliAdapter } = await import('./jira-cli.js');
       return new JiraCliAdapter();
     }
-    case "linear": {
-      const { LinearAdapter } = await import("./linear.js");
+    case 'linear': {
+      const { LinearAdapter } = await import('./linear.js');
       return new LinearAdapter(config);
     }
   }
@@ -95,11 +90,9 @@ export async function buildAdapter(
  * user doesn't set `linkTemplate` explicitly, this gives a sensible
  * default per system.
  */
-export function deriveLinkTemplate(
-  config: ValidationConfig,
-): string | undefined {
-  if (config.type === "jira-rest") {
-    return `${config.baseUrl.replace(/\/$/, "")}/browse/{ticket}`;
+export function deriveLinkTemplate(config: ValidationConfig): string | undefined {
+  if (config.type === 'jira-rest') {
+    return `${config.baseUrl.replace(/\/$/, '')}/browse/{ticket}`;
   }
   return undefined;
 }

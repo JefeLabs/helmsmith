@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { runCli, createTempHome, cleanupTempHome } from './helpers.js';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { cleanupTempHome, createTempHome, runCli } from './helpers.js';
 
 describe('E2E: Error scenarios', () => {
   let tempHome: string;

@@ -18,7 +18,7 @@ import type {
   NextSuggestion,
   Skill,
   Workflow,
-} from "../types.js";
+} from '../types.js';
 
 export type {
   Catalog,
@@ -28,14 +28,14 @@ export type {
   NextSuggestion,
   Skill,
   Workflow,
-} from "../types.js";
+} from '../types.js';
 
 /* ── Catalog item shapes (server → client) ─────────────────────── */
 
 /** Command minus the body — used in list responses. */
-export type CommandSummary = Omit<Command, "body">;
-export type SkillSummary = Omit<Skill, "body">;
-export type WorkflowSummary = Omit<Workflow, "body">;
+export type CommandSummary = Omit<Command, 'body'>;
+export type SkillSummary = Omit<Skill, 'body'>;
+export type WorkflowSummary = Omit<Workflow, 'body'>;
 
 /** Full catalog with bodies — used by `GET /catalog` for clients that
  *  want everything in one payload (e.g., TUI cold start). */
@@ -85,7 +85,7 @@ export interface SuggestResponse {
 }
 
 export interface HealthResponse {
-  status: "ok";
+  status: 'ok';
   version: string;
   catalogGeneratedAt: string;
   itemCounts: { commands: number; skills: number; workflows: number };
@@ -130,7 +130,7 @@ export interface AuthorIdentity {
  * skill creation for maintainers — the API can enforce that with an
  * authorization check (role on AuthorIdentity), not a hard-coded gate.
  */
-export type ContributionKind = "command" | "workflow" | "skill";
+export type ContributionKind = 'command' | 'workflow' | 'skill';
 
 /**
  * One file within a contribution bundle.
@@ -167,7 +167,7 @@ export interface CreateContributionRequest {
   files: ContributionFile[];
   /** Optional — semver bump hint for the next version. Defaults to
    *  monotonic increment from latest existing version. */
-  versionBump?: "major" | "minor" | "patch";
+  versionBump?: 'major' | 'minor' | 'patch';
   /** Optional message describing the change — surfaces in version
    *  history and any moderation UI. */
   changelog?: string;
@@ -181,12 +181,7 @@ export interface CreateContributionRequest {
  * separate explicit step regardless — `promoted` means the catalog
  * index points at this version as the "live" one.
  */
-export type ContributionStatus =
-  | "pending"
-  | "reviewing"
-  | "accepted"
-  | "rejected"
-  | "promoted";
+export type ContributionStatus = 'pending' | 'reviewing' | 'accepted' | 'rejected' | 'promoted';
 
 /**
  * A single finding produced by the layer-3 agent reviewer or the
@@ -199,8 +194,8 @@ export type ContributionStatus =
  * (e.g., a quality finding that applies to the entire submission).
  */
 export interface ReviewFinding {
-  severity: "low" | "medium" | "high";
-  axis: "structural" | "bundle" | "quality" | "tag-fit" | "safety";
+  severity: 'low' | 'medium' | 'high';
+  axis: 'structural' | 'bundle' | 'quality' | 'tag-fit' | 'safety';
   message: string;
   fileRef?: string;
 }
@@ -264,13 +259,13 @@ export interface PromoteVersionRequest {
  */
 export interface ApiError {
   code:
-    | "validation_failed"
-    | "slug_conflict"
-    | "author_mismatch"
-    | "not_found"
-    | "unauthorized"
-    | "forbidden"
-    | "internal_error";
+    | 'validation_failed'
+    | 'slug_conflict'
+    | 'author_mismatch'
+    | 'not_found'
+    | 'unauthorized'
+    | 'forbidden'
+    | 'internal_error';
   message: string;
   details?: Record<string, unknown>;
 }

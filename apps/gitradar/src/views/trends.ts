@@ -1,19 +1,19 @@
 import chalk from 'chalk';
-import type { ViewContext, NavigationAction } from './types.js';
-import type { UserWeekRepoRecord } from '../types/schema.js';
-import { renderBanner } from '../ui/banner.js';
-import { renderGroupedHBarChart } from '../ui/grouped-hbar-chart.js';
-import type { HBarGroup } from '../ui/grouped-hbar-chart.js';
-import { renderLineChart } from '../ui/line-chart.js';
-import { renderLegend } from '../ui/legend.js';
-import { renderHotkeyBar } from '../ui/tab-bar.js';
-import { readKey, readKeyWithTimeout } from '../ui/keypress.js';
-import { sparkline } from '../ui/sparkline.js';
 import { rollup } from '../aggregator/engine.js';
 import { filterRecords, getLastNWeeks } from '../aggregator/filters.js';
-import { computeTrend, computeRunningAvg } from '../aggregator/trends.js';
+import { computeRunningAvg } from '../aggregator/trends.js';
+import type { UserWeekRepoRecord } from '../types/schema.js';
+import { renderBanner } from '../ui/banner.js';
 import { SEGMENT_DEFS } from '../ui/constants.js';
-import { fmt, weekShort, padRight } from '../ui/format.js';
+import { fmt, padRight, weekShort } from '../ui/format.js';
+import type { HBarGroup } from '../ui/grouped-hbar-chart.js';
+import { renderGroupedHBarChart } from '../ui/grouped-hbar-chart.js';
+import { readKey, readKeyWithTimeout } from '../ui/keypress.js';
+import { renderLegend } from '../ui/legend.js';
+import { renderLineChart } from '../ui/line-chart.js';
+import { sparkline } from '../ui/sparkline.js';
+import { renderHotkeyBar } from '../ui/tab-bar.js';
+import type { NavigationAction, ViewContext } from './types.js';
 
 type TrendsExpandMode = 'org' | 'team' | 'tag';
 
@@ -126,8 +126,14 @@ function buildFileTypeBreakdownBars(
           segments: [
             { key: 'app', value: agg.filetype.app.insertions + agg.filetype.app.deletions },
             { key: 'test', value: agg.filetype.test.insertions + agg.filetype.test.deletions },
-            { key: 'config', value: agg.filetype.config.insertions + agg.filetype.config.deletions },
-            { key: 'storybook', value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions },
+            {
+              key: 'config',
+              value: agg.filetype.config.insertions + agg.filetype.config.deletions,
+            },
+            {
+              key: 'storybook',
+              value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions,
+            },
             { key: 'doc', value: agg.filetype.doc.insertions + agg.filetype.doc.deletions },
           ],
           total: agg.insertions + agg.deletions,
@@ -146,8 +152,14 @@ function buildFileTypeBreakdownBars(
             segments: [
               { key: 'app', value: agg.filetype.app.insertions + agg.filetype.app.deletions },
               { key: 'test', value: agg.filetype.test.insertions + agg.filetype.test.deletions },
-              { key: 'config', value: agg.filetype.config.insertions + agg.filetype.config.deletions },
-              { key: 'storybook', value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions },
+              {
+                key: 'config',
+                value: agg.filetype.config.insertions + agg.filetype.config.deletions,
+              },
+              {
+                key: 'storybook',
+                value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions,
+              },
             ],
             total: agg.insertions + agg.deletions,
           });
@@ -167,8 +179,14 @@ function buildFileTypeBreakdownBars(
           segments: [
             { key: 'app', value: agg.filetype.app.insertions + agg.filetype.app.deletions },
             { key: 'test', value: agg.filetype.test.insertions + agg.filetype.test.deletions },
-            { key: 'config', value: agg.filetype.config.insertions + agg.filetype.config.deletions },
-            { key: 'storybook', value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions },
+            {
+              key: 'config',
+              value: agg.filetype.config.insertions + agg.filetype.config.deletions,
+            },
+            {
+              key: 'storybook',
+              value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions,
+            },
             { key: 'doc', value: agg.filetype.doc.insertions + agg.filetype.doc.deletions },
           ],
           total: agg.insertions + agg.deletions,
@@ -205,11 +223,16 @@ function buildAvgOutputSparklines(
         let total = 0;
         for (const r of weekRecords) {
           total +=
-            r.filetype.app.insertions + r.filetype.app.deletions +
-            r.filetype.test.insertions + r.filetype.test.deletions +
-            r.filetype.config.insertions + r.filetype.config.deletions +
-            r.filetype.storybook.insertions + r.filetype.storybook.deletions +
-            (r.filetype.doc?.insertions ?? 0) + (r.filetype.doc?.deletions ?? 0);
+            r.filetype.app.insertions +
+            r.filetype.app.deletions +
+            r.filetype.test.insertions +
+            r.filetype.test.deletions +
+            r.filetype.config.insertions +
+            r.filetype.config.deletions +
+            r.filetype.storybook.insertions +
+            r.filetype.storybook.deletions +
+            (r.filetype.doc?.insertions ?? 0) +
+            (r.filetype.doc?.deletions ?? 0);
         }
         weeklyAvgs.push(members.size > 0 ? total / members.size : 0);
       }
@@ -297,11 +320,7 @@ export async function trendsView(ctx: ViewContext): Promise<NavigationAction> {
 
     // Banner
     const modeLabel =
-      expandMode === 'org'
-        ? 'All Orgs'
-        : expandMode === 'team'
-          ? 'By Team'
-          : 'By Tag';
+      expandMode === 'org' ? 'All Orgs' : expandMode === 'team' ? 'By Team' : 'By Tag';
     const banner = renderBanner({
       title: `TRENDS \u2014 ${modeLabel}`,
       right: `${weekShort(weeks12[0])} \u2192 ${weekShort(weeks12[weeks12.length - 1])}`,
@@ -335,7 +354,7 @@ export async function trendsView(ctx: ViewContext): Promise<NavigationAction> {
       SEGMENT_DEFS.map((d) => ({ label: d.label, color: d.color, char: d.char })),
       { inline: true },
     );
-    console.log(chalk.bold('File Type Breakdown \u2014 12 Weeks') + '  ' + legend);
+    console.log(`${chalk.bold('File Type Breakdown \u2014 12 Weeks')}  ${legend}`);
     console.log('');
 
     const breakdownGroups = buildFileTypeBreakdownBars(
@@ -361,11 +380,7 @@ export async function trendsView(ctx: ViewContext): Promise<NavigationAction> {
         chalk.dim(' = 3-month running avg'),
     );
     console.log('');
-    const sparkOutput = buildAvgOutputSparklines(
-      ctx.records,
-      ctx.currentWeek,
-      ctx.config,
-    );
+    const sparkOutput = buildAvgOutputSparklines(ctx.records, ctx.currentWeek, ctx.config);
     console.log(sparkOutput);
     console.log('');
 
@@ -400,9 +415,18 @@ export async function trendsView(ctx: ViewContext): Promise<NavigationAction> {
         continue;
       }
 
-      if (key.name === 'e' && expandMode !== 'team') { expandMode = 'team'; continue; }
-      if (key.name === 'g' && expandMode !== 'tag') { expandMode = 'tag'; continue; }
-      if (key.name === 'o' && expandMode !== 'org') { expandMode = 'org'; continue; }
+      if (key.name === 'e' && expandMode !== 'team') {
+        expandMode = 'team';
+        continue;
+      }
+      if (key.name === 'g' && expandMode !== 'tag') {
+        expandMode = 'tag';
+        continue;
+      }
+      if (key.name === 'o' && expandMode !== 'org') {
+        expandMode = 'org';
+        continue;
+      }
       if (key.name === 'b') return { type: 'pop' };
       if (key.name === 'q') return { type: 'quit' };
     } catch {

@@ -1,7 +1,12 @@
-import { assignAuthor, assignByIdentifierPrefix } from '../store/author-registry.js';
-import { loadAuthorRegistrySQL, saveAuthorRegistrySQL, queryRecords, reattributeRecordsSQL } from '../store/sqlite-store.js';
-import { loadConfig } from '../config/loader.js';
 import { buildAuthorMap, buildIdentifierRules } from '../collector/author-map.js';
+import { loadConfig } from '../config/loader.js';
+import { assignAuthor, assignByIdentifierPrefix } from '../store/author-registry.js';
+import {
+  loadAuthorRegistrySQL,
+  queryRecords,
+  reattributeRecordsSQL,
+  saveAuthorRegistrySQL,
+} from '../store/sqlite-store.js';
 
 export interface AssignAuthorOptions {
   email: string;
@@ -28,10 +33,22 @@ export async function assignAuthorCmd(options: AssignAuthorOptions): Promise<voi
   // Re-attribute existing records via SQL UPDATE
   try {
     const config = await loadConfig(options.config);
-    const authorMap = buildAuthorMap(config, updated);
-    const identifierRules = buildIdentifierRules(config);
-    const updates: Array<{ email: string; org: string; orgType: string; team: string; tag: string }> = [];
-    updates.push({ email: key, org: options.org, orgType: 'core', team: options.team, tag: 'default' });
+    const _authorMap = buildAuthorMap(config, updated);
+    const _identifierRules = buildIdentifierRules(config);
+    const updates: Array<{
+      email: string;
+      org: string;
+      orgType: string;
+      team: string;
+      tag: string;
+    }> = [];
+    updates.push({
+      email: key,
+      org: options.org,
+      orgType: 'core',
+      team: options.team,
+      tag: 'default',
+    });
     reattributeRecordsSQL(updates);
     const recordCount = queryRecords({}).length;
     console.log(`Assigned ${author.name} <${author.email}> → ${options.org} / ${options.team}`);
@@ -60,16 +77,32 @@ export async function bulkAssignCmd(options: BulkAssignOptions): Promise<void> {
 
   // Re-attribute existing records via SQL UPDATE for all newly assigned authors
   try {
-    const updates: Array<{ email: string; org: string; orgType: string; team: string; tag: string }> = [];
+    const updates: Array<{
+      email: string;
+      org: string;
+      orgType: string;
+      team: string;
+      tag: string;
+    }> = [];
     for (const [email, author] of Object.entries(result.registry.authors)) {
       if (author.org === options.org && author.team === options.team) {
-        updates.push({ email, org: options.org, orgType: 'core', team: options.team, tag: 'default' });
+        updates.push({
+          email,
+          org: options.org,
+          orgType: 'core',
+          team: options.team,
+          tag: 'default',
+        });
       }
     }
     if (updates.length > 0) reattributeRecordsSQL(updates);
-    console.log(`Assigned ${result.assignedCount} authors with prefix "${options.prefix}" → ${options.org} / ${options.team}`);
+    console.log(
+      `Assigned ${result.assignedCount} authors with prefix "${options.prefix}" → ${options.org} / ${options.team}`,
+    );
     console.log(`Re-attributed records for ${updates.length} authors.`);
   } catch {
-    console.log(`Assigned ${result.assignedCount} authors with prefix "${options.prefix}" → ${options.org} / ${options.team}`);
+    console.log(
+      `Assigned ${result.assignedCount} authors with prefix "${options.prefix}" → ${options.org} / ${options.team}`,
+    );
   }
 }

@@ -7,9 +7,9 @@
  *   <Heading level={3}>Subheading</Heading> → subheading preset (bold + muted)
  */
 
-import type { ReactNode } from "react";
-import { Text } from "./Text.tsx";
-import type { TypographyPreset } from "../theme/types.ts";
+import type { ReactNode } from 'react';
+import type { TypographyPreset } from '../theme/types.ts';
+import { Text } from './Text.tsx';
 
 export type HeadingLevel = 1 | 2 | 3;
 
@@ -21,9 +21,9 @@ export interface HeadingProps {
 }
 
 const PRESET_BY_LEVEL: Record<HeadingLevel, TypographyPreset> = {
-  1: "title",
-  2: "heading",
-  3: "subheading",
+  1: 'title',
+  2: 'heading',
+  3: 'subheading',
 };
 
 export function Heading({ level = 2, style, children, ...rest }: HeadingProps) {

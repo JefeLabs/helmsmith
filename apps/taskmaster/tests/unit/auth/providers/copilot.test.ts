@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock token-manager
 vi.mock('../../../../src/auth/token-manager.js', () => ({
@@ -83,9 +83,9 @@ describe('CopilotProvider', () => {
     it('throws when not authenticated', async () => {
       mockedReadAuthFile.mockResolvedValue({ active_provider: 'copilot' });
 
-      await expect(
-        provider.callAI([{ role: 'user', content: 'test' }], 'gpt-4o'),
-      ).rejects.toThrow('Not authenticated');
+      await expect(provider.callAI([{ role: 'user', content: 'test' }], 'gpt-4o')).rejects.toThrow(
+        'Not authenticated',
+      );
     });
 
     it('makes request to Copilot chat completions API', async () => {
@@ -110,10 +110,7 @@ describe('CopilotProvider', () => {
         ),
       );
 
-      const result = await provider.callAI(
-        [{ role: 'user', content: 'score this' }],
-        'gpt-4o',
-      );
+      const result = await provider.callAI([{ role: 'user', content: 'score this' }], 'gpt-4o');
 
       expect(result.choices[0].message.content).toBe('{"score": 5}');
 
@@ -121,7 +118,7 @@ describe('CopilotProvider', () => {
       const [url, opts] = fetchSpy.mock.calls[0];
       expect(url).toBe('https://api.githubcopilot.com/chat/completions');
       const headers = opts!.headers as Record<string, string>;
-      expect(headers['Authorization']).toBe('Bearer cached_copilot_token');
+      expect(headers.Authorization).toBe('Bearer cached_copilot_token');
       expect(headers['Copilot-Integration-Id']).toBe('vscode-chat');
 
       fetchSpy.mockRestore();
@@ -143,9 +140,9 @@ describe('CopilotProvider', () => {
         new Response('Service Unavailable', { status: 503 }),
       );
 
-      await expect(
-        provider.callAI([{ role: 'user', content: 'test' }], 'gpt-4o'),
-      ).rejects.toThrow('Copilot API error (503)');
+      await expect(provider.callAI([{ role: 'user', content: 'test' }], 'gpt-4o')).rejects.toThrow(
+        'Copilot API error (503)',
+      );
 
       vi.restoreAllMocks();
     });

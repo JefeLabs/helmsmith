@@ -1,6 +1,6 @@
-import type { CodebaseScanResult, BuildComponent } from '../parser/analysis/types.js';
-import type { BlueprintDetectionResult } from './types.js';
+import type { BuildComponent, CodebaseScanResult } from '../parser/analysis/types.js';
 import { BLUEPRINTS } from './registry.js';
+import type { BlueprintDetectionResult } from './types.js';
 
 /**
  * Score each blueprint's detection hints against scan results and component

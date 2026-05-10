@@ -1,17 +1,14 @@
+import { fetchGitHubUsername, loginGitHubCopilot } from '@ecruz165/agent-auth';
 import chalk from 'chalk';
-import {
-  fetchGitHubUsername,
-  loginGitHubCopilot,
-} from '@ecruz165/agent-auth';
+import { writeAuthCredentials } from './token-manager.js';
 import {
   COPILOT_CLIENT_ID,
+  DEVICE_FLOW_TIMEOUT_MS,
+  type DeviceCodeResponse,
   GITHUB_DEVICE_CODE_URL,
   GITHUB_TOKEN_URL,
   GITHUB_USER_URL,
-  DEVICE_FLOW_TIMEOUT_MS,
-  type DeviceCodeResponse,
 } from './types.js';
-import { writeAuthCredentials } from './token-manager.js';
 
 /**
  * Request a device code from GitHub for the OAuth device flow.
@@ -33,7 +30,9 @@ export async function requestDeviceCode(): Promise<DeviceCodeResponse> {
 
   if (!response.ok) {
     const body = await response.text().catch(() => '');
-    throw new Error(`Failed to request device code (${response.status}): ${body || response.statusText}`);
+    throw new Error(
+      `Failed to request device code (${response.status}): ${body || response.statusText}`,
+    );
   }
 
   return (await response.json()) as DeviceCodeResponse;
@@ -100,7 +99,7 @@ export async function pollForToken(
 /**
  * Fetch the authenticated user's GitHub username.
  */
-async function fetchUsername(githubToken: string): Promise<string> {
+async function _fetchUsername(githubToken: string): Promise<string> {
   const response = await fetch(GITHUB_USER_URL, {
     headers: {
       Authorization: `token ${githubToken}`,

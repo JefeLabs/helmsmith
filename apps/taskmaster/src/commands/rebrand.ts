@@ -1,9 +1,9 @@
-import type { Command } from 'commander';
-import { readFileSync, writeFileSync, renameSync, existsSync } from 'node:fs';
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { load as loadYaml } from 'js-yaml';
 import chalk from 'chalk';
-import { APP_GROUP_NAME, APP_GROUP_INITIALS, APP_NAME } from '../config/branding.js';
+import type { Command } from 'commander';
+import { load as loadYaml } from 'js-yaml';
+import { APP_GROUP_INITIALS, APP_GROUP_NAME, APP_NAME } from '../config/branding.js';
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -97,7 +97,11 @@ function buildReplacements(current: DerivedBrand, next: DerivedBrand): Array<[st
   return pairs;
 }
 
-function updateFileContent(filePath: string, replacements: Array<[string, string]>, dryRun: boolean): boolean {
+function updateFileContent(
+  filePath: string,
+  replacements: Array<[string, string]>,
+  dryRun: boolean,
+): boolean {
   const original = readFileSync(filePath, 'utf-8');
   let content = original;
 
@@ -129,7 +133,7 @@ function updatePackageJson(
     changed = true;
   }
 
-  if (pkg.bin && pkg.bin[current.cliBinName]) {
+  if (pkg.bin?.[current.cliBinName]) {
     const binPath = pkg.bin[current.cliBinName].replace(current.cliBinName, next.cliBinName);
     delete pkg.bin[current.cliBinName];
     pkg.bin[next.cliBinName] = binPath;
@@ -158,7 +162,7 @@ function updatePackageJson(
   }
 
   if (changed && !dryRun) {
-    writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf-8');
+    writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf-8');
   }
 
   return changed;
@@ -271,7 +275,7 @@ function executeRebrand(rootDir: string, dryRun: boolean): void {
 
     const changed = updateFileContent(filePath, replacements, dryRun);
     if (changed) {
-      const relative = filePath.replace(rootDir + '/', '');
+      const relative = filePath.replace(`${rootDir}/`, '');
       console.log(`  updated: ${relative}`);
       updatedCount++;
     }

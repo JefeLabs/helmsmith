@@ -1,5 +1,12 @@
-import { input, select, checkbox, confirm, search, number as numberPrompt } from '@inquirer/prompts';
-import { readDefaults, type Defaults } from '../utils/defaults.js';
+import {
+  checkbox,
+  confirm,
+  input,
+  number as numberPrompt,
+  search,
+  select,
+} from '@inquirer/prompts';
+import { type Defaults, readDefaults } from '../utils/defaults.js';
 
 // Lazy-loaded, cached defaults
 let cachedDefaults: Defaults | null = null;

@@ -1,6 +1,7 @@
-import type { UserWeekRepoRecord } from "../types/schema.js";
-import type { RolledUp } from "./engine.js";
-export type { Segment } from "./segments.js";
+import type { UserWeekRepoRecord } from '../types/schema.js';
+import type { RolledUp } from './engine.js';
+
+export type { Segment } from './segments.js';
 
 export interface Filters {
   weeks?: string[];
@@ -9,14 +10,14 @@ export interface Filters {
   tag?: string;
   group?: string;
   member?: string;
-  segment?: import("./segments.js").Segment;
+  segment?: import('./segments.js').Segment;
 }
 
 export interface Delta {
   value: number;
   prev: number;
   pctChange: number | null;
-  direction: "up" | "down" | "flat";
+  direction: 'up' | 'down' | 'flat';
 }
 
 /**
@@ -71,32 +72,29 @@ export function getLastNWeeks(n: number, fromWeek?: string): string[] {
  * Compute deltas between a current and previous RolledUp.
  * Returns a Record keyed by metric name.
  */
-export function computeDeltas(
-  current: RolledUp,
-  previous: RolledUp,
-): Record<string, Delta> {
+export function computeDeltas(current: RolledUp, previous: RolledUp): Record<string, Delta> {
   const metrics: Array<[string, number, number]> = [
-    ["commits", current.commits, previous.commits],
-    ["insertions", current.insertions, previous.insertions],
-    ["deletions", current.deletions, previous.deletions],
-    ["netLines", current.netLines, previous.netLines],
-    ["filesChanged", current.filesChanged, previous.filesChanged],
-    ["activeDays", current.activeDays, previous.activeDays],
-    ["activeMembers", current.activeMembers, previous.activeMembers],
+    ['commits', current.commits, previous.commits],
+    ['insertions', current.insertions, previous.insertions],
+    ['deletions', current.deletions, previous.deletions],
+    ['netLines', current.netLines, previous.netLines],
+    ['filesChanged', current.filesChanged, previous.filesChanged],
+    ['activeDays', current.activeDays, previous.activeDays],
+    ['activeMembers', current.activeMembers, previous.activeMembers],
   ];
 
   const result: Record<string, Delta> = {};
 
   for (const [name, value, prev] of metrics) {
     let pctChange: number | null;
-    let direction: "up" | "down" | "flat";
+    let direction: 'up' | 'down' | 'flat';
 
     if (prev === 0) {
       pctChange = null;
-      direction = value > 0 ? "up" : value < 0 ? "down" : "flat";
+      direction = value > 0 ? 'up' : value < 0 ? 'down' : 'flat';
     } else {
       pctChange = Math.round(((value - prev) / Math.abs(prev)) * 100);
-      direction = pctChange > 0 ? "up" : pctChange < 0 ? "down" : "flat";
+      direction = pctChange > 0 ? 'up' : pctChange < 0 ? 'down' : 'flat';
     }
 
     result[name] = { value, prev, pctChange, direction };
@@ -133,7 +131,20 @@ export function weekToMonth(isoWeek: string): string {
  */
 export function monthShort(month: string): string {
   const [yearStr, monthStr] = month.split('-');
-  const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const names = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
   const mi = parseInt(monthStr, 10) - 1;
   return `${names[mi]} '${yearStr.slice(2)}`;
 }
@@ -150,7 +161,10 @@ export function getLastNQuarters(n: number, fromWeek?: string): string[] {
   for (let i = n - 1; i >= 0; i--) {
     let q = refQ - i;
     let y = refYear;
-    while (q < 0) { q += 4; y--; }
+    while (q < 0) {
+      q += 4;
+      y--;
+    }
     quarters.push(`${y}-Q${q + 1}`);
   }
   return quarters;
@@ -221,11 +235,9 @@ function dateToISOWeek(date: Date): string {
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
 
   // Calculate full weeks to nearest Thursday
-  const weekNo = Math.ceil(
-    ((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
-  );
+  const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 
-  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
 }
 
 /**

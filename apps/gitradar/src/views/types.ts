@@ -1,5 +1,12 @@
-import type { Config, Org, UserWeekRepoRecord, ScanState, AuthorRegistry, EnrichmentStore } from '../types/schema.js';
 import type { RolledUp, RollupFilters, RollupGroupBy } from '../store/sqlite-store.js';
+import type {
+  AuthorRegistry,
+  Config,
+  EnrichmentStore,
+  Org,
+  ScanState,
+  UserWeekRepoRecord,
+} from '../types/schema.js';
 
 export interface ViewContext {
   config: Config;

@@ -13,17 +13,17 @@
  * so consumers can express "Ctrl+S" or "Esc when in modal" cleanly.
  */
 
+import { useKeyboard } from '@opentui/react';
 import {
   createContext,
+  type ReactNode,
   useCallback,
   useContext,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type ReactNode,
-} from "react";
-import { useKeyboard } from "@opentui/react";
+} from 'react';
 
 export interface KeyEvent {
   name?: string;
@@ -48,7 +48,9 @@ export interface KeybindingEntry {
   priority?: number;
   /** Hide from the help bar. Useful for invisible global bindings. */
   hidden?: boolean;
-  handler: () => void;
+  /** Handler receives the matched KeyEvent so a single binding can
+   *  match a class of keys (e.g. any digit) and dispatch on the value. */
+  handler: (key: KeyEvent) => void;
 }
 
 interface KeyboardContextValue {
@@ -59,14 +61,14 @@ interface KeyboardContextValue {
 const KeyboardContext = createContext<KeyboardContextValue | null>(null);
 
 function matches(matcher: KeyMatcher, key: KeyEvent): boolean {
-  if (typeof matcher === "string") return key.name === matcher;
+  if (typeof matcher === 'string') return key.name === matcher;
   return matcher(key);
 }
 
 let nextId = 0;
 
 export interface KeyboardProviderProps {
-  children: ReactNode;
+  children?: ReactNode;
 }
 
 export function KeyboardProvider({ children }: KeyboardProviderProps) {
@@ -89,22 +91,15 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
   useKeyboard((key: KeyEvent) => {
     for (const b of bindingsRef.current) {
       if (matches(b.match, key)) {
-        b.handler();
+        b.handler(key);
         return;
       }
     }
   });
 
-  const value = useMemo<KeyboardContextValue>(
-    () => ({ bindings, register }),
-    [bindings, register],
-  );
+  const value = useMemo<KeyboardContextValue>(() => ({ bindings, register }), [bindings, register]);
 
-  return (
-    <KeyboardContext.Provider value={value}>
-      {children}
-    </KeyboardContext.Provider>
-  );
+  return <KeyboardContext.Provider value={value}>{children}</KeyboardContext.Provider>;
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -134,7 +129,7 @@ export interface UseKeybindingOptions {
 export function useKeybinding(
   match: KeyMatcher,
   label: string,
-  handler: () => void,
+  handler: (key: KeyEvent) => void,
   opts: UseKeybindingOptions = {},
 ): void {
   const ctx = useContext(KeyboardContext);
@@ -148,17 +143,14 @@ export function useKeybinding(
       id: `kb-${nextId++}`,
       match,
       label,
-      keyDisplay:
-        opts.keyDisplay ??
-        (typeof match === "string" ? match : undefined) ??
-        label,
+      keyDisplay: opts.keyDisplay ?? (typeof match === 'string' ? match : undefined) ?? label,
       priority: opts.priority,
       hidden: opts.hidden,
-      handler: () => handlerRef.current(),
+      handler: (key) => handlerRef.current(key),
     };
     return ctx.register(entry);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ctx, label, opts.enabled, opts.priority, opts.hidden]);
+  }, [ctx, label, opts.enabled, opts.priority, opts.hidden, opts.keyDisplay, match]);
 }
 
 /**

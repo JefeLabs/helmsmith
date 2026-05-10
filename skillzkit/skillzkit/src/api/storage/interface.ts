@@ -27,12 +27,13 @@
  */
 
 import type {
+  AuthorIdentity,
   CatalogIndex,
   Command,
   Skill,
+  VersionEntry,
   Workflow,
-} from "../contracts.js";
-import type { AuthorIdentity, VersionEntry } from "../contracts.js";
+} from '../contracts.js';
 
 /* ── Read-only surface ────────────────────────────────────────── */
 
@@ -87,10 +88,7 @@ export interface CatalogStorage extends CatalogReadStorage {
    * promoted version). Returns null if that version doesn't exist. */
   getCommandVersion(slug: string, version: string): Promise<Command | null>;
   getSkillVersion(name: string, version: string): Promise<Skill | null>;
-  getWorkflowVersion(
-    qualifiedName: string,
-    version: string,
-  ): Promise<Workflow | null>;
+  getWorkflowVersion(qualifiedName: string, version: string): Promise<Workflow | null>;
 
   /* Write a new immutable version. Returns the metadata that was
    * persisted alongside the artifact. Promotion is a separate call —
@@ -120,7 +118,7 @@ export class VersionConflictError extends Error {
     public readonly version: string,
   ) {
     super(`${slug}@${version} already exists — versions are immutable; bump version`);
-    this.name = "VersionConflictError";
+    this.name = 'VersionConflictError';
   }
 }
 
@@ -136,10 +134,8 @@ export class AuthorMismatchError extends Error {
     public readonly attemptedAuthorId: string,
     public readonly ownerAuthorId: string,
   ) {
-    super(
-      `${slug} is owned by author ${ownerAuthorId}; cannot publish as ${attemptedAuthorId}`,
-    );
-    this.name = "AuthorMismatchError";
+    super(`${slug} is owned by author ${ownerAuthorId}; cannot publish as ${attemptedAuthorId}`);
+    this.name = 'AuthorMismatchError';
   }
 }
 
@@ -153,6 +149,6 @@ export class VersionNotFoundError extends Error {
     public readonly version: string,
   ) {
     super(`${slug}@${version} not found in storage`);
-    this.name = "VersionNotFoundError";
+    this.name = 'VersionNotFoundError';
   }
 }

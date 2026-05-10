@@ -11,11 +11,11 @@
 export type {
   Catalog,
   Command,
+  Frontmatter,
+  ItemKind,
   Skill,
   Workflow,
-  ItemKind,
-  Frontmatter,
-} from "@ecruz165/skillzkit-types";
+} from '@ecruz165/skillzkit-types';
 
 /**
  * One suggested next-step for a completed slug. Returned by
@@ -31,13 +31,13 @@ export type {
  * print or hand to an agent.
  */
 export type NextReason =
-  | "consumes-X" // candidate's body references the completed slug
-  | "wraps-X" // candidate is a workflow whose body references the completed slug
-  | "next-in-active-workflow"; // positional next step in the active workflow
+  | 'consumes-X' // candidate's body references the completed slug
+  | 'wraps-X' // candidate is a workflow whose body references the completed slug
+  | 'next-in-active-workflow'; // positional next step in the active workflow
 
 export interface NextSuggestion {
   slug: string;
-  kind: "command" | "workflow";
+  kind: 'command' | 'workflow';
   reason: NextReason;
   score: number;
   rationale: string;

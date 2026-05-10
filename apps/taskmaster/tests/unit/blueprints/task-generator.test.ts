@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { generateConcernTasks } from '../../../src/blueprints/task-generator.js';
 import type { BlueprintConcern } from '../../../src/blueprints/types.js';
 
@@ -16,9 +16,24 @@ function makeConcern(overrides: Partial<BlueprintConcern> & { id: string }): Blu
   };
 }
 
-const upfrontConcern = makeConcern({ id: 'c-upfront', urgency: 'upfront', category: 'security', estimatedComplexity: 7 });
-const patternConcern = makeConcern({ id: 'c-pattern', urgency: 'pattern-first', category: 'performance', estimatedComplexity: 4 });
-const deferredConcern = makeConcern({ id: 'c-deferred', urgency: 'deferred', category: 'documentation', estimatedComplexity: 3 });
+const upfrontConcern = makeConcern({
+  id: 'c-upfront',
+  urgency: 'upfront',
+  category: 'security',
+  estimatedComplexity: 7,
+});
+const patternConcern = makeConcern({
+  id: 'c-pattern',
+  urgency: 'pattern-first',
+  category: 'performance',
+  estimatedComplexity: 4,
+});
+const deferredConcern = makeConcern({
+  id: 'c-deferred',
+  urgency: 'deferred',
+  category: 'documentation',
+  estimatedComplexity: 3,
+});
 const allConcerns = [upfrontConcern, patternConcern, deferredConcern];
 
 describe('generateConcernTasks - grouped style', () => {
@@ -94,10 +109,10 @@ describe('generateConcernTasks - grouped style', () => {
 
   it('skips tiers with no concerns', () => {
     // Only upfront and deferred, no pattern-first
-    const tasks = generateConcernTasks(
-      [upfrontConcern, deferredConcern],
-      { blueprintId: 'test-bp', style: 'grouped' },
-    );
+    const tasks = generateConcernTasks([upfrontConcern, deferredConcern], {
+      blueprintId: 'test-bp',
+      style: 'grouped',
+    });
     expect(tasks).toHaveLength(2);
     expect(tasks[0].tags).toContain('urgency:upfront');
     expect(tasks[1].tags).toContain('urgency:deferred');

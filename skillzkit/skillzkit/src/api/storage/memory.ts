@@ -17,20 +17,17 @@
  */
 
 import type {
+  AuthorIdentity,
   CatalogIndex,
   Command,
   CommandSummary,
   Skill,
   SkillSummary,
+  VersionEntry,
   Workflow,
   WorkflowSummary,
-} from "../contracts.js";
-import {
-  toCommandSummary,
-  toSkillSummary,
-  toWorkflowSummary,
-} from "../contracts.js";
-import type { AuthorIdentity, VersionEntry } from "../contracts.js";
+} from '../contracts.js';
+import { toCommandSummary, toSkillSummary, toWorkflowSummary } from '../contracts.js';
 import {
   AuthorMismatchError,
   type CatalogStorage,
@@ -39,7 +36,7 @@ import {
   type PutWorkflowInput,
   VersionConflictError,
   VersionNotFoundError,
-} from "./interface.js";
+} from './interface.js';
 
 interface StoredEntry<T> {
   artifact: T;
@@ -54,7 +51,7 @@ export class MemoryCatalogStorage implements CatalogStorage {
   constructor(
     /** Package version reported in the index. Defaults to "0.0.0" if
      *  not provided — useful for tests where it doesn't matter. */
-    private readonly packageVersion: string = "0.0.0",
+    private readonly packageVersion: string = '0.0.0',
   ) {}
 
   /* ── Read ────────────────────────────────────────────────────── */
@@ -101,10 +98,7 @@ export class MemoryCatalogStorage implements CatalogStorage {
   async getSkillVersion(name: string, version: string): Promise<Skill | null> {
     return findVersion(this.skillVersions.get(name), version);
   }
-  async getWorkflowVersion(
-    qualifiedName: string,
-    version: string,
-  ): Promise<Workflow | null> {
+  async getWorkflowVersion(qualifiedName: string, version: string): Promise<Workflow | null> {
     return findVersion(this.workflowVersions.get(qualifiedName), version);
   }
 
@@ -157,10 +151,7 @@ export class MemoryCatalogStorage implements CatalogStorage {
   async promoteSkill(name: string, version: string): Promise<void> {
     promote(this.skillVersions.get(name), name, version);
   }
-  async promoteWorkflow(
-    qualifiedName: string,
-    version: string,
-  ): Promise<void> {
+  async promoteWorkflow(qualifiedName: string, version: string): Promise<void> {
     promote(this.workflowVersions.get(qualifiedName), qualifiedName, version);
   }
 
@@ -219,26 +210,17 @@ function getPromoted<T>(entries: StoredEntry<T>[] | undefined): T | null {
   return promoted ? promoted.artifact : null;
 }
 
-function findVersion<T>(
-  entries: StoredEntry<T>[] | undefined,
-  version: string,
-): T | null {
+function findVersion<T>(entries: StoredEntry<T>[] | undefined, version: string): T | null {
   if (!entries) return null;
   const match = entries.find((e) => e.metadata.version === version);
   return match ? match.artifact : null;
 }
 
-function listMetadata<T>(
-  entries: StoredEntry<T>[] | undefined,
-): VersionEntry[] {
+function listMetadata<T>(entries: StoredEntry<T>[] | undefined): VersionEntry[] {
   return entries ? entries.map((e) => ({ ...e.metadata })) : [];
 }
 
-function promote<T>(
-  entries: StoredEntry<T>[] | undefined,
-  key: string,
-  version: string,
-): void {
+function promote<T>(entries: StoredEntry<T>[] | undefined, key: string, version: string): void {
   if (!entries) throw new VersionNotFoundError(key, version);
   const target = entries.find((e) => e.metadata.version === version);
   if (!target) throw new VersionNotFoundError(key, version);

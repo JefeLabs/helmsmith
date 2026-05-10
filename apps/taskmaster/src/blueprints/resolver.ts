@@ -1,8 +1,4 @@
-import type {
-  ApplicationBlueprint,
-  BlueprintConcern,
-  ConcernUrgency,
-} from './types.js';
+import type { ApplicationBlueprint, BlueprintConcern, ConcernUrgency } from './types.js';
 
 /**
  * Apply conditional rules based on context answers and return the final
@@ -24,10 +20,9 @@ export function resolveBlueprint(
     const answer = contextAnswers[rule.questionId];
     if (answer === undefined) continue;
 
-    const matches =
-      Array.isArray(answer)
-        ? answer.includes(String(rule.answerEquals))
-        : answer === rule.answerEquals;
+    const matches = Array.isArray(answer)
+      ? answer.includes(String(rule.answerEquals))
+      : answer === rule.answerEquals;
 
     if (!matches) continue;
 

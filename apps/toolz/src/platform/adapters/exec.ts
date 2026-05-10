@@ -6,9 +6,9 @@
  * directly so tests can mock it in one place.
  */
 
-import { execFile as nodeExecFile } from "node:child_process";
-import { promisify } from "node:util";
-import type { InstallResult } from "../package-managers.js";
+import { execFile as nodeExecFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import type { InstallResult } from '../package-managers.js';
 
 const runArgs = promisify(nodeExecFile);
 
@@ -39,8 +39,8 @@ export async function runCommand(
     };
     return {
       success: false,
-      stdout: e.stdout ?? "",
-      stderr: e.stderr ?? "",
+      stdout: e.stdout ?? '',
+      stderr: e.stderr ?? '',
       error: e.message,
     };
   }
@@ -52,10 +52,7 @@ export async function runCommand(
  * whether the package manager itself is installed.
  */
 export async function commandExists(name: string): Promise<boolean> {
-  const result = await runCommand(
-    process.platform === "win32" ? "where" : "which",
-    [name],
-  );
+  const result = await runCommand(process.platform === 'win32' ? 'where' : 'which', [name]);
   return result.success && result.stdout.trim().length > 0;
 }
 
@@ -69,6 +66,6 @@ export async function commandExists(name: string): Promise<boolean> {
  * building their argv.
  */
 export function needsSudo(): boolean {
-  if (process.platform === "win32") return false;
+  if (process.platform === 'win32') return false;
   return process.getuid?.() !== 0;
 }

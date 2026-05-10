@@ -10,15 +10,15 @@
  * Box + Text from atoms — not a pure keyboard concern).
  */
 
+export type {
+  KeybindingEntry,
+  KeyboardProviderProps,
+  KeyEvent,
+  KeyMatcher,
+  UseKeybindingOptions,
+} from './registry.tsx';
 export {
   KeyboardProvider,
   useKeybinding,
   useKeybindings,
-} from "./registry.tsx";
-export type {
-  KeyboardProviderProps,
-  KeybindingEntry,
-  KeyEvent,
-  KeyMatcher,
-  UseKeybindingOptions,
-} from "./registry.tsx";
+} from './registry.tsx';

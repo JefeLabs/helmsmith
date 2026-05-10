@@ -9,5 +9,5 @@
  * every TUI app's root is an AppShell.
  */
 
-export { AppShell } from "./AppShell.tsx";
-export type { AppShellProps } from "./AppShell.tsx";
+export type { AppShellProps } from './AppShell.tsx';
+export { AppShell } from './AppShell.tsx';

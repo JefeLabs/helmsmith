@@ -24,8 +24,14 @@ export const ComponentInterfaceSchema = z.object({
   from: z.string(),
   to: z.string(),
   type: z.enum([
-    'REST', 'gRPC', 'WebSocket', 'messageQueue',
-    'internal', 'eventBus', 'fileSystem', 'CLI',
+    'REST',
+    'gRPC',
+    'WebSocket',
+    'messageQueue',
+    'internal',
+    'eventBus',
+    'fileSystem',
+    'CLI',
   ]),
   description: z.string(),
   protocol: z.string().optional(),
@@ -38,8 +44,17 @@ export type ComponentInterface = z.infer<typeof ComponentInterfaceSchema>;
 export const DataSourceSchema = z.object({
   name: z.string(),
   type: z.enum([
-    'postgres', 'mysql', 'mongodb', 'redis', 'elasticsearch', 's3', 'sqlite',
-    'external-api', 'file-system', 'in-memory', 'other',
+    'postgres',
+    'mysql',
+    'mongodb',
+    'redis',
+    'elasticsearch',
+    's3',
+    'sqlite',
+    'external-api',
+    'file-system',
+    'in-memory',
+    'other',
   ]),
   ownerComponent: z.string(),
   description: z.string(),
@@ -51,8 +66,16 @@ export type DataSource = z.infer<typeof DataSourceSchema>;
 
 export const CrossCuttingConcernSchema = z.object({
   name: z.enum([
-    'security', 'logging', 'telemetry', 'config-management', 'error-handling',
-    'testing', 'documentation', 'ci-cd', 'performance', 'accessibility',
+    'security',
+    'logging',
+    'telemetry',
+    'config-management',
+    'error-handling',
+    'testing',
+    'documentation',
+    'ci-cd',
+    'performance',
+    'accessibility',
   ]),
   scope: z.string(),
   relatedComponents: z.array(z.string()),
@@ -64,8 +87,13 @@ export type CrossCuttingConcern = z.infer<typeof CrossCuttingConcernSchema>;
 // --- Entry Point Category ---
 
 export const EntryPointCategorySchema = z.enum([
-  'http-api', 'ui-route', 'cli-command', 'event',
-  'job-cron', 'internal-service', 'callback-webhook',
+  'http-api',
+  'ui-route',
+  'cli-command',
+  'event',
+  'job-cron',
+  'internal-service',
+  'callback-webhook',
 ]);
 
 export type EntryPointCategory = z.infer<typeof EntryPointCategorySchema>;
@@ -90,10 +118,17 @@ export type EntryPoint = z.infer<typeof EntryPointSchema>;
 // --- Side Effect ---
 
 export const SideEffectTypeSchema = z.enum([
-  'database-write', 'database-read', 'cache-mutation',
-  'file-write', 'file-read', 'external-api-call',
-  'event-publish', 'email-send', 'notification',
-  'queue-enqueue', 'state-mutation',
+  'database-write',
+  'database-read',
+  'cache-mutation',
+  'file-write',
+  'file-read',
+  'external-api-call',
+  'event-publish',
+  'email-send',
+  'notification',
+  'queue-enqueue',
+  'state-mutation',
 ]);
 
 export type SideEffectType = z.infer<typeof SideEffectTypeSchema>;
@@ -130,17 +165,19 @@ export const EntryPointIndexSchema = z.object({
   generatedAt: z.string(),
   entryPoints: z.array(EntryPointSchema).default([]),
   traces: z.array(EntryPointTraceSchema).default([]),
-  validation: z.object({
-    orphanComponents: z.array(z.string()).default([]),
-    unreachableComponents: z.array(z.string()).default([]),
-    entryPointsWithoutTraces: z.array(z.string()).default([]),
-    coveragePercentage: z.number().default(0),
-  }).default({
-    orphanComponents: [],
-    unreachableComponents: [],
-    entryPointsWithoutTraces: [],
-    coveragePercentage: 0,
-  }),
+  validation: z
+    .object({
+      orphanComponents: z.array(z.string()).default([]),
+      unreachableComponents: z.array(z.string()).default([]),
+      entryPointsWithoutTraces: z.array(z.string()).default([]),
+      coveragePercentage: z.number().default(0),
+    })
+    .default({
+      orphanComponents: [],
+      unreachableComponents: [],
+      entryPointsWithoutTraces: [],
+      coveragePercentage: 0,
+    }),
 });
 
 export type EntryPointIndex = z.infer<typeof EntryPointIndexSchema>;
@@ -199,7 +236,14 @@ export interface SourceAnalysisResult {
 // --- Pragmatic Layer Model ---
 
 export const PragmaticLayerSchema = z.enum([
-  'api', 'service', 'domain', 'data', 'infra', 'cli', 'scripts', 'tests',
+  'api',
+  'service',
+  'domain',
+  'data',
+  'infra',
+  'cli',
+  'scripts',
+  'tests',
 ]);
 
 export type PragmaticLayer = z.infer<typeof PragmaticLayerSchema>;
@@ -207,15 +251,29 @@ export type PragmaticLayer = z.infer<typeof PragmaticLayerSchema>;
 // --- Enhanced Symbol Types ---
 
 export const SymbolKindSchema = z.enum([
-  'function', 'method', 'class', 'interface', 'type', 'enum', 'const',
-  'route', 'command', 'script_fn', 'task',
+  'function',
+  'method',
+  'class',
+  'interface',
+  'type',
+  'enum',
+  'const',
+  'route',
+  'command',
+  'script_fn',
+  'task',
 ]);
 
 export type SymbolKind = z.infer<typeof SymbolKindSchema>;
 
 export const SymbolVisibilitySchema = z.enum([
-  'public', 'protected', 'internal', 'private',
-  'exported', 'file', 'unknown',
+  'public',
+  'protected',
+  'internal',
+  'private',
+  'exported',
+  'file',
+  'unknown',
 ]);
 
 export type SymbolVisibility = z.infer<typeof SymbolVisibilitySchema>;

@@ -19,33 +19,27 @@
  * and pages.
  */
 
-export { StatusList } from "./StatusList.tsx";
+export type { ConfirmProps } from './Confirm.tsx';
+export { Confirm } from './Confirm.tsx';
+export type { MenuItem, MenuProps } from './Menu.tsx';
+export { Menu } from './Menu.tsx';
+export type { SelectListItem, SelectListProps } from './SelectList.tsx';
+export { SelectList } from './SelectList.tsx';
 export type {
-  StatusListProps,
   StatusListItem,
   StatusListItemState,
-} from "./StatusList.tsx";
-
-export { SelectList } from "./SelectList.tsx";
-export type { SelectListProps, SelectListItem } from "./SelectList.tsx";
-
-export { Confirm } from "./Confirm.tsx";
-export type { ConfirmProps } from "./Confirm.tsx";
-
-export { Table } from "./Table.tsx";
+  StatusListProps,
+} from './StatusList.tsx';
+export { StatusList } from './StatusList.tsx';
 export type {
-  TableProps,
+  RowKey,
   TableColumn,
   TableHandle,
+  TableProps,
   TableReorderStrategy,
-  RowKey,
-} from "./Table.tsx";
-
-export { TableHelp } from "./TableHelp.tsx";
-export type { TableHelpProps } from "./TableHelp.tsx";
-
-export { ThemeSwitcher } from "./ThemeSwitcher.tsx";
-export type { ThemeSwitcherProps } from "./ThemeSwitcher.tsx";
-
-export { Menu } from "./Menu.tsx";
-export type { MenuProps, MenuItem } from "./Menu.tsx";
+} from './Table.tsx';
+export { Table } from './Table.tsx';
+export type { TableHelpProps } from './TableHelp.tsx';
+export { TableHelp } from './TableHelp.tsx';
+export type { ThemeSwitcherProps } from './ThemeSwitcher.tsx';
+export { ThemeSwitcher } from './ThemeSwitcher.tsx';

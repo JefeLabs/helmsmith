@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { safeLoad, safeDump, YamlParseError } from '../src/formats/yaml-bridge.js';
+import { describe, expect, it } from 'vitest';
+import { safeDump, safeLoad, YamlParseError } from '../src/formats/yaml-bridge.js';
 
 describe('safeLoad', () => {
   it('parses a simple YAML string', () => {

@@ -1,17 +1,17 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { existsSync, rmSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
-  getConfigRoot,
-  getTaskmasterHome,
-  getProjectDir,
-  getHomePath,
   bootstrapHome,
+  bootstrapRepoHome,
+  getConfigRoot,
+  getHomePath,
+  getProjectDir,
+  getTaskmasterHome,
+  getTaskmasterHomeFor,
   homeExists,
   scaffoldProjectDir,
-  getTaskmasterHomeFor,
-  bootstrapRepoHome,
 } from '../src/utils/home.js';
 
 const TEST_DIR = join(tmpdir(), `agentx-test-home-${Date.now()}`);

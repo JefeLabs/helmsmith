@@ -1,5 +1,5 @@
-import Handlebars from 'handlebars';
 import chalk from 'chalk';
+import Handlebars from 'handlebars';
 
 /** Default status-to-badge mapping (standard preset fallback). */
 const STATUS_BADGES: Record<string, { icon: string; color: (s: string) => string }> = {
@@ -15,7 +15,7 @@ const STATUS_BADGES: Record<string, { icon: string; color: (s: string) => string
 };
 
 /** Default category-to-badge fallback for unknown statuses. */
-const CATEGORY_BADGES: Record<string, { icon: string; color: (s: string) => string }> = {
+const _CATEGORY_BADGES: Record<string, { icon: string; color: (s: string) => string }> = {
   open: { icon: '\u2022', color: chalk.gray },
   active: { icon: '\u25CB', color: chalk.yellow },
   closed: { icon: '\u2713', color: chalk.green },
@@ -45,7 +45,7 @@ export function registerHelpers(): void {
  */
 export function complexityColor(score: unknown): string {
   const n = Number(score);
-  if (isNaN(n)) return String(score);
+  if (Number.isNaN(n)) return String(score);
 
   if (n <= 3) return chalk.green(`${n}`);
   if (n <= 6) return chalk.yellow(`${n}`);
@@ -76,7 +76,7 @@ export function progressBar(done: unknown, total: unknown): string {
   const d = Number(done);
   const t = Number(total);
 
-  if (isNaN(d) || isNaN(t) || t === 0) {
+  if (Number.isNaN(d) || Number.isNaN(t) || t === 0) {
     return '[....................] 0%';
   }
 
@@ -100,7 +100,7 @@ export function dateFormat(dateStr: unknown, format: unknown): string {
   const fmt = typeof format === 'string' ? format : 'YYYY-MM-DD';
 
   const date = new Date(s);
-  if (isNaN(date.getTime())) return s;
+  if (Number.isNaN(date.getTime())) return s;
 
   const tokens: Record<string, string> = {
     YYYY: String(date.getFullYear()),
@@ -134,7 +134,7 @@ export function pluralize(count: unknown, singular: unknown, plural: unknown): s
 export function indent(text: unknown, level: unknown): string {
   const s = String(text);
   const n = Number(level);
-  if (isNaN(n) || n <= 0) return s;
+  if (Number.isNaN(n) || n <= 0) return s;
 
   const prefix = '  '.repeat(n);
   return s
@@ -146,24 +146,49 @@ export function indent(text: unknown, level: unknown): string {
 // --- Block comparison helpers ---
 // These must be regular functions (not arrow functions) so Handlebars can bind `this`.
 
-export function ifGte(this: unknown, a: unknown, b: unknown, options: Handlebars.HelperOptions): string {
+export function ifGte(
+  this: unknown,
+  a: unknown,
+  b: unknown,
+  options: Handlebars.HelperOptions,
+): string {
   return Number(a) >= Number(b) ? options.fn(this) : options.inverse(this);
 }
 
-export function ifLte(this: unknown, a: unknown, b: unknown, options: Handlebars.HelperOptions): string {
+export function ifLte(
+  this: unknown,
+  a: unknown,
+  b: unknown,
+  options: Handlebars.HelperOptions,
+): string {
   return Number(a) <= Number(b) ? options.fn(this) : options.inverse(this);
 }
 
-export function ifGt(this: unknown, a: unknown, b: unknown, options: Handlebars.HelperOptions): string {
+export function ifGt(
+  this: unknown,
+  a: unknown,
+  b: unknown,
+  options: Handlebars.HelperOptions,
+): string {
   return Number(a) > Number(b) ? options.fn(this) : options.inverse(this);
 }
 
-export function ifLt(this: unknown, a: unknown, b: unknown, options: Handlebars.HelperOptions): string {
+export function ifLt(
+  this: unknown,
+  a: unknown,
+  b: unknown,
+  options: Handlebars.HelperOptions,
+): string {
   return Number(a) < Number(b) ? options.fn(this) : options.inverse(this);
 }
 
-export function ifEq(this: unknown, a: unknown, b: unknown, options: Handlebars.HelperOptions): string {
-  return a == b ? options.fn(this) : options.inverse(this);
+export function ifEq(
+  this: unknown,
+  a: unknown,
+  b: unknown,
+  options: Handlebars.HelperOptions,
+): string {
+  return a === b ? options.fn(this) : options.inverse(this);
 }
 
 /**

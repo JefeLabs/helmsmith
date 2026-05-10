@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock @inquirer/prompts
 vi.mock('@inquirer/prompts', () => ({
@@ -15,11 +15,11 @@ vi.mock('../../../src/utils/defaults.js', () => ({
   readDefaults: vi.fn().mockResolvedValue({}),
 }));
 
-import { confirm, checkbox, number as numberPrompt } from '@inquirer/prompts';
+import { checkbox, confirm, number as numberPrompt } from '@inquirer/prompts';
 import {
-  confirmRemove,
-  confirmExpand,
   confirmBulkOperation,
+  confirmExpand,
+  confirmRemove,
 } from '../../../src/prompts/confirmations.js';
 import { resetDefaultsCache } from '../../../src/prompts/factory.js';
 

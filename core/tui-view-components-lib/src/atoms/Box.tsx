@@ -15,11 +15,11 @@
  * `@opentui/core` version's BoxOptions and update the merge below.
  */
 
-import type { ReactNode } from "react";
-import { useThemeTokens } from "../theme/hooks.ts";
-import type { SpacingKey } from "../theme/types.ts";
+import type { ReactNode } from 'react';
+import { useThemeTokens } from '../theme/hooks.ts';
+import type { SpacingKey } from '../theme/types.ts';
 
-export type BoxVariant = "default" | "panel" | "overlay" | "transparent";
+export type BoxVariant = 'default' | 'panel' | 'overlay' | 'transparent';
 
 export interface BoxProps {
   variant?: BoxVariant;
@@ -33,7 +33,7 @@ export interface BoxProps {
 }
 
 export function Box({
-  variant = "default",
+  variant = 'default',
   padding,
   paddingX,
   paddingY,
@@ -48,9 +48,7 @@ export function Box({
 
   const merged: Record<string, unknown> = {
     ...(v.bg ? { backgroundColor: v.bg } : {}),
-    ...(v.border && v.border !== "none"
-      ? { border: true, borderStyle: v.border }
-      : {}),
+    ...(v.border && v.border !== 'none' ? { border: true, borderStyle: v.border } : {}),
     ...(v.borderColor ? { borderColor: v.borderColor } : {}),
     ...(px !== undefined
       ? { paddingLeft: theme.spacing[px], paddingRight: theme.spacing[px] }

@@ -4,9 +4,9 @@
  * need to pick the right install path for the current host.
  */
 
-export type Platform = "darwin" | "linux" | "win32";
+export type Platform = 'darwin' | 'linux' | 'win32';
 
-export type Architecture = "x64" | "arm64";
+export type Architecture = 'x64' | 'arm64';
 
 /**
  * Linux distro family. Determines which package manager to default to
@@ -15,21 +15,21 @@ export type Architecture = "x64" | "arm64";
  * etc.).
  */
 export type LinuxFamily =
-  | "debian" // apt: Debian, Ubuntu, Mint, Pop!_OS, ...
-  | "fedora" // dnf: Fedora, RHEL, CentOS Stream, ...
-  | "arch" // pacman: Arch, Manjaro, ...
-  | "alpine" // apk: Alpine
-  | "unknown";
+  | 'debian' // apt: Debian, Ubuntu, Mint, Pop!_OS, ...
+  | 'fedora' // dnf: Fedora, RHEL, CentOS Stream, ...
+  | 'arch' // pacman: Arch, Manjaro, ...
+  | 'alpine' // apk: Alpine
+  | 'unknown';
 
 export type PackageManagerType =
-  | "brew" // macOS, Linuxbrew
-  | "apt" // Debian-family
-  | "dnf" // Fedora-family
-  | "pacman" // Arch-family
-  | "apk" // Alpine
-  | "winget" // Windows: Winget
-  | "scoop" // Windows: Scoop
-  | "choco"; // Windows: Chocolatey
+  | 'brew' // macOS, Linuxbrew
+  | 'apt' // Debian-family
+  | 'dnf' // Fedora-family
+  | 'pacman' // Arch-family
+  | 'apk' // Alpine
+  | 'winget' // Windows: Winget
+  | 'scoop' // Windows: Scoop
+  | 'choco'; // Windows: Chocolatey
 
 export interface PlatformInfo {
   platform: Platform;

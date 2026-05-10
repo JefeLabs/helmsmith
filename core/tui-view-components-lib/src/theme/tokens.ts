@@ -8,7 +8,7 @@
  * `overrides` field on ThemeDefinition.
  */
 
-import { deepMerge } from "./base16.ts";
+import { deepMerge } from './base16.ts';
 import type {
   Base16Palette,
   ButtonComponent,
@@ -20,7 +20,7 @@ import type {
   ThemeComponents,
   ThemeDefinition,
   Typography,
-} from "./types.ts";
+} from './types.ts';
 
 // ────────────────────────────────────────────────────────────────────
 // palette → semantic colors
@@ -96,7 +96,7 @@ function defaultTypography(c: ThemeColors): Typography {
 // Component defaults
 // ────────────────────────────────────────────────────────────────────
 
-const BUTTON_SIZES: ButtonComponent["sizes"] = {
+const BUTTON_SIZES: ButtonComponent['sizes'] = {
   sm: { paddingX: 1, paddingY: 0, minWidth: 6 },
   md: { paddingX: 2, paddingY: 0, minWidth: 10 },
   lg: { paddingX: 3, paddingY: 1, minWidth: 14 },
@@ -145,9 +145,7 @@ function defaultButton(c: ThemeColors): ButtonComponent {
   };
 }
 
-function cloneSizes(
-  sizes: Record<string, ButtonSizeStyle>,
-): ButtonComponent["sizes"] {
+function cloneSizes(sizes: Record<string, ButtonSizeStyle>): ButtonComponent['sizes'] {
   return {
     sm: { ...sizes.sm! },
     md: { ...sizes.md! },
@@ -184,20 +182,20 @@ function defaultComponents(c: ThemeColors): ThemeComponents {
   return {
     box: {
       variants: {
-        default: { bg: c.background, fg: c.text, border: "none" },
+        default: { bg: c.background, fg: c.text, border: 'none' },
         panel: {
           bg: c.surface,
           fg: c.text,
-          border: "single",
+          border: 'single',
           borderColor: c.border,
         },
         overlay: {
           bg: c.overlay,
           fg: c.text,
-          border: "single",
+          border: 'single',
           borderColor: c.accent,
         },
-        transparent: { border: "none" },
+        transparent: { border: 'none' },
       },
     },
     text: {
@@ -212,8 +210,8 @@ function defaultComponents(c: ThemeColors): ThemeComponents {
     button: defaultButton(c),
     input: defaultInput(c),
     panel: {
-      padding: "md",
-      border: "single",
+      padding: 'md',
+      border: 'single',
       titleFg: c.primary,
       titleBg: c.surface,
     },
@@ -231,13 +229,13 @@ function defaultComponents(c: ThemeColors): ThemeComponents {
  */
 export function defineTheme(def: ThemeDefinition): Theme {
   const colors = deriveColors(def.palette);
-  const baseTheme: Omit<Theme, "name" | "displayName" | "appearance"> = {
+  const baseTheme: Omit<Theme, 'name' | 'displayName' | 'appearance'> = {
     colors,
     spacing: { none: 0, xs: 1, sm: 1, md: 2, lg: 3, xl: 4 },
     borders: {
-      default: "single",
-      emphasis: "double",
-      none: "none",
+      default: 'single',
+      emphasis: 'double',
+      none: 'none',
     },
     typography: defaultTypography(colors),
     components: defaultComponents(colors),
@@ -260,9 +258,9 @@ export function defineTheme(def: ThemeDefinition): Theme {
 export function themeFromPalette(args: {
   name: string;
   displayName: string;
-  appearance: ThemeDefinition["appearance"];
+  appearance: ThemeDefinition['appearance'];
   palette: Base16Palette;
-  overrides?: DeepPartial<Omit<Theme, "name" | "displayName" | "appearance">>;
+  overrides?: DeepPartial<Omit<Theme, 'name' | 'displayName' | 'appearance'>>;
 }): Theme {
   return defineTheme(args);
 }

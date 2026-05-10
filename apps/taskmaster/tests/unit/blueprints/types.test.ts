@@ -1,10 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
+  ApplicationBlueprintSchema,
   BlueprintConcernSchema,
+  BlueprintConfigSchema,
   ConcernUrgencySchema,
   ContextQuestionSchema,
-  ApplicationBlueprintSchema,
-  BlueprintConfigSchema,
 } from '../../../src/blueprints/types.js';
 
 describe('ConcernUrgencySchema', () => {
@@ -97,8 +97,12 @@ describe('BlueprintConcernSchema', () => {
   });
 
   it('rejects estimatedComplexity outside 1-10 range', () => {
-    expect(() => BlueprintConcernSchema.parse({ ...validConcern, estimatedComplexity: 0 })).toThrow();
-    expect(() => BlueprintConcernSchema.parse({ ...validConcern, estimatedComplexity: 11 })).toThrow();
+    expect(() =>
+      BlueprintConcernSchema.parse({ ...validConcern, estimatedComplexity: 0 }),
+    ).toThrow();
+    expect(() =>
+      BlueprintConcernSchema.parse({ ...validConcern, estimatedComplexity: 11 }),
+    ).toThrow();
   });
 });
 
@@ -186,9 +190,7 @@ describe('ApplicationBlueprintSchema', () => {
       name: 'Full Blueprint',
       description: 'A fully specified blueprint',
       appType: 'tool',
-      contextQuestions: [
-        { id: 'q1', question: 'Ready?', type: 'boolean' },
-      ],
+      contextQuestions: [{ id: 'q1', question: 'Ready?', type: 'boolean' }],
       concerns: [
         {
           id: 'c1',
@@ -199,9 +201,7 @@ describe('ApplicationBlueprintSchema', () => {
           implementationGuidance: 'do it',
         },
       ],
-      conditionalRules: [
-        { questionId: 'q1', answerEquals: true, addConcerns: ['c1'] },
-      ],
+      conditionalRules: [{ questionId: 'q1', answerEquals: true, addConcerns: ['c1'] }],
       nonNegotiableBundle: ['c1'],
       detectionHints: {
         patterns: ['rest'],
@@ -242,6 +242,6 @@ describe('BlueprintConfigSchema', () => {
     const result = BlueprintConfigSchema.parse({
       contextAnswers: { features: ['caching', 'tracing'] },
     });
-    expect(result.contextAnswers['features']).toEqual(['caching', 'tracing']);
+    expect(result.contextAnswers.features).toEqual(['caching', 'tracing']);
   });
 });

@@ -13,13 +13,13 @@
  * `bun server/bun.ts`.
  */
 
-import { createApp } from "./app.js";
-import { loadServerConfig } from "./config.js";
+import { createApp } from './app.js';
+import { loadServerConfig } from './config.js';
 
 const config = await loadServerConfig();
 const app = createApp({ storage: config.storage, writable: config.writable });
 
-const storageDesc = process.env.SKILLZKIT_STORAGE ?? "fs:auto";
+const storageDesc = process.env.SKILLZKIT_STORAGE ?? 'fs:auto';
 console.log(
   `skillzkit-api listening on :${config.port}  (storage=${storageDesc}, writable=${config.writable})`,
 );

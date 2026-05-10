@@ -1,9 +1,9 @@
-import { readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import yaml from 'js-yaml';
-import { ProjectConfigSchema, type ProjectConfig } from './schema.js';
 import { readDefaults } from '../utils/defaults.js';
+import { type ProjectConfig, ProjectConfigSchema } from './schema.js';
 
 /**
  * Load and validate a project's config.yaml.
@@ -62,11 +62,7 @@ export async function writeProjectConfig(
   const existing = await loadProjectConfig(projectDir);
   const merged = deepMerge(existing as unknown as Record<string, unknown>, patch);
   const validated = ProjectConfigSchema.parse(merged);
-  await writeFile(
-    configPath,
-    yaml.dump(validated, { lineWidth: -1, noRefs: true }),
-    'utf-8',
-  );
+  await writeFile(configPath, yaml.dump(validated, { lineWidth: -1, noRefs: true }), 'utf-8');
 }
 
 /**

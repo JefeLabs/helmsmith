@@ -29,13 +29,8 @@
  * user can't decrypt their config.
  */
 
-import {
-  createCipheriv,
-  createDecipheriv,
-  randomBytes,
-  scryptSync,
-} from "node:crypto";
-import type { EncryptedBlob, ScryptParams } from "./config.js";
+import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto';
+import type { EncryptedBlob, ScryptParams } from './config.js';
 
 /** Default KDF parameters for new configs. Stored params from older
  *  blobs are honored on decrypt regardless of these defaults. */
@@ -71,19 +66,16 @@ export function encryptApiKey(input: EncryptInput): EncryptedBlob {
   const iv = randomBytes(IV_BYTES);
   const key = deriveKey(input.email, input.pin, salt, params);
 
-  const cipher = createCipheriv("aes-256-gcm", key, iv);
-  const ciphertext = Buffer.concat([
-    cipher.update(input.apiKey, "utf8"),
-    cipher.final(),
-  ]);
+  const cipher = createCipheriv('aes-256-gcm', key, iv);
+  const ciphertext = Buffer.concat([cipher.update(input.apiKey, 'utf8'), cipher.final()]);
   const authTag = cipher.getAuthTag();
 
   const blob: EncryptedBlob = {
-    ciphertext: ciphertext.toString("base64"),
-    iv: iv.toString("base64"),
-    authTag: authTag.toString("base64"),
-    salt: salt.toString("base64"),
-    kdf: "scrypt",
+    ciphertext: ciphertext.toString('base64'),
+    iv: iv.toString('base64'),
+    authTag: authTag.toString('base64'),
+    salt: salt.toString('base64'),
+    kdf: 'scrypt',
     kdfParams: { ...params },
   };
 
@@ -98,7 +90,7 @@ export function encryptApiKey(input: EncryptInput): EncryptedBlob {
   });
   if (verify !== input.apiKey) {
     throw new Error(
-      "Internal error: encryption self-test failed — round-trip did not return the original key. This is a bug in the crypto pipeline.",
+      'Internal error: encryption self-test failed — round-trip did not return the original key. This is a bug in the crypto pipeline.',
     );
   }
 
@@ -119,28 +111,23 @@ export function decryptApiKey(input: DecryptInput): string {
   let authTag: Buffer;
   let ciphertext: Buffer;
   try {
-    salt = Buffer.from(encrypted.salt, "base64");
-    iv = Buffer.from(encrypted.iv, "base64");
-    authTag = Buffer.from(encrypted.authTag, "base64");
-    ciphertext = Buffer.from(encrypted.ciphertext, "base64");
+    salt = Buffer.from(encrypted.salt, 'base64');
+    iv = Buffer.from(encrypted.iv, 'base64');
+    authTag = Buffer.from(encrypted.authTag, 'base64');
+    ciphertext = Buffer.from(encrypted.ciphertext, 'base64');
   } catch {
-    throw new Error("Encrypted blob has malformed base64 fields");
+    throw new Error('Encrypted blob has malformed base64 fields');
   }
 
   const key = deriveKey(input.email, input.pin, salt, encrypted.kdfParams);
 
   try {
-    const decipher = createDecipheriv("aes-256-gcm", key, iv);
+    const decipher = createDecipheriv('aes-256-gcm', key, iv);
     decipher.setAuthTag(authTag);
-    const plaintext = Buffer.concat([
-      decipher.update(ciphertext),
-      decipher.final(),
-    ]);
-    return plaintext.toString("utf8");
+    const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    return plaintext.toString('utf8');
   } catch {
-    throw new Error(
-      "Could not decrypt API key — wrong PIN, or the config has been tampered with",
-    );
+    throw new Error('Could not decrypt API key — wrong PIN, or the config has been tampered with');
   }
 }
 
@@ -158,7 +145,7 @@ export function decryptApiKey(input: DecryptInput): string {
  *   maskApiKey("xyz")                    → "...xyz"   (shorter than 4 — show what we have)
  */
 export function maskApiKey(key: string): string {
-  if (key.length === 0) return "...";
+  if (key.length === 0) return '...';
   // Scan for a 4-character window where every char is a digit. Walk
   // from rightmost to leftmost so we prefer trailing numeric runs
   // (which feel more natural to identify by, e.g. AWS access key IDs).
@@ -186,12 +173,7 @@ export function maskApiKey(key: string): string {
  * (128 * N * r * 2) so Node doesn't reject larger N values when
  * users tune for stronger KDF.
  */
-function deriveKey(
-  email: string,
-  pin: string,
-  salt: Buffer,
-  params: ScryptParams,
-): Buffer {
+function deriveKey(email: string, pin: string, salt: Buffer, params: ScryptParams): Buffer {
   const passphrase = `${email}:${pin}`;
   return scryptSync(passphrase, salt, KEY_BYTES, {
     N: params.N,

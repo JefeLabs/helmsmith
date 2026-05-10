@@ -13,7 +13,7 @@
  * line-buffered handling conflicts with raw-mode keystroke capture.
  */
 
-import { createInterface, type Interface as ReadlineInterface } from "node:readline/promises";
+import { createInterface, type Interface as ReadlineInterface } from 'node:readline/promises';
 
 let sharedRl: ReadlineInterface | undefined;
 
@@ -63,44 +63,44 @@ export function promptHidden(question: string): Promise<string> {
     process.stdout.write(question);
     const stdin = process.stdin;
     const wasRaw = stdin.isRaw;
-    let value = "";
+    let value = '';
 
     const restore = () => {
       stdin.setRawMode(wasRaw);
-      stdin.removeListener("data", onData);
+      stdin.removeListener('data', onData);
       stdin.pause();
     };
 
     const onData = (chunk: Buffer) => {
-      const str = chunk.toString("utf8");
+      const str = chunk.toString('utf8');
       for (const ch of str) {
-        if (ch === "\r" || ch === "\n") {
-          process.stdout.write("\n");
+        if (ch === '\r' || ch === '\n') {
+          process.stdout.write('\n');
           restore();
           resolve(value);
           return;
         }
-        if (ch === "") {
+        if (ch === '') {
           // Ctrl-C — restore terminal state before exit so the parent
           // shell isn't left in raw mode.
-          process.stdout.write("\n");
+          process.stdout.write('\n');
           restore();
           process.exit(130);
         }
-        if (ch === "\b" || ch === "") {
+        if (ch === '\b' || ch === '') {
           // Backspace (\b = ) or DEL () — terminals send
           // one or the other depending on platform/config.
           if (value.length > 0) {
             value = value.slice(0, -1);
-            process.stdout.write("\b \b");
+            process.stdout.write('\b \b');
           }
           continue;
         }
         // Filter non-printable control codes so escape sequences,
         // arrow keys, etc. can't pollute the captured value.
-        if (ch >= " ") {
+        if (ch >= ' ') {
           value += ch;
-          process.stdout.write("*");
+          process.stdout.write('*');
         }
       }
     };
@@ -108,7 +108,7 @@ export function promptHidden(question: string): Promise<string> {
     try {
       stdin.setRawMode(true);
       stdin.resume();
-      stdin.on("data", onData);
+      stdin.on('data', onData);
     } catch (err) {
       restore();
       reject(err);
@@ -120,14 +120,11 @@ export function promptHidden(question: string): Promise<string> {
  * Yes/no prompt — accepts y/yes (true) or n/no (false), case-insensitive,
  * empty input falls back to `defaultValue`.
  */
-export async function promptYesNo(
-  question: string,
-  defaultValue: boolean,
-): Promise<boolean> {
-  const suffix = defaultValue ? " [Y/n] " : " [y/N] ";
+export async function promptYesNo(question: string, defaultValue: boolean): Promise<boolean> {
+  const suffix = defaultValue ? ' [Y/n] ' : ' [y/N] ';
   const answer = (await prompt(question + suffix)).trim().toLowerCase();
-  if (answer === "") return defaultValue;
-  return answer === "y" || answer === "yes";
+  if (answer === '') return defaultValue;
+  return answer === 'y' || answer === 'yes';
 }
 
 /**

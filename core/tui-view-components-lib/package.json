@@ -16,7 +16,10 @@
     "./focus": "./src/focus/index.ts",
     "./keyboard": "./src/keyboard/index.ts"
   },
-  "files": ["src", "README.md"],
+  "files": [
+    "src",
+    "README.md"
+  ],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

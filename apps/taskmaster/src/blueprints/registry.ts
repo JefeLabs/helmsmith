@@ -1,11 +1,11 @@
-import type { ApplicationBlueprint } from './types.js';
-import { REST_API_BLUEPRINT } from './archetypes/rest-api.js';
-import { EVENT_DRIVEN_BLUEPRINT } from './archetypes/event-driven.js';
 import { CLI_TOOL_BLUEPRINT } from './archetypes/cli-tool.js';
 import { DATA_PIPELINE_BLUEPRINT } from './archetypes/data-pipeline.js';
+import { EVENT_DRIVEN_BLUEPRINT } from './archetypes/event-driven.js';
 import { FRONTEND_SPA_BLUEPRINT } from './archetypes/frontend-spa.js';
 import { FULLSTACK_WEB_BLUEPRINT } from './archetypes/fullstack-web.js';
 import { LIBRARY_SDK_BLUEPRINT } from './archetypes/library-sdk.js';
+import { REST_API_BLUEPRINT } from './archetypes/rest-api.js';
+import type { ApplicationBlueprint } from './types.js';
 
 export const BLUEPRINTS: Record<string, ApplicationBlueprint> = {
   'rest-api': REST_API_BLUEPRINT,

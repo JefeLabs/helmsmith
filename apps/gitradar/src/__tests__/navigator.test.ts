@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { runNavigator } from '../views/navigator.js';
-import type { ViewContext, ViewFn, NavigationAction } from '../views/types.js';
-import { DEFAULT_SETTINGS } from '../types/schema.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Config } from '../types/schema.js';
+import { DEFAULT_SETTINGS } from '../types/schema.js';
+import { runNavigator } from '../views/navigator.js';
+import type { ViewContext, ViewFn } from '../views/types.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -155,13 +155,7 @@ describe('runNavigator', () => {
     await runNavigator(level1, ctx);
 
     // level1 -> push level2 -> push level3 -> pop to level2 -> pop to level1 -> quit
-    expect(callOrder).toEqual([
-      'level1',
-      'level2',
-      'level3',
-      'level2',
-      'level1',
-    ]);
+    expect(callOrder).toEqual(['level1', 'level2', 'level3', 'level2', 'level1']);
   });
 
   it('replace does not grow the stack', async () => {

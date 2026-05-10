@@ -1,7 +1,7 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative, sep } from "node:path";
-import matter from "gray-matter";
-import type { Command, Frontmatter, Skill, Workflow } from "./types.js";
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, relative, sep } from 'node:path';
+import matter from 'gray-matter';
+import type { Command, Frontmatter, Skill, Workflow } from './types.js';
 
 interface ParsedFile {
   absolutePath: string;
@@ -18,8 +18,8 @@ export function walkMarkdown(root: string): ParsedFile[] {
       const stat = statSync(full);
       if (stat.isDirectory()) {
         recurse(full);
-      } else if (stat.isFile() && entry.endsWith(".md")) {
-        const raw = readFileSync(full, "utf8");
+      } else if (stat.isFile() && entry.endsWith('.md')) {
+        const raw = readFileSync(full, 'utf8');
         const parsed = parseFrontmatter(raw, full);
         out.push({
           absolutePath: full,
@@ -40,7 +40,10 @@ export function walkMarkdown(root: string): ParsedFile[] {
  * Tries gray-matter first; on failure, hand-extracts simple `key: value`
  * pairs from the frontmatter block.
  */
-function parseFrontmatter(raw: string, filePath: string): { frontmatter: Frontmatter; body: string } {
+function parseFrontmatter(
+  raw: string,
+  filePath: string,
+): { frontmatter: Frontmatter; body: string } {
   try {
     const parsed = matter(raw);
     return {
@@ -56,12 +59,12 @@ function parseFrontmatter(raw: string, filePath: string): { frontmatter: Frontma
     }
     const [, fmBlock, body] = match;
     const fm: Frontmatter = {};
-    for (const line of fmBlock.split("\n")) {
+    for (const line of fmBlock.split('\n')) {
       const kv = line.match(/^([a-zA-Z][a-zA-Z0-9_-]*):\s*(.*)$/);
       if (kv) {
         const [, key, value] = kv;
         // Strip quotes if present
-        fm[key] = value.replace(/^["'](.*)["']$/, "$1");
+        fm[key] = value.replace(/^["'](.*)["']$/, '$1');
       }
     }
     console.warn(`  ! Lenient parse for ${filePath} (frontmatter not strict YAML)`);
@@ -71,25 +74,28 @@ function parseFrontmatter(raw: string, filePath: string): { frontmatter: Frontma
 
 function pathToSlashCommand(relativePath: string): string {
   // "core/tools/npm.md" → "core:tools:npm"
-  return relativePath.replace(/\.md$/, "").split(sep).join(":");
+  return relativePath.replace(/\.md$/, '').split(sep).join(':');
 }
 
 function asString(value: unknown): string | undefined {
-  return typeof value === "string" ? value : undefined;
+  return typeof value === 'string' ? value : undefined;
 }
 
 function asStringArray(value: unknown): string[] | undefined {
-  if (Array.isArray(value) && value.every((v) => typeof v === "string")) {
+  if (Array.isArray(value) && value.every((v) => typeof v === 'string')) {
     return value;
   }
-  if (typeof value === "string") {
-    return value.split(",").map((s) => s.trim()).filter(Boolean);
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
   return undefined;
 }
 
 function asNumber(value: unknown): number | undefined {
-  return typeof value === "number" ? value : undefined;
+  return typeof value === 'number' ? value : undefined;
 }
 
 /**
@@ -101,8 +107,8 @@ const REFERENCE_REGEX = /\/([a-z][a-z0-9_-]*(?::[a-z0-9_*-]+)+)/gi;
 function extractReferences(body: string, knownSlugs: Set<string>): string[] {
   const seen = new Set<string>();
   for (const match of body.matchAll(REFERENCE_REGEX)) {
-    let ref = match[1].replace(/[.,;:)\]*]+$/, "");
-    if (ref.includes("*")) continue; // wildcard refs like `core:tools:*` aren't real items
+    const ref = match[1].replace(/[.,;:)\]*]+$/, '');
+    if (ref.includes('*')) continue; // wildcard refs like `core:tools:*` aren't real items
     if (!knownSlugs.has(ref)) continue; // filter to real catalog items only
     seen.add(ref);
   }
@@ -118,24 +124,24 @@ export function loadCommands(commandsRoot: string): Command[] {
     const slug = pathToSlashCommand(file.relativePath);
     const fm = file.frontmatter;
     const segments = file.relativePath.split(sep);
-    const isContext = segments.some((segment) => segment.startsWith("_"));
+    const isContext = segments.some((segment) => segment.startsWith('_'));
     // A file is a workflow if its frontmatter says so OR it lives under a
     // persona's workflows/ directory. The path-based check catches files
     // that pre-date the `type: workflow` convention.
-    const isInPersonaWorkflowsDir = segments[0] !== "core" && segments.includes("workflows");
-    const isWorkflow = fm.type === "workflow" || isInPersonaWorkflowsDir;
+    const isInPersonaWorkflowsDir = segments[0] !== 'core' && segments.includes('workflows');
+    const isWorkflow = fm.type === 'workflow' || isInPersonaWorkflowsDir;
     // Context wins over workflow: _context.md files inside workflows/
     // directories are documentation, not workflow playbooks.
-    const kind = isContext ? "context" : isWorkflow ? "workflow" : "command";
+    const kind = isContext ? 'context' : isWorkflow ? 'workflow' : 'command';
 
     return {
       slug,
       path: file.relativePath,
       kind,
       outcome: asString(fm.outcome),
-      description: asString(fm.description) ?? "",
-      argumentHint: asString(fm["argument-hint"]),
-      allowedTools: asStringArray(fm["allowed-tools"]),
+      description: asString(fm.description) ?? '',
+      argumentHint: asString(fm['argument-hint']),
+      allowedTools: asStringArray(fm['allowed-tools']),
       references: extractReferences(file.body, knownSlugs),
       // Filled in by the second pass below — start empty so the field is
       // always present on the returned object (TS narrowing wins).
@@ -170,16 +176,16 @@ export function loadSkills(skillsRoot: string, commands: Command[]): Skill[] {
   for (const entry of readdirSync(skillsRoot)) {
     const dir = join(skillsRoot, entry);
     if (!statSync(dir).isDirectory()) continue;
-    const skillFile = join(dir, "SKILL.md");
+    const skillFile = join(dir, 'SKILL.md');
     try {
-      const raw = readFileSync(skillFile, "utf8");
+      const raw = readFileSync(skillFile, 'utf8');
       const parsed = parseFrontmatter(raw, skillFile);
       const fm = parsed.frontmatter;
       const name = asString(fm.name) ?? entry;
       out.push({
         name,
         path: relative(skillsRoot, skillFile),
-        description: asString(fm.description) ?? "",
+        description: asString(fm.description) ?? '',
         references: extractReferences(parsed.body, knownSlugs),
         tags: asStringArray(fm.tags),
         body: parsed.body,
@@ -194,12 +200,12 @@ export function loadSkills(skillsRoot: string, commands: Command[]): Skill[] {
 
 export function deriveWorkflows(commands: Command[]): Workflow[] {
   return commands
-    .filter((cmd) => cmd.kind === "workflow")
+    .filter((cmd) => cmd.kind === 'workflow')
     .map((cmd) => {
       // path looks like "product/strategy/workflows/greenfield.md" or
       // "engineer/architecture/workflows/adr-cycle.md" or
       // "market/workflows/launch-campaign.md"
-      const segments = cmd.path.replace(/\.md$/, "").split(sep);
+      const segments = cmd.path.replace(/\.md$/, '').split(sep);
       const slug = segments[segments.length - 1];
       // Domain is the first segment (product, engineer, market)
       const domain = segments[0];

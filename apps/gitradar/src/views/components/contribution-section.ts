@@ -1,16 +1,19 @@
 import chalk from 'chalk';
-import type { ViewContext } from '../types.js';
-import type { UserWeekRepoRecord, EnrichmentStore } from '../../types/schema.js';
-import type { ProductivityExtensions } from '../../types/schema.js';
-import type { HBarGroup, HBar, DetailLayer } from '../../ui/grouped-hbar-chart.js';
+import { rollup } from '../../aggregator/engine.js';
+import { filterRecords } from '../../aggregator/filters.js';
+import { testPct as computeTestPctCanonical } from '../../aggregator/metrics.js';
+import { calculateSegments, type Segment } from '../../aggregator/segments.js';
+import type {
+  EnrichmentStore,
+  ProductivityExtensions,
+  UserWeekRepoRecord,
+} from '../../types/schema.js';
+import { SEGMENT_DEFS, SEGMENT_INDICATORS } from '../../ui/constants.js';
+import { fmt } from '../../ui/format.js';
+import type { DetailLayer, HBar, HBarGroup } from '../../ui/grouped-hbar-chart.js';
 import { renderGroupedHBarChart } from '../../ui/grouped-hbar-chart.js';
 import { renderTable } from '../../ui/table.js';
-import { rollup } from '../../aggregator/engine.js';
-import { testPct as computeTestPctCanonical } from '../../aggregator/metrics.js';
-import { filterRecords } from '../../aggregator/filters.js';
-import { SEGMENT_DEFS, SEGMENT_INDICATORS } from '../../ui/constants.js';
-import { calculateSegments, type Segment } from '../../aggregator/segments.js';
-import { fmt } from '../../ui/format.js';
+import type { ViewContext } from '../types.js';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,8 +28,17 @@ export interface TimeBucket {
 // ── Enrichment helpers ───────────────────────────────────────────────────────
 
 const defaultEnrichment: ProductivityExtensions = {
-  prs_opened: 0, prs_merged: 0, avg_cycle_hrs: 0, reviews_given: 0, churn_rate_pct: 0,
-  pr_feature: 0, pr_fix: 0, pr_bugfix: 0, pr_chore: 0, pr_hotfix: 0, pr_other: 0,
+  prs_opened: 0,
+  prs_merged: 0,
+  avg_cycle_hrs: 0,
+  reviews_given: 0,
+  churn_rate_pct: 0,
+  pr_feature: 0,
+  pr_fix: 0,
+  pr_bugfix: 0,
+  pr_chore: 0,
+  pr_hotfix: 0,
+  pr_other: 0,
 };
 
 function getEnrichment(store: EnrichmentStore, key: string): ProductivityExtensions {
@@ -34,7 +46,12 @@ function getEnrichment(store: EnrichmentStore, key: string): ProductivityExtensi
 }
 
 /** Compute test% — delegates to the canonical metrics module. */
-export function computeTestPct(agg: { filetype: { app: { insertions: number; deletions: number }; test: { insertions: number; deletions: number } } }): number {
+export function computeTestPct(agg: {
+  filetype: {
+    app: { insertions: number; deletions: number };
+    test: { insertions: number; deletions: number };
+  };
+}): number {
   return computeTestPctCanonical(agg.filetype);
 }
 
@@ -53,11 +70,18 @@ export function aggregateEnrichments(
   enrichments: EnrichmentStore,
   groupBy: (r: UserWeekRepoRecord) => string,
 ): Map<string, AggregatedEnrichments> {
-  const result = new Map<string, {
-    prsOpened: number; prsMerged: number; reviewsGiven: number;
-    sumCycleWeighted: number; totalPrCount: number;
-    sumChurnWeighted: number; totalLines: number;
-  }>();
+  const result = new Map<
+    string,
+    {
+      prsOpened: number;
+      prsMerged: number;
+      reviewsGiven: number;
+      sumCycleWeighted: number;
+      totalPrCount: number;
+      sumChurnWeighted: number;
+      totalLines: number;
+    }
+  >();
   const seen = new Set<string>();
 
   for (const r of records) {
@@ -68,16 +92,26 @@ export function aggregateEnrichments(
     seen.add(dedupeKey);
 
     const e = getEnrichment(enrichments, enrichKey);
-    const lines = r.filetype.app.insertions + r.filetype.app.deletions +
-      r.filetype.test.insertions + r.filetype.test.deletions +
-      r.filetype.config.insertions + r.filetype.config.deletions +
-      r.filetype.storybook.insertions + r.filetype.storybook.deletions +
-      (r.filetype.doc?.insertions ?? 0) + (r.filetype.doc?.deletions ?? 0);
+    const lines =
+      r.filetype.app.insertions +
+      r.filetype.app.deletions +
+      r.filetype.test.insertions +
+      r.filetype.test.deletions +
+      r.filetype.config.insertions +
+      r.filetype.config.deletions +
+      r.filetype.storybook.insertions +
+      r.filetype.storybook.deletions +
+      (r.filetype.doc?.insertions ?? 0) +
+      (r.filetype.doc?.deletions ?? 0);
 
     const agg = result.get(groupKey) ?? {
-      prsOpened: 0, prsMerged: 0, reviewsGiven: 0,
-      sumCycleWeighted: 0, totalPrCount: 0,
-      sumChurnWeighted: 0, totalLines: 0,
+      prsOpened: 0,
+      prsMerged: 0,
+      reviewsGiven: 0,
+      sumCycleWeighted: 0,
+      totalPrCount: 0,
+      sumChurnWeighted: 0,
+      totalLines: 0,
     };
     agg.prsOpened += e.prs_opened;
     agg.prsMerged += e.prs_merged;
@@ -135,8 +169,14 @@ export function buildContributionGroups(
           segments: [
             { key: 'app', value: agg.filetype.app.insertions + agg.filetype.app.deletions },
             { key: 'test', value: agg.filetype.test.insertions + agg.filetype.test.deletions },
-            { key: 'config', value: agg.filetype.config.insertions + agg.filetype.config.deletions },
-            { key: 'storybook', value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions },
+            {
+              key: 'config',
+              value: agg.filetype.config.insertions + agg.filetype.config.deletions,
+            },
+            {
+              key: 'storybook',
+              value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions,
+            },
             { key: 'doc', value: agg.filetype.doc.insertions + agg.filetype.doc.deletions },
           ],
           total: agg.insertions + agg.deletions,
@@ -159,8 +199,14 @@ export function buildContributionGroups(
           segments: [
             { key: 'app', value: agg.filetype.app.insertions + agg.filetype.app.deletions },
             { key: 'test', value: agg.filetype.test.insertions + agg.filetype.test.deletions },
-            { key: 'config', value: agg.filetype.config.insertions + agg.filetype.config.deletions },
-            { key: 'storybook', value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions },
+            {
+              key: 'config',
+              value: agg.filetype.config.insertions + agg.filetype.config.deletions,
+            },
+            {
+              key: 'storybook',
+              value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions,
+            },
             { key: 'doc', value: agg.filetype.doc.insertions + agg.filetype.doc.deletions },
           ],
           total: agg.insertions + agg.deletions,
@@ -188,8 +234,14 @@ export function buildContributionGroups(
             segments: [
               { key: 'app', value: agg.filetype.app.insertions + agg.filetype.app.deletions },
               { key: 'test', value: agg.filetype.test.insertions + agg.filetype.test.deletions },
-              { key: 'config', value: agg.filetype.config.insertions + agg.filetype.config.deletions },
-              { key: 'storybook', value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions },
+              {
+                key: 'config',
+                value: agg.filetype.config.insertions + agg.filetype.config.deletions,
+              },
+              {
+                key: 'storybook',
+                value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions,
+              },
               { key: 'doc', value: agg.filetype.doc.insertions + agg.filetype.doc.deletions },
             ],
             total: agg.insertions + agg.deletions,
@@ -209,8 +261,8 @@ export function buildContributionGroups(
     } else {
       // user level — one bar per individual member
       const rolled = rollup(bucketRecords, (r) => r.member);
-      const entries = [...rolled.entries()].sort((a, b) =>
-        (b[1].insertions + b[1].deletions) - (a[1].insertions + a[1].deletions),
+      const entries = [...rolled.entries()].sort(
+        (a, b) => b[1].insertions + b[1].deletions - (a[1].insertions + a[1].deletions),
       );
       for (const [member, agg] of entries) {
         bars.push({
@@ -218,8 +270,14 @@ export function buildContributionGroups(
           segments: [
             { key: 'app', value: agg.filetype.app.insertions + agg.filetype.app.deletions },
             { key: 'test', value: agg.filetype.test.insertions + agg.filetype.test.deletions },
-            { key: 'config', value: agg.filetype.config.insertions + agg.filetype.config.deletions },
-            { key: 'storybook', value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions },
+            {
+              key: 'config',
+              value: agg.filetype.config.insertions + agg.filetype.config.deletions,
+            },
+            {
+              key: 'storybook',
+              value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions,
+            },
             { key: 'doc', value: agg.filetype.doc.insertions + agg.filetype.doc.deletions },
           ],
           total: agg.insertions + agg.deletions,
@@ -235,10 +293,13 @@ export function buildContributionGroups(
 
     // Stamp enrichment data onto bars
     if (enrichments) {
-      const groupByFn = tagOverlay ? (r: UserWeekRepoRecord) => (config.tags?.[r.tag]?.label ?? r.tag)
-        : drillLevel === 'org' ? (r: UserWeekRepoRecord) => r.org
-        : drillLevel === 'team' ? (r: UserWeekRepoRecord) => r.team
-        : (r: UserWeekRepoRecord) => r.member;
+      const groupByFn = tagOverlay
+        ? (r: UserWeekRepoRecord) => config.tags?.[r.tag]?.label ?? r.tag
+        : drillLevel === 'org'
+          ? (r: UserWeekRepoRecord) => r.org
+          : drillLevel === 'team'
+            ? (r: UserWeekRepoRecord) => r.team
+            : (r: UserWeekRepoRecord) => r.member;
       const enrichAgg = aggregateEnrichments(bucketRecords, enrichments, groupByFn);
       for (const bar of bars) {
         const e = enrichAgg.get(bar.label);
@@ -260,22 +321,41 @@ export function buildContributionGroups(
   }
 
   // Compute per-label averages across all buckets and stamp onto each bar
-  const labelTotals = new Map<string, {
-    sumTotal: number; sumIns: number; sumDel: number; sumNet: number;
-    sumCommits: number; sumActiveDays: number; sumHeadcount: number;
-    sumTestPct: number;
-    sumChurnRatePct: number; sumPrsOpened: number; sumPrsMerged: number;
-    sumAvgCycleHrs: number; sumReviewsGiven: number;
-    count: number;
-  }>();
+  const labelTotals = new Map<
+    string,
+    {
+      sumTotal: number;
+      sumIns: number;
+      sumDel: number;
+      sumNet: number;
+      sumCommits: number;
+      sumActiveDays: number;
+      sumHeadcount: number;
+      sumTestPct: number;
+      sumChurnRatePct: number;
+      sumPrsOpened: number;
+      sumPrsMerged: number;
+      sumAvgCycleHrs: number;
+      sumReviewsGiven: number;
+      count: number;
+    }
+  >();
   for (const group of groups) {
     for (const bar of group.bars) {
       const entry = labelTotals.get(bar.label) ?? {
-        sumTotal: 0, sumIns: 0, sumDel: 0, sumNet: 0,
-        sumCommits: 0, sumActiveDays: 0, sumHeadcount: 0,
+        sumTotal: 0,
+        sumIns: 0,
+        sumDel: 0,
+        sumNet: 0,
+        sumCommits: 0,
+        sumActiveDays: 0,
+        sumHeadcount: 0,
         sumTestPct: 0,
-        sumChurnRatePct: 0, sumPrsOpened: 0, sumPrsMerged: 0,
-        sumAvgCycleHrs: 0, sumReviewsGiven: 0,
+        sumChurnRatePct: 0,
+        sumPrsOpened: 0,
+        sumPrsMerged: 0,
+        sumAvgCycleHrs: 0,
+        sumReviewsGiven: 0,
         count: 0,
       };
       entry.sumTotal += bar.total;
@@ -358,21 +438,38 @@ export function buildContributionGroups(
     // For each bucket, compute per-team averages across members
     for (const group of groups) {
       // Collect per-team totals for this bucket
-      const teamBucketTotals = new Map<string, {
-        sumIns: number; sumDel: number; sumNet: number;
-        sumCommits: number; sumActiveDays: number; sumTestPct: number;
-        sumChurnRatePct: number; sumPrsOpened: number; sumPrsMerged: number;
-        sumAvgCycleHrs: number; sumReviewsGiven: number;
-        memberCount: number;
-      }>();
+      const teamBucketTotals = new Map<
+        string,
+        {
+          sumIns: number;
+          sumDel: number;
+          sumNet: number;
+          sumCommits: number;
+          sumActiveDays: number;
+          sumTestPct: number;
+          sumChurnRatePct: number;
+          sumPrsOpened: number;
+          sumPrsMerged: number;
+          sumAvgCycleHrs: number;
+          sumReviewsGiven: number;
+          memberCount: number;
+        }
+      >();
 
       for (const bar of group.bars) {
         const team = memberTeamMap.get(bar.label) ?? 'unassigned';
         const e = teamBucketTotals.get(team) ?? {
-          sumIns: 0, sumDel: 0, sumNet: 0,
-          sumCommits: 0, sumActiveDays: 0, sumTestPct: 0,
-          sumChurnRatePct: 0, sumPrsOpened: 0, sumPrsMerged: 0,
-          sumAvgCycleHrs: 0, sumReviewsGiven: 0,
+          sumIns: 0,
+          sumDel: 0,
+          sumNet: 0,
+          sumCommits: 0,
+          sumActiveDays: 0,
+          sumTestPct: 0,
+          sumChurnRatePct: 0,
+          sumPrsOpened: 0,
+          sumPrsMerged: 0,
+          sumAvgCycleHrs: 0,
+          sumReviewsGiven: 0,
           memberCount: 0,
         };
         e.sumIns += bar.insertions ?? 0;
@@ -427,10 +524,13 @@ export function buildContributionGroupsByEntity(
   enrichments?: EnrichmentStore,
   classifyPerception?: (history: number[]) => string,
 ): HBarGroup[] {
-  const groupByFn = tagOverlay ? (r: UserWeekRepoRecord) => r.tag
-    : drillLevel === 'org' ? (r: UserWeekRepoRecord) => r.org
-    : drillLevel === 'team' ? (r: UserWeekRepoRecord) => r.team
-    : (r: UserWeekRepoRecord) => r.member;
+  const groupByFn = tagOverlay
+    ? (r: UserWeekRepoRecord) => r.tag
+    : drillLevel === 'org'
+      ? (r: UserWeekRepoRecord) => r.org
+      : drillLevel === 'team'
+        ? (r: UserWeekRepoRecord) => r.team
+        : (r: UserWeekRepoRecord) => r.member;
 
   // Build entity list
   type Entry = { label: string; orgType?: 'core' | 'consultant'; key: string };
@@ -453,7 +553,7 @@ export function buildContributionGroupsByEntity(
   } else {
     const memberRolled = rollup(records, groupByFn);
     const sorted = [...memberRolled.entries()].sort(
-      (a, b) => (b[1].insertions + b[1].deletions) - (a[1].insertions + a[1].deletions),
+      (a, b) => b[1].insertions + b[1].deletions - (a[1].insertions + a[1].deletions),
     );
     entries = sorted.map(([m]) => ({ label: m, key: m }));
   }
@@ -462,8 +562,8 @@ export function buildContributionGroupsByEntity(
   const groups: HBarGroup[] = [];
 
   for (const entry of entries) {
-    const entityRecords = records.filter((r) =>
-      allBucketWeeks.has(r.week) && groupByFn(r) === entry.key,
+    const entityRecords = records.filter(
+      (r) => allBucketWeeks.has(r.week) && groupByFn(r) === entry.key,
     );
     if (entityRecords.length === 0) continue;
 
@@ -483,7 +583,10 @@ export function buildContributionGroupsByEntity(
           { key: 'app', value: agg.filetype.app.insertions + agg.filetype.app.deletions },
           { key: 'test', value: agg.filetype.test.insertions + agg.filetype.test.deletions },
           { key: 'config', value: agg.filetype.config.insertions + agg.filetype.config.deletions },
-          { key: 'storybook', value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions },
+          {
+            key: 'storybook',
+            value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions,
+          },
           { key: 'doc', value: agg.filetype.doc.insertions + agg.filetype.doc.deletions },
         ],
         total: agg.insertions + agg.deletions,
@@ -512,28 +615,52 @@ export function buildContributionGroupsByEntity(
 
     if (bars.length === 0) continue;
 
-    const prefix = entry.orgType === 'core' ? '\u2605 ' : entry.orgType === 'consultant' ? '\u25C6 ' : '';
+    const prefix =
+      entry.orgType === 'core' ? '\u2605 ' : entry.orgType === 'consultant' ? '\u25C6 ' : '';
     groups.push({ groupLabel: prefix + entry.label, bars });
   }
 
   // Compute per-label averages (labels are now time bucket labels)
-  const labelTotals = new Map<string, {
-    sumTotal: number; sumIns: number; sumDel: number; sumNet: number;
-    sumCommits: number; sumActiveDays: number; sumHeadcount: number;
-    sumTestPct: number; count: number;
-    sumPrsOpened: number; sumPrsMerged: number; sumReviews: number;
-    churnWeightedSum: number; churnWeight: number;
-    cycleWeightedSum: number; cycleWeight: number;
-  }>();
+  const labelTotals = new Map<
+    string,
+    {
+      sumTotal: number;
+      sumIns: number;
+      sumDel: number;
+      sumNet: number;
+      sumCommits: number;
+      sumActiveDays: number;
+      sumHeadcount: number;
+      sumTestPct: number;
+      count: number;
+      sumPrsOpened: number;
+      sumPrsMerged: number;
+      sumReviews: number;
+      churnWeightedSum: number;
+      churnWeight: number;
+      cycleWeightedSum: number;
+      cycleWeight: number;
+    }
+  >();
   for (const group of groups) {
     for (const bar of group.bars) {
       const e = labelTotals.get(bar.label) ?? {
-        sumTotal: 0, sumIns: 0, sumDel: 0, sumNet: 0,
-        sumCommits: 0, sumActiveDays: 0, sumHeadcount: 0,
-        sumTestPct: 0, count: 0,
-        sumPrsOpened: 0, sumPrsMerged: 0, sumReviews: 0,
-        churnWeightedSum: 0, churnWeight: 0,
-        cycleWeightedSum: 0, cycleWeight: 0,
+        sumTotal: 0,
+        sumIns: 0,
+        sumDel: 0,
+        sumNet: 0,
+        sumCommits: 0,
+        sumActiveDays: 0,
+        sumHeadcount: 0,
+        sumTestPct: 0,
+        count: 0,
+        sumPrsOpened: 0,
+        sumPrsMerged: 0,
+        sumReviews: 0,
+        churnWeightedSum: 0,
+        churnWeight: 0,
+        cycleWeightedSum: 0,
+        cycleWeight: 0,
       };
       e.sumTotal += bar.total;
       e.sumIns += bar.insertions ?? 0;
@@ -641,10 +768,13 @@ export function buildContributionDetailRows(
       entries = [...memberRolled.keys()].map((m) => ({ label: m, key: m }));
     }
 
-    const groupByFn = tagOverlay ? (r: UserWeekRepoRecord) => r.tag
-      : drillLevel === 'org' ? (r: UserWeekRepoRecord) => r.org
-      : drillLevel === 'team' ? (r: UserWeekRepoRecord) => r.team
-      : (r: UserWeekRepoRecord) => r.member;
+    const groupByFn = tagOverlay
+      ? (r: UserWeekRepoRecord) => r.tag
+      : drillLevel === 'org'
+        ? (r: UserWeekRepoRecord) => r.org
+        : drillLevel === 'team'
+          ? (r: UserWeekRepoRecord) => r.team
+          : (r: UserWeekRepoRecord) => r.member;
 
     const rolled = rollup(bucketRecords, groupByFn);
 
@@ -653,8 +783,10 @@ export function buildContributionDetailRows(
       const agg = rolled.get(entry.key);
       if (!agg) continue;
 
-      const prefix = entry.orgType === 'core' ? '\u2605 ' : entry.orgType === 'consultant' ? '\u25C6 ' : '';
-      const avgSize = agg.commits > 0 ? Math.round((agg.insertions + agg.deletions) / agg.commits) : 0;
+      const prefix =
+        entry.orgType === 'core' ? '\u2605 ' : entry.orgType === 'consultant' ? '\u25C6 ' : '';
+      const avgSize =
+        agg.commits > 0 ? Math.round((agg.insertions + agg.deletions) / agg.commits) : 0;
 
       rows.push({
         week: rows.length === bucketStartIndex ? bucket.label : '',
@@ -693,10 +825,13 @@ export function buildContributionDetailRowsByEntity(
   const rows: Record<string, any>[] = [];
   const groupSeparators: number[] = [];
 
-  const groupByFn = tagOverlay ? (r: UserWeekRepoRecord) => r.tag
-    : drillLevel === 'org' ? (r: UserWeekRepoRecord) => r.org
-    : drillLevel === 'team' ? (r: UserWeekRepoRecord) => r.team
-    : (r: UserWeekRepoRecord) => r.member;
+  const groupByFn = tagOverlay
+    ? (r: UserWeekRepoRecord) => r.tag
+    : drillLevel === 'org'
+      ? (r: UserWeekRepoRecord) => r.org
+      : drillLevel === 'team'
+        ? (r: UserWeekRepoRecord) => r.team
+        : (r: UserWeekRepoRecord) => r.member;
 
   // Build entity list
   let entries: Array<{ label: string; orgType?: 'core' | 'consultant'; key: string }> = [];
@@ -719,7 +854,7 @@ export function buildContributionDetailRowsByEntity(
     const memberRolled = rollup(records, groupByFn);
     // Sort members by total lines desc
     const sorted = [...memberRolled.entries()].sort(
-      (a, b) => (b[1].insertions + b[1].deletions) - (a[1].insertions + a[1].deletions),
+      (a, b) => b[1].insertions + b[1].deletions - (a[1].insertions + a[1].deletions),
     );
     entries = sorted.map(([m]) => ({ label: m, key: m }));
   }
@@ -729,7 +864,8 @@ export function buildContributionDetailRowsByEntity(
 
   for (let ei = 0; ei < entries.length; ei++) {
     const entry = entries[ei];
-    const prefix = entry.orgType === 'core' ? '\u2605 ' : entry.orgType === 'consultant' ? '\u25C6 ' : '';
+    const prefix =
+      entry.orgType === 'core' ? '\u2605 ' : entry.orgType === 'consultant' ? '\u25C6 ' : '';
 
     // Entity total row
     const entityRecords = records.filter((r) => {
@@ -742,7 +878,10 @@ export function buildContributionDetailRowsByEntity(
     const totalAgg = totalRolled.get(entry.key);
     if (!totalAgg) continue;
 
-    const totalAvgSize = totalAgg.commits > 0 ? Math.round((totalAgg.insertions + totalAgg.deletions) / totalAgg.commits) : 0;
+    const totalAvgSize =
+      totalAgg.commits > 0
+        ? Math.round((totalAgg.insertions + totalAgg.deletions) / totalAgg.commits)
+        : 0;
 
     rows.push({
       group: prefix + entry.label,
@@ -766,7 +905,8 @@ export function buildContributionDetailRowsByEntity(
       const agg = rolled.get(entry.key);
       if (!agg) continue;
 
-      const avgSize = agg.commits > 0 ? Math.round((agg.insertions + agg.deletions) / agg.commits) : 0;
+      const avgSize =
+        agg.commits > 0 ? Math.round((agg.insertions + agg.deletions) / agg.commits) : 0;
 
       rows.push({
         group: '',
@@ -805,15 +945,22 @@ export function renderContributionsDetailTab(
   records?: UserWeekRepoRecord[],
 ): void {
   const recs = records ?? ctx.records;
-  const modeLabel = tagOverlay ? 'Tag'
-    : drillLevel === 'org' ? 'Organization'
-    : drillLevel === 'team' ? 'Team' : 'User';
+  const modeLabel = tagOverlay
+    ? 'Tag'
+    : drillLevel === 'org'
+      ? 'Organization'
+      : drillLevel === 'team'
+        ? 'Team'
+        : 'User';
   const firstLabel = buckets[0]?.label ?? '';
   const lastLabel = buckets[buckets.length - 1]?.label ?? '';
   const pivotLabel = pivotEntity ? 'by entity' : 'by time';
   console.log(
-    chalk.bold(`Contribution Detail`) + '  ' +
-    chalk.dim(`(${modeLabel} view \u00b7 ${pivotLabel} \u00b7 ${rangeLabel} \u00b7 ${firstLabel} \u2192 ${lastLabel})`),
+    chalk.bold(`Contribution Detail`) +
+      '  ' +
+      chalk.dim(
+        `(${modeLabel} view \u00b7 ${pivotLabel} \u00b7 ${rangeLabel} \u00b7 ${firstLabel} \u2192 ${lastLabel})`,
+      ),
   );
   console.log('');
 
@@ -834,22 +981,54 @@ export function renderContributionsDetailTab(
     ? { key: 'week', label: periodLabel, minWidth: 6 }
     : { key: 'group', label: modeLabel, minWidth: 12 };
 
-  console.log(renderTable({
-    columns: [
-      col1,
-      col2,
-      { key: 'commits', label: 'Commits', align: 'right', minWidth: 7 },
-      { key: 'avgSize', label: 'Avg Size', align: 'right', minWidth: 8, format: (v) => fmt(v) },
-      { key: 'filesAdded', label: '+Files', align: 'right', minWidth: 6, format: (v) => chalk.green(fmt(v)) },
-      { key: 'filesDeleted', label: '-Files', align: 'right', minWidth: 6, format: (v) => chalk.red(fmt(v)) },
-      { key: 'insertions', label: '+Lines', align: 'right', minWidth: 7, format: (v) => chalk.green(fmt(v)) },
-      { key: 'deletions', label: '-Lines', align: 'right', minWidth: 7, format: (v) => chalk.red(fmt(v)) },
-      { key: 'net', label: 'Net', align: 'right', minWidth: 6, format: (v) => v >= 0 ? chalk.green(fmt(v)) : chalk.red(fmt(v)) },
-    ],
-    rows,
-    maxWidth: termCols,
-    groupSeparator: groupSeparators,
-  }));
+  console.log(
+    renderTable({
+      columns: [
+        col1,
+        col2,
+        { key: 'commits', label: 'Commits', align: 'right', minWidth: 7 },
+        { key: 'avgSize', label: 'Avg Size', align: 'right', minWidth: 8, format: (v) => fmt(v) },
+        {
+          key: 'filesAdded',
+          label: '+Files',
+          align: 'right',
+          minWidth: 6,
+          format: (v) => chalk.green(fmt(v)),
+        },
+        {
+          key: 'filesDeleted',
+          label: '-Files',
+          align: 'right',
+          minWidth: 6,
+          format: (v) => chalk.red(fmt(v)),
+        },
+        {
+          key: 'insertions',
+          label: '+Lines',
+          align: 'right',
+          minWidth: 7,
+          format: (v) => chalk.green(fmt(v)),
+        },
+        {
+          key: 'deletions',
+          label: '-Lines',
+          align: 'right',
+          minWidth: 7,
+          format: (v) => chalk.red(fmt(v)),
+        },
+        {
+          key: 'net',
+          label: 'Net',
+          align: 'right',
+          minWidth: 6,
+          format: (v) => (v >= 0 ? chalk.green(fmt(v)) : chalk.red(fmt(v))),
+        },
+      ],
+      rows,
+      maxWidth: termCols,
+      groupSeparator: groupSeparators,
+    }),
+  );
 }
 
 export function renderContributionsTab(
@@ -871,37 +1050,59 @@ export function renderContributionsTab(
   perUserMode = false,
 ): void {
   const recs = records ?? ctx.records;
-  const modeLabel = tagOverlay ? 'Tag'
-    : drillLevel === 'org' ? 'Organization'
-    : drillLevel === 'team' ? 'Team' : 'User';
-  const byLabel = pivotEntity ? modeLabel
-    : granularity === 'week' ? 'Week'
-    : granularity === 'month' ? 'Month'
-    : granularity === 'quarter' ? 'Quarter' : 'Year';
+  const modeLabel = tagOverlay
+    ? 'Tag'
+    : drillLevel === 'org'
+      ? 'Organization'
+      : drillLevel === 'team'
+        ? 'Team'
+        : 'User';
+  const byLabel = pivotEntity
+    ? modeLabel
+    : granularity === 'week'
+      ? 'Week'
+      : granularity === 'month'
+        ? 'Month'
+        : granularity === 'quarter'
+          ? 'Quarter'
+          : 'Year';
   const firstLabel = buckets[0]?.label ?? '';
   const lastLabel = buckets[buckets.length - 1]?.label ?? '';
   console.log(
-    chalk.bold(`Contribution by ${byLabel}`) + '  ' +
-    chalk.dim(`(${pivotEntity ? 'by entity' : 'by time'} \u00b7 ${rangeLabel} \u00b7 ${firstLabel} \u2192 ${lastLabel})`) +
-    '  ' + legend,
+    chalk.bold(`Contribution by ${byLabel}`) +
+      '  ' +
+      chalk.dim(
+        `(${pivotEntity ? 'by entity' : 'by time'} \u00b7 ${rangeLabel} \u00b7 ${firstLabel} \u2192 ${lastLabel})`,
+      ) +
+      '  ' +
+      legend,
   );
   console.log('');
 
   // When drill level is org/team (not user) and segments are being excluded,
   // pre-filter records at the user level so that excluded-segment users are
   // removed before aggregation — rather than removing entire orgs/teams.
-  const segThresholds = { high: ctx.config.settings.segment_high_pct ?? 20, low: ctx.config.settings.segment_low_pct ?? 20 };
+  const segThresholds = {
+    high: ctx.config.settings.segment_high_pct ?? 20,
+    low: ctx.config.settings.segment_low_pct ?? 20,
+  };
   let filteredRecs = recs;
   let userSegMap: Map<string, Segment> | undefined;
   if (excludedSegments && excludedSegments.size > 0 && drillLevel !== 'user' && !tagOverlay) {
     const userTotals = new Map<string, number>();
     for (const r of recs) {
       const key = r.member;
-      const total = r.filetype.app.insertions + r.filetype.app.deletions +
-        r.filetype.test.insertions + r.filetype.test.deletions +
-        r.filetype.config.insertions + r.filetype.config.deletions +
-        r.filetype.storybook.insertions + r.filetype.storybook.deletions +
-        (r.filetype.doc?.insertions ?? 0) + (r.filetype.doc?.deletions ?? 0);
+      const total =
+        r.filetype.app.insertions +
+        r.filetype.app.deletions +
+        r.filetype.test.insertions +
+        r.filetype.test.deletions +
+        r.filetype.config.insertions +
+        r.filetype.config.deletions +
+        r.filetype.storybook.insertions +
+        r.filetype.storybook.deletions +
+        (r.filetype.doc?.insertions ?? 0) +
+        (r.filetype.doc?.deletions ?? 0);
       userTotals.set(key, (userTotals.get(key) ?? 0) + total);
     }
     userSegMap = calculateSegments(userTotals, segThresholds);
@@ -912,8 +1113,24 @@ export function renderContributionsTab(
   }
 
   let groups = pivotEntity
-    ? buildContributionGroupsByEntity(filteredRecs, buckets, drillLevel, tagOverlay, ctx.config, enrichments, classifyPerception)
-    : buildContributionGroups(filteredRecs, buckets, drillLevel, tagOverlay, ctx.config, enrichments, classifyPerception);
+    ? buildContributionGroupsByEntity(
+        filteredRecs,
+        buckets,
+        drillLevel,
+        tagOverlay,
+        ctx.config,
+        enrichments,
+        classifyPerception,
+      )
+    : buildContributionGroups(
+        filteredRecs,
+        buckets,
+        drillLevel,
+        tagOverlay,
+        ctx.config,
+        enrichments,
+        classifyPerception,
+      );
 
   // Stamp segments onto bars and optionally filter by excluded segments.
   if (!pivotEntity) {
@@ -958,7 +1175,7 @@ export function renderContributionsTab(
             bar.segment = seg;
           }
           const ind = SEGMENT_INDICATORS[seg];
-          g.groupLabel = ind.color(ind.char) + ' ' + g.groupLabel;
+          g.groupLabel = `${ind.color(ind.char)} ${g.groupLabel}`;
         }
       }
       // Filter entire entity groups
@@ -1016,11 +1233,15 @@ export function renderContributionsTab(
           commits: Math.round(bar.avgCommits ?? 0),
           activeDays: Math.round(bar.avgActiveDays ?? 0),
           headcount: Math.round(bar.avgHeadcount ?? 0),
-          churnRatePct: bar.avgChurnRatePct !== undefined ? Math.round(bar.avgChurnRatePct * 10) / 10 : undefined,
+          churnRatePct:
+            bar.avgChurnRatePct !== undefined
+              ? Math.round(bar.avgChurnRatePct * 10) / 10
+              : undefined,
           prsOpened: bar.avgPrsOpened !== undefined ? Math.round(bar.avgPrsOpened) : undefined,
           prsMerged: bar.avgPrsMerged !== undefined ? Math.round(bar.avgPrsMerged) : undefined,
           avgCycleHrs: bar.avgAvgCycleHrs,
-          reviewsGiven: bar.avgReviewsGiven !== undefined ? Math.round(bar.avgReviewsGiven) : undefined,
+          reviewsGiven:
+            bar.avgReviewsGiven !== undefined ? Math.round(bar.avgReviewsGiven) : undefined,
           isAverage: true,
           sparkData: labelChronTotals.get(bar.label),
         });
@@ -1037,14 +1258,27 @@ export function renderContributionsTab(
       }
 
       // Collect per-team per-bucket totals
-      const teamBucketData = new Map<string, {
-        sumTotal: number; sumIns: number; sumDel: number;
-        sumCommits: number; sumActiveDays: number; sumTestPct: number;
-        segTotals: Map<string, number>; memberCount: number; bucketCount: number;
-        sumPrsOpened: number; sumPrsMerged: number; sumReviews: number;
-        churnWeightedSum: number; churnWeight: number;
-        cycleWeightedSum: number; cycleWeight: number;
-      }>();
+      const teamBucketData = new Map<
+        string,
+        {
+          sumTotal: number;
+          sumIns: number;
+          sumDel: number;
+          sumCommits: number;
+          sumActiveDays: number;
+          sumTestPct: number;
+          segTotals: Map<string, number>;
+          memberCount: number;
+          bucketCount: number;
+          sumPrsOpened: number;
+          sumPrsMerged: number;
+          sumReviews: number;
+          churnWeightedSum: number;
+          churnWeight: number;
+          cycleWeightedSum: number;
+          cycleWeight: number;
+        }
+      >();
 
       for (const g of groups) {
         if (g.isSummary) continue;
@@ -1058,12 +1292,22 @@ export function renderContributionsTab(
           const team = memberTeamMap.get(bar.label) ?? 'unassigned';
           const mc = teamMembers.get(team) ?? 1;
           const e = teamBucketData.get(team) ?? {
-            sumTotal: 0, sumIns: 0, sumDel: 0,
-            sumCommits: 0, sumActiveDays: 0, sumTestPct: 0,
-            segTotals: new Map(), memberCount: mc, bucketCount: 0,
-            sumPrsOpened: 0, sumPrsMerged: 0, sumReviews: 0,
-            churnWeightedSum: 0, churnWeight: 0,
-            cycleWeightedSum: 0, cycleWeight: 0,
+            sumTotal: 0,
+            sumIns: 0,
+            sumDel: 0,
+            sumCommits: 0,
+            sumActiveDays: 0,
+            sumTestPct: 0,
+            segTotals: new Map(),
+            memberCount: mc,
+            bucketCount: 0,
+            sumPrsOpened: 0,
+            sumPrsMerged: 0,
+            sumReviews: 0,
+            churnWeightedSum: 0,
+            churnWeight: 0,
+            cycleWeightedSum: 0,
+            cycleWeight: 0,
           };
           e.sumTotal += bar.total;
           e.sumIns += bar.insertions ?? 0;
@@ -1127,18 +1371,20 @@ export function renderContributionsTab(
   }
 
   const trendPct = ctx.config.settings.trend_threshold;
-  console.log(renderGroupedHBarChart({
-    groups,
-    segmentDefs: SEGMENT_DEFS,
-    maxBarWidth: 30,
-    maxWidth: termCols,
-    showValues: true,
-    showXAxis: false,
-    labelWidth,
-    trendThreshold: trendPct,
-    detailLayers,
-    perUserMode,
-  }));
+  console.log(
+    renderGroupedHBarChart({
+      groups,
+      segmentDefs: SEGMENT_DEFS,
+      maxBarWidth: 30,
+      maxWidth: termCols,
+      showValues: true,
+      showXAxis: false,
+      labelWidth,
+      trendThreshold: trendPct,
+      detailLayers,
+      perUserMode,
+    }),
+  );
   console.log('');
 
   // ── Footer: aggregate totals + avg per period + legend ──
@@ -1150,18 +1396,21 @@ export function renderContributionsTab(
   if (agg) {
     const members = new Set(windowRecords.map((r) => r.member));
     const net = agg.insertions - agg.deletions;
-    const netStr = net >= 0 ? '+' + fmt(net) : '-' + fmt(Math.abs(net));
+    const netStr = net >= 0 ? `+${fmt(net)}` : `-${fmt(Math.abs(net))}`;
     const netColor = net >= 0 ? chalk.green : chalk.red;
 
     // Totals line
     console.log(
       chalk.dim('  \u03A3 ') +
-      chalk.green('+' + fmt(agg.insertions)) + chalk.dim(' ins  ') +
-      chalk.red('-' + fmt(agg.deletions)) + chalk.dim(' del  ') +
-      netColor(netStr) + chalk.dim(' net  ') +
-      chalk.dim(fmt(agg.commits) + ' cmts  ') +
-      chalk.dim(fmt(agg.activeDays) + ' days  ') +
-      chalk.dim(`(${members.size} contributors)`),
+        chalk.green(`+${fmt(agg.insertions)}`) +
+        chalk.dim(' ins  ') +
+        chalk.red(`-${fmt(agg.deletions)}`) +
+        chalk.dim(' del  ') +
+        netColor(netStr) +
+        chalk.dim(' net  ') +
+        chalk.dim(`${fmt(agg.commits)} cmts  `) +
+        chalk.dim(`${fmt(agg.activeDays)} days  `) +
+        chalk.dim(`(${members.size} contributors)`),
     );
 
     // Avg per period line
@@ -1169,13 +1418,15 @@ export function renderContributionsTab(
       const avgIns = Math.round(agg.insertions / periodCount);
       const avgDel = Math.round(agg.deletions / periodCount);
       const avgNet = Math.round(net / periodCount);
-      const avgNetStr = avgNet >= 0 ? '+' + fmt(avgNet) : '-' + fmt(Math.abs(avgNet));
+      const avgNetStr = avgNet >= 0 ? `+${fmt(avgNet)}` : `-${fmt(Math.abs(avgNet))}`;
       const avgCmts = Math.round(agg.commits / periodCount);
       const avgDays = Math.round(agg.activeDays / periodCount);
 
       console.log(
         chalk.dim(`  \u00F8 `) +
-        chalk.dim(`+${fmt(avgIns)} ins  -${fmt(avgDel)} del  ${avgNetStr} net  ${fmt(avgCmts)} cmts  ${fmt(avgDays)} days  per ${granularity}`),
+          chalk.dim(
+            `+${fmt(avgIns)} ins  -${fmt(avgDel)} del  ${avgNetStr} net  ${fmt(avgCmts)} cmts  ${fmt(avgDays)} days  per ${granularity}`,
+          ),
       );
     }
   }
@@ -1201,13 +1452,14 @@ export function renderContributionsTab(
     }
     if (totalPrsOpened > 0 || totalPrsMerged > 0) {
       const avgCycle = cycleWeight > 0 ? cycleSum / cycleWeight : 0;
-      const cycleStr = avgCycle >= 24 ? `${(avgCycle / 24).toFixed(1)}d` : `${avgCycle.toFixed(1)}h`;
+      const cycleStr =
+        avgCycle >= 24 ? `${(avgCycle / 24).toFixed(1)}d` : `${avgCycle.toFixed(1)}h`;
       console.log(
         chalk.dim('  \u03A3 ') +
-        chalk.dim(`${fmt(totalPrsOpened)} PRs opened  `) +
-        chalk.dim(`${fmt(totalPrsMerged)} merged  `) +
-        chalk.dim(`${cycleStr} avg cycle  `) +
-        chalk.dim(`${fmt(totalReviews)} reviews`),
+          chalk.dim(`${fmt(totalPrsOpened)} PRs opened  `) +
+          chalk.dim(`${fmt(totalPrsMerged)} merged  `) +
+          chalk.dim(`${cycleStr} avg cycle  `) +
+          chalk.dim(`${fmt(totalReviews)} reviews`),
       );
     }
   }
@@ -1216,10 +1468,14 @@ export function renderContributionsTab(
   const trendPctLabel = Math.round(trendPct * 100);
   console.log(
     chalk.dim('  ') +
-    chalk.green('\u25B2') + chalk.dim(' above avg  ') +
-    chalk.red('\u25BC') + chalk.dim(' below avg  ') +
-    chalk.bgGreen.black('\u25B2') + chalk.dim(' above avg+team  ') +
-    chalk.bgRed.black('\u25BC') + chalk.dim(' below avg+team  ') +
-    chalk.dim(`\u25CB within ${trendPctLabel}%`),
+      chalk.green('\u25B2') +
+      chalk.dim(' above avg  ') +
+      chalk.red('\u25BC') +
+      chalk.dim(' below avg  ') +
+      chalk.bgGreen.black('\u25B2') +
+      chalk.dim(' above avg+team  ') +
+      chalk.bgRed.black('\u25BC') +
+      chalk.dim(' below avg+team  ') +
+      chalk.dim(`\u25CB within ${trendPctLabel}%`),
   );
 }

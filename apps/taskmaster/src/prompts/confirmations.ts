@@ -1,8 +1,4 @@
-import {
-  confirmPrompt,
-  checkboxWithDefaults,
-  numberWithDefault,
-} from './factory.js';
+import { checkboxWithDefaults, confirmPrompt, numberWithDefault } from './factory.js';
 
 // --- Remove confirmation ---
 
@@ -93,10 +89,7 @@ export async function confirmExpand(
       defaultValue: 5,
     }));
 
-  const confirmed = await confirmPrompt(
-    `Expand ${taskIds.length} task(s) into subtasks?`,
-    true,
-  );
+  const confirmed = await confirmPrompt(`Expand ${taskIds.length} task(s) into subtasks?`, true);
   return { taskIds, maxSubtasks, confirmed };
 }
 

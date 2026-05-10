@@ -20,10 +20,7 @@ export interface ScanSummary {
  * Execute the scan command: scan a repository and build a capabilities model.
  * Optionally persists indexes to repo home.
  */
-export async function executeScan(
-  rootPath: string,
-  repoHome: string | null,
-): Promise<ScanSummary> {
+export async function executeScan(rootPath: string, repoHome: string | null): Promise<ScanSummary> {
   const { runScanPipeline } = await import('../parser/analysis/scanner.js');
   const result = await runScanPipeline(rootPath);
 
@@ -32,17 +29,16 @@ export async function executeScan(
     const { mkdir } = await import('node:fs/promises');
     await mkdir(repoHome, { recursive: true });
 
-    const { writeComponentIndex, writeSymbolIndex, writeEntryPointIndex } =
-      await import('../formats/index-store.js');
+    const { writeComponentIndex, writeSymbolIndex, writeEntryPointIndex } = await import(
+      '../formats/index-store.js'
+    );
     await writeComponentIndex(repoHome, result.componentIndex);
     await writeSymbolIndex(repoHome, result.symbolIndex);
     await writeEntryPointIndex(repoHome, result.entryPointIndex);
   }
 
   // Compute summary
-  const symbolCount = result.symbolIndex.entries.reduce(
-    (sum, e) => sum + e.symbols.length, 0,
-  );
+  const symbolCount = result.symbolIndex.entries.reduce((sum, e) => sum + e.symbols.length, 0);
   const layers = [...new Set(result.symbolIndex.entries.map((e) => e.layer))];
 
   const reachableComponents = new Set<string>();

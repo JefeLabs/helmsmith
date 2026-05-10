@@ -1,12 +1,12 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
-import { join, dirname, resolve, isAbsolute } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import yaml from 'js-yaml';
-import { ManifestSchema } from './schema.js';
-import type { Manifest, RepoConfig, RepoGroup } from './schema.js';
-import { APP_NAME, APP_CONFIG_DIR, APP_REPO_URL, MANIFEST_FILENAME } from './branding.js';
 import { detectGitRoot, getRepoConfigHome } from '../utils/git.js';
 import type { ConfigLocation, ResolvedConfig } from '../utils/location.js';
+import { APP_CONFIG_DIR, APP_NAME, APP_REPO_URL, MANIFEST_FILENAME } from './branding.js';
+import type { Manifest, RepoConfig, RepoGroup } from './schema.js';
+import { ManifestSchema } from './schema.js';
 
 const DEFAULT_PR_TEMPLATE = [
   '## {{operation}} from `{{source_branch}}` → `{{target_branch}}`',

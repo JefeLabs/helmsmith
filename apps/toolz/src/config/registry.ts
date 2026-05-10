@@ -18,10 +18,10 @@
  *       registered_at: "..."
  */
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { parse, stringify } from "yaml";
-import type { PackageManagerType } from "../platform/types.js";
-import { ensureToolzDir, getRegistryPath } from "./paths.js";
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { parse, stringify } from 'yaml';
+import type { PackageManagerType } from '../platform/types.js';
+import { ensureToolzDir, getRegistryPath } from './paths.js';
 
 export interface RegistryToolEntry {
   /** Parsed version string (or null if the tool didn't report one). */
@@ -51,7 +51,7 @@ export interface Registry {
 function emptyRegistry(): Registry {
   return {
     version: 1,
-    updated_at: "1970-01-01T00:00:00Z",
+    updated_at: '1970-01-01T00:00:00Z',
     tools: {},
   };
 }
@@ -66,12 +66,12 @@ export function loadRegistry(): Registry {
   const path = getRegistryPath();
   if (!existsSync(path)) return emptyRegistry();
   try {
-    const raw = readFileSync(path, "utf8");
+    const raw = readFileSync(path, 'utf8');
     const parsed = parse(raw);
-    if (!parsed || typeof parsed !== "object") return emptyRegistry();
+    if (!parsed || typeof parsed !== 'object') return emptyRegistry();
     return {
       version: 1,
-      updated_at: String(parsed.updated_at ?? "1970-01-01T00:00:00Z"),
+      updated_at: String(parsed.updated_at ?? '1970-01-01T00:00:00Z'),
       tools: (parsed.tools ?? {}) as Record<string, RegistryToolEntry>,
     };
   } catch {
@@ -87,13 +87,10 @@ export function saveRegistry(registry: Registry): void {
     ...registry,
     updated_at: new Date().toISOString(),
   };
-  writeFileSync(path, stringify(next), "utf8");
+  writeFileSync(path, stringify(next), 'utf8');
 }
 
-export function registerTool(
-  name: string,
-  entry: Omit<RegistryToolEntry, "registered_at">,
-): void {
+export function registerTool(name: string, entry: Omit<RegistryToolEntry, 'registered_at'>): void {
   const registry = loadRegistry();
   registry.tools[name] = {
     ...entry,

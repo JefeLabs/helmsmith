@@ -8,10 +8,7 @@ export { loadProjectConfig, projectConfigExists };
  * E.g., getConfigValue('/path/to/project', 'ai.model') => 'claude-sonnet-4-20250514'
  * Returns undefined if the key path does not exist.
  */
-export async function getConfigValue(
-  projectDir: string,
-  keyPath: string,
-): Promise<unknown> {
+export async function getConfigValue(projectDir: string, keyPath: string): Promise<unknown> {
   const config = await loadProjectConfig(projectDir);
   return resolveKeyPath(config, keyPath);
 }

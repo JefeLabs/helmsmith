@@ -1,10 +1,5 @@
-import {
-  createProject,
-  listAllProjects,
-  switchProject,
-  removeProject,
-} from '../utils/projects.js';
 import type { ProjectLocation } from '../utils/location.js';
+import { createProject, listAllProjects, removeProject, switchProject } from '../utils/projects.js';
 
 export interface ProjectEntry {
   name: string;
@@ -27,9 +22,7 @@ export interface ProjectsCreateResult {
 /**
  * Execute projects list: list all projects with active marker.
  */
-export async function executeProjectsList(
-  gitRoot: string | null,
-): Promise<ProjectsListResult> {
+export async function executeProjectsList(gitRoot: string | null): Promise<ProjectsListResult> {
   const all = await listAllProjects(gitRoot);
   return all;
 }

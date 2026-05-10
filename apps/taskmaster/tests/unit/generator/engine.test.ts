@@ -1,13 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   compileTemplate,
   renderToMarkdown,
   renderToTerminal,
-  setProjectPath,
   resetEngine,
+  setProjectPath,
 } from '../../../src/generator/index.js';
 import { makeTask } from '../../fixtures/tasks.js';
 
@@ -15,7 +15,10 @@ let tempDir: string;
 
 beforeEach(() => {
   resetEngine();
-  tempDir = join(tmpdir(), `agentx-test-engine-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  tempDir = join(
+    tmpdir(),
+    `agentx-test-engine-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
   mkdirSync(tempDir, { recursive: true });
 });
 
@@ -73,9 +76,7 @@ describe('renderToMarkdown', () => {
       priority: 'high',
       requiredSkills: ['backend', 'database'],
       dependencies: [{ taskId: 'T-1', type: 'blocks' }],
-      children: [
-        makeTask({ id: 'T-5.1', title: 'Child task', status: 'todo', complexity: 2 }),
-      ],
+      children: [makeTask({ id: 'T-5.1', title: 'Child task', status: 'todo', complexity: 2 })],
     });
 
     const md = renderToMarkdown('task-detail', { task });
@@ -148,9 +149,7 @@ describe('renderToMarkdown', () => {
 
 describe('renderToTerminal', () => {
   it('produces non-empty ANSI output for task-list', () => {
-    const tasks = [
-      makeTask({ id: 'T-1', title: 'Test task', status: 'done', complexity: 3 }),
-    ];
+    const tasks = [makeTask({ id: 'T-1', title: 'Test task', status: 'done', complexity: 3 })];
 
     const output = renderToTerminal('task-list', { tasks });
     expect(output).toBeTruthy();

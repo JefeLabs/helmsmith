@@ -1,19 +1,19 @@
 import chalk from 'chalk';
 import { scanCodebase } from './codebase-scanner.js';
-import { analyzeSourceEnhanced } from './source-analyzer.js';
 import { discoverComponents } from './component-discovery.js';
-import { buildComponentIndex, buildSymbolIndex, buildEntryPointIndex } from './retrieval.js';
 import { detectEntryPoints } from './entrypoint-detection.js';
 import { applyValidation, generateValidationWarnings } from './entrypoint-validation.js';
+import { buildComponentIndex, buildEntryPointIndex, buildSymbolIndex } from './retrieval.js';
+import { analyzeSourceEnhanced } from './source-analyzer.js';
 import type {
-  CodebaseScanResult,
-  SourceAnalysisResult,
   BuildComponent,
+  CodebaseScanResult,
   ComponentIndex,
-  SymbolIndex,
   EnhancedFileAnalysis,
-  EntryPointIndex,
   EntryPoint,
+  EntryPointIndex,
+  SourceAnalysisResult,
+  SymbolIndex,
 } from './types.js';
 
 export interface ScanPipelineResult {
@@ -55,7 +55,7 @@ export async function runScanPipeline(rootPath: string): Promise<ScanPipelineRes
     console.error(
       chalk.dim(
         `  Scanned: ${scanResult.totalFiles} files, ${scanResult.totalDirectories} dirs, ` +
-        `patterns: [${scanResult.detectedPatterns.join(', ')}]`,
+          `patterns: [${scanResult.detectedPatterns.join(', ')}]`,
       ),
     );
   } catch (err) {
@@ -72,7 +72,11 @@ export async function runScanPipeline(rootPath: string): Promise<ScanPipelineRes
     sourceResult = enhancedResult.legacy;
     enhancedFiles = enhancedResult.enhanced;
     const symbolCount = sourceResult.publicApi.length;
-    console.error(chalk.dim(`  Found ${symbolCount} exported symbol(s) across ${sourceResult.files.length} file(s)`));
+    console.error(
+      chalk.dim(
+        `  Found ${symbolCount} exported symbol(s) across ${sourceResult.files.length} file(s)`,
+      ),
+    );
   } catch (err) {
     warnings.push(`Source analysis failed: ${(err as Error).message}`);
   }
@@ -82,11 +86,11 @@ export async function runScanPipeline(rootPath: string): Promise<ScanPipelineRes
   console.error(chalk.dim('  Detecting entry points...'));
   try {
     detectedEntryPoints = await detectEntryPoints(rootPath, enhancedFiles, components);
-    const categories = [...new Set(detectedEntryPoints.map(ep => ep.category))];
+    const categories = [...new Set(detectedEntryPoints.map((ep) => ep.category))];
     console.error(
       chalk.dim(
         `  Found ${detectedEntryPoints.length} entry point(s)` +
-        (categories.length > 0 ? ` [${categories.join(', ')}]` : ''),
+          (categories.length > 0 ? ` [${categories.join(', ')}]` : ''),
       ),
     );
   } catch (err) {
@@ -105,14 +109,18 @@ export async function runScanPipeline(rootPath: string): Promise<ScanPipelineRes
 
   // Link entry point IDs back to their owning components
   for (const ep of detectedEntryPoints) {
-    const comp = components.find(c => c.id === ep.componentId);
+    const comp = components.find((c) => c.id === ep.componentId);
     if (comp && !comp.entryPointIds.includes(ep.id)) {
       comp.entryPointIds.push(ep.id);
     }
   }
 
   if (components.length > 0) {
-    console.error(chalk.dim(`  Built component index (${components.length}) and symbol index (${symbolIndex.entries.length} entries)`));
+    console.error(
+      chalk.dim(
+        `  Built component index (${components.length}) and symbol index (${symbolIndex.entries.length} entries)`,
+      ),
+    );
   } else {
     console.error(chalk.dim(`  Built symbol index (${symbolIndex.entries.length} entries)`));
   }

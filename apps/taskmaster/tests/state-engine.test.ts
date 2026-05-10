@@ -1,15 +1,15 @@
-import { describe, it, expect } from 'vitest';
-import type { StatesConfig, StateDefinition, TaskNode } from '../src/config/schema.js';
+import { describe, expect, it } from 'vitest';
+import type { StateDefinition, StatesConfig, TaskNode } from '../src/config/schema.js';
 import {
-  resolveStates,
-  validateTransition,
-  getStateCategory,
+  findTaskById,
   getDefaultStatus,
-  isOpenState,
+  getStateCategory,
+  getValidStatuses,
   isActiveState,
   isClosedState,
-  getValidStatuses,
-  findTaskById,
+  isOpenState,
+  resolveStates,
+  validateTransition,
 } from '../src/config/state-engine.js';
 
 // --- resolveStates ---
@@ -24,7 +24,15 @@ describe('resolveStates', () => {
   it('returns standard preset states', () => {
     const states = resolveStates({ preset: 'standard', enforce_transitions: false });
     const names = states.map((s) => s.name);
-    expect(names).toEqual(['backlog', 'todo', 'in-progress', 'review', 'blocked', 'qa-failed', 'done']);
+    expect(names).toEqual([
+      'backlog',
+      'todo',
+      'in-progress',
+      'review',
+      'blocked',
+      'qa-failed',
+      'done',
+    ]);
   });
 
   it('returns kanban preset states', () => {
@@ -142,7 +150,9 @@ describe('validateTransition', () => {
     const result = validateTransition(standardStates, 'todo', 'done', true);
     expect(result.valid).toBe(false);
     expect(result.error).toContain('Allowed transitions from "todo": in-progress, blocked');
-    expect(result.error).toContain('Valid states: backlog, todo, in-progress, review, blocked, qa-failed, done');
+    expect(result.error).toContain(
+      'Valid states: backlog, todo, in-progress, review, blocked, qa-failed, done',
+    );
   });
 });
 

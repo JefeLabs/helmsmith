@@ -21,20 +21,17 @@
  */
 
 import type {
+  AuthorIdentity,
   CatalogIndex,
   Command,
   CommandSummary,
   Skill,
   SkillSummary,
+  VersionEntry,
   Workflow,
   WorkflowSummary,
-} from "../contracts.js";
-import {
-  toCommandSummary,
-  toSkillSummary,
-  toWorkflowSummary,
-} from "../contracts.js";
-import type { AuthorIdentity, VersionEntry } from "../contracts.js";
+} from '../contracts.js';
+import { toCommandSummary, toSkillSummary, toWorkflowSummary } from '../contracts.js';
 import {
   AuthorMismatchError,
   type CatalogStorage,
@@ -43,7 +40,7 @@ import {
   type PutWorkflowInput,
   VersionConflictError,
   VersionNotFoundError,
-} from "./interface.js";
+} from './interface.js';
 
 /* ── S3-like interface (avoids depending on the AWS SDK directly) ── */
 
@@ -72,9 +69,9 @@ export interface S3PutOptions {
  * uses this to recognize CAS retry conditions cleanly.
  */
 export class S3PreconditionFailedError extends Error {
-  constructor(message = "S3 precondition failed (ETag mismatch or object exists)") {
+  constructor(message = 'S3 precondition failed (ETag mismatch or object exists)') {
     super(message);
-    this.name = "S3PreconditionFailedError";
+    this.name = 'S3PreconditionFailedError';
   }
 }
 
@@ -84,9 +81,9 @@ export class S3PreconditionFailedError extends Error {
  * first init.
  */
 export class S3NotFoundError extends Error {
-  constructor(message = "S3 object not found") {
+  constructor(message = 'S3 object not found') {
     super(message);
-    this.name = "S3NotFoundError";
+    this.name = 'S3NotFoundError';
   }
 }
 
@@ -101,11 +98,7 @@ export interface S3Like {
    * Put an object. Returns the new ETag. Throws
    * S3PreconditionFailedError on conditional-write failures.
    */
-  putObject(
-    key: string,
-    body: string,
-    options?: S3PutOptions,
-  ): Promise<S3PutResult>;
+  putObject(key: string, body: string, options?: S3PutOptions): Promise<S3PutResult>;
 }
 
 /* ── Registry types (parallel to fs-persistent) ───────────────── */
@@ -166,8 +159,8 @@ export class S3CatalogStorage implements CatalogStorage {
     private readonly s3: S3Like,
     options: S3CatalogStorageOptions = {},
   ) {
-    this.prefix = options.prefix ?? "v1/";
-    this.packageVersion = options.packageVersion ?? "0.0.0";
+    this.prefix = options.prefix ?? 'v1/';
+    this.packageVersion = options.packageVersion ?? '0.0.0';
     this.maxRetries = options.maxRetries ?? 5;
   }
 
@@ -175,9 +168,7 @@ export class S3CatalogStorage implements CatalogStorage {
 
   async getIndex(): Promise<CatalogIndex> {
     const { registry } = await this.readRegistry();
-    const collect = <T>(
-      entries: Record<string, S3RegistryEntry<T>>,
-    ): T[] =>
+    const collect = <T>(entries: Record<string, S3RegistryEntry<T>>): T[] =>
       Object.values(entries)
         .filter((e) => e.currentVersion !== null && e.summary !== null)
         .map((e) => e.summary as T);
@@ -194,44 +185,30 @@ export class S3CatalogStorage implements CatalogStorage {
   async getCommand(slug: string): Promise<Command | null> {
     const { registry } = await this.readRegistry();
     const entry = registry.commands[slug];
-    if (!entry || !entry.currentVersion) return null;
-    return this.readArtifact<Command>("commands", slug, entry.currentVersion);
+    if (!entry?.currentVersion) return null;
+    return this.readArtifact<Command>('commands', slug, entry.currentVersion);
   }
   async getSkill(name: string): Promise<Skill | null> {
     const { registry } = await this.readRegistry();
     const entry = registry.skills[name];
-    if (!entry || !entry.currentVersion) return null;
-    return this.readArtifact<Skill>("skills", name, entry.currentVersion);
+    if (!entry?.currentVersion) return null;
+    return this.readArtifact<Skill>('skills', name, entry.currentVersion);
   }
   async getWorkflow(qualifiedName: string): Promise<Workflow | null> {
     const { registry } = await this.readRegistry();
     const entry = registry.workflows[qualifiedName];
-    if (!entry || !entry.currentVersion) return null;
-    return this.readArtifact<Workflow>(
-      "workflows",
-      qualifiedName,
-      entry.currentVersion,
-    );
+    if (!entry?.currentVersion) return null;
+    return this.readArtifact<Workflow>('workflows', qualifiedName, entry.currentVersion);
   }
 
-  async getCommandVersion(
-    slug: string,
-    version: string,
-  ): Promise<Command | null> {
-    return this.readArtifact<Command>("commands", slug, version);
+  async getCommandVersion(slug: string, version: string): Promise<Command | null> {
+    return this.readArtifact<Command>('commands', slug, version);
   }
   async getSkillVersion(name: string, version: string): Promise<Skill | null> {
-    return this.readArtifact<Skill>("skills", name, version);
+    return this.readArtifact<Skill>('skills', name, version);
   }
-  async getWorkflowVersion(
-    qualifiedName: string,
-    version: string,
-  ): Promise<Workflow | null> {
-    return this.readArtifact<Workflow>(
-      "workflows",
-      qualifiedName,
-      version,
-    );
+  async getWorkflowVersion(qualifiedName: string, version: string): Promise<Workflow | null> {
+    return this.readArtifact<Workflow>('workflows', qualifiedName, version);
   }
 
   async listCommandVersions(slug: string): Promise<VersionEntry[]> {
@@ -265,7 +242,7 @@ export class S3CatalogStorage implements CatalogStorage {
         );
         return {
           metadata,
-          artifactKind: "commands",
+          artifactKind: 'commands',
           artifactKey: slug,
           artifactVersion: input.version,
           artifactPayload: { artifact: input.command, metadata },
@@ -287,7 +264,7 @@ export class S3CatalogStorage implements CatalogStorage {
         );
         return {
           metadata,
-          artifactKind: "skills",
+          artifactKind: 'skills',
           artifactKey: name,
           artifactVersion: input.version,
           artifactPayload: { artifact: input.skill, metadata },
@@ -309,7 +286,7 @@ export class S3CatalogStorage implements CatalogStorage {
         );
         return {
           metadata,
-          artifactKind: "workflows",
+          artifactKind: 'workflows',
           artifactKey: qn,
           artifactVersion: input.version,
           artifactPayload: { artifact: input.workflow, metadata },
@@ -320,10 +297,10 @@ export class S3CatalogStorage implements CatalogStorage {
 
   async promoteCommand(slug: string, version: string): Promise<void> {
     return this.serialize(() =>
-      this.promoteWithRetry("commands", slug, version, async (reg) => {
+      this.promoteWithRetry('commands', slug, version, async (reg) => {
         const entry = reg.commands[slug];
         if (!entry) return;
-        const cmd = await this.readArtifact<Command>("commands", slug, version);
+        const cmd = await this.readArtifact<Command>('commands', slug, version);
         entry.summary = cmd ? toCommandSummary(cmd) : null;
       }),
     );
@@ -331,42 +308,30 @@ export class S3CatalogStorage implements CatalogStorage {
 
   async promoteSkill(name: string, version: string): Promise<void> {
     return this.serialize(() =>
-      this.promoteWithRetry("skills", name, version, async (reg) => {
+      this.promoteWithRetry('skills', name, version, async (reg) => {
         const entry = reg.skills[name];
         if (!entry) return;
-        const skill = await this.readArtifact<Skill>("skills", name, version);
+        const skill = await this.readArtifact<Skill>('skills', name, version);
         entry.summary = skill ? toSkillSummary(skill) : null;
       }),
     );
   }
 
-  async promoteWorkflow(
-    qualifiedName: string,
-    version: string,
-  ): Promise<void> {
+  async promoteWorkflow(qualifiedName: string, version: string): Promise<void> {
     return this.serialize(() =>
-      this.promoteWithRetry(
-        "workflows",
-        qualifiedName,
-        version,
-        async (reg) => {
-          const entry = reg.workflows[qualifiedName];
-          if (!entry) return;
-          const wf = await this.readArtifact<Workflow>(
-            "workflows",
-            qualifiedName,
-            version,
-          );
-          entry.summary = wf ? toWorkflowSummary(wf) : null;
-        },
-      ),
+      this.promoteWithRetry('workflows', qualifiedName, version, async (reg) => {
+        const entry = reg.workflows[qualifiedName];
+        if (!entry) return;
+        const wf = await this.readArtifact<Workflow>('workflows', qualifiedName, version);
+        entry.summary = wf ? toWorkflowSummary(wf) : null;
+      }),
     );
   }
 
   /* ── Internal: registry ─────────────────────────────────────── */
 
   private async readRegistry(): Promise<RegistryWithEtag> {
-    const key = this.prefix + "registry.json";
+    const key = `${this.prefix}registry.json`;
     try {
       const result = await this.s3.getObject(key);
       const parsed = JSON.parse(result.body) as S3Registry;
@@ -388,14 +353,14 @@ export class S3CatalogStorage implements CatalogStorage {
     expectedEtag: string | undefined,
   ): Promise<S3PutResult> {
     registry.generatedAt = new Date().toISOString();
-    const key = this.prefix + "registry.json";
-    const body = JSON.stringify(registry, null, 2) + "\n";
+    const key = `${this.prefix}registry.json`;
+    const body = `${JSON.stringify(registry, null, 2)}\n`;
     if (expectedEtag === undefined) {
       // First-time write: only succeed if the object doesn't exist
       // yet. Two concurrent first-writers will collide here; the
       // loser will get S3PreconditionFailedError and retry, picking
       // up the winner's registry on the next read.
-      return await this.s3.putObject(key, body, { ifNoneMatch: "*" });
+      return await this.s3.putObject(key, body, { ifNoneMatch: '*' });
     }
     return await this.s3.putObject(key, body, { ifMatch: expectedEtag });
   }
@@ -414,7 +379,7 @@ export class S3CatalogStorage implements CatalogStorage {
   /* ── Internal: artifact ─────────────────────────────────────── */
 
   private async readArtifact<T>(
-    kind: "commands" | "skills" | "workflows",
+    kind: 'commands' | 'skills' | 'workflows',
     key: string,
     version: string,
   ): Promise<T | null> {
@@ -430,18 +395,18 @@ export class S3CatalogStorage implements CatalogStorage {
   }
 
   private async writeArtifact<T>(
-    kind: "commands" | "skills" | "workflows",
+    kind: 'commands' | 'skills' | 'workflows',
     key: string,
     version: string,
     payload: StoredArtifact<T>,
   ): Promise<void> {
     const objectKey = this.artifactKey(kind, key, version);
-    const body = JSON.stringify(payload, null, 2) + "\n";
+    const body = `${JSON.stringify(payload, null, 2)}\n`;
     await this.s3.putObject(objectKey, body);
   }
 
   private artifactKey(
-    kind: "commands" | "skills" | "workflows",
+    kind: 'commands' | 'skills' | 'workflows',
     key: string,
     version: string,
   ): string {
@@ -479,11 +444,11 @@ export class S3CatalogStorage implements CatalogStorage {
         throw err;
       }
     }
-    throw new Error("S3CatalogStorage: putWithRetry exhausted retries");
+    throw new Error('S3CatalogStorage: putWithRetry exhausted retries');
   }
 
   private async promoteWithRetry(
-    kind: "commands" | "skills" | "workflows",
+    kind: 'commands' | 'skills' | 'workflows',
     key: string,
     version: string,
     summaryUpdate: (reg: S3Registry) => Promise<void>,
@@ -513,7 +478,7 @@ export class S3CatalogStorage implements CatalogStorage {
         throw err;
       }
     }
-    throw new Error("S3CatalogStorage: promoteWithRetry exhausted retries");
+    throw new Error('S3CatalogStorage: promoteWithRetry exhausted retries');
   }
 
   /* ── Internal: queue ────────────────────────────────────────── */
@@ -529,14 +494,14 @@ export class S3CatalogStorage implements CatalogStorage {
 
 interface PutMutationResult {
   metadata: VersionEntry;
-  artifactKind: "commands" | "skills" | "workflows";
+  artifactKind: 'commands' | 'skills' | 'workflows';
   artifactKey: string;
   artifactVersion: string;
   artifactPayload: StoredArtifact<unknown>;
 }
 
 function encodeKey(key: string): string {
-  return key.replace(/:/g, "__");
+  return key.replace(/:/g, '__');
 }
 
 function appendVersion<T>(

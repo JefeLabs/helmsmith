@@ -1,11 +1,11 @@
-import { readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import yaml from 'js-yaml';
-import { getHomePath, getProjectDir, scaffoldProjectDir, getTaskmasterHomeFor } from './home.js';
 import type { ProjectConfig } from '../config/schema.js';
-import type { ProjectLocation } from './location.js';
 import { getRepoTaskmasterHome } from './git.js';
+import { getHomePath, getProjectDir, scaffoldProjectDir } from './home.js';
+import type { ProjectLocation } from './location.js';
 
 const PROJECTS_FILE = 'projects.yaml';
 
@@ -102,7 +102,10 @@ export async function writeGlobalProjects(registry: GlobalProjectsRegistry): Pro
 /**
  * Write a repo-local projects registry.
  */
-export async function writeRepoProjects(gitRoot: string, registry: RepoProjectsRegistry): Promise<void> {
+export async function writeRepoProjects(
+  gitRoot: string,
+  registry: RepoProjectsRegistry,
+): Promise<void> {
   const path = getRepoProjectsPath(gitRoot);
   const content = yaml.dump(registry, { lineWidth: -1, noRefs: true });
   await writeFile(path, content, 'utf-8');
@@ -111,9 +114,16 @@ export async function writeRepoProjects(gitRoot: string, registry: RepoProjectsR
 /**
  * List all projects from both global and repo-local registries, tagged with location.
  */
-export async function listAllProjects(gitRoot?: string | null): Promise<{ active: string | null; activeLocation: ProjectLocation | null; projects: TaggedProjectEntry[] }> {
+export async function listAllProjects(gitRoot?: string | null): Promise<{
+  active: string | null;
+  activeLocation: ProjectLocation | null;
+  projects: TaggedProjectEntry[];
+}> {
   const global = await readGlobalProjects();
-  const tagged: TaggedProjectEntry[] = global.projects.map((p) => ({ ...p, location: 'home' as const }));
+  const tagged: TaggedProjectEntry[] = global.projects.map((p) => ({
+    ...p,
+    location: 'home' as const,
+  }));
 
   if (gitRoot) {
     const repo = await readRepoProjects(gitRoot);
@@ -180,7 +190,11 @@ export async function createProject(
       flag: 8,
     },
   };
-  await writeFile(join(projectDir, 'config.yaml'), yaml.dump(defaultConfig, { lineWidth: -1, noRefs: true }), 'utf-8');
+  await writeFile(
+    join(projectDir, 'config.yaml'),
+    yaml.dump(defaultConfig, { lineWidth: -1, noRefs: true }),
+    'utf-8',
+  );
 
   const entry: ProjectEntry = {
     name,
@@ -214,7 +228,11 @@ export async function createProject(
  * Remove a project from the appropriate registry.
  * Does NOT delete the project directory.
  */
-export async function removeProject(name: string, location: ProjectLocation, gitRoot: string | null): Promise<void> {
+export async function removeProject(
+  name: string,
+  location: ProjectLocation,
+  gitRoot: string | null,
+): Promise<void> {
   if (location === 'repo' && gitRoot) {
     const repo = await readRepoProjects(gitRoot);
     const index = repo.projects.findIndex((p) => p.name === name);
@@ -245,7 +263,11 @@ export async function removeProject(name: string, location: ProjectLocation, git
 /**
  * Switch the active project. Searches both registries.
  */
-export async function switchProject(name: string, location: ProjectLocation, gitRoot?: string | null): Promise<void> {
+export async function switchProject(
+  name: string,
+  location: ProjectLocation,
+  gitRoot?: string | null,
+): Promise<void> {
   // Verify the project exists in the specified location
   if (location === 'repo') {
     if (!gitRoot) throw new Error('gitRoot is required for repo-local projects');
@@ -270,7 +292,10 @@ export async function switchProject(name: string, location: ProjectLocation, git
 /**
  * Get the active project name and location, or null if none.
  */
-export async function getActiveProject(): Promise<{ name: string; location: ProjectLocation } | null> {
+export async function getActiveProject(): Promise<{
+  name: string;
+  location: ProjectLocation;
+} | null> {
   const global = await readGlobalProjects();
   if (!global.active) return null;
   return { name: global.active, location: global.active_location ?? 'home' };

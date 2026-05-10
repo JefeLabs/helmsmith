@@ -17,40 +17,40 @@
  * extract it. Until then, keep this in sync with each command's reality.
  */
 
-export type Interface = "cli" | "mcp" | "rest";
+export type Interface = 'cli' | 'mcp' | 'rest';
 
 const INTERFACES: Record<string, Interface[]> = {
   // Integrations
-  "core:integrations:jira": ["cli", "mcp", "rest"],
-  "core:integrations:github": ["cli", "mcp", "rest"],
-  "core:integrations:figma": ["mcp", "rest"],
-  "core:integrations:datadog": ["cli", "mcp", "rest"],
-  "core:integrations:splunk": ["cli", "rest"],
-  "core:integrations:discord": ["rest"],
-  "core:integrations:hootsuite": ["rest"],
-  "core:integrations:linkedin": ["rest"],
-  "core:integrations:outlook": ["rest"],
-  "core:integrations:onedrive": ["rest"],
-  "core:integrations:teams": ["rest"],
-  "core:integrations:instagram": ["rest"],
-  "core:integrations:reddit": ["rest"],
-  "core:integrations:semrush": ["rest"],
-  "core:integrations:x": ["rest"],
+  'core:integrations:jira': ['cli', 'mcp', 'rest'],
+  'core:integrations:github': ['cli', 'mcp', 'rest'],
+  'core:integrations:figma': ['mcp', 'rest'],
+  'core:integrations:datadog': ['cli', 'mcp', 'rest'],
+  'core:integrations:splunk': ['cli', 'rest'],
+  'core:integrations:discord': ['rest'],
+  'core:integrations:hootsuite': ['rest'],
+  'core:integrations:linkedin': ['rest'],
+  'core:integrations:outlook': ['rest'],
+  'core:integrations:onedrive': ['rest'],
+  'core:integrations:teams': ['rest'],
+  'core:integrations:instagram': ['rest'],
+  'core:integrations:reddit': ['rest'],
+  'core:integrations:semrush': ['rest'],
+  'core:integrations:x': ['rest'],
   // Tools
-  "core:tools:npm": ["cli"],
-  "core:tools:maven": ["cli"],
-  "core:tools:gradle": ["cli"],
-  "core:tools:biome": ["cli"],
-  "core:tools:eslint": ["cli"],
-  "core:tools:chromatic": ["cli"],
-  "core:tools:terraform": ["cli"],
-  "core:tools:pixelmatch": ["cli"],
-  "core:tools:imagemagick": ["cli"],
-  "core:tools:chrome-devtools": ["cli"],
-  "core:tools:playwright": ["cli", "mcp"],
-  "core:tools:open-pencil": ["cli"],
-  "core:tools:pencil-mcp": ["mcp"],
-  "core:tools:context7": ["mcp"],
+  'core:tools:npm': ['cli'],
+  'core:tools:maven': ['cli'],
+  'core:tools:gradle': ['cli'],
+  'core:tools:biome': ['cli'],
+  'core:tools:eslint': ['cli'],
+  'core:tools:chromatic': ['cli'],
+  'core:tools:terraform': ['cli'],
+  'core:tools:pixelmatch': ['cli'],
+  'core:tools:imagemagick': ['cli'],
+  'core:tools:chrome-devtools': ['cli'],
+  'core:tools:playwright': ['cli', 'mcp'],
+  'core:tools:open-pencil': ['cli'],
+  'core:tools:pencil-mcp': ['mcp'],
+  'core:tools:context7': ['mcp'],
 };
 
 export function getInterfaces(slug: string): Interface[] {
@@ -59,20 +59,20 @@ export function getInterfaces(slug: string): Interface[] {
 
 export function listIntegrations(): Array<{ slug: string; leaf: string; interfaces: Interface[] }> {
   return Object.entries(INTERFACES)
-    .filter(([slug]) => slug.startsWith("core:integrations:"))
+    .filter(([slug]) => slug.startsWith('core:integrations:'))
     .map(([slug, interfaces]) => ({
       slug,
-      leaf: slug.slice("core:integrations:".length),
+      leaf: slug.slice('core:integrations:'.length),
       interfaces,
     }));
 }
 
 export function listTools(): Array<{ slug: string; leaf: string; interfaces: Interface[] }> {
   return Object.entries(INTERFACES)
-    .filter(([slug]) => slug.startsWith("core:tools:"))
+    .filter(([slug]) => slug.startsWith('core:tools:'))
     .map(([slug, interfaces]) => ({
       slug,
-      leaf: slug.slice("core:tools:".length),
+      leaf: slug.slice('core:tools:'.length),
       interfaces,
     }));
 }

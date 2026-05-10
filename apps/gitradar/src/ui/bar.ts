@@ -12,13 +12,13 @@ export interface BarSegment {
  */
 export function stackedBar(segments: BarSegment[], width: number): string {
   if (width <= 0) {
-    return "";
+    return '';
   }
 
   const total = segments.reduce((sum, seg) => sum + seg.value, 0);
 
   if (total === 0) {
-    return " ".repeat(width);
+    return ' '.repeat(width);
   }
 
   // Filter to segments with value > 0
@@ -31,7 +31,7 @@ export function stackedBar(segments: BarSegment[], width: number): string {
   const charWidths = rawWidths.map((raw) => Math.max(1, Math.floor(raw)));
 
   // Adjust to fill exactly `width` characters
-  let allocated = charWidths.reduce((sum, w) => sum + w, 0);
+  const allocated = charWidths.reduce((sum, w) => sum + w, 0);
 
   if (allocated < width) {
     // Distribute remaining chars to segments with the largest fractional parts
@@ -73,5 +73,5 @@ export function stackedBar(segments: BarSegment[], width: number): string {
     return seg.color(chars);
   });
 
-  return parts.join("");
+  return parts.join('');
 }

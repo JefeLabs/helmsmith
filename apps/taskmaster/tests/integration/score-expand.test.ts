@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { TaskNode } from '../../src/config/schema.js';
-import { HeuristicScorer } from '../../src/scorer/index.js';
 import { expandTask, getChildType } from '../../src/decomposer/index.js';
+import { HeuristicScorer } from '../../src/scorer/index.js';
 
 function makeTask(overrides: Partial<TaskNode> = {}): TaskNode {
   return {
@@ -35,7 +35,8 @@ describe('Score -> Expand pipeline', () => {
     const task = makeTask({
       id: 'T-1',
       title: 'Build authentication system',
-      description: 'Implement OAuth 2.0 with Google and GitHub. JWT token management. Session handling with Redis. Rate limiting and brute force protection.',
+      description:
+        'Implement OAuth 2.0 with Google and GitHub. JWT token management. Session handling with Redis. Rate limiting and brute force protection.',
       requiredSkills: ['backend', 'security', 'database'],
     });
 
@@ -76,7 +77,8 @@ describe('Score -> Expand pipeline', () => {
     const task = makeTask({
       id: 'T-2',
       title: 'Design API layer',
-      description: 'Create CRUD endpoints for core resources. Build middleware pipeline. Request validation.',
+      description:
+        'Create CRUD endpoints for core resources. Build middleware pipeline. Request validation.',
     });
     task.complexity = 7;
 

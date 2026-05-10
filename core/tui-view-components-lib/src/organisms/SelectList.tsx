@@ -10,11 +10,11 @@
  * controlled, or omit both for uncontrolled (component owns state).
  */
 
-import { useEffect, useState } from "react";
-import { Box } from "../atoms/Box.tsx";
-import { Text } from "../atoms/Text.tsx";
-import { useKeybinding } from "../keyboard/registry.tsx";
-import { useFocus } from "../focus/manager.tsx";
+import { useEffect, useState } from 'react';
+import { Box } from '../atoms/Box.tsx';
+import { Text } from '../atoms/Text.tsx';
+import { useFocus } from '../focus/manager.tsx';
+import { useKeybinding } from '../keyboard/registry.tsx';
 
 export interface SelectListItem {
   id: string;
@@ -48,7 +48,7 @@ export function SelectList({
   onChange,
   onSelect,
   onCancel,
-  focusId = "select-list",
+  focusId = 'select-list',
   alwaysCapture = false,
   style,
 }: SelectListProps) {
@@ -74,47 +74,42 @@ export function SelectList({
   };
 
   const enabled = isFocused || alwaysCapture;
-  useKeybinding("up", "navigate", () => move(-1), { enabled, hidden: true });
-  useKeybinding("down", "navigate", () => move(1), { enabled, hidden: true });
-  useKeybinding("k", "navigate", () => move(-1), { enabled, hidden: true });
-  useKeybinding("j", "navigate", () => move(1), { enabled, hidden: true });
+  useKeybinding('up', 'navigate', () => move(-1), { enabled, hidden: true });
+  useKeybinding('down', 'navigate', () => move(1), { enabled, hidden: true });
+  useKeybinding('k', 'navigate', () => move(-1), { enabled, hidden: true });
+  useKeybinding('j', 'navigate', () => move(1), { enabled, hidden: true });
   useKeybinding(
-    (k) => k.name === "return" || k.name === "enter",
-    "select",
+    (k) => k.name === 'return' || k.name === 'enter',
+    'select',
     () => {
       const it = items[idx];
       if (it && !it.disabled) onSelect?.(idx, it);
     },
-    { enabled, keyDisplay: "↵" },
+    { enabled, keyDisplay: '↵' },
   );
-  useKeybinding("escape", "cancel", () => onCancel?.(), {
+  useKeybinding('escape', 'cancel', () => onCancel?.(), {
     enabled,
-    keyDisplay: "esc",
+    keyDisplay: 'esc',
     hidden: !onCancel,
   });
 
   return (
-    <Box
-      variant="transparent"
-      style={{ flexDirection: "column", gap: 0, ...style }}
-    >
+    <Box variant="transparent" style={{ flexDirection: 'column', gap: 0, ...style }}>
       {items.map((item, i) => {
         const isCursor = i === idx;
         return (
           <Box
             key={item.id}
-            variant={isCursor ? "panel" : "transparent"}
-            style={{ flexDirection: "row", gap: 1, paddingLeft: 1, paddingRight: 1 }}
+            variant={isCursor ? 'panel' : 'transparent'}
+            style={{ flexDirection: 'row', gap: 1, paddingLeft: 1, paddingRight: 1 }}
           >
-            <Text variant={isCursor ? "accent" : item.disabled ? "subtle" : "body"}>
-              {isCursor ? "▸" : " "}
+            <Text variant={isCursor ? 'accent' : item.disabled ? 'subtle' : 'body'}>
+              {isCursor ? '▸' : ' '}
             </Text>
-            <Text variant={item.disabled ? "subtle" : isCursor ? "accent" : "body"}>
+            <Text variant={item.disabled ? 'subtle' : isCursor ? 'accent' : 'body'}>
               {item.label}
             </Text>
-            {item.detail ? (
-              <Text variant="subtle">{item.detail}</Text>
-            ) : null}
+            {item.detail ? <Text variant="subtle">{item.detail}</Text> : null}
           </Box>
         );
       })}

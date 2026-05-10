@@ -1,5 +1,5 @@
-import chalk from "chalk";
-import { stripAnsi, padRight } from "./format.js";
+import chalk from 'chalk';
+import { stripAnsi } from './format.js';
 
 export interface BannerOptions {
   /** Main title, rendered with chalk.bold */
@@ -29,26 +29,26 @@ export function renderBanner(options: BannerOptions): string {
     const titleVisible = stripAnsi(titleStr).length;
     const rightVisible = stripAnsi(options.right).length;
     const gap = Math.max(2, width - titleVisible - rightVisible);
-    lines.push(titleStr + " ".repeat(gap) + options.right);
+    lines.push(titleStr + ' '.repeat(gap) + options.right);
   } else {
     lines.push(titleStr);
   }
 
   // Line 2: subtitle + optional rightSub
   if (options.subtitle || options.rightSub) {
-    const subtitleStr = options.subtitle ?? "";
+    const subtitleStr = options.subtitle ?? '';
     if (options.rightSub) {
       const subVisible = stripAnsi(subtitleStr).length;
       const rightSubVisible = stripAnsi(options.rightSub).length;
       const gap = Math.max(2, width - subVisible - rightSubVisible);
-      lines.push(subtitleStr + " ".repeat(gap) + options.rightSub);
+      lines.push(subtitleStr + ' '.repeat(gap) + options.rightSub);
     } else {
       lines.push(subtitleStr);
     }
   }
 
   // Separator line
-  lines.push(chalk.dim("\u2500".repeat(Math.min(width, 120))));
+  lines.push(chalk.dim('\u2500'.repeat(Math.min(width, 120))));
 
-  return lines.join("\n");
+  return lines.join('\n');
 }

@@ -1,6 +1,6 @@
-import type { TaskNode, ProjectConfig } from '../config/schema.js';
+import type { ProjectConfig, TaskNode } from '../config/schema.js';
 import { findTaskById } from '../config/state-engine.js';
-import { expandTask, expandMultiple, getChildType } from '../decomposer/index.js';
+import { expandMultiple, expandTask, getChildType } from '../decomposer/index.js';
 
 export interface ExpandOpts {
   force?: boolean;
@@ -37,11 +37,7 @@ export interface ExpandAllResult {
  * Validate whether a task can be expanded.
  * Returns an error message or null if expandable.
  */
-export function validateExpandable(
-  task: TaskNode,
-  style: string,
-  force?: boolean,
-): string | null {
+export function validateExpandable(task: TaskNode, style: string, force?: boolean): string | null {
   const childType = getChildType(task.type, style);
   if (!childType) {
     return `Cannot expand ${task.id}: already at maximum depth (${task.type}) for style '${style}'.`;
@@ -92,10 +88,7 @@ export async function executeExpand(
 /**
  * Find all tasks eligible for expansion based on a complexity threshold.
  */
-export function findExpandCandidates(
-  tasks: TaskNode[],
-  threshold: number,
-): ExpandAllCandidate[] {
+export function findExpandCandidates(tasks: TaskNode[], threshold: number): ExpandAllCandidate[] {
   return tasks
     .filter((t) => t.complexity >= threshold && t.children.length === 0)
     .map((t) => ({

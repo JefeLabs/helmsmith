@@ -1,10 +1,10 @@
 import type { ProjectConfig } from '../config/schema.js';
 import {
-  runConfigEditor,
-  getConfigValue,
-  validateConfigValue,
   applyConfigValue,
   CONFIG_KEYS,
+  getConfigValue,
+  runConfigEditor,
+  validateConfigValue,
 } from '../prompts/config-editor.js';
 
 export interface ConfigGetResult {
@@ -26,10 +26,7 @@ export interface ConfigEditResult {
 /**
  * Execute config --get: retrieve a configuration value by key.
  */
-export function executeConfigGet(
-  config: ProjectConfig,
-  key: string,
-): ConfigGetResult {
+export function executeConfigGet(config: ProjectConfig, key: string): ConfigGetResult {
   const value = getConfigValue(config, key);
   if (value === null) {
     throw new Error(
@@ -42,10 +39,7 @@ export function executeConfigGet(
 /**
  * Execute config --set: validate and build a config patch for a key=value pair.
  */
-export function executeConfigSet(
-  key: string,
-  value: string,
-): ConfigSetResult {
+export function executeConfigSet(key: string, value: string): ConfigSetResult {
   const validation = validateConfigValue(key, value);
   if (!validation.valid) {
     throw new Error(validation.error!);
@@ -57,11 +51,9 @@ export function executeConfigSet(
 /**
  * Execute interactive config editor and return the patch, or null if cancelled.
  */
-export async function executeConfigEdit(
-  config: ProjectConfig,
-): Promise<ConfigEditResult | null> {
+export async function executeConfigEdit(config: ProjectConfig): Promise<ConfigEditResult | null> {
   const result = await runConfigEditor(config);
-  if (!result || !result.confirmed) {
+  if (!result?.confirmed) {
     return null;
   }
   const patch = applyConfigValue(result.key, result.value);

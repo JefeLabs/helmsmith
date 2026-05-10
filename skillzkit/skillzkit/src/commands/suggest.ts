@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
-import { suggestNext, type ActiveWorkflowState } from "../suggest.js";
+import { existsSync, readFileSync } from 'node:fs';
+import { type ActiveWorkflowState, suggestNext } from '../suggest.js';
 
 export interface SuggestOptions {
   limit?: string;
@@ -18,7 +18,7 @@ export function runSuggest(slug: string, options: SuggestOptions = {}): void {
   let activeWorkflowState: ActiveWorkflowState | undefined;
   if (options.state && existsSync(options.state)) {
     try {
-      const parsed = JSON.parse(readFileSync(options.state, "utf8"));
+      const parsed = JSON.parse(readFileSync(options.state, 'utf8'));
       if (parsed?.active?.workflow) {
         activeWorkflowState = {
           workflow: parsed.active.workflow,
@@ -26,9 +26,7 @@ export function runSuggest(slug: string, options: SuggestOptions = {}): void {
         };
       }
     } catch (err) {
-      console.error(
-        `Could not read workflow state at ${options.state}: ${(err as Error).message}`,
-      );
+      console.error(`Could not read workflow state at ${options.state}: ${(err as Error).message}`);
     }
   }
 
@@ -40,9 +38,9 @@ export function runSuggest(slug: string, options: SuggestOptions = {}): void {
 
   console.log(`\nNext steps after ${slug}:\n`);
   for (const s of suggestions) {
-    const tag = s.kind === "workflow" ? "[workflow]" : "[task]    ";
+    const tag = s.kind === 'workflow' ? '[workflow]' : '[task]    ';
     console.log(`  ${tag}  ${s.slug}`);
     console.log(`            ${s.rationale} (score: ${s.score.toFixed(2)})`);
-    console.log("");
+    console.log('');
   }
 }

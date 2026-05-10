@@ -14,20 +14,20 @@
  * (pritty, gittyup, etc.) inherits the change.
  */
 
-import { unlink } from "node:fs/promises";
-import { homedir } from "node:os";
-import { join } from "node:path";
+import { unlink } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import {
-  AuthStore,
   type AuthFile,
-  loginGitHubCopilot,
+  AuthStore,
   type DeviceFlowResult,
-} from "@ecruz165/agent-auth";
+  loginGitHubCopilot,
+} from '@ecruz165/agent-auth';
 
 /** Resolve the pritty auth-store location. Override via PRITTY_HOME. */
 export function getAuthPath(): string {
-  const home = process.env.PRITTY_HOME ?? join(homedir(), ".pritty");
-  return join(home, "auth.json");
+  const home = process.env.PRITTY_HOME ?? join(homedir(), '.pritty');
+  return join(home, 'auth.json');
 }
 
 export function getAuthStore(): AuthStore {
@@ -40,11 +40,7 @@ export function getAuthStore(): AuthStore {
  * a callback so the CLI can use chalk/ora.
  */
 export async function login(opts: {
-  onPrompt: (info: {
-    verificationUri: string;
-    userCode: string;
-    expiresIn: number;
-  }) => void;
+  onPrompt: (info: { verificationUri: string; userCode: string; expiresIn: number }) => void;
 }): Promise<DeviceFlowResult> {
   const result = await loginGitHubCopilot({
     onPrompt: opts.onPrompt,
@@ -79,6 +75,6 @@ export async function logout(): Promise<void> {
   try {
     await unlink(getAuthPath());
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
   }
 }

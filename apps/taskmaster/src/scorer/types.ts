@@ -45,9 +45,9 @@ export interface ScoringProvider {
  * Default dimension weights. Sum = 1.0.
  */
 export const DEFAULT_WEIGHTS = {
-  scopeBreadth: 0.20,
+  scopeBreadth: 0.2,
   technicalDepth: 0.25,
   dependencyCount: 0.15,
-  ambiguity: 0.20,
-  crossCutting: 0.20,
+  ambiguity: 0.2,
+  crossCutting: 0.2,
 } as const;

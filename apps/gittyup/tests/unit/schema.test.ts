@@ -1,9 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  ManifestSchema,
-  RepoConfigSchema,
   AiModeSchema,
+  ManifestSchema,
   ManifestSettingsSchema,
+  RepoConfigSchema,
 } from '../../src/config/schema.js';
 
 describe('RepoConfig schema', () => {
@@ -78,13 +78,16 @@ describe('Manifest schema', () => {
         frontend: {
           description: 'Client apps',
           repos: [
-            { name: 'web-app', path: './web-app', remote: 'origin', branches: { dev: 'develop', prod: 'main' } },
+            {
+              name: 'web-app',
+              path: './web-app',
+              remote: 'origin',
+              branches: { dev: 'develop', prod: 'main' },
+            },
           ],
         },
         services: {
-          repos: [
-            { name: 'api', path: './api', branches: { dev: 'dev' } },
-          ],
+          repos: [{ name: 'api', path: './api', branches: { dev: 'dev' } }],
         },
       },
       settings: {

@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  mockCopilotTokenResponse,
   mockChatCompletionResponse,
+  mockCopilotTokenResponse,
 } from '../../fixtures/copilot-responses.js';
 
 // Mock getHomePath to use temp directory
@@ -128,9 +128,11 @@ describe('token-manager', () => {
 
   describe('getCopilotToken', () => {
     it('fetches a new Copilot token from the API', async () => {
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-        new Response(JSON.stringify(mockCopilotTokenResponse), { status: 200 }),
-      );
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(mockCopilotTokenResponse), { status: 200 }),
+        );
 
       const token = await getCopilotToken('gho_test_github_token');
       expect(token).toBe(mockCopilotTokenResponse.token);
@@ -159,9 +161,11 @@ describe('token-manager', () => {
         copilot_token_expires_at: Math.floor(Date.now() / 1000) + 120,
       });
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-        new Response(JSON.stringify(mockCopilotTokenResponse), { status: 200 }),
-      );
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(mockCopilotTokenResponse), { status: 200 }),
+        );
 
       const token = await getCopilotToken('gho_test');
       expect(token).toBe(mockCopilotTokenResponse.token);
@@ -173,7 +177,9 @@ describe('token-manager', () => {
         new Response('Forbidden', { status: 403 }),
       );
 
-      await expect(getCopilotToken('gho_bad_token')).rejects.toThrow('Failed to get Copilot token (403)');
+      await expect(getCopilotToken('gho_bad_token')).rejects.toThrow(
+        'Failed to get Copilot token (403)',
+      );
     });
   });
 
@@ -267,7 +273,8 @@ describe('token-manager', () => {
     it('sends correct headers and body', async () => {
       await writeAuthCredentials({ github_token: 'gho_test' });
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
         // First call: getCopilotToken
         .mockResolvedValueOnce(
           new Response(JSON.stringify(mockCopilotTokenResponse), { status: 200 }),
@@ -277,10 +284,7 @@ describe('token-manager', () => {
           new Response(JSON.stringify(mockChatCompletionResponse), { status: 200 }),
         );
 
-      const result = await callCopilot(
-        [{ role: 'user', content: 'test' }],
-        'gpt-4o',
-      );
+      const result = await callCopilot([{ role: 'user', content: 'test' }], 'gpt-4o');
 
       expect(result.choices[0].message.content).toContain('"score"');
 
@@ -288,7 +292,7 @@ describe('token-manager', () => {
       const chatCall = fetchSpy.mock.calls[1];
       const chatOpts = chatCall[1] as RequestInit;
       const headers = chatOpts.headers as Record<string, string>;
-      expect(headers['Authorization']).toContain('Bearer');
+      expect(headers.Authorization).toContain('Bearer');
       expect(headers['Editor-Version']).toBe('AgentX-Taskmaster/0.1.0');
       expect(headers['Openai-Intent']).toBe('conversation-panel');
 
@@ -302,28 +306,26 @@ describe('token-manager', () => {
     it('retries once on 401', async () => {
       await writeAuthCredentials({ github_token: 'gho_test' });
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
         // getCopilotToken (first attempt)
         .mockResolvedValueOnce(
           new Response(JSON.stringify(mockCopilotTokenResponse), { status: 200 }),
         )
         // Chat completions → 401
-        .mockResolvedValueOnce(
-          new Response('Unauthorized', { status: 401 }),
-        )
+        .mockResolvedValueOnce(new Response('Unauthorized', { status: 401 }))
         // getCopilotToken (retry after clearing cache)
         .mockResolvedValueOnce(
-          new Response(JSON.stringify({ ...mockCopilotTokenResponse, token: 'new_token' }), { status: 200 }),
+          new Response(JSON.stringify({ ...mockCopilotTokenResponse, token: 'new_token' }), {
+            status: 200,
+          }),
         )
         // Chat completions → success
         .mockResolvedValueOnce(
           new Response(JSON.stringify(mockChatCompletionResponse), { status: 200 }),
         );
 
-      const result = await callCopilot(
-        [{ role: 'user', content: 'test' }],
-        'gpt-4o',
-      );
+      const result = await callCopilot([{ role: 'user', content: 'test' }], 'gpt-4o');
 
       expect(result.choices).toHaveLength(1);
       // 4 fetch calls: token, 401, token refresh, success
@@ -331,9 +333,9 @@ describe('token-manager', () => {
     });
 
     it('throws when not authenticated', async () => {
-      await expect(
-        callCopilot([{ role: 'user', content: 'test' }], 'gpt-4o'),
-      ).rejects.toThrow('Not authenticated');
+      await expect(callCopilot([{ role: 'user', content: 'test' }], 'gpt-4o')).rejects.toThrow(
+        'Not authenticated',
+      );
     });
   });
 });

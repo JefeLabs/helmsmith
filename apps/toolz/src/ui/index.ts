@@ -1,4 +1,4 @@
-export { printBanner } from "./banner.js";
+export { printBanner } from './banner.js';
 export {
   bold,
   colorsEnabled,
@@ -8,4 +8,4 @@ export {
   info,
   ok,
   warn,
-} from "./symbols.js";
+} from './symbols.js';

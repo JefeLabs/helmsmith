@@ -1,4 +1,4 @@
-import { normalizeKey } from "./keypress.js";
+import { normalizeKey } from './keypress.js';
 
 /**
  * Read a line of text from stdin in raw mode.
@@ -12,11 +12,11 @@ import { normalizeKey } from "./keypress.js";
 export function readLine(prompt: string): Promise<string | null> {
   return new Promise<string | null>((resolve, reject) => {
     if (!process.stdin.isTTY) {
-      reject(new Error("readLine requires a TTY stdin"));
+      reject(new Error('readLine requires a TTY stdin'));
       return;
     }
 
-    let buffer = "";
+    let buffer = '';
 
     const render = () => {
       // Clear the current line and redraw
@@ -25,41 +25,41 @@ export function readLine(prompt: string): Promise<string | null> {
 
     process.stdin.setRawMode(true);
     process.stdin.resume();
-    process.stdin.setEncoding("utf8");
+    process.stdin.setEncoding('utf8');
 
     render();
 
     const cleanup = () => {
       process.stdin.setRawMode(false);
       process.stdin.pause();
-      process.stdin.removeListener("data", handler);
+      process.stdin.removeListener('data', handler);
     };
 
     const handler = (chunk: string) => {
       const key = normalizeKey(chunk);
 
-      if (key.name === "ctrl-c") {
+      if (key.name === 'ctrl-c') {
         cleanup();
-        process.stdout.write("\n");
-        reject(new Error("SIGINT"));
+        process.stdout.write('\n');
+        reject(new Error('SIGINT'));
         return;
       }
 
-      if (key.name === "escape") {
+      if (key.name === 'escape') {
         cleanup();
-        process.stdout.write("\n");
+        process.stdout.write('\n');
         resolve(null);
         return;
       }
 
-      if (key.name === "return") {
+      if (key.name === 'return') {
         cleanup();
-        process.stdout.write("\n");
+        process.stdout.write('\n');
         resolve(buffer);
         return;
       }
 
-      if (key.name === "backspace") {
+      if (key.name === 'backspace') {
         if (buffer.length > 0) {
           buffer = buffer.slice(0, -1);
         }
@@ -74,6 +74,6 @@ export function readLine(prompt: string): Promise<string | null> {
       }
     };
 
-    process.stdin.on("data", handler);
+    process.stdin.on('data', handler);
   });
 }

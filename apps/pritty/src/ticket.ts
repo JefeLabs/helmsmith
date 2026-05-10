@@ -40,13 +40,10 @@ export interface TicketConfig {
  * for typical patterns (Jira keys are uppercase by convention but
  * branch names sometimes downcase them).
  */
-export function detectTicket(
-  branch: string,
-  pattern: string,
-): string | null {
+export function detectTicket(branch: string, pattern: string): string | null {
   if (!branch) return null;
   try {
-    const re = new RegExp(pattern, "i");
+    const re = new RegExp(pattern, 'i');
     const match = branch.match(re);
     if (!match) return null;
     // Preserve original casing from the branch — uppercase tickets
@@ -62,10 +59,7 @@ export function detectTicket(
  * undefined when no template is set or the ticket is empty. The
  * template uses `{ticket}` as the substitution token.
  */
-export function ticketLink(
-  ticket: string | null,
-  template?: string,
-): string | undefined {
+export function ticketLink(ticket: string | null, template?: string): string | undefined {
   if (!ticket || !template) return undefined;
   return template.replace(/\{ticket\}/g, ticket);
 }
@@ -116,8 +110,8 @@ export function ticketPromptGuidance(
   link: string | undefined,
   title?: string | undefined,
 ): string {
-  if (!ticket) return "";
-  const titleText = title ? ` — "${title}"` : "";
-  const linkText = link ? ` (${link})` : "";
+  if (!ticket) return '';
+  const titleText = title ? ` — "${title}"` : '';
+  const linkText = link ? ` (${link})` : '';
   return `\nReference ticket: ${ticket}${titleText}${linkText}. Include "Refs: ${ticket}" as a commit footer line, and mention the ticket in any PR body you generate.`;
 }

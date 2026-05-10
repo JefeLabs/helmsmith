@@ -1,11 +1,11 @@
-import type { Command } from 'commander';
+import { checkbox, select } from '@inquirer/prompts';
 import chalk from 'chalk';
-import { select, checkbox } from '@inquirer/prompts';
+import type { Command } from 'commander';
+import { APP_CONFIG_DIR, APP_NAME } from '../config/branding.js';
 import { ManifestManager } from '../config/manifest.js';
-import { APP_NAME, APP_CONFIG_DIR } from '../config/branding.js';
-import { detectGitRoot, getRepoConfigHome } from '../utils/git.js';
-import { AGENT_FILES, AI_TOOLING_CHOICES, installContext } from '../context/index.js';
 import type { AITooling } from '../context/index.js';
+import { AGENT_FILES, AI_TOOLING_CHOICES, installContext } from '../context/index.js';
+import { detectGitRoot, getRepoConfigHome } from '../utils/git.js';
 
 export function registerInit(program: Command): void {
   program

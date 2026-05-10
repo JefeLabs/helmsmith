@@ -1,12 +1,12 @@
-import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtemp, rm } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   readComponentIndex,
-  writeComponentIndex,
   readSymbolIndex,
+  writeComponentIndex,
   writeSymbolIndex,
 } from '../../../src/formats/index-store.js';
 import type { ComponentIndex, SymbolIndex } from '../../../src/parser/analysis/types.js';

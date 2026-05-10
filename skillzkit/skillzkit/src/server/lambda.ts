@@ -16,9 +16,9 @@
  * request — defeats the purpose of warm starts.
  */
 
-import { handle } from "hono/aws-lambda";
-import { createApp } from "./app.js";
-import { loadServerConfig } from "./config.js";
+import { handle } from 'hono/aws-lambda';
+import { createApp } from './app.js';
+import { loadServerConfig } from './config.js';
 
 // Top-level await - Node 20+ + AWS Lambda Node runtimes ≥ nodejs18
 // support TLA. Module loads once on cold start; subsequent warm

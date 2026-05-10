@@ -19,14 +19,14 @@
  *     resolves them when requestReviewers is called)
  */
 
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-import { minimatch } from "minimatch";
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { minimatch } from 'minimatch';
 
 const CODEOWNERS_PATHS: ReadonlyArray<string> = [
-  ".github/CODEOWNERS",
-  "CODEOWNERS",
-  "docs/CODEOWNERS",
+  '.github/CODEOWNERS',
+  'CODEOWNERS',
+  'docs/CODEOWNERS',
 ];
 
 export interface CodeownersRule {
@@ -53,10 +53,8 @@ export function findCodeowners(cwd: string = process.cwd()): string | null {
     const full = join(cwd, rel);
     if (!existsSync(full)) continue;
     try {
-      return readFileSync(full, "utf8");
-    } catch {
-      continue;
-    }
+      return readFileSync(full, 'utf8');
+    } catch {}
   }
   return null;
 }
@@ -70,7 +68,7 @@ export function findCodeowners(cwd: string = process.cwd()): string | null {
 export function parseCodeowners(content: string): CodeownersRule[] {
   const rules: CodeownersRule[] = [];
   for (const rawLine of content.split(/\r?\n/)) {
-    const line = rawLine.replace(/#.*$/, "").trim();
+    const line = rawLine.replace(/#.*$/, '').trim();
     if (!line) continue;
     const tokens = line.split(/\s+/);
     if (tokens.length < 2) continue;
@@ -103,11 +101,11 @@ export function resolveReviewers(
   const users: string[] = [];
   const teams: string[] = [];
   for (const owner of allOwners) {
-    if (owner.startsWith("@")) {
+    if (owner.startsWith('@')) {
       const stripped = owner.slice(1);
-      if (stripped.includes("/")) {
+      if (stripped.includes('/')) {
         // @org/team → team slug
-        const slug = stripped.split("/")[1];
+        const slug = stripped.split('/')[1];
         if (slug) teams.push(slug);
       } else {
         users.push(stripped);
@@ -134,15 +132,15 @@ function matchesPattern(file: string, pattern: string): boolean {
   // Normalize: strip leading slash → root-relative; minimatch matches
   // from beginning of input by default
   let p = pattern;
-  if (p.startsWith("/")) {
+  if (p.startsWith('/')) {
     p = p.slice(1);
-  } else if (!p.includes("/")) {
+  } else if (!p.includes('/')) {
     // No slash anywhere → match at any depth (gitignore convention)
     return minimatch(file, p, { ...opts, matchBase: true });
   }
 
   // Trailing slash → directory match: prepend `**` to cover anything inside
-  if (p.endsWith("/")) {
+  if (p.endsWith('/')) {
     p = `${p}**`;
   }
 

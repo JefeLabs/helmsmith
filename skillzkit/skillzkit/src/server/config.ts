@@ -22,20 +22,14 @@
  *                              Defaults to 3000.
  */
 
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-import {
-  FilesystemCatalogStorage,
-  findSkillzkitPackageRoot,
-} from "../api/storage/fs.js";
-import { FilesystemPersistentCatalogStorage } from "../api/storage/fs-persistent.js";
-import { MemoryCatalogStorage } from "../api/storage/memory.js";
-import { S3CatalogStorage } from "../api/storage/s3.js";
-import { createS3LikeFromAwsClient } from "../api/storage/s3-aws-client.js";
-import type {
-  CatalogReadStorage,
-  CatalogStorage,
-} from "../api/storage/interface.js";
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { FilesystemCatalogStorage, findSkillzkitPackageRoot } from '../api/storage/fs.js';
+import { FilesystemPersistentCatalogStorage } from '../api/storage/fs-persistent.js';
+import type { CatalogReadStorage, CatalogStorage } from '../api/storage/interface.js';
+import { MemoryCatalogStorage } from '../api/storage/memory.js';
+import { S3CatalogStorage } from '../api/storage/s3.js';
+import { createS3LikeFromAwsClient } from '../api/storage/s3-aws-client.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -54,8 +48,8 @@ export interface ServerConfig {
  * backends (S3) load their SDK via dynamic import.
  */
 export async function loadServerConfig(): Promise<ServerConfig> {
-  const spec = process.env.SKILLZKIT_STORAGE ?? "fs:auto";
-  const port = Number.parseInt(process.env.PORT ?? "3000", 10);
+  const spec = process.env.SKILLZKIT_STORAGE ?? 'fs:auto';
+  const port = Number.parseInt(process.env.PORT ?? '3000', 10);
   const { storage, writable } = await resolveStorage(spec);
   return { storage, writable, port };
 }
@@ -64,11 +58,11 @@ async function resolveStorage(spec: string): Promise<{
   storage: CatalogReadStorage;
   writable: boolean;
 }> {
-  if (spec === "memory") {
+  if (spec === 'memory') {
     return { storage: new MemoryCatalogStorage(), writable: true };
   }
 
-  if (spec === "fs:auto") {
+  if (spec === 'fs:auto') {
     // Walk up from this file's directory to find the skillzkit
     // package root. Convenient for local dev — `SKILLZKIT_STORAGE`
     // doesn't need to be set when running inside the repo.
@@ -76,13 +70,13 @@ async function resolveStorage(spec: string): Promise<{
     return { storage: new FilesystemCatalogStorage(root), writable: false };
   }
 
-  if (spec.startsWith("fs:")) {
-    const path = spec.slice("fs:".length);
+  if (spec.startsWith('fs:')) {
+    const path = spec.slice('fs:'.length);
     return { storage: new FilesystemCatalogStorage(path), writable: false };
   }
 
-  if (spec.startsWith("fs-persistent:")) {
-    const path = spec.slice("fs-persistent:".length);
+  if (spec.startsWith('fs-persistent:')) {
+    const path = spec.slice('fs-persistent:'.length);
     if (!path) {
       throw new Error(
         `SKILLZKIT_STORAGE=${spec}: fs-persistent requires a path, e.g. \`fs-persistent:/data\``,
@@ -94,15 +88,15 @@ async function resolveStorage(spec: string): Promise<{
     };
   }
 
-  if (spec.startsWith("s3:")) {
-    const bucket = spec.slice("s3:".length);
+  if (spec.startsWith('s3:')) {
+    const bucket = spec.slice('s3:'.length);
     if (!bucket) {
       throw new Error(
         `SKILLZKIT_STORAGE=${spec}: S3 backend requires a bucket name, e.g. \`s3:my-bucket\``,
       );
     }
     const region = process.env.AWS_REGION;
-    const prefix = process.env.SKILLZKIT_S3_PREFIX ?? "v1/";
+    const prefix = process.env.SKILLZKIT_S3_PREFIX ?? 'v1/';
     const s3Like = await createS3LikeFromAwsClient({ bucket, region });
     return {
       storage: new S3CatalogStorage(s3Like, { prefix }),
@@ -117,10 +111,6 @@ async function resolveStorage(spec: string): Promise<{
 }
 
 /** Type-narrow check for whether a storage instance supports writes. */
-export function isWritable(
-  storage: CatalogReadStorage,
-): storage is CatalogStorage {
-  return (
-    typeof (storage as CatalogStorage).putCommand === "function"
-  );
+export function isWritable(storage: CatalogReadStorage): storage is CatalogStorage {
+  return typeof (storage as CatalogStorage).putCommand === 'function';
 }

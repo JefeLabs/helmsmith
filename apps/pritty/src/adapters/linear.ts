@@ -16,13 +16,9 @@
  *   - Network / non-200 → null
  */
 
-import type {
-  LinearValidation,
-  TicketSystemAdapter,
-  ValidationResult,
-} from "./index.js";
+import type { LinearValidation, TicketSystemAdapter, ValidationResult } from './index.js';
 
-const LINEAR_GRAPHQL_URL = "https://api.linear.app/graphql";
+const LINEAR_GRAPHQL_URL = 'https://api.linear.app/graphql';
 
 const ISSUE_QUERY = `
   query ($id: String!) {
@@ -50,7 +46,7 @@ interface LinearGraphQLResponse {
 }
 
 export class LinearAdapter implements TicketSystemAdapter {
-  readonly name = "linear" as const;
+  readonly name = 'linear' as const;
 
   constructor(private readonly config: LinearValidation) {}
 
@@ -65,10 +61,10 @@ export class LinearAdapter implements TicketSystemAdapter {
     let response: Response;
     try {
       response = await fetch(LINEAR_GRAPHQL_URL, {
-        method: "POST",
+        method: 'POST',
         headers: {
           Authorization: apiKey, // Linear: raw API key, no `Bearer`
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           query: ISSUE_QUERY,

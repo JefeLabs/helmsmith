@@ -1,8 +1,13 @@
-import { queryRecords, queryRollup } from '../store/sqlite-store.js';
-import { filterRecords, getLastNWeeks, getCurrentWeek, type Filters } from '../aggregator/filters.js';
 import { rollup } from '../aggregator/engine.js';
+import {
+  type Filters,
+  filterRecords,
+  getCurrentWeek,
+  getLastNWeeks,
+} from '../aggregator/filters.js';
+import { queryRollup } from '../store/sqlite-store.js';
+import { type Column, printJson, printNoData, printTable } from '../ui/cli-renderer.js';
 import { fmt } from '../ui/format.js';
-import { printTable, printNoData, printJson, type Column } from '../ui/cli-renderer.js';
 
 export interface RepoActivityOptions {
   weeks?: number;
@@ -29,9 +34,27 @@ const repoColumns: Column[] = [
   { key: 'group', label: 'Group', minWidth: 10 },
   { key: 'commits', label: 'cmts', align: 'right', minWidth: 6 },
   { key: 'contributors', label: 'devs', align: 'right', minWidth: 5 },
-  { key: 'insertions', label: '+ins', align: 'right', minWidth: 8, format: (v: any) => '+' + fmt(v) },
-  { key: 'deletions', label: '-del', align: 'right', minWidth: 8, format: (v: any) => '-' + fmt(v) },
-  { key: 'net', label: 'net', align: 'right', minWidth: 8, format: (v: any) => (v >= 0 ? '+' : '') + fmt(v) },
+  {
+    key: 'insertions',
+    label: '+ins',
+    align: 'right',
+    minWidth: 8,
+    format: (v: any) => `+${fmt(v)}`,
+  },
+  {
+    key: 'deletions',
+    label: '-del',
+    align: 'right',
+    minWidth: 8,
+    format: (v: any) => `-${fmt(v)}`,
+  },
+  {
+    key: 'net',
+    label: 'net',
+    align: 'right',
+    minWidth: 8,
+    format: (v: any) => (v >= 0 ? '+' : '') + fmt(v),
+  },
   { key: 'files', label: 'files', align: 'right', minWidth: 6 },
 ];
 
@@ -56,22 +79,29 @@ export async function repoActivity(options: RepoActivityOptions = {}): Promise<v
 
     // Get per-repo group name via a lightweight query
     const db = (await import('../store/sqlite-store.js')).getDB();
-    const groupRows = db.prepare(
-      "SELECT DISTINCT repo, grp FROM records WHERE week IN (SELECT value FROM json_each(?))",
-    ).all(JSON.stringify(weeks)) as Array<{ repo: string; grp: string }>;
+    const groupRows = db
+      .prepare(
+        'SELECT DISTINCT repo, grp FROM records WHERE week IN (SELECT value FROM json_each(?))',
+      )
+      .all(JSON.stringify(weeks)) as Array<{ repo: string; grp: string }>;
     const repoGroups = new Map(groupRows.map((r) => [r.repo, r.grp]));
 
     // Get weekly commits per repo via SQL
-    const weeklyRows = db.prepare(`
+    const weeklyRows = db
+      .prepare(`
       SELECT repo, week, SUM(commits) as commits
       FROM records
       WHERE week IN (SELECT value FROM json_each(?))
       GROUP BY repo, week
-    `).all(JSON.stringify(weeks)) as Array<{ repo: string; week: string; commits: number }>;
+    `)
+      .all(JSON.stringify(weeks)) as Array<{ repo: string; week: string; commits: number }>;
     const weeklyMap = new Map<string, Map<string, number>>();
     for (const r of weeklyRows) {
       let repoMap = weeklyMap.get(r.repo);
-      if (!repoMap) { repoMap = new Map(); weeklyMap.set(r.repo, repoMap); }
+      if (!repoMap) {
+        repoMap = new Map();
+        weeklyMap.set(r.repo, repoMap);
+      }
       repoMap.set(r.week, r.commits);
     }
 

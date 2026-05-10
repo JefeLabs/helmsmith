@@ -1,14 +1,14 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   mockDeviceCodeResponse,
-  mockTokenResponse,
-  mockTokenPendingResponse,
-  mockTokenSlowDownResponse,
-  mockTokenExpiredResponse,
   mockTokenDeniedResponse,
+  mockTokenExpiredResponse,
+  mockTokenPendingResponse,
+  mockTokenResponse,
+  mockTokenSlowDownResponse,
   mockUserResponse,
 } from '../../fixtures/copilot-responses.js';
 
@@ -20,9 +20,7 @@ vi.mock('../../../src/utils/home.js', () => ({
   getTaskmasterHome: () => tempDir,
 }));
 
-const { requestDeviceCode, pollForToken, login } = await import(
-  '../../../src/auth/device-flow.js'
-);
+const { requestDeviceCode, pollForToken, login } = await import('../../../src/auth/device-flow.js');
 
 describe('device-flow', () => {
   beforeEach(async () => {
@@ -39,9 +37,11 @@ describe('device-flow', () => {
 
   describe('requestDeviceCode', () => {
     it('sends correct POST body with client_id and scope', async () => {
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-        new Response(JSON.stringify(mockDeviceCodeResponse), { status: 200 }),
-      );
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(mockDeviceCodeResponse), { status: 200 }),
+        );
 
       const result = await requestDeviceCode();
 
@@ -76,13 +76,12 @@ describe('device-flow', () => {
     });
 
     it('handles authorization_pending and continues polling', async () => {
-      const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
         .mockResolvedValueOnce(
           new Response(JSON.stringify(mockTokenPendingResponse), { status: 200 }),
         )
-        .mockResolvedValueOnce(
-          new Response(JSON.stringify(mockTokenResponse), { status: 200 }),
-        );
+        .mockResolvedValueOnce(new Response(JSON.stringify(mockTokenResponse), { status: 200 }));
 
       const token = await pollForToken('dc_test', 0.01, 60);
       expect(token).toBe(mockTokenResponse.access_token);
@@ -90,13 +89,12 @@ describe('device-flow', () => {
     });
 
     it('handles slow_down by increasing interval', async () => {
-      const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
         .mockResolvedValueOnce(
           new Response(JSON.stringify(mockTokenSlowDownResponse), { status: 200 }),
         )
-        .mockResolvedValueOnce(
-          new Response(JSON.stringify(mockTokenResponse), { status: 200 }),
-        );
+        .mockResolvedValueOnce(new Response(JSON.stringify(mockTokenResponse), { status: 200 }));
 
       const token = await pollForToken('dc_test', 0.01, 60);
       expect(token).toBe(mockTokenResponse.access_token);
@@ -131,13 +129,9 @@ describe('device-flow', () => {
           new Response(JSON.stringify(mockDeviceCodeResponse), { status: 200 }),
         )
         // pollForToken (immediate success)
-        .mockResolvedValueOnce(
-          new Response(JSON.stringify(mockTokenResponse), { status: 200 }),
-        )
+        .mockResolvedValueOnce(new Response(JSON.stringify(mockTokenResponse), { status: 200 }))
         // fetchUsername
-        .mockResolvedValueOnce(
-          new Response(JSON.stringify(mockUserResponse), { status: 200 }),
-        );
+        .mockResolvedValueOnce(new Response(JSON.stringify(mockUserResponse), { status: 200 }));
 
       const result = await login();
       expect(result.username).toBe('testuser');

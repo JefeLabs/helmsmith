@@ -1,9 +1,9 @@
-import { existsSync, readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
-import type { Catalog, Command, Skill, Workflow } from "./types.js";
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { Catalog, Command, Skill, Workflow } from './types.js';
 
-export type { Catalog, Command, Skill, Workflow, ItemKind, Frontmatter } from "./types.js";
+export type { Catalog, Command, Frontmatter, ItemKind, Skill, Workflow } from './types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -16,7 +16,7 @@ const __dirname = dirname(__filename);
 function findCatalogPath(): string {
   let dir = __dirname;
   for (let i = 0; i < 5; i++) {
-    const candidate = join(dir, "catalog.json");
+    const candidate = join(dir, 'catalog.json');
     if (existsSync(candidate)) return candidate;
     const parent = dirname(dir);
     if (parent === dir) break;
@@ -24,7 +24,7 @@ function findCatalogPath(): string {
   }
   throw new Error(
     `catalog.json not found searching upward from ${__dirname}. ` +
-      `Run \`npm run catalog\` to generate it.`
+      `Run \`npm run catalog\` to generate it.`,
   );
 }
 
@@ -32,7 +32,7 @@ let cached: Catalog | undefined;
 
 export function loadCatalog(): Catalog {
   if (!cached) {
-    const raw = readFileSync(findCatalogPath(), "utf8");
+    const raw = readFileSync(findCatalogPath(), 'utf8');
     cached = JSON.parse(raw) as Catalog;
   }
   return cached;

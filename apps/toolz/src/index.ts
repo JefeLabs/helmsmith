@@ -8,6 +8,30 @@
  * `ensureTools`, registry CRUD.
  */
 
+export type { Registry, RegistryToolEntry } from './config/index.js';
+export {
+  ensureToolzDir,
+  getRegisteredTool,
+  getRegistryPath,
+  getToolzDir,
+  getUserCatalogPath,
+  isRegistered,
+  listRegisteredTools,
+  loadRegistry,
+  registerTool,
+  saveRegistry,
+  unregisterTool,
+} from './config/index.js';
+export type {
+  CatalogEntry,
+  DoctorFinding,
+  DoctorSeverity,
+  EnsureOptions,
+  EnsureSource,
+  ResolvedPackage,
+  ToolCheckResult,
+  ToolStatus,
+} from './core/index.js';
 export {
   BUILT_IN_CATALOG,
   catalogToolNames,
@@ -19,24 +43,7 @@ export {
   isInstalled,
   resolvePackageName,
   runDoctor,
-} from "./core/index.js";
-export type {
-  CatalogEntry,
-  DoctorFinding,
-  DoctorSeverity,
-  EnsureOptions,
-  EnsureSource,
-  ResolvedPackage,
-  ToolCheckResult,
-  ToolStatus,
-} from "./core/index.js";
-
-export {
-  adapters,
-  detectPlatform,
-  resetPlatformCache,
-  selectAdapter,
-} from "./platform/index.js";
+} from './core/index.js';
 export type {
   Architecture,
   InstallResult,
@@ -45,19 +52,10 @@ export type {
   PackageManagerType,
   Platform,
   PlatformInfo,
-} from "./platform/index.js";
-
+} from './platform/index.js';
 export {
-  ensureToolzDir,
-  getRegistryPath,
-  getRegisteredTool,
-  getToolzDir,
-  getUserCatalogPath,
-  isRegistered,
-  listRegisteredTools,
-  loadRegistry,
-  registerTool,
-  saveRegistry,
-  unregisterTool,
-} from "./config/index.js";
-export type { Registry, RegistryToolEntry } from "./config/index.js";
+  adapters,
+  detectPlatform,
+  resetPlatformCache,
+  selectAdapter,
+} from './platform/index.js';

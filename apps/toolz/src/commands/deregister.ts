@@ -1,5 +1,5 @@
-import { isRegistered, unregisterTool } from "../config/index.js";
-import { fail, ok } from "../ui/index.js";
+import { isRegistered, unregisterTool } from '../config/index.js';
+import { fail, ok } from '../ui/index.js';
 
 /** Remove a tool from the registry (does NOT uninstall). */
 export function runDeregister(tool: string): void {

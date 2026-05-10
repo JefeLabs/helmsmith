@@ -33,28 +33,25 @@
 import {
   existsSync,
   mkdirSync,
-  readFileSync,
   readdirSync,
+  readFileSync,
   renameSync,
   unlinkSync,
   writeFileSync,
-} from "node:fs";
-import { join } from "node:path";
+} from 'node:fs';
+import { join } from 'node:path';
 import type {
+  AuthorIdentity,
   CatalogIndex,
   Command,
   CommandSummary,
   Skill,
   SkillSummary,
+  VersionEntry,
   Workflow,
   WorkflowSummary,
-} from "../contracts.js";
-import {
-  toCommandSummary,
-  toSkillSummary,
-  toWorkflowSummary,
-} from "../contracts.js";
-import type { AuthorIdentity, VersionEntry } from "../contracts.js";
+} from '../contracts.js';
+import { toCommandSummary, toSkillSummary, toWorkflowSummary } from '../contracts.js';
 import {
   AuthorMismatchError,
   type CatalogStorage,
@@ -63,7 +60,7 @@ import {
   type PutWorkflowInput,
   VersionConflictError,
   VersionNotFoundError,
-} from "./interface.js";
+} from './interface.js';
 
 interface PersistentRegistryEntry<TSummary> {
   ownerAuthorId: string;
@@ -91,16 +88,14 @@ export class FilesystemPersistentCatalogStorage implements CatalogStorage {
 
   constructor(
     private readonly root: string,
-    private readonly packageVersion: string = "0.0.0",
+    private readonly packageVersion: string = '0.0.0',
   ) {}
 
   /* ── Read ────────────────────────────────────────────────────── */
 
   async getIndex(): Promise<CatalogIndex> {
     const reg = this.readRegistry();
-    const collect = <T>(
-      entries: Record<string, PersistentRegistryEntry<T>>,
-    ): T[] =>
+    const collect = <T>(entries: Record<string, PersistentRegistryEntry<T>>): T[] =>
       Object.values(entries)
         .filter((e) => e.currentVersion !== null && e.summary !== null)
         .map((e) => e.summary as T);
@@ -117,40 +112,30 @@ export class FilesystemPersistentCatalogStorage implements CatalogStorage {
   async getCommand(slug: string): Promise<Command | null> {
     const reg = this.readRegistry();
     const entry = reg.commands[slug];
-    if (!entry || !entry.currentVersion) return null;
-    return this.readArtifact<Command>("commands", slug, entry.currentVersion);
+    if (!entry?.currentVersion) return null;
+    return this.readArtifact<Command>('commands', slug, entry.currentVersion);
   }
   async getSkill(name: string): Promise<Skill | null> {
     const reg = this.readRegistry();
     const entry = reg.skills[name];
-    if (!entry || !entry.currentVersion) return null;
-    return this.readArtifact<Skill>("skills", name, entry.currentVersion);
+    if (!entry?.currentVersion) return null;
+    return this.readArtifact<Skill>('skills', name, entry.currentVersion);
   }
   async getWorkflow(qualifiedName: string): Promise<Workflow | null> {
     const reg = this.readRegistry();
     const entry = reg.workflows[qualifiedName];
-    if (!entry || !entry.currentVersion) return null;
-    return this.readArtifact<Workflow>(
-      "workflows",
-      qualifiedName,
-      entry.currentVersion,
-    );
+    if (!entry?.currentVersion) return null;
+    return this.readArtifact<Workflow>('workflows', qualifiedName, entry.currentVersion);
   }
 
-  async getCommandVersion(
-    slug: string,
-    version: string,
-  ): Promise<Command | null> {
-    return this.readArtifact<Command>("commands", slug, version);
+  async getCommandVersion(slug: string, version: string): Promise<Command | null> {
+    return this.readArtifact<Command>('commands', slug, version);
   }
   async getSkillVersion(name: string, version: string): Promise<Skill | null> {
-    return this.readArtifact<Skill>("skills", name, version);
+    return this.readArtifact<Skill>('skills', name, version);
   }
-  async getWorkflowVersion(
-    qualifiedName: string,
-    version: string,
-  ): Promise<Workflow | null> {
-    return this.readArtifact<Workflow>("workflows", qualifiedName, version);
+  async getWorkflowVersion(qualifiedName: string, version: string): Promise<Workflow | null> {
+    return this.readArtifact<Workflow>('workflows', qualifiedName, version);
   }
 
   async listCommandVersions(slug: string): Promise<VersionEntry[]> {
@@ -179,7 +164,7 @@ export class FilesystemPersistentCatalogStorage implements CatalogStorage {
         input.version,
         input.changelog,
       );
-      this.writeArtifact("commands", slug, input.version, {
+      this.writeArtifact('commands', slug, input.version, {
         artifact: input.command,
         metadata,
       });
@@ -199,7 +184,7 @@ export class FilesystemPersistentCatalogStorage implements CatalogStorage {
         input.version,
         input.changelog,
       );
-      this.writeArtifact("skills", name, input.version, {
+      this.writeArtifact('skills', name, input.version, {
         artifact: input.skill,
         metadata,
       });
@@ -219,7 +204,7 @@ export class FilesystemPersistentCatalogStorage implements CatalogStorage {
         input.version,
         input.changelog,
       );
-      this.writeArtifact("workflows", qn, input.version, {
+      this.writeArtifact('workflows', qn, input.version, {
         artifact: input.workflow,
         metadata,
       });
@@ -232,13 +217,13 @@ export class FilesystemPersistentCatalogStorage implements CatalogStorage {
     return this.serialize(async () => {
       const reg = this.readRegistry();
       this.promoteIn(reg.commands, slug, version, async () => {
-        const cmd = await this.readArtifact<Command>("commands", slug, version);
+        const cmd = await this.readArtifact<Command>('commands', slug, version);
         return cmd ? toCommandSummary(cmd) : null;
       });
       // promoteIn populates the summary via callback; await + write
       const entry = reg.commands[slug];
       if (entry) {
-        const cmd = await this.readArtifact<Command>("commands", slug, version);
+        const cmd = await this.readArtifact<Command>('commands', slug, version);
         entry.summary = cmd ? toCommandSummary(cmd) : null;
       }
       this.writeRegistry(reg);
@@ -251,27 +236,20 @@ export class FilesystemPersistentCatalogStorage implements CatalogStorage {
       this.promoteIn(reg.skills, name, version, async () => null);
       const entry = reg.skills[name];
       if (entry) {
-        const skill = await this.readArtifact<Skill>("skills", name, version);
+        const skill = await this.readArtifact<Skill>('skills', name, version);
         entry.summary = skill ? toSkillSummary(skill) : null;
       }
       this.writeRegistry(reg);
     });
   }
 
-  async promoteWorkflow(
-    qualifiedName: string,
-    version: string,
-  ): Promise<void> {
+  async promoteWorkflow(qualifiedName: string, version: string): Promise<void> {
     return this.serialize(async () => {
       const reg = this.readRegistry();
       this.promoteIn(reg.workflows, qualifiedName, version, async () => null);
       const entry = reg.workflows[qualifiedName];
       if (entry) {
-        const wf = await this.readArtifact<Workflow>(
-          "workflows",
-          qualifiedName,
-          version,
-        );
+        const wf = await this.readArtifact<Workflow>('workflows', qualifiedName, version);
         entry.summary = wf ? toWorkflowSummary(wf) : null;
       }
       this.writeRegistry(reg);
@@ -281,12 +259,12 @@ export class FilesystemPersistentCatalogStorage implements CatalogStorage {
   /* ── Internal: registry I/O ─────────────────────────────────── */
 
   private readRegistry(): PersistentRegistry {
-    const path = join(this.root, "registry.json");
+    const path = join(this.root, 'registry.json');
     if (!existsSync(path)) {
       return this.emptyRegistry();
     }
     try {
-      const raw = readFileSync(path, "utf8");
+      const raw = readFileSync(path, 'utf8');
       const parsed = JSON.parse(raw) as PersistentRegistry;
       // Defensive: ensure all kind buckets exist (forward-compat with
       // older registries that may have been written before a kind was
@@ -308,7 +286,7 @@ export class FilesystemPersistentCatalogStorage implements CatalogStorage {
       mkdirSync(this.root, { recursive: true });
     }
     reg.generatedAt = new Date().toISOString();
-    atomicWriteJson(join(this.root, "registry.json"), reg);
+    atomicWriteJson(join(this.root, 'registry.json'), reg);
   }
 
   private emptyRegistry(): PersistentRegistry {
@@ -325,25 +303,23 @@ export class FilesystemPersistentCatalogStorage implements CatalogStorage {
   /* ── Internal: artifact I/O ─────────────────────────────────── */
 
   private readArtifact<T>(
-    kind: "commands" | "skills" | "workflows",
+    kind: 'commands' | 'skills' | 'workflows',
     key: string,
     version: string,
   ): T | null {
     const path = this.artifactPath(kind, key, version);
     if (!existsSync(path)) return null;
     try {
-      const raw = readFileSync(path, "utf8");
+      const raw = readFileSync(path, 'utf8');
       const parsed = JSON.parse(raw) as StoredArtifact<T>;
       return parsed.artifact;
     } catch (err) {
-      throw new Error(
-        `Could not read artifact at ${path}: ${(err as Error).message}`,
-      );
+      throw new Error(`Could not read artifact at ${path}: ${(err as Error).message}`);
     }
   }
 
   private writeArtifact<T>(
-    kind: "commands" | "skills" | "workflows",
+    kind: 'commands' | 'skills' | 'workflows',
     key: string,
     version: string,
     payload: StoredArtifact<T>,
@@ -356,7 +332,7 @@ export class FilesystemPersistentCatalogStorage implements CatalogStorage {
   }
 
   private artifactPath(
-    kind: "commands" | "skills" | "workflows",
+    kind: 'commands' | 'skills' | 'workflows',
     key: string,
     version: string,
   ): string {
@@ -445,7 +421,7 @@ export class FilesystemPersistentCatalogStorage implements CatalogStorage {
  * result is portable across filesystems that reject `:`.
  */
 function encodeKey(key: string): string {
-  return key.replace(/:/g, "__");
+  return key.replace(/:/g, '__');
 }
 
 /**
@@ -459,8 +435,8 @@ function atomicWriteJson(path: string, data: unknown): void {
     Math.random() * 1_000_000,
   )}`;
   try {
-    writeFileSync(tmpPath, JSON.stringify(data, null, 2) + "\n", {
-      encoding: "utf8",
+    writeFileSync(tmpPath, `${JSON.stringify(data, null, 2)}\n`, {
+      encoding: 'utf8',
     });
     renameSync(tmpPath, path);
   } catch (err) {
@@ -484,9 +460,9 @@ export { encodeKey };
  */
 export function listArtifactFiles(
   root: string,
-  kind: "commands" | "skills" | "workflows",
+  kind: 'commands' | 'skills' | 'workflows',
 ): string[] {
   const dir = join(root, kind);
   if (!existsSync(dir)) return [];
-  return readdirSync(dir).filter((f) => f.endsWith(".json"));
+  return readdirSync(dir).filter((f) => f.endsWith('.json'));
 }

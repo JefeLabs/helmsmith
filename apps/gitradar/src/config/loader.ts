@@ -1,9 +1,9 @@
-import { readFile, writeFile, access, mkdir } from "node:fs/promises";
-import path from "node:path";
-import yaml from "js-yaml";
-import { ZodError } from "zod";
-import { Config, ConfigSchema } from "../types/schema.js";
-import { getConfigPath, expandTilde } from "../store/paths.js";
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import yaml from 'js-yaml';
+import { ZodError } from 'zod';
+import { expandTilde, getConfigPath } from '../store/paths.js';
+import { Config, ConfigSchema } from '../types/schema.js';
 
 /**
  * Load, parse, and validate the YAML config file.
@@ -19,7 +19,7 @@ export async function loadConfig(configPath?: string): Promise<Config> {
   // Read config file
   let raw: string;
   try {
-    raw = await readFile(resolvedConfigPath, "utf-8");
+    raw = await readFile(resolvedConfigPath, 'utf-8');
   } catch {
     throw new Error(`Config file not found at ${resolvedConfigPath}`);
   }
@@ -29,7 +29,7 @@ export async function loadConfig(configPath?: string): Promise<Config> {
   try {
     parsed = yaml.load(raw);
   } catch {
-    throw new Error("Invalid YAML");
+    throw new Error('Invalid YAML');
   }
 
   // Validate with Zod
@@ -42,11 +42,9 @@ export async function loadConfig(configPath?: string): Promise<Config> {
         const path = issue.path.join('.');
         return `  - '${path}': ${issue.message}`;
       });
-      throw new Error(
-        `Config validation failed:\n${details.join('\n')}`,
-      );
+      throw new Error(`Config validation failed:\n${details.join('\n')}`);
     }
-    throw new Error("Config validation error");
+    throw new Error('Config validation error');
   }
 
   // Resolve repo paths
@@ -67,9 +65,7 @@ export async function loadConfig(configPath?: string): Promise<Config> {
     try {
       await access(repoPath);
     } catch {
-      console.warn(
-        `Warning: repo path does not exist: ${repoPath}`
-      );
+      console.warn(`Warning: repo path does not exist: ${repoPath}`);
     }
   }
 
@@ -90,9 +86,9 @@ export async function saveConfig(
   // Load existing content or start with empty object
   let existing: Record<string, unknown> = {};
   try {
-    const raw = await readFile(resolvedPath, "utf-8");
+    const raw = await readFile(resolvedPath, 'utf-8');
     const parsed = yaml.load(raw);
-    if (parsed && typeof parsed === "object") {
+    if (parsed && typeof parsed === 'object') {
       existing = parsed as Record<string, unknown>;
     }
   } catch {
@@ -110,5 +106,5 @@ export async function saveConfig(
     noRefs: true,
     quotingType: '"',
   });
-  await writeFile(resolvedPath, content, "utf-8");
+  await writeFile(resolvedPath, content, 'utf-8');
 }

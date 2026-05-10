@@ -1,5 +1,5 @@
-import type { Command } from 'commander';
 import chalk from 'chalk';
+import type { Command } from 'commander';
 import { APP_NAME } from '../config/index.js';
 
 export function registerAuth(program: Command): void {
@@ -52,7 +52,11 @@ export function registerAuth(program: Command): void {
       console.log(chalk.bold(`\n  Available Copilot Models (${models.length}):\n`));
       for (const m of models) {
         const limits = m.capabilities?.limits;
-        const info = limits ? chalk.dim(` (${limits.max_prompt_tokens ?? '?'}/${limits.max_output_tokens ?? '?'} tokens)`) : '';
+        const info = limits
+          ? chalk.dim(
+              ` (${limits.max_prompt_tokens ?? '?'}/${limits.max_output_tokens ?? '?'} tokens)`,
+            )
+          : '';
         console.log(`    ${chalk.white(m.id)}${info}`);
       }
       console.log();

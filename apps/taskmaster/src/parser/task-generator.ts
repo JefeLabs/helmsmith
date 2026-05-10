@@ -125,10 +125,10 @@ function applyNumTasksMerge(sections: ParsedSection[], numTasks: number): Parsed
 /**
  * Count all tasks recursively in a TaskNode tree.
  */
-function countTasks(tasks: TaskNode[]): number {
+function _countTasks(tasks: TaskNode[]): number {
   let count = tasks.length;
   for (const task of tasks) {
-    count += countTasks(task.children);
+    count += _countTasks(task.children);
   }
   return count;
 }

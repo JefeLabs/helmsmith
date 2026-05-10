@@ -7,17 +7,13 @@
  * elements; molecules and organisms compose them.
  */
 
-export { Box } from "./Box.tsx";
-export type { BoxProps, BoxVariant } from "./Box.tsx";
-
-export { Text } from "./Text.tsx";
-export type { TextProps, TextVariant } from "./Text.tsx";
-
-export { Heading } from "./Heading.tsx";
-export type { HeadingProps, HeadingLevel } from "./Heading.tsx";
-
-export { Button } from "./Button.tsx";
-export type { ButtonProps, ButtonVariant, ButtonSize } from "./Button.tsx";
-
-export { Input } from "./Input.tsx";
-export type { InputProps, InputVariant } from "./Input.tsx";
+export type { BoxProps, BoxVariant } from './Box.tsx';
+export { Box } from './Box.tsx';
+export type { ButtonProps, ButtonSize, ButtonVariant } from './Button.tsx';
+export { Button } from './Button.tsx';
+export type { HeadingLevel, HeadingProps } from './Heading.tsx';
+export { Heading } from './Heading.tsx';
+export type { InputProps, InputVariant } from './Input.tsx';
+export { Input } from './Input.tsx';
+export type { TextProps, TextVariant } from './Text.tsx';
+export { Text } from './Text.tsx';

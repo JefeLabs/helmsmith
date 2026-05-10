@@ -1,4 +1,4 @@
-import type { TaskNode, ProjectConfig } from '../config/schema.js';
+import type { ProjectConfig, TaskNode } from '../config/schema.js';
 import { findTaskById } from '../config/state-engine.js';
 import { createScorer } from '../scorer/index.js';
 import type { ScoredResult } from '../scorer/types.js';
@@ -28,9 +28,7 @@ export async function executeScore(
   opts: ScoreOpts = {},
 ): Promise<ScoreResult> {
   const scoreAll = opts.all || opts.recalculate;
-  const tasksToScore = scoreAll
-    ? tasks
-    : tasks.filter((t) => t.complexity === 1);
+  const tasksToScore = scoreAll ? tasks : tasks.filter((t) => t.complexity === 1);
 
   if (tasksToScore.length === 0) {
     return { results: [], providerLabel: '', tasks };
@@ -41,9 +39,7 @@ export async function executeScore(
     ? `AI (${config.ai.provider}/${config.ai.model}) + heuristic blend`
     : 'heuristic (no AI authentication)';
 
-  const results = await Promise.all(
-    tasksToScore.map((task) => scorer.scoreTask(task, tasks)),
-  );
+  const results = await Promise.all(tasksToScore.map((task) => scorer.scoreTask(task, tasks)));
 
   // Apply scores to task objects
   for (const result of results) {

@@ -1,22 +1,28 @@
-import type { TaskNode, StateDefinition } from '../config/schema.js';
+import type { StateDefinition, TaskNode } from '../config/schema.js';
 import {
-  aggregateSummary,
   aggregateComplexity,
-  aggregateProgress,
   aggregateDependencies,
+  aggregateProgress,
   aggregateQA,
+  aggregateSummary,
 } from './aggregator.js';
 import type { ReportType } from './types.js';
 
-export type { ReportType, ReportFormat, SummaryReportContext, SkillCoverage, QAReportContext } from './types.js';
 export {
-  aggregateSummary,
   aggregateComplexity,
-  aggregateProgress,
   aggregateDependencies,
+  aggregateProgress,
   aggregateQA,
+  aggregateSummary,
   generateMermaidSyntax,
 } from './aggregator.js';
+export type {
+  QAReportContext,
+  ReportFormat,
+  ReportType,
+  SkillCoverage,
+  SummaryReportContext,
+} from './types.js';
 
 /** Mapping from built-in report type to its Handlebars template name. */
 export const REPORT_TYPE_TO_TEMPLATE: Record<ReportType, string> = {

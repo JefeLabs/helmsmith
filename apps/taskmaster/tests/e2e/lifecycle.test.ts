@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { runCli, createTempHome, cleanupTempHome, FIXTURE_PLAN_MD } from './helpers.js';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { cleanupTempHome, createTempHome, FIXTURE_PLAN_MD, runCli } from './helpers.js';
 
 describe('E2E: Project lifecycle', () => {
   let tempHome: string;
@@ -14,7 +14,9 @@ describe('E2E: Project lifecycle', () => {
     await cleanupTempHome(tempHome);
   });
 
-  it('completes full lifecycle: init -> parse -> score -> list -> set-status -> report', { timeout: 15_000 }, async () => {
+  it('completes full lifecycle: init -> parse -> score -> list -> set-status -> report', {
+    timeout: 15_000,
+  }, async () => {
     // 1. Init project
     const init = await runCli(['init', '--name', 'e2e-project', '--no-interactive'], env);
     expect(init.exitCode).toBe(0);

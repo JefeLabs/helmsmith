@@ -1,23 +1,20 @@
-import type { TaskNode } from '../config/schema.js';
-import { PROJECT_STYLES } from '../config/styles.js';
-import { getDefaultStatus } from '../config/state-engine.js';
 import { callAI } from '../auth/call-ai.js';
 import type { ChatCompletionMessage } from '../auth/types.js';
+import type { TaskNode } from '../config/schema.js';
+import { getDefaultStatus } from '../config/state-engine.js';
+import { PROJECT_STYLES } from '../config/styles.js';
 import type {
+  BatchExpansionResult,
+  ExpansionError,
   ExpansionOptions,
   ExpansionResult,
-  ExpansionError,
-  BatchExpansionResult,
 } from './types.js';
 
 /**
  * Determine the child type for a given parent type within a project style.
  * Returns null if the parent is already at max depth (cannot expand further).
  */
-export function getChildType(
-  parentType: string,
-  styleKey: string,
-): string | null {
+export function getChildType(parentType: string, styleKey: string): string | null {
   const style = PROJECT_STYLES[styleKey];
   if (!style) return null;
 
@@ -65,9 +62,7 @@ export function buildExpansionPrompt(
   };
 
   const skillsInfo =
-    task.requiredSkills.length > 0
-      ? `\nRequired skills: ${task.requiredSkills.join(', ')}`
-      : '';
+    task.requiredSkills.length > 0 ? `\nRequired skills: ${task.requiredSkills.join(', ')}` : '';
   const depsInfo =
     task.dependencies.length > 0
       ? `\nThis task has ${task.dependencies.length} dependency(ies).`
@@ -225,7 +220,7 @@ function generatePartSubtasks(
 function truncateTitle(text: string): string {
   const firstLine = text.split('\n')[0].trim();
   if (firstLine.length <= 80) return firstLine;
-  return firstLine.substring(0, 77) + '...';
+  return `${firstLine.substring(0, 77)}...`;
 }
 
 /**
@@ -335,9 +330,7 @@ export async function expandMultiple(
   threshold: number,
   options: ExpansionOptions,
 ): Promise<BatchExpansionResult> {
-  const eligible = tasks.filter(
-    (t) => t.complexity >= threshold && t.children.length === 0,
-  );
+  const eligible = tasks.filter((t) => t.complexity >= threshold && t.children.length === 0);
 
   const expanded: ExpansionResult[] = [];
   const errors: ExpansionError[] = [];

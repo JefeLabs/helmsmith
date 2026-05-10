@@ -8,7 +8,7 @@
  * AuthorIdentity I should record on the version metadata."
  */
 
-import type { AuthorIdentity } from "./contracts.js";
+import type { AuthorIdentity } from './contracts.js';
 
 export interface AuthVerifier {
   /**
@@ -89,9 +89,7 @@ export class NoAuthVerifier implements AuthVerifier {
  * Extract the token portion of an `Authorization: Bearer <token>`
  * header. Returns null for missing or malformed headers.
  */
-export function extractBearerToken(
-  authHeader: string | null | undefined,
-): string | null {
+export function extractBearerToken(authHeader: string | null | undefined): string | null {
   if (!authHeader) return null;
   const match = authHeader.match(/^Bearer\s+(\S+)$/i);
   return match ? match[1] : null;

@@ -1,9 +1,9 @@
-import type { TaskNode, ProjectConfig, StateDefinition } from '../config/schema.js';
-import { getDefaultStatus, resolveStates, findTaskById } from '../config/state-engine.js';
+import type { ProjectConfig, TaskNode } from '../config/schema.js';
+import { findTaskById, getDefaultStatus, resolveStates } from '../config/state-engine.js';
 import { getValidTypes } from '../config/styles.js';
 import { getNextId } from '../parser/index.js';
-import { runAddTaskPrompt, type AddTaskResult } from '../prompts/add-task.js';
-import { recomputeAllReadiness, applyReadiness } from '../readiness/index.js';
+import { type AddTaskResult, runAddTaskPrompt } from '../prompts/add-task.js';
+import { applyReadiness, recomputeAllReadiness } from '../readiness/index.js';
 
 export interface AddCommandOpts {
   /** Positional type argument (e.g., "task", "story"). */
@@ -40,10 +40,7 @@ function getNextChildId(parent: TaskNode): string {
  * When `opts.title` is provided, runs in non-interactive mode using flag values.
  * Otherwise, launches the Inquirer.js prompt flow.
  */
-export async function executeAdd(
-  tasks: TaskNode[],
-  config: ProjectConfig,
-): Promise<AddResult>;
+export async function executeAdd(tasks: TaskNode[], config: ProjectConfig): Promise<AddResult>;
 export async function executeAdd(
   tasks: TaskNode[],
   config: ProjectConfig,
@@ -81,7 +78,10 @@ export async function executeAdd(
     }
 
     const resolvedSkills = opts.skills
-      ? opts.skills.split(',').map((s) => s.trim()).filter(Boolean)
+      ? opts.skills
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
       : [];
 
     result = {
@@ -99,7 +99,10 @@ export async function executeAdd(
     if (opts.priority) partialOpts.priority = opts.priority as AddTaskResult['priority'];
     if (opts.parent) partialOpts.parentId = opts.parent;
     if (opts.skills) {
-      partialOpts.requiredSkills = opts.skills.split(',').map((s) => s.trim()).filter(Boolean);
+      partialOpts.requiredSkills = opts.skills
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
     }
 
     result = await runAddTaskPrompt(tasks, vocabulary, validTypes, partialOpts);

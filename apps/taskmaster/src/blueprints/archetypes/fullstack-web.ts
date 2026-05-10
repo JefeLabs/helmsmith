@@ -324,13 +324,7 @@ export const FULLSTACK_WEB_BLUEPRINT: ApplicationBlueprint = {
     patterns: ['frontend-framework', 'REST-server', 'database-migrations'],
     frameworks: [],
     capabilities: [],
-    fileIndicators: [
-      'src/server/',
-      'src/client/',
-      'pages/',
-      'api/',
-      'migrations/',
-    ],
+    fileIndicators: ['src/server/', 'src/client/', 'pages/', 'api/', 'migrations/'],
     weight: 0.6,
   },
 };

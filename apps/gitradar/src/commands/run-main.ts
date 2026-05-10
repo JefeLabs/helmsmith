@@ -1,12 +1,12 @@
-import { GitRadarEngine } from '../engine/gitradar-engine.js';
 import { generateDemoData } from '../demo.js';
-import { runNavigator } from '../views/navigator.js';
+import { GitRadarEngine } from '../engine/gitradar-engine.js';
 import { dashboardView } from '../views/dashboard.js';
+import { runNavigator } from '../views/navigator.js';
 import { trendsView } from '../views/trends.js';
 
 // Re-export types and helpers so existing consumers don't break
 export type { RunOptions } from '../engine/gitradar-engine.js';
-export { getLastScanAgo, buildConfigFromWorkspace } from '../engine/gitradar-engine.js';
+export { buildConfigFromWorkspace, getLastScanAgo } from '../engine/gitradar-engine.js';
 
 /**
  * Main entry point for the gitradar CLI.
@@ -14,7 +14,9 @@ export { getLastScanAgo, buildConfigFromWorkspace } from '../engine/gitradar-eng
  * This is a thin orchestrator that delegates to GitRadarEngine for
  * data management, scanning, and ViewContext construction.
  */
-export async function runMain(opts: import('../engine/gitradar-engine.js').RunOptions): Promise<void> {
+export async function runMain(
+  opts: import('../engine/gitradar-engine.js').RunOptions,
+): Promise<void> {
   const engine = new GitRadarEngine();
 
   // ── Early exits ─────────────────────────────────────────────────────────
@@ -73,10 +75,7 @@ export async function runMain(opts: import('../engine/gitradar-engine.js').RunOp
   // ── Launch TUI ────────────────────────────────────────────────────────
   const ctx = await engine.buildViewContext();
 
-  const initial =
-    opts.initialView === 'trends'
-      ? trendsView
-      : dashboardView;
+  const initial = opts.initialView === 'trends' ? trendsView : dashboardView;
 
   process.on('SIGINT', () => {
     console.log('\n');

@@ -1,15 +1,15 @@
-import { describe, expect, it } from "vitest";
-import { adapters, brewAdapter, selectAdapter } from "./index.js";
-import { detectPlatform } from "../detect.js";
+import { describe, expect, it } from 'vitest';
+import { detectPlatform } from '../detect.js';
+import { adapters, brewAdapter, selectAdapter } from './index.js';
 
-describe("adapter registry", () => {
-  it("exposes the implemented adapters by name", () => {
+describe('adapter registry', () => {
+  it('exposes the implemented adapters by name', () => {
     expect(adapters.brew).toBeDefined();
     expect(adapters.apt).toBeDefined();
     expect(adapters.winget).toBeDefined();
   });
 
-  it("does not expose unimplemented adapters", () => {
+  it('does not expose unimplemented adapters', () => {
     // dnf, pacman, apk, scoop, choco — not yet built.
     expect(adapters.dnf).toBeUndefined();
     expect(adapters.pacman).toBeUndefined();
@@ -18,19 +18,19 @@ describe("adapter registry", () => {
     expect(adapters.choco).toBeUndefined();
   });
 
-  it("each adapter exposes the required interface members", () => {
+  it('each adapter exposes the required interface members', () => {
     for (const adapter of [adapters.brew, adapters.apt, adapters.winget]) {
       expect(adapter).toBeDefined();
-      expect(typeof adapter!.name).toBe("string");
-      expect(typeof adapter!.isAvailable).toBe("function");
-      expect(typeof adapter!.install).toBe("function");
-      expect(typeof adapter!.uninstall).toBe("function");
-      expect(typeof adapter!.isPackageInstalled).toBe("function");
+      expect(typeof adapter!.name).toBe('string');
+      expect(typeof adapter!.isAvailable).toBe('function');
+      expect(typeof adapter!.install).toBe('function');
+      expect(typeof adapter!.uninstall).toBe('function');
+      expect(typeof adapter!.isPackageInstalled).toBe('function');
     }
   });
 });
 
-describe("selectAdapter", () => {
+describe('selectAdapter', () => {
   it("picks an adapter that's actually available on the host", async () => {
     const adapter = await selectAdapter();
     if (adapter === null) {
@@ -43,12 +43,12 @@ describe("selectAdapter", () => {
     expect(await adapter.isAvailable()).toBe(true);
   });
 
-  it("on darwin, prefers brew", async () => {
+  it('on darwin, prefers brew', async () => {
     const info = detectPlatform();
-    if (info.platform !== "darwin") return; // skip on non-mac
+    if (info.platform !== 'darwin') return; // skip on non-mac
     const adapter = await selectAdapter();
     if (adapter !== null) {
-      expect(adapter.name).toBe("brew");
+      expect(adapter.name).toBe('brew');
       expect(adapter).toBe(brewAdapter);
     }
   });

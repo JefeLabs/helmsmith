@@ -1,13 +1,18 @@
-import type { UserWeekRepoRecord, FiletypeMetrics } from "../types/schema.js";
+import type { FiletypeMetrics, UserWeekRepoRecord } from '../types/schema.js';
 
 // Re-export types from sqlite-store (canonical definition)
-export type { FiletypeRollup, RolledUp, RollupGroupBy, RollupFilters } from "../store/sqlite-store.js";
-export { queryRollup } from "../store/sqlite-store.js";
+export type {
+  FiletypeRollup,
+  RolledUp,
+  RollupFilters,
+  RollupGroupBy,
+} from '../store/sqlite-store.js';
+export { queryRollup } from '../store/sqlite-store.js';
 
 // Import for local use
-import type { RolledUp } from "../store/sqlite-store.js";
+import type { RolledUp } from '../store/sqlite-store.js';
 
-const FILETYPE_KEYS = ["app", "test", "config", "storybook", "doc"] as const;
+const FILETYPE_KEYS = ['app', 'test', 'config', 'storybook', 'doc'] as const;
 
 function emptyRolledUp(): RolledUp {
   return {

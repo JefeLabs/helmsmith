@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { makeTask } from '../../fixtures/tasks.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AIScorer, buildScoringPrompt, parseAIResponse } from '../../../src/scorer/ai-scorer.js';
+import { makeTask } from '../../fixtures/tasks.js';
 
 // Mock callAI (replaces callCopilot)
 vi.mock('../../../src/auth/call-ai.js', () => ({
@@ -55,7 +55,9 @@ describe('parseAIResponse', () => {
   });
 
   it('strips markdown code fences', () => {
-    const result = parseAIResponse('```json\n{"score": 5, "label": "medium", "reasoning": "ok"}\n```');
+    const result = parseAIResponse(
+      '```json\n{"score": 5, "label": "medium", "reasoning": "ok"}\n```',
+    );
     expect(result).not.toBeNull();
     expect(result!.score).toBe(5);
   });

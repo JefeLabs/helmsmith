@@ -8,9 +8,9 @@
  *   ↑↓ navigate · enter login · l logout · q quit
  */
 
-import { Text } from "../atoms/Text.tsx";
-import { Box } from "../atoms/Box.tsx";
-import { useKeybindings } from "../keyboard/registry.tsx";
+import { Box } from '../atoms/Box.tsx';
+import { Text } from '../atoms/Text.tsx';
+import { useKeybindings } from '../keyboard/registry.tsx';
 
 export interface KeybindingsBarProps {
   /** Override separator between entries. Defaults to " · ". */
@@ -18,19 +18,14 @@ export interface KeybindingsBarProps {
   style?: Record<string, unknown>;
 }
 
-export function KeybindingsBar({
-  separator = " · ",
-  style,
-}: KeybindingsBarProps) {
+export function KeybindingsBar({ separator = ' · ', style }: KeybindingsBarProps) {
   const bindings = useKeybindings().filter((b) => !b.hidden);
   if (bindings.length === 0) return null;
 
   return (
     <Box variant="transparent" style={style}>
       <Text variant="subtle">
-        {bindings
-          .map((b) => `${b.keyDisplay ?? b.label} ${b.label}`)
-          .join(separator)}
+        {bindings.map((b) => `${b.keyDisplay ?? b.label} ${b.label}`).join(separator)}
       </Text>
     </Box>
   );

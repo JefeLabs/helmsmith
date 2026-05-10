@@ -1,30 +1,29 @@
-import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import {
+  AITaskWithTagsSchema,
   ArchitectureAnalysisSchema,
   ArchitectureComponentSchema,
-  ComponentSchema,
+  BuildComponentSchema,
+  ComponentIndexSchema,
   ComponentInterfaceSchema,
-  DataSourceSchema,
+  ComponentSchema,
   CrossCuttingConcernSchema,
+  DataSourceSchema,
+  EnhancedFileAnalysisSchema,
+  EnhancedSourceSymbolSchema,
+  EntryPointCategorySchema,
+  EntryPointIndexSchema,
+  EntryPointSchema,
+  EntryPointTraceSchema,
   Phase2ResponseSchema,
-  AITaskWithTagsSchema,
   PragmaticLayerSchema,
+  SideEffectSchema,
+  SideEffectTypeSchema,
+  SymbolIndexSchema,
   SymbolKindSchema,
   SymbolVisibilitySchema,
-  EnhancedSourceSymbolSchema,
-  BuildComponentSchema,
-  EnhancedFileAnalysisSchema,
-  ComponentIndexSchema,
-  SymbolIndexEntrySchema,
-  SymbolIndexSchema,
-  EntryPointCategorySchema,
-  EntryPointSchema,
-  SideEffectTypeSchema,
-  SideEffectSchema,
-  EntryPointTraceSchema,
-  EntryPointIndexSchema,
 } from '../../../../src/parser/analysis/types.js';
 
 const fixturesDir = join(import.meta.dirname, '../../../fixtures/analysis');
@@ -206,7 +205,19 @@ describe('PragmaticLayerSchema', () => {
 
 describe('SymbolKindSchema', () => {
   it('accepts all valid kinds including new ones', () => {
-    const kinds = ['function', 'method', 'class', 'interface', 'type', 'enum', 'const', 'route', 'command', 'script_fn', 'task'];
+    const kinds = [
+      'function',
+      'method',
+      'class',
+      'interface',
+      'type',
+      'enum',
+      'const',
+      'route',
+      'command',
+      'script_fn',
+      'task',
+    ];
     for (const kind of kinds) {
       expect(SymbolKindSchema.parse(kind)).toBe(kind);
     }
@@ -371,7 +382,15 @@ describe('SymbolIndexSchema', () => {
 
 describe('EntryPointCategorySchema', () => {
   it('accepts all valid categories', () => {
-    const cats = ['http-api', 'ui-route', 'cli-command', 'event', 'job-cron', 'internal-service', 'callback-webhook'];
+    const cats = [
+      'http-api',
+      'ui-route',
+      'cli-command',
+      'event',
+      'job-cron',
+      'internal-service',
+      'callback-webhook',
+    ];
     for (const cat of cats) {
       expect(EntryPointCategorySchema.parse(cat)).toBe(cat);
     }
@@ -431,10 +450,17 @@ describe('EntryPointSchema', () => {
 describe('SideEffectTypeSchema', () => {
   it('accepts all valid side effect types', () => {
     const types = [
-      'database-write', 'database-read', 'cache-mutation',
-      'file-write', 'file-read', 'external-api-call',
-      'event-publish', 'email-send', 'notification',
-      'queue-enqueue', 'state-mutation',
+      'database-write',
+      'database-read',
+      'cache-mutation',
+      'file-write',
+      'file-read',
+      'external-api-call',
+      'event-publish',
+      'email-send',
+      'notification',
+      'queue-enqueue',
+      'state-mutation',
     ];
     for (const t of types) {
       expect(SideEffectTypeSchema.parse(t)).toBe(t);
@@ -501,7 +527,9 @@ describe('EntryPointTraceSchema', () => {
 
 describe('EntryPointIndexSchema', () => {
   it('parses the sample fixture', () => {
-    const raw = JSON.parse(readFileSync(join(fixturesDir, 'sample-entrypoint-index.json'), 'utf-8'));
+    const raw = JSON.parse(
+      readFileSync(join(fixturesDir, 'sample-entrypoint-index.json'), 'utf-8'),
+    );
     const result = EntryPointIndexSchema.parse(raw);
 
     expect(result.version).toBe(1);
@@ -524,11 +552,13 @@ describe('EntryPointIndexSchema', () => {
   });
 
   it('rejects wrong version', () => {
-    expect(() => EntryPointIndexSchema.parse({
-      version: 2,
-      repoRoot: '/a',
-      generatedAt: 'now',
-    })).toThrow();
+    expect(() =>
+      EntryPointIndexSchema.parse({
+        version: 2,
+        repoRoot: '/a',
+        generatedAt: 'now',
+      }),
+    ).toThrow();
   });
 });
 

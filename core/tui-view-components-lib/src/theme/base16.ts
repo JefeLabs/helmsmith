@@ -26,21 +26,28 @@
  * `loadOverrideFile()` handles (3) → returns a Partial<Theme>.
  */
 
-import { readFileSync, existsSync } from "node:fs";
-import { extname } from "node:path";
-import type {
-  Base16Palette,
-  Theme,
-  ThemeAppearance,
-  ThemeDefinition,
-} from "./types.ts";
-import { defineTheme } from "./tokens.ts";
+import { existsSync, readFileSync } from 'node:fs';
+import { extname } from 'node:path';
+import { defineTheme } from './tokens.ts';
+import type { Base16Palette, Theme, ThemeAppearance, ThemeDefinition } from './types.ts';
 
 const BASE16_KEYS = [
-  "base00", "base01", "base02", "base03",
-  "base04", "base05", "base06", "base07",
-  "base08", "base09", "base0A", "base0B",
-  "base0C", "base0D", "base0E", "base0F",
+  'base00',
+  'base01',
+  'base02',
+  'base03',
+  'base04',
+  'base05',
+  'base06',
+  'base07',
+  'base08',
+  'base09',
+  'base0A',
+  'base0B',
+  'base0C',
+  'base0D',
+  'base0E',
+  'base0F',
 ] as const;
 
 type Base16Key = (typeof BASE16_KEYS)[number];
@@ -51,14 +58,13 @@ type Base16Key = (typeof BASE16_KEYS)[number];
 
 function parseScalar(s: string): unknown {
   const t = s.trim();
-  if (t === "") return null;
-  if ((t.startsWith('"') && t.endsWith('"')) ||
-      (t.startsWith("'") && t.endsWith("'"))) {
+  if (t === '') return null;
+  if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'"))) {
     return t.slice(1, -1);
   }
-  if (t === "true") return true;
-  if (t === "false") return false;
-  if (t === "null" || t === "~") return null;
+  if (t === 'true') return true;
+  if (t === 'false') return false;
+  if (t === 'null' || t === '~') return null;
   if (/^-?\d+$/.test(t)) return parseInt(t, 10);
   if (/^-?\d+\.\d+$/.test(t)) return parseFloat(t);
   return t;
@@ -72,13 +78,11 @@ function parseScalar(s: string): unknown {
  */
 export function parseYaml(src: string): Record<string, unknown> {
   const root: Record<string, unknown> = {};
-  const stack: { indent: number; obj: Record<string, unknown> }[] = [
-    { indent: -1, obj: root },
-  ];
+  const stack: { indent: number; obj: Record<string, unknown> }[] = [{ indent: -1, obj: root }];
 
   for (const raw of src.split(/\r?\n/)) {
     if (/^\s*#/.test(raw)) continue;
-    const line = raw.replace(/(\s)#.*$/, "$1");
+    const line = raw.replace(/(\s)#.*$/, '$1');
     if (!line.trim()) continue;
 
     const m = line.match(/^( *)([A-Za-z_][\w-]*)\s*:\s*(.*)$/);
@@ -92,7 +96,7 @@ export function parseYaml(src: string): Record<string, unknown> {
     }
     const parent = stack[stack.length - 1]!.obj;
 
-    if (rawValue.trim() === "") {
+    if (rawValue.trim() === '') {
       const child: Record<string, unknown> = {};
       parent[key] = child;
       stack.push({ indent, obj: child });
@@ -109,8 +113,8 @@ export function parseYaml(src: string): Record<string, unknown> {
 // ────────────────────────────────────────────────────────────────────
 
 function normalizeHex(value: string): string {
-  const v = value.trim().replace(/^['"]|['"]$/g, "");
-  if (v.startsWith("#")) return v.toLowerCase();
+  const v = value.trim().replace(/^['"]|['"]$/g, '');
+  if (v.startsWith('#')) return v.toLowerCase();
   if (/^[0-9a-fA-F]{6}$/.test(v)) return `#${v.toLowerCase()}`;
   if (/^[0-9a-fA-F]{3}$/.test(v)) return `#${v.toLowerCase()}`;
   if (/^0x[0-9a-fA-F]{6}$/.test(v)) return `#${v.slice(2).toLowerCase()}`;
@@ -121,7 +125,7 @@ function paletteFromRecord(rec: Record<string, unknown>): Base16Palette {
   const palette = {} as Base16Palette;
   for (const k of BASE16_KEYS) {
     const v = rec[k];
-    if (typeof v !== "string") {
+    if (typeof v !== 'string') {
       throw new Error(`Missing or invalid base16 key "${k}"`);
     }
     palette[k as Base16Key] = normalizeHex(v);
@@ -130,21 +134,24 @@ function paletteFromRecord(rec: Record<string, unknown>): Base16Palette {
 }
 
 function relativeLuminance(hex: string): number {
-  const h = hex.replace("#", "");
+  const h = hex.replace('#', '');
   const r = parseInt(h.slice(0, 2), 16) / 255;
   const g = parseInt(h.slice(2, 4), 16) / 255;
   const b = parseInt(h.slice(4, 6), 16) / 255;
-  const lin = (c: number) =>
-    c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
   return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
 }
 
 function appearanceFromPalette(p: Base16Palette): ThemeAppearance {
-  return relativeLuminance(p.base00) > 0.5 ? "light" : "dark";
+  return relativeLuminance(p.base00) > 0.5 ? 'light' : 'dark';
 }
 
 function slugify(s: string): string {
-  return s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return s
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -152,7 +159,7 @@ function slugify(s: string): string {
 // ────────────────────────────────────────────────────────────────────
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
-  if (typeof v !== "object" || v === null || Array.isArray(v)) return false;
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return false;
   const proto = Object.getPrototypeOf(v);
   return proto === Object.prototype || proto === null;
 }
@@ -181,18 +188,18 @@ export function deepMerge<T>(base: T, override: unknown): T {
 // ────────────────────────────────────────────────────────────────────
 
 function readParsed(filePath: string): Record<string, unknown> {
-  const src = readFileSync(filePath, "utf8");
+  const src = readFileSync(filePath, 'utf8');
   const ext = extname(filePath).toLowerCase();
-  if (ext === ".json") return JSON.parse(src);
+  if (ext === '.json') return JSON.parse(src);
   return parseYaml(src);
 }
 
 function isFlatBase16(rec: Record<string, unknown>): boolean {
-  return BASE16_KEYS.every((k) => typeof rec[k] === "string");
+  return BASE16_KEYS.every((k) => typeof rec[k] === 'string');
 }
 
 function isRichDefinition(rec: Record<string, unknown>): boolean {
-  return isPlainObject(rec["palette"]);
+  return isPlainObject(rec.palette);
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -211,9 +218,9 @@ export function themeFromBase16(
 ): Theme {
   const palette = paletteFromRecord(record);
   const sourceName =
-    (typeof record["scheme"] === "string" && record["scheme"]) ||
-    (typeof record["name"] === "string" && record["name"]) ||
-    "custom";
+    (typeof record.scheme === 'string' && record.scheme) ||
+    (typeof record.name === 'string' && record.name) ||
+    'custom';
   const name = options.name ?? slugify(sourceName as string);
   const displayName = options.displayName ?? (sourceName as string);
   const appearance = options.appearance ?? appearanceFromPalette(palette);
@@ -225,35 +232,34 @@ function themeFromRichDefinition(
   rec: Record<string, unknown>,
   options: Base16ToThemeOptions = {},
 ): Theme {
-  const palette = paletteFromRecord(rec["palette"] as Record<string, unknown>);
+  const palette = paletteFromRecord(rec.palette as Record<string, unknown>);
   const def: ThemeDefinition = {
-    name: options.name ??
-      (typeof rec["name"] === "string" ? rec["name"] : "custom"),
-    displayName: options.displayName ??
-      (typeof rec["displayName"] === "string"
-        ? rec["displayName"]
-        : (typeof rec["name"] === "string" ? rec["name"] : "Custom")),
-    appearance: options.appearance ??
-      ((rec["appearance"] === "light" || rec["appearance"] === "dark")
-        ? rec["appearance"]
+    name: options.name ?? (typeof rec.name === 'string' ? rec.name : 'custom'),
+    displayName:
+      options.displayName ??
+      (typeof rec.displayName === 'string'
+        ? rec.displayName
+        : typeof rec.name === 'string'
+          ? rec.name
+          : 'Custom'),
+    appearance:
+      options.appearance ??
+      (rec.appearance === 'light' || rec.appearance === 'dark'
+        ? rec.appearance
         : appearanceFromPalette(palette)),
     palette,
-    overrides: (rec["overrides"] ?? undefined) as ThemeDefinition["overrides"],
+    overrides: (rec.overrides ?? undefined) as ThemeDefinition['overrides'],
   };
   return defineTheme(def);
 }
 
 /** Load a full theme file (base16 record OR rich ThemeDefinition). */
-export function loadThemeFile(
-  filePath: string,
-  options: Base16ToThemeOptions = {},
-): Theme {
+export function loadThemeFile(filePath: string, options: Base16ToThemeOptions = {}): Theme {
   const rec = readParsed(filePath);
   if (isFlatBase16(rec)) return themeFromBase16(rec, options);
   if (isRichDefinition(rec)) return themeFromRichDefinition(rec, options);
   throw new Error(
-    `${filePath}: not a recognized theme file ` +
-      `(expected base16 keys or a "palette" block).`,
+    `${filePath}: not a recognized theme file (expected base16 keys or a "palette" block).`,
   );
 }
 
@@ -288,11 +294,9 @@ export const loadBase16File = loadThemeFile;
 // Tinty artifact
 // ────────────────────────────────────────────────────────────────────
 
-export function loadTintyArtifact(
-  options: Base16ToThemeOptions = {},
-): Theme | null {
-  const explicit = process.env["TINTY_OPENTUI_THEME"];
-  const home = process.env["HOME"] ?? "";
+export function loadTintyArtifact(options: Base16ToThemeOptions = {}): Theme | null {
+  const explicit = process.env.TINTY_OPENTUI_THEME;
+  const home = process.env.HOME ?? '';
   const fallback = home
     ? `${home}/.local/share/tinted-theming/tinty/tinted-opentui-themes-file.json`
     : null;

@@ -9,8 +9,8 @@
  * without it.
  */
 
-import { Octokit } from "octokit";
-import { readAuth } from "./auth.js";
+import { Octokit } from 'octokit';
+import { readAuth } from './auth.js';
 
 export interface CreatePROptions {
   owner: string;
@@ -44,7 +44,7 @@ export interface OpenPRSummary {
  */
 async function resolveGitHubToken(): Promise<string | null> {
   const auth = await readAuth();
-  const fromAuth = auth.providers["github-copilot"]?.apiKey;
+  const fromAuth = auth.providers['github-copilot']?.apiKey;
   if (fromAuth) return fromAuth;
   return process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN ?? null;
 }
@@ -52,9 +52,7 @@ async function resolveGitHubToken(): Promise<string | null> {
 async function octokit(): Promise<Octokit> {
   const token = await resolveGitHubToken();
   if (!token) {
-    throw new Error(
-      "No GitHub token available. Run `pritty auth login` or set GITHUB_TOKEN.",
-    );
+    throw new Error('No GitHub token available. Run `pritty auth login` or set GITHUB_TOKEN.');
   }
   return new Octokit({ auth: token });
 }
@@ -131,7 +129,7 @@ export async function listOpenPRsForHead(
   const result = await client.rest.pulls.list({
     owner,
     repo,
-    state: "open",
+    state: 'open',
     head: `${owner}:${branch}`,
   });
   return result.data.map((pr) => ({
@@ -143,10 +141,7 @@ export async function listOpenPRsForHead(
 }
 
 /** Get the repository's default branch (used when --base isn't supplied). */
-export async function getDefaultBranch(
-  owner: string,
-  repo: string,
-): Promise<string> {
+export async function getDefaultBranch(owner: string, repo: string): Promise<string> {
   const client = await octokit();
   const result = await client.rest.repos.get({ owner, repo });
   return result.data.default_branch;

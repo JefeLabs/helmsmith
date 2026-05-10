@@ -1,7 +1,7 @@
-import { listWithDefault, inputWithDefault, confirmPrompt } from './factory.js';
 import type { ProjectConfig } from '../config/schema.js';
-import { STYLE_NAMES } from '../config/styles.js';
 import { PRESET_NAMES } from '../config/state-presets.js';
+import { STYLE_NAMES } from '../config/styles.js';
+import { confirmPrompt, inputWithDefault, listWithDefault } from './factory.js';
 
 interface ConfigKey {
   key: string;
@@ -82,19 +82,13 @@ export interface ConfigEditResult {
  * Returns the key/value to write, or null if cancelled.
  * CLI handles persistence.
  */
-export async function runConfigEditor(
-  config: ProjectConfig,
-): Promise<ConfigEditResult | null> {
+export async function runConfigEditor(config: ProjectConfig): Promise<ConfigEditResult | null> {
   const keyChoices = CONFIG_KEYS.map((k) => ({
     name: `${k.label} (${k.key} = ${k.getter(config)})`,
     value: k.key,
   }));
 
-  const selectedKey = await listWithDefault(
-    'configKey',
-    'Select setting to edit:',
-    keyChoices,
-  );
+  const selectedKey = await listWithDefault('configKey', 'Select setting to edit:', keyChoices);
   const keyDef = CONFIG_KEYS.find((k) => k.key === selectedKey);
   if (!keyDef) return null;
 
@@ -112,10 +106,7 @@ export async function runConfigEditor(
     return { key: selectedKey, value: newValue, confirmed: false };
   }
 
-  const confirmed = await confirmPrompt(
-    `Set ${keyDef.label} to "${newValue}"?`,
-    true,
-  );
+  const confirmed = await confirmPrompt(`Set ${keyDef.label} to "${newValue}"?`, true);
   return { key: selectedKey, value: newValue, confirmed };
 }
 
@@ -159,7 +150,7 @@ export function applyConfigValue(key: string, value: string): Record<string, unk
   let parsed: unknown;
   if (value === 'true') parsed = true;
   else if (value === 'false') parsed = false;
-  else if (!isNaN(Number(value)) && value.trim() !== '') parsed = Number(value);
+  else if (!Number.isNaN(Number(value)) && value.trim() !== '') parsed = Number(value);
   else parsed = value;
 
   if (parts.length === 1) {

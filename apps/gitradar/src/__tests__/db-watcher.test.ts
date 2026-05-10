@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DbWatcher } from '../store/db-watcher.js';
 
 describe('DbWatcher', () => {
@@ -75,7 +75,7 @@ describe('DbWatcher', () => {
     const signal = watcher.createSignal();
 
     // Write a WAL file
-    writeFileSync(dbPath + '-wal', 'wal data');
+    writeFileSync(`${dbPath}-wal`, 'wal data');
 
     await new Promise((r) => setTimeout(r, 300));
 

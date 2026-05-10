@@ -1,24 +1,20 @@
-import chalk from "chalk";
-import { confirm, editor } from "@inquirer/prompts";
-import ora from "ora";
-import { generatePR } from "../ai.js";
-import { findPullRequestTemplate } from "../pr-template.js";
-import { loadConfig } from "../config.js";
-import { createGit, parseGitHubRemote } from "../git.js";
+import { confirm, editor } from '@inquirer/prompts';
+import chalk from 'chalk';
+import ora from 'ora';
+import { generatePR } from '../ai.js';
+import { findCodeowners, parseCodeowners, resolveReviewers } from '../codeowners.js';
+import { loadConfig } from '../config.js';
+import { createGit, parseGitHubRemote } from '../git.js';
 import {
   addLabels,
   createPR,
   getDefaultBranch,
   listOpenPRsForHead,
   requestReviewers,
-} from "../github.js";
-import {
-  findCodeowners,
-  parseCodeowners,
-  resolveReviewers,
-} from "../codeowners.js";
-import { resolveTicketContext } from "./_shared/ticket-context.js";
-import { splitTitleBody } from "./_shared/format.js";
+} from '../github.js';
+import { findPullRequestTemplate } from '../pr-template.js';
+import { splitTitleBody } from './_shared/format.js';
+import { resolveTicketContext } from './_shared/ticket-context.js';
 
 export interface PrOptions {
   base?: string;
@@ -40,17 +36,13 @@ export async function runPr(options: PrOptions = {}): Promise<void> {
   const remoteUrl = await git.getRemoteUrl();
   if (!remoteUrl) {
     console.error(
-      chalk.red(
-        "✗ No `origin` remote configured. Add one with `git remote add origin ...`.",
-      ),
+      chalk.red('✗ No `origin` remote configured. Add one with `git remote add origin ...`.'),
     );
     process.exit(1);
   }
   const repo = parseGitHubRemote(remoteUrl);
   if (!repo) {
-    console.error(
-      chalk.red(`✗ Remote URL doesn't look like GitHub: ${remoteUrl}`),
-    );
+    console.error(chalk.red(`✗ Remote URL doesn't look like GitHub: ${remoteUrl}`));
     process.exit(1);
   }
 
@@ -70,11 +62,7 @@ export async function runPr(options: PrOptions = {}): Promise<void> {
       effectiveBase = defaultBranch;
     }
   } catch (err) {
-    console.error(
-      chalk.yellow(
-        `⚠ Couldn't query repo default branch: ${(err as Error).message}`,
-      ),
-    );
+    console.error(chalk.yellow(`⚠ Couldn't query repo default branch: ${(err as Error).message}`));
   }
 
   console.log(
@@ -87,55 +75,42 @@ export async function runPr(options: PrOptions = {}): Promise<void> {
   try {
     const open = await listOpenPRsForHead(repo.owner, repo.repo, branch);
     if (open.length > 0) {
-      console.log(
-        chalk.yellow(
-          `⚠ ${open.length} open PR(s) already exist for ${branch}:`,
-        ),
-      );
+      console.log(chalk.yellow(`⚠ ${open.length} open PR(s) already exist for ${branch}:`));
       for (const pr of open) {
-        console.log(
-          `    ${chalk.dim(`#${pr.number}`)} ${pr.title} — ${pr.url}`,
-        );
+        console.log(`    ${chalk.dim(`#${pr.number}`)} ${pr.title} — ${pr.url}`);
       }
     }
   } catch (err) {
-    console.error(
-      chalk.yellow(
-        `⚠ Couldn't list existing PRs: ${(err as Error).message}`,
-      ),
-    );
+    console.error(chalk.yellow(`⚠ Couldn't list existing PRs: ${(err as Error).message}`));
   }
 
   // 3. Get commits between base and HEAD
   const commits = await git.log(effectiveBase);
   if (commits.length === 0) {
-    console.log(
-      chalk.dim(
-        `No commits between ${effectiveBase} and ${branch}. Nothing to PR.`,
-      ),
-    );
+    console.log(chalk.dim(`No commits between ${effectiveBase} and ${branch}. Nothing to PR.`));
     return;
   }
   console.log(chalk.cyan(`Commits in PR (${commits.length}):`));
   for (const c of commits) {
     console.log(`  ${chalk.dim(c.hash.slice(0, 7))}  ${c.subject}`);
   }
-  console.log("");
+  console.log('');
 
   // 4. AI-generate title + body + labels.
   const template = findPullRequestTemplate();
   if (template) {
     console.log(
       chalk.dim(
-        `  (using PR template: ${template.path}${template.truncated ? " — truncated" : ""})`,
+        `  (using PR template: ${template.path}${template.truncated ? ' — truncated' : ''})`,
       ),
     );
   }
 
   const spinner = ora({
-    text: "Generating PR description...",
-    color: "cyan",
+    text: 'Generating PR description...',
+    color: 'cyan',
   }).start();
+  // biome-ignore lint/suspicious/noImplicitAnyLet: assigned in try/catch below
   let draft;
   try {
     draft = await generatePR(
@@ -145,40 +120,40 @@ export async function runPr(options: PrOptions = {}): Promise<void> {
       ticketCtx,
       template,
     );
-    spinner.succeed("PR description ready");
+    spinner.succeed('PR description ready');
   } catch (err) {
     spinner.fail((err as Error).message);
     process.exit(1);
   }
 
   // 5. Show preview
-  console.log("");
+  console.log('');
   console.log(chalk.bold.cyan(draft.title));
-  console.log("");
-  for (const line of draft.body.split("\n")) {
+  console.log('');
+  for (const line of draft.body.split('\n')) {
     console.log(`  ${chalk.dim(line)}`);
   }
   if (draft.labels.length > 0) {
-    console.log("");
-    console.log(`  ${chalk.dim("Labels: ")}${draft.labels.join(", ")}`);
+    console.log('');
+    console.log(`  ${chalk.dim('Labels: ')}${draft.labels.join(', ')}`);
   }
-  console.log("");
+  console.log('');
 
   // 5.5. Optional editor pass — default N so the wrap-up stays fast.
   if (!options.autoApprove && !options.dryRun) {
     const wantEdit = await confirm({
-      message: "Edit PR title or body?",
+      message: 'Edit PR title or body?',
       default: false,
     });
     if (wantEdit) {
       const combined = `${draft.title}\n\n${draft.body}`;
       const edited = await editor({
-        message: "Editing PR (first line = title, blank line, then body)",
+        message: 'Editing PR (first line = title, blank line, then body)',
         default: combined,
       });
       const { title: nextTitle, body: nextBody } = splitTitleBody(edited);
       if (nextTitle.length === 0) {
-        console.log(chalk.yellow("⚠ Empty title — keeping original."));
+        console.log(chalk.yellow('⚠ Empty title — keeping original.'));
       } else {
         draft = { ...draft, title: nextTitle, body: nextBody };
       }
@@ -188,9 +163,7 @@ export async function runPr(options: PrOptions = {}): Promise<void> {
   // 6. Dry-run exits here
   if (options.dryRun) {
     console.log(
-      chalk.yellow(
-        "Dry-run — no push, no PR created. Re-run without --dry-run to apply.",
-      ),
+      chalk.yellow('Dry-run — no push, no PR created. Re-run without --dry-run to apply.'),
     );
     return;
   }
@@ -202,7 +175,7 @@ export async function runPr(options: PrOptions = {}): Promise<void> {
       default: true,
     });
     if (!ok) {
-      console.log(chalk.dim("Aborted."));
+      console.log(chalk.dim('Aborted.'));
       return;
     }
   }
@@ -210,18 +183,19 @@ export async function runPr(options: PrOptions = {}): Promise<void> {
   // 8. Push (set upstream — assume first push for the branch)
   const pushSpinner = ora({
     text: `Pushing ${branch} to origin...`,
-    color: "cyan",
+    color: 'cyan',
   }).start();
   try {
     await git.push(branch, { setUpstream: true });
-    pushSpinner.succeed("Pushed");
+    pushSpinner.succeed('Pushed');
   } catch (err) {
     pushSpinner.fail((err as Error).message);
     process.exit(1);
   }
 
   // 9. Create PR
-  const prSpinner = ora({ text: "Creating PR...", color: "cyan" }).start();
+  const prSpinner = ora({ text: 'Creating PR...', color: 'cyan' }).start();
+  // biome-ignore lint/suspicious/noImplicitAnyLet: assigned in try/catch below
   let result;
   try {
     result = await createPR({
@@ -242,13 +216,9 @@ export async function runPr(options: PrOptions = {}): Promise<void> {
   if (draft.labels.length > 0) {
     try {
       await addLabels(repo.owner, repo.repo, result.number, draft.labels);
-      console.log(chalk.dim(`  Applied labels: ${draft.labels.join(", ")}`));
+      console.log(chalk.dim(`  Applied labels: ${draft.labels.join(', ')}`));
     } catch (err) {
-      console.error(
-        chalk.yellow(
-          `⚠ Couldn't apply labels: ${(err as Error).message}`,
-        ),
-      );
+      console.error(chalk.yellow(`⚠ Couldn't apply labels: ${(err as Error).message}`));
     }
   }
 
@@ -270,18 +240,14 @@ export async function runPr(options: PrOptions = {}): Promise<void> {
         const summary = [
           ...reviewers.users.map((u) => `@${u}`),
           ...reviewers.teams.map((t) => `@${repo.owner}/${t}`),
-        ].join(", ");
+        ].join(', ');
         console.log(chalk.dim(`  Requested reviewers: ${summary}`));
       } catch (err) {
-        console.error(
-          chalk.yellow(
-            `⚠ Couldn't request reviewers: ${(err as Error).message}`,
-          ),
-        );
+        console.error(chalk.yellow(`⚠ Couldn't request reviewers: ${(err as Error).message}`));
       }
     }
   }
 
-  console.log("");
+  console.log('');
   console.log(chalk.green(`✓ ${result.url}`));
 }

@@ -1,8 +1,8 @@
-import type { Command } from 'commander';
+import { checkbox, input, select } from '@inquirer/prompts';
 import chalk from 'chalk';
-import { checkbox, select, input } from '@inquirer/prompts';
-import { ManifestManager } from '../config/manifest.js';
+import type { Command } from 'commander';
 import { APP_NAME } from '../config/branding.js';
+import { ManifestManager } from '../config/manifest.js';
 import type { RepoConfig } from '../config/schema.js';
 
 export function registerRepo(program: Command): void {
@@ -15,14 +15,30 @@ export function registerRepo(program: Command): void {
     .option('-u, --url <url>', 'GitHub clone URL')
     .option('--branches <json>', 'Branch aliases as JSON')
     .option('--group-desc <desc>', 'Description for a new group')
-    .action(async (group: string, name: string, repoPath: string, opts: { remote: string; url?: string; branches?: string; groupDesc?: string }) => {
-      const manifest = new ManifestManager();
-      const branches = opts.branches ? JSON.parse(opts.branches) : { dev: 'develop', staging: 'staging', prod: 'main' };
-      const repo: RepoConfig = { name, path: repoPath, remote: opts.remote, url: opts.url, branches, tags: [] };
-      manifest.addRepo(group, repo, opts.groupDesc);
-      manifest.save();
-      console.log(chalk.green(`✓ Added ${name} to group "${group}"`));
-    });
+    .action(
+      async (
+        group: string,
+        name: string,
+        repoPath: string,
+        opts: { remote: string; url?: string; branches?: string; groupDesc?: string },
+      ) => {
+        const manifest = new ManifestManager();
+        const branches = opts.branches
+          ? JSON.parse(opts.branches)
+          : { dev: 'develop', staging: 'staging', prod: 'main' };
+        const repo: RepoConfig = {
+          name,
+          path: repoPath,
+          remote: opts.remote,
+          url: opts.url,
+          branches,
+          tags: [],
+        };
+        manifest.addRepo(group, repo, opts.groupDesc);
+        manifest.save();
+        console.log(chalk.green(`✓ Added ${name} to group "${group}"`));
+      },
+    );
 
   repoCmd
     .command('remove <group> <name>')
@@ -42,15 +58,25 @@ export function registerRepo(program: Command): void {
       const manifest = new ManifestManager();
       const groups = manifest.getGroups();
       if (groups.length === 0) {
-        console.log(chalk.yellow(`No repos configured. Use: ${APP_NAME} repo add <group> <name> <path>`));
+        console.log(
+          chalk.yellow(`No repos configured. Use: ${APP_NAME} repo add <group> <name> <path>`),
+        );
         return;
       }
       for (const group of groups) {
-        console.log(chalk.blue.bold(`\n  ${group.name}`) + (group.description ? chalk.dim(` — ${group.description}`) : ''));
+        console.log(
+          chalk.blue.bold(`\n  ${group.name}`) +
+            (group.description ? chalk.dim(` — ${group.description}`) : ''),
+        );
         for (const repo of group.repos) {
-          const branchStr = Object.entries(repo.branches).map(([a, b]) => `${a}:${b}`).join(', ');
-          const tagStr = opts.tags && repo.tags.length > 0 ? chalk.magenta(` [${repo.tags.join(', ')}]`) : '';
-          console.log(`    ${chalk.white(repo.name)} ${chalk.dim(repo.path)} ${chalk.dim(`[${branchStr}]`)}${tagStr}`);
+          const branchStr = Object.entries(repo.branches)
+            .map(([a, b]) => `${a}:${b}`)
+            .join(', ');
+          const tagStr =
+            opts.tags && repo.tags.length > 0 ? chalk.magenta(` [${repo.tags.join(', ')}]`) : '';
+          console.log(
+            `    ${chalk.white(repo.name)} ${chalk.dim(repo.path)} ${chalk.dim(`[${branchStr}]`)}${tagStr}`,
+          );
         }
       }
       console.log();
@@ -65,7 +91,7 @@ export function registerRepo(program: Command): void {
     .action(async (opts: { group?: string; add?: string; remove?: string }) => {
       const manifest = new ManifestManager();
       const allRepos = opts.group
-        ? manifest.getGroup(opts.group)?.repos.map((r) => ({ ...r, group: opts.group! })) ?? []
+        ? (manifest.getGroup(opts.group)?.repos.map((r) => ({ ...r, group: opts.group! })) ?? [])
         : manifest.getAllRepos();
 
       if (allRepos.length === 0) {
@@ -81,7 +107,9 @@ export function registerRepo(program: Command): void {
           checked: false,
         }));
 
-        console.log(chalk.dim('\n  Select repos to tag. Shortcuts: Space=toggle, A=all, I=invert\n'));
+        console.log(
+          chalk.dim('\n  Select repos to tag. Shortcuts: Space=toggle, A=all, I=invert\n'),
+        );
 
         const selectedRepos = await checkbox({
           message: 'Select repos to modify tags:',
@@ -112,10 +140,14 @@ export function registerRepo(program: Command): void {
         }
 
         const tagsInput = await input({
-          message: action === 'remove' ? 'Tags to remove (comma-separated):' : 'Tags (comma-separated):',
+          message:
+            action === 'remove' ? 'Tags to remove (comma-separated):' : 'Tags (comma-separated):',
         });
 
-        const tags = tagsInput.split(',').map((t) => t.trim()).filter((t) => t.length > 0);
+        const tags = tagsInput
+          .split(',')
+          .map((t) => t.trim())
+          .filter((t) => t.length > 0);
 
         if (tags.length === 0) {
           console.log(chalk.yellow('\n  No tags specified.\n'));
@@ -141,8 +173,16 @@ export function registerRepo(program: Command): void {
         console.log(chalk.green(`\n  ✓ Updated tags for ${selectedRepos.length} repo(s)\n`));
       } else {
         // Non-interactive: apply to all repos in scope
-        const addTags = opts.add?.split(',').map((t) => t.trim()).filter((t) => t) ?? [];
-        const removeTags = opts.remove?.split(',').map((t) => t.trim()).filter((t) => t) ?? [];
+        const addTags =
+          opts.add
+            ?.split(',')
+            .map((t) => t.trim())
+            .filter((t) => t) ?? [];
+        const removeTags =
+          opts.remove
+            ?.split(',')
+            .map((t) => t.trim())
+            .filter((t) => t) ?? [];
 
         for (const repo of allRepos) {
           const group = manifest.data.groups[repo.group];
@@ -185,8 +225,12 @@ export function registerRepo(program: Command): void {
       }
 
       console.log(chalk.bold('\n  Tags:\n'));
-      for (const [tag, count] of Array.from(tagCounts.entries()).sort((a, b) => a[0].localeCompare(b[0]))) {
-        console.log(`    ${chalk.magenta(tag)} ${chalk.dim(`(${count} repo${count > 1 ? 's' : ''})`)}`);
+      for (const [tag, count] of Array.from(tagCounts.entries()).sort((a, b) =>
+        a[0].localeCompare(b[0]),
+      )) {
+        console.log(
+          `    ${chalk.magenta(tag)} ${chalk.dim(`(${count} repo${count > 1 ? 's' : ''})`)}`,
+        );
       }
       console.log();
     });

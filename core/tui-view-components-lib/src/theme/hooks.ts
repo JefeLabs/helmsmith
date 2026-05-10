@@ -8,16 +8,16 @@
  *   useThemeKeybindings → register Ctrl+T cycle, Ctrl+Shift+T toggle
  */
 
-import { useContext } from "react";
-import { useKeyboard } from "@opentui/react";
-import { ThemeContext, type ThemeContextValue } from "./context.tsx";
-import type { Theme, ThemeColors } from "./types.ts";
+import { useKeyboard } from '@opentui/react';
+import { useContext } from 'react';
+import { ThemeContext, type ThemeContextValue } from './context.tsx';
+import type { Theme, ThemeColors } from './types.ts';
 
 export function useTheme(): ThemeContextValue {
   const ctx = useContext(ThemeContext);
   if (!ctx) {
     throw new Error(
-      "useTheme() called outside <ThemeProvider>. Wrap your app in <AgentxThemeProvider> (or a custom provider that supplies ThemeContext).",
+      'useTheme() called outside <ThemeProvider>. Wrap your app in <AgentxThemeProvider> (or a custom provider that supplies ThemeContext).',
     );
   }
   return ctx;
@@ -40,8 +40,7 @@ export interface ThemeSwitcher {
 }
 
 export function useThemeSwitcher(): ThemeSwitcher {
-  const { setTheme, cycleTheme, toggleAppearance, themes, activeName } =
-    useTheme();
+  const { setTheme, cycleTheme, toggleAppearance, themes, activeName } = useTheme();
   return { setTheme, cycleTheme, toggleAppearance, themes, activeName };
 }
 
@@ -69,10 +68,9 @@ export interface ThemeKeybindingsOptions {
   toggleAppearance?: KeyMatcher | null;
 }
 
-const defaultCycleMatcher: KeyMatcher = (k) =>
-  Boolean(k.ctrl) && !k.shift && k.name === "t";
+const defaultCycleMatcher: KeyMatcher = (k) => Boolean(k.ctrl) && !k.shift && k.name === 't';
 const defaultToggleMatcher: KeyMatcher = (k) =>
-  Boolean(k.ctrl) && Boolean(k.shift) && k.name === "t";
+  Boolean(k.ctrl) && Boolean(k.shift) && k.name === 't';
 
 /**
  * Register the standard theme keybindings: Ctrl+T cycles themes,
@@ -86,14 +84,11 @@ const defaultToggleMatcher: KeyMatcher = (k) =>
 export function useThemeKeybindings(opts: ThemeKeybindingsOptions = {}): void {
   const { cycleTheme, toggleAppearance } = useTheme();
   const cycle = opts.cycle === undefined ? defaultCycleMatcher : opts.cycle;
-  const toggle =
-    opts.toggleAppearance === undefined
-      ? defaultToggleMatcher
-      : opts.toggleAppearance;
+  const toggle = opts.toggleAppearance === undefined ? defaultToggleMatcher : opts.toggleAppearance;
 
   useKeyboard((key: KeyEvent) => {
-    if (cycle && cycle(key)) cycleTheme();
-    if (toggle && toggle(key)) toggleAppearance();
+    if (cycle?.(key)) cycleTheme();
+    if (toggle?.(key)) toggleAppearance();
   });
 }
 
@@ -118,9 +113,7 @@ export function useThemeKeyHandlers(opts: ThemeKeybindingsOptions = {}): {
     matchers: {
       cycle: opts.cycle === undefined ? defaultCycleMatcher : opts.cycle,
       toggleAppearance:
-        opts.toggleAppearance === undefined
-          ? defaultToggleMatcher
-          : opts.toggleAppearance,
+        opts.toggleAppearance === undefined ? defaultToggleMatcher : opts.toggleAppearance,
     },
     cycleTheme,
     toggleAppearance,

@@ -1,5 +1,5 @@
-import { readdir, access } from "node:fs/promises";
-import path from "node:path";
+import { access, readdir } from 'node:fs/promises';
+import path from 'node:path';
 
 /**
  * A git repository discovered by scanning a directory.
@@ -37,7 +37,7 @@ async function walk(
 ): Promise<void> {
   if (currentDepth >= maxDepth) return;
 
-  let entries: import("node:fs").Dirent[];
+  let entries: import('node:fs').Dirent[];
   try {
     entries = await readdir(dir, { withFileTypes: true });
   } catch {
@@ -46,10 +46,10 @@ async function walk(
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-    if (entry.name.startsWith(".")) continue; // skip hidden dirs
+    if (entry.name.startsWith('.')) continue; // skip hidden dirs
 
     const childPath = path.join(dir, entry.name);
-    const gitPath = path.join(childPath, ".git");
+    const gitPath = path.join(childPath, '.git');
 
     let isRepo = false;
     try {

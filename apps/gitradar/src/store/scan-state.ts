@@ -1,17 +1,14 @@
-import type { ScanState } from "../types/schema.js";
+import type { ScanState } from '../types/schema.js';
 
 /**
  * Inferred type for a single repo's scan state entry.
  */
-export type RepoScanState = ScanState["repos"][string];
+export type RepoScanState = ScanState['repos'][string];
 
 /**
  * Get the scan state for a specific repo, or undefined if not found.
  */
-export function getRepoState(
-  state: ScanState,
-  repoName: string
-): RepoScanState | undefined {
+export function getRepoState(state: ScanState, repoName: string): RepoScanState | undefined {
   return state.repos[repoName];
 }
 
@@ -22,7 +19,7 @@ export function getRepoState(
 export function updateRepoState(
   state: ScanState,
   repoName: string,
-  update: Partial<RepoScanState>
+  update: Partial<RepoScanState>,
 ): ScanState {
   return {
     ...state,
@@ -39,10 +36,7 @@ export function updateRepoState(
 /**
  * Returns true if the repo state is stale (undefined or elapsed time exceeds threshold).
  */
-export function isStale(
-  repoState: RepoScanState | undefined,
-  stalenessMinutes: number
-): boolean {
+export function isStale(repoState: RepoScanState | undefined, stalenessMinutes: number): boolean {
   if (!repoState) return true;
   const lastScan = new Date(repoState.lastScanDate).getTime();
   const now = Date.now();
@@ -58,7 +52,7 @@ export function isStale(
 export function rotateHashes(
   recentHashes: string[],
   newHashes: string[],
-  maxSize: number = 500
+  maxSize: number = 500,
 ): string[] {
   return [...newHashes, ...recentHashes].slice(0, maxSize);
 }

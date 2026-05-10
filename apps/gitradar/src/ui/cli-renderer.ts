@@ -1,4 +1,4 @@
-import { renderTable, type Column, type TableOptions } from './table.js';
+import { type Column, renderTable, type TableOptions } from './table.js';
 
 // ── Atomic output primitives ─────────────────────────────────────────────────
 

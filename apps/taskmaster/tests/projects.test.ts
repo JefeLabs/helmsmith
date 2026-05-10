@@ -1,16 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { existsSync, rmSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { bootstrapHome, getProjectDir, bootstrapRepoHome } from '../src/utils/home.js';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { bootstrapHome, bootstrapRepoHome, getProjectDir } from '../src/utils/home.js';
 import {
-  readGlobalProjects,
-  readRepoProjects,
   createProject,
-  removeProject,
-  switchProject,
   getActiveProject,
   listAllProjects,
+  readGlobalProjects,
+  readRepoProjects,
+  removeProject,
+  switchProject,
 } from '../src/utils/projects.js';
 
 const TEST_DIR = join(tmpdir(), `agentx-test-projects-${Date.now()}`);

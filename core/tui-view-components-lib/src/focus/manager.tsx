@@ -9,14 +9,14 @@
 
 import {
   createContext,
+  type ReactNode,
   useCallback,
   useContext,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type ReactNode,
-} from "react";
+} from 'react';
 
 interface FocusEntry {
   id: string;
@@ -44,9 +44,7 @@ export interface FocusManagerProps {
 
 export function FocusManager({ initialFocus, children }: FocusManagerProps) {
   const entriesRef = useRef<FocusEntry[]>([]);
-  const [focusedId, setFocusedId] = useState<string | null>(
-    initialFocus ?? null,
-  );
+  const [focusedId, setFocusedId] = useState<string | null>(initialFocus ?? null);
 
   const register = useCallback((id: string, order?: number) => {
     const list = entriesRef.current;
@@ -82,8 +80,7 @@ export function FocusManager({ initialFocus, children }: FocusManagerProps) {
     if (list.length === 0) return;
     setFocusedId((curr) => {
       const idx = curr ? list.findIndex((e) => e.id === curr) : -1;
-      const nextIdx =
-        idx < 0 ? 0 : (idx + delta + list.length) % list.length;
+      const nextIdx = idx < 0 ? 0 : (idx + delta + list.length) % list.length;
       return list[nextIdx]?.id ?? null;
     });
   }, []);
@@ -96,9 +93,7 @@ export function FocusManager({ initialFocus, children }: FocusManagerProps) {
     [focusedId, register, unregister, request, release, next, prev],
   );
 
-  return (
-    <FocusContext.Provider value={value}>{children}</FocusContext.Provider>
-  );
+  return <FocusContext.Provider value={value}>{children}</FocusContext.Provider>;
 }
 
 // ────────────────────────────────────────────────────────────────────

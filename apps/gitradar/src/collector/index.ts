@@ -1,15 +1,9 @@
-import { access } from "node:fs/promises";
-import type { Config, UserWeekRepoRecord, ScanState } from "../types/schema.js";
-import {
-  isStale,
-  getRepoState,
-  updateRepoState,
-  rotateHashes,
-} from "../store/scan-state.js";
-import { buildAuthorMap, buildIdentifierRules } from "./author-map.js";
-import type { AuthorRegistry } from "../types/schema.js";
-import { scanRepo } from "./git.js";
-import type { RawAuthor } from "./git.js";
+import { access } from 'node:fs/promises';
+import { getRepoState, isStale, rotateHashes, updateRepoState } from '../store/scan-state.js';
+import type { AuthorRegistry, Config, ScanState, UserWeekRepoRecord } from '../types/schema.js';
+import { buildAuthorMap, buildIdentifierRules } from './author-map.js';
+import type { RawAuthor } from './git.js';
+import { scanRepo } from './git.js';
 
 /**
  * Discovered authors from a single repo scan — includes repo context.
@@ -62,11 +56,10 @@ export async function scanAllRepos(
     onScanStateUpdated?: (state: ScanState) => Promise<void>;
     /** Called after each repo with newly discovered authors. Enables per-repo author persistence. */
     onAuthorsDiscovered?: (authors: RepoDiscoveredAuthor[]) => Promise<void>;
-  }
+  },
 ): Promise<ScanAllResult> {
   const forceScan = options?.forceScan ?? false;
-  const stalenessMinutes =
-    options?.stalenessMinutes ?? config.settings.staleness_minutes;
+  const stalenessMinutes = options?.stalenessMinutes ?? config.settings.staleness_minutes;
 
   const authorMap = buildAuthorMap(config, options?.authorRegistry);
   const identifierRules = buildIdentifierRules(config);
@@ -81,16 +74,13 @@ export async function scanAllRepos(
   let reposMissing = 0;
 
   for (const repo of config.repos) {
-    const repoName = repo.name ?? repo.path.split("/").pop() ?? repo.path;
+    const repoName = repo.name ?? repo.path.split('/').pop() ?? repo.path;
     const repoState = getRepoState(currentState, repoName);
 
     // Check staleness — skip if fresh (unless forceScan)
     if (!forceScan && !isStale(repoState, stalenessMinutes)) {
       const elapsed = repoState
-        ? Math.round(
-            (Date.now() - new Date(repoState.lastScanDate).getTime()) /
-              60000
-          )
+        ? Math.round((Date.now() - new Date(repoState.lastScanDate).getTime()) / 60000)
         : 0;
       console.log(`· ${repoName}: fresh (${elapsed}m ago)`);
       reposSkipped++;
@@ -137,9 +127,10 @@ export async function scanAllRepos(
     }
 
     // Collect discovered authors with repo context
-    const repoAuthors: RepoDiscoveredAuthor[] = result.discoveredAuthors.map(
-      (a) => ({ ...a, repoName }),
-    );
+    const repoAuthors: RepoDiscoveredAuthor[] = result.discoveredAuthors.map((a) => ({
+      ...a,
+      repoName,
+    }));
     allDiscoveredAuthors.push(...repoAuthors);
     if (options?.onAuthorsDiscovered && repoAuthors.length > 0) {
       await options.onAuthorsDiscovered(repoAuthors);
@@ -155,7 +146,7 @@ export async function scanAllRepos(
     const existingRecordCount = repoState?.recordCount ?? 0;
 
     currentState = updateRepoState(currentState, repoName, {
-      lastHash: result.newHashes[0] ?? repoState?.lastHash ?? "",
+      lastHash: result.newHashes[0] ?? repoState?.lastHash ?? '',
       lastScanDate: new Date().toISOString(),
       recentHashes: rotated,
       recordCount: existingRecordCount + result.newRecords.length,
@@ -166,7 +157,7 @@ export async function scanAllRepos(
     }
 
     console.log(
-      `✓ ${repoName}: +${result.commitCount} commits → ${result.newRecords.length} new records`
+      `✓ ${repoName}: +${result.commitCount} commits → ${result.newRecords.length} new records`,
     );
   }
 

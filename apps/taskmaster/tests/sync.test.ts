@@ -1,14 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { syncTaskFiles } from '../src/formats/sync.js';
-import { writeTasks, readTasks } from '../src/formats/tasks-store.js';
-import { generateTaskFiles } from '../src/formats/task-writer.js';
-import { safeDump } from '../src/formats/yaml-bridge.js';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { TaskNode } from '../src/config/schema.js';
+import { syncTaskFiles } from '../src/formats/sync.js';
+import { generateTaskFiles } from '../src/formats/task-writer.js';
+import { readTasks, writeTasks } from '../src/formats/tasks-store.js';
+import { safeDump } from '../src/formats/yaml-bridge.js';
 
-function makeTask(overrides: Partial<TaskNode> & { id: string; title: string; type: TaskNode['type'] }): TaskNode {
+function makeTask(
+  overrides: Partial<TaskNode> & { id: string; title: string; type: TaskNode['type'] },
+): TaskNode {
   return {
     description: '',
     status: 'todo',
@@ -45,9 +47,7 @@ describe('sync', () => {
   });
 
   it('reports no changes when everything is in sync', async () => {
-    const tasks: TaskNode[] = [
-      makeTask({ id: 'T-1', title: 'Task One', type: 'task' }),
-    ];
+    const tasks: TaskNode[] = [makeTask({ id: 'T-1', title: 'Task One', type: 'task' })];
 
     await writeTasks(tmpDir, tasks);
     await generateTaskFiles(tmpDir, tasks);
@@ -58,9 +58,7 @@ describe('sync', () => {
   });
 
   it('detects title change in YAML', async () => {
-    const tasks: TaskNode[] = [
-      makeTask({ id: 'T-1', title: 'Original Title', type: 'task' }),
-    ];
+    const tasks: TaskNode[] = [makeTask({ id: 'T-1', title: 'Original Title', type: 'task' })];
 
     await writeTasks(tmpDir, tasks);
     await generateTaskFiles(tmpDir, tasks);
@@ -126,9 +124,7 @@ describe('sync', () => {
   });
 
   it('dry-run mode does not modify tasks.json', async () => {
-    const tasks: TaskNode[] = [
-      makeTask({ id: 'T-1', title: 'Original', type: 'task' }),
-    ];
+    const tasks: TaskNode[] = [makeTask({ id: 'T-1', title: 'Original', type: 'task' })];
 
     await writeTasks(tmpDir, tasks);
     await generateTaskFiles(tmpDir, tasks);
@@ -172,9 +168,7 @@ describe('sync', () => {
   });
 
   it('reports tasks with no YAML file', async () => {
-    const tasks: TaskNode[] = [
-      makeTask({ id: 'T-1', title: 'No YAML', type: 'task' }),
-    ];
+    const tasks: TaskNode[] = [makeTask({ id: 'T-1', title: 'No YAML', type: 'task' })];
     await writeTasks(tmpDir, tasks);
     // Don't generate YAML files
 
@@ -188,9 +182,7 @@ describe('sync', () => {
         id: 'T-1',
         title: 'Parent',
         type: 'task',
-        children: [
-          makeTask({ id: 'T-1.1', title: 'Child', type: 'subtask' }),
-        ],
+        children: [makeTask({ id: 'T-1.1', title: 'Child', type: 'subtask' })],
       }),
     ];
 

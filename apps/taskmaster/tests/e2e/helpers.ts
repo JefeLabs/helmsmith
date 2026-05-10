@@ -1,9 +1,8 @@
 import { execFile as execFileCb } from 'node:child_process';
-import { promisify } from 'node:util';
 import { mkdtemp, rm } from 'node:fs/promises';
-import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
+import { promisify } from 'node:util';
 
 const execFile = promisify(execFileCb);
 

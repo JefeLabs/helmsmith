@@ -1,13 +1,13 @@
-import { describe, it, expect, beforeAll } from 'vitest';
 import Handlebars from 'handlebars';
+import { beforeAll, describe, expect, it } from 'vitest';
 import {
-  registerHelpers,
   complexityColor,
-  statusBadge,
-  progressBar,
   dateFormat,
-  pluralize,
   indent,
+  pluralize,
+  progressBar,
+  registerHelpers,
+  statusBadge,
 } from '../../../src/generator/helpers.js';
 
 // Register helpers once for block helper tests

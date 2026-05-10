@@ -1,17 +1,17 @@
 import type {
   BuildComponent,
+  ComponentIndex,
   EnhancedFileAnalysis,
   EnhancedSourceSymbol,
-  ComponentIndex,
-  SymbolIndex,
-  SymbolIndexEntry,
+  EntryPoint,
+  EntryPointIndex,
+  EntryPointTrace,
   IndexQuery,
   IndexQueryResult,
   PragmaticLayer,
+  SymbolIndex,
+  SymbolIndexEntry,
   SymbolKind,
-  EntryPoint,
-  EntryPointTrace,
-  EntryPointIndex,
 } from './types.js';
 
 /**
@@ -266,8 +266,8 @@ export function buildEntryPointIndex(
       orphanComponents: [],
       unreachableComponents: [],
       entryPointsWithoutTraces: entryPoints
-        .filter(ep => !traces.some(t => t.entryPointId === ep.id))
-        .map(ep => ep.id),
+        .filter((ep) => !traces.some((t) => t.entryPointId === ep.id))
+        .map((ep) => ep.id),
       coveragePercentage: 0,
     },
   };
@@ -306,7 +306,9 @@ export function formatEntryPointIndexForPrompt(index: EntryPointIndex): string {
     for (const trace of index.traces) {
       lines.push(`  ${trace.entryPointId}: ${trace.componentChain.join(' → ')}`);
       if (trace.sideEffects.length > 0) {
-        lines.push(`    Side effects: ${trace.sideEffects.map(se => `${se.type}(${se.target})`).join(', ')}`);
+        lines.push(
+          `    Side effects: ${trace.sideEffects.map((se) => `${se.type}(${se.target})`).join(', ')}`,
+        );
       }
       if (trace.externalSystems.length > 0) {
         lines.push(`    External: ${trace.externalSystems.join(', ')}`);

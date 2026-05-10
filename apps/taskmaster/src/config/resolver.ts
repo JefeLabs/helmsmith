@@ -1,9 +1,8 @@
-import { readGlobalProjects, readRepoProjects } from '../utils/projects.js';
 import { getProjectDir, getTaskmasterHomeFor } from '../utils/home.js';
-import { parseProjectRef } from '../utils/location.js';
 import type { ProjectLocation, ResolvedProject } from '../utils/location.js';
+import { parseProjectRef } from '../utils/location.js';
+import { readGlobalProjects, readRepoProjects } from '../utils/projects.js';
 import { CLI_BIN_NAME } from './branding.js';
-import { existsSync } from 'node:fs';
 
 /**
  * Resolve the active project using the following priority:
@@ -127,7 +126,11 @@ async function resolveInLocation(
 /**
  * Build a ResolvedProject from resolved params.
  */
-function buildResolved(name: string, location: ProjectLocation, gitRoot?: string | null): ResolvedProject {
+function buildResolved(
+  name: string,
+  location: ProjectLocation,
+  gitRoot?: string | null,
+): ResolvedProject {
   return {
     name,
     location,

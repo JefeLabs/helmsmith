@@ -1,12 +1,12 @@
-import { describe, it, expect } from 'vitest';
-import type { TaskNode, StateDefinition } from '../../../src/config/schema.js';
-import { STANDARD_PRESET } from '../../../src/config/state-presets.js';
+import { describe, expect, it } from 'vitest';
 import {
-  executeRemove,
-  collectDescendantIds,
-  removeFromTree,
   cleanupDependencies,
+  collectDescendantIds,
+  executeRemove,
+  removeFromTree,
 } from '../../../src/commands/remove.js';
+import type { StateDefinition, TaskNode } from '../../../src/config/schema.js';
+import { STANDARD_PRESET } from '../../../src/config/state-presets.js';
 
 const STATES: StateDefinition[] = [...STANDARD_PRESET];
 

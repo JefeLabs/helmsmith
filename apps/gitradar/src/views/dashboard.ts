@@ -1,38 +1,51 @@
-import chalk from 'chalk';
+import { writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import { writeFile } from 'node:fs/promises';
+import chalk from 'chalk';
 import yaml from 'js-yaml';
-import type { ViewContext, NavigationAction } from './types.js';
-import type { UserWeekRepoRecord } from '../types/schema.js';
-import type { DetailLayer } from '../ui/grouped-hbar-chart.js';
-import { renderBanner } from '../ui/banner.js';
-import { renderLegend } from '../ui/legend.js';
-import { renderTabBar, renderHotkeyBar, renderBreadcrumb } from '../ui/tab-bar.js';
-import type { TabDef } from '../ui/tab-bar.js';
-import { readKey, readKeyWithTimeout } from '../ui/keypress.js';
-import { readLine } from '../ui/readline.js';
-import { getLastNWeeks, getLastNMonths, getLastNQuarters, getLastNYears, weekToMonth, weekToQuarter, weekToYear, monthShort } from '../aggregator/filters.js';
-import { recordsToCsv } from '../commands/export-data.js';
-import { assignAuthor, unassignAuthor, assignByIdentifierPrefix } from '../store/author-registry.js';
-import { reattributeRecords } from '../collector/author-map.js';
-import { SEGMENT_DEFS } from '../ui/constants.js';
-import type { Segment } from '../aggregator/segments.js';
-import { weekShort, quarterShort, yearShort } from '../ui/format.js';
-import { teamDetailView } from './team-detail.js';
-import { renderManageTab, buildManageHotkeyItems } from './manage-tab.js';
-import { scanDirectory } from '../collector/dir-scanner.js';
-import { expandTilde } from '../store/paths.js';
-import type { ManageSection } from './manage-tab.js';
-import { renderTopPerformersTab } from './components/top-performers-section.js';
-import { renderRepoActivityTab } from './components/repo-activity-section.js';
 import {
-  renderContributionsTab,
-  renderContributionsDetailTab,
-  type DrillLevel,
+  getLastNMonths,
+  getLastNQuarters,
+  getLastNWeeks,
+  getLastNYears,
+  monthShort,
+  weekToMonth,
+  weekToQuarter,
+  weekToYear,
+} from '../aggregator/filters.js';
+import type { Segment } from '../aggregator/segments.js';
+import { reattributeRecords } from '../collector/author-map.js';
+import { scanDirectory } from '../collector/dir-scanner.js';
+import { recordsToCsv } from '../commands/export-data.js';
+import {
+  assignAuthor,
+  assignByIdentifierPrefix,
+  unassignAuthor,
+} from '../store/author-registry.js';
+import { expandTilde } from '../store/paths.js';
+import type { UserWeekRepoRecord } from '../types/schema.js';
+import { renderBanner } from '../ui/banner.js';
+import { SEGMENT_DEFS } from '../ui/constants.js';
+import { quarterShort, weekShort, yearShort } from '../ui/format.js';
+import type { DetailLayer } from '../ui/grouped-hbar-chart.js';
+import { readKey, readKeyWithTimeout } from '../ui/keypress.js';
+import { renderLegend } from '../ui/legend.js';
+import { readLine } from '../ui/readline.js';
+import type { TabDef } from '../ui/tab-bar.js';
+import { renderBreadcrumb, renderHotkeyBar, renderTabBar } from '../ui/tab-bar.js';
+import {
   type ContribGranularity,
+  type DrillLevel,
+  renderContributionsDetailTab,
+  renderContributionsTab,
   type TimeBucket,
 } from './components/contribution-section.js';
+import { renderRepoActivityTab } from './components/repo-activity-section.js';
+import { renderTopPerformersTab } from './components/top-performers-section.js';
+import type { ManageSection } from './manage-tab.js';
+import { buildManageHotkeyItems, renderManageTab } from './manage-tab.js';
+import { teamDetailView } from './team-detail.js';
+import type { NavigationAction, ViewContext } from './types.js';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -201,7 +214,6 @@ function getNumberedTeams(
   return teams;
 }
 
-
 // ── Key mapping ──────────────────────────────────────────────────────────────
 
 function mapKey(
@@ -312,9 +324,18 @@ function buildHotkeyItems(
         dLabel = 'Lines';
       }
       items.push({ key: hasAnyDetail ? '[D]' : 'D', label: dLabel });
-      items.push({ key: contribPivotEntity ? '[V]' : 'V', label: contribPivotEntity ? 'By Entity' : 'By Time' });
-      items.push({ key: contribPerUserMode ? '[U]' : 'U', label: contribPerUserMode ? '/user' : 'Total' });
-      items.push({ key: contribHideUnassigned ? '[H]' : 'H', label: contribHideUnassigned ? 'Assigned' : 'Show all' });
+      items.push({
+        key: contribPivotEntity ? '[V]' : 'V',
+        label: contribPivotEntity ? 'By Entity' : 'By Time',
+      });
+      items.push({
+        key: contribPerUserMode ? '[U]' : 'U',
+        label: contribPerUserMode ? '/user' : 'Total',
+      });
+      items.push({
+        key: contribHideUnassigned ? '[H]' : 'H',
+        label: contribHideUnassigned ? 'Assigned' : 'Show all',
+      });
       if (excludedSegments.size > 0) {
         const excluded = [...excludedSegments].map((s) => s[0].toUpperCase()).join('');
         items.push({ key: '[S]', label: `-${excluded}` });
@@ -356,7 +377,7 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
   let contribTagOverlay = false;
   let contribGranularity: ContribGranularity = 'week';
   let contribDepth: number = ctx.config.settings.weeks_back;
-  let contribDetailLayers = new Set<DetailLayer>();
+  const contribDetailLayers = new Set<DetailLayer>();
   let contribTableMode = false;
   let contribPivotEntity = false;
   let contribPerUserMode = false;
@@ -415,27 +436,52 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
       );
     } else {
       hotkeys = buildHotkeyItems(
-        activeTab, contribDrillLevel, contribTagOverlay, contribGranularity, contribDepth,
-        contribDetailLayers, contribTableMode, contribPivotEntity, contribPerUserMode, contribHideUnassigned, contribExcludedSegments, repoWindowWeeks, leaderboardWindowWeeks,
+        activeTab,
+        contribDrillLevel,
+        contribTagOverlay,
+        contribGranularity,
+        contribDepth,
+        contribDetailLayers,
+        contribTableMode,
+        contribPivotEntity,
+        contribPerUserMode,
+        contribHideUnassigned,
+        contribExcludedSegments,
+        repoWindowWeeks,
+        leaderboardWindowWeeks,
       );
     }
     console.log(renderHotkeyBar(hotkeys));
 
     // Breadcrumb row (contributions tab — shows drill level + numbered team drill-downs)
     if (activeTab === 'contributions') {
-      const modeLabel = contribTagOverlay ? 'By Tag'
-        : contribDrillLevel === 'org' ? 'By Org'
-        : contribDrillLevel === 'team' ? 'By Team' : 'By User';
+      const modeLabel = contribTagOverlay
+        ? 'By Tag'
+        : contribDrillLevel === 'org'
+          ? 'By Org'
+          : contribDrillLevel === 'team'
+            ? 'By Team'
+            : 'By User';
       console.log(renderBreadcrumb([modeLabel], numberedTeams));
     }
     console.log('');
 
     // Build time buckets and range label for contributions tab
-    const contribBuckets = buildTimeBuckets(contribGranularity, contribDepth, ctx.currentWeek, ctx.records);
+    const contribBuckets = buildTimeBuckets(
+      contribGranularity,
+      contribDepth,
+      ctx.currentWeek,
+      ctx.records,
+    );
     const contribRangeLabel = `${contribDepth} ${contribGranularity}s`;
-    const contribPeriodLabel = contribGranularity === 'week' ? 'Week'
-      : contribGranularity === 'month' ? 'Month'
-      : contribGranularity === 'quarter' ? 'Quarter' : 'Year';
+    const contribPeriodLabel =
+      contribGranularity === 'week'
+        ? 'Week'
+        : contribGranularity === 'month'
+          ? 'Month'
+          : contribGranularity === 'quarter'
+            ? 'Quarter'
+            : 'Year';
 
     // Tab content
     const contribRecords = contribHideUnassigned
@@ -445,9 +491,36 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
     switch (activeTab) {
       case 'contributions':
         if (contribTableMode) {
-          renderContributionsDetailTab(ctx, contribDrillLevel, contribTagOverlay, contribPivotEntity, contribBuckets, contribRangeLabel, contribPeriodLabel, termCols, contribRecords);
+          renderContributionsDetailTab(
+            ctx,
+            contribDrillLevel,
+            contribTagOverlay,
+            contribPivotEntity,
+            contribBuckets,
+            contribRangeLabel,
+            contribPeriodLabel,
+            termCols,
+            contribRecords,
+          );
         } else {
-          renderContributionsTab(ctx, contribDrillLevel, contribTagOverlay, contribPivotEntity, contribBuckets, contribGranularity, contribRangeLabel, termCols, legend, classifyPerception, contribLabelWidth, contribRecords, contribExcludedSegments, contribDetailLayers, ctx.enrichments, contribPerUserMode);
+          renderContributionsTab(
+            ctx,
+            contribDrillLevel,
+            contribTagOverlay,
+            contribPivotEntity,
+            contribBuckets,
+            contribGranularity,
+            contribRangeLabel,
+            termCols,
+            legend,
+            classifyPerception,
+            contribLabelWidth,
+            contribRecords,
+            contribExcludedSegments,
+            contribDetailLayers,
+            ctx.enrichments,
+            contribPerUserMode,
+          );
         }
         break;
       case 'repo_activity':
@@ -465,7 +538,13 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
         if (manageAuthorIdx >= authorCount) {
           manageAuthorIdx = Math.max(0, authorCount - 1);
         }
-        const manageResult = renderManageTab(ctx, manageSection, termCols, manageRepoIdx, manageAuthorIdx);
+        const manageResult = renderManageTab(
+          ctx,
+          manageSection,
+          termCols,
+          manageRepoIdx,
+          manageAuthorIdx,
+        );
         manageRepoNames = manageResult.repoNames;
         manageAuthorGroups = manageResult.authorEmailGroups;
         break;
@@ -489,8 +568,11 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
       }
 
       const action = mapKey(
-        key.name, activeTab,
-        repoWindowWeeks, leaderboardWindowWeeks, numberedTeams,
+        key.name,
+        activeTab,
+        repoWindowWeeks,
+        leaderboardWindowWeeks,
+        numberedTeams,
       );
 
       if (!action) continue; // unrecognized key — re-render
@@ -551,13 +633,20 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
         continue;
       }
       // Contributions: tag overlay toggle
-      if (action === 'contrib_toggle_tag') { contribTagOverlay = !contribTagOverlay; continue; }
+      if (action === 'contrib_toggle_tag') {
+        contribTagOverlay = !contribTagOverlay;
+        continue;
+      }
       // Contributions: detail toggle
       if (action === 'contrib_toggle_detail') {
         process.stdout.write('\n');
         console.log(chalk.bold('  Detail View:'));
-        console.log(`  ${chalk.cyan('L')}  ${contribDetailLayers.has('lines') ? chalk.underline('Lines') : 'Lines'} ${chalk.dim('(+ins · -del · tst% · churn)')}`);
-        console.log(`  ${chalk.cyan('T')}  ${contribTableMode ? chalk.underline('Table') : 'Table'} ${chalk.dim('(full numeric table)')}`);
+        console.log(
+          `  ${chalk.cyan('L')}  ${contribDetailLayers.has('lines') ? chalk.underline('Lines') : 'Lines'} ${chalk.dim('(+ins · -del · tst% · churn)')}`,
+        );
+        console.log(
+          `  ${chalk.cyan('T')}  ${contribTableMode ? chalk.underline('Table') : 'Table'} ${chalk.dim('(full numeric table)')}`,
+        );
         console.log(chalk.dim('  Esc  Clear\n'));
         const detailKey = await readKey();
         if (detailKey.name === 'l') {
@@ -574,18 +663,33 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
         continue;
       }
       // Contributions: pivot toggle (time-first ↔ entity-first)
-      if (action === 'contrib_toggle_peruser') { contribPerUserMode = !contribPerUserMode; continue; }
-      if (action === 'contrib_toggle_pivot') { contribPivotEntity = !contribPivotEntity; continue; }
+      if (action === 'contrib_toggle_peruser') {
+        contribPerUserMode = !contribPerUserMode;
+        continue;
+      }
+      if (action === 'contrib_toggle_pivot') {
+        contribPivotEntity = !contribPivotEntity;
+        continue;
+      }
       // Contributions: show/hide unassigned authors
-      if (action === 'contrib_toggle_unassigned') { contribHideUnassigned = !contribHideUnassigned; continue; }
+      if (action === 'contrib_toggle_unassigned') {
+        contribHideUnassigned = !contribHideUnassigned;
+        continue;
+      }
 
       // Contributions: segment exclusion menu
       if (action === 'contrib_segment_menu') {
         process.stdout.write('\n');
         console.log(chalk.bold('  Segment Filter:'));
-        console.log(`  ${chalk.cyan('H')}  ${contribExcludedSegments.has('high') ? chalk.strikethrough('High (top 20%)') : 'Hide High (top 20%)'}`);
-        console.log(`  ${chalk.cyan('M')}  ${contribExcludedSegments.has('middle') ? chalk.strikethrough('Middle (60%)') : 'Hide Middle (60%)'}`);
-        console.log(`  ${chalk.cyan('L')}  ${contribExcludedSegments.has('low') ? chalk.strikethrough('Low (bottom 20%)') : 'Hide Low (bottom 20%)'}`);
+        console.log(
+          `  ${chalk.cyan('H')}  ${contribExcludedSegments.has('high') ? chalk.strikethrough('High (top 20%)') : 'Hide High (top 20%)'}`,
+        );
+        console.log(
+          `  ${chalk.cyan('M')}  ${contribExcludedSegments.has('middle') ? chalk.strikethrough('Middle (60%)') : 'Hide Middle (60%)'}`,
+        );
+        console.log(
+          `  ${chalk.cyan('L')}  ${contribExcludedSegments.has('low') ? chalk.strikethrough('Low (bottom 20%)') : 'Hide Low (bottom 20%)'}`,
+        );
         console.log(`  ${chalk.cyan('A')}  Show All (reset)`);
         console.log(chalk.dim('  Esc  Cancel\n'));
         const segKey = await readKey();
@@ -605,28 +709,62 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
       }
 
       // Repo Activity window
-      if (action === 'repo_window_4') { repoWindowWeeks = 4; continue; }
-      if (action === 'repo_window_8') { repoWindowWeeks = 8; continue; }
-      if (action === 'repo_window_12') { repoWindowWeeks = 12; continue; }
+      if (action === 'repo_window_4') {
+        repoWindowWeeks = 4;
+        continue;
+      }
+      if (action === 'repo_window_8') {
+        repoWindowWeeks = 8;
+        continue;
+      }
+      if (action === 'repo_window_12') {
+        repoWindowWeeks = 12;
+        continue;
+      }
 
       // Top Performers window
-      if (action === 'lb_window_4') { leaderboardWindowWeeks = 4; continue; }
-      if (action === 'lb_window_8') { leaderboardWindowWeeks = 8; continue; }
-      if (action === 'lb_window_12') { leaderboardWindowWeeks = 12; continue; }
+      if (action === 'lb_window_4') {
+        leaderboardWindowWeeks = 4;
+        continue;
+      }
+      if (action === 'lb_window_8') {
+        leaderboardWindowWeeks = 8;
+        continue;
+      }
+      if (action === 'lb_window_12') {
+        leaderboardWindowWeeks = 12;
+        continue;
+      }
 
       // Manage tab: section switches
-      if (action === 'manage_repos') { manageSection = 'repos'; continue; }
-      if (action === 'manage_orgs') { manageSection = 'orgs'; continue; }
-      if (action === 'manage_authors') { manageSection = 'authors'; continue; }
-      if (action === 'manage_groups') { manageSection = 'groups'; continue; }
-      if (action === 'manage_tags') { manageSection = 'tags'; continue; }
+      if (action === 'manage_repos') {
+        manageSection = 'repos';
+        continue;
+      }
+      if (action === 'manage_orgs') {
+        manageSection = 'orgs';
+        continue;
+      }
+      if (action === 'manage_authors') {
+        manageSection = 'authors';
+        continue;
+      }
+      if (action === 'manage_groups') {
+        manageSection = 'groups';
+        continue;
+      }
+      if (action === 'manage_tags') {
+        manageSection = 'tags';
+        continue;
+      }
 
       // Manage tab: cursor navigation
       if (action === 'manage_cursor_up') {
         if (manageSection === 'repos' && manageRepoNames.length > 0) {
           manageRepoIdx = (manageRepoIdx - 1 + manageRepoNames.length) % manageRepoNames.length;
         } else if (manageSection === 'authors' && manageAuthorGroups.length > 0) {
-          manageAuthorIdx = (manageAuthorIdx - 1 + manageAuthorGroups.length) % manageAuthorGroups.length;
+          manageAuthorIdx =
+            (manageAuthorIdx - 1 + manageAuthorGroups.length) % manageAuthorGroups.length;
         }
         continue;
       }
@@ -685,7 +823,9 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
           try {
             await ctx.onScanRepo(repoName);
           } catch (err) {
-            console.log(chalk.red(`  ${repoName}: failed — ${err instanceof Error ? err.message : err}`));
+            console.log(
+              chalk.red(`  ${repoName}: failed — ${err instanceof Error ? err.message : err}`),
+            );
           }
         }
         console.log(chalk.green(`\nAll collections complete. Press any key to continue.`));
@@ -695,10 +835,16 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
 
       // Manage tab: assign/move selected author (Enter in authors section)
       if (action === 'manage_action_selected' && manageSection === 'authors') {
-        if (manageAuthorIdx >= 0 && manageAuthorIdx < manageAuthorGroups.length && ctx.authorRegistry) {
+        if (
+          manageAuthorIdx >= 0 &&
+          manageAuthorIdx < manageAuthorGroups.length &&
+          ctx.authorRegistry
+        ) {
           const emails = manageAuthorGroups[manageAuthorIdx];
           const firstAuthor = ctx.authorRegistry.authors[emails[0].toLowerCase()];
-          if (!firstAuthor) { continue; }
+          if (!firstAuthor) {
+            continue;
+          }
 
           if (ctx.config.orgs.length === 0) {
             process.stdout.write('\n');
@@ -709,9 +855,10 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
           }
 
           process.stdout.write('\n');
-          const emailLabel = emails.length > 1
-            ? chalk.dim(` (${emails.length} emails)`)
-            : chalk.dim(` <${firstAuthor.email}>`);
+          const emailLabel =
+            emails.length > 1
+              ? chalk.dim(` (${emails.length} emails)`)
+              : chalk.dim(` <${firstAuthor.email}>`);
           const isReassign = !!firstAuthor.org;
           const verb = isReassign ? 'Move' : 'Assign';
           console.log(chalk.bold(`  ${verb}: ${firstAuthor.name}`) + emailLabel);
@@ -735,16 +882,25 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
             console.log(`  ${chalk.dim('Esc')}  Cancel\n`);
 
             const teamOrOrgChoice = await readKey();
-            if (teamOrOrgChoice.name === 'escape') { continue; }
+            if (teamOrOrgChoice.name === 'escape') {
+              continue;
+            }
 
             if (teamOrOrgChoice.name !== 'o') {
               // Quick team change within same org
               const teamIdx = parseInt(teamOrOrgChoice.name, 10) - 1;
-              if (isNaN(teamIdx) || teamIdx < 0 || teamIdx >= currentOrg.teams.length) { continue; }
+              if (Number.isNaN(teamIdx) || teamIdx < 0 || teamIdx >= currentOrg.teams.length) {
+                continue;
+              }
               const teamName = currentOrg.teams[teamIdx].name;
 
               for (const email of emails) {
-                ctx.authorRegistry = assignAuthor(ctx.authorRegistry, email, currentOrg.name, teamName);
+                ctx.authorRegistry = assignAuthor(
+                  ctx.authorRegistry,
+                  email,
+                  currentOrg.name,
+                  teamName,
+                );
               }
               if (ctx.onSaveAuthorRegistry) {
                 await ctx.onSaveAuthorRegistry(ctx.authorRegistry);
@@ -771,9 +927,13 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
           console.log(`  ${chalk.dim('Esc')}  Cancel\n`);
 
           const orgChoice = await readKey();
-          if (orgChoice.name === 'escape') { continue; }
+          if (orgChoice.name === 'escape') {
+            continue;
+          }
           const orgIdx = parseInt(orgChoice.name, 10) - 1;
-          if (isNaN(orgIdx) || orgIdx < 0 || orgIdx >= ctx.config.orgs.length) { continue; }
+          if (Number.isNaN(orgIdx) || orgIdx < 0 || orgIdx >= ctx.config.orgs.length) {
+            continue;
+          }
           const selectedOrg = ctx.config.orgs[orgIdx];
 
           // Pick team
@@ -783,22 +943,34 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
           } else {
             console.log('');
             for (let i = 0; i < selectedOrg.teams.length; i++) {
-              const isCurrent = isReassign && selectedOrg.name === firstAuthor.org && selectedOrg.teams[i].name === firstAuthor.team;
+              const isCurrent =
+                isReassign &&
+                selectedOrg.name === firstAuthor.org &&
+                selectedOrg.teams[i].name === firstAuthor.team;
               const marker = isCurrent ? chalk.green(' ●') : '';
               console.log(`  ${chalk.cyan(String(i + 1))}  ${selectedOrg.teams[i].name}${marker}`);
             }
             console.log(`  ${chalk.dim('Esc')}  Cancel\n`);
 
             const teamChoice = await readKey();
-            if (teamChoice.name === 'escape') { continue; }
+            if (teamChoice.name === 'escape') {
+              continue;
+            }
             const teamIdx = parseInt(teamChoice.name, 10) - 1;
-            if (isNaN(teamIdx) || teamIdx < 0 || teamIdx >= selectedOrg.teams.length) { continue; }
+            if (Number.isNaN(teamIdx) || teamIdx < 0 || teamIdx >= selectedOrg.teams.length) {
+              continue;
+            }
             teamName = selectedOrg.teams[teamIdx].name;
           }
 
           // Assign all emails in the group
           for (const email of emails) {
-            ctx.authorRegistry = assignAuthor(ctx.authorRegistry, email, selectedOrg.name, teamName);
+            ctx.authorRegistry = assignAuthor(
+              ctx.authorRegistry,
+              email,
+              selectedOrg.name,
+              teamName,
+            );
           }
           if (ctx.onSaveAuthorRegistry) {
             await ctx.onSaveAuthorRegistry(ctx.authorRegistry);
@@ -806,7 +978,11 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
           // Re-attribute existing records with updated author assignments
           ctx.records = reattributeRecords(ctx.records, ctx.config, ctx.authorRegistry);
           const countLabel = emails.length > 1 ? ` (${emails.length} emails)` : '';
-          console.log(chalk.green(`  ${isReassign ? 'Moved' : 'Assigned'} to ${selectedOrg.name} → ${teamName}${countLabel}`));
+          console.log(
+            chalk.green(
+              `  ${isReassign ? 'Moved' : 'Assigned'} to ${selectedOrg.name} → ${teamName}${countLabel}`,
+            ),
+          );
 
           console.log(chalk.dim('  Press any key to continue.'));
           await readKey();
@@ -816,10 +992,16 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
 
       // Manage tab: unassign selected author
       if (action === 'manage_unassign_author' && manageSection === 'authors') {
-        if (manageAuthorIdx >= 0 && manageAuthorIdx < manageAuthorGroups.length && ctx.authorRegistry) {
+        if (
+          manageAuthorIdx >= 0 &&
+          manageAuthorIdx < manageAuthorGroups.length &&
+          ctx.authorRegistry
+        ) {
           const emails = manageAuthorGroups[manageAuthorIdx];
           const firstAuthor = ctx.authorRegistry.authors[emails[0].toLowerCase()];
-          if (!firstAuthor) { continue; }
+          if (!firstAuthor) {
+            continue;
+          }
 
           if (!firstAuthor.org) {
             process.stdout.write('\n');
@@ -830,9 +1012,10 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
           }
 
           process.stdout.write('\n');
-          const emailLabel = emails.length > 1
-            ? chalk.dim(` (${emails.length} emails)`)
-            : chalk.dim(` <${firstAuthor.email}>`);
+          const emailLabel =
+            emails.length > 1
+              ? chalk.dim(` (${emails.length} emails)`)
+              : chalk.dim(` <${firstAuthor.email}>`);
           console.log(chalk.bold(`  Unassign: ${firstAuthor.name}`) + emailLabel);
           console.log(chalk.dim(`  Currently: ${firstAuthor.org} → ${firstAuthor.team}`));
           console.log('');
@@ -840,7 +1023,9 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
           console.log(`  ${chalk.dim('Esc')}  Cancel\n`);
 
           const confirm = await readKey();
-          if (confirm.name !== 'y') { continue; }
+          if (confirm.name !== 'y') {
+            continue;
+          }
 
           for (const email of emails) {
             ctx.authorRegistry = unassignAuthor(ctx.authorRegistry, email);
@@ -889,7 +1074,9 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
         }
 
         const prefix = await readLine(chalk.cyan('  Identifier prefix: '));
-        if (!prefix?.trim()) { continue; }
+        if (!prefix?.trim()) {
+          continue;
+        }
 
         // Pick org
         console.log('');
@@ -901,9 +1088,13 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
         console.log(`  ${chalk.dim('Esc')}  Cancel\n`);
 
         const orgChoice = await readKey();
-        if (orgChoice.name === 'escape') { continue; }
+        if (orgChoice.name === 'escape') {
+          continue;
+        }
         const orgIdx = parseInt(orgChoice.name, 10) - 1;
-        if (isNaN(orgIdx) || orgIdx < 0 || orgIdx >= ctx.config.orgs.length) { continue; }
+        if (Number.isNaN(orgIdx) || orgIdx < 0 || orgIdx >= ctx.config.orgs.length) {
+          continue;
+        }
         const selectedOrg = ctx.config.orgs[orgIdx];
 
         // Pick team
@@ -918,14 +1109,21 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
           console.log(`  ${chalk.dim('Esc')}  Cancel\n`);
 
           const teamChoice = await readKey();
-          if (teamChoice.name === 'escape') { continue; }
+          if (teamChoice.name === 'escape') {
+            continue;
+          }
           const teamIdx = parseInt(teamChoice.name, 10) - 1;
-          if (isNaN(teamIdx) || teamIdx < 0 || teamIdx >= selectedOrg.teams.length) { continue; }
+          if (Number.isNaN(teamIdx) || teamIdx < 0 || teamIdx >= selectedOrg.teams.length) {
+            continue;
+          }
           teamName = selectedOrg.teams[teamIdx].name;
         }
 
         const result = assignByIdentifierPrefix(
-          ctx.authorRegistry, prefix.trim(), selectedOrg.name, teamName,
+          ctx.authorRegistry,
+          prefix.trim(),
+          selectedOrg.name,
+          teamName,
         );
         ctx.authorRegistry = result.registry;
 
@@ -936,9 +1134,15 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
         ctx.records = reattributeRecords(ctx.records, ctx.config, ctx.authorRegistry);
 
         if (result.assignedCount > 0) {
-          console.log(chalk.green(`\n  Assigned ${result.assignedCount} authors with prefix "${prefix.trim()}" to ${selectedOrg.name} → ${teamName}`));
+          console.log(
+            chalk.green(
+              `\n  Assigned ${result.assignedCount} authors with prefix "${prefix.trim()}" to ${selectedOrg.name} → ${teamName}`,
+            ),
+          );
         } else {
-          console.log(chalk.yellow(`\n  No unassigned authors found with prefix "${prefix.trim()}"`));
+          console.log(
+            chalk.yellow(`\n  No unassigned authors found with prefix "${prefix.trim()}"`),
+          );
         }
 
         console.log(chalk.dim('\n  Press any key to continue.'));
@@ -959,7 +1163,9 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
         console.log(`  ${chalk.dim('Esc')}  Cancel\n`);
 
         const choice = await readKey();
-        if (choice.name === 'escape') { continue; }
+        if (choice.name === 'escape') {
+          continue;
+        }
 
         let dirPath: string | null = null;
         if (choice.name === '1') {
@@ -973,10 +1179,12 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
           continue;
         }
 
-        if (!dirPath) { continue; }
+        if (!dirPath) {
+          continue;
+        }
 
-        const group = await readLine(chalk.cyan('  Group name (default): ')) ?? '';
-        const depthStr = await readLine(chalk.cyan('  Depth 1-3 (1): ')) ?? '';
+        const group = (await readLine(chalk.cyan('  Group name (default): '))) ?? '';
+        const depthStr = (await readLine(chalk.cyan('  Depth 1-3 (1): '))) ?? '';
         const depth = Math.min(3, Math.max(1, parseInt(depthStr, 10) || 1));
 
         console.log(chalk.dim(`\n  Scanning ${dirPath} (depth ${depth})...\n`));
@@ -989,9 +1197,9 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
           } else {
             // Lightweight: just discover and add to runtime config
             const discovered = await scanDirectory(dirPath, depth);
-            const existingNames = new Set(ctx.config.repos.map(
-              (r) => r.name ?? r.path.split('/').pop() ?? r.path,
-            ));
+            const existingNames = new Set(
+              ctx.config.repos.map((r) => r.name ?? r.path.split('/').pop() ?? r.path),
+            );
             const groupName = group.trim() || 'default';
             for (const repo of discovered) {
               if (!existingNames.has(repo.name)) {
@@ -1023,7 +1231,9 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
               try {
                 await ctx.onScanRepo(repoName);
               } catch (err) {
-                console.log(chalk.red(`  ${repoName}: failed — ${err instanceof Error ? err.message : err}`));
+                console.log(
+                  chalk.red(`  ${repoName}: failed — ${err instanceof Error ? err.message : err}`),
+                );
               }
             }
             console.log(chalk.green(`\n  All collections complete.`));
@@ -1041,7 +1251,9 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
 
         // Org name
         const orgName = await readLine(chalk.cyan('  Name: '));
-        if (!orgName?.trim()) { continue; }
+        if (!orgName?.trim()) {
+          continue;
+        }
 
         // Org type
         console.log(`\n  ${chalk.cyan('1')}  Core (internal team)`);
@@ -1057,22 +1269,25 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
 
         // Initial team
         const teamName = await readLine(chalk.cyan('  First team name: '));
-        if (!teamName?.trim()) { continue; }
+        if (!teamName?.trim()) {
+          continue;
+        }
 
         // Tag for the team
-        const teamTag = await readLine(
-          chalk.cyan('  Team tag ') + chalk.dim('(default): '),
-        ) ?? '';
+        const teamTag =
+          (await readLine(chalk.cyan('  Team tag ') + chalk.dim('(default): '))) ?? '';
 
         const newOrg = {
           name: orgName.trim(),
           type: orgType as 'core' | 'consultant',
           identifier: identifier?.trim() || undefined,
-          teams: [{
-            name: teamName.trim(),
-            tag: teamTag.trim() || 'default',
-            members: [],
-          }],
+          teams: [
+            {
+              name: teamName.trim(),
+              tag: teamTag.trim() || 'default',
+              members: [],
+            },
+          ],
         };
 
         ctx.config.orgs.push(newOrg);
@@ -1095,7 +1310,9 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
 
       // Manage tab: add team to existing org
       if (action === 'manage_add_team' && manageSection === 'orgs') {
-        if (ctx.config.orgs.length === 0) { continue; }
+        if (ctx.config.orgs.length === 0) {
+          continue;
+        }
 
         process.stdout.write('\x1B[2J\x1B[3J\x1B[H');
         console.log(chalk.bold('Add Team to Organization\n'));
@@ -1110,30 +1327,41 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
         console.log(`  ${chalk.dim('Esc')}  Cancel\n`);
 
         const orgChoice = await readKey();
-        if (orgChoice.name === 'escape') { continue; }
+        if (orgChoice.name === 'escape') {
+          continue;
+        }
         const orgIdx = parseInt(orgChoice.name, 10) - 1;
-        if (isNaN(orgIdx) || orgIdx < 0 || orgIdx >= ctx.config.orgs.length) { continue; }
+        if (Number.isNaN(orgIdx) || orgIdx < 0 || orgIdx >= ctx.config.orgs.length) {
+          continue;
+        }
         const selectedOrg = ctx.config.orgs[orgIdx];
 
         // Show existing teams
-        console.log(chalk.dim(`  Existing teams in ${selectedOrg.name}: ${selectedOrg.teams.map((t) => t.name).join(', ')}\n`));
+        console.log(
+          chalk.dim(
+            `  Existing teams in ${selectedOrg.name}: ${selectedOrg.teams.map((t) => t.name).join(', ')}\n`,
+          ),
+        );
 
         // Team name
         const teamName = await readLine(chalk.cyan('  Team name: '));
-        if (!teamName?.trim()) { continue; }
+        if (!teamName?.trim()) {
+          continue;
+        }
 
         // Check for duplicate
         if (selectedOrg.teams.some((t) => t.name.toLowerCase() === teamName.trim().toLowerCase())) {
-          console.log(chalk.yellow(`\n  Team "${teamName.trim()}" already exists in ${selectedOrg.name}.`));
+          console.log(
+            chalk.yellow(`\n  Team "${teamName.trim()}" already exists in ${selectedOrg.name}.`),
+          );
           console.log(chalk.dim('  Press any key to continue.'));
           await readKey();
           continue;
         }
 
         // Tag
-        const teamTag = await readLine(
-          chalk.cyan('  Team tag ') + chalk.dim('(default): '),
-        ) ?? '';
+        const teamTag =
+          (await readLine(chalk.cyan('  Team tag ') + chalk.dim('(default): '))) ?? '';
 
         selectedOrg.teams.push({
           name: teamName.trim(),
@@ -1144,12 +1372,18 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
         if (ctx.onAddOrg) {
           try {
             await ctx.onAddOrg(selectedOrg);
-            console.log(chalk.green(`\n  Team "${teamName.trim()}" added to ${selectedOrg.name} and saved.`));
+            console.log(
+              chalk.green(`\n  Team "${teamName.trim()}" added to ${selectedOrg.name} and saved.`),
+            );
           } catch (err) {
             console.log(chalk.red(`\n  Error saving: ${err instanceof Error ? err.message : err}`));
           }
         } else {
-          console.log(chalk.green(`\n  Team "${teamName.trim()}" added to ${selectedOrg.name} (runtime only).`));
+          console.log(
+            chalk.green(
+              `\n  Team "${teamName.trim()}" added to ${selectedOrg.name} (runtime only).`,
+            ),
+          );
         }
 
         console.log(chalk.dim(`  Teams: ${selectedOrg.teams.map((t) => t.name).join(', ')}`));
@@ -1160,7 +1394,9 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
 
       // Manage tab: remove team from org
       if (action === 'manage_remove_team' && manageSection === 'orgs') {
-        if (ctx.config.orgs.length === 0) { continue; }
+        if (ctx.config.orgs.length === 0) {
+          continue;
+        }
 
         process.stdout.write('\x1B[2J\x1B[3J\x1B[H');
         console.log(chalk.bold('Remove Team from Organization\n'));
@@ -1175,13 +1411,19 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
         console.log(`  ${chalk.dim('Esc')}  Cancel\n`);
 
         const orgChoice = await readKey();
-        if (orgChoice.name === 'escape') { continue; }
+        if (orgChoice.name === 'escape') {
+          continue;
+        }
         const orgIdx = parseInt(orgChoice.name, 10) - 1;
-        if (isNaN(orgIdx) || orgIdx < 0 || orgIdx >= ctx.config.orgs.length) { continue; }
+        if (Number.isNaN(orgIdx) || orgIdx < 0 || orgIdx >= ctx.config.orgs.length) {
+          continue;
+        }
         const selectedOrg = ctx.config.orgs[orgIdx];
 
         if (selectedOrg.teams.length <= 1) {
-          console.log(chalk.yellow(`  ${selectedOrg.name} has only one team — cannot remove the last team.`));
+          console.log(
+            chalk.yellow(`  ${selectedOrg.name} has only one team — cannot remove the last team.`),
+          );
           console.log(chalk.dim('  Press any key to continue.'));
           await readKey();
           continue;
@@ -1191,15 +1433,20 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
         console.log(chalk.dim(`  Select team to remove from ${selectedOrg.name}:\n`));
         for (let i = 0; i < selectedOrg.teams.length; i++) {
           const t = selectedOrg.teams[i];
-          const memberCount = t.members.length > 0 ? chalk.dim(` (${t.members.length} members)`) : '';
+          const memberCount =
+            t.members.length > 0 ? chalk.dim(` (${t.members.length} members)`) : '';
           console.log(`  ${chalk.cyan(String(i + 1))}  ${t.name}${memberCount}`);
         }
         console.log(`  ${chalk.dim('Esc')}  Cancel\n`);
 
         const teamChoice = await readKey();
-        if (teamChoice.name === 'escape') { continue; }
+        if (teamChoice.name === 'escape') {
+          continue;
+        }
         const teamIdx = parseInt(teamChoice.name, 10) - 1;
-        if (isNaN(teamIdx) || teamIdx < 0 || teamIdx >= selectedOrg.teams.length) { continue; }
+        if (Number.isNaN(teamIdx) || teamIdx < 0 || teamIdx >= selectedOrg.teams.length) {
+          continue;
+        }
         const teamToRemove = selectedOrg.teams[teamIdx];
 
         // Check if authors are assigned to this team
@@ -1210,7 +1457,11 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
           : 0;
 
         if (assignedCount > 0) {
-          console.log(chalk.yellow(`\n  ${assignedCount} author${assignedCount !== 1 ? 's' : ''} assigned to "${teamToRemove.name}".`));
+          console.log(
+            chalk.yellow(
+              `\n  ${assignedCount} author${assignedCount !== 1 ? 's' : ''} assigned to "${teamToRemove.name}".`,
+            ),
+          );
           console.log(chalk.yellow('  They will become unassigned.'));
         }
 
@@ -1219,7 +1470,9 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
         console.log(`  ${chalk.dim('Esc')}  Cancel\n`);
 
         const confirm = await readKey();
-        if (confirm.name !== 'y') { continue; }
+        if (confirm.name !== 'y') {
+          continue;
+        }
 
         // Remove the team
         selectedOrg.teams.splice(teamIdx, 1);
@@ -1241,7 +1494,9 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
         if (ctx.onAddOrg) {
           try {
             await ctx.onAddOrg(selectedOrg);
-            console.log(chalk.green(`  Team "${teamToRemove.name}" removed from ${selectedOrg.name}.`));
+            console.log(
+              chalk.green(`  Team "${teamToRemove.name}" removed from ${selectedOrg.name}.`),
+            );
           } catch (err) {
             console.log(chalk.red(`  Error saving: ${err instanceof Error ? err.message : err}`));
           }
@@ -1250,9 +1505,13 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
         }
 
         if (assignedCount > 0) {
-          console.log(chalk.dim(`  ${assignedCount} author${assignedCount !== 1 ? 's' : ''} unassigned.`));
+          console.log(
+            chalk.dim(`  ${assignedCount} author${assignedCount !== 1 ? 's' : ''} unassigned.`),
+          );
         }
-        console.log(chalk.dim(`  Remaining teams: ${selectedOrg.teams.map((t) => t.name).join(', ')}`));
+        console.log(
+          chalk.dim(`  Remaining teams: ${selectedOrg.teams.map((t) => t.name).join(', ')}`),
+        );
         console.log(chalk.dim('\n  Press any key to continue.'));
         await readKey();
         continue;
@@ -1268,7 +1527,9 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
         console.log(`  ${chalk.dim('Esc')}  Cancel\n`);
 
         const exportChoice = await readKey();
-        if (exportChoice.name === 'escape') { continue; }
+        if (exportChoice.name === 'escape') {
+          continue;
+        }
 
         if (exportChoice.name === '1') {
           // ── CSV export ──
@@ -1276,7 +1537,7 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
           const customPath = await readLine(
             chalk.cyan('  Output path ') + chalk.dim(`(${defaultPath}): `),
           );
-          const outPath = expandTilde((customPath?.trim() || defaultPath));
+          const outPath = expandTilde(customPath?.trim() || defaultPath);
 
           if (ctx.records.length === 0) {
             console.log(chalk.yellow('\n  No records to export. Collect data first.'));
@@ -1295,7 +1556,7 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
           const customPath = await readLine(
             chalk.cyan('  Output path ') + chalk.dim(`(${defaultPath}): `),
           );
-          const outPath = expandTilde((customPath?.trim() || defaultPath));
+          const outPath = expandTilde(customPath?.trim() || defaultPath);
 
           const portableRepos = ctx.config.repos.map((r) => {
             const portable: Record<string, unknown> = {
@@ -1325,7 +1586,9 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
             });
             await writeFile(outPath, yamlOut, 'utf-8');
             console.log(chalk.green(`\n  Workspace exported to ${outPath}`));
-            console.log(chalk.dim(`  ${portableRepos.length} repos (paths stripped for portability)`));
+            console.log(
+              chalk.dim(`  ${portableRepos.length} repos (paths stripped for portability)`),
+            );
           } catch (err) {
             console.log(chalk.red(`\n  Error: ${err instanceof Error ? err.message : err}`));
           }

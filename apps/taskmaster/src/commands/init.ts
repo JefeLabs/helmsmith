@@ -1,5 +1,5 @@
 import type { AIProviderName } from '../auth/index.js';
-import { runInitWizard, type InitWizardResult } from '../prompts/init-wizard.js';
+import { type InitWizardResult, runInitWizard } from '../prompts/init-wizard.js';
 
 export interface InitOpts {
   style?: string;
@@ -32,10 +32,7 @@ function buildFlagOverrides(opts: InitOpts): Partial<InitWizardResult> {
  * Execute the init command: run the interactive wizard (or non-interactive
  * with flags) and return the configuration result.
  */
-export async function executeInit(
-  opts: InitOpts,
-  gitRoot: string | null,
-): Promise<InitResult> {
+export async function executeInit(opts: InitOpts, gitRoot: string | null): Promise<InitResult> {
   const flagOverrides = buildFlagOverrides(opts);
 
   // --no-interactive: require at least --name, fill rest from defaults
@@ -47,7 +44,7 @@ export async function executeInit(
     flagOverrides.style = flagOverrides.style ?? 'task-only';
     flagOverrides.statePreset = 'standard';
     flagOverrides.skills = ['backend', 'frontend', 'database', 'devops', 'testing'];
-    flagOverrides.provider = flagOverrides.provider ?? 'copilot' as AIProviderName;
+    flagOverrides.provider = flagOverrides.provider ?? ('copilot' as AIProviderName);
     flagOverrides.model = flagOverrides.model ?? 'gpt-4.1';
     flagOverrides.thresholds = { expand: 5, flag: 8 };
     flagOverrides.location = flagOverrides.location ?? 'home';
@@ -57,7 +54,12 @@ export async function executeInit(
   const wizardResult = await runInitWizard(
     opts.interactive === false
       ? flagOverrides
-      : { name: flagOverrides.name, style: flagOverrides.style, model: flagOverrides.model, location: flagOverrides.location },
+      : {
+          name: flagOverrides.name,
+          style: flagOverrides.style,
+          model: flagOverrides.model,
+          location: flagOverrides.location,
+        },
     { gitRoot },
   );
 

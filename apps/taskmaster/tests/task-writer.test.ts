@@ -1,12 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, readFile, readdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { TaskNode } from '../src/config/schema.js';
 import { generateTaskFiles } from '../src/formats/task-writer.js';
 import { safeLoad } from '../src/formats/yaml-bridge.js';
-import type { TaskNode } from '../src/config/schema.js';
 
-function makeTask(overrides: Partial<TaskNode> & { id: string; title: string; type: TaskNode['type'] }): TaskNode {
+function makeTask(
+  overrides: Partial<TaskNode> & { id: string; title: string; type: TaskNode['type'] },
+): TaskNode {
   return {
     description: '',
     status: 'todo',
@@ -115,9 +117,7 @@ describe('task-writer', () => {
       id: 'T-1',
       title: 'Parent',
       type: 'task',
-      children: [
-        makeTask({ id: 'T-1.1', title: 'Child 1', type: 'subtask' }),
-      ],
+      children: [makeTask({ id: 'T-1.1', title: 'Child 1', type: 'subtask' })],
     });
 
     await generateTaskFiles(tmpDir, [parent]);

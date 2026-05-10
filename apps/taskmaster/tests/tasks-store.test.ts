@@ -1,11 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { readTasks, writeTasks } from '../src/formats/tasks-store.js';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { TaskNode } from '../src/config/schema.js';
+import { readTasks, writeTasks } from '../src/formats/tasks-store.js';
 
-function makeTask(overrides: Partial<TaskNode> & { id: string; title: string; type: TaskNode['type'] }): TaskNode {
+function makeTask(
+  overrides: Partial<TaskNode> & { id: string; title: string; type: TaskNode['type'] },
+): TaskNode {
   return {
     description: '',
     status: 'todo',
@@ -66,7 +68,11 @@ describe('tasks-store', () => {
 
     it('throws on invalid tasks.json', async () => {
       const { writeFile: wf } = await import('node:fs/promises');
-      await wf(join(tmpDir, 'tasks.json'), JSON.stringify([{ id: 'T-1', type: 'invalid' }]), 'utf-8');
+      await wf(
+        join(tmpDir, 'tasks.json'),
+        JSON.stringify([{ id: 'T-1', type: 'invalid' }]),
+        'utf-8',
+      );
 
       await expect(readTasks(tmpDir)).rejects.toThrow();
     });
@@ -74,9 +80,7 @@ describe('tasks-store', () => {
 
   describe('writeTasks', () => {
     it('atomically writes tasks.json', async () => {
-      const tasks: TaskNode[] = [
-        makeTask({ id: 'T-1', title: 'First', type: 'task' }),
-      ];
+      const tasks: TaskNode[] = [makeTask({ id: 'T-1', title: 'First', type: 'task' })];
 
       await writeTasks(tmpDir, tasks);
 

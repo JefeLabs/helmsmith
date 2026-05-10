@@ -6,10 +6,10 @@
  * `pritty pr` and `pritty rebase` ship.
  */
 
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { simpleGit, type SimpleGit } from "simple-git";
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { type SimpleGit, simpleGit } from 'simple-git';
 
 export interface GitOps {
   /** Files staged for commit (subset of `git status`). */
@@ -69,9 +69,7 @@ export function createGit(cwd: string = process.cwd()): GitOps {
     async getAllChanged(): Promise<string[]> {
       const status = await git.status();
       // Dedupe in case a file is staged AND modified
-      return Array.from(
-        new Set([...status.staged, ...status.modified, ...status.not_added]),
-      );
+      return Array.from(new Set([...status.staged, ...status.modified, ...status.not_added]));
     },
 
     async getCurrentBranch(): Promise<string> {
@@ -80,9 +78,9 @@ export function createGit(cwd: string = process.cwd()): GitOps {
     },
 
     async getStagedDiff(files?: string[]): Promise<string> {
-      const args = ["--cached"];
+      const args = ['--cached'];
       if (files && files.length > 0) {
-        args.push("--", ...files);
+        args.push('--', ...files);
       }
       return await git.diff(args);
     },
@@ -101,14 +99,14 @@ export function createGit(cwd: string = process.cwd()): GitOps {
     },
 
     async push(branch: string, opts: { setUpstream?: boolean } = {}): Promise<void> {
-      const args = ["origin", branch];
-      if (opts.setUpstream) args.push("-u");
+      const args = ['origin', branch];
+      if (opts.setUpstream) args.push('-u');
       await git.push(args);
     },
 
     async log(base: string, head?: string): Promise<Array<{ hash: string; subject: string }>> {
       const range = head ? `${base}..${head}` : `${base}..HEAD`;
-      const result = await git.log({ from: base, to: head ?? "HEAD" }).catch(async () => {
+      const result = await git.log({ from: base, to: head ?? 'HEAD' }).catch(async () => {
         // Fall back to raw range syntax — some repos don't have the
         // upstream-tracking config simple-git's .log() expects.
         return await git.log([range]);
@@ -118,20 +116,17 @@ export function createGit(cwd: string = process.cwd()): GitOps {
 
     async getRemoteUrl(): Promise<string | null> {
       try {
-        const url = await git.remote(["get-url", "origin"]);
-        return typeof url === "string" ? url.trim() : null;
+        const url = await git.remote(['get-url', 'origin']);
+        return typeof url === 'string' ? url.trim() : null;
       } catch {
         return null;
       }
     },
 
-    async changedFilesBetween(
-      base: string,
-      head?: string,
-    ): Promise<string[]> {
+    async changedFilesBetween(base: string, head?: string): Promise<string[]> {
       const range = head ? `${base}..${head}` : `${base}..HEAD`;
       try {
-        const result = await git.diff(["--name-only", range]);
+        const result = await git.diff(['--name-only', range]);
         return result
           .split(/\r?\n/)
           .map((line) => line.trim())
@@ -169,16 +164,16 @@ export function createGit(cwd: string = process.cwd()): GitOps {
       // at a `cp` command. git uses this instead of opening $EDITOR
       // for the rebase TODO step. POSIX-only — Windows users would
       // need a different shim.
-      const dir = mkdtempSync(join(tmpdir(), "pritty-rebase-"));
-      const todoPath = join(dir, "rebase-todo");
-      writeFileSync(todoPath, todoContent, "utf8");
+      const dir = mkdtempSync(join(tmpdir(), 'pritty-rebase-'));
+      const todoPath = join(dir, 'rebase-todo');
+      writeFileSync(todoPath, todoContent, 'utf8');
       try {
         const env = {
           ...process.env,
           GIT_SEQUENCE_EDITOR: `cp ${JSON.stringify(todoPath)} `,
         };
-        const result = await git.env(env).rebase(["-i", base]);
-        return { ok: true, output: typeof result === "string" ? result : "" };
+        const result = await git.env(env).rebase(['-i', base]);
+        return { ok: true, output: typeof result === 'string' ? result : '' };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return { ok: false, output: message };
@@ -194,12 +189,8 @@ export function createGit(cwd: string = process.cwd()): GitOps {
  * https://github.com/owner/repo(.git) and git@github.com:owner/repo(.git)
  * forms. Returns null when the URL doesn't look like GitHub.
  */
-export function parseGitHubRemote(
-  url: string,
-): { owner: string; repo: string } | null {
-  const httpsMatch = url.match(
-    /https:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/,
-  );
+export function parseGitHubRemote(url: string): { owner: string; repo: string } | null {
+  const httpsMatch = url.match(/https:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/);
   if (httpsMatch) return { owner: httpsMatch[1], repo: httpsMatch[2] };
 
   const sshMatch = url.match(/git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/);

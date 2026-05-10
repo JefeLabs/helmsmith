@@ -1,4 +1,4 @@
-import type { FiletypeRollup, RolledUp } from '../store/sqlite-store.js';
+import type { RolledUp } from '../store/sqlite-store.js';
 
 /**
  * Canonical derived-metric calculations.

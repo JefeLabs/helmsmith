@@ -1,6 +1,6 @@
-import type { TaskNode, StateDefinition } from '../config/schema.js';
+import type { StateDefinition, TaskNode } from '../config/schema.js';
 import { findTaskById } from '../config/state-engine.js';
-import { recomputeAllReadiness, applyReadiness, flattenTasks } from '../readiness/index.js';
+import { applyReadiness, flattenTasks, recomputeAllReadiness } from '../readiness/index.js';
 
 export interface RemoveResult {
   removedIds: string[];
@@ -44,9 +44,7 @@ export function removeFromTree(tasks: TaskNode[], targetId: string): boolean {
 export function cleanupDependencies(tasks: TaskNode[], removedIds: Set<string>): void {
   const flat = flattenTasks(tasks);
   for (const task of flat) {
-    task.dependencies = task.dependencies.filter(
-      (dep) => !removedIds.has(dep.taskId),
-    );
+    task.dependencies = task.dependencies.filter((dep) => !removedIds.has(dep.taskId));
   }
 }
 

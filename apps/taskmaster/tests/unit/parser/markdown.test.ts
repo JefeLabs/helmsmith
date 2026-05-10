@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { parseMarkdown } from '../../../src/parser/markdown.js';
 
 describe('parseMarkdown', () => {
@@ -23,7 +23,8 @@ describe('parseMarkdown', () => {
   });
 
   it('nests sub-headings as children', () => {
-    const content = '# Parent\n\nParent body.\n\n## Child One\n\nChild body.\n\n## Child Two\n\nAnother child.';
+    const content =
+      '# Parent\n\nParent body.\n\n## Child One\n\nChild body.\n\n## Child Two\n\nAnother child.';
     const sections = parseMarkdown(content);
 
     expect(sections).toHaveLength(1);
@@ -93,14 +94,7 @@ describe('parseMarkdown', () => {
   });
 
   it('handles sibling sections at different depths correctly', () => {
-    const content = [
-      '# A',
-      '## A.1',
-      '## A.2',
-      '# B',
-      '## B.1',
-      '### B.1.1',
-    ].join('\n\n');
+    const content = ['# A', '## A.1', '## A.2', '# B', '## B.1', '### B.1.1'].join('\n\n');
 
     const sections = parseMarkdown(content);
 

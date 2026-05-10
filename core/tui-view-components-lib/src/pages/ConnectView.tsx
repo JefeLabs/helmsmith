@@ -20,17 +20,17 @@
  *   └──────────────────────────────────────────┘
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Connection, ConnectionStatus } from "../connection.ts";
-import { Box } from "../atoms/Box.tsx";
-import { Heading } from "../atoms/Heading.tsx";
-import { Text } from "../atoms/Text.tsx";
-import { StatusList, type StatusListItem } from "../organisms/StatusList.tsx";
-import { SelectList, type SelectListItem } from "../organisms/SelectList.tsx";
-import { Spinner } from "../molecules/Spinner.tsx";
-import { useKeybinding } from "../keyboard/registry.tsx";
-import { KeybindingsBar } from "../molecules/KeybindingsBar.tsx";
-import { FocusManager } from "../focus/manager.tsx";
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Box } from '../atoms/Box.tsx';
+import { Heading } from '../atoms/Heading.tsx';
+import { Text } from '../atoms/Text.tsx';
+import type { Connection, ConnectionStatus } from '../connection.ts';
+import { FocusManager } from '../focus/manager.tsx';
+import { useKeybinding } from '../keyboard/registry.tsx';
+import { KeybindingsBar } from '../molecules/KeybindingsBar.tsx';
+import { Spinner } from '../molecules/Spinner.tsx';
+import { SelectList, type SelectListItem } from '../organisms/SelectList.tsx';
+import { StatusList, type StatusListItem } from '../organisms/StatusList.tsx';
 
 export interface ConnectViewProps {
   appName: string;
@@ -43,24 +43,14 @@ export interface ConnectViewProps {
 interface BusyState {
   /** Connection id currently performing an action. */
   connectionId: string;
-  action: "login" | "logout";
+  action: 'login' | 'logout';
   message: string;
 }
 
-export function ConnectView({
-  appName,
-  required = [],
-  optional = [],
-  onQuit,
-}: ConnectViewProps) {
-  const all = useMemo(
-    () => [...required, ...optional],
-    [required, optional],
-  );
+export function ConnectView({ appName, required = [], optional = [], onQuit }: ConnectViewProps) {
+  const all = useMemo(() => [...required, ...optional], [required, optional]);
 
-  const [statuses, setStatuses] = useState<Map<string, ConnectionStatus>>(
-    () => new Map(),
-  );
+  const [statuses, setStatuses] = useState<Map<string, ConnectionStatus>>(() => new Map());
   const [busy, setBusy] = useState<BusyState | null>(null);
 
   // Initial status fetch + refresh helper
@@ -70,7 +60,7 @@ export function ConnectView({
       try {
         next.set(c.id, await c.getStatus());
       } catch {
-        next.set(c.id, { state: "disconnected", message: "status unavailable" });
+        next.set(c.id, { state: 'disconnected', message: 'status unavailable' });
       }
     }
     setStatuses(next);
@@ -80,48 +70,48 @@ export function ConnectView({
     void refreshAll();
   }, [refreshAll]);
 
-  /** Returns the loaded ConnectionStatus, or null if still loading. */
-  const statusOf = (c: Connection): ConnectionStatus | null =>
-    statuses.get(c.id) ?? null;
+  /** Returns the loaded ConnectionStatus, or null if still loading.
+   *  Wrapped in useCallback so consuming useMemo/useCallback hooks
+   *  can depend on it without invalidating every render. */
+  const statusOf = useCallback(
+    (c: Connection): ConnectionStatus | null => statuses.get(c.id) ?? null,
+    [statuses],
+  );
 
   // Build StatusList items (required + optional, with section badges).
   // A null status means the fetch is in flight — render as "pending".
   const statusItems: StatusListItem[] = useMemo(() => {
     const out: StatusListItem[] = [];
-    const buildItem = (
-      c: Connection,
-      badge: "required" | "optional",
-    ): StatusListItem => {
+    const buildItem = (c: Connection, badge: 'required' | 'optional'): StatusListItem => {
       const s = statusOf(c);
       return {
         id: c.id,
         label: c.displayName,
-        state: s ? s.state : "pending",
+        state: s ? s.state : 'pending',
         detail: s?.identity ?? s?.message ?? c.description ?? undefined,
         badge,
       };
     };
-    for (const c of required) out.push(buildItem(c, "required"));
-    for (const c of optional) out.push(buildItem(c, "optional"));
+    for (const c of required) out.push(buildItem(c, 'required'));
+    for (const c of optional) out.push(buildItem(c, 'optional'));
     return out;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [required, optional, statuses]);
+    // statusOf is a stable closure over `statuses`; depend on the state map directly.
+  }, [required, optional, statusOf]);
 
   // Build action items (login or logout per connection)
   const actionItems: SelectListItem[] = useMemo(
     () =>
       all.map((c) => {
         const s = statusOf(c);
-        const isConnected = s?.state === "connected";
+        const isConnected = s?.state === 'connected';
         return {
           id: c.id,
-          label: `${isConnected ? "logout" : "login"} ${c.displayName}`,
-          detail: isConnected ? s?.identity ?? "" : "",
+          label: `${isConnected ? 'logout' : 'login'} ${c.displayName}`,
+          detail: isConnected ? (s?.identity ?? '') : '',
           disabled: !s, // disabled while loading
         };
       }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [all, statuses],
+    [all, statusOf],
   );
 
   const runAction = useCallback(
@@ -130,15 +120,14 @@ export function ConnectView({
       const conn = all[idx];
       if (!conn) return;
       const s = statusOf(conn);
-      const action: "login" | "logout" =
-        s?.state === "connected" ? "logout" : "login";
+      const action: 'login' | 'logout' = s?.state === 'connected' ? 'logout' : 'login';
       setBusy({
         connectionId: conn.id,
         action,
-        message: action === "login" ? "starting login…" : "logging out…",
+        message: action === 'login' ? 'starting login…' : 'logging out…',
       });
       try {
-        if (action === "login") {
+        if (action === 'login') {
           await conn.login((message) => {
             setBusy({ connectionId: conn.id, action, message });
           });
@@ -149,7 +138,7 @@ export function ConnectView({
         setStatuses((prev) => {
           const next = new Map(prev);
           next.set(conn.id, {
-            state: "disconnected",
+            state: 'disconnected',
             message: `${action} failed: ${(err as Error).message}`,
           });
           return next;
@@ -159,52 +148,39 @@ export function ConnectView({
         await refreshAll();
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [all, busy, refreshAll, statuses],
+    [all, busy, refreshAll, statusOf],
   );
 
   // Quit + refresh keybindings
   useKeybinding(
-    "q",
-    "quit",
+    'q',
+    'quit',
     () => {
       if (onQuit) onQuit();
       else process.exit(0);
     },
     { hidden: false },
   );
-  useKeybinding(
-    "r",
-    "refresh",
-    () => {
-      void refreshAll();
-    },
-  );
+  useKeybinding('r', 'refresh', () => {
+    void refreshAll();
+  });
 
   return (
     <FocusManager initialFocus="connect-actions">
-      <Box
-        variant="default"
-        padding="md"
-        style={{ flexDirection: "column", gap: 1, minWidth: 56 }}
-      >
+      <Box variant="default" padding="md" style={{ flexDirection: 'column', gap: 1, minWidth: 56 }}>
         <Heading level={1}>{appName} · connect</Heading>
 
         {required.length > 0 ? (
-          <Box variant="transparent" style={{ flexDirection: "column" }}>
+          <Box variant="transparent" style={{ flexDirection: 'column' }}>
             <Text variant="muted">Required</Text>
-            <StatusList
-              items={statusItems.filter((i) => i.badge === "required")}
-            />
+            <StatusList items={statusItems.filter((i) => i.badge === 'required')} />
           </Box>
         ) : null}
 
         {optional.length > 0 ? (
-          <Box variant="transparent" style={{ flexDirection: "column" }}>
+          <Box variant="transparent" style={{ flexDirection: 'column' }}>
             <Text variant="muted">Optional</Text>
-            <StatusList
-              items={statusItems.filter((i) => i.badge === "optional")}
-            />
+            <StatusList items={statusItems.filter((i) => i.badge === 'optional')} />
           </Box>
         ) : null}
 
@@ -213,7 +189,7 @@ export function ConnectView({
             No connections registered. This app doesn't require any auth today.
           </Text>
         ) : (
-          <Box variant="transparent" style={{ flexDirection: "column" }}>
+          <Box variant="transparent" style={{ flexDirection: 'column' }}>
             <Text variant="muted">Actions</Text>
             <SelectList
               focusId="connect-actions"

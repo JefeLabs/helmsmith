@@ -1,16 +1,16 @@
 export {
-  getChildType,
-  generateSubtaskId,
   buildExpansionPrompt,
-  parseExpansionResponse,
-  heuristicExpand,
-  expandTask,
   expandMultiple,
+  expandTask,
+  generateSubtaskId,
+  getChildType,
+  heuristicExpand,
+  parseExpansionResponse,
 } from './expander.js';
 
 export type {
+  BatchExpansionResult,
+  ExpansionError,
   ExpansionOptions,
   ExpansionResult,
-  ExpansionError,
-  BatchExpansionResult,
 } from './types.js';

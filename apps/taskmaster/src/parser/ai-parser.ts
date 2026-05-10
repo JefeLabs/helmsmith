@@ -1,11 +1,11 @@
-import type { TaskNode } from '../config/schema.js';
-import type { ChatCompletionMessage } from '../auth/types.js';
 import { callAI } from '../auth/call-ai.js';
 import type { AIProviderName } from '../auth/provider.js';
+import type { ChatCompletionMessage } from '../auth/types.js';
+import type { TaskNode } from '../config/schema.js';
 import { PROJECT_STYLES } from '../config/styles.js';
-import type { ParseOptions } from './types.js';
 import { runAnalysisPipeline } from './analysis/analyzer.js';
-import type { ArchitectureAnalysis, AnalysisPipelineOptions } from './analysis/types.js';
+import type { AnalysisPipelineOptions, ArchitectureAnalysis } from './analysis/types.js';
+import type { ParseOptions } from './types.js';
 
 /**
  * Lightweight task shape for the AI response (no metadata/readiness/etc.).
@@ -28,10 +28,7 @@ interface AIParseResponse {
 /**
  * Build the prompt that instructs the LLM to decompose a document into tasks.
  */
-function buildParsePrompt(
-  content: string,
-  options: ParseOptions,
-): ChatCompletionMessage[] {
+function buildParsePrompt(content: string, options: ParseOptions): ChatCompletionMessage[] {
   const style = PROJECT_STYLES[options.style];
   const hierarchy = style ? style.hierarchy : ['task'];
   const maxDepth = style ? style.maxDepth : 2;
@@ -52,7 +49,7 @@ function buildParsePrompt(
         'Each task object has these fields:',
         '  - title: string (concise, actionable title)',
         '  - description: string (what needs to be done, key details from the document)',
-        '  - type: string (one of: ' + hierarchy.map(h => `"${h}"`).join(', ') + ')',
+        `  - type: string (one of: ${hierarchy.map((h) => `"${h}"`).join(', ')})`,
         '  - priority: string (one of: "critical", "high", "medium", "low")',
         '  - dependencies: string[] (titles of other tasks this depends on, empty if none)',
         '  - requiredSkills: string[] (e.g., "backend", "frontend", "database", "devops", "testing")',
@@ -69,7 +66,9 @@ function buildParsePrompt(
         '- Be specific about what each task delivers',
         '- Preserve technical details from the document in descriptions',
         numTasksHint,
-      ].filter(Boolean).join('\n'),
+      ]
+        .filter(Boolean)
+        .join('\n'),
     },
     {
       role: 'user',

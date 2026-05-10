@@ -1,19 +1,19 @@
-import { writeFileSync, readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
-import { deriveWorkflows, loadCommands, loadSkills } from "../src/load.js";
-import type { Catalog } from "../src/types.js";
+import { readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { deriveWorkflows, loadCommands, loadSkills } from '../src/load.js';
+import type { Catalog } from '../src/types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const repoRoot = join(__dirname, "..");
+const repoRoot = join(__dirname, '..');
 
-const commandsRoot = join(repoRoot, ".claude", "commands");
-const skillsRoot = join(repoRoot, ".claude", "skills");
-const catalogPath = join(repoRoot, "catalog.json");
-const packageJsonPath = join(repoRoot, "package.json");
+const commandsRoot = join(repoRoot, '.claude', 'commands');
+const skillsRoot = join(repoRoot, '.claude', 'skills');
+const catalogPath = join(repoRoot, 'catalog.json');
+const packageJsonPath = join(repoRoot, 'package.json');
 
-const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8"));
+const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
 
 const commands = loadCommands(commandsRoot);
 const skills = loadSkills(skillsRoot, commands);
@@ -28,12 +28,12 @@ const catalog: Catalog = {
   workflows,
 };
 
-writeFileSync(catalogPath, JSON.stringify(catalog, null, 2) + "\n");
+writeFileSync(catalogPath, `${JSON.stringify(catalog, null, 2)}\n`);
 
 const counts = {
-  commands: commands.filter((c) => c.kind === "command").length,
+  commands: commands.filter((c) => c.kind === 'command').length,
   workflows: workflows.length,
-  context: commands.filter((c) => c.kind === "context").length,
+  context: commands.filter((c) => c.kind === 'context').length,
   skills: skills.length,
 };
 

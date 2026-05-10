@@ -15,14 +15,14 @@
  *   - calls the optional `onApply` callback (e.g. to close the overlay)
  */
 
-import { useEffect, useState } from "react";
-import { useKeyboard } from "@opentui/react";
-import { useTheme } from "../theme/hooks.ts";
-import { Box } from "../atoms/Box.tsx";
-import { Heading } from "../atoms/Heading.tsx";
-import { Text } from "../atoms/Text.tsx";
-import type { Theme } from "../theme/types.ts";
-import type { KeyEvent } from "../theme/hooks.ts";
+import { useKeyboard } from '@opentui/react';
+import { useEffect, useState } from 'react';
+import { Box } from '../atoms/Box.tsx';
+import { Heading } from '../atoms/Heading.tsx';
+import { Text } from '../atoms/Text.tsx';
+import type { KeyEvent } from '../theme/hooks.ts';
+import { useTheme } from '../theme/hooks.ts';
+import type { Theme } from '../theme/types.ts';
 
 export interface ThemeSwitcherProps {
   /** When false, the switcher does not capture keystrokes. */
@@ -33,11 +33,7 @@ export interface ThemeSwitcherProps {
   onCancel?: () => void;
 }
 
-export function ThemeSwitcher({
-  active = true,
-  onApply,
-  onCancel,
-}: ThemeSwitcherProps) {
+export function ThemeSwitcher({ active = true, onApply, onCancel }: ThemeSwitcherProps) {
   const { themes, activeName, setTheme } = useTheme();
   const names = Object.keys(themes);
   const initialIdx = Math.max(0, names.indexOf(activeName));
@@ -51,28 +47,24 @@ export function ThemeSwitcher({
 
   useKeyboard((key: KeyEvent) => {
     if (!active) return;
-    if (key.name === "up" || key.name === "k") {
+    if (key.name === 'up' || key.name === 'k') {
       setIdx((i) => (i - 1 + names.length) % names.length);
-    } else if (key.name === "down" || key.name === "j") {
+    } else if (key.name === 'down' || key.name === 'j') {
       setIdx((i) => (i + 1) % names.length);
-    } else if (key.name === "return" || key.name === "enter") {
+    } else if (key.name === 'return' || key.name === 'enter') {
       const target = names[idx];
       if (target) {
         setTheme(target);
         const applied = themes[target];
         if (applied) onApply?.(applied);
       }
-    } else if (key.name === "escape") {
+    } else if (key.name === 'escape') {
       onCancel?.();
     }
   });
 
   return (
-    <Box
-      variant="overlay"
-      padding="md"
-      style={{ flexDirection: "column", gap: 1, minWidth: 32 }}
-    >
+    <Box variant="overlay" padding="md" style={{ flexDirection: 'column', gap: 1, minWidth: 32 }}>
       <Heading level={2}>Pick a theme</Heading>
       {names.map((name, i) => {
         const t = themes[name];
@@ -81,20 +73,18 @@ export function ThemeSwitcher({
         return (
           <Box
             key={name}
-            variant={focused ? "panel" : "transparent"}
+            variant={focused ? 'panel' : 'transparent'}
             padding="sm"
-            style={{ flexDirection: "row", gap: 1 }}
+            style={{ flexDirection: 'row', gap: 1 }}
           >
-            <Text variant={focused ? "accent" : "body"}>
-              {focused ? "▸" : " "}
-            </Text>
-            <Text variant={focused ? "accent" : "body"}>{t.displayName}</Text>
+            <Text variant={focused ? 'accent' : 'body'}>{focused ? '▸' : ' '}</Text>
+            <Text variant={focused ? 'accent' : 'body'}>{t.displayName}</Text>
             <Text variant="subtle">({t.appearance})</Text>
             {t.name === activeName ? <Text variant="muted">· active</Text> : null}
           </Box>
         );
       })}
-      <Text variant="subtle">↑↓ / j k  navigate · enter apply · esc cancel</Text>
+      <Text variant="subtle">↑↓ / j k navigate · enter apply · esc cancel</Text>
     </Box>
   );
 }

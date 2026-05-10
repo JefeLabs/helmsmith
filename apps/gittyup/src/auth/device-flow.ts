@@ -1,13 +1,13 @@
 import chalk from 'chalk';
+import { writeAuthCredentials } from './token-manager.js';
 import {
   COPILOT_CLIENT_ID,
+  DEVICE_FLOW_TIMEOUT_MS,
+  type DeviceCodeResponse,
   GITHUB_DEVICE_CODE_URL,
   GITHUB_TOKEN_URL,
   GITHUB_USER_URL,
-  DEVICE_FLOW_TIMEOUT_MS,
-  type DeviceCodeResponse,
 } from './types.js';
-import { writeAuthCredentials } from './token-manager.js';
 
 /**
  * Request a device code from GitHub for the OAuth device flow.
@@ -29,7 +29,9 @@ export async function requestDeviceCode(): Promise<DeviceCodeResponse> {
 
   if (!response.ok) {
     const body = await response.text().catch(() => '');
-    throw new Error(`Failed to request device code (${response.status}): ${body || response.statusText}`);
+    throw new Error(
+      `Failed to request device code (${response.status}): ${body || response.statusText}`,
+    );
   }
 
   return (await response.json()) as DeviceCodeResponse;

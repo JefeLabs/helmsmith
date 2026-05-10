@@ -1,4 +1,8 @@
-import type { DeviceCodeResponse, CopilotTokenResponse, ChatCompletionResponse } from '../../src/auth/types.js';
+import type {
+  ChatCompletionResponse,
+  CopilotTokenResponse,
+  DeviceCodeResponse,
+} from '../../src/auth/types.js';
 
 export const mockDeviceCodeResponse: DeviceCodeResponse = {
   device_code: 'dc_test_device_code_123',
@@ -48,7 +52,8 @@ export const mockChatCompletionResponse: ChatCompletionResponse = {
   choices: [
     {
       message: {
-        content: '{"score": 7, "label": "high", "reasoning": "Complex task with multiple integration points and cross-cutting concerns."}',
+        content:
+          '{"score": 7, "label": "high", "reasoning": "Complex task with multiple integration points and cross-cutting concerns."}',
       },
     },
   ],

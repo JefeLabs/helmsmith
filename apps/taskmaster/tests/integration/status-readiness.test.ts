@@ -1,12 +1,11 @@
-import { describe, it, expect } from 'vitest';
-import type { TaskNode, StateDefinition } from '../../src/config/schema.js';
-import { STANDARD_PRESET } from '../../src/config/state-presets.js';
-import { resolveStates } from '../../src/config/state-engine.js';
+import { describe, expect, it } from 'vitest';
 import { executeSetStatus } from '../../src/commands/set-status.js';
+import type { StateDefinition, TaskNode } from '../../src/config/schema.js';
+import { STANDARD_PRESET } from '../../src/config/state-presets.js';
 import {
-  recomputeAllReadiness,
   applyReadiness,
   buildDelegationManifest,
+  recomputeAllReadiness,
 } from '../../src/readiness/index.js';
 
 const STATES: StateDefinition[] = [...STANDARD_PRESET];
@@ -59,7 +58,7 @@ describe('Status -> Readiness recomputation pipeline', () => {
     ];
 
     // Initial: C is pending (no deps), B is blocked (C not done), A is blocked (B not done)
-    let results = recomputeAllReadiness(tasks, STATES);
+    const results = recomputeAllReadiness(tasks, STATES);
     applyReadiness(tasks, results);
 
     expect(tasks[2].readiness).toBe('pending'); // C
@@ -116,7 +115,7 @@ describe('Status -> Readiness recomputation pipeline', () => {
     ];
 
     // Initially: B is ready (no deps), A is blocked
-    let results = recomputeAllReadiness(tasks, STATES);
+    const results = recomputeAllReadiness(tasks, STATES);
     applyReadiness(tasks, results);
 
     let manifest = buildDelegationManifest(tasks, STATES);
@@ -134,9 +133,7 @@ describe('Status -> Readiness recomputation pipeline', () => {
   });
 
   it('--force bypasses transition rules', () => {
-    const tasks = [
-      makeTask({ id: 'X', title: 'Task X', status: 'todo' }),
-    ];
+    const tasks = [makeTask({ id: 'X', title: 'Task X', status: 'todo' })];
 
     // Direct jump from todo to done without --force should work when enforce_transitions is false
     const result = executeSetStatus(tasks, 'X', 'done', STATES, false);
@@ -167,7 +164,7 @@ describe('Status -> Readiness recomputation pipeline', () => {
       }),
     ];
 
-    let results = recomputeAllReadiness(tasks, STATES);
+    const results = recomputeAllReadiness(tasks, STATES);
     applyReadiness(tasks, results);
 
     expect(tasks[0].readiness).toBe('pending'); // A: no deps

@@ -1,12 +1,12 @@
-import type { UserWeekRepoRecord } from "../types/schema.js";
-import { rollup } from "./engine.js";
+import type { UserWeekRepoRecord } from '../types/schema.js';
+import { rollup } from './engine.js';
 
 export interface LeaderboardEntry {
   rank: number;
   member: string;
   team: string;
   org: string;
-  orgType: "core" | "consultant";
+  orgType: 'core' | 'consultant';
   value: number;
   filetype: {
     app: number;
@@ -19,15 +19,15 @@ export interface LeaderboardEntry {
 
 export interface LeaderboardColumn {
   title: string;
-  metric: "all" | "app" | "test" | "config" | "storybook";
+  metric: 'all' | 'app' | 'test' | 'config' | 'storybook';
   entries: LeaderboardEntry[];
 }
 
-const COLUMN_DEFS: Array<{ title: string; metric: LeaderboardColumn["metric"] }> = [
-  { title: "Overall", metric: "all" },
-  { title: "App", metric: "app" },
-  { title: "Test", metric: "test" },
-  { title: "Config", metric: "config" },
+const COLUMN_DEFS: Array<{ title: string; metric: LeaderboardColumn['metric'] }> = [
+  { title: 'Overall', metric: 'all' },
+  { title: 'App', metric: 'app' },
+  { title: 'Test', metric: 'test' },
+  { title: 'Config', metric: 'config' },
 ];
 
 /**
@@ -63,7 +63,7 @@ export function computeLeaderboard(
   // Use the first record found for each member.
   const memberMeta = new Map<
     string,
-    { team: string; org: string; orgType: "core" | "consultant" }
+    { team: string; org: string; orgType: 'core' | 'consultant' }
   >();
   for (const r of filtered) {
     if (!memberMeta.has(r.member)) {
@@ -80,7 +80,7 @@ export function computeLeaderboard(
     member: string;
     team: string;
     org: string;
-    orgType: "core" | "consultant";
+    orgType: 'core' | 'consultant';
     total: number;
     app: number;
     test: number;
@@ -120,15 +120,15 @@ export function computeLeaderboard(
   return COLUMN_DEFS.map((def) => {
     const valueFn = (s: MemberSummary): number => {
       switch (def.metric) {
-        case "all":
+        case 'all':
           return s.total;
-        case "app":
+        case 'app':
           return s.app;
-        case "test":
+        case 'test':
           return s.test;
-        case "config":
+        case 'config':
           return s.config;
-        case "storybook":
+        case 'storybook':
           return s.storybook;
       }
     };

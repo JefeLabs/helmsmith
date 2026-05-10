@@ -13,9 +13,9 @@
  * Linux/Windows users follow Atlassian's docs.
  */
 
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-import type { TicketSystemAdapter, ValidationResult } from "./index.js";
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import type { TicketSystemAdapter, ValidationResult } from './index.js';
 
 const runArgs = promisify(execFile);
 
@@ -28,11 +28,11 @@ interface AcliResponse {
 }
 
 export class JiraCliAdapter implements TicketSystemAdapter {
-  readonly name = "jira-cli" as const;
+  readonly name = 'jira-cli' as const;
 
   async isAvailable(): Promise<boolean> {
     try {
-      await runArgs("acli", ["jira", "--version"], { timeout: 5_000 });
+      await runArgs('acli', ['jira', '--version'], { timeout: 5_000 });
       return true;
     } catch {
       return false;
@@ -42,14 +42,13 @@ export class JiraCliAdapter implements TicketSystemAdapter {
   async validate(ticket: string): Promise<ValidationResult | null> {
     if (!(await this.isAvailable())) return null;
 
-    let stdout = "";
-    let stderr = "";
+    let stdout = '';
+    let stderr = '';
     try {
-      const result = await runArgs(
-        "acli",
-        ["jira", "workitem", "view", ticket, "--json"],
-        { timeout: 30_000, maxBuffer: 4 * 1024 * 1024 },
-      );
+      const result = await runArgs('acli', ['jira', 'workitem', 'view', ticket, '--json'], {
+        timeout: 30_000,
+        maxBuffer: 4 * 1024 * 1024,
+      });
       stdout = result.stdout;
       stderr = result.stderr;
     } catch (err) {
@@ -57,8 +56,8 @@ export class JiraCliAdapter implements TicketSystemAdapter {
         stdout?: string;
         stderr?: string;
       };
-      const combined = `${e.stderr ?? ""} ${e.message ?? ""}`.toLowerCase();
-      if (combined.includes("not found") || combined.includes("404")) {
+      const combined = `${e.stderr ?? ''} ${e.message ?? ''}`.toLowerCase();
+      if (combined.includes('not found') || combined.includes('404')) {
         return { exists: false, error: `${ticket} not found in Jira` };
       }
       // 401 / network / config error → fail open
@@ -66,10 +65,10 @@ export class JiraCliAdapter implements TicketSystemAdapter {
     }
 
     // acli sometimes returns a 0 exit but writes "not found" to stderr
-    if (stderr.toLowerCase().includes("not found")) {
+    if (stderr.toLowerCase().includes('not found')) {
       return { exists: false, error: `${ticket} not found in Jira` };
     }
-    if (stderr.toLowerCase().includes("unauthorized")) {
+    if (stderr.toLowerCase().includes('unauthorized')) {
       return null;
     }
 
@@ -82,8 +81,7 @@ export class JiraCliAdapter implements TicketSystemAdapter {
       return { exists: true };
     }
 
-    const status =
-      typeof data.status === "object" ? data.status?.name : data.status;
+    const status = typeof data.status === 'object' ? data.status?.name : data.status;
 
     return {
       exists: true,

@@ -1,7 +1,7 @@
-import { selectAdapter } from "../platform/index.js";
-import { checkTool, resolvePackageName } from "../core/index.js";
-import { registerTool } from "../config/index.js";
-import { fail, ok } from "../ui/index.js";
+import { registerTool } from '../config/index.js';
+import { checkTool, resolvePackageName } from '../core/index.js';
+import { selectAdapter } from '../platform/index.js';
+import { fail, ok } from '../ui/index.js';
 
 export interface InstallOptions {
   via?: string;
@@ -13,14 +13,9 @@ export interface InstallOptions {
  * freshly-installed binary afterward and records it in the registry
  * so subsequent `toolz list` and `toolz check` see consistent state.
  */
-export async function runInstall(
-  tool: string,
-  options: InstallOptions = {},
-): Promise<void> {
+export async function runInstall(tool: string, options: InstallOptions = {}): Promise<void> {
   const adapter = options.via
-    ? (await import("../platform/adapters/index.js")).adapters[
-        options.via as never
-      ] ?? null
+    ? ((await import('../platform/adapters/index.js')).adapters[options.via as never] ?? null)
     : await selectAdapter();
 
   if (!adapter) {
@@ -50,7 +45,7 @@ export async function runInstall(
   console.log(`Installing ${tool} via ${adapter.name} (${resolved.packageName})...`);
   const result = await adapter.install(resolved.packageName);
   if (!result.success) {
-    console.error(fail(`Install failed: ${result.error ?? "unknown error"}`));
+    console.error(fail(`Install failed: ${result.error ?? 'unknown error'}`));
     if (result.stderr) console.error(result.stderr);
     process.exit(1);
   }

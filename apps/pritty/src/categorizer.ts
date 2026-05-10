@@ -9,7 +9,7 @@
  * stops at "which category does this file belong to?".
  */
 
-import { minimatch } from "minimatch";
+import { minimatch } from 'minimatch';
 
 export interface CategoryMap {
   [category: string]: string[];
@@ -21,48 +21,33 @@ export interface CategoryMap {
  * To add to a default category, copy its patterns and append.
  */
 export const DEFAULT_CATEGORIES: CategoryMap = {
-  app: [
-    "src/**",
-    "lib/**",
-    "app/**",
-    "pages/**",
-    "components/**",
-    "hooks/**",
-    "utils/**",
-  ],
-  test: [
-    "test/**",
-    "tests/**",
-    "__tests__/**",
-    "**/*.test.*",
-    "**/*.spec.*",
-    "**/*_test.*",
-  ],
+  app: ['src/**', 'lib/**', 'app/**', 'pages/**', 'components/**', 'hooks/**', 'utils/**'],
+  test: ['test/**', 'tests/**', '__tests__/**', '**/*.test.*', '**/*.spec.*', '**/*_test.*'],
   infra: [
-    "terraform/**",
-    ".github/**",
-    "Dockerfile*",
-    "docker-compose*",
-    "k8s/**",
-    "helm/**",
-    ".gitlab-ci*",
-    ".circleci/**",
+    'terraform/**',
+    '.github/**',
+    'Dockerfile*',
+    'docker-compose*',
+    'k8s/**',
+    'helm/**',
+    '.gitlab-ci*',
+    '.circleci/**',
   ],
-  storybook: ["**/*.stories.*", "**/*.story.*", ".storybook/**"],
+  storybook: ['**/*.stories.*', '**/*.story.*', '.storybook/**'],
   config: [
-    "*.config.*",
-    "package.json",
-    "tsconfig*",
-    ".eslintrc*",
-    ".prettierrc*",
-    "Cargo.toml",
-    "pyproject.toml",
-    "go.mod",
+    '*.config.*',
+    'package.json',
+    'tsconfig*',
+    '.eslintrc*',
+    '.prettierrc*',
+    'Cargo.toml',
+    'pyproject.toml',
+    'go.mod',
   ],
 };
 
 /** Bucket that catches files matching no configured category. */
-export const UNKNOWN_CATEGORY = "unknown";
+export const UNKNOWN_CATEGORY = 'unknown';
 
 export interface CategorizedFiles {
   [category: string]: string[];

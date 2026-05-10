@@ -1,8 +1,8 @@
 import chalk from 'chalk';
 import ora from 'ora';
-import type { RepoConfig, BranchSideInfo, PRInfo, CompareRow } from '../config/schema.js';
-import { GitOperations } from '../core/git-operations.js';
 import { ManifestManager } from '../config/manifest.js';
+import type { BranchSideInfo, CompareRow, PRInfo, RepoConfig } from '../config/schema.js';
+import { GitOperations } from '../core/git-operations.js';
 import { RepoManager } from '../core/repo-manager.js';
 
 // ─── Terminal Hyperlinks (OSC 8) ────────────────────────────────────
@@ -20,7 +20,12 @@ function repoLink(repo: RepoConfig, displayName: string): string {
 }
 
 function prLink(pr: PRInfo): string {
-  const icon = pr.state === 'open' ? chalk.yellow('⚠') : pr.state === 'merged' ? chalk.green('✓') : chalk.red('⊘');
+  const icon =
+    pr.state === 'open'
+      ? chalk.yellow('⚠')
+      : pr.state === 'merged'
+        ? chalk.green('✓')
+        : chalk.red('⊘');
   const label = `${icon}#${pr.number}`;
   return pr.url ? link(pr.url, label) : label;
 }
@@ -28,7 +33,7 @@ function prLink(pr: PRInfo): string {
 // ─── Data Gathering ─────────────────────────────────────────────────
 
 export async function gatherCompareData(
-  manifest: ManifestManager,
+  _manifest: ManifestManager,
   repoManager: RepoManager,
   target: string | undefined,
   leftBranch: string,
@@ -36,9 +41,15 @@ export async function gatherCompareData(
   options: { fetch?: boolean; checkConflicts?: boolean } = {},
 ): Promise<CompareRow[]> {
   const repos = target ? repoManager.getReposForTarget(target) : repoManager.getAllRepos();
-  if (options.fetch) { const s = ora('Fetching remotes...').start(); await repoManager.fetchAll(target); s.succeed('Fetched'); }
+  if (options.fetch) {
+    const s = ora('Fetching remotes...').start();
+    await repoManager.fetchAll(target);
+    s.succeed('Fetched');
+  }
 
-  const spinner = ora(`Comparing ${leftBranch} vs ${rightBranch} across ${repos.length} repos...`).start();
+  const spinner = ora(
+    `Comparing ${leftBranch} vs ${rightBranch} across ${repos.length} repos...`,
+  ).start();
   const rows: CompareRow[] = [];
 
   for (const repo of repos) {
@@ -58,7 +69,14 @@ export async function gatherCompareData(
 
       rows.push({ repo, hasConflicts, left, right, pr: null });
     } catch (err) {
-      rows.push({ repo, hasConflicts: false, left: null, right: null, pr: null, error: err instanceof Error ? err.message : String(err) });
+      rows.push({
+        repo,
+        hasConflicts: false,
+        left: null,
+        right: null,
+        pr: null,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -74,25 +92,59 @@ async function getSideInfo(git: GitOperations, branchRef: string): Promise<Branc
     const commitDate = new Date(latest.date);
     const sinceDays = Math.floor((Date.now() - commitDate.getTime()) / (1000 * 60 * 60 * 24));
     const allCommits = await git.listCommits(branchRef, 9999);
-    return { lastCommitDate: commitDate.toISOString().slice(0, 10), author: latest.author.substring(0, 7).toUpperCase(), sinceDays, commitCount: allCommits.length };
-  } catch { return null; }
+    return {
+      lastCommitDate: commitDate.toISOString().slice(0, 10),
+      author: latest.author.substring(0, 7).toUpperCase(),
+      sinceDays,
+      commitCount: allCommits.length,
+    };
+  } catch {
+    return null;
+  }
 }
 
-async function checkConflicts(git: GitOperations, sourceBranch: string, targetBranch: string): Promise<boolean> {
+async function checkConflicts(
+  git: GitOperations,
+  sourceBranch: string,
+  targetBranch: string,
+): Promise<boolean> {
   try {
-    try { await git.instance.raw(['merge-tree', '--write-tree', '--no-messages', targetBranch, sourceBranch]); return false; } catch {
+    try {
+      await git.instance.raw([
+        'merge-tree',
+        '--write-tree',
+        '--no-messages',
+        targetBranch,
+        sourceBranch,
+      ]);
+      return false;
+    } catch {
       try {
-        const revList = await git.instance.raw(['rev-list', '--left-right', '--count', `${targetBranch}...${sourceBranch}`]);
+        const revList = await git.instance.raw([
+          'rev-list',
+          '--left-right',
+          '--count',
+          `${targetBranch}...${sourceBranch}`,
+        ]);
         const [left, right] = revList.trim().split(/\s+/).map(Number);
         return (left ?? 0) > 0 && (right ?? 0) > 0;
-      } catch { return false; }
+      } catch {
+        return false;
+      }
     }
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }
 
 // ─── Render ─────────────────────────────────────────────────────────
 
-export function renderCompare(rows: CompareRow[], leftLabel: string, rightLabel: string, prData?: Map<string, PRInfo>): void {
+export function renderCompare(
+  rows: CompareRow[],
+  leftLabel: string,
+  rightLabel: string,
+  prData?: Map<string, PRInfo>,
+): void {
   const withConflicts = rows.filter((r) => r.hasConflicts);
   const noConflicts = rows.filter((r) => !r.hasConflicts);
 
@@ -105,28 +157,67 @@ export function renderCompare(rows: CompareRow[], leftLabel: string, rightLabel:
     renderSection(noConflicts, leftLabel, rightLabel, prData, false);
   }
 
-  console.log(chalk.dim(`\n  Total: ${rows.length} repos │ ${chalk.red(`${withConflicts.length} conflicts`)} │ ${chalk.green(`${noConflicts.length} clean`)}\n`));
+  console.log(
+    chalk.dim(
+      `\n  Total: ${rows.length} repos │ ${chalk.red(`${withConflicts.length} conflicts`)} │ ${chalk.green(`${noConflicts.length} clean`)}\n`,
+    ),
+  );
 }
 
-function renderSection(rows: CompareRow[], leftLabel: string, rightLabel: string, prData?: Map<string, PRInfo>, isConflict?: boolean): void {
-  const header = [pad('REPOSITORY', 36), pad(leftLabel, 12), pad('AUTHOR', 8), pad('SINCE', 6), pad('COMMITS', 8), pad('PR #', 16), pad(rightLabel, 12), pad('AUTHOR', 8), pad('SINCE', 6), 'COMMITS'].join('');
+function renderSection(
+  rows: CompareRow[],
+  leftLabel: string,
+  rightLabel: string,
+  prData?: Map<string, PRInfo>,
+  isConflict?: boolean,
+): void {
+  const header = [
+    pad('REPOSITORY', 36),
+    pad(leftLabel, 12),
+    pad('AUTHOR', 8),
+    pad('SINCE', 6),
+    pad('COMMITS', 8),
+    pad('PR #', 16),
+    pad(rightLabel, 12),
+    pad('AUTHOR', 8),
+    pad('SINCE', 6),
+    'COMMITS',
+  ].join('');
   console.log(chalk.bold.white(`  ${header}`));
-  console.log(chalk.dim(`  ${'─'.repeat(34)}  ${'─'.repeat(10)}  ${'─'.repeat(6)}  ${'─'.repeat(5)}  ${'─'.repeat(7)}  ${'─'.repeat(14)}  ${'─'.repeat(10)}  ${'─'.repeat(6)}  ${'─'.repeat(5)}  ${'─'.repeat(7)}`));
+  console.log(
+    chalk.dim(
+      `  ${'─'.repeat(34)}  ${'─'.repeat(10)}  ${'─'.repeat(6)}  ${'─'.repeat(5)}  ${'─'.repeat(7)}  ${'─'.repeat(14)}  ${'─'.repeat(10)}  ${'─'.repeat(6)}  ${'─'.repeat(5)}  ${'─'.repeat(7)}`,
+    ),
+  );
 
   for (const row of rows) {
-    if (row.error) { console.log(`  ${chalk.red('⚠ ')}${chalk.red(pad(row.repo.name, 34))} ${chalk.red(row.error.substring(0, 60))}`); continue; }
+    if (row.error) {
+      console.log(
+        `  ${chalk.red('⚠ ')}${chalk.red(pad(row.repo.name, 34))} ${chalk.red(row.error.substring(0, 60))}`,
+      );
+      continue;
+    }
 
     const indicator = isConflict ? chalk.red('🔴 ') : chalk.green('✅ ');
     const repoName = repoLink(row.repo, chalk.white(row.repo.name));
     const repoCol = pad(repoName, 34, row.repo.name.length);
 
     const pr = prData?.get(row.repo.name) ?? row.pr;
-    let prStr: string; let prVisLen: number;
-    if (pr) { const linked = prLink(pr); const dateStr = pr.date ? ` ${pr.date}` : ''; prStr = `${linked}${dateStr}`; prVisLen = `⚠#${pr.number}${dateStr}`.length; }
-    else { prStr = 'N/A'; prVisLen = 3; }
+    let prStr: string;
+    let prVisLen: number;
+    if (pr) {
+      const linked = prLink(pr);
+      const dateStr = pr.date ? ` ${pr.date}` : '';
+      prStr = `${linked}${dateStr}`;
+      prVisLen = `⚠#${pr.number}${dateStr}`.length;
+    } else {
+      prStr = 'N/A';
+      prVisLen = 3;
+    }
 
     const line = [
-      indicator, repoCol,
+      indicator,
+      repoCol,
       pad(row.left?.lastCommitDate ?? 'N/A', 12),
       pad(row.left?.author ?? 'N/A', 8),
       pad(colorSince(row.left?.sinceDays ?? -1), 6),
@@ -144,7 +235,11 @@ function renderSection(rows: CompareRow[], leftLabel: string, rightLabel: string
 // ─── Helpers ────────────────────────────────────────────────────────
 
 function pad(str: string, len: number, knownVisLen?: number): string {
-  const visLen = knownVisLen ?? str.replace(/\x1b\[[0-9;]*m/g, '').replace(/\x1b\]8;;[^\x07]*\x07/g, '').length;
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape sequences (deliberate)
+  const ansiSgr = /\x1b\[[0-9;]*m/g;
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: OSC 8 hyperlink termination (deliberate)
+  const ansiHyperlink = /\x1b\]8;;[^\x07]*\x07/g;
+  const visLen = knownVisLen ?? str.replace(ansiSgr, '').replace(ansiHyperlink, '').length;
   return visLen >= len ? str : str + ' '.repeat(len - visLen);
 }
 
@@ -156,5 +251,9 @@ function colorSince(days: number): string {
 
 function colorCommits(count: number): string {
   if (count === 0) return chalk.dim('0');
-  return count < 10 ? chalk.white(String(count)) : count < 50 ? chalk.yellow(String(count)) : chalk.red(String(count));
+  return count < 10
+    ? chalk.white(String(count))
+    : count < 50
+      ? chalk.yellow(String(count))
+      : chalk.red(String(count));
 }

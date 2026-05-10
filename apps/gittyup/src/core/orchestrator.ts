@@ -1,17 +1,21 @@
+import { checkbox } from '@inquirer/prompts';
 import chalk from 'chalk';
 import ora from 'ora';
-import { confirm, checkbox } from '@inquirer/prompts';
-import { RepoManager } from './repo-manager.js';
-import { ConflictResolver } from './conflict-resolver.js';
-import { GitHubClient } from '../github/client.js';
-import { callCopilot } from '../auth/token-manager.js';
-import { resolveGitHubToken } from '../auth/token-manager.js';
-import { Dashboard } from '../ui/dashboard.js';
-import { ManifestManager } from '../config/manifest.js';
+import { callCopilot, resolveGitHubToken } from '../auth/token-manager.js';
 import { APP_NAME } from '../config/branding.js';
+import { ManifestManager } from '../config/manifest.js';
 import type {
-  AiMode, CherryPickTarget, ConflictFile, MergeTarget, OperationResult, RepoConfig,
+  AiMode,
+  CherryPickTarget,
+  ConflictFile,
+  MergeTarget,
+  OperationResult,
+  RepoConfig,
 } from '../config/schema.js';
+import { GitHubClient } from '../github/client.js';
+import { Dashboard } from '../ui/dashboard.js';
+import { ConflictResolver } from './conflict-resolver.js';
+import { RepoManager } from './repo-manager.js';
 
 /**
  * Coordinates merge and cherry-pick flows across multiple repos.
@@ -50,13 +54,19 @@ export class Orchestrator {
     if (options.fetch !== false) {
       const spinner = ora('Fetching latest from remotes...').start();
       for (const t of targets) {
-        try { await this.repoManager.getGit(t.repo).fetch(t.repo.remote); } catch {}
+        try {
+          await this.repoManager.getGit(t.repo).fetch(t.repo.remote);
+        } catch {}
       }
       spinner.succeed('Fetch complete');
     }
 
     for (const target of targets) {
-      console.log(chalk.bold(`\n  Merging ${target.sourceBranch} → ${target.targetBranch} in ${target.repo.name}`));
+      console.log(
+        chalk.bold(
+          `\n  Merging ${target.sourceBranch} → ${target.targetBranch} in ${target.repo.name}`,
+        ),
+      );
       const spinner = ora('  Merging...').start();
 
       try {
@@ -70,24 +80,46 @@ export class Orchestrator {
             await git.push(target.repo.remote, target.targetBranch);
             console.log(chalk.dim(`    Pushed to ${target.repo.remote}/${target.targetBranch}`));
           }
-          results.push({ repo: target.repo.name, status: 'success', message: `Merged ${target.sourceBranch} → ${target.targetBranch}` });
+          results.push({
+            repo: target.repo.name,
+            status: 'success',
+            message: `Merged ${target.sourceBranch} → ${target.targetBranch}`,
+          });
         } else {
           spinner.warn(`  ${target.repo.name}: ${mergeResult.conflicts.length} conflict(s)`);
-          const resolver = new ConflictResolver(git, target.repo, aiMode, { onAiResolve: this.createAiResolver() });
-          const session = await resolver.startSession('merge', target.sourceBranch, target.targetBranch);
-          if (session.status === 'resolved' && options.push) await git.push(target.repo.remote, target.targetBranch);
+          const resolver = new ConflictResolver(git, target.repo, aiMode, {
+            onAiResolve: this.createAiResolver(),
+          });
+          const session = await resolver.startSession(
+            'merge',
+            target.sourceBranch,
+            target.targetBranch,
+          );
+          if (session.status === 'resolved' && options.push)
+            await git.push(target.repo.remote, target.targetBranch);
           results.push({
             repo: target.repo.name,
             status: session.status === 'resolved' ? 'success' : 'conflict',
-            message: session.status === 'resolved' ? 'Conflicts resolved' : `${session.files.length - session.resolvedFiles.length} unresolved`,
+            message:
+              session.status === 'resolved'
+                ? 'Conflicts resolved'
+                : `${session.files.length - session.resolvedFiles.length} unresolved`,
             conflictSession: session,
           });
         }
 
-        if (hadStash) { try { await git.stashPop(); } catch {} }
+        if (hadStash) {
+          try {
+            await git.stashPop();
+          } catch {}
+        }
       } catch (err) {
         spinner.fail(`  ${target.repo.name}: Error`);
-        results.push({ repo: target.repo.name, status: 'error', message: err instanceof Error ? err.message : String(err) });
+        results.push({
+          repo: target.repo.name,
+          status: 'error',
+          message: err instanceof Error ? err.message : String(err),
+        });
       }
     }
 
@@ -107,12 +139,20 @@ export class Orchestrator {
 
     if (options.fetch !== false) {
       const spinner = ora('Fetching latest from remotes...').start();
-      for (const t of targets) { try { await this.repoManager.getGit(t.repo).fetch(t.repo.remote); } catch {} }
+      for (const t of targets) {
+        try {
+          await this.repoManager.getGit(t.repo).fetch(t.repo.remote);
+        } catch {}
+      }
       spinner.succeed('Fetch complete');
     }
 
     for (const target of targets) {
-      console.log(chalk.bold(`\n  Cherry-picking ${target.commits.length} commit(s) → ${target.targetBranch} in ${target.repo.name}`));
+      console.log(
+        chalk.bold(
+          `\n  Cherry-picking ${target.commits.length} commit(s) → ${target.targetBranch} in ${target.repo.name}`,
+        ),
+      );
       const spinner = ora('  Cherry-picking...').start();
 
       try {
@@ -121,26 +161,52 @@ export class Orchestrator {
         const cpResult = await git.cherryPick(target.commits, target.targetBranch);
 
         if (cpResult.success) {
-          spinner.succeed(`  ${target.repo.name}: Applied ${cpResult.applied.length} commit(s) cleanly`);
+          spinner.succeed(
+            `  ${target.repo.name}: Applied ${cpResult.applied.length} commit(s) cleanly`,
+          );
           if (options.push) await git.push(target.repo.remote, target.targetBranch);
-          results.push({ repo: target.repo.name, status: 'success', message: `Applied ${cpResult.applied.length} commits to ${target.targetBranch}` });
+          results.push({
+            repo: target.repo.name,
+            status: 'success',
+            message: `Applied ${cpResult.applied.length} commits to ${target.targetBranch}`,
+          });
         } else {
-          spinner.warn(`  ${target.repo.name}: Conflict at commit ${cpResult.failedAt?.substring(0, 8)}`);
-          const resolver = new ConflictResolver(git, target.repo, aiMode, { onAiResolve: this.createAiResolver() });
-          const session = await resolver.startSession('cherry-pick', target.sourceBranch, target.targetBranch);
-          if (session.status === 'resolved' && options.push) await git.push(target.repo.remote, target.targetBranch);
+          spinner.warn(
+            `  ${target.repo.name}: Conflict at commit ${cpResult.failedAt?.substring(0, 8)}`,
+          );
+          const resolver = new ConflictResolver(git, target.repo, aiMode, {
+            onAiResolve: this.createAiResolver(),
+          });
+          const session = await resolver.startSession(
+            'cherry-pick',
+            target.sourceBranch,
+            target.targetBranch,
+          );
+          if (session.status === 'resolved' && options.push)
+            await git.push(target.repo.remote, target.targetBranch);
           results.push({
             repo: target.repo.name,
             status: session.status === 'resolved' ? 'success' : 'conflict',
-            message: session.status === 'resolved' ? `Resolved and applied ${target.commits.length} commits` : `Conflict at ${cpResult.failedAt?.substring(0, 8)}`,
+            message:
+              session.status === 'resolved'
+                ? `Resolved and applied ${target.commits.length} commits`
+                : `Conflict at ${cpResult.failedAt?.substring(0, 8)}`,
             conflictSession: session,
           });
         }
 
-        if (hadStash) { try { await git.stashPop(); } catch {} }
+        if (hadStash) {
+          try {
+            await git.stashPop();
+          } catch {}
+        }
       } catch (err) {
         spinner.fail(`  ${target.repo.name}: Error`);
-        results.push({ repo: target.repo.name, status: 'error', message: err instanceof Error ? err.message : String(err) });
+        results.push({
+          repo: target.repo.name,
+          status: 'error',
+          message: err instanceof Error ? err.message : String(err),
+        });
       }
     }
 
@@ -155,7 +221,10 @@ export class Orchestrator {
   async selectCommits(repo: RepoConfig, sourceBranch: string, maxCount = 30): Promise<string[]> {
     const git = this.repoManager.getGit(repo);
     const commits = await git.listCommits(sourceBranch, maxCount);
-    if (commits.length === 0) { console.log(chalk.yellow(`No commits found on ${sourceBranch}`)); return []; }
+    if (commits.length === 0) {
+      console.log(chalk.yellow(`No commits found on ${sourceBranch}`));
+      return [];
+    }
 
     return checkbox({
       message: `Select commits to cherry-pick from ${sourceBranch}:`,
@@ -191,7 +260,15 @@ export class Orchestrator {
           .replace('{{target_branch}}', target.targetBranch)
           .replace('{{repo_name}}', target.repo.name)
           .replace('{{commit_count}}', 'N/A');
-        const pr = await gh.createPR({ owner, repo, title: `[${APP_NAME}] ${operation}: ${target.sourceBranch} → ${target.targetBranch}`, body, head, base: target.targetBranch, labels: [APP_NAME] });
+        const pr = await gh.createPR({
+          owner,
+          repo,
+          title: `[${APP_NAME}] ${operation}: ${target.sourceBranch} → ${target.targetBranch}`,
+          body,
+          head,
+          base: target.targetBranch,
+          labels: [APP_NAME],
+        });
         if (pr.url) result.prUrl = pr.url;
       } catch (err) {
         console.log(chalk.yellow(`  Could not create PR for ${result.repo}: ${err}`));
@@ -201,18 +278,26 @@ export class Orchestrator {
 
   // ─── AI Resolver via Copilot ───────────────────────────────────────
 
-  private createAiResolver(): (file: ConflictFile, mode: 'auto' | 'suggest') => Promise<string | null> {
+  private createAiResolver(): (
+    file: ConflictFile,
+    mode: 'auto' | 'suggest',
+  ) => Promise<string | null> {
     return async (file: ConflictFile, mode: 'auto' | 'suggest') => {
       // Check if Copilot auth is available
       const tokenSource = await resolveGitHubToken();
       if (!tokenSource) {
-        console.log(chalk.dim(`\n  [AI] No GitHub token found. Run "${APP_NAME} auth login" for Copilot access.`));
+        console.log(
+          chalk.dim(
+            `\n  [AI] No GitHub token found. Run "${APP_NAME} auth login" for Copilot access.`,
+          ),
+        );
         return null;
       }
 
-      const systemPrompt = mode === 'auto'
-        ? 'You are a git merge conflict resolver. Given the OURS (current branch), THEIRS (incoming branch), and BASE (common ancestor) versions of a file, produce the correctly merged output. Output ONLY the merged file contents, no explanation.'
-        : 'You are a git merge conflict resolver. Given the OURS (current branch), THEIRS (incoming branch), and BASE (common ancestor) versions of a file, suggest a merged resolution. Explain your reasoning briefly, then output the merged file contents in a code block.';
+      const systemPrompt =
+        mode === 'auto'
+          ? 'You are a git merge conflict resolver. Given the OURS (current branch), THEIRS (incoming branch), and BASE (common ancestor) versions of a file, produce the correctly merged output. Output ONLY the merged file contents, no explanation.'
+          : 'You are a git merge conflict resolver. Given the OURS (current branch), THEIRS (incoming branch), and BASE (common ancestor) versions of a file, suggest a merged resolution. Explain your reasoning briefly, then output the merged file contents in a code block.';
 
       const userPrompt = [
         `File: ${file.path}`,
@@ -245,7 +330,9 @@ export class Orchestrator {
         }
         return content;
       } catch (err) {
-        console.log(chalk.yellow(`  [AI] Copilot error: ${err instanceof Error ? err.message : String(err)}`));
+        console.log(
+          chalk.yellow(`  [AI] Copilot error: ${err instanceof Error ? err.message : String(err)}`),
+        );
         return null;
       }
     };

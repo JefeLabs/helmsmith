@@ -1,12 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { TaskNode } from '../../../src/config/schema.js';
 import {
-  flattenTasks,
-  buildTaskMap,
   buildDag,
+  buildTaskMap,
   detectDanglingRefs,
   fixCycles,
   fixDanglingRefs,
+  flattenTasks,
 } from '../../../src/readiness/dag.js';
 
 function makeTask(overrides: Partial<TaskNode> = {}): TaskNode {
@@ -138,7 +138,13 @@ describe('buildDag - no cycles', () => {
 
   it('handles diamond dependency (A->B, A->C, B->D, C->D)', () => {
     const tasks = [
-      makeTask({ id: 'A', dependencies: [{ taskId: 'B', type: 'blocks' }, { taskId: 'C', type: 'blocks' }] }),
+      makeTask({
+        id: 'A',
+        dependencies: [
+          { taskId: 'B', type: 'blocks' },
+          { taskId: 'C', type: 'blocks' },
+        ],
+      }),
       makeTask({ id: 'B', dependencies: [{ taskId: 'D', type: 'blocks' }] }),
       makeTask({ id: 'C', dependencies: [{ taskId: 'D', type: 'blocks' }] }),
       makeTask({ id: 'D' }),
@@ -189,9 +195,7 @@ describe('buildDag - cycle detection', () => {
   });
 
   it('detects self-reference', () => {
-    const tasks = [
-      makeTask({ id: 'A', dependencies: [{ taskId: 'A', type: 'blocks' }] }),
-    ];
+    const tasks = [makeTask({ id: 'A', dependencies: [{ taskId: 'A', type: 'blocks' }] })];
     const result = buildDag(tasks);
     expect(result.hasCycle).toBe(true);
     expect(result.cycleNodes).toEqual(['A']);
@@ -236,9 +240,7 @@ describe('detectDanglingRefs', () => {
   });
 
   it('detects reference to non-existent task', () => {
-    const flat = [
-      makeTask({ id: 'A', dependencies: [{ taskId: 'MISSING', type: 'blocks' }] }),
-    ];
+    const flat = [makeTask({ id: 'A', dependencies: [{ taskId: 'MISSING', type: 'blocks' }] })];
     const taskMap = buildTaskMap(flat);
     const result = detectDanglingRefs(flat, taskMap);
     expect(result.danglingRefs).toHaveLength(1);

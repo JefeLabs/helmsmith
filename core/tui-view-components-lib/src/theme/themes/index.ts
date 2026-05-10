@@ -3,13 +3,13 @@
  * via the `extraThemes` prop on `<AgentxThemeProvider>`.
  */
 
-import type { Theme } from "../types.ts";
-import { rosePine } from "./rose-pine.ts";
-import { tokyoNight } from "./tokyo-night.ts";
-import { catppuccinMocha } from "./catppuccin-mocha.ts";
-import { catppuccinLatte } from "./catppuccin-latte.ts";
+import type { Theme } from '../types.ts';
+import { catppuccinLatte } from './catppuccin-latte.ts';
+import { catppuccinMocha } from './catppuccin-mocha.ts';
+import { rosePine } from './rose-pine.ts';
+import { tokyoNight } from './tokyo-night.ts';
 
-export { rosePine, tokyoNight, catppuccinMocha, catppuccinLatte };
+export { catppuccinLatte, catppuccinMocha, rosePine, tokyoNight };
 
 /** Registry keyed by theme name. */
 export const builtInThemes: Record<string, Theme> = {

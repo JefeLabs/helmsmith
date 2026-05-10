@@ -1,10 +1,10 @@
-import chalk from "chalk";
-import { stripAnsi, padRight, padLeft } from "./format.js";
+import chalk from 'chalk';
+import { padLeft, padRight, stripAnsi } from './format.js';
 
 export interface Column {
   key: string;
   label: string;
-  align?: "left" | "right" | "center";
+  align?: 'left' | 'right' | 'center';
   width?: number;
   minWidth?: number;
   flex?: number;
@@ -19,7 +19,7 @@ export interface TableOptions {
   footerRows?: Record<string, any>[];
   highlightRow?: number;
   maxWidth?: number;
-  borderStyle?: "rounded" | "minimal" | "none";
+  borderStyle?: 'rounded' | 'minimal' | 'none';
   zebra?: boolean;
   groupSeparator?: number[];
 }
@@ -33,7 +33,7 @@ export interface TableOptions {
  */
 function truncate(s: string, maxWidth: number): string {
   if (maxWidth <= 0) {
-    return "";
+    return '';
   }
 
   const plain = stripAnsi(s);
@@ -43,23 +43,23 @@ function truncate(s: string, maxWidth: number): string {
   }
 
   // We need to truncate. Walk through the original string, tracking visible chars.
-  const ellipsis = "\u2026"; // …
+  const ellipsis = '\u2026'; // …
   const targetVisible = maxWidth - 1; // Reserve 1 char for ellipsis
 
   if (targetVisible <= 0) {
     return ellipsis;
   }
 
-  let result = "";
+  let result = '';
   let visibleCount = 0;
   let i = 0;
 
   while (i < s.length && visibleCount < targetVisible) {
     // Check if we're at an ANSI escape sequence
-    if (s[i] === "\x1b" && s[i + 1] === "[") {
+    if (s[i] === '\x1b' && s[i + 1] === '[') {
       // Find the end of the ANSI sequence
       let j = i + 2;
-      while (j < s.length && s[j] !== "m") {
+      while (j < s.length && s[j] !== 'm') {
         j++;
       }
       // Include the 'm'
@@ -73,7 +73,7 @@ function truncate(s: string, maxWidth: number): string {
   }
 
   // Reset any open ANSI codes and append ellipsis
-  result += "\x1b[0m" + ellipsis;
+  result += `\x1b[0m${ellipsis}`;
 
   return result;
 }
@@ -81,11 +81,7 @@ function truncate(s: string, maxWidth: number): string {
 /**
  * Align cell content within a given width, ANSI-aware.
  */
-function alignCell(
-  content: string,
-  width: number,
-  align: "left" | "right" | "center"
-): string {
+function alignCell(content: string, width: number, align: 'left' | 'right' | 'center'): string {
   const visLen = stripAnsi(content).length;
 
   if (visLen >= width) {
@@ -93,15 +89,14 @@ function alignCell(
   }
 
   switch (align) {
-    case "right":
+    case 'right':
       return padLeft(content, width);
-    case "center": {
+    case 'center': {
       const totalPad = width - visLen;
       const leftPad = Math.floor(totalPad / 2);
       const rightPad = totalPad - leftPad;
-      return " ".repeat(leftPad) + content + " ".repeat(rightPad);
+      return ' '.repeat(leftPad) + content + ' '.repeat(rightPad);
     }
-    case "left":
     default:
       return padRight(content, width);
   }
@@ -118,7 +113,7 @@ function calculateColumnWidths(
   columns: Column[],
   maxWidth: number,
   rows: Record<string, any>[],
-  footerRows?: Record<string, any>[]
+  footerRows?: Record<string, any>[],
 ): number[] {
   const widths = new Array<number>(columns.length).fill(0);
   const allRows = [...rows, ...(footerRows ?? [])];
@@ -133,8 +128,7 @@ function calculateColumnWidths(
       let maxContent = stripAnsi(col.label).length;
       for (const row of allRows) {
         const val = row[col.key];
-        const formatted =
-          col.format !== undefined ? col.format(val, row) : String(val ?? "");
+        const formatted = col.format !== undefined ? col.format(val, row) : String(val ?? '');
         const visLen = stripAnsi(formatted).length;
         if (visLen > maxContent) {
           maxContent = visLen;
@@ -163,10 +157,7 @@ function calculateColumnWidths(
     .filter(({ col }) => col.flex !== undefined);
 
   if (flexColumns.length > 0 && remaining > 0) {
-    const totalFlex = flexColumns.reduce(
-      (sum, { col }) => sum + (col.flex ?? 0),
-      0
-    );
+    const totalFlex = flexColumns.reduce((sum, { col }) => sum + (col.flex ?? 0), 0);
 
     if (totalFlex > 0) {
       let distributed = 0;
@@ -223,17 +214,18 @@ export function renderTable(options: TableOptions): string {
   const {
     columns,
     rows,
+    // biome-ignore lint/correctness/noUnusedVariables: reserved for future compact mode rendering
     compact = false,
     footerRows,
     highlightRow,
     maxWidth = process.stdout.columns || 80,
-    borderStyle = "minimal",
+    borderStyle = 'minimal',
     zebra = false,
     groupSeparator = [],
   } = options;
 
   if (columns.length === 0) {
-    return "";
+    return '';
   }
 
   const colWidths = calculateColumnWidths(columns, maxWidth, rows, footerRows);
@@ -244,16 +236,11 @@ export function renderTable(options: TableOptions): string {
   /**
    * Format a single cell value.
    */
-  function formatCell(
-    col: Column,
-    row: Record<string, any>,
-    width: number
-  ): string {
+  function formatCell(col: Column, row: Record<string, any>, width: number): string {
     const raw = row[col.key];
-    const formatted =
-      col.format !== undefined ? col.format(raw, row) : String(raw ?? "");
+    const formatted = col.format !== undefined ? col.format(raw, row) : String(raw ?? '');
     const truncated = truncate(formatted, width);
-    return alignCell(truncated, width, col.align ?? "left");
+    return alignCell(truncated, width, col.align ?? 'left');
   }
 
   /**
@@ -262,22 +249,19 @@ export function renderTable(options: TableOptions): string {
   function buildRow(row: Record<string, any>): string {
     const cells = columns.map((col, i) => formatCell(col, row, colWidths[i]));
 
-    if (borderStyle === "rounded") {
-      return "\u2502 " + cells.join(" \u2502 ") + " \u2502";
-    } else if (borderStyle === "none") {
-      return cells.join(" ");
+    if (borderStyle === 'rounded') {
+      return `\u2502 ${cells.join(' \u2502 ')} \u2502`;
+    } else if (borderStyle === 'none') {
+      return cells.join(' ');
     } else {
       // minimal
-      return cells.join(" ");
+      return cells.join(' ');
     }
   }
 
   // === Rounded border: top border ===
-  if (borderStyle === "rounded") {
-    const topBorder =
-      "\u256D" +
-      colWidths.map((w) => "\u2500".repeat(w + 2)).join("\u252C") +
-      "\u256E";
+  if (borderStyle === 'rounded') {
+    const topBorder = `\u256D${colWidths.map((w) => '\u2500'.repeat(w + 2)).join('\u252C')}\u256E`;
     lines.push(topBorder);
   }
 
@@ -285,32 +269,29 @@ export function renderTable(options: TableOptions): string {
   const headerCells = columns.map((col, i) => {
     const label = col.label;
     const truncated = truncate(label, colWidths[i]);
-    const aligned = alignCell(truncated, colWidths[i], col.align ?? "left");
+    const aligned = alignCell(truncated, colWidths[i], col.align ?? 'left');
     if (col.headerColor) {
       return col.headerColor(aligned);
     }
     return chalk.bold(aligned);
   });
 
-  if (borderStyle === "rounded") {
-    lines.push("\u2502 " + headerCells.join(" \u2502 ") + " \u2502");
-  } else if (borderStyle === "none") {
-    lines.push(headerCells.join(" "));
+  if (borderStyle === 'rounded') {
+    lines.push(`\u2502 ${headerCells.join(' \u2502 ')} \u2502`);
+  } else if (borderStyle === 'none') {
+    lines.push(headerCells.join(' '));
   } else {
     // minimal
-    lines.push(headerCells.join(" "));
+    lines.push(headerCells.join(' '));
   }
 
   // === Header separator ===
-  if (borderStyle === "rounded") {
-    const sep =
-      "\u251C" +
-      colWidths.map((w) => "\u2500".repeat(w + 2)).join("\u253C") +
-      "\u2524";
+  if (borderStyle === 'rounded') {
+    const sep = `\u251C${colWidths.map((w) => '\u2500'.repeat(w + 2)).join('\u253C')}\u2524`;
     lines.push(sep);
-  } else if (borderStyle === "minimal") {
+  } else if (borderStyle === 'minimal') {
     const totalWidth = colWidths.reduce((sum, w) => sum + w, 0) + (columns.length - 1);
-    lines.push(chalk.dim("\u2500".repeat(totalWidth)));
+    lines.push(chalk.dim('\u2500'.repeat(totalWidth)));
   }
   // "none" border style: no header separator
 
@@ -333,45 +314,40 @@ export function renderTable(options: TableOptions): string {
 
     // Group separator after this row
     if (groupSepSet.has(rowIdx)) {
-      if (borderStyle === "rounded") {
+      if (borderStyle === 'rounded') {
         const sep =
-          "\u251C" +
+          '\u251C' +
           colWidths
             .map((w) => {
               // Dashed line inside rounded
               const dashes: string[] = [];
               for (let d = 0; d < w + 2; d++) {
-                dashes.push(d % 2 === 0 ? "\u2500" : " ");
+                dashes.push(d % 2 === 0 ? '\u2500' : ' ');
               }
-              return dashes.join("");
+              return dashes.join('');
             })
-            .join("\u253C") +
-          "\u2524";
+            .join('\u253C') +
+          '\u2524';
         lines.push(chalk.dim(sep));
-      } else if (borderStyle === "minimal" || borderStyle === "none") {
-        const totalWidth =
-          colWidths.reduce((sum, w) => sum + w, 0) + (columns.length - 1);
+      } else if (borderStyle === 'minimal' || borderStyle === 'none') {
+        const totalWidth = colWidths.reduce((sum, w) => sum + w, 0) + (columns.length - 1);
         const dashes: string[] = [];
         for (let d = 0; d < totalWidth; d++) {
-          dashes.push(d % 2 === 0 ? "\u2500" : " ");
+          dashes.push(d % 2 === 0 ? '\u2500' : ' ');
         }
-        lines.push(chalk.dim(dashes.join("")));
+        lines.push(chalk.dim(dashes.join('')));
       }
     }
   }
 
   // === Footer separator + footer rows ===
   if (footerRows && footerRows.length > 0) {
-    if (borderStyle === "rounded") {
-      const sep =
-        "\u251C" +
-        colWidths.map((w) => "\u2500".repeat(w + 2)).join("\u253C") +
-        "\u2524";
+    if (borderStyle === 'rounded') {
+      const sep = `\u251C${colWidths.map((w) => '\u2500'.repeat(w + 2)).join('\u253C')}\u2524`;
       lines.push(sep);
-    } else if (borderStyle === "minimal") {
-      const totalWidth =
-        colWidths.reduce((sum, w) => sum + w, 0) + (columns.length - 1);
-      lines.push(chalk.dim("\u2500".repeat(totalWidth)));
+    } else if (borderStyle === 'minimal') {
+      const totalWidth = colWidths.reduce((sum, w) => sum + w, 0) + (columns.length - 1);
+      lines.push(chalk.dim('\u2500'.repeat(totalWidth)));
     }
 
     for (const row of footerRows) {
@@ -380,13 +356,10 @@ export function renderTable(options: TableOptions): string {
   }
 
   // === Rounded border: bottom border ===
-  if (borderStyle === "rounded") {
-    const bottomBorder =
-      "\u2570" +
-      colWidths.map((w) => "\u2500".repeat(w + 2)).join("\u2534") +
-      "\u256F";
+  if (borderStyle === 'rounded') {
+    const bottomBorder = `\u2570${colWidths.map((w) => '\u2500'.repeat(w + 2)).join('\u2534')}\u256F`;
     lines.push(bottomBorder);
   }
 
-  return lines.join("\n");
+  return lines.join('\n');
 }

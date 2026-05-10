@@ -1,6 +1,5 @@
-import type { TaskNode } from '../config/schema.js';
-import type { StatesConfig } from '../config/schema.js';
 import type { AIProviderName } from '../auth/provider.js';
+import type { StatesConfig, TaskNode } from '../config/schema.js';
 
 /**
  * Options passed to expandTask() and expandMultiple().

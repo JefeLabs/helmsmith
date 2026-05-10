@@ -1,7 +1,7 @@
 import { execFile as execFileCb } from 'node:child_process';
-import { promisify } from 'node:util';
 import { join } from 'node:path';
-import { CONFIG_PARENT_DIR, CONFIG_DIR_NAME } from '../config/branding.js';
+import { promisify } from 'node:util';
+import { CONFIG_DIR_NAME, CONFIG_PARENT_DIR } from '../config/branding.js';
 
 const execFile = promisify(execFileCb);
 

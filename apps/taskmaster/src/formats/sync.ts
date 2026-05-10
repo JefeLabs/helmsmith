@@ -1,10 +1,9 @@
-import { readdir } from 'node:fs/promises';
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { existsSync } from 'node:fs';
-import { safeLoad } from './yaml-bridge.js';
+import { readdir, readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import type { TaskNode } from '../config/schema.js';
 import { readTasks, writeTasks } from './tasks-store.js';
-import type { TaskNode, Dependency } from '../config/schema.js';
+import { safeLoad } from './yaml-bridge.js';
 
 /** Fields that can be edited in YAML and synced back into tasks.json. */
 const EDITABLE_FIELDS = [

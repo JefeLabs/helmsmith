@@ -1,6 +1,6 @@
 import { loadConfig, saveConfig } from '../config/loader.js';
-import { DEFAULT_SETTINGS } from '../types/schema.js';
 import type { Org } from '../types/schema.js';
+import { DEFAULT_SETTINGS } from '../types/schema.js';
 
 export interface AddOrgOptions {
   name: string;
@@ -12,6 +12,7 @@ export interface AddOrgOptions {
 }
 
 export async function addOrg(options: AddOrgOptions): Promise<void> {
+  // biome-ignore lint/suspicious/noImplicitAnyLet: assigned in try/catch below
   let config;
   try {
     config = await loadConfig(options.config);
@@ -58,6 +59,7 @@ export interface AddTeamOptions {
 }
 
 export async function addTeamToOrg(options: AddTeamOptions): Promise<void> {
+  // biome-ignore lint/suspicious/noImplicitAnyLet: assigned in try/catch below
   let config;
   try {
     config = await loadConfig(options.config);
@@ -69,7 +71,9 @@ export async function addTeamToOrg(options: AddTeamOptions): Promise<void> {
 
   const org = config.orgs.find((o) => o.name.toLowerCase() === options.org.toLowerCase());
   if (!org) {
-    console.error(`Organization "${options.org}" not found. Run "gitradar org list" to see available orgs.`);
+    console.error(
+      `Organization "${options.org}" not found. Run "gitradar org list" to see available orgs.`,
+    );
     process.exitCode = 1;
     return;
   }

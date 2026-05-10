@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 // ── Config Schemas ──────────────────────────────────────────────────────────
 
@@ -12,13 +12,13 @@ export const MemberSchema = z.object({
 
 export const TeamSchema = z.object({
   name: z.string(),
-  tag: z.string().optional().default("default"),
+  tag: z.string().optional().default('default'),
   members: z.array(MemberSchema),
 });
 
 export const OrgSchema = z.object({
   name: z.string(),
-  type: z.enum(["core", "consultant"]),
+  type: z.enum(['core', 'consultant']),
   /** Prefix pattern to auto-match authors by identifier in git name, e.g. "ACN" matches "(ACNxxx)". */
   identifier: z.string().optional(),
   teams: z.array(TeamSchema),
@@ -27,7 +27,7 @@ export const OrgSchema = z.object({
 export const RepoSchema = z.object({
   path: z.string(),
   name: z.string().optional(),
-  group: z.string().optional().default("default"),
+  group: z.string().optional().default('default'),
 });
 
 export const ConfigSchema = z.object({
@@ -47,13 +47,13 @@ export const ConfigSchema = z.object({
    *  Example: { "*.tf": "config", "*.proto": "app", "src/generated/**": "config" }
    */
   classification: z
-    .record(z.string(), z.enum(["app", "test", "config", "storybook", "doc"]))
+    .record(z.string(), z.enum(['app', 'test', 'config', 'storybook', 'doc']))
     .optional(),
   settings: z
     .object({
       weeks_back: z.number().optional().default(12),
       staleness_minutes: z.number().optional().default(60),
-      trend_threshold: z.number().optional().default(0.10),
+      trend_threshold: z.number().optional().default(0.1),
       /** Glob patterns for files to exclude from metrics (e.g. "package-lock.json", "*.min.js", "dist/*"). */
       ignore_patterns: z.array(z.string()).optional(),
       /** How many days before the analysis period to look for "recently modified" files
@@ -75,17 +75,29 @@ export const ConfigSchema = z.object({
     })
     .optional()
     .default({
-      weeks_back: 12, staleness_minutes: 60, trend_threshold: 0.10,
-      churn_window_days: 21, churn_max_commits: 50, churn_concurrency: 3,
-      segment_high_pct: 20, segment_low_pct: 20, auto_prune_weeks: 0,
+      weeks_back: 12,
+      staleness_minutes: 60,
+      trend_threshold: 0.1,
+      churn_window_days: 21,
+      churn_max_commits: 50,
+      churn_concurrency: 3,
+      segment_high_pct: 20,
+      segment_low_pct: 20,
+      auto_prune_weeks: 0,
     }),
 });
 
 /** Default settings — use when constructing Config objects outside of Zod parsing. */
 export const DEFAULT_SETTINGS: Config['settings'] = {
-  weeks_back: 12, staleness_minutes: 60, trend_threshold: 0.10,
-  churn_window_days: 21, churn_max_commits: 50, churn_concurrency: 3,
-  segment_high_pct: 20, segment_low_pct: 20, auto_prune_weeks: 0,
+  weeks_back: 12,
+  staleness_minutes: 60,
+  trend_threshold: 0.1,
+  churn_window_days: 21,
+  churn_max_commits: 50,
+  churn_concurrency: 3,
+  segment_high_pct: 20,
+  segment_low_pct: 20,
+  auto_prune_weeks: 0,
 };
 
 // ── Data Schemas ────────────────────────────────────────────────────────────
@@ -103,7 +115,7 @@ export const UserWeekRepoRecordSchema = z.object({
   member: z.string(),
   email: z.string(),
   org: z.string(),
-  orgType: z.enum(["core", "consultant"]),
+  orgType: z.enum(['core', 'consultant']),
   team: z.string(),
   tag: z.string(),
 
@@ -118,15 +130,17 @@ export const UserWeekRepoRecordSchema = z.object({
 
   // Semantic intent breakdown (from conventional commit prefixes).
   // Optional for backwards compatibility with records created before this field existed.
-  intent: z.object({
-    feat: z.number().optional().default(0),
-    fix: z.number().optional().default(0),
-    refactor: z.number().optional().default(0),
-    docs: z.number().optional().default(0),
-    test: z.number().optional().default(0),
-    chore: z.number().optional().default(0),
-    other: z.number().optional().default(0),
-  }).optional(),
+  intent: z
+    .object({
+      feat: z.number().optional().default(0),
+      fix: z.number().optional().default(0),
+      refactor: z.number().optional().default(0),
+      docs: z.number().optional().default(0),
+      test: z.number().optional().default(0),
+      chore: z.number().optional().default(0),
+      other: z.number().optional().default(0),
+    })
+    .optional(),
 
   // Semantic scope and breaking change tracking (from conventional commit parsing).
   // breakingChanges: count of commits with "!" breaking marker (e.g. "feat!:", "fix(auth)!:")
@@ -221,7 +235,7 @@ export const EnrichmentStoreSchema = z.object({
 export const WorkspaceRepoSchema = z.object({
   name: z.string(),
   path: z.string().optional(),
-  group: z.string().optional().default("default"),
+  group: z.string().optional().default('default'),
   tags: z.array(z.string()).optional().default([]),
 });
 

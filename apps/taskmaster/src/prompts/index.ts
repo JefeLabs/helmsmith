@@ -1,37 +1,34 @@
 // Factory — reusable prompt builders
-export {
-  inputWithDefault,
-  listWithDefault,
-  checkboxWithDefaults,
-  confirmPrompt,
-  numberWithDefault,
-  searchPrompt,
-  resolveDefault,
-  resetDefaultsCache,
-} from './factory.js';
-
-// Init wizard
-export { runInitWizard, type InitWizardResult } from './init-wizard.js';
 
 // Add task prompt
-export { runAddTaskPrompt, type AddTaskResult } from './add-task.js';
-
+export { type AddTaskResult, runAddTaskPrompt } from './add-task.js';
 // Config editor
 export {
-  runConfigEditor,
-  getConfigValue,
-  validateConfigValue,
   applyConfigValue,
   CONFIG_KEYS,
   type ConfigEditResult,
+  getConfigValue,
+  runConfigEditor,
+  validateConfigValue,
 } from './config-editor.js';
-
 // Confirmation prompts
 export {
-  confirmRemove,
-  confirmExpand,
-  confirmBulkOperation,
-  type RemoveConfirmResult,
-  type ExpandConfirmResult,
   type BulkConfirmResult,
+  confirmBulkOperation,
+  confirmExpand,
+  confirmRemove,
+  type ExpandConfirmResult,
+  type RemoveConfirmResult,
 } from './confirmations.js';
+export {
+  checkboxWithDefaults,
+  confirmPrompt,
+  inputWithDefault,
+  listWithDefault,
+  numberWithDefault,
+  resetDefaultsCache,
+  resolveDefault,
+  searchPrompt,
+} from './factory.js';
+// Init wizard
+export { type InitWizardResult, runInitWizard } from './init-wizard.js';

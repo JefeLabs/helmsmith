@@ -1,13 +1,12 @@
-export { BUILT_IN_SKILLS, type SkillInferenceResult, type SkillValidationIssue } from './types.js';
-
 export {
+  buildSkillInferencePrompt,
+  getEffectiveVocabulary,
   inferSkills,
+  inferSkillsByKeyword,
   inferSkillsForTask,
   inheritSkills,
-  getEffectiveVocabulary,
-  inferSkillsByKeyword,
-  buildSkillInferencePrompt,
   parseSkillInferenceResponse,
 } from './inference.js';
+export { BUILT_IN_SKILLS, type SkillInferenceResult, type SkillValidationIssue } from './types.js';
 
-export { validateSkills, findClosestMatch } from './validation.js';
+export { findClosestMatch, validateSkills } from './validation.js';

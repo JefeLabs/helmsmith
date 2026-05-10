@@ -1,23 +1,24 @@
 import chalk from 'chalk';
+import { callAI } from '../../auth/call-ai.js';
 import type { TaskNode } from '../../config/schema.js';
 import { PROJECT_STYLES } from '../../config/styles.js';
-import { callAI } from '../../auth/call-ai.js';
-import { formatComponentIndexForPrompt, formatEntryPointIndexForPrompt, buildEntryPointIndex } from './retrieval.js';
 import { applyValidation, generateValidationWarnings } from './entrypoint-validation.js';
 import { buildArchitectureDiscoveryPrompt, buildTaskGenerationPrompt } from './prompts.js';
-import { runScanPipeline } from './scanner.js';
 import {
-  ArchitectureAnalysisSchema,
-  Phase2ResponseSchema,
-} from './types.js';
+  buildEntryPointIndex,
+  formatComponentIndexForPrompt,
+  formatEntryPointIndexForPrompt,
+} from './retrieval.js';
+import { runScanPipeline } from './scanner.js';
 import type {
-  ArchitectureAnalysis,
   AITaskWithTags,
   AnalysisPipelineOptions,
   AnalysisPipelineResult,
-  EntryPointIndex,
+  ArchitectureAnalysis,
   EntryPoint,
+  EntryPointIndex,
 } from './types.js';
+import { ArchitectureAnalysisSchema, Phase2ResponseSchema } from './types.js';
 
 /**
  * Strip markdown code fences from AI response.
@@ -131,7 +132,7 @@ function resolveDependencies(
         const depId = titleMap.get(depTitle.toLowerCase());
         if (depId && depId !== nodes[i].id) {
           // Avoid duplicate dependency entries
-          if (!nodes[i].dependencies.some(d => d.taskId === depId)) {
+          if (!nodes[i].dependencies.some((d) => d.taskId === depId)) {
             nodes[i].dependencies.push({ taskId: depId, type: 'blocks' });
           }
         }
@@ -149,10 +150,7 @@ function resolveDependencies(
  * Infer additional dependencies from interface relationships.
  * For each interface {from: A, to: B}, A's top-level task depends on B's.
  */
-function inferInterfaceDependencies(
-  tasks: TaskNode[],
-  analysis: ArchitectureAnalysis,
-): void {
+function inferInterfaceDependencies(tasks: TaskNode[], analysis: ArchitectureAnalysis): void {
   // Build component-name → task-id map (top-level tasks tagged with component:<name>)
   const componentToTask = new Map<string, string>();
   for (const task of tasks) {
@@ -168,8 +166,8 @@ function inferInterfaceDependencies(
     const toTaskId = componentToTask.get(iface.to);
 
     if (fromTaskId && toTaskId && fromTaskId !== toTaskId) {
-      const fromTask = tasks.find(t => t.id === fromTaskId);
-      if (fromTask && !fromTask.dependencies.some(d => d.taskId === toTaskId)) {
+      const fromTask = tasks.find((t) => t.id === fromTaskId);
+      if (fromTask && !fromTask.dependencies.some((d) => d.taskId === toTaskId)) {
         fromTask.dependencies.push({ taskId: toTaskId, type: 'blocks' });
       }
     }
@@ -194,9 +192,11 @@ export async function runAnalysisPipeline(
   // --- Steps 0–2.5: Scan pipeline (component discovery, codebase scan, source analysis, indexes) ---
   let scanResult = null;
   let sourceResult = null;
-  let componentIndex = undefined;
-  let symbolIndex = undefined;
-  let entryPointIndex: EntryPointIndex | undefined = undefined;
+  // biome-ignore lint/suspicious/noImplicitAnyLet: assigned in try/catch below
+  let componentIndex;
+  // biome-ignore lint/suspicious/noImplicitAnyLet: assigned in try/catch below
+  let symbolIndex;
+  let entryPointIndex: EntryPointIndex | undefined;
   let componentIndexSummary: string | null = null;
   let entryPointIndexSummary: string | null = null;
 
@@ -224,8 +224,19 @@ export async function runAnalysisPipeline(
 
   // --- Step 3: Phase 1 — Architecture Discovery ---
   console.error(chalk.dim('  Phase 1: Architecture discovery...'));
-  const phase1Messages = buildArchitectureDiscoveryPrompt(documentContent, scanResult, sourceResult, componentIndexSummary, entryPointIndexSummary);
-  const phase1Response = await callAI(phase1Messages, options.model, options.provider, 'parser-analysis');
+  const phase1Messages = buildArchitectureDiscoveryPrompt(
+    documentContent,
+    scanResult,
+    sourceResult,
+    componentIndexSummary,
+    entryPointIndexSummary,
+  );
+  const phase1Response = await callAI(
+    phase1Messages,
+    options.model,
+    options.provider,
+    'parser-analysis',
+  );
   const phase1Content = phase1Response.choices?.[0]?.message?.content;
 
   if (!phase1Content) {
@@ -242,8 +253,8 @@ export async function runAnalysisPipeline(
   console.error(
     chalk.dim(
       `  Architecture: ${analysis.components.length} components, ` +
-      `${analysis.interfaces.length} interfaces, ` +
-      `${analysis.dataSources.length} data sources`,
+        `${analysis.interfaces.length} interfaces, ` +
+        `${analysis.dataSources.length} data sources`,
     ),
   );
 
@@ -265,11 +276,7 @@ export async function runAnalysisPipeline(
     const aiTraces = analysis.entryPointTraces ?? [];
     const aiSideEffects = analysis.sideEffects ?? [];
 
-    entryPointIndex = buildEntryPointIndex(
-      entryPointIndex.repoRoot,
-      mergedEntryPoints,
-      aiTraces,
-    );
+    entryPointIndex = buildEntryPointIndex(entryPointIndex.repoRoot, mergedEntryPoints, aiTraces);
 
     // Update analysis with merged data
     analysis.entryPoints = mergedEntryPoints;
@@ -293,7 +300,7 @@ export async function runAnalysisPipeline(
   }
 
   // --- Step 3.5: Load blueprint context (if configured) ---
-  let blueprintOption: Parameters<typeof buildTaskGenerationPrompt>[2]['blueprint'] = undefined;
+  let blueprintOption: Parameters<typeof buildTaskGenerationPrompt>[2]['blueprint'];
   if (options.blueprintId) {
     try {
       const { getBlueprint, resolveBlueprint } = await import('../../blueprints/index.js');
@@ -317,7 +324,12 @@ export async function runAnalysisPipeline(
     numTasks: options.numTasks,
     blueprint: blueprintOption,
   });
-  const phase2Response = await callAI(phase2Messages, options.model, options.provider, 'parser-taskgen');
+  const phase2Response = await callAI(
+    phase2Messages,
+    options.model,
+    options.provider,
+    'parser-taskgen',
+  );
   const phase2Content = phase2Response.choices?.[0]?.message?.content;
 
   if (!phase2Content) {
@@ -350,9 +362,7 @@ export async function runAnalysisPipeline(
   // Infer interface-based dependencies
   inferInterfaceDependencies(tasks, analysis);
 
-  console.error(
-    chalk.dim(`  Generated ${tasks.length} top-level task(s)`),
-  );
+  console.error(chalk.dim(`  Generated ${tasks.length} top-level task(s)`));
 
   return { analysis, tasks, warnings, componentIndex, symbolIndex, entryPointIndex };
 }

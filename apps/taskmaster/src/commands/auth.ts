@@ -1,10 +1,10 @@
 import type { AIProviderName } from '../auth/index.js';
 import {
+  AI_PROVIDERS,
   getProvider,
   readAuthFile,
-  writeAuthFile,
-  AI_PROVIDERS,
   resolveGitHubToken,
+  writeAuthFile,
 } from '../auth/index.js';
 
 export interface AuthLoginOpts {
@@ -62,7 +62,10 @@ export async function executeAuthLogin(
   // Check if already authenticated (unless --force)
   if (!opts.force) {
     const existing = await provider.resolveAuth();
-    if (existing && (existing.source.startsWith('auth.json') || existing.source.startsWith('env:'))) {
+    if (
+      existing &&
+      (existing.source.startsWith('auth.json') || existing.source.startsWith('env:'))
+    ) {
       throw new Error(
         `Already authenticated with ${providerName} (source: ${existing.source}). ` +
           `Use --force to re-authenticate.`,
@@ -93,9 +96,12 @@ export async function executeAuthStatus(): Promise<AuthStatusResult> {
     const isActive = name === authFile.active_provider;
 
     if (authResult) {
-      const displayName = name === 'copilot'
-        ? authFile.copilot?.username ? `@${authFile.copilot.username}` : 'authenticated'
-        : authFile[name]?.display_name ?? 'authenticated';
+      const displayName =
+        name === 'copilot'
+          ? authFile.copilot?.username
+            ? `@${authFile.copilot.username}`
+            : 'authenticated'
+          : (authFile[name]?.display_name ?? 'authenticated');
       entries.push({ name, isActive, authenticated: true, displayName, source: authResult.source });
     } else {
       entries.push({ name, isActive, authenticated: false, displayName: '', source: '' });
@@ -108,9 +114,7 @@ export async function executeAuthStatus(): Promise<AuthStatusResult> {
 /**
  * Execute auth switch: change active provider without re-authenticating.
  */
-export async function executeAuthSwitch(
-  providerArg: string,
-): Promise<AuthSwitchResult> {
+export async function executeAuthSwitch(providerArg: string): Promise<AuthSwitchResult> {
   if (!AI_PROVIDERS.includes(providerArg as AIProviderName)) {
     throw new Error(`Unknown provider "${providerArg}". Valid: ${AI_PROVIDERS.join(', ')}`);
   }

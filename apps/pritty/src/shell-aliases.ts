@@ -10,14 +10,14 @@
  * we shouldn't second-guess that.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, join } from 'node:path';
 
-export type SupportedShell = "zsh" | "bash" | "fish";
+export type SupportedShell = 'zsh' | 'bash' | 'fish';
 
-export const ALIAS_BLOCK_START = "# >>> pritty aliases >>>";
-export const ALIAS_BLOCK_END = "# <<< pritty aliases <<<";
+export const ALIAS_BLOCK_START = '# >>> pritty aliases >>>';
+export const ALIAS_BLOCK_END = '# <<< pritty aliases <<<';
 
 /**
  * Detect the user's shell from $SHELL. Returns null when the shell
@@ -25,10 +25,10 @@ export const ALIAS_BLOCK_END = "# <<< pritty aliases <<<";
  * the prompt rather than guess.
  */
 export function detectShell(): SupportedShell | null {
-  const shell = process.env.SHELL ?? "";
-  if (shell.endsWith("/zsh") || shell.endsWith("\\zsh")) return "zsh";
-  if (shell.endsWith("/bash") || shell.endsWith("\\bash")) return "bash";
-  if (shell.endsWith("/fish") || shell.endsWith("\\fish")) return "fish";
+  const shell = process.env.SHELL ?? '';
+  if (shell.endsWith('/zsh') || shell.endsWith('\\zsh')) return 'zsh';
+  if (shell.endsWith('/bash') || shell.endsWith('\\bash')) return 'bash';
+  if (shell.endsWith('/fish') || shell.endsWith('\\fish')) return 'fish';
   return null;
 }
 
@@ -36,12 +36,12 @@ export function detectShell(): SupportedShell | null {
 export function rcPathFor(shell: SupportedShell): string {
   const home = homedir();
   switch (shell) {
-    case "zsh":
-      return join(home, ".zshrc");
-    case "bash":
-      return join(home, ".bashrc");
-    case "fish":
-      return join(home, ".config", "fish", "config.fish");
+    case 'zsh':
+      return join(home, '.zshrc');
+    case 'bash':
+      return join(home, '.bashrc');
+    case 'fish':
+      return join(home, '.config', 'fish', 'config.fish');
   }
 }
 
@@ -52,7 +52,7 @@ export function rcPathFor(shell: SupportedShell): string {
  */
 export function aliasBlock(shell: SupportedShell): string {
   const lines: string[] = [ALIAS_BLOCK_START];
-  if (shell === "fish") {
+  if (shell === 'fish') {
     lines.push(`alias commit "pritty commit"`);
     lines.push(`alias pr "pritty pr"`);
   } else {
@@ -60,7 +60,7 @@ export function aliasBlock(shell: SupportedShell): string {
     lines.push(`alias pr="pritty pr"`);
   }
   lines.push(ALIAS_BLOCK_END);
-  return lines.join("\n");
+  return lines.join('\n');
 }
 
 export interface InstallResult {
@@ -78,9 +78,9 @@ export interface InstallResult {
 export function installShellAliases(shell: SupportedShell): InstallResult {
   const rcPath = rcPathFor(shell);
   const block = aliasBlock(shell);
-  let content = "";
+  let content = '';
   if (existsSync(rcPath)) {
-    content = readFileSync(rcPath, "utf8");
+    content = readFileSync(rcPath, 'utf8');
   }
 
   const startIdx = content.indexOf(ALIAS_BLOCK_START);
@@ -100,8 +100,7 @@ export function installShellAliases(shell: SupportedShell): InstallResult {
   // Fresh append — make sure the parent dir exists (fish's default
   // location may not be created yet on a fresh user setup).
   mkdirSync(dirname(rcPath), { recursive: true });
-  const separator =
-    content.length === 0 ? "" : content.endsWith("\n") ? "\n" : "\n\n";
+  const separator = content.length === 0 ? '' : content.endsWith('\n') ? '\n' : '\n\n';
   writeFileSync(rcPath, `${content}${separator}${block}\n`);
   return { rcPath, replaced: false };
 }
@@ -115,20 +114,16 @@ export function installShellAliases(shell: SupportedShell): InstallResult {
 export function uninstallShellAliases(shell: SupportedShell): boolean {
   const rcPath = rcPathFor(shell);
   if (!existsSync(rcPath)) return false;
-  const content = readFileSync(rcPath, "utf8");
+  const content = readFileSync(rcPath, 'utf8');
   const startIdx = content.indexOf(ALIAS_BLOCK_START);
   if (startIdx < 0) return false;
   const endMarkerIdx = content.indexOf(ALIAS_BLOCK_END, startIdx);
   if (endMarkerIdx < 0) {
-    throw new Error(
-      `${rcPath} has a start marker but no end marker — refusing to mangle.`,
-    );
+    throw new Error(`${rcPath} has a start marker but no end marker — refusing to mangle.`);
   }
-  const before = content.slice(0, startIdx).replace(/\n+$/, "");
-  const after = content.slice(endMarkerIdx + ALIAS_BLOCK_END.length).replace(/^\n+/, "");
-  const next = before.length > 0 && after.length > 0
-    ? `${before}\n${after}`
-    : `${before}${after}`;
+  const before = content.slice(0, startIdx).replace(/\n+$/, '');
+  const after = content.slice(endMarkerIdx + ALIAS_BLOCK_END.length).replace(/^\n+/, '');
+  const next = before.length > 0 && after.length > 0 ? `${before}\n${after}` : `${before}${after}`;
   writeFileSync(rcPath, next);
   return true;
 }

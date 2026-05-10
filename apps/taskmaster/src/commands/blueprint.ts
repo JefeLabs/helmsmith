@@ -1,4 +1,4 @@
-import type { TaskNode, ProjectConfig } from '../config/schema.js';
+import type { ProjectConfig, TaskNode } from '../config/schema.js';
 import { getDefaultStatus } from '../config/state-engine.js';
 import { getNextId } from '../parser/index.js';
 
@@ -47,8 +47,9 @@ export async function executeBlueprintApply(
   contextAnswers: Record<string, string | boolean | string[]>,
   opts: { flat?: boolean } = {},
 ): Promise<BlueprintApplyResult> {
-  const { getBlueprint, resolveBlueprint, generateConcernTasks, BLUEPRINT_IDS } =
-    await import('../blueprints/index.js');
+  const { getBlueprint, resolveBlueprint, generateConcernTasks, BLUEPRINT_IDS } = await import(
+    '../blueprints/index.js'
+  );
   const bp = getBlueprint(id);
 
   if (!bp) {
@@ -92,8 +93,7 @@ export async function executeBlueprintCheck(
   blueprintId: string,
   blueprintContextAnswers: Record<string, string | boolean | string[]>,
 ): Promise<BlueprintCheckResult> {
-  const { getBlueprint, resolveBlueprint, groupByUrgency } =
-    await import('../blueprints/index.js');
+  const { getBlueprint, resolveBlueprint } = await import('../blueprints/index.js');
   const bp = getBlueprint(blueprintId);
 
   if (!bp) {
@@ -126,7 +126,12 @@ export async function executeBlueprintCheck(
       status = '\u2717 missing';
     }
 
-    return { title: c.title, urgency: c.urgency, status, isMissing: !present && c.urgency !== 'deferred' };
+    return {
+      title: c.title,
+      urgency: c.urgency,
+      status,
+      isMissing: !present && c.urgency !== 'deferred',
+    };
   });
 
   const coveredCount = concernStatuses.filter((c) => c.status.startsWith('\u2713')).length;

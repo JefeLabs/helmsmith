@@ -1,6 +1,6 @@
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { APP_GROUP_INITIALS, APP_NAME } from '../config/branding.js';
 
@@ -126,7 +126,9 @@ function readCommand(filename: string): string {
 function listCommandFiles(): string[] {
   const commandsDir = join(getContextDir(), 'commands');
   if (!existsSync(commandsDir)) return [];
-  return readdirSync(commandsDir).filter((f) => f.endsWith('.md')).sort();
+  return readdirSync(commandsDir)
+    .filter((f) => f.endsWith('.md'))
+    .sort();
 }
 
 // ── Tool-specific adapters: agents ───────────────────────────
@@ -159,16 +161,12 @@ function wrapAgentForCopilot(_id: string, content: string, meta: InstructionFile
 function wrapCommandForCopilotPrompt(filename: string, content: string): string {
   const lines = content.split('\n');
   const name = filename.replace('.md', '');
-  const descLine = lines.find((l, i) => i > 0 && l.trim().length > 0 && !l.startsWith('Arguments:'));
+  const descLine = lines.find(
+    (l, i) => i > 0 && l.trim().length > 0 && !l.startsWith('Arguments:'),
+  );
   const description = descLine?.trim() || name;
 
-  return [
-    '---',
-    `description: '${description}'`,
-    '---',
-    '',
-    content,
-  ].join('\n');
+  return ['---', `description: '${description}'`, '---', '', content].join('\n');
 }
 
 function buildAgentsMd(ids: string[], includeCommands: boolean): string {
@@ -205,7 +203,7 @@ function buildAgentsMd(ids: string[], includeCommands: boolean): string {
     }
   }
 
-  return sections.join('\n').trimEnd() + '\n';
+  return `${sections.join('\n').trimEnd()}\n`;
 }
 
 // ── Installation ─────────────────────────────────────────────
@@ -301,7 +299,7 @@ export async function installContext(
       const taskmasterSection = buildAgentsMd(ids, true);
 
       if (existing && !existing.includes('# Taskmaster Agent Instructions')) {
-        const combined = existing.trimEnd() + '\n\n' + taskmasterSection;
+        const combined = `${existing.trimEnd()}\n\n${taskmasterSection}`;
         await writeFile(agentsMdPath, combined, 'utf-8');
       } else {
         await writeFile(agentsMdPath, taskmasterSection, 'utf-8');

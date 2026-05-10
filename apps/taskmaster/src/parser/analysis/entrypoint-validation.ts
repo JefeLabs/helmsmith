@@ -1,7 +1,4 @@
-import type {
-  EntryPointIndex,
-  ComponentIndex,
-} from './types.js';
+import type { ComponentIndex, EntryPointIndex } from './types.js';
 
 export interface EntryPointValidationResult {
   orphanComponents: string[];
@@ -27,7 +24,7 @@ export function validateEntryPointCoverage(
   entryPointIndex: EntryPointIndex,
   componentIndex: ComponentIndex,
 ): EntryPointValidationResult {
-  const allComponentIds = new Set(componentIndex.components.map(c => c.id));
+  const allComponentIds = new Set(componentIndex.components.map((c) => c.id));
 
   // Components that own at least one entry point
   const ownerComponents = new Set<string>();
@@ -51,22 +48,22 @@ export function validateEntryPointCoverage(
   const reachable = new Set([...ownerComponents, ...tracedComponents]);
 
   // Orphans = total - reachable
-  const orphanComponents = [...allComponentIds].filter(id => !reachable.has(id));
+  const orphanComponents = [...allComponentIds].filter((id) => !reachable.has(id));
 
   // Unreachable = not in any trace chain (may own entry points but are leaf nodes)
-  const unreachableComponents = [...allComponentIds].filter(id => !tracedComponents.has(id) && !ownerComponents.has(id));
+  const unreachableComponents = [...allComponentIds].filter(
+    (id) => !tracedComponents.has(id) && !ownerComponents.has(id),
+  );
 
   // Entry points without traces
-  const tracedEntryPointIds = new Set(entryPointIndex.traces.map(t => t.entryPointId));
+  const tracedEntryPointIds = new Set(entryPointIndex.traces.map((t) => t.entryPointId));
   const entryPointsWithoutTraces = entryPointIndex.entryPoints
-    .filter(ep => !tracedEntryPointIds.has(ep.id))
-    .map(ep => ep.id);
+    .filter((ep) => !tracedEntryPointIds.has(ep.id))
+    .map((ep) => ep.id);
 
   // Coverage percentage
   const total = allComponentIds.size;
-  const coveragePercentage = total > 0
-    ? Math.round((reachable.size / total) * 100)
-    : 0;
+  const coveragePercentage = total > 0 ? Math.round((reachable.size / total) * 100) : 0;
 
   return {
     orphanComponents,
@@ -94,9 +91,7 @@ export function applyValidation(
 /**
  * Generate validation warning messages for pipeline output.
  */
-export function generateValidationWarnings(
-  validation: EntryPointValidationResult,
-): string[] {
+export function generateValidationWarnings(validation: EntryPointValidationResult): string[] {
   const warnings: string[] = [];
 
   if (validation.orphanComponents.length > 0) {

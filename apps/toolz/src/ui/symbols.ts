@@ -5,7 +5,7 @@
  * library (or disable colors entirely under NO_COLOR) in one place.
  */
 
-import chalk from "chalk";
+import chalk from 'chalk';
 
 /**
  * NO_COLOR support — chalk respects this automatically, but exposing

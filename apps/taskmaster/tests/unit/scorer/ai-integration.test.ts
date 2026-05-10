@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { AIScorer, createScorer, HeuristicScorer } from '../../../src/scorer/index.js';
 import { makeTask } from '../../fixtures/tasks.js';
-import { createScorer, AIScorer, HeuristicScorer } from '../../../src/scorer/index.js';
 
 describe('createScorer', () => {
   it('returns AIScorer when authAvailable is true', () => {

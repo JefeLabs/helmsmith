@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { defaultsExist, readDefaults, writeDefaults } from '../src/utils/defaults.js';
 import { bootstrapHome } from '../src/utils/home.js';
-import { readDefaults, writeDefaults, defaultsExist } from '../src/utils/defaults.js';
 
 const TEST_DIR = join(tmpdir(), `agentx-test-defaults-${Date.now()}`);
 

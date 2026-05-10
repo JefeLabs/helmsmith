@@ -1,7 +1,7 @@
-import type { UserWeekRepoRecord } from "../types/schema.js";
-import { weekLabel } from "../ui/format.js";
-import { rollup } from "./engine.js";
-import { filterRecords, type Filters } from "./filters.js";
+import type { UserWeekRepoRecord } from '../types/schema.js';
+import { weekLabel } from '../ui/format.js';
+import { rollup } from './engine.js';
+import { type Filters, filterRecords } from './filters.js';
 
 export interface TrendPoint {
   week: string;
@@ -23,10 +23,7 @@ export interface TrendPoint {
  * Groups by week, sums metrics, and computes testRatio = test / (app + test).
  * Returns points sorted by week (oldest first).
  */
-export function computeTrend(
-  records: UserWeekRepoRecord[],
-  filters?: Filters,
-): TrendPoint[] {
+export function computeTrend(records: UserWeekRepoRecord[], filters?: Filters): TrendPoint[] {
   const filtered = filters ? filterRecords(records, filters) : records;
 
   const byWeek = rollup(filtered, (r) => r.week);
@@ -34,16 +31,11 @@ export function computeTrend(
   const points: TrendPoint[] = [];
 
   for (const [week, agg] of byWeek) {
-    const app =
-      agg.filetype.app.insertions + agg.filetype.app.deletions;
-    const test =
-      agg.filetype.test.insertions + agg.filetype.test.deletions;
-    const config =
-      agg.filetype.config.insertions + agg.filetype.config.deletions;
-    const storybook =
-      agg.filetype.storybook.insertions + agg.filetype.storybook.deletions;
-    const doc =
-      agg.filetype.doc.insertions + agg.filetype.doc.deletions;
+    const app = agg.filetype.app.insertions + agg.filetype.app.deletions;
+    const test = agg.filetype.test.insertions + agg.filetype.test.deletions;
+    const config = agg.filetype.config.insertions + agg.filetype.config.deletions;
+    const storybook = agg.filetype.storybook.insertions + agg.filetype.storybook.deletions;
+    const doc = agg.filetype.doc.insertions + agg.filetype.doc.deletions;
 
     const denominator = app + test;
     const testRatio = denominator === 0 ? 0 : test / denominator;
@@ -91,9 +83,7 @@ export function computeRunningAvg(
   const windowWeekSet = buildWeekWindow(currentWeek, windowWeeks);
 
   // Filter to team + window
-  const filtered = records.filter(
-    (r) => r.team === team && windowWeekSet.has(r.week),
-  );
+  const filtered = records.filter((r) => r.team === team && windowWeekSet.has(r.week));
 
   if (filtered.length === 0) {
     return 0;
@@ -107,11 +97,16 @@ export function computeRunningAvg(
   for (const r of filtered) {
     const ft = r.filetype;
     totalLines +=
-      ft.app.insertions + ft.app.deletions +
-      ft.test.insertions + ft.test.deletions +
-      ft.config.insertions + ft.config.deletions +
-      ft.storybook.insertions + ft.storybook.deletions +
-      ft.doc.insertions + ft.doc.deletions;
+      ft.app.insertions +
+      ft.app.deletions +
+      ft.test.insertions +
+      ft.test.deletions +
+      ft.config.insertions +
+      ft.config.deletions +
+      ft.storybook.insertions +
+      ft.storybook.deletions +
+      ft.doc.insertions +
+      ft.doc.deletions;
     members.add(r.member);
     activeWeeks.add(r.week);
   }
@@ -139,9 +134,7 @@ export function computeRunningAvgByOrg(
 ): number {
   const windowWeekSet = buildWeekWindow(currentWeek, windowWeeks);
 
-  const filtered = records.filter(
-    (r) => r.org === org && windowWeekSet.has(r.week),
-  );
+  const filtered = records.filter((r) => r.org === org && windowWeekSet.has(r.week));
 
   if (filtered.length === 0) {
     return 0;
@@ -154,11 +147,16 @@ export function computeRunningAvgByOrg(
   for (const r of filtered) {
     const ft = r.filetype;
     totalLines +=
-      ft.app.insertions + ft.app.deletions +
-      ft.test.insertions + ft.test.deletions +
-      ft.config.insertions + ft.config.deletions +
-      ft.storybook.insertions + ft.storybook.deletions +
-      ft.doc.insertions + ft.doc.deletions;
+      ft.app.insertions +
+      ft.app.deletions +
+      ft.test.insertions +
+      ft.test.deletions +
+      ft.config.insertions +
+      ft.config.deletions +
+      ft.storybook.insertions +
+      ft.storybook.deletions +
+      ft.doc.insertions +
+      ft.doc.deletions;
     members.add(r.member);
     activeWeeks.add(r.week);
   }
@@ -211,7 +209,7 @@ function buildWeekWindow(currentWeek: string, windowWeeks: number): Set<string> 
     const ys = new Date(Date.UTC(copy.getUTCFullYear(), 0, 1));
     const wn = Math.ceil(((copy.getTime() - ys.getTime()) / 86400000 + 1) / 7);
 
-    weeks.add(`${copy.getUTCFullYear()}-W${String(wn).padStart(2, "0")}`);
+    weeks.add(`${copy.getUTCFullYear()}-W${String(wn).padStart(2, '0')}`);
   }
 
   return weeks;

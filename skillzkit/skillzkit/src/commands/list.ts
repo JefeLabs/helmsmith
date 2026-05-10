@@ -1,15 +1,11 @@
-import {
-  getCommands,
-  getSkills,
-  getWorkflows,
-} from "../index.js";
-import { truncate } from "./_shared/format.js";
+import { getCommands, getSkills, getWorkflows } from '../index.js';
+import { truncate } from './_shared/format.js';
 
 export interface ListOptions {
   commands?: boolean;
   skills?: boolean;
   workflows?: boolean;
-  kind?: "command" | "workflow" | "context";
+  kind?: 'command' | 'workflow' | 'context';
   tree?: boolean;
   tag?: string;
 }
@@ -27,16 +23,12 @@ export function runList(options: ListOptions = {}): void {
     return;
   }
 
-  const showAll =
-    !options.commands && !options.skills && !options.workflows;
-  const hasTag = (tags: string[] | undefined) =>
-    !options.tag || (tags ?? []).includes(options.tag);
+  const showAll = !options.commands && !options.skills && !options.workflows;
+  const hasTag = (tags: string[] | undefined) => !options.tag || (tags ?? []).includes(options.tag);
 
   if (showAll || options.commands) {
     const commands = getCommands().filter(
-      (c) =>
-        (options.kind ? c.kind === options.kind : c.kind === "command") &&
-        hasTag(c.tags),
+      (c) => (options.kind ? c.kind === options.kind : c.kind === 'command') && hasTag(c.tags),
     );
     console.log(`\n=== Commands (${commands.length}) ===`);
     for (const cmd of commands) {
@@ -48,10 +40,8 @@ export function runList(options: ListOptions = {}): void {
     const workflows = getWorkflows().filter((w) => hasTag(w.tags));
     console.log(`\n=== Workflows (${workflows.length}) ===`);
     for (const wf of workflows) {
-      const dur = wf.estimatedDuration ? ` (${wf.estimatedDuration})` : "";
-      console.log(
-        `  ${wf.qualifiedName}${dur}  —  ${truncate(wf.description, 80)}`,
-      );
+      const dur = wf.estimatedDuration ? ` (${wf.estimatedDuration})` : '';
+      console.log(`  ${wf.qualifiedName}${dur}  —  ${truncate(wf.description, 80)}`);
     }
   }
 
@@ -72,14 +62,14 @@ export function runList(options: ListOptions = {}): void {
  */
 function renderTreeView(): string {
   const cmds = getCommands()
-    .filter((c) => c.kind !== "context")
+    .filter((c) => c.kind !== 'context')
     .sort((a, b) => a.slug.localeCompare(b.slug));
 
   const out: string[] = [];
   const lastPath: string[] = [];
 
   for (const cmd of cmds) {
-    const parts = cmd.slug.split(":");
+    const parts = cmd.slug.split(':');
     const ancestors = parts.slice(0, -1);
 
     let common = 0;
@@ -92,14 +82,12 @@ function renderTreeView(): string {
     }
 
     for (let i = common; i < ancestors.length; i++) {
-      out.push(`${"  ".repeat(i)}${ancestors[i]}/`);
+      out.push(`${'  '.repeat(i)}${ancestors[i]}/`);
     }
 
-    const indent = "  ".repeat(ancestors.length);
-    const tag = cmd.kind === "workflow" ? "[wf]" : "    ";
-    out.push(
-      `${indent}${tag} /${cmd.slug}  —  ${truncate(cmd.description, 70)}`,
-    );
+    const indent = '  '.repeat(ancestors.length);
+    const tag = cmd.kind === 'workflow' ? '[wf]' : '    ';
+    out.push(`${indent}${tag} /${cmd.slug}  —  ${truncate(cmd.description, 70)}`);
 
     lastPath.length = 0;
     lastPath.push(...ancestors);
@@ -107,12 +95,12 @@ function renderTreeView(): string {
 
   const skills = getSkills();
   if (skills.length > 0) {
-    out.push("");
+    out.push('');
     out.push(`Skills (${skills.length})`);
     for (const s of skills) {
       out.push(`  ${s.name}  —  ${truncate(s.description, 70)}`);
     }
   }
 
-  return out.join("\n");
+  return out.join('\n');
 }

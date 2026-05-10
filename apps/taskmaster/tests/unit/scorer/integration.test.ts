@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
-import { makeTask } from '../../fixtures/tasks.js';
-import { scoreTasks } from '../../../src/scorer/index.js';
+import { describe, expect, it } from 'vitest';
 import type { TaskNode } from '../../../src/config/schema.js';
+import { scoreTasks } from '../../../src/scorer/index.js';
+import { makeTask } from '../../fixtures/tasks.js';
 
 describe('Scorer integration', () => {
   it('scores a realistic set of tasks with reasonable relative ordering', async () => {
@@ -158,10 +158,10 @@ describe('Scorer integration', () => {
     expect(typeof mod.analyzeAmbiguity).toBe('function');
     expect(typeof mod.analyzeCrossCutting).toBe('function');
     expect(mod.DEFAULT_WEIGHTS).toBeDefined();
-    expect(mod.DEFAULT_WEIGHTS.scopeBreadth).toBe(0.20);
+    expect(mod.DEFAULT_WEIGHTS.scopeBreadth).toBe(0.2);
     expect(mod.DEFAULT_WEIGHTS.technicalDepth).toBe(0.25);
     expect(mod.DEFAULT_WEIGHTS.dependencyCount).toBe(0.15);
-    expect(mod.DEFAULT_WEIGHTS.ambiguity).toBe(0.20);
-    expect(mod.DEFAULT_WEIGHTS.crossCutting).toBe(0.20);
+    expect(mod.DEFAULT_WEIGHTS.ambiguity).toBe(0.2);
+    expect(mod.DEFAULT_WEIGHTS.crossCutting).toBe(0.2);
   });
 });

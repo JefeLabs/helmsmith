@@ -1,7 +1,7 @@
-import type { TaskNode, StateDefinition, QAFeedbackEntry } from '../config/schema.js';
-import { findTaskById, isClosedState, isActiveState } from '../config/state-engine.js';
+import type { QAFeedbackEntry, StateDefinition, TaskNode } from '../config/schema.js';
+import { findTaskById, isClosedState } from '../config/state-engine.js';
 import { flattenTasks } from '../readiness/dag.js';
-import { recomputeAllReadiness, applyReadiness } from '../readiness/index.js';
+import { applyReadiness, recomputeAllReadiness } from '../readiness/index.js';
 
 export interface QAFailOpts {
   testType: QAFeedbackEntry['testType'];
@@ -45,7 +45,9 @@ function getPullBackStatus(states: StateDefinition[]): string {
   const inProgress = states.find((s) => s.name === 'in-progress');
   if (inProgress) return 'in-progress';
   // Fallback: first active state
-  const firstActive = states.find((s) => s.category === 'active' && s.name !== 'qa-failed' && s.name !== 'blocked');
+  const firstActive = states.find(
+    (s) => s.category === 'active' && s.name !== 'qa-failed' && s.name !== 'blocked',
+  );
   return firstActive?.name ?? 'in-progress';
 }
 

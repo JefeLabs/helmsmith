@@ -1,12 +1,12 @@
-import chalk from "chalk";
-import { fmt, stripAnsi, padRight, padLeft } from "../ui/format.js";
-import { sparkline } from "../ui/sparkline.js";
-import { SEGMENT_INDICATORS } from "../ui/constants.js";
-import type { Segment } from "../aggregator/segments.js";
+import chalk from 'chalk';
+import type { Segment } from '../aggregator/segments.js';
+import { SEGMENT_INDICATORS } from '../ui/constants.js';
+import { fmt, padLeft, padRight, stripAnsi } from '../ui/format.js';
+import { sparkline } from '../ui/sparkline.js';
 
 export interface HBar {
   label: string;
-  orgType?: "core" | "consultant";
+  orgType?: 'core' | 'consultant';
   segments: { key: string; value: number }[];
   total: number;
   insertions?: number;
@@ -91,9 +91,7 @@ export interface GroupedHBarChartOptions {
  * followed by bars indented below. Core teams are prefixed with \u2605,
  * consultant with \u25C6. Dashed separators appear after specified bar indices.
  */
-export function renderGroupedHBarChart(
-  options: GroupedHBarChartOptions
-): string {
+export function renderGroupedHBarChart(options: GroupedHBarChartOptions): string {
   const {
     groups,
     segmentDefs,
@@ -102,7 +100,7 @@ export function renderGroupedHBarChart(
     showValues = true,
     showXAxis = false,
     maxWidth = 100,
-    trendThreshold = 0.10,
+    trendThreshold = 0.1,
     columnMode = 'compact',
     detailLayers,
     perUserMode = false,
@@ -114,7 +112,7 @@ export function renderGroupedHBarChart(
   const hasLineLayer = detailLayers ? detailLayers.has('lines') : columnMode === 'lines';
 
   if (groups.length === 0) {
-    return "";
+    return '';
   }
 
   // Auto-compute group label width from actual group labels (bucket timeframe column)
@@ -125,7 +123,7 @@ export function renderGroupedHBarChart(
   glw = Math.max(4, glw + 1);
 
   // Auto-compute bar label width from actual bar labels (with org-type + segment prefixes)
-  const hasSegments = groups.some((g) => g.bars.some((b) => b.segment !== undefined));
+  const _hasSegments = groups.some((g) => g.bars.some((b) => b.segment !== undefined));
   let labelWidth = explicitLabelWidth ?? 14;
   if (explicitLabelWidth === undefined) {
     let maxLabel = 0;
@@ -141,17 +139,14 @@ export function renderGroupedHBarChart(
   }
 
   // Compute globalMax across all bars for consistent scale
-  const globalMax = Math.max(
-    1,
-    ...groups.flatMap((g) => g.bars.map((b) => b.total))
-  );
+  const globalMax = Math.max(1, ...groups.flatMap((g) => g.bars.map((b) => b.total)));
 
   // Detect which optional columns exist on any bar (for consistent spacing)
   const hasPerception = groups.some((g) => g.bars.some((b) => b.perception !== undefined));
   const hasTestPct = groups.some((g) => g.bars.some((b) => b.testPct !== undefined));
   const hasCommits = groups.some((g) => g.bars.some((b) => b.commits !== undefined));
   const hasActiveDays = groups.some((g) => g.bars.some((b) => b.activeDays !== undefined));
-  const hasHeadcount = groups.some((g) => g.bars.some((b) => b.headcount !== undefined));
+  const _hasHeadcount = groups.some((g) => g.bars.some((b) => b.headcount !== undefined));
   const hasMultiHeadcount = groups.some((g) => g.bars.some((b) => (b.headcount ?? 0) > 1));
   const hasChurnPct = groups.some((g) => g.bars.some((b) => b.churnRatePct !== undefined));
   const hasPrs = groups.some((g) => g.bars.some((b) => b.prsOpened !== undefined));
@@ -172,7 +167,9 @@ export function renderGroupedHBarChart(
 
   // Calculate available bar width
   // Layout: [groupLabel(glw) ┤] [space] [barLabel(labelWidth)] [space] [bar] [space] [value]
-  const hasExtendedData = groups.some(g => g.bars.some(b => b.insertions !== undefined || b.prsOpened !== undefined));
+  const hasExtendedData = groups.some((g) =>
+    g.bars.some((b) => b.insertions !== undefined || b.prsOpened !== undefined),
+  );
   let valueWidth = 0;
   if (showValues && hasExtendedData) {
     if (showPerception) valueWidth += 15;
@@ -183,15 +180,15 @@ export function renderGroupedHBarChart(
     if (showCommits) valueWidth += 9;
     if (showActiveDays) valueWidth += 9;
     if (showChurnPct) valueWidth += 9;
-    if (showPrs) valueWidth += 36;                // PRs + merged + cycle + reviews (4 × 9)
-    if (showHeadcount) valueWidth += 7;          // "(hc)" column — last
+    if (showPrs) valueWidth += 36; // PRs + merged + cycle + reviews (4 × 9)
+    if (showHeadcount) valueWidth += 7; // "(hc)" column — last
   } else if (showValues) {
     valueWidth = 8;
   }
   const gutterWidth = glw + 2 + 1 + labelWidth + 1; // prefix + space + label + space
   const availableBarWidth = Math.min(
     maxBarWidth,
-    Math.max(10, maxWidth - gutterWidth - valueWidth - 2)
+    Math.max(10, maxWidth - gutterWidth - valueWidth - 2),
   );
 
   const lines: string[] = [];
@@ -200,42 +197,42 @@ export function renderGroupedHBarChart(
   if (showValues && groups.length > 0) {
     const firstBar = groups[0].bars[0];
     if (firstBar?.insertions !== undefined || firstBar?.prsOpened !== undefined) {
-      const headerIndent = " ".repeat(glw + 2) + " " + " ".repeat(labelWidth) + " " + " ".repeat(availableBarWidth);
+      const headerIndent = `${' '.repeat(glw + 2)} ${' '.repeat(labelWidth)} ${' '.repeat(availableBarWidth)}`;
       let header = headerIndent;
-      const T = "  "; // trend spacer (2 chars)
+      const T = '  '; // trend spacer (2 chars)
       const pu = perUserMode; // shorthand for header labels
       if (showPerception) {
-        header += " " + padLeft(chalk.dim("trend"), PERCEPTION_WIDTH);
+        header += ` ${padLeft(chalk.dim('trend'), PERCEPTION_WIDTH)}`;
       }
       if (showInsertions) {
-        header += " " + padLeft(chalk.dim(pu ? "+ins/u" : "+ins"), 8) + T;
+        header += ` ${padLeft(chalk.dim(pu ? '+ins/u' : '+ins'), 8)}${T}`;
       }
       if (showDeletions) {
-        header += " " + padLeft(chalk.dim(pu ? "-del/u" : "-del"), 8) + T;
+        header += ` ${padLeft(chalk.dim(pu ? '-del/u' : '-del'), 8)}${T}`;
       }
       if (showNet) {
-        header += " " + padLeft(chalk.dim(pu ? "net/u" : "net"), 8) + T;
+        header += ` ${padLeft(chalk.dim(pu ? 'net/u' : 'net'), 8)}${T}`;
       }
       if (showTestPct) {
-        header += " " + padLeft(chalk.dim("tst%"), 5) + T;
+        header += ` ${padLeft(chalk.dim('tst%'), 5)}${T}`;
       }
       if (showCommits) {
-        header += " " + padLeft(chalk.dim(pu ? "cmt/u" : "cmts"), 6) + T;
+        header += ` ${padLeft(chalk.dim(pu ? 'cmt/u' : 'cmts'), 6)}${T}`;
       }
       if (showActiveDays) {
-        header += " " + padLeft(chalk.dim(pu ? "day/u" : "days"), 6) + T;
+        header += ` ${padLeft(chalk.dim(pu ? 'day/u' : 'days'), 6)}${T}`;
       }
       if (showChurnPct) {
-        header += " " + padLeft(chalk.dim("churn"), 6) + T;
+        header += ` ${padLeft(chalk.dim('churn'), 6)}${T}`;
       }
       if (showPrs) {
-        header += " " + padLeft(chalk.dim(pu ? "PRs/u" : "PRs"), 6) + T;
-        header += " " + padLeft(chalk.dim(pu ? "mrg/u" : "merged"), 6) + T;
-        header += " " + padLeft(chalk.dim("cycle"), 6) + T;
-        header += " " + padLeft(chalk.dim(pu ? "rev/u" : "reviews"), 7) + T;
+        header += ` ${padLeft(chalk.dim(pu ? 'PRs/u' : 'PRs'), 6)}${T}`;
+        header += ` ${padLeft(chalk.dim(pu ? 'mrg/u' : 'merged'), 6)}${T}`;
+        header += ` ${padLeft(chalk.dim('cycle'), 6)}${T}`;
+        header += ` ${padLeft(chalk.dim(pu ? 'rev/u' : 'reviews'), 7)}${T}`;
       }
       if (showHeadcount) {
-        header += " " + padLeft(chalk.dim("hc"), 6);
+        header += ` ${padLeft(chalk.dim('hc'), 6)}`;
       }
       lines.push(header);
     }
@@ -250,21 +247,21 @@ export function renderGroupedHBarChart(
       // Build prefix: group label with axis char on first bar, indent on rest
       let prefix: string;
       if (bi === 0) {
-        prefix = padRight(group.groupLabel, glw) + " \u2524";
+        prefix = `${padRight(group.groupLabel, glw)} \u2524`;
       } else {
-        prefix = " ".repeat(glw) + " \u2502";
+        prefix = `${' '.repeat(glw)} \u2502`;
       }
 
       // Build bar label with segment + org type prefixes
       let barLabel = bar.label;
-      if (bar.orgType === "core") {
-        barLabel = "\u2605 " + barLabel;
-      } else if (bar.orgType === "consultant") {
-        barLabel = "\u25C6 " + barLabel;
+      if (bar.orgType === 'core') {
+        barLabel = `\u2605 ${barLabel}`;
+      } else if (bar.orgType === 'consultant') {
+        barLabel = `\u25C6 ${barLabel}`;
       }
       if (bar.segment) {
         const ind = SEGMENT_INDICATORS[bar.segment];
-        barLabel = ind.color(ind.char) + " " + barLabel;
+        barLabel = `${ind.color(ind.char)} ${barLabel}`;
       }
 
       // Render the stacked bar
@@ -273,7 +270,7 @@ export function renderGroupedHBarChart(
         bar.total,
         globalMax,
         availableBarWidth,
-        segmentDefs
+        segmentDefs,
       );
 
       // Pad bar area to fixed width so value columns align
@@ -281,19 +278,20 @@ export function renderGroupedHBarChart(
       const barPad = Math.max(0, availableBarWidth - barVisualWidth);
 
       // Build the line
-      let line =
-        prefix + " " + padRight(barLabel, labelWidth) + " " +
-        barChars + " ".repeat(barPad);
+      let line = `${prefix} ${padRight(barLabel, labelWidth)} ${barChars}${' '.repeat(barPad)}`;
 
       if (showValues) {
         const isAvg = bar.isAverage === true;
         // For average rows: use chalk.dim for all values, skip trend indicators
         const trendFn = isAvg
-          ? () => "  "
+          ? () => '  '
           : (v: number, a: number | undefined, ta?: number) => trend(v, a, trendThreshold, ta);
         const valColor = isAvg ? chalk.dim : (s: string) => s;
 
-        if ((bar.insertions !== undefined && bar.deletions !== undefined) || bar.prsOpened !== undefined) {
+        if (
+          (bar.insertions !== undefined && bar.deletions !== undefined) ||
+          bar.prsOpened !== undefined
+        ) {
           // Per-user divisor: divide by headcount when perUserMode is active and hc > 1
           const pu = perUserMode && (bar.headcount ?? 0) > 1 ? bar.headcount! : 1;
           const avgPu = perUserMode && (bar.avgHeadcount ?? 0) > 1 ? bar.avgHeadcount! : 1;
@@ -318,63 +316,63 @@ export function renderGroupedHBarChart(
           // perception / sparkline
           if (showPerception) {
             if (isAvg && bar.sparkData && bar.sparkData.length > 0) {
-              line += " " + padLeft(chalk.dim(sparkline(bar.sparkData)), PERCEPTION_WIDTH);
+              line += ` ${padLeft(chalk.dim(sparkline(bar.sparkData)), PERCEPTION_WIDTH)}`;
             } else if (bar.perception) {
-              line += " " + formatPerception(bar.perception);
+              line += ` ${formatPerception(bar.perception)}`;
             } else {
-              line += " " + " ".repeat(PERCEPTION_WIDTH);
+              line += ` ${' '.repeat(PERCEPTION_WIDTH)}`;
             }
           }
 
           // +ins
           if (showInsertions) {
-            line += " " + padLeft(valColor(chalk.green("+" + fmt(ins))), 8);
+            line += ` ${padLeft(valColor(chalk.green(`+${fmt(ins)}`)), 8)}`;
             line += trendFn(ins, avgIns, teamAvgIns);
           }
 
           // -del
           if (showDeletions) {
-            line += " " + padLeft(valColor(chalk.red("-" + fmt(del))), 8);
+            line += ` ${padLeft(valColor(chalk.red(`-${fmt(del)}`)), 8)}`;
             line += trendFn(del, avgDel, teamAvgDel);
           }
 
           // net
           if (showNet) {
-            const netStr = net >= 0 ? "+" + fmt(net) : "-" + fmt(Math.abs(net));
+            const netStr = net >= 0 ? `+${fmt(net)}` : `-${fmt(Math.abs(net))}`;
             const netColor = net >= 0 ? chalk.green : chalk.red;
-            line += " " + padLeft(valColor(netColor(netStr)), 8);
+            line += ` ${padLeft(valColor(netColor(netStr)), 8)}`;
             line += trendFn(net, avgNet, teamAvgNet);
           }
 
           // test%
           if (showTestPct) {
             if (bar.testPct !== undefined) {
-              line += " " + padLeft(chalk.dim(bar.testPct + "%"), 5);
+              line += ` ${padLeft(chalk.dim(`${bar.testPct}%`), 5)}`;
               line += trendFn(bar.testPct, bar.avgTestPct, bar.teamAvgTestPct);
             } else {
-              line += " " + " ".repeat(5) + "  ";
+              line += ` ${' '.repeat(5)}  `;
             }
           }
 
           // commits
           if (showCommits) {
-            line += " " + padLeft(chalk.dim(fmt(cmts)), 6);
+            line += ` ${padLeft(chalk.dim(fmt(cmts)), 6)}`;
             line += trendFn(cmts, avgCmts, teamAvgCmts);
           }
 
           // active days
           if (showActiveDays) {
-            line += " " + padLeft(chalk.dim(fmt(days)), 6);
+            line += ` ${padLeft(chalk.dim(fmt(days)), 6)}`;
             line += trendFn(days, avgDays, teamAvgDays);
           }
 
           // churn%
           if (showChurnPct) {
             if (bar.churnRatePct !== undefined) {
-              line += " " + padLeft(chalk.dim(bar.churnRatePct + "%"), 6);
+              line += ` ${padLeft(chalk.dim(`${bar.churnRatePct}%`), 6)}`;
               line += trendFn(bar.churnRatePct, bar.avgChurnRatePct, bar.teamAvgChurnRatePct);
             } else {
-              line += " " + " ".repeat(6) + "  ";
+              line += ` ${' '.repeat(6)}  `;
             }
           }
 
@@ -385,27 +383,28 @@ export function renderGroupedHBarChart(
             const revs = Math.round((bar.reviewsGiven ?? 0) / pu);
             const avgPrsO = bar.avgPrsOpened !== undefined ? bar.avgPrsOpened / avgPu : undefined;
             const avgPrsM = bar.avgPrsMerged !== undefined ? bar.avgPrsMerged / avgPu : undefined;
-            const avgRevs = bar.avgReviewsGiven !== undefined ? bar.avgReviewsGiven / avgPu : undefined;
-            line += " " + padLeft(chalk.dim(fmt(prsO)), 6);
+            const avgRevs =
+              bar.avgReviewsGiven !== undefined ? bar.avgReviewsGiven / avgPu : undefined;
+            line += ` ${padLeft(chalk.dim(fmt(prsO)), 6)}`;
             line += trendFn(prsO, avgPrsO, bar.teamAvgPrsOpened);
-            line += " " + padLeft(chalk.dim(fmt(prsM)), 6);
+            line += ` ${padLeft(chalk.dim(fmt(prsM)), 6)}`;
             line += trendFn(prsM, avgPrsM, bar.teamAvgPrsMerged);
             const hrs = bar.avgCycleHrs ?? 0;
             const cycleLabel = hrs >= 24 ? `${(hrs / 24).toFixed(1)}d` : `${hrs.toFixed(0)}h`;
-            line += " " + padLeft(chalk.dim(cycleLabel), 6);
+            line += ` ${padLeft(chalk.dim(cycleLabel), 6)}`;
             line += trendFn(hrs, bar.avgAvgCycleHrs, bar.teamAvgAvgCycleHrs);
-            line += " " + padLeft(chalk.dim(fmt(revs)), 7);
+            line += ` ${padLeft(chalk.dim(fmt(revs)), 7)}`;
             line += trendFn(revs, avgRevs, bar.teamAvgReviewsGiven);
           }
 
           // headcount (last column)
           if (showHeadcount && bar.headcount !== undefined && bar.headcount > 1) {
-            line += " " + padLeft(chalk.dim(`(${bar.headcount})`), 6);
+            line += ` ${padLeft(chalk.dim(`(${bar.headcount})`), 6)}`;
           } else if (showHeadcount) {
-            line += " " + " ".repeat(6);
+            line += ` ${' '.repeat(6)}`;
           }
         } else {
-          line += " " + padLeft(chalk.dim(fmt(bar.total)), 8);
+          line += ` ${padLeft(chalk.dim(fmt(bar.total)), 8)}`;
         }
       }
 
@@ -413,17 +412,9 @@ export function renderGroupedHBarChart(
 
       // Check for separator after this bar index
       if (group.separatorAfter?.includes(bi)) {
-        const separatorIndent = " ".repeat(glw) + " \u2502";
-        const dashes = "\u2500 ".repeat(
-          Math.floor(availableBarWidth / 2)
-        );
-        lines.push(
-          separatorIndent +
-            " " +
-            " ".repeat(labelWidth) +
-            " " +
-            chalk.dim(dashes)
-        );
+        const separatorIndent = `${' '.repeat(glw)} \u2502`;
+        const dashes = '\u2500 '.repeat(Math.floor(availableBarWidth / 2));
+        lines.push(`${separatorIndent} ${' '.repeat(labelWidth)} ${chalk.dim(dashes)}`);
       }
     }
 
@@ -432,11 +423,11 @@ export function renderGroupedHBarChart(
       const nextGroup = groups[gi + 1];
       if (nextGroup.isSummary) {
         // Dashed separator before summary (Avg) row
-        const sepPrefix = " ".repeat(glw) + " \u2502";
-        const dashes = "\u2500\u2500".repeat(Math.floor((availableBarWidth + labelWidth) / 2));
-        lines.push(sepPrefix + " " + chalk.dim(dashes));
+        const sepPrefix = `${' '.repeat(glw)} \u2502`;
+        const dashes = '\u2500\u2500'.repeat(Math.floor((availableBarWidth + labelWidth) / 2));
+        lines.push(`${sepPrefix} ${chalk.dim(dashes)}`);
       } else {
-        const blankPrefix = " ".repeat(glw) + " \u2502";
+        const blankPrefix = `${' '.repeat(glw)} \u2502`;
         lines.push(blankPrefix);
       }
     }
@@ -444,14 +435,13 @@ export function renderGroupedHBarChart(
 
   // X-axis
   if (showXAxis) {
-    const axisIndent = " ".repeat(glw) + " \u2514";
-    const axisLine =
-      "\u2500".repeat(availableBarWidth + labelWidth + 1) + "\u2524";
+    const axisIndent = `${' '.repeat(glw)} \u2514`;
+    const axisLine = `${'\u2500'.repeat(availableBarWidth + labelWidth + 1)}\u2524`;
     lines.push(axisIndent + axisLine);
 
     // Scale labels
-    const scaleIndent = " ".repeat(glw + 2 + 1 + labelWidth);
-    const zeroLabel = "0";
+    const scaleIndent = ' '.repeat(glw + 2 + 1 + labelWidth);
+    const zeroLabel = '0';
     const midValue = globalMax / 2;
     const maxValue = globalMax;
     const midPos = Math.floor(availableBarWidth / 2);
@@ -459,16 +449,14 @@ export function renderGroupedHBarChart(
     let scaleLine = scaleIndent + zeroLabel;
     const midLabel = fmt(midValue);
     const maxLabel = fmt(maxValue);
-    scaleLine += " ".repeat(Math.max(1, midPos - zeroLabel.length));
+    scaleLine += ' '.repeat(Math.max(1, midPos - zeroLabel.length));
     scaleLine += midLabel;
-    scaleLine += " ".repeat(
-      Math.max(1, availableBarWidth - midPos - midLabel.length)
-    );
+    scaleLine += ' '.repeat(Math.max(1, availableBarWidth - midPos - midLabel.length));
     scaleLine += maxLabel;
     lines.push(scaleLine);
   }
 
-  return lines.join("\n");
+  return lines.join('\n');
 }
 
 /**
@@ -479,7 +467,7 @@ export function renderGroupedHBarChart(
  * in the same direction, renders a strong (bg-colored) indicator.
  */
 function trend(value: number, avg: number | undefined, pct: number, teamAvg?: number): string {
-  if (avg === undefined) return "  ";
+  if (avg === undefined) return '  ';
   const delta = value - avg;
   const threshold = Math.abs(avg) * pct;
   const aboveOwn = delta > threshold;
@@ -492,13 +480,13 @@ function trend(value: number, avg: number | undefined, pct: number, teamAvg?: nu
     const belowTeam = teamDelta < -teamThreshold;
 
     // Strong: exceeds both own avg and team avg — inverted (bg swap)
-    if (aboveOwn && aboveTeam) return " " + chalk.bgGreen.black("\u25B2");
-    if (belowOwn && belowTeam) return " " + chalk.bgRed.black("\u25BC");
+    if (aboveOwn && aboveTeam) return ` ${chalk.bgGreen.black('\u25B2')}`;
+    if (belowOwn && belowTeam) return ` ${chalk.bgRed.black('\u25BC')}`;
   }
 
-  if (aboveOwn) return " " + chalk.green("\u25B2");
-  if (belowOwn) return " " + chalk.red("\u25BC");
-  return " " + chalk.dim("\u25CB");
+  if (aboveOwn) return ` ${chalk.green('\u25B2')}`;
+  if (belowOwn) return ` ${chalk.red('\u25BC')}`;
+  return ` ${chalk.dim('\u25CB')}`;
 }
 
 const PERCEPTION_WIDTH = 14;
@@ -513,12 +501,12 @@ const PERCEPTION_STYLES: Record<string, (s: string) => string> = {
 };
 
 const PERCEPTION_ICONS: Record<string, string> = {
-  accelerating: '\u2197',  // ↗
-  recovering: '\u21AA',    // ↪
-  stable: '\u2192',        // →
-  slowing: '\u2198',       // ↘
-  dipping: '\u2199',       // ↙
-  new: '\u2022',           // •
+  accelerating: '\u2197', // ↗
+  recovering: '\u21AA', // ↪
+  stable: '\u2192', // →
+  slowing: '\u2198', // ↘
+  dipping: '\u2199', // ↙
+  new: '\u2022', // •
 };
 
 function formatPerception(perception: string): string {
@@ -536,10 +524,10 @@ function renderBar(
   total: number,
   globalMax: number,
   maxWidth: number,
-  segmentDefs: SegmentDef[]
+  segmentDefs: SegmentDef[],
 ): string {
   if (total === 0 || globalMax === 0) {
-    return "";
+    return '';
   }
 
   // Total bar width proportional to globalMax
@@ -549,19 +537,17 @@ function renderBar(
   const activeSegments = segments.filter((s) => s.value > 0);
 
   if (activeSegments.length === 0) {
-    return "";
+    return '';
   }
 
   // Calculate raw proportional widths within the bar
-  const rawWidths = activeSegments.map(
-    (s) => (s.value / total) * totalBarWidth
-  );
+  const rawWidths = activeSegments.map((s) => (s.value / total) * totalBarWidth);
 
   // Ensure minimum of 1 char per non-zero segment
   const charWidths = rawWidths.map((raw) => Math.max(1, Math.floor(raw)));
 
   // Adjust to fill exactly totalBarWidth characters
-  let allocated = charWidths.reduce((sum, w) => sum + w, 0);
+  const allocated = charWidths.reduce((sum, w) => sum + w, 0);
 
   if (allocated < totalBarWidth) {
     const remainders = rawWidths.map((raw, i) => ({
@@ -598,10 +584,10 @@ function renderBar(
   const parts = activeSegments.map((seg, i) => {
     const def = defMap.get(seg.key);
     if (!def) {
-      return " ".repeat(charWidths[i]);
+      return ' '.repeat(charWidths[i]);
     }
     return def.color(def.char.repeat(charWidths[i]));
   });
 
-  return parts.join("");
+  return parts.join('');
 }

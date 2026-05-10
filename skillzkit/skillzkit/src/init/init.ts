@@ -19,12 +19,12 @@
  *      mkdir-p, file mode 0600, and updatedAt stamping.
  */
 
-import { configExists, configPath, writeConfig } from "./config.js";
-import type { SkillzkitConfig } from "./config.js";
-import { encryptApiKey, maskApiKey } from "./crypto.js";
+import type { SkillzkitConfig } from './config.js';
+import { configExists, configPath, writeConfig } from './config.js';
+import { encryptApiKey, maskApiKey } from './crypto.js';
 
 export interface InitOptions {
-  mode: "standalone" | "team";
+  mode: 'standalone' | 'team';
   email: string;
   /** Required when mode === "team". */
   apiUrl?: string;
@@ -51,16 +51,12 @@ const MIN_PIN_LENGTH = 6;
 
 export function validateInitOptions(opts: InitOptions): void {
   if (!EMAIL_REGEX.test(opts.email)) {
-    throw new Error(
-      `Invalid email "${opts.email}" — must look like name@example.com`,
-    );
+    throw new Error(`Invalid email "${opts.email}" — must look like name@example.com`);
   }
-  if (opts.mode !== "standalone" && opts.mode !== "team") {
-    throw new Error(
-      `Invalid mode "${opts.mode}" — must be "standalone" or "team"`,
-    );
+  if (opts.mode !== 'standalone' && opts.mode !== 'team') {
+    throw new Error(`Invalid mode "${opts.mode}" — must be "standalone" or "team"`);
   }
-  if (opts.mode === "team") {
+  if (opts.mode === 'team') {
     if (!opts.apiUrl) {
       throw new Error(`Team mode requires --api-url`);
     }
@@ -73,9 +69,7 @@ export function validateInitOptions(opts: InitOptions): void {
       throw new Error(`Team mode requires --api-key (cannot be empty)`);
     }
     if (!opts.pin || opts.pin.length < MIN_PIN_LENGTH) {
-      throw new Error(
-        `Team mode requires --pin of at least ${MIN_PIN_LENGTH} characters`,
-      );
+      throw new Error(`Team mode requires --pin of at least ${MIN_PIN_LENGTH} characters`);
     }
   }
 }
@@ -94,10 +88,10 @@ export function runInit(opts: InitOptions): InitResult {
   const now = new Date().toISOString();
   let config: SkillzkitConfig;
 
-  if (opts.mode === "standalone") {
+  if (opts.mode === 'standalone') {
     config = {
       version: 1,
-      mode: "standalone",
+      mode: 'standalone',
       email: opts.email,
       createdAt: now,
       updatedAt: now,
@@ -106,7 +100,7 @@ export function runInit(opts: InitOptions): InitResult {
     // Team mode — required-field guarantees come from validateInitOptions
     // above, but TypeScript can't narrow that, so re-check non-null.
     if (!opts.apiUrl || !opts.apiKey || !opts.pin) {
-      throw new Error("internal: team-mode fields missing after validation");
+      throw new Error('internal: team-mode fields missing after validation');
     }
     const keyEncrypted = encryptApiKey({
       email: opts.email,
@@ -115,7 +109,7 @@ export function runInit(opts: InitOptions): InitResult {
     });
     config = {
       version: 1,
-      mode: "team",
+      mode: 'team',
       email: opts.email,
       team: {
         apiUrl: opts.apiUrl,

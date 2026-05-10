@@ -1,5 +1,11 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { printTitle, printNoData, printSummary, printJson, printTable } from '../ui/cli-renderer.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  printJson,
+  printNoData,
+  printSummary,
+  printTable,
+  printTitle,
+} from '../ui/cli-renderer.js';
 
 describe('cli-renderer', () => {
   let logs: string[];

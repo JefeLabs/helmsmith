@@ -1,20 +1,20 @@
-import Database from "better-sqlite3";
-import { join } from "node:path";
+import { join } from 'node:path';
+import Database from 'better-sqlite3';
 import type {
-  UserWeekRepoRecord,
+  AuthorRegistry,
   CommitsByFiletype,
+  DiscoveredAuthor,
   EnrichmentStore,
   ProductivityExtensions,
   ScanState,
-  AuthorRegistry,
-  DiscoveredAuthor,
-} from "../types/schema.js";
-import { getDataDir } from "./paths.js";
+  UserWeekRepoRecord,
+} from '../types/schema.js';
+import { getDataDir } from './paths.js';
 
 // ── Database path ───────────────────────────────────────────────────────────
 
 export function getSQLitePath(): string {
-  return join(getDataDir(), "gitradar.db");
+  return join(getDataDir(), 'gitradar.db');
 }
 
 // ── Database singleton ──────────────────────────────────────────────────────
@@ -24,9 +24,9 @@ let _db: Database.Database | null = null;
 export function getDB(): Database.Database {
   if (!_db) {
     _db = new Database(getSQLitePath());
-    _db.pragma("journal_mode = WAL");
-    _db.pragma("synchronous = NORMAL");
-    _db.pragma("busy_timeout = 5000");
+    _db.pragma('journal_mode = WAL');
+    _db.pragma('synchronous = NORMAL');
+    _db.pragma('busy_timeout = 5000');
     ensureSchema(_db);
   }
   return _db;
@@ -146,10 +146,10 @@ function ensureSchema(db: Database.Database): void {
 
 /** Add pr_branch columns to enrichments if they don't exist (migration v2). */
 function migrateEnrichmentBranchColumns(db: Database.Database): void {
-  const columns = db.pragma("table_info(enrichments)") as Array<{ name: string }>;
+  const columns = db.pragma('table_info(enrichments)') as Array<{ name: string }>;
   const colNames = new Set(columns.map((c) => c.name));
 
-  if (!colNames.has("pr_feature")) {
+  if (!colNames.has('pr_feature')) {
     db.exec(`
       ALTER TABLE enrichments ADD COLUMN pr_feature INTEGER NOT NULL DEFAULT 0;
       ALTER TABLE enrichments ADD COLUMN pr_fix INTEGER NOT NULL DEFAULT 0;
@@ -163,10 +163,10 @@ function migrateEnrichmentBranchColumns(db: Database.Database): void {
 
 /** Add breaking_changes and scopes columns to records if they don't exist (migration v3). */
 function migrateRecordsScopeColumns(db: Database.Database): void {
-  const columns = db.pragma("table_info(records)") as Array<{ name: string }>;
+  const columns = db.pragma('table_info(records)') as Array<{ name: string }>;
   const colNames = new Set(columns.map((c) => c.name));
 
-  if (!colNames.has("breaking_changes")) {
+  if (!colNames.has('breaking_changes')) {
     db.exec(`
       ALTER TABLE records ADD COLUMN breaking_changes INTEGER NOT NULL DEFAULT 0;
       ALTER TABLE records ADD COLUMN scopes TEXT NOT NULL DEFAULT '[]';
@@ -231,7 +231,7 @@ function rowToRecord(row: Record<string, unknown>): UserWeekRepoRecord {
     member: row.member as string,
     email: row.email as string,
     org: row.org as string,
-    orgType: row.org_type as "core" | "consultant",
+    orgType: row.org_type as 'core' | 'consultant',
     team: row.team as string,
     tag: row.tag as string,
     week: row.week as string,
@@ -304,7 +304,9 @@ export interface MetaTimestamps {
 export function getMetaTimestamps(): MetaTimestamps {
   const db = getDB();
   const rows = db
-    .prepare("SELECT key, value FROM meta WHERE key IN ('commits_last_updated', 'enrichments_last_updated')")
+    .prepare(
+      "SELECT key, value FROM meta WHERE key IN ('commits_last_updated', 'enrichments_last_updated')",
+    )
     .all() as Array<{ key: string; value: string }>;
 
   let commitsUpdated: string | null = null;
@@ -320,11 +322,13 @@ export function getMetaTimestamps(): MetaTimestamps {
 
 export function loadCommitsDataSQL(): CommitsByFiletype {
   const db = getDB();
-  const rows = db.prepare("SELECT * FROM records").all() as Record<string, unknown>[];
-  const lastUpdated = (
-    db.prepare("SELECT value FROM meta WHERE key = 'commits_last_updated'").get() as
-      { value: string } | undefined
-  )?.value ?? new Date().toISOString();
+  const rows = db.prepare('SELECT * FROM records').all() as Record<string, unknown>[];
+  const lastUpdated =
+    (
+      db.prepare("SELECT value FROM meta WHERE key = 'commits_last_updated'").get() as
+        | { value: string }
+        | undefined
+    )?.value ?? new Date().toISOString();
 
   return {
     version: 1,
@@ -405,9 +409,9 @@ export function saveCommitsDataSQL(data: CommitsByFiletype): void {
 
   insertMany(data.records);
 
-  db.prepare(
-    "INSERT OR REPLACE INTO meta (key, value) VALUES ('commits_last_updated', ?)",
-  ).run(new Date().toISOString());
+  db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('commits_last_updated', ?)").run(
+    new Date().toISOString(),
+  );
 }
 
 /** Query records filtered by week range, repo, org, or team. */
@@ -425,43 +429,46 @@ export function queryRecords(filters: {
   const params: Record<string, string> = {};
 
   if (filters.weekFrom) {
-    clauses.push("week >= @weekFrom");
+    clauses.push('week >= @weekFrom');
     params.weekFrom = filters.weekFrom;
   }
   if (filters.weekTo) {
-    clauses.push("week <= @weekTo");
+    clauses.push('week <= @weekTo');
     params.weekTo = filters.weekTo;
   }
   if (filters.repo) {
-    clauses.push("repo = @repo");
+    clauses.push('repo = @repo');
     params.repo = filters.repo;
   }
   if (filters.org) {
-    clauses.push("org = @org");
+    clauses.push('org = @org');
     params.org = filters.org;
   }
   if (filters.team) {
-    clauses.push("team = @team");
+    clauses.push('team = @team');
     params.team = filters.team;
   }
   if (filters.tag) {
-    clauses.push("tag = @tag");
+    clauses.push('tag = @tag');
     params.tag = filters.tag;
   }
   if (filters.group) {
-    clauses.push("grp = @grp");
+    clauses.push('grp = @grp');
     params.grp = filters.group;
   }
 
-  const where = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
-  const rows = db.prepare(`SELECT * FROM records ${where}`).all(params) as Record<string, unknown>[];
+  const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+  const rows = db.prepare(`SELECT * FROM records ${where}`).all(params) as Record<
+    string,
+    unknown
+  >[];
   return rows.map(rowToRecord);
 }
 
 /** Delete records older than a given week. */
 export function pruneRecordsSQL(beforeWeek: string): number {
   const db = getDB();
-  const result = db.prepare("DELETE FROM records WHERE week < ?").run(beforeWeek);
+  const result = db.prepare('DELETE FROM records WHERE week < ?').run(beforeWeek);
   return result.changes;
 }
 
@@ -472,9 +479,9 @@ export function getStoreStatsSQL(): {
   newestWeek: string | undefined;
 } {
   const db = getDB();
-  const row = db.prepare(
-    "SELECT COUNT(*) as cnt, MIN(week) as oldest, MAX(week) as newest FROM records",
-  ).get() as { cnt: number; oldest: string | null; newest: string | null };
+  const row = db
+    .prepare('SELECT COUNT(*) as cnt, MIN(week) as oldest, MAX(week) as newest FROM records')
+    .get() as { cnt: number; oldest: string | null; newest: string | null };
 
   return {
     recordCount: row.cnt,
@@ -535,7 +542,7 @@ const GROUP_BY_COLUMN: Record<RollupGroupBy, string> = {
   team: 'team',
   tag: 'tag',
   week: 'week',
-  all: "'all'",  // string literal — no GROUP BY needed
+  all: "'all'", // string literal — no GROUP BY needed
 };
 
 /**
@@ -546,10 +553,7 @@ const GROUP_BY_COLUMN: Record<RollupGroupBy, string> = {
  * deserializing every row into JS objects. With indexes on week, repo,
  * org, and team, this is near-instant even with millions of rows.
  */
-export function queryRollup(
-  filters: RollupFilters,
-  groupBy: RollupGroupBy,
-): Map<string, RolledUp> {
+export function queryRollup(filters: RollupFilters, groupBy: RollupGroupBy): Map<string, RolledUp> {
   const db = getDB();
 
   const groupCol = GROUP_BY_COLUMN[groupBy];
@@ -557,44 +561,44 @@ export function queryRollup(
   const params: Record<string, unknown> = {};
 
   if (filters.weeks && filters.weeks.length > 0) {
-    clauses.push("week IN (SELECT value FROM json_each(@weeks_json))");
+    clauses.push('week IN (SELECT value FROM json_each(@weeks_json))');
     params.weeks_json = JSON.stringify(filters.weeks);
   }
   if (filters.weekFrom) {
-    clauses.push("week >= @weekFrom");
+    clauses.push('week >= @weekFrom');
     params.weekFrom = filters.weekFrom;
   }
   if (filters.weekTo) {
-    clauses.push("week <= @weekTo");
+    clauses.push('week <= @weekTo');
     params.weekTo = filters.weekTo;
   }
   if (filters.org !== undefined) {
-    clauses.push("org = @org");
+    clauses.push('org = @org');
     params.org = filters.org;
   }
   if (filters.team !== undefined) {
-    clauses.push("team = @team");
+    clauses.push('team = @team');
     params.team = filters.team;
   }
   if (filters.tag !== undefined) {
-    clauses.push("tag = @tag");
+    clauses.push('tag = @tag');
     params.tag = filters.tag;
   }
   if (filters.group !== undefined) {
-    clauses.push("grp = @grp");
+    clauses.push('grp = @grp');
     params.grp = filters.group;
   }
   if (filters.member !== undefined) {
-    clauses.push("member = @member");
+    clauses.push('member = @member');
     params.member = filters.member;
   }
   if (filters.repo !== undefined) {
-    clauses.push("repo = @repo");
+    clauses.push('repo = @repo');
     params.repo = filters.repo;
   }
 
-  const where = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
-  const groupByClause = groupBy === 'all' ? "" : `GROUP BY ${groupCol}`;
+  const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+  const groupByClause = groupBy === 'all' ? '' : `GROUP BY ${groupCol}`;
 
   const sql = `
     SELECT
@@ -674,11 +678,19 @@ export function queryRollup(
       deletions: row.doc_del as number,
     };
 
-    const insertions = app.insertions + test.insertions + config.insertions + storybook.insertions + doc.insertions;
-    const deletions = app.deletions + test.deletions + config.deletions + storybook.deletions + doc.deletions;
+    const insertions =
+      app.insertions + test.insertions + config.insertions + storybook.insertions + doc.insertions;
+    const deletions =
+      app.deletions + test.deletions + config.deletions + storybook.deletions + doc.deletions;
     const filesChanged = app.files + test.files + config.files + storybook.files + doc.files;
-    const filesAdded = app.filesAdded + test.filesAdded + config.filesAdded + storybook.filesAdded + doc.filesAdded;
-    const filesDeleted = app.filesDeleted + test.filesDeleted + config.filesDeleted + storybook.filesDeleted + doc.filesDeleted;
+    const filesAdded =
+      app.filesAdded + test.filesAdded + config.filesAdded + storybook.filesAdded + doc.filesAdded;
+    const filesDeleted =
+      app.filesDeleted +
+      test.filesDeleted +
+      config.filesDeleted +
+      storybook.filesDeleted +
+      doc.filesDeleted;
 
     result.set(key, {
       commits: row.commits as number,
@@ -702,7 +714,7 @@ export function queryRollup(
 
 export function loadEnrichmentsSQL(): EnrichmentStore {
   const db = getDB();
-  const rows = db.prepare("SELECT * FROM enrichments").all() as Array<{
+  const rows = db.prepare('SELECT * FROM enrichments').all() as Array<{
     key: string;
     prs_opened: number;
     prs_merged: number;
@@ -734,18 +746,17 @@ export function loadEnrichmentsSQL(): EnrichmentStore {
     };
   }
 
-  const lastUpdated = (
-    db.prepare("SELECT value FROM meta WHERE key = 'enrichments_last_updated'").get() as
-      { value: string } | undefined
-  )?.value ?? new Date().toISOString();
+  const lastUpdated =
+    (
+      db.prepare("SELECT value FROM meta WHERE key = 'enrichments_last_updated'").get() as
+        | { value: string }
+        | undefined
+    )?.value ?? new Date().toISOString();
 
   return { version: 1, lastUpdated, enrichments };
 }
 
-export function saveEnrichmentSQL(
-  key: string,
-  metrics: ProductivityExtensions,
-): void {
+export function saveEnrichmentSQL(key: string, metrics: ProductivityExtensions): void {
   const db = getDB();
   db.prepare(`
     INSERT INTO enrichments (key, prs_opened, prs_merged, avg_cycle_hrs, reviews_given, churn_rate_pct,
@@ -779,9 +790,9 @@ export function saveEnrichmentSQL(
     pr_other: metrics.pr_other ?? 0,
   });
 
-  db.prepare(
-    "INSERT OR REPLACE INTO meta (key, value) VALUES ('enrichments_last_updated', ?)",
-  ).run(new Date().toISOString());
+  db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('enrichments_last_updated', ?)").run(
+    new Date().toISOString(),
+  );
 }
 
 // ── Batch enrichment save ────────────────────────────────────────────────────
@@ -830,46 +841,59 @@ export function saveEnrichmentBatchSQL(
 
   insertMany(entries);
 
-  db.prepare(
-    "INSERT OR REPLACE INTO meta (key, value) VALUES ('enrichments_last_updated', ?)",
-  ).run(new Date().toISOString());
+  db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('enrichments_last_updated', ?)").run(
+    new Date().toISOString(),
+  );
 }
 
 /** Check if an enrichment key exists. */
 export function hasEnrichment(key: string): boolean {
   const db = getDB();
-  const row = db.prepare("SELECT 1 FROM enrichments WHERE key = ?").get(key);
+  const row = db.prepare('SELECT 1 FROM enrichments WHERE key = ?').get(key);
   return row !== undefined;
 }
 
 /** Get a single enrichment by key, or default zeros. */
 export function getEnrichmentSQL(key: string): ProductivityExtensions {
   const db = getDB();
-  const row = db.prepare("SELECT * FROM enrichments WHERE key = ?").get(key) as {
-    prs_opened: number;
-    prs_merged: number;
-    avg_cycle_hrs: number;
-    reviews_given: number;
-    churn_rate_pct: number;
-    pr_feature: number;
-    pr_fix: number;
-    pr_bugfix: number;
-    pr_chore: number;
-    pr_hotfix: number;
-    pr_other: number;
-  } | undefined;
+  const row = db.prepare('SELECT * FROM enrichments WHERE key = ?').get(key) as
+    | {
+        prs_opened: number;
+        prs_merged: number;
+        avg_cycle_hrs: number;
+        reviews_given: number;
+        churn_rate_pct: number;
+        pr_feature: number;
+        pr_fix: number;
+        pr_bugfix: number;
+        pr_chore: number;
+        pr_hotfix: number;
+        pr_other: number;
+      }
+    | undefined;
 
-  return row ?? {
-    prs_opened: 0, prs_merged: 0, avg_cycle_hrs: 0, reviews_given: 0, churn_rate_pct: 0,
-    pr_feature: 0, pr_fix: 0, pr_bugfix: 0, pr_chore: 0, pr_hotfix: 0, pr_other: 0,
-  };
+  return (
+    row ?? {
+      prs_opened: 0,
+      prs_merged: 0,
+      avg_cycle_hrs: 0,
+      reviews_given: 0,
+      churn_rate_pct: 0,
+      pr_feature: 0,
+      pr_fix: 0,
+      pr_bugfix: 0,
+      pr_chore: 0,
+      pr_hotfix: 0,
+      pr_other: 0,
+    }
+  );
 }
 
 // ── Scan state (SQLite-backed) ──────────────────────────────────────────────
 
 export function loadScanStateSQL(): ScanState {
   const db = getDB();
-  const rows = db.prepare("SELECT * FROM scan_state").all() as Array<{
+  const rows = db.prepare('SELECT * FROM scan_state').all() as Array<{
     repo: string;
     last_hash: string;
     last_scan_date: string;
@@ -877,7 +901,7 @@ export function loadScanStateSQL(): ScanState {
     record_count: number;
   }>;
 
-  const repos: ScanState["repos"] = {};
+  const repos: ScanState['repos'] = {};
   for (const row of rows) {
     repos[row.repo] = {
       lastHash: row.last_hash,
@@ -902,7 +926,7 @@ export function saveScanStateSQL(state: ScanState): void {
       record_count = excluded.record_count
   `);
 
-  const saveAll = db.transaction((repos: Record<string, ScanState["repos"][string]>) => {
+  const saveAll = db.transaction((repos: Record<string, ScanState['repos'][string]>) => {
     for (const [repo, rs] of Object.entries(repos)) {
       upsert.run({
         repo,
@@ -917,10 +941,7 @@ export function saveScanStateSQL(state: ScanState): void {
   saveAll(state.repos);
 }
 
-export function updateRepoScanStateSQL(
-  repoName: string,
-  rs: ScanState["repos"][string],
-): void {
+export function updateRepoScanStateSQL(repoName: string, rs: ScanState['repos'][string]): void {
   const db = getDB();
   db.prepare(`
     INSERT INTO scan_state (repo, last_hash, last_scan_date, recent_hashes, record_count)
@@ -941,14 +962,14 @@ export function updateRepoScanStateSQL(
 
 export function deleteScanStateForRepo(repoName: string): void {
   const db = getDB();
-  db.prepare("DELETE FROM scan_state WHERE repo = ?").run(repoName);
+  db.prepare('DELETE FROM scan_state WHERE repo = ?').run(repoName);
 }
 
 // ── Author registry (SQLite-backed) ─────────────────────────────────────────
 
 export function loadAuthorRegistrySQL(): AuthorRegistry {
   const db = getDB();
-  const rows = db.prepare("SELECT * FROM authors").all() as Array<{
+  const rows = db.prepare('SELECT * FROM authors').all() as Array<{
     email: string;
     name: string;
     identifier: string | null;
@@ -1091,15 +1112,15 @@ export function upsertRecords(records: UserWeekRepoRecord[]): void {
 
   insertMany(records);
 
-  db.prepare(
-    "INSERT OR REPLACE INTO meta (key, value) VALUES ('commits_last_updated', ?)",
-  ).run(new Date().toISOString());
+  db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('commits_last_updated', ?)").run(
+    new Date().toISOString(),
+  );
 }
 
 /** Delete all records for a repo (used before rescan). */
 export function deleteRecordsForRepo(repoName: string): void {
   const db = getDB();
-  db.prepare("DELETE FROM records WHERE repo = ?").run(repoName);
+  db.prepare('DELETE FROM records WHERE repo = ?').run(repoName);
 }
 
 /** Bulk update org/team on all records matching email. */
@@ -1108,7 +1129,7 @@ export function reattributeRecordsSQL(
 ): void {
   const db = getDB();
   const stmt = db.prepare(
-    "UPDATE records SET org = @org, org_type = @org_type, team = @team, tag = @tag WHERE email = @email",
+    'UPDATE records SET org = @org, org_type = @org_type, team = @team, tag = @tag WHERE email = @email',
   );
 
   const updateAll = db.transaction((items: typeof updates) => {
@@ -1137,17 +1158,17 @@ export function getStoreStatsSQLFull(): {
   teamCount: number;
 } {
   const db = getDB();
-  const row = db.prepare(
-    "SELECT COUNT(*) as cnt, MIN(week) as oldest, MAX(week) as newest FROM records",
-  ).get() as { cnt: number; oldest: string | null; newest: string | null };
+  const row = db
+    .prepare('SELECT COUNT(*) as cnt, MIN(week) as oldest, MAX(week) as newest FROM records')
+    .get() as { cnt: number; oldest: string | null; newest: string | null };
 
-  const orgRow = db.prepare(
-    "SELECT COUNT(DISTINCT org) as cnt FROM records WHERE org != ''",
-  ).get() as { cnt: number };
+  const orgRow = db
+    .prepare("SELECT COUNT(DISTINCT org) as cnt FROM records WHERE org != ''")
+    .get() as { cnt: number };
 
-  const teamRow = db.prepare(
-    "SELECT COUNT(DISTINCT team) as cnt FROM records WHERE team != ''",
-  ).get() as { cnt: number };
+  const teamRow = db
+    .prepare("SELECT COUNT(DISTINCT team) as cnt FROM records WHERE team != ''")
+    .get() as { cnt: number };
 
   return {
     recordCount: row.cnt,
@@ -1164,11 +1185,11 @@ export function getStoreStatsSQLFull(): {
 export function resetAllData(): void {
   const db = getDB();
   db.transaction(() => {
-    db.prepare("DELETE FROM records").run();
-    db.prepare("DELETE FROM enrichments").run();
-    db.prepare("DELETE FROM scan_state").run();
-    db.prepare("DELETE FROM authors").run();
-    db.prepare("DELETE FROM meta").run();
+    db.prepare('DELETE FROM records').run();
+    db.prepare('DELETE FROM enrichments').run();
+    db.prepare('DELETE FROM scan_state').run();
+    db.prepare('DELETE FROM authors').run();
+    db.prepare('DELETE FROM meta').run();
   })();
 }
 
@@ -1176,4 +1197,3 @@ export function resetAllData(): void {
 export function resetDB(): void {
   closeDB();
 }
-

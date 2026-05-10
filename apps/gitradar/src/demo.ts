@@ -1,5 +1,5 @@
-import { DEFAULT_SETTINGS } from './types/schema.js';
 import type { Config, UserWeekRepoRecord } from './types/schema.js';
+import { DEFAULT_SETTINGS } from './types/schema.js';
 
 /**
  * Simple seeded PRNG (mulberry32) for reproducible demo data.
@@ -127,16 +127,12 @@ const TEAM_REPO_AFFINITY: Record<string, string[]> = {
  * Generate an ISO week string for a given number of weeks before `now`.
  */
 function weeksBefore(now: Date, weeksAgo: number): string {
-  const d = new Date(
-    Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()),
-  );
+  const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
   d.setUTCDate(d.getUTCDate() - weeksAgo * 7);
   const dayNum = d.getUTCDay() || 7;
   d.setUTCDate(d.getUTCDate() + 4 - dayNum);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil(
-    ((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
-  );
+  const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
   return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
 }
 
@@ -197,9 +193,7 @@ export function generateDemoData(weeks: number = 12): {
 
     for (const org of DEMO_ORGS) {
       for (const team of org.teams) {
-        const affinity = TEAM_REPO_AFFINITY[team.name] ?? [
-          DEMO_REPOS[0].name,
-        ];
+        const affinity = TEAM_REPO_AFFINITY[team.name] ?? [DEMO_REPOS[0].name];
 
         for (const member of team.members) {
           // Each member works in 1-3 repos per week from their affinity set
@@ -218,11 +212,14 @@ export function generateDemoData(weeks: number = 12): {
 
             // File type distribution: ~55% app, ~22% test, ~10% config, ~5% storybook, ~8% doc
             const totalFiles = 2 + Math.floor(rand() * 12);
-            const appFiles = Math.max(1, Math.round(totalFiles * (0.50 + rand() * 0.15)));
+            const appFiles = Math.max(1, Math.round(totalFiles * (0.5 + rand() * 0.15)));
             const testFiles = Math.max(0, Math.round(totalFiles * (0.18 + rand() * 0.1)));
             const configFiles = Math.max(0, Math.round(totalFiles * (0.05 + rand() * 0.1)));
             const docFiles = Math.max(0, Math.round(totalFiles * (0.03 + rand() * 0.1)));
-            const storybookFiles = Math.max(0, totalFiles - appFiles - testFiles - configFiles - docFiles);
+            const storybookFiles = Math.max(
+              0,
+              totalFiles - appFiles - testFiles - configFiles - docFiles,
+            );
 
             // Lines per file: 10-80 insertions, 5-30 deletions
             const insPerFile = 10 + Math.floor(rand() * 70);
@@ -230,12 +227,21 @@ export function generateDemoData(weeks: number = 12): {
 
             // Intent distribution: spread commits across conventional types
             const featCommits = Math.max(0, Math.round(baseCommits * (0.35 + rand() * 0.15)));
-            const fixCommits = Math.max(0, Math.round(baseCommits * (0.15 + rand() * 0.10)));
-            const refactorCommits = Math.max(0, Math.round(baseCommits * (0.05 + rand() * 0.10)));
+            const fixCommits = Math.max(0, Math.round(baseCommits * (0.15 + rand() * 0.1)));
+            const refactorCommits = Math.max(0, Math.round(baseCommits * (0.05 + rand() * 0.1)));
             const testCommits = Math.max(0, Math.round(baseCommits * (0.05 + rand() * 0.05)));
             const choreCommits = Math.max(0, Math.round(baseCommits * (0.05 + rand() * 0.05)));
             const docsCommits = Math.max(0, Math.round(baseCommits * (0.02 + rand() * 0.05)));
-            const otherCommits = Math.max(0, baseCommits - featCommits - fixCommits - refactorCommits - testCommits - choreCommits - docsCommits);
+            const otherCommits = Math.max(
+              0,
+              baseCommits -
+                featCommits -
+                fixCommits -
+                refactorCommits -
+                testCommits -
+                choreCommits -
+                docsCommits,
+            );
 
             // ~8% chance of a breaking change per record, 1-2 breaking commits when it happens
             const breakingChanges = rand() < 0.08 ? 1 + Math.floor(rand() * 2) : 0;

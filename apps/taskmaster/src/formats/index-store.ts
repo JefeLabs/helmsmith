@@ -1,9 +1,13 @@
-import { readFile, writeFile, rename } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import lockfile from 'proper-lockfile';
-import type { ComponentIndex, SymbolIndex, EntryPointIndex } from '../parser/analysis/types.js';
-import { ComponentIndexSchema, SymbolIndexSchema, EntryPointIndexSchema } from '../parser/analysis/types.js';
+import type { ComponentIndex, EntryPointIndex, SymbolIndex } from '../parser/analysis/types.js';
+import {
+  ComponentIndexSchema,
+  EntryPointIndexSchema,
+  SymbolIndexSchema,
+} from '../parser/analysis/types.js';
 
 const COMPONENT_INDEX_FILENAME = 'component-index.json';
 const SYMBOL_INDEX_FILENAME = 'symbol-index.json';

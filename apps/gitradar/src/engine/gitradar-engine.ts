@@ -1,59 +1,69 @@
-import path from 'node:path';
 import { homedir } from 'node:os';
-import pLimit from 'p-limit';
+import path from 'node:path';
 import ora from 'ora';
-import { loadConfig, saveConfig } from '../config/loader.js';
-import { detectGitRoot } from '../config/git-root.js';
+import pLimit from 'p-limit';
+import { getCurrentWeek, getLastNWeeks, isoWeekToDateRange } from '../aggregator/filters.js';
 import {
-  loadAllRegistries,
-  getAvailableWorkspaces,
+  buildAuthorMap,
+  buildIdentifierRules,
+  reattributeRecords,
+  resolveAuthor,
+} from '../collector/author-map.js';
+import { scanDirectory } from '../collector/dir-scanner.js';
+import { calculateChurnRate, calculateFastChurnRate } from '../collector/git.js';
+import {
+  createCacheStats,
+  createOctokit,
+  detectGitHubRemote,
+  fetchGitHubMetricsBatch,
+  type GitHubMetrics,
+  GitHubRateLimiter,
+} from '../collector/github.js';
+import { scanAllRepos } from '../collector/index.js';
+import { detectGitRoot } from '../config/git-root.js';
+import { loadConfig, saveConfig } from '../config/loader.js';
+import type { LoadedWorkspace } from '../config/repos-registry.js';
+import {
   addReposToWorkspace,
+  createWorkspace,
+  getAvailableWorkspaces,
+  loadAllRegistries,
   removeRepoFromWorkspace,
   saveReposRegistry,
-  createWorkspace,
 } from '../config/repos-registry.js';
-import type { LoadedWorkspace } from '../config/repos-registry.js';
-import { scanDirectory } from '../collector/dir-scanner.js';
-import { readKey } from '../ui/keypress.js';
 import { selectWorkspace } from '../config/workspace-selector.js';
-import {
-  mergeDiscoveredAuthors,
-} from '../store/author-registry.js';
-import {
-  upsertRecords,
-  deleteRecordsForRepo,
-  queryRecords,
-  pruneRecordsSQL,
-  getStoreStatsSQLFull,
-  loadScanStateSQL,
-  saveScanStateSQL,
-  deleteScanStateForRepo,
-  loadAuthorRegistrySQL,
-  saveAuthorRegistrySQL,
-  loadEnrichmentsSQL,
-  saveEnrichmentBatchSQL,
-  hasEnrichment,
-  resetAllData,
-  getMetaTimestamps,
-  queryRollup,
-} from '../store/sqlite-store.js';
+import { mergeDiscoveredAuthors } from '../store/author-registry.js';
 import { DbWatcher } from '../store/db-watcher.js';
-import { getSQLitePath } from '../store/sqlite-store.js';
-import { scanAllRepos } from '../collector/index.js';
-import { getCurrentWeek, getLastNWeeks, isoWeekToDateRange } from '../aggregator/filters.js';
-import { buildAuthorMap, resolveAuthor, buildIdentifierRules, reattributeRecords } from '../collector/author-map.js';
 import {
-  detectGitHubRemote,
-  createOctokit,
-  fetchGitHubMetricsBatch,
-  GitHubRateLimiter,
-  createCacheStats,
-  type GitHubMetrics,
-} from '../collector/github.js';
-import { calculateChurnRate, calculateFastChurnRate } from '../collector/git.js';
-import type { ViewContext } from '../views/types.js';
+  deleteRecordsForRepo,
+  deleteScanStateForRepo,
+  getMetaTimestamps,
+  getSQLitePath,
+  getStoreStatsSQLFull,
+  hasEnrichment,
+  loadAuthorRegistrySQL,
+  loadEnrichmentsSQL,
+  loadScanStateSQL,
+  pruneRecordsSQL,
+  queryRecords,
+  queryRollup,
+  resetAllData,
+  saveAuthorRegistrySQL,
+  saveEnrichmentBatchSQL,
+  saveScanStateSQL,
+  upsertRecords,
+} from '../store/sqlite-store.js';
+import type {
+  AuthorRegistry,
+  Config,
+  Org,
+  ProductivityExtensions,
+  ScanState,
+  UserWeekRepoRecord,
+} from '../types/schema.js';
 import { DEFAULT_SETTINGS } from '../types/schema.js';
-import type { Config, Org, UserWeekRepoRecord, AuthorRegistry, ScanState, ProductivityExtensions } from '../types/schema.js';
+import { readKey } from '../ui/keypress.js';
+import type { ViewContext } from '../views/types.js';
 
 export interface RunOptions {
   config?: string;
@@ -288,7 +298,9 @@ export class GitRadarEngine {
 
   // ── Rescan a single repo (used by ViewContext.onScanRepo) ────────────────
 
-  async rescanRepo(repoName: string): Promise<{ records: UserWeekRepoRecord[]; scanState: ScanState }> {
+  async rescanRepo(
+    repoName: string,
+  ): Promise<{ records: UserWeekRepoRecord[]; scanState: ScanState }> {
     const repoEntry = this.config.repos.find(
       (r) => (r.name ?? r.path.split('/').pop() ?? r.path) === repoName,
     );
@@ -388,7 +400,7 @@ export class GitRadarEngine {
    */
   async enrich(options: EnrichOptions = {}): Promise<void> {
     const weeksBack = options.weeks ?? 4;
-    const concurrency = options.concurrency ?? 5;
+    const _concurrency = options.concurrency ?? 5;
 
     const authorRegistry = this.authorRegistry ?? loadAuthorRegistrySQL();
     const authorMap = buildAuthorMap(this.config, authorRegistry);
@@ -402,7 +414,7 @@ export class GitRadarEngine {
     });
 
     if (targetRecords.length === 0) {
-      console.log("No records found for the target period.");
+      console.log('No records found for the target period.');
       return;
     }
 
@@ -428,7 +440,7 @@ export class GitRadarEngine {
 
     if (!octokit) {
       console.log("No GitHub token found. Set GITHUB_TOKEN or run 'gh auth login'.");
-      console.log("Skipping GitHub metrics. Only churn analysis will be performed.");
+      console.log('Skipping GitHub metrics. Only churn analysis will be performed.');
     }
 
     const churnConcurrency = this.config.settings.churn_concurrency ?? 3;
@@ -442,7 +454,17 @@ export class GitRadarEngine {
     const cacheStats = createCacheStats();
 
     const repoTotal = repoNames.length;
-    const enrichCtx = { options, octokit, rateLimiter, authorMap, identifierRules, churnWindowDays, churnMaxCommits, churnLimit, cacheStats };
+    const enrichCtx = {
+      options,
+      octokit,
+      rateLimiter,
+      authorMap,
+      identifierRules,
+      churnWindowDays,
+      churnMaxCommits,
+      churnLimit,
+      cacheStats,
+    };
 
     for (let repoIdx = 0; repoIdx < repoTotal; repoIdx++) {
       const repoName = repoNames[repoIdx];
@@ -459,7 +481,7 @@ export class GitRadarEngine {
     if (cacheStats.hits > 0 || cacheStats.misses > 0) {
       parts.push(`${cacheStats.hits} cached / ${cacheStats.misses} fetched`);
     }
-    console.log(`\nEnrichment complete: ${parts.join(", ")}`);
+    console.log(`\nEnrichment complete: ${parts.join(', ')}`);
   }
 
   /** Enrich a single repo: fetch GitHub metrics + churn, persist results. */
@@ -479,7 +501,17 @@ export class GitRadarEngine {
       cacheStats: ReturnType<typeof createCacheStats>;
     },
   ): Promise<{ enriched: number; skipped: number; errors: number }> {
-    const { options, octokit, rateLimiter, authorMap, identifierRules, churnWindowDays, churnMaxCommits, churnLimit, cacheStats } = ctx;
+    const {
+      options,
+      octokit,
+      rateLimiter,
+      authorMap,
+      identifierRules,
+      churnWindowDays,
+      churnMaxCommits,
+      churnLimit,
+      cacheStats,
+    } = ctx;
     let enriched = 0;
     let skipped = 0;
     let errors = 0;
@@ -487,7 +519,7 @@ export class GitRadarEngine {
     const spinner = ora({ text: `${repoLabel}: preparing`, indent: 2 }).start();
 
     const repoConfig = this.config.repos.find(
-      (r) => (r.name ?? r.path.split("/").pop() ?? r.path) === repoName,
+      (r) => (r.name ?? r.path.split('/').pop() ?? r.path) === repoName,
     );
     if (!repoConfig) {
       spinner.warn(`${repoLabel}: skipped (no config)`);
@@ -501,7 +533,8 @@ export class GitRadarEngine {
     }
 
     // Group records by member+week (deduplicated)
-    const memberWeekEntries: Array<{ key: string; member: string; email: string; week: string }> = [];
+    const memberWeekEntries: Array<{ key: string; member: string; email: string; week: string }> =
+      [];
     const seen = new Set<string>();
     for (const r of repoRecords) {
       const key = `${r.member}::${r.week}::${repoName}`;
@@ -517,23 +550,42 @@ export class GitRadarEngine {
     skipped += memberWeekEntries.length - toEnrich.length;
 
     if (toEnrich.length === 0) {
-      spinner.succeed(`${repoLabel}: all ${memberWeekEntries.length} member-weeks already enriched`);
+      spinner.succeed(
+        `${repoLabel}: all ${memberWeekEntries.length} member-weeks already enriched`,
+      );
       return { enriched, skipped, errors };
     }
 
     // Fetch GitHub metrics batched by week
     const ghResultMap = await this.fetchGitHubForRepo(
-      repoLabel, toEnrich, octokit, githubRemote, rateLimiter, authorMap, identifierRules, options, cacheStats, spinner,
+      repoLabel,
+      toEnrich,
+      octokit,
+      githubRemote,
+      rateLimiter,
+      authorMap,
+      identifierRules,
+      options,
+      cacheStats,
+      spinner,
     );
 
     // Merge GitHub results + churn into final metrics and persist
     const mergeResult = await this.mergeAndPersistEnrichments(
-      repoLabel, repoConfig.path, toEnrich, ghResultMap, options, churnLimit, churnWindowDays, churnMaxCommits, spinner,
+      repoLabel,
+      repoConfig.path,
+      toEnrich,
+      ghResultMap,
+      options,
+      churnLimit,
+      churnWindowDays,
+      churnMaxCommits,
+      spinner,
     );
     enriched += mergeResult.enriched;
     errors += mergeResult.errors;
 
-    const ghLabel = githubRemote ? ` (GitHub: ${githubRemote.owner}/${githubRemote.repo})` : "";
+    const ghLabel = githubRemote ? ` (GitHub: ${githubRemote.owner}/${githubRemote.repo})` : '';
     spinner.succeed(`${repoLabel}: ${toEnrich.length} member-weeks enriched${ghLabel}`);
     return { enriched, skipped, errors };
   }
@@ -581,7 +633,12 @@ export class GitRadarEngine {
 
       const dateRange = isoWeekToDateRange(week);
 
-      const batchEntries: Array<{ githubHandle: string; since: string; until: string; keys: string[] }> = [];
+      const batchEntries: Array<{
+        githubHandle: string;
+        since: string;
+        until: string;
+        keys: string[];
+      }> = [];
       for (const entry of entries) {
         const handle = handleMap.get(entry.email);
         if (handle) {
@@ -589,7 +646,12 @@ export class GitRadarEngine {
           if (existing) {
             existing.keys.push(entry.key);
           } else {
-            batchEntries.push({ githubHandle: handle, since: dateRange.since, until: dateRange.until, keys: [entry.key] });
+            batchEntries.push({
+              githubHandle: handle,
+              since: dateRange.since,
+              until: dateRange.until,
+              keys: [entry.key],
+            });
           }
         }
       }
@@ -601,7 +663,11 @@ export class GitRadarEngine {
           octokit,
           owner: githubRemote.owner,
           repo: githubRemote.repo,
-          entries: batchEntries.map((b) => ({ githubHandle: b.githubHandle, since: b.since, until: b.until })),
+          entries: batchEntries.map((b) => ({
+            githubHandle: b.githubHandle,
+            since: b.since,
+            until: b.until,
+          })),
           rateLimiter,
           skipCache: options.skipCache,
           cacheStats,
@@ -646,9 +712,10 @@ export class GitRadarEngine {
     for (let batchStart = 0; batchStart < toEnrich.length; batchStart += SAVE_BATCH_SIZE) {
       batchIdx++;
       const phase = options.skipChurn ? 'saving' : 'churn analysis';
-      spinner.text = totalBatches > 1
-        ? `${repoLabel}: ${phase} (batch ${batchIdx}/${totalBatches})`
-        : `${repoLabel}: ${phase}`;
+      spinner.text =
+        totalBatches > 1
+          ? `${repoLabel}: ${phase} (batch ${batchIdx}/${totalBatches})`
+          : `${repoLabel}: ${phase}`;
 
       const batch = toEnrich.slice(batchStart, batchStart + SAVE_BATCH_SIZE);
 
@@ -677,8 +744,21 @@ export class GitRadarEngine {
               try {
                 metrics.churn_rate_pct = await churnLimit(() =>
                   options.deepChurn
-                    ? calculateChurnRate(repoPath, email, dateRange.since, dateRange.until, churnWindowDays, churnMaxCommits)
-                    : calculateFastChurnRate(repoPath, email, dateRange.since, dateRange.until, churnWindowDays),
+                    ? calculateChurnRate(
+                        repoPath,
+                        email,
+                        dateRange.since,
+                        dateRange.until,
+                        churnWindowDays,
+                        churnMaxCommits,
+                      )
+                    : calculateFastChurnRate(
+                        repoPath,
+                        email,
+                        dateRange.since,
+                        dateRange.until,
+                        churnWindowDays,
+                      ),
                 );
               } catch {
                 errors++;
@@ -756,9 +836,7 @@ export class GitRadarEngine {
         this.scanState = ctx.scanState;
         return true;
       },
-      createRefreshSignal: this.dbWatcher
-        ? () => this.dbWatcher!.createSignal()
-        : undefined,
+      createRefreshSignal: this.dbWatcher ? () => this.dbWatcher!.createSignal() : undefined,
       onScanRepo: async (repoName: string) => {
         const result = await this.rescanRepo(repoName);
         ctx.records = result.records;

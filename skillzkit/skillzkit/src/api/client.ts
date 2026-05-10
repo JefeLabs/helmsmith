@@ -31,7 +31,7 @@ import type {
   SearchResponse,
   Skill,
   Workflow,
-} from "./contracts.js";
+} from './contracts.js';
 
 export interface ClientOptions {
   /** Base URL of the API, e.g. "https://skillz.example.com". No trailing slash. */
@@ -43,7 +43,7 @@ export interface ClientOptions {
 }
 
 export interface ListCommandsFilters {
-  kind?: "command" | "workflow" | "context";
+  kind?: 'command' | 'workflow' | 'context';
   prefix?: string;
   tag?: string;
   limit?: number;
@@ -53,12 +53,12 @@ export interface ListCommandsFilters {
 export class SkillzkitApiError extends Error {
   constructor(
     public readonly status: number,
-    public readonly code: ApiError["code"] | "network_error",
+    public readonly code: ApiError['code'] | 'network_error',
     message: string,
     public readonly details?: Record<string, unknown>,
   ) {
     super(message);
-    this.name = "SkillzkitApiError";
+    this.name = 'SkillzkitApiError';
   }
 }
 
@@ -69,7 +69,7 @@ export class SkillzkitApiClient {
 
   constructor(options: ClientOptions) {
     // Strip trailing slash so we can concatenate cleanly with leading-slash paths
-    this.baseUrl = options.baseUrl.replace(/\/$/, "");
+    this.baseUrl = options.baseUrl.replace(/\/$/, '');
     this.apiKey = options.apiKey;
     this.timeoutMs = options.timeoutMs ?? 10_000;
   }
@@ -77,22 +77,22 @@ export class SkillzkitApiClient {
   /* ── read endpoints ──────────────────────────────────────────── */
 
   getHealth(): Promise<HealthResponse> {
-    return this.get("/api/v1/health");
+    return this.get('/api/v1/health');
   }
 
   getCatalog(): Promise<CatalogIndex> {
-    return this.get("/api/v1/catalog");
+    return this.get('/api/v1/catalog');
   }
 
   listCommands(filters: ListCommandsFilters = {}): Promise<ListCommandsResponse> {
     const params = new URLSearchParams();
-    if (filters.kind) params.set("kind", filters.kind);
-    if (filters.prefix) params.set("prefix", filters.prefix);
-    if (filters.tag) params.set("tag", filters.tag);
-    if (filters.limit !== undefined) params.set("limit", String(filters.limit));
-    if (filters.offset !== undefined) params.set("offset", String(filters.offset));
+    if (filters.kind) params.set('kind', filters.kind);
+    if (filters.prefix) params.set('prefix', filters.prefix);
+    if (filters.tag) params.set('tag', filters.tag);
+    if (filters.limit !== undefined) params.set('limit', String(filters.limit));
+    if (filters.offset !== undefined) params.set('offset', String(filters.offset));
     const qs = params.toString();
-    return this.get(`/api/v1/commands${qs ? `?${qs}` : ""}`);
+    return this.get(`/api/v1/commands${qs ? `?${qs}` : ''}`);
   }
 
   getCommand(slug: string): Promise<Command> {
@@ -100,7 +100,7 @@ export class SkillzkitApiClient {
   }
 
   listSkills(tag?: string): Promise<ListSkillsResponse> {
-    const qs = tag ? `?tag=${encodeURIComponent(tag)}` : "";
+    const qs = tag ? `?tag=${encodeURIComponent(tag)}` : '';
     return this.get(`/api/v1/skills${qs}`);
   }
 
@@ -110,10 +110,10 @@ export class SkillzkitApiClient {
 
   listWorkflows(filters: { tag?: string; domain?: string } = {}): Promise<ListWorkflowsResponse> {
     const params = new URLSearchParams();
-    if (filters.tag) params.set("tag", filters.tag);
-    if (filters.domain) params.set("domain", filters.domain);
+    if (filters.tag) params.set('tag', filters.tag);
+    if (filters.domain) params.set('domain', filters.domain);
     const qs = params.toString();
-    return this.get(`/api/v1/workflows${qs ? `?${qs}` : ""}`);
+    return this.get(`/api/v1/workflows${qs ? `?${qs}` : ''}`);
   }
 
   getWorkflow(qualifiedName: string): Promise<Workflow> {
@@ -122,7 +122,7 @@ export class SkillzkitApiClient {
 
   search(query: string, limit?: number): Promise<SearchResponse> {
     const params = new URLSearchParams({ q: query });
-    if (limit !== undefined) params.set("limit", String(limit));
+    if (limit !== undefined) params.set('limit', String(limit));
     return this.get(`/api/v1/search?${params.toString()}`);
   }
 
@@ -143,10 +143,8 @@ export class SkillzkitApiClient {
    * On success, returns the ContributionResponse with the assigned
    * version, content-addressable id, and recorded author.
    */
-  createContribution(
-    req: CreateContributionRequest,
-  ): Promise<ContributionResponse> {
-    return this.post("/api/v1/contributions", req);
+  createContribution(req: CreateContributionRequest): Promise<ContributionResponse> {
+    return this.post('/api/v1/contributions', req);
   }
 
   /**
@@ -184,7 +182,7 @@ export class SkillzkitApiClient {
    * validation failures.
    */
   private get<T>(path: string): Promise<T> {
-    return this.request<T>("GET", path);
+    return this.request<T>('GET', path);
   }
 
   /**
@@ -192,7 +190,7 @@ export class SkillzkitApiClient {
    * JSON body. Used by the contribute + promote endpoints.
    */
   private post<T>(path: string, body?: unknown): Promise<T> {
-    return this.request<T>("POST", path, body);
+    return this.request<T>('POST', path, body);
   }
 
   /**
@@ -200,20 +198,15 @@ export class SkillzkitApiClient {
    * timeout semantics across all methods so the surface area is
    * uniform.
    */
-  private async request<T>(
-    method: "GET" | "POST",
-    path: string,
-    body?: unknown,
-  ): Promise<T> {
+  private async request<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
     const url = `${this.baseUrl}${path}`;
     const headers: Record<string, string> = {
-      Accept: "application/json",
+      Accept: 'application/json',
     };
     if (this.apiKey) headers.Authorization = `Bearer ${this.apiKey}`;
-    if (body !== undefined) headers["Content-Type"] = "application/json";
+    if (body !== undefined) headers['Content-Type'] = 'application/json';
 
-    const signal =
-      this.timeoutMs > 0 ? AbortSignal.timeout(this.timeoutMs) : undefined;
+    const signal = this.timeoutMs > 0 ? AbortSignal.timeout(this.timeoutMs) : undefined;
 
     const init: RequestInit = { method, headers, signal };
     if (body !== undefined) {
@@ -225,11 +218,7 @@ export class SkillzkitApiClient {
       res = await fetch(url, init);
     } catch (err) {
       const msg = (err as Error).message ?? String(err);
-      throw new SkillzkitApiError(
-        0,
-        "network_error",
-        `Could not reach ${url}: ${msg}`,
-      );
+      throw new SkillzkitApiError(0, 'network_error', `Could not reach ${url}: ${msg}`);
     }
 
     if (!res.ok) {
@@ -241,7 +230,7 @@ export class SkillzkitApiClient {
       }
       throw new SkillzkitApiError(
         res.status,
-        errBody?.code ?? "internal_error",
+        errBody?.code ?? 'internal_error',
         errBody?.message ?? `${res.status} ${res.statusText} from ${url}`,
         errBody?.details,
       );

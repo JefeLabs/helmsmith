@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   formatProjectRef,
-  parseProjectRef,
   type ProjectLocation,
+  parseProjectRef,
   type ResolvedProject,
 } from '../../../src/utils/location.js';
 

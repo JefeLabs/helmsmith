@@ -1,10 +1,6 @@
-import type { TaskNode, StateDefinition } from '../config/schema.js';
+import type { StateDefinition, TaskNode } from '../config/schema.js';
+import { applyReadiness, recomputeAllReadiness, runValidation } from '../readiness/index.js';
 import type { ValidationReport } from '../readiness/types.js';
-import {
-  recomputeAllReadiness,
-  applyReadiness,
-  runValidation,
-} from '../readiness/index.js';
 
 export interface ValidateResult extends ValidationReport {
   tasks: TaskNode[];

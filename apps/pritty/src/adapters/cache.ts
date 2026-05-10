@@ -12,10 +12,10 @@
  * tests for isolation).
  */
 
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { dirname, join } from "node:path";
-import type { ValidationType } from "./index.js";
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, join } from 'node:path';
+import type { ValidationType } from './index.js';
 
 export interface CacheEntry {
   system: ValidationType;
@@ -37,8 +37,8 @@ function emptyCache(): CacheFile {
 }
 
 export function getCachePath(): string {
-  const home = process.env.PRITTY_HOME ?? join(homedir(), ".pritty");
-  return join(home, "cache.json");
+  const home = process.env.PRITTY_HOME ?? join(homedir(), '.pritty');
+  return join(home, 'cache.json');
 }
 
 function ensureCacheDir(): void {
@@ -50,9 +50,9 @@ export function readCache(): CacheFile {
   const path = getCachePath();
   if (!existsSync(path)) return emptyCache();
   try {
-    const raw = readFileSync(path, "utf8");
+    const raw = readFileSync(path, 'utf8');
     const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return emptyCache();
+    if (!parsed || typeof parsed !== 'object') return emptyCache();
     return {
       version: 1,
       tickets: (parsed.tickets ?? {}) as Record<string, CacheEntry>,
@@ -64,17 +64,14 @@ export function readCache(): CacheFile {
 
 export function writeCache(cache: CacheFile): void {
   ensureCacheDir();
-  writeFileSync(getCachePath(), JSON.stringify(cache, null, 2) + "\n", "utf8");
+  writeFileSync(getCachePath(), `${JSON.stringify(cache, null, 2)}\n`, 'utf8');
 }
 
 /**
  * Look up a ticket in the cache, scoped by system to avoid
  * cross-instance bleed (PROJ-123 in jira-rest A vs B).
  */
-export function getCachedTicket(
-  ticket: string,
-  system: ValidationType,
-): CacheEntry | null {
+export function getCachedTicket(ticket: string, system: ValidationType): CacheEntry | null {
   const cache = readCache();
   const entry = cache.tickets[cacheKey(ticket, system)];
   return entry ?? null;
@@ -83,7 +80,7 @@ export function getCachedTicket(
 export function setCachedTicket(
   ticket: string,
   system: ValidationType,
-  entry: Omit<CacheEntry, "validatedAt" | "system">,
+  entry: Omit<CacheEntry, 'validatedAt' | 'system'>,
 ): void {
   const cache = readCache();
   cache.tickets[cacheKey(ticket, system)] = {
@@ -103,7 +100,7 @@ export function clearCache(): void {
   try {
     unlinkSync(path);
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
   }
 }
 

@@ -1,9 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   BLUEPRINTS,
   getBlueprint,
-  listBlueprints,
   getBlueprintsByAppType,
+  listBlueprints,
 } from '../../../src/blueprints/registry.js';
 import { ApplicationBlueprintSchema } from '../../../src/blueprints/types.js';
 
@@ -89,7 +89,10 @@ describe('Blueprint schema validation', () => {
   it('each blueprint passes ApplicationBlueprintSchema validation', () => {
     for (const [id, bp] of Object.entries(BLUEPRINTS)) {
       const result = ApplicationBlueprintSchema.safeParse(bp);
-      expect(result.success, `Blueprint "${id}" failed schema validation: ${JSON.stringify(result.error?.issues)}`).toBe(true);
+      expect(
+        result.success,
+        `Blueprint "${id}" failed schema validation: ${JSON.stringify(result.error?.issues)}`,
+      ).toBe(true);
     }
   });
 

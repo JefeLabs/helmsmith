@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock provider-registry, token-manager, home, and fs
 vi.mock('../../../src/auth/provider-registry.js', () => ({
@@ -35,9 +35,9 @@ const mockedAppendFileSync = vi.mocked(appendFileSync);
 function makeMockProvider(name: 'anthropic' | 'openai' | 'copilot', response?: object) {
   return {
     name: name as const,
-    callAI: vi.fn().mockResolvedValue(
-      response ?? { choices: [{ message: { content: 'response' } }] },
-    ),
+    callAI: vi
+      .fn()
+      .mockResolvedValue(response ?? { choices: [{ message: { content: 'response' } }] }),
     resolveAuth: vi.fn(),
     login: vi.fn(),
     listModels: vi.fn(),
@@ -81,9 +81,9 @@ describe('callAI', () => {
     mockProvider.callAI.mockRejectedValue(new Error('API unavailable'));
     mockedGetProvider.mockReturnValue(mockProvider);
 
-    await expect(
-      callAI([{ role: 'user', content: 'test' }], 'gpt-4o', 'copilot'),
-    ).rejects.toThrow('API unavailable');
+    await expect(callAI([{ role: 'user', content: 'test' }], 'gpt-4o', 'copilot')).rejects.toThrow(
+      'API unavailable',
+    );
   });
 
   it('passes caller context through to the JSONL log', async () => {
@@ -93,12 +93,7 @@ describe('callAI', () => {
     });
     mockedGetProvider.mockReturnValue(mockProvider);
 
-    await callAI(
-      [{ role: 'user', content: 'test' }],
-      'claude-sonnet-4',
-      'anthropic',
-      'parser',
-    );
+    await callAI([{ role: 'user', content: 'test' }], 'claude-sonnet-4', 'anthropic', 'parser');
 
     expect(mockedAppendFileSync).toHaveBeenCalledOnce();
     const logLine = mockedAppendFileSync.mock.calls[0][1] as string;

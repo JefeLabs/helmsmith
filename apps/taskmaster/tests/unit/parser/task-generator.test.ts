@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import type { TaskNode } from '../../../src/config/schema.js';
 import { generateTasks, getNextId, renumberTasks } from '../../../src/parser/task-generator.js';
 import type { ParsedSection } from '../../../src/parser/types.js';
-import type { TaskNode } from '../../../src/config/schema.js';
 
 const defaultOptions = {
   style: 'task-only',
@@ -53,11 +53,7 @@ describe('generateTasks', () => {
 
   it('generates three levels of IDs', () => {
     const sections: ParsedSection[] = [
-      makeSection('L1', 1, '', [
-        makeSection('L2', 2, '', [
-          makeSection('L3', 3, 'Deep body'),
-        ]),
-      ]),
+      makeSection('L1', 1, '', [makeSection('L2', 2, '', [makeSection('L3', 3, 'Deep body')])]),
     ];
 
     const { tasks } = generateTasks(sections, { ...defaultOptions, style: 'story-driven' });
@@ -68,11 +64,7 @@ describe('generateTasks', () => {
   });
 
   it('maps heading depth to correct type for task-only style', () => {
-    const sections: ParsedSection[] = [
-      makeSection('Task', 1, '', [
-        makeSection('Subtask', 2, ''),
-      ]),
-    ];
+    const sections: ParsedSection[] = [makeSection('Task', 1, '', [makeSection('Subtask', 2, '')])];
 
     const { tasks } = generateTasks(sections, { ...defaultOptions, style: 'task-only' });
 
@@ -83,11 +75,7 @@ describe('generateTasks', () => {
   it('maps heading depth to correct type for agile-full style', () => {
     const sections: ParsedSection[] = [
       makeSection('Epic', 1, '', [
-        makeSection('Story', 2, '', [
-          makeSection('Task', 3, '', [
-            makeSection('Subtask', 4, ''),
-          ]),
-        ]),
+        makeSection('Story', 2, '', [makeSection('Task', 3, '', [makeSection('Subtask', 4, '')])]),
       ]),
     ];
 
@@ -101,11 +89,7 @@ describe('generateTasks', () => {
 
   it('maps heading depth to correct type for story-driven style', () => {
     const sections: ParsedSection[] = [
-      makeSection('Story', 1, '', [
-        makeSection('Task', 2, '', [
-          makeSection('Subtask', 3, ''),
-        ]),
-      ]),
+      makeSection('Story', 1, '', [makeSection('Task', 2, '', [makeSection('Subtask', 3, '')])]),
     ];
 
     const { tasks } = generateTasks(sections, { ...defaultOptions, style: 'story-driven' });
@@ -116,10 +100,7 @@ describe('generateTasks', () => {
   });
 
   it('maps all headings to task for flat style', () => {
-    const sections: ParsedSection[] = [
-      makeSection('Task A', 1),
-      makeSection('Task B', 1),
-    ];
+    const sections: ParsedSection[] = [makeSection('Task A', 1), makeSection('Task B', 1)];
 
     const { tasks } = generateTasks(sections, { ...defaultOptions, style: 'flat' });
 
@@ -129,11 +110,7 @@ describe('generateTasks', () => {
 
   it('collapses headings beyond maxDepth with warning', () => {
     const sections: ParsedSection[] = [
-      makeSection('Task', 1, '', [
-        makeSection('Subtask', 2, '', [
-          makeSection('Too Deep', 3, ''),
-        ]),
-      ]),
+      makeSection('Task', 1, '', [makeSection('Subtask', 2, '', [makeSection('Too Deep', 3, '')])]),
     ];
 
     // task-only has maxDepth 2, so depth 3 should collapse to subtask
@@ -192,10 +169,7 @@ describe('generateTasks', () => {
   });
 
   it('uses startId parameter for append mode', () => {
-    const sections: ParsedSection[] = [
-      makeSection('New Task A', 1),
-      makeSection('New Task B', 1),
-    ];
+    const sections: ParsedSection[] = [makeSection('New Task A', 1), makeSection('New Task B', 1)];
 
     const { tasks } = generateTasks(sections, defaultOptions, 17);
 
@@ -300,9 +274,7 @@ describe('renumberTasks', () => {
       {
         id: '1',
         title: 'Parent',
-        children: [
-          { id: '1.1', title: 'Child', children: [] },
-        ],
+        children: [{ id: '1.1', title: 'Child', children: [] }],
       },
     ] as TaskNode[];
 

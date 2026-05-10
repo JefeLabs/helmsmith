@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { runCli, createTempHome, cleanupTempHome } from './helpers.js';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { cleanupTempHome, createTempHome, runCli } from './helpers.js';
 
 describe('E2E: CRUD commands', () => {
   let tempHome: string;
@@ -18,7 +18,10 @@ describe('E2E: CRUD commands', () => {
 
   it('add -> show -> list -> remove lifecycle', { timeout: 15_000 }, async () => {
     // Add a task
-    const add = await runCli(['add', '--title', 'Integration test task', '--priority', 'high'], env);
+    const add = await runCli(
+      ['add', '--title', 'Integration test task', '--priority', 'high'],
+      env,
+    );
     expect(add.exitCode).toBe(0);
     expect(add.stdout).toContain('Created task');
 
@@ -53,12 +56,20 @@ describe('E2E: CRUD commands', () => {
   });
 
   it('add with --type and --skills', async () => {
-    const add = await runCli([
-      'add', '--title', 'Skilled task',
-      '--type', 'task',
-      '--skills', 'backend,frontend',
-      '--priority', 'critical',
-    ], env);
+    const add = await runCli(
+      [
+        'add',
+        '--title',
+        'Skilled task',
+        '--type',
+        'task',
+        '--skills',
+        'backend,frontend',
+        '--priority',
+        'critical',
+      ],
+      env,
+    );
     expect(add.exitCode).toBe(0);
 
     // Extract ID and show

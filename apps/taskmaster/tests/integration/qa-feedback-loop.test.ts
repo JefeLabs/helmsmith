@@ -1,13 +1,10 @@
-import { describe, it, expect } from 'vitest';
-import type { TaskNode, StateDefinition } from '../../src/config/schema.js';
-import { STANDARD_PRESET } from '../../src/config/state-presets.js';
-import { executeSetStatus } from '../../src/commands/set-status.js';
-import { executeQAFail, executeQAFailBatch } from '../../src/commands/qa-fail.js';
+import { describe, expect, it } from 'vitest';
 import { executeQAClear, executeQAClearBatch } from '../../src/commands/qa-clear.js';
-import {
-  buildDelegationManifest,
-  findNextTask,
-} from '../../src/readiness/index.js';
+import { executeQAFail, executeQAFailBatch } from '../../src/commands/qa-fail.js';
+import { executeSetStatus } from '../../src/commands/set-status.js';
+import type { StateDefinition, TaskNode } from '../../src/config/schema.js';
+import { STANDARD_PRESET } from '../../src/config/state-presets.js';
+import { buildDelegationManifest, findNextTask } from '../../src/readiness/index.js';
 
 const STATES: StateDefinition[] = [...STANDARD_PRESET];
 
@@ -79,9 +76,7 @@ describe('QA Feedback Loop — Full Cycle', () => {
     expect(next?.id).toBe('T-1');
 
     // Step 4: Verify the gate — T-2 cannot go to done while tagged
-    expect(() =>
-      executeSetStatus(tasks, 'T-2', 'done', STATES, false),
-    ).toThrow('qa-review-needed');
+    expect(() => executeSetStatus(tasks, 'T-2', 'done', STATES, false)).toThrow('qa-review-needed');
 
     // Step 5: Dev fixes T-1 (move to in-progress, then done)
     executeSetStatus(tasks, 'T-1', 'in-progress', STATES, false, { force: true });
@@ -243,9 +238,7 @@ describe('QA Feedback Loop — Batch Cycle', () => {
     expect(manifest.qa_failed_tasks).toHaveLength(2);
 
     // Step 3: The gate — dependents can't go to done while tagged
-    expect(() =>
-      executeSetStatus(tasks, 'T-3', 'done', STATES, false),
-    ).toThrow('qa-review-needed');
+    expect(() => executeSetStatus(tasks, 'T-3', 'done', STATES, false)).toThrow('qa-review-needed');
 
     // Step 4: Dev fixes T-1 and T-2
     executeSetStatus(tasks, 'T-1', 'in-progress', STATES, false, { force: true });

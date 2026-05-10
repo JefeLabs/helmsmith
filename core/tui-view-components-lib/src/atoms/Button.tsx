@@ -10,17 +10,12 @@
  * (no native onClick); we forward `onPress` and `onClick` for both.
  */
 
-import type { ReactNode } from "react";
-import { useThemeTokens } from "../theme/hooks.ts";
+import type { ReactNode } from 'react';
+import { useThemeTokens } from '../theme/hooks.ts';
 
-export type ButtonVariant =
-  | "primary"
-  | "secondary"
-  | "ghost"
-  | "danger"
-  | "success";
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
 
-export type ButtonSize = "sm" | "md" | "lg";
+export type ButtonSize = 'sm' | 'md' | 'lg';
 
 export interface ButtonProps {
   variant?: ButtonVariant;
@@ -34,8 +29,8 @@ export interface ButtonProps {
 }
 
 export function Button({
-  variant = "primary",
-  size = "md",
+  variant = 'primary',
+  size = 'md',
   focused = false,
   disabled = false,
   onPress,
@@ -53,7 +48,7 @@ export function Button({
   const boxStyle: Record<string, unknown> = {
     backgroundColor: bg,
     border: true,
-    borderStyle: "single",
+    borderStyle: 'single',
     borderColor: v.borderColor,
     paddingLeft: s.paddingX,
     paddingRight: s.paddingX,

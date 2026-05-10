@@ -1,4 +1,4 @@
-import { getCachePath } from "../adapters/cache.js";
+import { getCachePath } from '../adapters/cache.js';
 
 export function runCachePath(): void {
   console.log(getCachePath());

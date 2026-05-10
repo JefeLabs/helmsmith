@@ -8,9 +8,9 @@
  * — we trust the user's shell configuration.
  */
 
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-import { detectPlatform } from "../platform/detect.js";
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { detectPlatform } from '../platform/detect.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -60,7 +60,7 @@ export async function getVersion(
  */
 async function resolveBinaryPath(toolName: string): Promise<string | null> {
   const platform = detectPlatform().platform;
-  const cmd = platform === "win32" ? "where" : "which";
+  const cmd = platform === 'win32' ? 'where' : 'which';
   try {
     const { stdout } = await execFileAsync(cmd, [toolName]);
     const first = stdout.split(/\r?\n/).find((line) => line.trim().length > 0);
@@ -79,7 +79,7 @@ async function parseToolVersion(
   toolName: string,
   options: { versionFlag?: string; versionRegex?: RegExp },
 ): Promise<string | null> {
-  const flag = options.versionFlag ?? "--version";
+  const flag = options.versionFlag ?? '--version';
   const regex = options.versionRegex ?? /(\d+\.\d+(?:\.\d+)?(?:-\S+)?)/;
   try {
     const { stdout, stderr } = await execFileAsync(toolName, [flag]);

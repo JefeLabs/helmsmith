@@ -1,11 +1,11 @@
-import chalk from "chalk";
-import { fmt, stripAnsi, padLeft, padRight } from "./format.js";
+import chalk from 'chalk';
+import { fmt, padLeft } from './format.js';
 
 export interface LineSeries {
   label: string;
   color: (s: string) => string;
   values: number[];
-  style?: "solid" | "dotted";
+  style?: 'solid' | 'dotted';
 }
 
 export interface LineChartOptions {
@@ -23,15 +23,15 @@ export interface LineChartOptions {
  * Selected based on direction transitions.
  */
 const LINE_CHARS = {
-  horizontal: "\u2500", // ─
-  vertical: "\u2502",   // │
-  cornerTopLeft: "\u256D",    // ╭ (going right then down, or arriving from below then going right)
-  cornerTopRight: "\u256E",   // ╮ (going left then down, or arriving from left then going down)
-  cornerBottomLeft: "\u2570", // ╰ (going right then up, or arriving from above then going right)
-  cornerBottomRight: "\u256F", // ╯ (going left then up, or arriving from left then going up)
+  horizontal: '\u2500', // ─
+  vertical: '\u2502', // │
+  cornerTopLeft: '\u256D', // ╭ (going right then down, or arriving from below then going right)
+  cornerTopRight: '\u256E', // ╮ (going left then down, or arriving from left then going down)
+  cornerBottomLeft: '\u2570', // ╰ (going right then up, or arriving from above then going right)
+  cornerBottomRight: '\u256F', // ╯ (going left then up, or arriving from left then going up)
 } as const;
 
-const DOT_CHAR = "\u00B7"; // ·
+const DOT_CHAR = '\u00B7'; // ·
 
 /**
  * Determine the line character to use based on previous, current, and next Y positions.
@@ -41,9 +41,9 @@ function selectLineChar(
   prevY: number | undefined,
   currY: number,
   nextY: number | undefined,
-  style: "solid" | "dotted"
+  style: 'solid' | 'dotted',
 ): string {
-  if (style === "dotted") {
+  if (style === 'dotted') {
     return DOT_CHAR;
   }
 
@@ -163,7 +163,7 @@ export function renderLineChart(options: LineChartOptions): string {
   } = options;
 
   if (series.length === 0 || xLabels.length === 0) {
-    return "";
+    return '';
   }
 
   const chartWidth = width ?? xLabels.length;
@@ -213,14 +213,14 @@ export function renderLineChart(options: LineChartOptions): string {
 
   // Build the grid: chartHeight rows x chartWidth columns
   // Each cell stores: { char, color } or null
-  const grid: ({ char: string; color: (s: string) => string } | null)[][] =
-    Array.from({ length: chartHeight }, () =>
-      Array.from({ length: chartWidth }, () => null)
-    );
+  const grid: ({ char: string; color: (s: string) => string } | null)[][] = Array.from(
+    { length: chartHeight },
+    () => Array.from({ length: chartWidth }, () => null),
+  );
 
   // Plot each series (later series overwrite earlier on overlap)
   for (const s of series) {
-    const style = s.style ?? "solid";
+    const style = s.style ?? 'solid';
     const numPoints = s.values.length;
 
     // Calculate row positions for each data point
@@ -252,14 +252,9 @@ export function renderLineChart(options: LineChartOptions): string {
           const fillCol = prevRowVal < row ? col : col;
 
           for (let r = startRow; r < endRow; r++) {
-            if (
-              fillCol >= 0 &&
-              fillCol < chartWidth &&
-              r >= 0 &&
-              r < chartHeight
-            ) {
+            if (fillCol >= 0 && fillCol < chartWidth && r >= 0 && r < chartHeight) {
               grid[r][fillCol] = {
-                char: style === "dotted" ? DOT_CHAR : LINE_CHARS.vertical,
+                char: style === 'dotted' ? DOT_CHAR : LINE_CHARS.vertical,
                 color: s.color,
               };
             }
@@ -273,13 +268,13 @@ export function renderLineChart(options: LineChartOptions): string {
 
   // === Y label ===
   if (yLabel) {
-    lines.push(" ".repeat(yAxisWidth) + " " + chalk.dim(yLabel));
+    lines.push(`${' '.repeat(yAxisWidth)} ${chalk.dim(yLabel)}`);
   }
 
   // === Chart body: rows from top (high) to bottom (low) ===
   for (let r = 0; r < chartHeight; r++) {
     // Y-axis label: show at top, middle, and bottom
-    let yLabelStr = "";
+    let yLabelStr = '';
     if (r === 0) {
       yLabelStr = fmt(globalMax);
     } else if (r === chartHeight - 1) {
@@ -289,7 +284,7 @@ export function renderLineChart(options: LineChartOptions): string {
     }
 
     const yAxisStr = padLeft(yLabelStr, yAxisWidth);
-    const separator = r === 0 || r === chartHeight - 1 ? "\u2524" : "\u2502";
+    const separator = r === 0 || r === chartHeight - 1 ? '\u2524' : '\u2502';
 
     // Build row content
     const rowChars: string[] = [];
@@ -298,17 +293,15 @@ export function renderLineChart(options: LineChartOptions): string {
       if (cell) {
         rowChars.push(cell.color(cell.char));
       } else {
-        rowChars.push(" ");
+        rowChars.push(' ');
       }
     }
 
-    lines.push(chalk.dim(yAxisStr + separator) + rowChars.join(""));
+    lines.push(chalk.dim(yAxisStr + separator) + rowChars.join(''));
   }
 
   // === X-axis line ===
-  lines.push(
-    chalk.dim(" ".repeat(yAxisWidth) + "\u2514" + "\u2500".repeat(chartWidth))
-  );
+  lines.push(chalk.dim(`${' '.repeat(yAxisWidth)}\u2514${'\u2500'.repeat(chartWidth)}`));
 
   // === X-axis labels ===
   if (xLabels.length > 0) {
@@ -316,7 +309,7 @@ export function renderLineChart(options: LineChartOptions): string {
     // Allow space beyond chartWidth so the last label is not clipped.
     const maxLabelLen = Math.max(...xLabels.map((l) => l.length));
     const lineLen = chartWidth + maxLabelLen;
-    const labelLine = new Array(lineLen).fill(" ");
+    const labelLine = new Array(lineLen).fill(' ');
     const numLabels = Math.min(xLabels.length, chartWidth);
 
     for (let i = 0; i < numLabels; i++) {
@@ -329,20 +322,20 @@ export function renderLineChart(options: LineChartOptions): string {
     }
 
     // Trim trailing spaces
-    const labelStr = labelLine.join("").trimEnd();
-    lines.push(" ".repeat(yAxisWidth + 1) + labelStr);
+    const labelStr = labelLine.join('').trimEnd();
+    lines.push(' '.repeat(yAxisWidth + 1) + labelStr);
   }
 
   // === Legend ===
   if (showLegend) {
     const legendParts = series.map((s) => {
-      const style = s.style ?? "solid";
-      const indicator = style === "solid" ? "\u2500\u2500" : DOT_CHAR + DOT_CHAR;
-      return s.color(indicator) + " " + s.label;
+      const style = s.style ?? 'solid';
+      const indicator = style === 'solid' ? '\u2500\u2500' : DOT_CHAR + DOT_CHAR;
+      return `${s.color(indicator)} ${s.label}`;
     });
-    lines.push("");
-    lines.push(" ".repeat(yAxisWidth + 1) + legendParts.join("  "));
+    lines.push('');
+    lines.push(' '.repeat(yAxisWidth + 1) + legendParts.join('  '));
   }
 
-  return lines.join("\n");
+  return lines.join('\n');
 }

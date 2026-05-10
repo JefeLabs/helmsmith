@@ -132,12 +132,14 @@ export type Thresholds = z.infer<typeof ThresholdsSchema>;
 
 // --- Blueprint configuration schema ---
 
-export const BlueprintProjectConfigSchema = z.object({
-  id: z.string().optional(),
-  contextAnswers: z
-    .record(z.string(), z.union([z.string(), z.boolean(), z.array(z.string())]))
-    .default({}),
-}).default({});
+export const BlueprintProjectConfigSchema = z
+  .object({
+    id: z.string().optional(),
+    contextAnswers: z
+      .record(z.string(), z.union([z.string(), z.boolean(), z.array(z.string())]))
+      .default({}),
+  })
+  .default({});
 
 export type BlueprintProjectConfig = z.infer<typeof BlueprintProjectConfigSchema>;
 

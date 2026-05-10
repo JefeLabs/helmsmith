@@ -1,5 +1,5 @@
-import type { Config, AuthorRegistry, UserWeekRepoRecord } from "../types/schema.js";
-import { extractIdentifier } from "../store/author-registry.js";
+import { extractIdentifier } from '../store/author-registry.js';
+import type { AuthorRegistry, Config, UserWeekRepoRecord } from '../types/schema.js';
 
 /**
  * Extract a GitHub username from a noreply email address.
@@ -20,7 +20,7 @@ export interface ResolvedAuthor {
   member: string;
   email: string;
   org: string;
-  orgType: "core" | "consultant";
+  orgType: 'core' | 'consultant';
   team: string;
   tag: string;
   /** GitHub username (without @) for PR/review metrics. */
@@ -38,7 +38,7 @@ export type AuthorMap = Map<string, ResolvedAuthor>;
 interface IdentifierRule {
   prefix: string;
   org: string;
-  orgType: "core" | "consultant";
+  orgType: 'core' | 'consultant';
   team: string;
   tag: string;
 }
@@ -59,10 +59,7 @@ export interface AuthorMapBundle {
  * 2. Author registry: assigned authors indexed by email
  * 3. Identifier rules: org.identifier prefix matching against git name
  */
-export function buildAuthorMap(
-  config: Config,
-  authorRegistry?: AuthorRegistry,
-): AuthorMap {
+export function buildAuthorMap(config: Config, authorRegistry?: AuthorRegistry): AuthorMap {
   const map: AuthorMap = new Map();
 
   // 1. Index config members (highest priority)
@@ -71,12 +68,15 @@ export function buildAuthorMap(
       for (const member of team.members) {
         const resolved: ResolvedAuthor = {
           member: member.name,
-          email: member.email ?? "",
+          email: member.email ?? '',
           org: org.name,
           orgType: org.type,
           team: team.name,
           tag: team.tag,
-          githubHandle: member.githubHandle ?? (member.email ? extractGitHubHandle(member.email) : null) ?? undefined,
+          githubHandle:
+            member.githubHandle ??
+            (member.email ? extractGitHubHandle(member.email) : null) ??
+            undefined,
         };
 
         // Index by name (lowercase)
@@ -157,8 +157,7 @@ export function resolveAuthor(
   identifierRules?: IdentifierRule[],
 ): ResolvedAuthor | null {
   // 1. Direct email or name lookup
-  const direct =
-    map.get(email.toLowerCase()) ?? map.get(name.toLowerCase()) ?? null;
+  const direct = map.get(email.toLowerCase()) ?? map.get(name.toLowerCase()) ?? null;
   if (direct) {
     // Auto-fill githubHandle from noreply email if not already set
     if (!direct.githubHandle) {
@@ -215,7 +214,13 @@ export function reattributeRecords(
       if (authorRegistry) {
         const regEntry = authorRegistry.authors[r.email.toLowerCase()];
         if (regEntry && !regEntry.org && r.org !== 'unassigned') {
-          return { ...r, org: 'unassigned', orgType: 'core' as const, team: 'unassigned', tag: 'default' };
+          return {
+            ...r,
+            org: 'unassigned',
+            orgType: 'core' as const,
+            team: 'unassigned',
+            tag: 'default',
+          };
         }
       }
       return r;

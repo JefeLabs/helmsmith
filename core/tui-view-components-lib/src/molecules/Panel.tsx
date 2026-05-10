@@ -7,11 +7,11 @@
  * (debug panels, setting groups, status displays).
  */
 
-import type { ReactNode } from "react";
-import { Box } from "../atoms/Box.tsx";
-import { Text } from "../atoms/Text.tsx";
-import { useThemeTokens } from "../theme/hooks.ts";
-import type { SpacingKey } from "../theme/types.ts";
+import type { ReactNode } from 'react';
+import { Box } from '../atoms/Box.tsx';
+import { Text } from '../atoms/Text.tsx';
+import { useThemeTokens } from '../theme/hooks.ts';
+import type { SpacingKey } from '../theme/types.ts';
 
 export interface PanelProps {
   title?: string;
@@ -22,23 +22,14 @@ export interface PanelProps {
   [extraProp: string]: unknown;
 }
 
-export function Panel({
-  title,
-  padding,
-  style,
-  children,
-  ...rest
-}: PanelProps) {
+export function Panel({ title, padding, style, children, ...rest }: PanelProps) {
   const theme = useThemeTokens();
   const effectivePadding = padding ?? theme.components.panel.padding;
 
   return (
     <Box variant="panel" padding={effectivePadding} style={style} {...rest}>
       {title ? (
-        <Text
-          color={theme.components.panel.titleFg}
-          bg={theme.components.panel.titleBg}
-        >
+        <Text color={theme.components.panel.titleFg} bg={theme.components.panel.titleBg}>
           {title}
         </Text>
       ) : null}

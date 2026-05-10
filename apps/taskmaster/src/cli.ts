@@ -1,66 +1,82 @@
+import { existsSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { createCli } from '@ecruz165/cli-kit';
 import chalk from 'chalk';
+import Table from 'cli-table3';
+import yaml from 'js-yaml';
+import type { AIProviderName } from './auth/index.js';
+import { AI_PROVIDERS, resolveActiveAuth } from './auth/index.js';
+import { type AddCommandOpts, executeAdd } from './commands/add.js';
 import {
+  executeAuthLogin,
+  executeAuthLogout,
+  executeAuthStatus,
+  executeAuthSwitch,
+} from './commands/auth.js';
+import { executeBlueprintApply, executeBlueprintCheck } from './commands/blueprint.js';
+import { executeConfigEdit, executeConfigGet, executeConfigSet } from './commands/config-cmd.js';
+import { runConnect } from './commands/connect.js';
+import {
+  executeExpand,
+  executeExpandAll,
+  findExpandCandidates,
+  validateExpandable,
+} from './commands/expand.js';
+import { executeGenerate } from './commands/generate.js';
+import { executeInit } from './commands/init.js';
+import { executeList } from './commands/list.js';
+import { executeNext } from './commands/next.js';
+import { executeParse } from './commands/parse.js';
+import {
+  executeProjectsCreate,
+  executeProjectsList,
+  executeProjectsRemove,
+  executeProjectsSwitch,
+} from './commands/projects.js';
+import {
+  executeQAClear,
+  executeQAClearBatch,
+  type QAClearBatchEntry,
+} from './commands/qa-clear.js';
+import {
+  executeQAFail,
+  executeQAFailBatch,
+  type QAFailBatchEntry,
+  type QAFailOpts,
+} from './commands/qa-fail.js';
+import { executeReady } from './commands/ready.js';
+import { registerRebrand } from './commands/rebrand.js';
+import { executeRemove } from './commands/remove.js';
+import { executeReport } from './commands/report.js';
+import { executeScan } from './commands/scan.js';
+import { executeScore } from './commands/score.js';
+import { executeSetStatus } from './commands/set-status.js';
+import { executeShow } from './commands/show.js';
+import { executeSync } from './commands/sync.js';
+import { executeValidate } from './commands/validate.js';
+import {
+  APP_CONFIG_DIR_DISPLAY,
+  APP_REPO_CONFIG_DIR_DISPLAY,
   CLI_BIN_NAME,
   CLI_DESCRIPTION,
   CLI_VERSION,
-  APP_CONFIG_DIR_DISPLAY,
-  APP_REPO_CONFIG_DIR_DISPLAY,
 } from './config/branding.js';
-import { bootstrapHome, bootstrapRepoHome } from './utils/home.js';
-import {
-  createProject,
-  switchProject,
-} from './utils/projects.js';
-import { resolveProjectOrThrow } from './config/resolver.js';
 import { loadProjectConfig, writeProjectConfig } from './config/loader.js';
+import { resolveProjectOrThrow } from './config/resolver.js';
+import { findTaskById, resolveStates } from './config/state-engine.js';
 import { readTasks, writeTasks } from './formats/tasks-store.js';
+import { renderToMarkdown, renderToTerminal, setProjectPath } from './generator/index.js';
+import type { ComplexityReportContext } from './generator/types.js';
+import { confirmBulkOperation, confirmExpand, confirmRemove } from './prompts/confirmations.js';
+import type { ReportFormat } from './reports/types.js';
+import { getEffectiveVocabulary } from './skills/index.js';
+import { writeDefaults } from './utils/defaults.js';
 import { detectGitRoot } from './utils/git.js';
 import { ensureGitignoreEntry } from './utils/gitignore.js';
+import { bootstrapHome, bootstrapRepoHome } from './utils/home.js';
 import type { ProjectLocation } from './utils/location.js';
-import { resolveStates, findTaskById, getDefaultStatus } from './config/state-engine.js';
-import { setProjectPath, renderToTerminal, renderToMarkdown } from './generator/index.js';
-import type { ReportFormat } from './reports/types.js';
-import { readFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { getNextId } from './parser/index.js';
-import { writeDefaults } from './utils/defaults.js';
-import type { InitWizardResult } from './prompts/init-wizard.js';
-import type { ComplexityReportContext } from './generator/types.js';
-import {
-  resolveActiveAuth,
-  AI_PROVIDERS,
-} from './auth/index.js';
-import type { AIProviderName } from './auth/index.js';
-import { confirmExpand, confirmBulkOperation, confirmRemove } from './prompts/confirmations.js';
-import { getEffectiveVocabulary } from './skills/index.js';
-import { executeAdd, type AddCommandOpts } from './commands/add.js';
-import { executeRemove } from './commands/remove.js';
-import { executeSetStatus } from './commands/set-status.js';
-import { executeQAFail, executeQAFailBatch, type QAFailOpts, type QAFailBatchEntry } from './commands/qa-fail.js';
-import { executeQAClear, executeQAClearBatch, type QAClearBatchEntry } from './commands/qa-clear.js';
-import { executeList } from './commands/list.js';
-import { executeShow } from './commands/show.js';
-import { executeNext } from './commands/next.js';
-import { executeGenerate } from './commands/generate.js';
-import { executeSync } from './commands/sync.js';
-import { executeScore } from './commands/score.js';
-import { validateExpandable, executeExpand, findExpandCandidates, executeExpandAll } from './commands/expand.js';
-import { executeValidate } from './commands/validate.js';
-import { executeReport } from './commands/report.js';
-import { executeConfigGet, executeConfigSet, executeConfigEdit } from './commands/config-cmd.js';
-import { executeAuthLogin, executeAuthStatus, executeAuthSwitch, executeAuthLogout } from './commands/auth.js';
-import { executeProjectsList, executeProjectsCreate, executeProjectsSwitch, executeProjectsRemove } from './commands/projects.js';
-import { executeBlueprintApply, executeBlueprintCheck } from './commands/blueprint.js';
-import { executeReady } from './commands/ready.js';
-import { executeScan } from './commands/scan.js';
-import { executeParse } from './commands/parse.js';
-import { executeInit } from './commands/init.js';
-import { registerRebrand } from './commands/rebrand.js';
-import { runConnect } from './commands/connect.js';
-import yaml from 'js-yaml';
-import Table from 'cli-table3';
+import { createProject, switchProject } from './utils/projects.js';
 
 // No `auth` wired — taskmaster resolves auth per-project via
 // `resolveActiveAuth(config.ai.provider)` (multi-provider with PKCE
@@ -75,7 +91,7 @@ const { program } = createCli({
 program.option('--project <name>', 'Target a specific project without switching active');
 
 // --- Placeholder handler ---
-function notImplemented(cmdName: string) {
+function _notImplemented(cmdName: string) {
   return () => {
     console.log(chalk.yellow(`Command "${cmdName}" is not yet implemented.`));
   };
@@ -90,77 +106,105 @@ program
   .option('--model <model>', 'AI model (e.g., gpt-4.1, gpt-4o, claude-sonnet-4.5)')
   .option('--repo', 'Store project data in the current repository')
   .option('--no-interactive', 'Skip interactive prompts')
-  .action(async (opts: { style?: string; name?: string; model?: string; repo?: boolean; interactive?: boolean }) => {
-    try {
-      await bootstrapHome();
-      const gitRoot = await detectGitRoot();
+  .action(
+    async (opts: {
+      style?: string;
+      name?: string;
+      model?: string;
+      repo?: boolean;
+      interactive?: boolean;
+    }) => {
+      try {
+        await bootstrapHome();
+        const gitRoot = await detectGitRoot();
 
-      const { wizardResult, isSwitchTo } = await executeInit(opts, gitRoot);
+        const { wizardResult, isSwitchTo } = await executeInit(opts, gitRoot);
 
-      // Handle switch-to-existing
-      if (isSwitchTo) {
-        await switchProject(wizardResult.switchTo!, wizardResult.switchToLocation!, gitRoot);
-        console.log(chalk.green(`Switched active project to "${wizardResult.switchTo}".`));
-        return;
-      }
-
-      // Create project with wizard config
-      const projectConfig = {
-        style: wizardResult.style,
-        states: { preset: wizardResult.statePreset, enforce_transitions: false },
-        skills: { vocabulary: wizardResult.skills, auto_infer: true },
-        ai: { provider: wizardResult.provider ?? 'copilot', model: wizardResult.model },
-        thresholds: wizardResult.thresholds,
-      };
-
-      if (wizardResult.location === 'repo' && gitRoot) {
-        await bootstrapRepoHome(gitRoot);
-      }
-
-      await createProject(wizardResult.name, wizardResult.location, gitRoot, wizardResult.description, projectConfig);
-
-      if (wizardResult.location === 'repo' && wizardResult.gitignore && gitRoot) {
-        await ensureGitignoreEntry(gitRoot);
-      }
-
-      await writeDefaults({
-        provider: wizardResult.provider,
-        model: wizardResult.model,
-        style: wizardResult.style,
-        statusPreset: wizardResult.statePreset,
-        skills: wizardResult.skills,
-        thresholds: wizardResult.thresholds,
-      });
-
-      // Install agent instruction files if requested
-      let installedInstructions: string[] = [];
-      if (wizardResult.aiTooling && wizardResult.instructionIds?.length) {
-        const { installContext } = await import('./context/index.js');
-        const repoRoot = gitRoot ?? process.cwd();
-        const result = await installContext(repoRoot, wizardResult.instructionIds, wizardResult.aiTooling);
-        installedInstructions = result.files;
-      }
-
-      const locationLabel = wizardResult.location === 'repo' ? ' [repo]' : ' [home]';
-      console.log(chalk.green(`\nProject "${wizardResult.name}"${locationLabel} created and set as active.`));
-      console.log(chalk.dim(`  Style: ${wizardResult.style} | Status preset: ${wizardResult.statePreset}`));
-      console.log(chalk.dim(`  Model: ${wizardResult.model}`));
-      console.log(chalk.dim(`  Skills: ${wizardResult.skills.join(', ')}`));
-      console.log(chalk.dim(`  Thresholds: expand=${wizardResult.thresholds.expand}, flag=${wizardResult.thresholds.flag}`));
-      if (wizardResult.location === 'repo' && wizardResult.gitignore) {
-        console.log(chalk.dim(`  .agentx/ added to .gitignore`));
-      }
-      if (installedInstructions.length > 0) {
-        console.log(chalk.dim(`  Agent instructions (${wizardResult.aiTooling}):`));
-        for (const f of installedInstructions) {
-          console.log(chalk.dim(`    ${f}`));
+        // Handle switch-to-existing
+        if (isSwitchTo) {
+          await switchProject(wizardResult.switchTo!, wizardResult.switchToLocation!, gitRoot);
+          console.log(chalk.green(`Switched active project to "${wizardResult.switchTo}".`));
+          return;
         }
+
+        // Create project with wizard config
+        const projectConfig = {
+          style: wizardResult.style,
+          states: { preset: wizardResult.statePreset, enforce_transitions: false },
+          skills: { vocabulary: wizardResult.skills, auto_infer: true },
+          ai: { provider: wizardResult.provider ?? 'copilot', model: wizardResult.model },
+          thresholds: wizardResult.thresholds,
+        };
+
+        if (wizardResult.location === 'repo' && gitRoot) {
+          await bootstrapRepoHome(gitRoot);
+        }
+
+        await createProject(
+          wizardResult.name,
+          wizardResult.location,
+          gitRoot,
+          wizardResult.description,
+          projectConfig,
+        );
+
+        if (wizardResult.location === 'repo' && wizardResult.gitignore && gitRoot) {
+          await ensureGitignoreEntry(gitRoot);
+        }
+
+        await writeDefaults({
+          provider: wizardResult.provider,
+          model: wizardResult.model,
+          style: wizardResult.style,
+          statusPreset: wizardResult.statePreset,
+          skills: wizardResult.skills,
+          thresholds: wizardResult.thresholds,
+        });
+
+        // Install agent instruction files if requested
+        let installedInstructions: string[] = [];
+        if (wizardResult.aiTooling && wizardResult.instructionIds?.length) {
+          const { installContext } = await import('./context/index.js');
+          const repoRoot = gitRoot ?? process.cwd();
+          const result = await installContext(
+            repoRoot,
+            wizardResult.instructionIds,
+            wizardResult.aiTooling,
+          );
+          installedInstructions = result.files;
+        }
+
+        const locationLabel = wizardResult.location === 'repo' ? ' [repo]' : ' [home]';
+        console.log(
+          chalk.green(
+            `\nProject "${wizardResult.name}"${locationLabel} created and set as active.`,
+          ),
+        );
+        console.log(
+          chalk.dim(`  Style: ${wizardResult.style} | Status preset: ${wizardResult.statePreset}`),
+        );
+        console.log(chalk.dim(`  Model: ${wizardResult.model}`));
+        console.log(chalk.dim(`  Skills: ${wizardResult.skills.join(', ')}`));
+        console.log(
+          chalk.dim(
+            `  Thresholds: expand=${wizardResult.thresholds.expand}, flag=${wizardResult.thresholds.flag}`,
+          ),
+        );
+        if (wizardResult.location === 'repo' && wizardResult.gitignore) {
+          console.log(chalk.dim(`  .agentx/ added to .gitignore`));
+        }
+        if (installedInstructions.length > 0) {
+          console.log(chalk.dim(`  Agent instructions (${wizardResult.aiTooling}):`));
+          for (const f of installedInstructions) {
+            console.log(chalk.dim(`    ${f}`));
+          }
+        }
+      } catch (err) {
+        console.error(chalk.red(`Error: ${(err as Error).message}`));
+        process.exitCode = 1;
       }
-    } catch (err) {
-      console.error(chalk.red(`Error: ${(err as Error).message}`));
-      process.exitCode = 1;
-    }
-  });
+    },
+  );
 
 // --- scan ---
 program
@@ -198,7 +242,11 @@ program
       console.log(chalk.dim(`  Symbols: ${result.symbolCount}`));
       console.log(chalk.dim(`  Layers: ${result.layers.join(', ') || 'none'}`));
       if (result.entryPointCount > 0) {
-        console.log(chalk.dim(`  Entry points: ${result.entryPointCount} detected [${result.entryPointCategories.join(', ')}]`));
+        console.log(
+          chalk.dim(
+            `  Entry points: ${result.entryPointCount} detected [${result.entryPointCategories.join(', ')}]`,
+          ),
+        );
         console.log(chalk.dim(`  Coverage: ${result.coveragePercent}%`));
       }
       if (result.detectedPatterns.length > 0) {
@@ -230,82 +278,94 @@ program
   .option('--force', 'Overwrite existing tasks without --append')
   .option('--no-ai', 'Skip AI parsing, use structural parser only')
   .option('--no-scan', 'Skip codebase scanning (only use PRD document)')
-  .action(async (file: string, opts: { numTasks?: string; style?: string; append?: boolean; force?: boolean; ai?: boolean; scan?: boolean }) => {
-    try {
-      await bootstrapHome();
-      const gitRoot = await detectGitRoot();
-      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
-      const config = await loadProjectConfig(resolved.projectDir);
+  .action(
+    async (
+      file: string,
+      opts: {
+        numTasks?: string;
+        style?: string;
+        append?: boolean;
+        force?: boolean;
+        ai?: boolean;
+        scan?: boolean;
+      },
+    ) => {
+      try {
+        await bootstrapHome();
+        const gitRoot = await detectGitRoot();
+        const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+        const config = await loadProjectConfig(resolved.projectDir);
 
-      // Read input file
-      const filePath = resolve(file);
-      if (!existsSync(filePath)) {
-        console.error(chalk.red(`Error: File "${file}" not found.`));
-        process.exitCode = 1;
-        return;
-      }
-      const content = await readFile(filePath, 'utf-8');
-      if (content.trim() === '') {
-        console.error(chalk.red('Error: File is empty, nothing to parse.'));
-        process.exitCode = 1;
-        return;
-      }
+        // Read input file
+        const filePath = resolve(file);
+        if (!existsSync(filePath)) {
+          console.error(chalk.red(`Error: File "${file}" not found.`));
+          process.exitCode = 1;
+          return;
+        }
+        const content = await readFile(filePath, 'utf-8');
+        if (content.trim() === '') {
+          console.error(chalk.red('Error: File is empty, nothing to parse.'));
+          process.exitCode = 1;
+          return;
+        }
 
-      // Overwrite protection
-      const existingTasks = await readTasks(resolved.projectDir);
-      if (existingTasks.length > 0 && !opts.append && !opts.force) {
-        console.error(
-          chalk.red(
-            `Project already has ${existingTasks.length} task(s). ` +
-              'Use --append to add to existing tasks, or --force to overwrite.',
+        // Overwrite protection
+        const existingTasks = await readTasks(resolved.projectDir);
+        if (existingTasks.length > 0 && !opts.append && !opts.force) {
+          console.error(
+            chalk.red(
+              `Project already has ${existingTasks.length} task(s). ` +
+                'Use --append to add to existing tasks, or --force to overwrite.',
+            ),
+          );
+          process.exitCode = 1;
+          return;
+        }
+
+        const result = await executeParse(content, file, existingTasks, config, opts, (msg) =>
+          console.log(chalk.dim(`  ${msg}`)),
+        );
+
+        await writeTasks(resolved.projectDir, result.finalTasks);
+
+        // Persist analysis.json (architecture pipeline only)
+        if (result.analysisJson) {
+          const { writeFile } = await import('node:fs/promises');
+          const analysisPath = resolve(resolved.projectDir, 'analysis.json');
+          await writeFile(analysisPath, `${JSON.stringify(result.analysisJson, null, 2)}\n`);
+          console.log(chalk.dim(`  Architecture analysis saved to analysis.json`));
+        }
+
+        // Summary output
+        console.log(
+          chalk.green(
+            `Parsed ${result.topLevel} top-level task(s) (${result.total} total) from ${file}`,
           ),
         );
+        const methodLabel =
+          result.parseMethod === 'ai-architecture'
+            ? `AI architecture pipeline (${config.ai.provider})`
+            : result.parseMethod === 'ai'
+              ? `AI single-shot (${config.ai.provider})`
+              : 'structural';
+        console.log(chalk.dim(`  Parse method: ${methodLabel}`));
+        if (result.skillSummary) {
+          console.log(chalk.dim(`  ${result.skillSummary}`));
+        }
+        if (opts.append && existingTasks.length > 0) {
+          console.log(chalk.dim(`  Existing tasks: ${existingTasks.length} (unchanged)`));
+          console.log(chalk.dim(`  New tasks appended: ${result.topLevel}`));
+        }
+        for (const w of result.warnings) {
+          console.log(chalk.yellow(`  Warning: ${w}`));
+        }
+      } catch (err) {
+        console.error(chalk.red(`Error: ${(err as Error).message}`));
         process.exitCode = 1;
-        return;
       }
-
-      const result = await executeParse(
-        content,
-        file,
-        existingTasks,
-        config,
-        opts,
-        (msg) => console.log(chalk.dim(`  ${msg}`)),
-      );
-
-      await writeTasks(resolved.projectDir, result.finalTasks);
-
-      // Persist analysis.json (architecture pipeline only)
-      if (result.analysisJson) {
-        const { writeFile } = await import('node:fs/promises');
-        const analysisPath = resolve(resolved.projectDir, 'analysis.json');
-        await writeFile(analysisPath, JSON.stringify(result.analysisJson, null, 2) + '\n');
-        console.log(chalk.dim(`  Architecture analysis saved to analysis.json`));
-      }
-
-      // Summary output
-      console.log(chalk.green(`Parsed ${result.topLevel} top-level task(s) (${result.total} total) from ${file}`));
-      const methodLabel = result.parseMethod === 'ai-architecture'
-        ? `AI architecture pipeline (${config.ai.provider})`
-        : result.parseMethod === 'ai'
-          ? `AI single-shot (${config.ai.provider})`
-          : 'structural';
-      console.log(chalk.dim(`  Parse method: ${methodLabel}`));
-      if (result.skillSummary) {
-        console.log(chalk.dim(`  ${result.skillSummary}`));
-      }
-      if (opts.append && existingTasks.length > 0) {
-        console.log(chalk.dim(`  Existing tasks: ${existingTasks.length} (unchanged)`));
-        console.log(chalk.dim(`  New tasks appended: ${result.topLevel}`));
-      }
-      for (const w of result.warnings) {
-        console.log(chalk.yellow(`  Warning: ${w}`));
-      }
-    } catch (err) {
-      console.error(chalk.red(`Error: ${(err as Error).message}`));
-      process.exitCode = 1;
-    }
-  });
+    },
+  );
 
 // --- list ---
 program
@@ -317,38 +377,50 @@ program
   .option('--skills <skills>', 'Filter by required skills (comma-separated, OR logic)')
   .option('--compact', 'Compact output')
   .option('--format <fmt>', 'Output format (json|md|table)')
-  .action(async (opts: { status?: string; type?: string; category?: string; skills?: string; compact?: boolean; format?: string }) => {
-    try {
-      await bootstrapHome();
-      const gitRoot = await detectGitRoot();
-      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
-      const tasks = await readTasks(resolved.projectDir);
+  .action(
+    async (opts: {
+      status?: string;
+      type?: string;
+      category?: string;
+      skills?: string;
+      compact?: boolean;
+      format?: string;
+    }) => {
+      try {
+        await bootstrapHome();
+        const gitRoot = await detectGitRoot();
+        const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+        const tasks = await readTasks(resolved.projectDir);
 
-      if (tasks.length === 0) {
-        console.log(chalk.yellow('No tasks found. Run a parse command to generate tasks.'));
-        return;
+        if (tasks.length === 0) {
+          console.log(chalk.yellow('No tasks found. Run a parse command to generate tasks.'));
+          return;
+        }
+
+        const result = executeList(tasks, opts);
+
+        if (result.tasks.length === 0 && opts.skills) {
+          console.log(chalk.yellow(`No tasks found matching skills: ${opts.skills}`));
+          return;
+        }
+
+        if (opts.format === 'json') {
+          console.log(JSON.stringify(result.tasks, null, 2));
+          return;
+        }
+
+        setProjectPath(resolved.projectDir);
+        const output = renderToTerminal('task-list', {
+          tasks: result.tasks,
+          filters: result.filters,
+        });
+        console.log(output);
+      } catch (err) {
+        console.error(chalk.red(`Error: ${(err as Error).message}`));
+        process.exitCode = 1;
       }
-
-      const result = executeList(tasks, opts);
-
-      if (result.tasks.length === 0 && opts.skills) {
-        console.log(chalk.yellow(`No tasks found matching skills: ${opts.skills}`));
-        return;
-      }
-
-      if (opts.format === 'json') {
-        console.log(JSON.stringify(result.tasks, null, 2));
-        return;
-      }
-
-      setProjectPath(resolved.projectDir);
-      const output = renderToTerminal('task-list', { tasks: result.tasks, filters: result.filters });
-      console.log(output);
-    } catch (err) {
-      console.error(chalk.red(`Error: ${(err as Error).message}`));
-      process.exitCode = 1;
-    }
-  });
+    },
+  );
 
 // --- show ---
 program
@@ -371,7 +443,10 @@ program
       }
 
       setProjectPath(resolved.projectDir);
-      const output = renderToTerminal('task-detail', { task: result.task, withChildren: opts.withChildren });
+      const output = renderToTerminal('task-detail', {
+        task: result.task,
+        withChildren: opts.withChildren,
+      });
       console.log(output);
     } catch (err) {
       console.error(chalk.red(`Error: ${(err as Error).message}`));
@@ -388,87 +463,101 @@ program
   .option('--all', 'Score all tasks, not just unscored')
   .option('--heuristic-only', 'Force heuristic scoring even when AI is available')
   .option('--format <fmt>', 'Output format (json)')
-  .action(async (opts: { recalculate?: boolean; threshold?: string; all?: boolean; heuristicOnly?: boolean; format?: string }) => {
-    try {
-      await bootstrapHome();
-      const gitRoot = await detectGitRoot();
-      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
-      const config = await loadProjectConfig(resolved.projectDir);
-      const tasks = await readTasks(resolved.projectDir);
+  .action(
+    async (opts: {
+      recalculate?: boolean;
+      threshold?: string;
+      all?: boolean;
+      heuristicOnly?: boolean;
+      format?: string;
+    }) => {
+      try {
+        await bootstrapHome();
+        const gitRoot = await detectGitRoot();
+        const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+        const config = await loadProjectConfig(resolved.projectDir);
+        const tasks = await readTasks(resolved.projectDir);
 
-      if (tasks.length === 0) {
-        console.log(chalk.yellow('No tasks found. Run a parse command to generate tasks.'));
-        return;
-      }
-
-      // Check if there are tasks to score
-      const scoreAll = opts.all || opts.recalculate;
-      if (!scoreAll && tasks.every((t) => t.complexity !== 1)) {
-        console.log(chalk.yellow('No unscored tasks found. Use --all to re-score all tasks.'));
-        return;
-      }
-
-      // Resolve auth
-      let authAvailable = false;
-      if (!opts.heuristicOnly) {
-        const authResult = await resolveActiveAuth(config.ai.provider);
-        authAvailable = authResult !== null;
-      }
-
-      const result = await executeScore(tasks, config, authAvailable, opts);
-
-      if (result.results.length === 0) {
-        console.log(chalk.yellow('No unscored tasks found. Use --all to re-score all tasks.'));
-        return;
-      }
-
-      console.log(chalk.dim(`Scored by: ${result.providerLabel}\n`));
-      await writeTasks(resolved.projectDir, result.tasks);
-
-      if (opts.format === 'json') {
-        console.log(JSON.stringify(result.results, null, 2));
-        return;
-      }
-
-      // Build complexity report context
-      const scoredTasks = result.results.map((r) => {
-        const task = findTaskById(tasks, r.taskId);
-        return task!;
-      });
-
-      const low = result.results.filter((r) => r.label === 'low').length;
-      const medium = result.results.filter((r) => r.label === 'medium').length;
-      const high = result.results.filter((r) => r.label === 'high').length;
-      const average = result.results.length > 0
-        ? Math.round((result.results.reduce((sum, r) => sum + r.score, 0) / result.results.length) * 10) / 10
-        : 0;
-
-      const context: ComplexityReportContext = {
-        tasks: scoredTasks,
-        summary: { low, medium, high, average },
-      };
-
-      setProjectPath(resolved.projectDir);
-      const output = renderToTerminal('complexity-report', context as unknown as Record<string, unknown>);
-      console.log(output);
-
-      // Threshold warnings
-      const threshold = opts.threshold
-        ? parseInt(opts.threshold, 10)
-        : config.thresholds.flag;
-      const flagged = result.results.filter((r) => r.score >= threshold);
-      if (flagged.length > 0) {
-        console.log(chalk.yellow(`\n${flagged.length} task(s) at or above threshold (${threshold}):`));
-        for (const r of flagged) {
-          const task = findTaskById(tasks, r.taskId);
-          console.log(chalk.yellow(`  ${r.taskId}: ${task?.title} (score: ${r.score})`));
+        if (tasks.length === 0) {
+          console.log(chalk.yellow('No tasks found. Run a parse command to generate tasks.'));
+          return;
         }
+
+        // Check if there are tasks to score
+        const scoreAll = opts.all || opts.recalculate;
+        if (!scoreAll && tasks.every((t) => t.complexity !== 1)) {
+          console.log(chalk.yellow('No unscored tasks found. Use --all to re-score all tasks.'));
+          return;
+        }
+
+        // Resolve auth
+        let authAvailable = false;
+        if (!opts.heuristicOnly) {
+          const authResult = await resolveActiveAuth(config.ai.provider);
+          authAvailable = authResult !== null;
+        }
+
+        const result = await executeScore(tasks, config, authAvailable, opts);
+
+        if (result.results.length === 0) {
+          console.log(chalk.yellow('No unscored tasks found. Use --all to re-score all tasks.'));
+          return;
+        }
+
+        console.log(chalk.dim(`Scored by: ${result.providerLabel}\n`));
+        await writeTasks(resolved.projectDir, result.tasks);
+
+        if (opts.format === 'json') {
+          console.log(JSON.stringify(result.results, null, 2));
+          return;
+        }
+
+        // Build complexity report context
+        const scoredTasks = result.results.map((r) => {
+          const task = findTaskById(tasks, r.taskId);
+          return task!;
+        });
+
+        const low = result.results.filter((r) => r.label === 'low').length;
+        const medium = result.results.filter((r) => r.label === 'medium').length;
+        const high = result.results.filter((r) => r.label === 'high').length;
+        const average =
+          result.results.length > 0
+            ? Math.round(
+                (result.results.reduce((sum, r) => sum + r.score, 0) / result.results.length) * 10,
+              ) / 10
+            : 0;
+
+        const context: ComplexityReportContext = {
+          tasks: scoredTasks,
+          summary: { low, medium, high, average },
+        };
+
+        setProjectPath(resolved.projectDir);
+        const output = renderToTerminal(
+          'complexity-report',
+          context as unknown as Record<string, unknown>,
+        );
+        console.log(output);
+
+        // Threshold warnings
+        const threshold = opts.threshold ? parseInt(opts.threshold, 10) : config.thresholds.flag;
+        const flagged = result.results.filter((r) => r.score >= threshold);
+        if (flagged.length > 0) {
+          console.log(
+            chalk.yellow(`\n${flagged.length} task(s) at or above threshold (${threshold}):`),
+          );
+          for (const r of flagged) {
+            const task = findTaskById(tasks, r.taskId);
+            console.log(chalk.yellow(`  ${r.taskId}: ${task?.title} (score: ${r.score})`));
+          }
+        }
+      } catch (err) {
+        console.error(chalk.red(`Error: ${(err as Error).message}`));
+        process.exitCode = 1;
       }
-    } catch (err) {
-      console.error(chalk.red(`Error: ${(err as Error).message}`));
-      process.exitCode = 1;
-    }
-  });
+    },
+  );
 
 // --- expand ---
 program
@@ -522,9 +611,7 @@ program
 
       await writeTasks(resolved.projectDir, result.tasks);
 
-      console.log(
-        chalk.green(`Expanded ${task.id} into ${result.children.length} subtask(s):`),
-      );
+      console.log(chalk.green(`Expanded ${task.id} into ${result.children.length} subtask(s):`));
       for (const child of result.children) {
         console.log(chalk.dim(`  ${child.id}: ${child.title}`));
       }
@@ -554,9 +641,7 @@ program
         return;
       }
 
-      const threshold = opts.threshold
-        ? parseInt(opts.threshold, 10)
-        : config.thresholds.expand;
+      const threshold = opts.threshold ? parseInt(opts.threshold, 10) : config.thresholds.expand;
 
       const candidates = findExpandCandidates(tasks, threshold);
 
@@ -585,11 +670,9 @@ program
       }
 
       // Confirmation
-      const bulkConfirm = await confirmBulkOperation(
-        'Expand',
-        candidates.length,
-        { force: opts.force },
-      );
+      const bulkConfirm = await confirmBulkOperation('Expand', candidates.length, {
+        force: opts.force,
+      });
       if (!bulkConfirm.confirmed) {
         console.log(chalk.dim('Expansion cancelled.'));
         return;
@@ -607,15 +690,9 @@ program
       await writeTasks(resolved.projectDir, result.tasks);
 
       if (result.expanded.length > 0) {
-        console.log(
-          chalk.green(
-            `Expanded ${result.expanded.length} task(s):`,
-          ),
-        );
+        console.log(chalk.green(`Expanded ${result.expanded.length} task(s):`));
         for (const exp of result.expanded) {
-          console.log(
-            chalk.dim(`  ${exp.parentId}: ${exp.children.length} subtask(s)`),
-          );
+          console.log(chalk.dim(`  ${exp.parentId}: ${exp.children.length} subtask(s)`));
         }
       }
 
@@ -650,15 +727,24 @@ program
         console.log(chalk.yellow('Warning: Transition rules bypassed with --force.'));
       }
 
-      const result = executeSetStatus(tasks, id, newStatus, states, config.states.enforce_transitions, {
-        cascade: opts.cascade,
-        force: opts.force,
-      });
+      const result = executeSetStatus(
+        tasks,
+        id,
+        newStatus,
+        states,
+        config.states.enforce_transitions,
+        {
+          cascade: opts.cascade,
+          force: opts.force,
+        },
+      );
 
       await writeTasks(resolved.projectDir, result.tasks);
 
       console.log(
-        chalk.green(`Updated ${id}: ${chalk.dim(result.oldStatus)} → ${chalk.bold(result.newStatus)}`),
+        chalk.green(
+          `Updated ${id}: ${chalk.dim(result.oldStatus)} → ${chalk.bold(result.newStatus)}`,
+        ),
       );
 
       if (opts.cascade && result.cascadedCount > 0) {
@@ -679,39 +765,50 @@ program
   .option('--parent <id>', 'Parent task ID')
   .option('--priority <priority>', 'Task priority (critical, high, medium, low)')
   .option('--skills <skills>', 'Required skills (comma-separated)')
-  .action(async (typeArg: string | undefined, opts: { title?: string; type?: string; parent?: string; priority?: string; skills?: string }) => {
-    try {
-      await bootstrapHome();
-      const gitRoot = await detectGitRoot();
-      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
-      const config = await loadProjectConfig(resolved.projectDir);
-      const tasks = await readTasks(resolved.projectDir);
+  .action(
+    async (
+      typeArg: string | undefined,
+      opts: { title?: string; type?: string; parent?: string; priority?: string; skills?: string },
+    ) => {
+      try {
+        await bootstrapHome();
+        const gitRoot = await detectGitRoot();
+        const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+        const config = await loadProjectConfig(resolved.projectDir);
+        const tasks = await readTasks(resolved.projectDir);
 
-      const addOpts: AddCommandOpts = {
-        typeArg,
-        title: opts.title,
-        type: opts.type,
-        priority: opts.priority,
-        parent: opts.parent,
-        skills: opts.skills,
-      };
+        const addOpts: AddCommandOpts = {
+          typeArg,
+          title: opts.title,
+          type: opts.type,
+          priority: opts.priority,
+          parent: opts.parent,
+          skills: opts.skills,
+        };
 
-      const result = await executeAdd(tasks, config, addOpts);
-      await writeTasks(resolved.projectDir, result.tasks);
+        const result = await executeAdd(tasks, config, addOpts);
+        await writeTasks(resolved.projectDir, result.tasks);
 
-      console.log(chalk.green(`Created task ${chalk.bold(result.task.id)}: ${result.task.title}`));
-      console.log(chalk.dim(`  Type: ${result.task.type} | Priority: ${result.task.priority} | Status: ${result.task.status}`));
-      if (result.task.requiredSkills.length > 0) {
-        console.log(chalk.dim(`  Skills: ${result.task.requiredSkills.join(', ')}`));
+        console.log(
+          chalk.green(`Created task ${chalk.bold(result.task.id)}: ${result.task.title}`),
+        );
+        console.log(
+          chalk.dim(
+            `  Type: ${result.task.type} | Priority: ${result.task.priority} | Status: ${result.task.status}`,
+          ),
+        );
+        if (result.task.requiredSkills.length > 0) {
+          console.log(chalk.dim(`  Skills: ${result.task.requiredSkills.join(', ')}`));
+        }
+        if (addOpts.parent) {
+          console.log(chalk.dim(`  Parent: ${addOpts.parent}`));
+        }
+      } catch (err) {
+        console.error(chalk.red(`Error: ${(err as Error).message}`));
+        process.exitCode = 1;
       }
-      if (addOpts.parent) {
-        console.log(chalk.dim(`  Parent: ${addOpts.parent}`));
-      }
-    } catch (err) {
-      console.error(chalk.red(`Error: ${(err as Error).message}`));
-      process.exitCode = 1;
-    }
-  });
+    },
+  );
 
 // --- remove ---
 program
@@ -745,7 +842,9 @@ program
       const result = executeRemove(tasks, id, states);
       await writeTasks(resolved.projectDir, result.tasks);
 
-      console.log(chalk.green(`Removed ${result.removedIds.length} task(s): ${result.removedIds.join(', ')}`));
+      console.log(
+        chalk.green(`Removed ${result.removedIds.length} task(s): ${result.removedIds.join(', ')}`),
+      );
     } catch (err) {
       console.error(chalk.red(`Error: ${(err as Error).message}`));
       process.exitCode = 1;
@@ -764,89 +863,104 @@ program
   .option('--cascade', 'Also set children to qa-failed')
   .option('--force', 'Bypass transition rules')
   .option('--no-interactive', 'Skip prompts, require flags')
-  .action(async (id: string, opts: {
-    testType?: string;
-    description?: string;
-    cause?: string;
-    severity?: string;
-    reporter?: string;
-    cascade?: boolean;
-    force?: boolean;
-    interactive?: boolean;
-  }) => {
-    try {
-      await bootstrapHome();
-      const gitRoot = await detectGitRoot();
-      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
-      const config = await loadProjectConfig(resolved.projectDir);
-      const states = resolveStates(config.states);
-      const tasks = await readTasks(resolved.projectDir);
+  .action(
+    async (
+      id: string,
+      opts: {
+        testType?: string;
+        description?: string;
+        cause?: string;
+        severity?: string;
+        reporter?: string;
+        cascade?: boolean;
+        force?: boolean;
+        interactive?: boolean;
+      },
+    ) => {
+      try {
+        await bootstrapHome();
+        const gitRoot = await detectGitRoot();
+        const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+        const config = await loadProjectConfig(resolved.projectDir);
+        const states = resolveStates(config.states);
+        const tasks = await readTasks(resolved.projectDir);
 
-      let testType = opts.testType as QAFailOpts['testType'];
-      let description = opts.description ?? '';
+        let testType = opts.testType as QAFailOpts['testType'];
+        let description = opts.description ?? '';
 
-      // Interactive prompts if flags not provided
-      if (opts.interactive !== false && (!testType || !description)) {
-        const { select, input } = await import('@inquirer/prompts');
+        // Interactive prompts if flags not provided
+        if (opts.interactive !== false && (!testType || !description)) {
+          const { select, input } = await import('@inquirer/prompts');
+          if (!testType) {
+            testType = (await select({
+              message: 'Test type:',
+              choices: [
+                { name: 'component', value: 'component' },
+                { name: 'integration', value: 'integration' },
+                { name: 'api', value: 'api' },
+                { name: 'e2e', value: 'e2e' },
+                { name: 'unit', value: 'unit' },
+                { name: 'manual', value: 'manual' },
+                { name: 'other', value: 'other' },
+              ],
+            })) as QAFailOpts['testType'];
+          }
+          if (!description) {
+            description = await input({ message: 'What failed:' });
+          }
+        }
+
         if (!testType) {
-          testType = await select({
-            message: 'Test type:',
-            choices: [
-              { name: 'component', value: 'component' },
-              { name: 'integration', value: 'integration' },
-              { name: 'api', value: 'api' },
-              { name: 'e2e', value: 'e2e' },
-              { name: 'unit', value: 'unit' },
-              { name: 'manual', value: 'manual' },
-              { name: 'other', value: 'other' },
-            ],
-          }) as QAFailOpts['testType'];
+          console.error(chalk.red('Error: --test-type is required when using --no-interactive.'));
+          process.exitCode = 1;
+          return;
         }
         if (!description) {
-          description = await input({ message: 'What failed:' });
+          console.error(chalk.red('Error: --description is required when using --no-interactive.'));
+          process.exitCode = 1;
+          return;
         }
-      }
 
-      if (!testType) {
-        console.error(chalk.red('Error: --test-type is required when using --no-interactive.'));
+        const result = executeQAFail(tasks, id, states, config.states.enforce_transitions, {
+          testType,
+          description,
+          cause: opts.cause,
+          severity: (opts.severity as QAFailOpts['severity']) ?? 'major',
+          reporter: opts.reporter,
+          cascade: opts.cascade,
+          force: opts.force,
+        });
+
+        await writeTasks(resolved.projectDir, result.tasks);
+
+        console.log(
+          chalk.red(
+            `QA Failed ${chalk.bold(id)}: ${chalk.dim(result.oldStatus)} → ${chalk.bold('qa-failed')}`,
+          ),
+        );
+        console.log(chalk.dim(`  Test type: ${testType} | Severity: ${opts.severity ?? 'major'}`));
+        console.log(chalk.dim(`  Description: ${description}`));
+
+        if (result.taggedDependents.length > 0) {
+          console.log(
+            chalk.yellow(
+              `  Tagged ${result.taggedDependents.length} dependent(s) with qa-review-needed: ${result.taggedDependents.join(', ')}`,
+            ),
+          );
+        }
+        if (result.pulledBackDependents.length > 0) {
+          console.log(
+            chalk.yellow(
+              `  Pulled back ${result.pulledBackDependents.length} dependent(s) from done: ${result.pulledBackDependents.join(', ')}`,
+            ),
+          );
+        }
+      } catch (err) {
+        console.error(chalk.red(`Error: ${(err as Error).message}`));
         process.exitCode = 1;
-        return;
       }
-      if (!description) {
-        console.error(chalk.red('Error: --description is required when using --no-interactive.'));
-        process.exitCode = 1;
-        return;
-      }
-
-      const result = executeQAFail(tasks, id, states, config.states.enforce_transitions, {
-        testType,
-        description,
-        cause: opts.cause,
-        severity: (opts.severity as QAFailOpts['severity']) ?? 'major',
-        reporter: opts.reporter,
-        cascade: opts.cascade,
-        force: opts.force,
-      });
-
-      await writeTasks(resolved.projectDir, result.tasks);
-
-      console.log(
-        chalk.red(`QA Failed ${chalk.bold(id)}: ${chalk.dim(result.oldStatus)} → ${chalk.bold('qa-failed')}`),
-      );
-      console.log(chalk.dim(`  Test type: ${testType} | Severity: ${opts.severity ?? 'major'}`));
-      console.log(chalk.dim(`  Description: ${description}`));
-
-      if (result.taggedDependents.length > 0) {
-        console.log(chalk.yellow(`  Tagged ${result.taggedDependents.length} dependent(s) with qa-review-needed: ${result.taggedDependents.join(', ')}`));
-      }
-      if (result.pulledBackDependents.length > 0) {
-        console.log(chalk.yellow(`  Pulled back ${result.pulledBackDependents.length} dependent(s) from done: ${result.pulledBackDependents.join(', ')}`));
-      }
-    } catch (err) {
-      console.error(chalk.red(`Error: ${(err as Error).message}`));
-      process.exitCode = 1;
-    }
-  });
+    },
+  );
 
 // --- qa-clear ---
 program
@@ -873,7 +987,11 @@ program
       if (result.tagRemoved) {
         console.log(chalk.green(`Cleared qa-review-needed tag from ${chalk.bold(id)}`));
       } else {
-        console.log(chalk.yellow(`Task ${chalk.bold(id)} did not have qa-review-needed tag (recorded pass entry anyway).`));
+        console.log(
+          chalk.yellow(
+            `Task ${chalk.bold(id)} did not have qa-review-needed tag (recorded pass entry anyway).`,
+          ),
+        );
       }
       if (opts.note) {
         console.log(chalk.dim(`  Note: ${opts.note}`));
@@ -893,88 +1011,112 @@ program
   .option('--reporter <name>', 'Default reporter for all entries (overridable per-entry)')
   .option('--cascade', 'Cascade qa-failed to children of each failed task')
   .option('--force', 'Bypass transition rules')
-  .action(async (opts: {
-    file?: string;
-    json?: string;
-    reporter?: string;
-    cascade?: boolean;
-    force?: boolean;
-  }) => {
-    try {
-      await bootstrapHome();
-      const gitRoot = await detectGitRoot();
-      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
-      const config = await loadProjectConfig(resolved.projectDir);
-      const states = resolveStates(config.states);
-      const tasks = await readTasks(resolved.projectDir);
+  .action(
+    async (opts: {
+      file?: string;
+      json?: string;
+      reporter?: string;
+      cascade?: boolean;
+      force?: boolean;
+    }) => {
+      try {
+        await bootstrapHome();
+        const gitRoot = await detectGitRoot();
+        const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+        const config = await loadProjectConfig(resolved.projectDir);
+        const states = resolveStates(config.states);
+        const tasks = await readTasks(resolved.projectDir);
 
-      // Parse input
-      let rawEntries: QAFailBatchEntry[];
-      if (opts.file) {
-        const filePath = resolve(opts.file);
-        if (!existsSync(filePath)) {
-          console.error(chalk.red(`Error: File "${opts.file}" not found.`));
+        // Parse input
+        let rawEntries: QAFailBatchEntry[];
+        if (opts.file) {
+          const filePath = resolve(opts.file);
+          if (!existsSync(filePath)) {
+            console.error(chalk.red(`Error: File "${opts.file}" not found.`));
+            process.exitCode = 1;
+            return;
+          }
+          const content = await readFile(filePath, 'utf-8');
+          rawEntries = JSON.parse(content);
+        } else if (opts.json) {
+          rawEntries = JSON.parse(opts.json);
+        } else {
+          console.error(chalk.red('Error: Provide --file <path> or --json <string>.'));
           process.exitCode = 1;
           return;
         }
-        const content = await readFile(filePath, 'utf-8');
-        rawEntries = JSON.parse(content);
-      } else if (opts.json) {
-        rawEntries = JSON.parse(opts.json);
-      } else {
-        console.error(chalk.red('Error: Provide --file <path> or --json <string>.'));
-        process.exitCode = 1;
-        return;
-      }
 
-      if (!Array.isArray(rawEntries) || rawEntries.length === 0) {
-        console.error(chalk.red('Error: Input must be a non-empty JSON array.'));
-        process.exitCode = 1;
-        return;
-      }
+        if (!Array.isArray(rawEntries) || rawEntries.length === 0) {
+          console.error(chalk.red('Error: Input must be a non-empty JSON array.'));
+          process.exitCode = 1;
+          return;
+        }
 
-      // Apply default reporter
-      if (opts.reporter) {
-        for (const entry of rawEntries) {
-          if (!entry.reporter) {
-            entry.reporter = opts.reporter;
+        // Apply default reporter
+        if (opts.reporter) {
+          for (const entry of rawEntries) {
+            if (!entry.reporter) {
+              entry.reporter = opts.reporter;
+            }
           }
         }
+
+        const result = executeQAFailBatch(
+          tasks,
+          rawEntries,
+          states,
+          config.states.enforce_transitions,
+          {
+            cascade: opts.cascade,
+            force: opts.force,
+          },
+        );
+
+        await writeTasks(resolved.projectDir, result.tasks);
+
+        // Output summary
+        if (result.entries.length > 0) {
+          console.log(chalk.red(`QA Failed ${result.summary.failed} task(s) atomically:`));
+          for (const entry of result.entries) {
+            console.log(
+              chalk.dim(
+                `  ${entry.taskId}: ${entry.oldStatus} → qa-failed (${entry.feedbackEntry.severity})`,
+              ),
+            );
+          }
+          if (result.summary.dependentsTagged > 0) {
+            console.log(
+              chalk.yellow(
+                `  Tagged ${result.summary.dependentsTagged} unique dependent(s) with qa-review-needed`,
+              ),
+            );
+          }
+          if (result.summary.dependentsPulledBack > 0) {
+            console.log(
+              chalk.yellow(
+                `  Pulled back ${result.summary.dependentsPulledBack} dependent(s) from done`,
+              ),
+            );
+          }
+          console.log(
+            chalk.dim(
+              `  Severity: ${result.summary.critical} critical, ${result.summary.major} major, ${result.summary.minor} minor`,
+            ),
+          );
+        }
+
+        if (result.errors.length > 0) {
+          console.log(chalk.yellow(`\n${result.errors.length} entry/entries skipped:`));
+          for (const err of result.errors) {
+            console.log(chalk.yellow(`  ${err.taskId}: ${err.error}`));
+          }
+        }
+      } catch (err) {
+        console.error(chalk.red(`Error: ${(err as Error).message}`));
+        process.exitCode = 1;
       }
-
-      const result = executeQAFailBatch(tasks, rawEntries, states, config.states.enforce_transitions, {
-        cascade: opts.cascade,
-        force: opts.force,
-      });
-
-      await writeTasks(resolved.projectDir, result.tasks);
-
-      // Output summary
-      if (result.entries.length > 0) {
-        console.log(chalk.red(`QA Failed ${result.summary.failed} task(s) atomically:`));
-        for (const entry of result.entries) {
-          console.log(chalk.dim(`  ${entry.taskId}: ${entry.oldStatus} → qa-failed (${entry.feedbackEntry.severity})`));
-        }
-        if (result.summary.dependentsTagged > 0) {
-          console.log(chalk.yellow(`  Tagged ${result.summary.dependentsTagged} unique dependent(s) with qa-review-needed`));
-        }
-        if (result.summary.dependentsPulledBack > 0) {
-          console.log(chalk.yellow(`  Pulled back ${result.summary.dependentsPulledBack} dependent(s) from done`));
-        }
-        console.log(chalk.dim(`  Severity: ${result.summary.critical} critical, ${result.summary.major} major, ${result.summary.minor} minor`));
-      }
-
-      if (result.errors.length > 0) {
-        console.log(chalk.yellow(`\n${result.errors.length} entry/entries skipped:`));
-        for (const err of result.errors) {
-          console.log(chalk.yellow(`  ${err.taskId}: ${err.error}`));
-        }
-      }
-    } catch (err) {
-      console.error(chalk.red(`Error: ${(err as Error).message}`));
-      process.exitCode = 1;
-    }
-  });
+    },
+  );
 
 // --- qa-clear-batch ---
 program
@@ -983,74 +1125,81 @@ program
   .option('--file <path>', 'Read clears from a JSON file (for per-task notes)')
   .option('--reporter <name>', 'Default reporter for all entries', 'qa-agent')
   .option('--note <text>', 'Default note for all entries (when using positional IDs)')
-  .action(async (ids: string[], opts: {
-    file?: string;
-    reporter?: string;
-    note?: string;
-  }) => {
-    try {
-      await bootstrapHome();
-      const gitRoot = await detectGitRoot();
-      const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
-      const config = await loadProjectConfig(resolved.projectDir);
-      const states = resolveStates(config.states);
-      const tasks = await readTasks(resolved.projectDir);
+  .action(
+    async (
+      ids: string[],
+      opts: {
+        file?: string;
+        reporter?: string;
+        note?: string;
+      },
+    ) => {
+      try {
+        await bootstrapHome();
+        const gitRoot = await detectGitRoot();
+        const resolved = await resolveProjectOrThrow(program.opts().project, gitRoot);
+        const config = await loadProjectConfig(resolved.projectDir);
+        const states = resolveStates(config.states);
+        const tasks = await readTasks(resolved.projectDir);
 
-      let clearEntries: QAClearBatchEntry[];
+        let clearEntries: QAClearBatchEntry[];
 
-      if (opts.file) {
-        const filePath = resolve(opts.file);
-        if (!existsSync(filePath)) {
-          console.error(chalk.red(`Error: File "${opts.file}" not found.`));
+        if (opts.file) {
+          const filePath = resolve(opts.file);
+          if (!existsSync(filePath)) {
+            console.error(chalk.red(`Error: File "${opts.file}" not found.`));
+            process.exitCode = 1;
+            return;
+          }
+          const content = await readFile(filePath, 'utf-8');
+          clearEntries = JSON.parse(content);
+        } else if (ids.length > 0) {
+          // Build entries from positional args
+          clearEntries = ids.map((id) => ({
+            taskId: id,
+            reporter: opts.reporter,
+            note: opts.note,
+          }));
+        } else {
+          console.error(chalk.red('Error: Provide task IDs as arguments or use --file <path>.'));
           process.exitCode = 1;
           return;
         }
-        const content = await readFile(filePath, 'utf-8');
-        clearEntries = JSON.parse(content);
-      } else if (ids.length > 0) {
-        // Build entries from positional args
-        clearEntries = ids.map((id) => ({
-          taskId: id,
-          reporter: opts.reporter,
-          note: opts.note,
-        }));
-      } else {
-        console.error(chalk.red('Error: Provide task IDs as arguments or use --file <path>.'));
-        process.exitCode = 1;
-        return;
-      }
 
-      if (!Array.isArray(clearEntries) || clearEntries.length === 0) {
-        console.error(chalk.red('Error: Input must be a non-empty list.'));
-        process.exitCode = 1;
-        return;
-      }
-
-      const result = executeQAClearBatch(tasks, clearEntries, states);
-
-      await writeTasks(resolved.projectDir, result.tasks);
-
-      // Output summary
-      if (result.entries.length > 0) {
-        const cleared = result.entries.filter((e) => e.tagRemoved).length;
-        console.log(chalk.green(`Cleared qa-review-needed from ${cleared} task(s):`));
-        for (const entry of result.entries) {
-          const status = entry.tagRemoved ? chalk.green('cleared') : chalk.dim('(tag not present)');
-          console.log(chalk.dim(`  ${entry.taskId}: ${status}`));
+        if (!Array.isArray(clearEntries) || clearEntries.length === 0) {
+          console.error(chalk.red('Error: Input must be a non-empty list.'));
+          process.exitCode = 1;
+          return;
         }
-      }
 
-      if (result.errors.length > 0) {
-        console.log(chalk.yellow(`\n${result.errors.length} entry/entries skipped:`));
-        for (const err of result.errors) {
-          console.log(chalk.yellow(`  ${err.taskId}: ${err.error}`));
+        const result = executeQAClearBatch(tasks, clearEntries, states);
+
+        await writeTasks(resolved.projectDir, result.tasks);
+
+        // Output summary
+        if (result.entries.length > 0) {
+          const cleared = result.entries.filter((e) => e.tagRemoved).length;
+          console.log(chalk.green(`Cleared qa-review-needed from ${cleared} task(s):`));
+          for (const entry of result.entries) {
+            const status = entry.tagRemoved
+              ? chalk.green('cleared')
+              : chalk.dim('(tag not present)');
+            console.log(chalk.dim(`  ${entry.taskId}: ${status}`));
+          }
         }
+
+        if (result.errors.length > 0) {
+          console.log(chalk.yellow(`\n${result.errors.length} entry/entries skipped:`));
+          for (const err of result.errors) {
+            console.log(chalk.yellow(`  ${err.taskId}: ${err.error}`));
+          }
+        }
+      } catch (err) {
+        console.error(chalk.red(`Error: ${(err as Error).message}`));
+        process.exitCode = 1;
       }
-    } catch (err) {
-      console.error(chalk.red(`Error: ${(err as Error).message}`));
-      process.exitCode = 1;
-    }
-  });
+    },
+  );
 
 // --- report ---
 program
@@ -1079,12 +1228,13 @@ program
           console.log(JSON.stringify(result.context, null, 2));
           break;
         case 'yaml':
-          console.log(yaml.dump(result.context as Record<string, unknown>, { lineWidth: -1, noRefs: true }));
+          console.log(
+            yaml.dump(result.context as Record<string, unknown>, { lineWidth: -1, noRefs: true }),
+          );
           break;
         case 'md':
           console.log(renderToMarkdown(result.templateName, result.context));
           break;
-        case 'table':
         default:
           console.log(renderToTerminal(result.templateName, result.context));
           break;
@@ -1169,7 +1319,14 @@ program
             style: { head: ['red'] },
           });
           for (const t of manifest.qa_failed_tasks) {
-            qaTable.push([t.id, t.title, t.priority, t.latest_feedback.severity, t.latest_feedback.test_type, t.latest_feedback.description]);
+            qaTable.push([
+              t.id,
+              t.title,
+              t.priority,
+              t.latest_feedback.severity,
+              t.latest_feedback.test_type,
+              t.latest_feedback.description,
+            ]);
           }
           console.log(qaTable.toString());
         }
@@ -1181,7 +1338,13 @@ program
             style: { head: ['cyan'] },
           });
           for (const t of manifest.ready_tasks) {
-            readyTable.push([t.id, t.title, t.priority, t.complexity, t.required_skills.join(', ') || '-']);
+            readyTable.push([
+              t.id,
+              t.title,
+              t.priority,
+              t.complexity,
+              t.required_skills.join(', ') || '-',
+            ]);
           }
           console.log(readyTable.toString());
         } else {
@@ -1201,7 +1364,9 @@ program
         }
 
         console.log(chalk.bold(`\nSummary:`));
-        console.log(`  Total: ${manifest.summary.total}  Ready: ${manifest.summary.ready}  Blocked: ${manifest.summary.blocked}  In Progress: ${manifest.summary.in_progress}  QA Failed: ${manifest.summary.qa_failed}  Completed: ${manifest.summary.completed}`);
+        console.log(
+          `  Total: ${manifest.summary.total}  Ready: ${manifest.summary.ready}  Blocked: ${manifest.summary.blocked}  In Progress: ${manifest.summary.in_progress}  QA Failed: ${manifest.summary.qa_failed}  Completed: ${manifest.summary.completed}`,
+        );
       }
     } catch (err) {
       console.error(chalk.red(`Error: ${(err as Error).message}`));
@@ -1341,7 +1506,11 @@ program
       }
 
       if (result.missingInJson.length > 0) {
-        console.log(chalk.yellow(`\nYAML files with no matching task in tasks.json: ${result.missingInJson.join(', ')}`));
+        console.log(
+          chalk.yellow(
+            `\nYAML files with no matching task in tasks.json: ${result.missingInJson.join(', ')}`,
+          ),
+        );
       }
     } catch (err) {
       console.error(chalk.red(`Error: ${(err as Error).message}`));
@@ -1417,7 +1586,9 @@ auth
 
       if (opts.provider) {
         if (!AI_PROVIDERS.includes(opts.provider as AIProviderName)) {
-          console.error(chalk.red(`Unknown provider "${opts.provider}". Valid: ${AI_PROVIDERS.join(', ')}`));
+          console.error(
+            chalk.red(`Unknown provider "${opts.provider}". Valid: ${AI_PROVIDERS.join(', ')}`),
+          );
           process.exitCode = 1;
           return;
         }
@@ -1435,7 +1606,9 @@ auth
       }
 
       const result = await executeAuthLogin(providerName, { force: opts.force });
-      console.log(chalk.green(`\nAuthenticated with ${result.providerName} as ${result.displayName}`));
+      console.log(
+        chalk.green(`\nAuthenticated with ${result.providerName} as ${result.displayName}`),
+      );
       console.log(chalk.dim(`  Credentials stored in ${APP_CONFIG_DIR_DISPLAY}/auth.json`));
       console.log(chalk.dim(`  Active provider set to: ${result.providerName}`));
     } catch (err) {
@@ -1460,14 +1633,20 @@ auth
         const marker = entry.isActive ? chalk.green(' (active)') : '';
         if (entry.authenticated) {
           anyAuth = true;
-          console.log(`  ${chalk.bold(entry.name)}${marker}: ${chalk.green(entry.displayName)} (${entry.source})`);
+          console.log(
+            `  ${chalk.bold(entry.name)}${marker}: ${chalk.green(entry.displayName)} (${entry.source})`,
+          );
         } else {
           console.log(`  ${chalk.bold(entry.name)}${marker}: ${chalk.dim('not authenticated')}`);
         }
       }
 
       if (!anyAuth) {
-        console.log(chalk.yellow(`\nNo providers authenticated. Run "${CLI_BIN_NAME} auth login" to connect.`));
+        console.log(
+          chalk.yellow(
+            `\nNo providers authenticated. Run "${CLI_BIN_NAME} auth login" to connect.`,
+          ),
+        );
       }
 
       if (opts.verbose) {
@@ -1520,9 +1699,7 @@ auth
   });
 
 // --- projects (subcommands) ---
-const projects = program
-  .command('projects')
-  .description('Multi-project management');
+const projects = program.command('projects').description('Multi-project management');
 
 projects
   .command('list')
@@ -1534,13 +1711,18 @@ projects
       const result = await executeProjectsList(gitRoot);
 
       if (result.projects.length === 0) {
-        console.log(chalk.yellow(`No projects found. Run '${CLI_BIN_NAME} projects create <name>' to create one.`));
+        console.log(
+          chalk.yellow(
+            `No projects found. Run '${CLI_BIN_NAME} projects create <name>' to create one.`,
+          ),
+        );
         return;
       }
 
       console.log(chalk.bold('\nProjects:\n'));
       for (const project of result.projects) {
-        const isActive = project.name === result.active && project.location === result.activeLocation;
+        const isActive =
+          project.name === result.active && project.location === result.activeLocation;
         const marker = isActive ? chalk.green(' (active)') : '';
         const locationTag = chalk.dim(` [${project.location}]`);
         console.log(`  ${chalk.bold(project.name)}${locationTag}${marker}`);
@@ -1580,8 +1762,11 @@ projects
 
       const result = await executeProjectsCreate(name, location, gitRoot, opts.description ?? '');
       const locationTag = result.location === 'repo' ? ' [repo]' : ' [home]';
-      const displayDir = result.location === 'repo' ? APP_REPO_CONFIG_DIR_DISPLAY : APP_CONFIG_DIR_DISPLAY;
-      console.log(chalk.green(`\nProject "${result.name}"${locationTag} created and set as active.`));
+      const displayDir =
+        result.location === 'repo' ? APP_REPO_CONFIG_DIR_DISPLAY : APP_CONFIG_DIR_DISPLAY;
+      console.log(
+        chalk.green(`\nProject "${result.name}"${locationTag} created and set as active.`),
+      );
       console.log(chalk.dim(`  Directory: ${displayDir}/${result.name}/`));
       console.log(chalk.dim(`  Config: config.yaml | Tasks: tasks.json`));
       console.log();
@@ -1623,7 +1808,9 @@ projects
       }
 
       const result = await executeProjectsRemove(name, gitRoot);
-      console.log(chalk.green(`Project "${result.name}" [${result.location}] removed from registry.`));
+      console.log(
+        chalk.green(`Project "${result.name}" [${result.location}] removed from registry.`),
+      );
     } catch (err) {
       console.error(chalk.red(`Error: ${(err as Error).message}`));
       process.exitCode = 1;
@@ -1663,7 +1850,9 @@ blueprint
 
       if (!bp) {
         const { BLUEPRINT_IDS } = await import('./blueprints/index.js');
-        console.error(chalk.red(`Blueprint "${id}" not found. Available: ${BLUEPRINT_IDS.join(', ')}`));
+        console.error(
+          chalk.red(`Blueprint "${id}" not found. Available: ${BLUEPRINT_IDS.join(', ')}`),
+        );
         process.exitCode = 1;
         return;
       }
@@ -1676,9 +1865,16 @@ blueprint
 
       // Filter by urgency if requested
       if (opts.urgency) {
-        if (opts.urgency === 'upfront') { patternFirst = []; deferred = []; }
-        else if (opts.urgency === 'pattern-first') { upfront = []; deferred = []; }
-        else if (opts.urgency === 'deferred') { upfront = []; patternFirst = []; }
+        if (opts.urgency === 'upfront') {
+          patternFirst = [];
+          deferred = [];
+        } else if (opts.urgency === 'pattern-first') {
+          upfront = [];
+          deferred = [];
+        } else if (opts.urgency === 'deferred') {
+          upfront = [];
+          patternFirst = [];
+        }
       }
 
       setProjectPath('');
@@ -1730,7 +1926,9 @@ blueprint
         const bp = getBlueprint(id);
         if (!bp) {
           const { BLUEPRINT_IDS } = await import('./blueprints/index.js');
-          console.error(chalk.red(`Blueprint "${id}" not found. Available: ${BLUEPRINT_IDS.join(', ')}`));
+          console.error(
+            chalk.red(`Blueprint "${id}" not found. Available: ${BLUEPRINT_IDS.join(', ')}`),
+          );
           process.exitCode = 1;
           return;
         }
@@ -1739,14 +1937,20 @@ blueprint
       }
 
       const existingTasks = await readTasks(resolved.projectDir);
-      const result = await executeBlueprintApply(id, existingTasks, config, contextAnswers, { flat: opts.flat });
+      const result = await executeBlueprintApply(id, existingTasks, config, contextAnswers, {
+        flat: opts.flat,
+      });
 
       await writeTasks(resolved.projectDir, result.allTasks);
       await writeProjectConfig(resolved.projectDir, {
         blueprint: { id, contextAnswers: result.contextAnswers },
       });
 
-      console.log(chalk.green(`Applied blueprint "${result.blueprintName}" — ${result.newTasks.length} top-level task(s) (${result.totalTasks} total)`));
+      console.log(
+        chalk.green(
+          `Applied blueprint "${result.blueprintName}" — ${result.newTasks.length} top-level task(s) (${result.totalTasks} total)`,
+        ),
+      );
       console.log(chalk.dim(`  Blueprint: ${result.blueprintId}`));
       console.log(chalk.dim(`  Concerns resolved: ${result.concernsResolved}`));
       console.log(chalk.dim(`  Context answers saved to config.yaml`));
@@ -1773,7 +1977,11 @@ blueprint
       }
 
       const tasks = await readTasks(resolved.projectDir);
-      const result = await executeBlueprintCheck(tasks, config.blueprint.id, config.blueprint.contextAnswers);
+      const result = await executeBlueprintCheck(
+        tasks,
+        config.blueprint.id,
+        config.blueprint.contextAnswers,
+      );
 
       setProjectPath(resolved.projectDir);
       const output = renderToTerminal('blueprint-check', {

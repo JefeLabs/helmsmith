@@ -1,5 +1,5 @@
-import { ensureTool, ensureTools } from "../core/index.js";
-import { dim, fail, ok, warn } from "../ui/index.js";
+import { ensureTool, ensureTools } from '../core/index.js';
+import { dim, fail, ok, warn } from '../ui/index.js';
 
 export interface EnsureOptions {
   minVersion?: string;
@@ -13,23 +13,16 @@ export interface EnsureOptions {
  * --auto-install. Exits non-zero if any tool is missing or below
  * --min-version.
  */
-export async function runEnsure(
-  tools: string[],
-  options: EnsureOptions = {},
-): Promise<void> {
+export async function runEnsure(tools: string[], options: EnsureOptions = {}): Promise<void> {
   const opts = {
     ...(options.minVersion ? { minVersion: options.minVersion } : {}),
-    ...(options.autoInstall !== undefined
-      ? { autoInstall: options.autoInstall }
-      : {}),
+    ...(options.autoInstall !== undefined ? { autoInstall: options.autoInstall } : {}),
     ...(options.silent !== undefined ? { silent: options.silent } : {}),
     ...(options.via ? { via: options.via as never } : {}),
   };
 
   const statuses =
-    tools.length === 1
-      ? [await ensureTool(tools[0], opts)]
-      : await ensureTools(tools, opts);
+    tools.length === 1 ? [await ensureTool(tools[0], opts)] : await ensureTools(tools, opts);
 
   let anyMissing = false;
   let anyStale = false;
@@ -43,7 +36,7 @@ export async function runEnsure(
       console.error(
         fail(
           `${status.name}: not installed${
-            opts.autoInstall ? " (install also failed)" : "; pass --auto-install to attempt install"
+            opts.autoInstall ? ' (install also failed)' : '; pass --auto-install to attempt install'
           }`,
         ),
       );
@@ -53,16 +46,14 @@ export async function runEnsure(
     if (status.versionTooLow) {
       console.error(
         warn(
-          `${status.name} ${status.version ?? "(unknown)"}: below minVersion ${opts.minVersion}`,
+          `${status.name} ${status.version ?? '(unknown)'}: below minVersion ${opts.minVersion}`,
         ),
       );
       anyStale = true;
       continue;
     }
     if (!options.silent) {
-      console.log(
-        ok(`${status.name} ${status.version ?? ""} ${dim(`(${status.source})`)}`),
-      );
+      console.log(ok(`${status.name} ${status.version ?? ''} ${dim(`(${status.source})`)}`));
     }
   }
 

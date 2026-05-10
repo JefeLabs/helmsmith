@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
-import { CONFIG_PARENT_DIR, CONFIG_DIR_NAME } from '../config/branding.js';
+import { CONFIG_DIR_NAME, CONFIG_PARENT_DIR } from '../config/branding.js';
 
 /**
  * Detect the git repository root for the given directory.

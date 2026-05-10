@@ -6,6 +6,7 @@ export interface ListOrgsOptions {
 }
 
 export async function listOrgs(options: ListOrgsOptions = {}): Promise<void> {
+  // biome-ignore lint/suspicious/noImplicitAnyLet: assigned in try/catch below
   let config;
   try {
     config = await loadConfig(options.config);

@@ -1,5 +1,5 @@
-import { readdirSync, statSync, existsSync } from 'node:fs';
-import { join, basename, relative } from 'node:path';
+import { existsSync, readdirSync, statSync } from 'node:fs';
+import { basename, join, relative } from 'node:path';
 import simpleGit from 'simple-git';
 
 /**
@@ -78,7 +78,7 @@ export class RepoFinder {
     dir: string,
     depth: number,
     repos: DiscoveredRepo[],
-    onProgress?: (path: string) => void
+    onProgress?: (path: string) => void,
   ): Promise<void> {
     if (depth > this.options.maxDepth) return;
 
@@ -123,10 +123,7 @@ export class RepoFinder {
     if (this.options.includeMetadata) {
       try {
         const git = simpleGit(repoPath);
-        const [remotes, status] = await Promise.all([
-          git.getRemotes(true),
-          git.status(),
-        ]);
+        const [remotes, status] = await Promise.all([git.getRemotes(true), git.status()]);
 
         const origin = remotes.find((r) => r.name === 'origin');
         if (origin?.refs?.fetch) {
@@ -142,4 +139,3 @@ export class RepoFinder {
     return repo;
   }
 }
-

@@ -5,12 +5,12 @@
  * built-in for any same-name tool.
  */
 
-import type { PackageManagerType } from "../platform/types.js";
-import { getMergedCatalog } from "../config/catalog.js";
-import type { CatalogEntry } from "./built-in-catalog.js";
+import { getMergedCatalog } from '../config/catalog.js';
+import type { PackageManagerType } from '../platform/types.js';
+import type { CatalogEntry } from './built-in-catalog.js';
 
-export { BUILT_IN_CATALOG } from "./built-in-catalog.js";
-export type { CatalogEntry } from "./built-in-catalog.js";
+export type { CatalogEntry } from './built-in-catalog.js';
+export { BUILT_IN_CATALOG } from './built-in-catalog.js';
 
 export interface ResolvedPackage {
   /** Manager-specific package name. */

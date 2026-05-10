@@ -11,9 +11,9 @@
  * (`(value: string) => void`) and forward through with a cast.
  */
 
-import { useThemeTokens } from "../theme/hooks.ts";
+import { useThemeTokens } from '../theme/hooks.ts';
 
-export type InputVariant = "default" | "filled" | "flushed";
+export type InputVariant = 'default' | 'filled' | 'flushed';
 
 export interface InputProps {
   variant?: InputVariant;
@@ -29,7 +29,7 @@ export interface InputProps {
 }
 
 export function Input({
-  variant = "default",
+  variant = 'default',
   value,
   placeholder,
   focused,

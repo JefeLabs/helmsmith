@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock callAI to return fixture data
 vi.mock('../../../../src/auth/call-ai.js', () => ({
@@ -75,12 +75,12 @@ describe('runAnalysisPipeline', () => {
     });
 
     // "Implement Product Catalog" depends on "Implement Auth Service"
-    const productTask = result.tasks.find(t => t.title === 'Implement Product Catalog');
+    const productTask = result.tasks.find((t) => t.title === 'Implement Product Catalog');
     expect(productTask).toBeDefined();
     expect(productTask!.dependencies.length).toBeGreaterThan(0);
 
-    const authTask = result.tasks.find(t => t.title === 'Implement Auth Service');
-    expect(productTask!.dependencies.some(d => d.taskId === authTask!.id)).toBe(true);
+    const authTask = result.tasks.find((t) => t.title === 'Implement Auth Service');
+    expect(productTask!.dependencies.some((d) => d.taskId === authTask!.id)).toBe(true);
   });
 
   it('infers interface dependencies between component tasks', async () => {
@@ -98,11 +98,11 @@ describe('runAnalysisPipeline', () => {
     });
 
     // web-frontend -> auth-service interface should add dependency
-    const frontendTask = result.tasks.find(t => t.tags.includes('component:web-frontend'));
-    const authTask = result.tasks.find(t => t.tags.includes('component:auth-service'));
+    const frontendTask = result.tasks.find((t) => t.tags.includes('component:web-frontend'));
+    const authTask = result.tasks.find((t) => t.tags.includes('component:auth-service'));
 
     if (frontendTask && authTask) {
-      expect(frontendTask.dependencies.some(d => d.taskId === authTask.id)).toBe(true);
+      expect(frontendTask.dependencies.some((d) => d.taskId === authTask.id)).toBe(true);
     }
   });
 
@@ -199,8 +199,8 @@ describe('runAnalysisPipeline', () => {
   });
 
   it('handles code-fenced JSON responses', async () => {
-    const fencedAnalysis = '```json\n' + sampleAnalysis + '\n```';
-    const fencedPhase2 = '```json\n' + samplePhase2 + '\n```';
+    const fencedAnalysis = `\`\`\`json\n${sampleAnalysis}\n\`\`\``;
+    const fencedPhase2 = `\`\`\`json\n${samplePhase2}\n\`\`\``;
 
     mockedCallAI.mockResolvedValueOnce({
       choices: [{ message: { content: fencedAnalysis } }],

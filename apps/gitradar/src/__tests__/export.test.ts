@@ -1,26 +1,26 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import yaml from "js-yaml";
-import type { RegistrySource, LoadedWorkspace } from "../config/repos-registry.js";
+import yaml from 'js-yaml';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { LoadedWorkspace, RegistrySource } from '../config/repos-registry.js';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
-vi.mock("../config/git-root.js", () => ({
+vi.mock('../config/git-root.js', () => ({
   detectGitRoot: vi.fn(),
 }));
 
-vi.mock("../config/repos-registry.js", () => ({
+vi.mock('../config/repos-registry.js', () => ({
   loadAllRegistries: vi.fn(),
   getAvailableWorkspaces: vi.fn(),
 }));
 
-vi.mock("@inquirer/prompts", () => ({
+vi.mock('@inquirer/prompts', () => ({
   select: vi.fn(),
 }));
 
-import { detectGitRoot } from "../config/git-root.js";
-import { loadAllRegistries, getAvailableWorkspaces } from "../config/repos-registry.js";
-import { select } from "@inquirer/prompts";
-import { exportWorkspace } from "../commands/export.js";
+import { select } from '@inquirer/prompts';
+import { exportWorkspace } from '../commands/export.js';
+import { detectGitRoot } from '../config/git-root.js';
+import { getAvailableWorkspaces, loadAllRegistries } from '../config/repos-registry.js';
 
 const mockDetectGitRoot = vi.mocked(detectGitRoot);
 const mockLoadAllRegistries = vi.mocked(loadAllRegistries);
@@ -31,8 +31,8 @@ const mockSelect = vi.mocked(select);
 
 function makeSource(overrides: Partial<RegistrySource> = {}): RegistrySource {
   return {
-    type: "global",
-    path: "/home/user/.agentx/repos.yml",
+    type: 'global',
+    path: '/home/user/.agentx/repos.yml',
     registry: {
       workspaces: {},
       groups: {},
@@ -45,7 +45,7 @@ function makeSource(overrides: Partial<RegistrySource> = {}): RegistrySource {
 function makeWorkspace(overrides: Partial<LoadedWorkspace> = {}): LoadedWorkspace {
   const source = overrides.source ?? makeSource();
   return {
-    name: "test-workspace",
+    name: 'test-workspace',
     repos: [],
     source,
     ...overrides,
@@ -54,7 +54,7 @@ function makeWorkspace(overrides: Partial<LoadedWorkspace> = {}): LoadedWorkspac
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
-describe("exportWorkspace", () => {
+describe('exportWorkspace', () => {
   let stdoutSpy: ReturnType<typeof vi.spyOn>;
   let stderrSpy: ReturnType<typeof vi.spyOn>;
 
@@ -62,10 +62,10 @@ describe("exportWorkspace", () => {
     vi.clearAllMocks();
     process.exitCode = undefined;
 
-    stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-    stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    stderrSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    mockDetectGitRoot.mockResolvedValue("/some/git/root");
+    mockDetectGitRoot.mockResolvedValue('/some/git/root');
     mockLoadAllRegistries.mockResolvedValue([]);
     mockGetAvailableWorkspaces.mockReturnValue([]);
   });
@@ -78,13 +78,13 @@ describe("exportWorkspace", () => {
 
   // ── 1. Strips paths from output ─────────────────────────────────────────
 
-  it("strips paths from exported repos", async () => {
+  it('strips paths from exported repos', async () => {
     const source = makeSource({
       registry: {
         workspaces: {
           myws: {
             repos: [
-              { name: "repo-a", path: "/absolute/path/to/repo-a", group: "web", tags: ["react"] },
+              { name: 'repo-a', path: '/absolute/path/to/repo-a', group: 'web', tags: ['react'] },
             ],
           },
         },
@@ -94,10 +94,8 @@ describe("exportWorkspace", () => {
     });
 
     const workspace = makeWorkspace({
-      name: "myws",
-      repos: [
-        { name: "repo-a", path: "/absolute/path/to/repo-a", group: "web", tags: ["react"] },
-      ],
+      name: 'myws',
+      repos: [{ name: 'repo-a', path: '/absolute/path/to/repo-a', group: 'web', tags: ['react'] }],
       source,
     });
 
@@ -106,42 +104,38 @@ describe("exportWorkspace", () => {
     await exportWorkspace();
 
     expect(stdoutSpy).toHaveBeenCalled();
-    const output = (stdoutSpy.mock.calls[0][0] as string);
+    const output = stdoutSpy.mock.calls[0][0] as string;
     const parsed = yaml.load(output) as Record<string, unknown>;
     const workspaces = parsed.workspaces as Record<string, { repos: Record<string, unknown>[] }>;
     const repos = workspaces.myws.repos;
 
     expect(repos).toHaveLength(1);
-    expect(repos[0]).not.toHaveProperty("path");
-    expect(repos[0].name).toBe("repo-a");
-    expect(repos[0].group).toBe("web");
-    expect(repos[0].tags).toEqual(["react"]);
+    expect(repos[0]).not.toHaveProperty('path');
+    expect(repos[0].name).toBe('repo-a');
+    expect(repos[0].group).toBe('web');
+    expect(repos[0].tags).toEqual(['react']);
   });
 
   // ── 2. Produces valid YAML ──────────────────────────────────────────────
 
-  it("produces valid YAML output", async () => {
+  it('produces valid YAML output', async () => {
     const source = makeSource({
       registry: {
         workspaces: {
           demo: {
-            label: "Demo",
-            repos: [
-              { name: "app", path: "/code/app", group: "frontend", tags: ["ts"] },
-            ],
+            label: 'Demo',
+            repos: [{ name: 'app', path: '/code/app', group: 'frontend', tags: ['ts'] }],
           },
         },
-        groups: { frontend: { label: "Frontend" } },
-        tags: { ts: { label: "TypeScript" } },
+        groups: { frontend: { label: 'Frontend' } },
+        tags: { ts: { label: 'TypeScript' } },
       },
     });
 
     const workspace = makeWorkspace({
-      name: "demo",
-      label: "Demo",
-      repos: [
-        { name: "app", path: "/code/app", group: "frontend", tags: ["ts"] },
-      ],
+      name: 'demo',
+      label: 'Demo',
+      repos: [{ name: 'app', path: '/code/app', group: 'frontend', tags: ['ts'] }],
       source,
     });
 
@@ -150,33 +144,33 @@ describe("exportWorkspace", () => {
     await exportWorkspace();
 
     expect(stdoutSpy).toHaveBeenCalled();
-    const output = (stdoutSpy.mock.calls[0][0] as string);
+    const output = stdoutSpy.mock.calls[0][0] as string;
 
     // Should not throw
     expect(() => yaml.load(output)).not.toThrow();
 
     const parsed = yaml.load(output) as Record<string, unknown>;
-    expect(parsed).toHaveProperty("workspaces");
+    expect(parsed).toHaveProperty('workspaces');
   });
 
   // ── 3. Includes groups and tags from source registry ────────────────────
 
-  it("includes groups and tags from source registry", async () => {
+  it('includes groups and tags from source registry', async () => {
     const source = makeSource({
       registry: {
         workspaces: {
           myws: {
-            repos: [{ name: "repo-a", group: "web", tags: ["react"] }],
+            repos: [{ name: 'repo-a', group: 'web', tags: ['react'] }],
           },
         },
-        groups: { web: { label: "Web Projects" }, api: { label: "API Services" } },
-        tags: { react: { label: "React Apps" }, node: { label: "Node.js" } },
+        groups: { web: { label: 'Web Projects' }, api: { label: 'API Services' } },
+        tags: { react: { label: 'React Apps' }, node: { label: 'Node.js' } },
       },
     });
 
     const workspace = makeWorkspace({
-      name: "myws",
-      repos: [{ name: "repo-a", group: "web", tags: ["react"] }],
+      name: 'myws',
+      repos: [{ name: 'repo-a', group: 'web', tags: ['react'] }],
       source,
     });
 
@@ -184,26 +178,26 @@ describe("exportWorkspace", () => {
 
     await exportWorkspace();
 
-    const output = (stdoutSpy.mock.calls[0][0] as string);
+    const output = stdoutSpy.mock.calls[0][0] as string;
     const parsed = yaml.load(output) as Record<string, unknown>;
 
     expect(parsed.groups).toEqual({
-      web: { label: "Web Projects" },
-      api: { label: "API Services" },
+      web: { label: 'Web Projects' },
+      api: { label: 'API Services' },
     });
     expect(parsed.tags).toEqual({
-      react: { label: "React Apps" },
-      node: { label: "Node.js" },
+      react: { label: 'React Apps' },
+      node: { label: 'Node.js' },
     });
   });
 
   // ── 4. Single workspace auto-selects ────────────────────────────────────
 
-  it("auto-selects when only one workspace exists (no prompt)", async () => {
+  it('auto-selects when only one workspace exists (no prompt)', async () => {
     const source = makeSource({
       registry: {
         workspaces: {
-          only: { repos: [{ name: "solo", group: "default", tags: [] }] },
+          only: { repos: [{ name: 'solo', group: 'default', tags: [] }] },
         },
         groups: {},
         tags: {},
@@ -211,8 +205,8 @@ describe("exportWorkspace", () => {
     });
 
     const workspace = makeWorkspace({
-      name: "only",
-      repos: [{ name: "solo", group: "default", tags: [] }],
+      name: 'only',
+      repos: [{ name: 'solo', group: 'default', tags: [] }],
       source,
     });
 
@@ -226,12 +220,12 @@ describe("exportWorkspace", () => {
 
   // ── 5. Multiple workspaces prompts for selection ────────────────────────
 
-  it("prompts for selection when multiple workspaces exist", async () => {
+  it('prompts for selection when multiple workspaces exist', async () => {
     const source = makeSource({
       registry: {
         workspaces: {
-          ws1: { repos: [{ name: "r1", group: "default", tags: [] }] },
-          ws2: { repos: [{ name: "r2", group: "default", tags: [] }] },
+          ws1: { repos: [{ name: 'r1', group: 'default', tags: [] }] },
+          ws2: { repos: [{ name: 'r2', group: 'default', tags: [] }] },
         },
         groups: {},
         tags: {},
@@ -239,14 +233,14 @@ describe("exportWorkspace", () => {
     });
 
     const ws1 = makeWorkspace({
-      name: "ws1",
-      repos: [{ name: "r1", group: "default", tags: [] }],
+      name: 'ws1',
+      repos: [{ name: 'r1', group: 'default', tags: [] }],
       source,
     });
 
     const ws2 = makeWorkspace({
-      name: "ws2",
-      repos: [{ name: "r2", group: "default", tags: [] }],
+      name: 'ws2',
+      repos: [{ name: 'r2', group: 'default', tags: [] }],
       source,
     });
 
@@ -256,7 +250,7 @@ describe("exportWorkspace", () => {
     await exportWorkspace();
 
     expect(mockSelect).toHaveBeenCalledWith({
-      message: "Select workspace to export:",
+      message: 'Select workspace to export:',
       choices: expect.arrayContaining([
         expect.objectContaining({ value: ws1 }),
         expect.objectContaining({ value: ws2 }),
@@ -267,13 +261,13 @@ describe("exportWorkspace", () => {
 
   // ── 6. Shows error when no workspaces found ─────────────────────────────
 
-  it("shows error when no workspaces found", async () => {
+  it('shows error when no workspaces found', async () => {
     mockGetAvailableWorkspaces.mockReturnValue([]);
 
     await exportWorkspace();
 
     expect(stderrSpy).toHaveBeenCalledWith(
-      "No workspaces found. Create ~/.agentx/repos.yml first."
+      'No workspaces found. Create ~/.agentx/repos.yml first.',
     );
     expect(process.exitCode).toBe(1);
     expect(stdoutSpy).not.toHaveBeenCalled();
@@ -286,7 +280,7 @@ describe("exportWorkspace", () => {
       registry: {
         workspaces: {
           myws: {
-            repos: [{ name: "repo-default", group: "default", tags: ["ts"] }],
+            repos: [{ name: 'repo-default', group: 'default', tags: ['ts'] }],
           },
         },
         groups: {},
@@ -295,8 +289,8 @@ describe("exportWorkspace", () => {
     });
 
     const workspace = makeWorkspace({
-      name: "myws",
-      repos: [{ name: "repo-default", group: "default", tags: ["ts"] }],
+      name: 'myws',
+      repos: [{ name: 'repo-default', group: 'default', tags: ['ts'] }],
       source,
     });
 
@@ -304,24 +298,24 @@ describe("exportWorkspace", () => {
 
     await exportWorkspace();
 
-    const output = (stdoutSpy.mock.calls[0][0] as string);
+    const output = stdoutSpy.mock.calls[0][0] as string;
     const parsed = yaml.load(output) as Record<string, unknown>;
     const workspaces = parsed.workspaces as Record<string, { repos: Record<string, unknown>[] }>;
     const repos = workspaces.myws.repos;
 
     expect(repos).toHaveLength(1);
-    expect(repos[0]).not.toHaveProperty("group");
-    expect(repos[0].name).toBe("repo-default");
+    expect(repos[0]).not.toHaveProperty('group');
+    expect(repos[0].name).toBe('repo-default');
   });
 
   // ── 8. Omits empty tags ─────────────────────────────────────────────────
 
-  it("omits tags when repo has empty tags array", async () => {
+  it('omits tags when repo has empty tags array', async () => {
     const source = makeSource({
       registry: {
         workspaces: {
           myws: {
-            repos: [{ name: "repo-notags", group: "web", tags: [] }],
+            repos: [{ name: 'repo-notags', group: 'web', tags: [] }],
           },
         },
         groups: {},
@@ -330,8 +324,8 @@ describe("exportWorkspace", () => {
     });
 
     const workspace = makeWorkspace({
-      name: "myws",
-      repos: [{ name: "repo-notags", group: "web", tags: [] }],
+      name: 'myws',
+      repos: [{ name: 'repo-notags', group: 'web', tags: [] }],
       source,
     });
 
@@ -339,26 +333,26 @@ describe("exportWorkspace", () => {
 
     await exportWorkspace();
 
-    const output = (stdoutSpy.mock.calls[0][0] as string);
+    const output = stdoutSpy.mock.calls[0][0] as string;
     const parsed = yaml.load(output) as Record<string, unknown>;
     const workspaces = parsed.workspaces as Record<string, { repos: Record<string, unknown>[] }>;
     const repos = workspaces.myws.repos;
 
     expect(repos).toHaveLength(1);
-    expect(repos[0]).not.toHaveProperty("tags");
-    expect(repos[0].name).toBe("repo-notags");
-    expect(repos[0].group).toBe("web");
+    expect(repos[0]).not.toHaveProperty('tags');
+    expect(repos[0].name).toBe('repo-notags');
+    expect(repos[0].group).toBe('web');
   });
 
   // ── 9. Preserves workspace label in output ──────────────────────────────
 
-  it("preserves workspace label in output", async () => {
+  it('preserves workspace label in output', async () => {
     const source = makeSource({
       registry: {
         workspaces: {
           labeled: {
-            label: "My Labeled Workspace",
-            repos: [{ name: "repo-x", group: "default", tags: [] }],
+            label: 'My Labeled Workspace',
+            repos: [{ name: 'repo-x', group: 'default', tags: [] }],
           },
         },
         groups: {},
@@ -367,9 +361,9 @@ describe("exportWorkspace", () => {
     });
 
     const workspace = makeWorkspace({
-      name: "labeled",
-      label: "My Labeled Workspace",
-      repos: [{ name: "repo-x", group: "default", tags: [] }],
+      name: 'labeled',
+      label: 'My Labeled Workspace',
+      repos: [{ name: 'repo-x', group: 'default', tags: [] }],
       source,
     });
 
@@ -377,10 +371,10 @@ describe("exportWorkspace", () => {
 
     await exportWorkspace();
 
-    const output = (stdoutSpy.mock.calls[0][0] as string);
+    const output = stdoutSpy.mock.calls[0][0] as string;
     const parsed = yaml.load(output) as Record<string, unknown>;
     const workspaces = parsed.workspaces as Record<string, { label?: string; repos: unknown[] }>;
 
-    expect(workspaces.labeled.label).toBe("My Labeled Workspace");
+    expect(workspaces.labeled.label).toBe('My Labeled Workspace');
   });
 });

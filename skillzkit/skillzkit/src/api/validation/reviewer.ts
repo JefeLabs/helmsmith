@@ -19,11 +19,7 @@
  *     only on borderline cases. Not built; the interface allows it.
  */
 
-import type {
-  ContributionKind,
-  CreateContributionRequest,
-  ReviewFinding,
-} from "../contracts.js";
+import type { ContributionKind, ReviewFinding } from '../contracts.js';
 
 /* ── interface ──────────────────────────────────────────────── */
 
@@ -45,7 +41,7 @@ export interface ContributionReviewer {
  * findings directly.
  */
 export function shouldBlock(findings: readonly ReviewFinding[]): boolean {
-  return findings.some((f) => f.severity === "high");
+  return findings.some((f) => f.severity === 'high');
 }
 
 /* ── mock reviewer for tests ─────────────────────────────────── */
@@ -130,8 +126,8 @@ export class AgentAdapterReviewer implements ContributionReviewer {
     if (userPrompt.length > this.maxBytes) {
       return [
         {
-          severity: "medium",
-          axis: "quality",
+          severity: 'medium',
+          axis: 'quality',
           message: `Bundle exceeds reviewer's per-call byte budget (${userPrompt.length} > ${this.maxBytes}); skipped agent review`,
         },
       ];
@@ -154,20 +150,20 @@ export class AgentAdapterReviewer implements ContributionReviewer {
     const lines: string[] = [];
     lines.push(`Kind: ${input.kind}`);
     lines.push(`Slug/Name: ${input.slug}`);
-    lines.push("");
-    lines.push("Frontmatter:");
-    lines.push("```json");
+    lines.push('');
+    lines.push('Frontmatter:');
+    lines.push('```json');
     lines.push(JSON.stringify(input.frontmatter, null, 2));
-    lines.push("```");
-    lines.push("");
+    lines.push('```');
+    lines.push('');
     lines.push(`Files (${input.files.length}):`);
     for (const file of input.files) {
-      lines.push("");
+      lines.push('');
       lines.push(`--- BEGIN FILE: ${file.path} ---`);
       lines.push(file.content);
       lines.push(`--- END FILE: ${file.path} ---`);
     }
-    return lines.join("\n");
+    return lines.join('\n');
   }
 }
 
@@ -184,21 +180,21 @@ export class AgentAdapterReviewer implements ContributionReviewer {
 export function parseFindings(raw: string): ReviewFinding[] {
   // Strip code fences if present
   let text = raw.trim();
-  if (text.startsWith("```")) {
-    text = text.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, "");
+  if (text.startsWith('```')) {
+    text = text.replace(/^```(?:json)?\s*/, '').replace(/```\s*$/, '');
   }
   // Accept the full string OR the first top-level JSON object substring
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
   } catch {
-    const start = text.indexOf("{");
-    const end = text.lastIndexOf("}");
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
     if (start === -1 || end === -1 || end < start) {
       return [
         {
-          severity: "medium",
-          axis: "quality",
+          severity: 'medium',
+          axis: 'quality',
           message: `Reviewer returned non-JSON output; could not extract findings`,
         },
       ];
@@ -208,8 +204,8 @@ export function parseFindings(raw: string): ReviewFinding[] {
     } catch {
       return [
         {
-          severity: "medium",
-          axis: "quality",
+          severity: 'medium',
+          axis: 'quality',
           message: `Reviewer returned malformed JSON`,
         },
       ];
@@ -217,14 +213,14 @@ export function parseFindings(raw: string): ReviewFinding[] {
   }
 
   if (
-    typeof parsed !== "object" ||
+    typeof parsed !== 'object' ||
     parsed === null ||
     !Array.isArray((parsed as { findings?: unknown }).findings)
   ) {
     return [
       {
-        severity: "medium",
-        axis: "quality",
+        severity: 'medium',
+        axis: 'quality',
         message: `Reviewer JSON does not match { findings: [...] } schema`,
       },
     ];
@@ -232,24 +228,18 @@ export function parseFindings(raw: string): ReviewFinding[] {
 
   const out: ReviewFinding[] = [];
   for (const f of (parsed as { findings: unknown[] }).findings) {
-    if (
-      typeof f === "object" &&
-      f !== null &&
-      "severity" in f &&
-      "axis" in f &&
-      "message" in f
-    ) {
+    if (typeof f === 'object' && f !== null && 'severity' in f && 'axis' in f && 'message' in f) {
       const finding = f as Record<string, unknown>;
       const severity = finding.severity;
       const axis = finding.axis;
       const message = finding.message;
       if (
-        (severity === "low" || severity === "medium" || severity === "high") &&
-        (axis === "quality" || axis === "tag-fit" || axis === "safety") &&
-        typeof message === "string"
+        (severity === 'low' || severity === 'medium' || severity === 'high') &&
+        (axis === 'quality' || axis === 'tag-fit' || axis === 'safety') &&
+        typeof message === 'string'
       ) {
         const finding_typed: ReviewFinding = { severity, axis, message };
-        if (typeof finding.fileRef === "string") {
+        if (typeof finding.fileRef === 'string') {
           finding_typed.fileRef = finding.fileRef;
         }
         out.push(finding_typed);

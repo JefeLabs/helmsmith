@@ -1,14 +1,10 @@
-import { mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import {
-  CONFIG_PARENT_DIR,
-  CONFIG_DIR_NAME,
-  ENV_CONFIG_OVERRIDE,
-} from '../config/branding.js';
-import type { ProjectLocation } from './location.js';
+import { join } from 'node:path';
+import { CONFIG_DIR_NAME, CONFIG_PARENT_DIR, ENV_CONFIG_OVERRIDE } from '../config/branding.js';
 import { getRepoTaskmasterHome } from './git.js';
+import type { ProjectLocation } from './location.js';
 
 /**
  * Returns the root config directory (e.g. ~/.agentx).
@@ -45,7 +41,11 @@ export function getTaskmasterHomeFor(location: ProjectLocation, gitRoot?: string
  * Returns the path for a specific project directory.
  * Location-aware: routes to home or repo-local storage.
  */
-export function getProjectDir(name: string, location: ProjectLocation = 'home', gitRoot?: string | null): string {
+export function getProjectDir(
+  name: string,
+  location: ProjectLocation = 'home',
+  gitRoot?: string | null,
+): string {
   return join(getTaskmasterHomeFor(location, gitRoot), name);
 }
 
@@ -99,7 +99,11 @@ export function homeExists(): boolean {
  * Scaffold per-project directory structure:
  * <project>/tasks.json, config.yaml, tasks/, templates/, docs/
  */
-export async function scaffoldProjectDir(name: string, location: ProjectLocation = 'home', gitRoot?: string | null): Promise<void> {
+export async function scaffoldProjectDir(
+  name: string,
+  location: ProjectLocation = 'home',
+  gitRoot?: string | null,
+): Promise<void> {
   const projectDir = getProjectDir(name, location, gitRoot);
 
   await mkdir(projectDir, { recursive: true });

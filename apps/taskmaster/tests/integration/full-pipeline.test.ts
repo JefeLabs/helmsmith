@@ -1,17 +1,17 @@
-import { describe, it, expect } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import type { TaskNode, StateDefinition } from '../../src/config/schema.js';
+import { describe, expect, it } from 'vitest';
+import type { StateDefinition } from '../../src/config/schema.js';
 import { STANDARD_PRESET } from '../../src/config/state-presets.js';
-import { parsePlan } from '../../src/parser/index.js';
-import { HeuristicScorer } from '../../src/scorer/index.js';
 import { expandTask } from '../../src/decomposer/index.js';
+import { parsePlan } from '../../src/parser/index.js';
 import {
-  recomputeAllReadiness,
   applyReadiness,
   buildDelegationManifest,
   findNextTask,
+  recomputeAllReadiness,
 } from '../../src/readiness/index.js';
+import { HeuristicScorer } from '../../src/scorer/index.js';
 
 const FIXTURE_PLAN = resolve(import.meta.dirname, '../fixtures/sample-plan.md');
 const STATES: StateDefinition[] = [...STANDARD_PRESET];
@@ -43,7 +43,9 @@ describe('Full pipeline: Parse -> Score -> Expand -> Ready -> Manifest', () => {
 
     // 3. Expand high-complexity tasks (>= 5)
     const expandThreshold = 5;
-    const eligible = tasks.filter((t) => t.complexity >= expandThreshold && t.children.length === 0);
+    const eligible = tasks.filter(
+      (t) => t.complexity >= expandThreshold && t.children.length === 0,
+    );
 
     for (const task of eligible) {
       const result = await expandTask(task, 'task-only', {
@@ -57,7 +59,7 @@ describe('Full pipeline: Parse -> Score -> Expand -> Ready -> Manifest', () => {
     }
 
     // Verify some tasks got expanded
-    const expandedTasks = tasks.filter((t) => t.children.length > 0);
+    const _expandedTasks = tasks.filter((t) => t.children.length > 0);
     // Note: may or may not have expandable tasks depending on scores
     // At minimum, the pipeline should not crash
 

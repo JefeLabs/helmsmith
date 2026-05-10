@@ -1,16 +1,24 @@
-import { queryRecords, queryRollup, type RollupGroupBy } from '../store/sqlite-store.js';
-import {
-  filterRecords, getLastNWeeks, getLastNMonths, getLastNQuarters, getLastNYears,
-  getCurrentWeek, weekToMonth, weekToQuarter, weekToYear, monthShort,
-  type Filters,
-} from '../aggregator/filters.js';
-import { rollup } from '../aggregator/engine.js';
 import type { RolledUp } from '../aggregator/engine.js';
+import { rollup } from '../aggregator/engine.js';
+import {
+  type Filters,
+  filterRecords,
+  getCurrentWeek,
+  getLastNMonths,
+  getLastNQuarters,
+  getLastNWeeks,
+  getLastNYears,
+  monthShort,
+  weekToMonth,
+  weekToQuarter,
+  weekToYear,
+} from '../aggregator/filters.js';
 import { testPct, totalLines } from '../aggregator/metrics.js';
-import { fmt, weekLabel, quarterShort, yearShort } from '../ui/format.js';
 import { calculateSegments, type Segment, type SegmentThresholds } from '../aggregator/segments.js';
-import { printTable, printTitle, printNoData, printJson, printSummary, type Column } from '../ui/cli-renderer.js';
+import { queryRecords, queryRollup, type RollupGroupBy } from '../store/sqlite-store.js';
 import type { UserWeekRepoRecord } from '../types/schema.js';
+import { type Column, printJson, printNoData, printTable } from '../ui/cli-renderer.js';
+import { fmt, quarterShort, weekLabel, yearShort } from '../ui/format.js';
 
 export type PivotGranularity = 'week' | 'month' | 'quarter' | 'year';
 
@@ -63,20 +71,21 @@ function rolledUpToRows(rolled: Map<string, RolledUp>): ContributionRow[] {
   }
 
   // Sort by total lines touched descending
-  rows.sort((a, b) => (b.insertions + b.deletions) - (a.insertions + a.deletions));
+  rows.sort((a, b) => b.insertions + b.deletions - (a.insertions + a.deletions));
   return rows;
 }
 
-function aggregateRows(
-  records: UserWeekRepoRecord[],
-  groupBy: string,
-): ContributionRow[] {
+function aggregateRows(records: UserWeekRepoRecord[], groupBy: string): ContributionRow[] {
   const keyFn = (r: UserWeekRepoRecord): string => {
     switch (groupBy) {
-      case 'team': return r.team;
-      case 'org': return r.org;
-      case 'repo': return r.repo;
-      default: return r.member;
+      case 'team':
+        return r.team;
+      case 'org':
+        return r.org;
+      case 'repo':
+        return r.repo;
+      default:
+        return r.member;
     }
   };
 
@@ -90,16 +99,41 @@ export { aggregateRows };
 function contributionColumns(segMap?: Map<string, string>): Column[] {
   return [
     { key: 'name', label: 'Name', minWidth: 30, flex: 1 },
-    ...(segMap ? [{
-      key: 'name', label: 'seg', align: 'right' as const, minWidth: 3,
-      format: (v: any) => ((segMap.get(v) ?? 'middle')[0]).toUpperCase(),
-    }] : []),
+    ...(segMap
+      ? [
+          {
+            key: 'name',
+            label: 'seg',
+            align: 'right' as const,
+            minWidth: 3,
+            format: (v: any) => (segMap.get(v) ?? 'middle')[0].toUpperCase(),
+          },
+        ]
+      : []),
     { key: 'commits', label: 'cmts', align: 'right', minWidth: 6 },
     { key: 'activeDays', label: 'days', align: 'right', minWidth: 5 },
-    { key: 'insertions', label: '+ins', align: 'right', minWidth: 8, format: (v: any) => '+' + fmt(v) },
-    { key: 'deletions', label: '-del', align: 'right', minWidth: 8, format: (v: any) => '-' + fmt(v) },
-    { key: 'net', label: 'net', align: 'right', minWidth: 8, format: (v: any) => (v >= 0 ? '+' : '') + fmt(v) },
-    { key: 'testPct', label: 'tst%', align: 'right', minWidth: 5, format: (v: any) => v + '%' },
+    {
+      key: 'insertions',
+      label: '+ins',
+      align: 'right',
+      minWidth: 8,
+      format: (v: any) => `+${fmt(v)}`,
+    },
+    {
+      key: 'deletions',
+      label: '-del',
+      align: 'right',
+      minWidth: 8,
+      format: (v: any) => `-${fmt(v)}`,
+    },
+    {
+      key: 'net',
+      label: 'net',
+      align: 'right',
+      minWidth: 8,
+      format: (v: any) => (v >= 0 ? '+' : '') + fmt(v),
+    },
+    { key: 'testPct', label: 'tst%', align: 'right', minWidth: 5, format: (v: any) => `${v}%` },
     { key: 'files', label: 'files', align: 'right', minWidth: 6 },
   ];
 }
@@ -109,20 +143,28 @@ function contributionColumns(segMap?: Map<string, string>): Column[] {
 /** Map a record's week to the appropriate time bucket key. */
 function weekToBucket(week: string, granularity: PivotGranularity): string {
   switch (granularity) {
-    case 'month': return weekToMonth(week);
-    case 'quarter': return weekToQuarter(week);
-    case 'year': return weekToYear(week);
-    default: return week;
+    case 'month':
+      return weekToMonth(week);
+    case 'quarter':
+      return weekToQuarter(week);
+    case 'year':
+      return weekToYear(week);
+    default:
+      return week;
   }
 }
 
 /** Human-readable label for a time bucket key. */
 function bucketLabel(key: string, granularity: PivotGranularity): string {
   switch (granularity) {
-    case 'month': return monthShort(key);
-    case 'quarter': return quarterShort(key);
-    case 'year': return yearShort(key);
-    default: return weekLabel(key);
+    case 'month':
+      return monthShort(key);
+    case 'quarter':
+      return quarterShort(key);
+    case 'year':
+      return yearShort(key);
+    default:
+      return weekLabel(key);
   }
 }
 
@@ -171,10 +213,14 @@ function aggregatePivot(
 ): PivotEntity[] {
   const entityKey = (r: UserWeekRepoRecord): string => {
     switch (groupBy) {
-      case 'team': return r.team;
-      case 'org': return r.org;
-      case 'repo': return r.repo;
-      default: return r.member;
+      case 'team':
+        return r.team;
+      case 'org':
+        return r.org;
+      case 'repo':
+        return r.repo;
+      default:
+        return r.member;
     }
   };
 
@@ -196,12 +242,18 @@ function aggregatePivot(
       matrix.set(entity, entityMap);
     }
     let arr = entityMap.get(bucket);
-    if (!arr) { arr = []; entityMap.set(bucket, arr); }
+    if (!arr) {
+      arr = [];
+      entityMap.set(bucket, arr);
+    }
     arr.push(r);
 
     // Total
     let all = allByEntity.get(entity);
-    if (!all) { all = []; allByEntity.set(entity, all); }
+    if (!all) {
+      all = [];
+      allByEntity.set(entity, all);
+    }
     all.push(r);
   }
 
@@ -209,13 +261,37 @@ function aggregatePivot(
   const entities: PivotEntity[] = [];
   for (const [name, entityMap] of matrix) {
     const totalRows = aggregateRows(allByEntity.get(name) ?? [], groupBy);
-    const total = totalRows[0] ?? { name, commits: 0, activeDays: 0, insertions: 0, deletions: 0, net: 0, files: 0, testPct: 0, appLines: 0, testLines: 0, configLines: 0 };
+    const total = totalRows[0] ?? {
+      name,
+      commits: 0,
+      activeDays: 0,
+      insertions: 0,
+      deletions: 0,
+      net: 0,
+      files: 0,
+      testPct: 0,
+      appLines: 0,
+      testLines: 0,
+      configLines: 0,
+    };
 
     const periods: PivotEntity['periods'] = [];
     for (const bucket of buckets) {
       const cellRecords = entityMap.get(bucket) ?? [];
       const cellRows = aggregateRows(cellRecords, groupBy);
-      const row = cellRows[0] ?? { name, commits: 0, activeDays: 0, insertions: 0, deletions: 0, net: 0, files: 0, testPct: 0, appLines: 0, testLines: 0, configLines: 0 };
+      const row = cellRows[0] ?? {
+        name,
+        commits: 0,
+        activeDays: 0,
+        insertions: 0,
+        deletions: 0,
+        net: 0,
+        files: 0,
+        testPct: 0,
+        appLines: 0,
+        testLines: 0,
+        configLines: 0,
+      };
       periods.push({ bucket, label: bucketLabel(bucket, granularity), row });
     }
 
@@ -223,7 +299,9 @@ function aggregatePivot(
   }
 
   // Sort by total lines touched descending
-  entities.sort((a, b) => (b.total.insertions + b.total.deletions) - (a.total.insertions + a.total.deletions));
+  entities.sort(
+    (a, b) => b.total.insertions + b.total.deletions - (a.total.insertions + a.total.deletions),
+  );
   return entities;
 }
 
@@ -245,10 +323,28 @@ function renderPivot(
     { key: 'period', label: 'period', minWidth: 9 },
     { key: 'commits', label: 'cmts', align: 'right', minWidth: 6 },
     { key: 'activeDays', label: 'days', align: 'right', minWidth: 5 },
-    { key: 'insertions', label: '+ins', align: 'right', minWidth: 8, format: (v: any) => '+' + fmt(v) },
-    { key: 'deletions', label: '-del', align: 'right', minWidth: 8, format: (v: any) => '-' + fmt(v) },
-    { key: 'net', label: 'net', align: 'right', minWidth: 8, format: (v: any) => (v >= 0 ? '+' : '') + fmt(v) },
-    { key: 'testPct', label: 'tst%', align: 'right', minWidth: 5, format: (v: any) => v + '%' },
+    {
+      key: 'insertions',
+      label: '+ins',
+      align: 'right',
+      minWidth: 8,
+      format: (v: any) => `+${fmt(v)}`,
+    },
+    {
+      key: 'deletions',
+      label: '-del',
+      align: 'right',
+      minWidth: 8,
+      format: (v: any) => `-${fmt(v)}`,
+    },
+    {
+      key: 'net',
+      label: 'net',
+      align: 'right',
+      minWidth: 8,
+      format: (v: any) => (v >= 0 ? '+' : '') + fmt(v),
+    },
+    { key: 'testPct', label: 'tst%', align: 'right', minWidth: 5, format: (v: any) => `${v}%` },
     { key: 'files', label: 'files', align: 'right', minWidth: 6 },
   ];
 
@@ -361,15 +457,17 @@ export async function contributions(options: ContributionsOptions = {}): Promise
     const entities = aggregatePivot(records, groupBy, options.pivot, buckets);
 
     if (options.json) {
-      printJson(entities.map((e) => ({
-        name: e.name,
-        total: e.total,
-        periods: e.periods.map((p) => ({
-          period: p.bucket,
-          label: p.label,
-          ...p.row,
+      printJson(
+        entities.map((e) => ({
+          name: e.name,
+          total: e.total,
+          periods: e.periods.map((p) => ({
+            period: p.bucket,
+            label: p.label,
+            ...p.row,
+          })),
         })),
-      })));
+      );
       return;
     }
 

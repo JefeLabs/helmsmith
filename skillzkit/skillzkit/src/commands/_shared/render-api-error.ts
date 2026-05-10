@@ -1,5 +1,5 @@
-import { SkillzkitApiError } from "../../api/client.js";
-import type { ReviewFinding } from "../../api/contracts.js";
+import { SkillzkitApiError } from '../../api/client.js';
+import type { ReviewFinding } from '../../api/contracts.js';
 
 /**
  * Pretty-print a SkillzkitApiError to stderr with code-aware
@@ -16,45 +16,39 @@ import type { ReviewFinding } from "../../api/contracts.js";
  */
 export function renderApiError(err: SkillzkitApiError): void {
   console.error(`✗ ${err.message}`);
-  if (err.code === "validation_failed") {
-    const findings = (err.details as { findings?: ReviewFinding[] } | undefined)
-      ?.findings;
+  if (err.code === 'validation_failed') {
+    const findings = (err.details as { findings?: ReviewFinding[] } | undefined)?.findings;
     if (findings && findings.length > 0) {
-      console.error("");
-      console.error("Validation findings:");
+      console.error('');
+      console.error('Validation findings:');
       const bySeverity: Record<string, ReviewFinding[]> = {
         high: [],
         medium: [],
         low: [],
       };
       for (const f of findings) bySeverity[f.severity]?.push(f);
-      for (const sev of ["high", "medium", "low"] as const) {
+      for (const sev of ['high', 'medium', 'low'] as const) {
         const items = bySeverity[sev];
         if (items.length === 0) continue;
         console.error(`  ${sev.toUpperCase()} (${items.length}):`);
         for (const f of items) {
-          const ref = f.fileRef ? ` [${f.fileRef}]` : "";
+          const ref = f.fileRef ? ` [${f.fileRef}]` : '';
           console.error(`    - ${f.axis}: ${f.message}${ref}`);
         }
       }
     }
-  } else if (err.code === "author_mismatch") {
-    const owner = (err.details as { ownerAuthorId?: string } | undefined)
-      ?.ownerAuthorId;
+  } else if (err.code === 'author_mismatch') {
+    const owner = (err.details as { ownerAuthorId?: string } | undefined)?.ownerAuthorId;
     if (owner) {
       console.error(`  Slug owner: ${owner}`);
     }
-  } else if (err.code === "slug_conflict") {
+  } else if (err.code === 'slug_conflict') {
+    console.error('  Bump the version (--bump major|minor|patch) and try again.');
+  } else if (err.code === 'unauthorized') {
+    console.error('  Check your API key and PIN. Re-run `skillzkit init` to re-authenticate.');
+  } else if (err.code === 'network_error') {
     console.error(
-      "  Bump the version (--bump major|minor|patch) and try again.",
-    );
-  } else if (err.code === "unauthorized") {
-    console.error(
-      "  Check your API key and PIN. Re-run `skillzkit init` to re-authenticate.",
-    );
-  } else if (err.code === "network_error") {
-    console.error(
-      "  Check connectivity, or run `skillzkit config apiUrl <url>` if the URL changed.",
+      '  Check connectivity, or run `skillzkit config apiUrl <url>` if the URL changed.',
     );
   }
 }

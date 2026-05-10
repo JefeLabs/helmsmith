@@ -1,4 +1,4 @@
-import { confirm, select, checkbox } from '@inquirer/prompts';
+import { checkbox, confirm, select } from '@inquirer/prompts';
 import type { ContextQuestion } from '../blueprints/types.js';
 
 /**

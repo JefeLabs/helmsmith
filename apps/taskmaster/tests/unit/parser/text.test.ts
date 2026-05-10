@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { parseText } from '../../../src/parser/text.js';
 
 describe('parseText', () => {
@@ -22,17 +22,9 @@ describe('parseText', () => {
   });
 
   it('nests --- headings under === headings', () => {
-    const content = [
-      'Main',
-      '====',
-      '',
-      'Main body.',
-      '',
-      'Sub',
-      '---',
-      '',
-      'Sub body.',
-    ].join('\n');
+    const content = ['Main', '====', '', 'Main body.', '', 'Sub', '---', '', 'Sub body.'].join(
+      '\n',
+    );
 
     const sections = parseText(content);
 

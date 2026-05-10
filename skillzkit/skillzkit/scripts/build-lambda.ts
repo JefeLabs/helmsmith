@@ -16,35 +16,35 @@
  * for you via `sam build`.
  */
 
-import { build } from "esbuild";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { build } from 'esbuild';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const repoRoot = join(__dirname, "..");
+const repoRoot = join(__dirname, '..');
 
 await build({
-  entryPoints: [join(repoRoot, "server", "lambda.ts")],
+  entryPoints: [join(repoRoot, 'server', 'lambda.ts')],
   // Output as .mjs so Lambda's nodejs20.x runtime recognizes the
   // file as ESM. TLA in lambda.ts (cold-start await of
   // loadServerConfig) requires ESM; CJS doesn't support it.
-  outfile: join(repoRoot, "dist", "lambda", "index.mjs"),
+  outfile: join(repoRoot, 'dist', 'lambda', 'index.mjs'),
   bundle: true,
-  platform: "node",
-  target: "node20",
-  format: "esm",
+  platform: 'node',
+  target: 'node20',
+  format: 'esm',
   // The AWS SDK ships with the Lambda runtime; bundling it would add
   // ~10MB to the ZIP for zero benefit. Same for any AWS-provided
   // modules.
   external: [
-    "@aws-sdk/*",
+    '@aws-sdk/*',
     // OpenTUI + React are TUI-only - the Lambda function should never
     // import them. Mark external so any accidental import fails at
     // runtime rather than dragging the dep into the bundle.
-    "@opentui/*",
-    "react",
-    "react-reconciler",
+    '@opentui/*',
+    'react',
+    'react-reconciler',
   ],
   sourcemap: true,
   minify: false,
@@ -54,10 +54,10 @@ await build({
   // module loader.
   banner: {
     js:
-      "// skillzkit Lambda artifact - bundled by scripts/build-lambda.ts\n" +
-      "// Externalized: @aws-sdk/* (provided by runtime), opentui/react (TUI-only)\n",
+      '// skillzkit Lambda artifact - bundled by scripts/build-lambda.ts\n' +
+      '// Externalized: @aws-sdk/* (provided by runtime), opentui/react (TUI-only)\n',
   },
-  logLevel: "info",
+  logLevel: 'info',
 });
 
-console.log(`✓ Wrote ${join(repoRoot, "dist", "lambda", "index.mjs")}`);
+console.log(`✓ Wrote ${join(repoRoot, 'dist', 'lambda', 'index.mjs')}`);

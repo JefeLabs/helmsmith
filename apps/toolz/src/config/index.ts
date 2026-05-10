@@ -1,10 +1,15 @@
 export {
+  _resetCatalogCache,
+  getMergedCatalog,
+  loadUserCatalog,
+} from './catalog.js';
+export {
   ensureToolzDir,
   getRegistryPath,
   getToolzDir,
   getUserCatalogPath,
-} from "./paths.js";
-
+} from './paths.js';
+export type { Registry, RegistryToolEntry } from './registry.js';
 export {
   getRegisteredTool,
   isRegistered,
@@ -13,11 +18,4 @@ export {
   registerTool,
   saveRegistry,
   unregisterTool,
-} from "./registry.js";
-export type { Registry, RegistryToolEntry } from "./registry.js";
-
-export {
-  _resetCatalogCache,
-  getMergedCatalog,
-  loadUserCatalog,
-} from "./catalog.js";
+} from './registry.js';

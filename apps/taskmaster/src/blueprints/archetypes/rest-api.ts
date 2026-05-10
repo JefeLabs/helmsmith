@@ -339,13 +339,7 @@ export const REST_API_BLUEPRINT: ApplicationBlueprint = {
   // --- Detection hints for auto-detecting this archetype from a codebase ---
 
   detectionHints: {
-    patterns: [
-      'REST-server',
-      'http-server',
-      'express-app',
-      'fastify-app',
-      'koa-app',
-    ],
+    patterns: ['REST-server', 'http-server', 'express-app', 'fastify-app', 'koa-app'],
     frameworks: [
       'framework:express',
       'framework:fastify',
@@ -354,13 +348,7 @@ export const REST_API_BLUEPRINT: ApplicationBlueprint = {
       'framework:nestjs',
     ],
     capabilities: ['REST-server', 'http-server'],
-    fileIndicators: [
-      'routes/',
-      'controllers/',
-      'middleware/',
-      'src/routes/',
-      'src/controllers/',
-    ],
+    fileIndicators: ['routes/', 'controllers/', 'middleware/', 'src/routes/', 'src/controllers/'],
     weight: 0.8,
   },
 };

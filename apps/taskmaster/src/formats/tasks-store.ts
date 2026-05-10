@@ -1,8 +1,9 @@
-import { readFile, writeFile, rename } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import lockfile from 'proper-lockfile';
-import { TasksFileSchema, type TaskNode } from '../config/schema.js';
+import { type TaskNode, TasksFileSchema } from '../config/schema.js';
+
 const TASKS_FILENAME = 'tasks.json';
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 200;

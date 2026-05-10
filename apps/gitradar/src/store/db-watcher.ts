@@ -1,4 +1,4 @@
-import { watch, type FSWatcher } from 'node:fs';
+import { type FSWatcher, watch } from 'node:fs';
 import path from 'node:path';
 
 const DEBOUNCE_MS = 150;
@@ -40,8 +40,8 @@ export class DbWatcher {
         if (!filename) return;
         if (
           filename === this.basename ||
-          filename === this.basename + '-wal' ||
-          filename === this.basename + '-shm'
+          filename === `${this.basename}-wal` ||
+          filename === `${this.basename}-shm`
         ) {
           this.onDbChange();
         }

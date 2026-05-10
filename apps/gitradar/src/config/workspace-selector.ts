@@ -1,5 +1,5 @@
-import { select, Separator } from "@inquirer/prompts";
-import type { LoadedWorkspace } from "./repos-registry.js";
+import { Separator, select } from '@inquirer/prompts';
+import type { LoadedWorkspace } from './repos-registry.js';
 
 /**
  * Select a workspace from available options.
@@ -29,42 +29,34 @@ export async function selectWorkspace(
   if (workspaces.length === 1) return workspaces[0];
 
   // Group by source type for display
-  const globalWorkspaces = workspaces.filter(
-    (w) => w.source.type === "global",
-  );
-  const projectWorkspaces = workspaces.filter(
-    (w) => w.source.type === "project",
-  );
+  const globalWorkspaces = workspaces.filter((w) => w.source.type === 'global');
+  const projectWorkspaces = workspaces.filter((w) => w.source.type === 'project');
 
   type Choice = { name: string; value: LoadedWorkspace };
   const choices: (Choice | Separator)[] = [];
 
   if (globalWorkspaces.length > 0) {
-    choices.push(
-      new Separator(`\n  Global (${globalWorkspaces[0].source.path})`),
-    );
+    choices.push(new Separator(`\n  Global (${globalWorkspaces[0].source.path})`));
     for (const w of globalWorkspaces) {
       choices.push({
-        name: `${w.name}${w.label ? ` — ${w.label}` : ""} (${w.repos.length} repos)`,
+        name: `${w.name}${w.label ? ` — ${w.label}` : ''} (${w.repos.length} repos)`,
         value: w,
       });
     }
   }
 
   if (projectWorkspaces.length > 0) {
-    choices.push(
-      new Separator(`\n  Project (${projectWorkspaces[0].source.path})`),
-    );
+    choices.push(new Separator(`\n  Project (${projectWorkspaces[0].source.path})`));
     for (const w of projectWorkspaces) {
       choices.push({
-        name: `${w.name}${w.label ? ` — ${w.label}` : ""} (${w.repos.length} repos)`,
+        name: `${w.name}${w.label ? ` — ${w.label}` : ''} (${w.repos.length} repos)`,
         value: w,
       });
     }
   }
 
   const selected = await select<LoadedWorkspace>({
-    message: "Select workspace:",
+    message: 'Select workspace:',
     choices,
   });
 

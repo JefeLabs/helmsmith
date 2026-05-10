@@ -1,5 +1,5 @@
-import { marked } from 'marked';
 import type { Token, Tokens } from 'marked';
+import { marked } from 'marked';
 import type { ParsedSection } from './types.js';
 
 /**
@@ -9,42 +9,38 @@ import type { ParsedSection } from './types.js';
 function tokenToText(token: Token): string {
   switch (token.type) {
     case 'paragraph':
-      return (token as Tokens.Paragraph).text + '\n\n';
+      return `${(token as Tokens.Paragraph).text}\n\n`;
     case 'list': {
       const list = token as Tokens.List;
-      return (
-        list.items
-          .map((item, i) => {
-            const prefix = list.ordered ? `${i + 1}. ` : '- ';
-            return prefix + item.text;
-          })
-          .join('\n') + '\n\n'
-      );
+      return `${list.items
+        .map((item, i) => {
+          const prefix = list.ordered ? `${i + 1}. ` : '- ';
+          return prefix + item.text;
+        })
+        .join('\n')}\n\n`;
     }
     case 'code': {
       const code = token as Tokens.Code;
       const lang = code.lang ?? '';
-      return '```' + lang + '\n' + code.text + '\n```\n\n';
+      return `\`\`\`${lang}\n${code.text}\n\`\`\`\n\n`;
     }
     case 'blockquote':
-      return (
-        (token as Tokens.Blockquote).text
-          .split('\n')
-          .map((line: string) => '> ' + line)
-          .join('\n') + '\n\n'
-      );
+      return `${(token as Tokens.Blockquote).text
+        .split('\n')
+        .map((line: string) => `> ${line}`)
+        .join('\n')}\n\n`;
     case 'space':
       return '';
     case 'hr':
       return '---\n\n';
     case 'html':
-      return (token as Tokens.HTML).text + '\n\n';
+      return `${(token as Tokens.HTML).text}\n\n`;
     case 'table': {
       const table = token as Tokens.Table;
       const headerRow = table.header.map((cell) => cell.text).join(' | ');
       const separator = table.header.map(() => '---').join(' | ');
       const bodyRows = table.rows.map((row) => row.map((cell) => cell.text).join(' | '));
-      return [headerRow, separator, ...bodyRows].join('\n') + '\n\n';
+      return `${[headerRow, separator, ...bodyRows].join('\n')}\n\n`;
     }
     default:
       // Fallback: use raw if available

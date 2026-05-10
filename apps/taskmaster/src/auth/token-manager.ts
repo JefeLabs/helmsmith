@@ -1,23 +1,23 @@
-import { readFile, writeFile, unlink, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { getHomePath } from '../utils/home.js';
 import { CLI_BIN_NAME } from '../config/branding.js';
+import { getHomePath } from '../utils/home.js';
 import {
-  AuthCredentialsSchema,
-  AuthFileSchema,
-  COPILOT_TOKEN_URL,
-  COPILOT_CHAT_URL,
-  COPILOT_MODELS_URL,
-  EDITOR_VERSION,
-  TOKEN_REFRESH_THRESHOLD,
   type AuthCredentials,
+  AuthCredentialsSchema,
   type AuthFile,
-  type CopilotTokenResponse,
+  AuthFileSchema,
   type ChatCompletionMessage,
   type ChatCompletionResponse,
-  type TokenSource,
+  COPILOT_CHAT_URL,
+  COPILOT_MODELS_URL,
+  COPILOT_TOKEN_URL,
   type CopilotModelEntry,
+  type CopilotTokenResponse,
+  EDITOR_VERSION,
+  TOKEN_REFRESH_THRESHOLD,
+  type TokenSource,
 } from './types.js';
 
 const AUTH_FILE = 'auth.json';
@@ -240,9 +240,7 @@ export async function callCopilot(
 
   if (!response.ok) {
     const body = await response.text().catch(() => '');
-    throw new Error(
-      `Copilot API error (${response.status}): ${body || response.statusText}`,
-    );
+    throw new Error(`Copilot API error (${response.status}): ${body || response.statusText}`);
   }
 
   return (await response.json()) as ChatCompletionResponse;
@@ -275,7 +273,7 @@ export async function fetchCopilotModels(): Promise<CopilotModelEntry[] | null> 
       return null;
     }
 
-    const data = await response.json() as { data?: CopilotModelEntry[] };
+    const data = (await response.json()) as { data?: CopilotModelEntry[] };
     return Array.isArray(data.data) ? data.data : null;
   } catch {
     return null;

@@ -1,7 +1,6 @@
-import type { AIProvider } from './provider.js';
-import type { AIProviderName } from './provider.js';
-import { CopilotProvider } from './providers/copilot.js';
+import type { AIProvider, AIProviderName } from './provider.js';
 import { AnthropicProvider } from './providers/anthropic.js';
+import { CopilotProvider } from './providers/copilot.js';
 import { OpenAIProvider } from './providers/openai.js';
 
 /** Singleton instances — one per provider name. */

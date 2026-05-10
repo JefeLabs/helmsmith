@@ -1,12 +1,12 @@
-import { select, input } from "@inquirer/prompts";
-import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
-import path from "node:path";
-import { homedir } from "node:os";
-import yaml from "js-yaml";
-import { ReposRegistrySchema, type ReposRegistry } from "../types/schema.js";
-import { loadReposRegistry } from "../config/repos-registry.js";
-import { detectGitRoot } from "../config/git-root.js";
-import { expandTilde } from "../store/paths.js";
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import path from 'node:path';
+import { input, select } from '@inquirer/prompts';
+import yaml from 'js-yaml';
+import { detectGitRoot } from '../config/git-root.js';
+import { loadReposRegistry } from '../config/repos-registry.js';
+import { expandTilde } from '../store/paths.js';
+import { type ReposRegistry, ReposRegistrySchema } from '../types/schema.js';
 
 /**
  * Import a portable repos.yml file into a local registry.
@@ -17,7 +17,7 @@ export async function importWorkspace(filePath: string): Promise<void> {
   const resolvedPath = expandTilde(filePath);
   let raw: string;
   try {
-    raw = await readFile(resolvedPath, "utf-8");
+    raw = await readFile(resolvedPath, 'utf-8');
   } catch {
     console.error(`File not found: ${resolvedPath}`);
     process.exitCode = 1;
@@ -44,7 +44,7 @@ export async function importWorkspace(filePath: string): Promise<void> {
 
   const workspaceNames = Object.keys(imported.workspaces);
   if (workspaceNames.length === 0) {
-    console.error("Imported file contains no workspaces.");
+    console.error('Imported file contains no workspaces.');
     process.exitCode = 1;
     return;
   }
@@ -57,13 +57,13 @@ export async function importWorkspace(filePath: string): Promise<void> {
     const choices = workspaceNames.map((name) => {
       const ws = imported.workspaces[name];
       return {
-        name: `${name}${ws.label ? ` — ${ws.label}` : ""} (${ws.repos.length} repos)`,
+        name: `${name}${ws.label ? ` — ${ws.label}` : ''} (${ws.repos.length} repos)`,
         value: name,
       };
     });
 
     sourceWorkspaceName = await select<string>({
-      message: "Which workspace to import?",
+      message: 'Which workspace to import?',
       choices,
     });
   }
@@ -73,31 +73,31 @@ export async function importWorkspace(filePath: string): Promise<void> {
   // 3. Prompt for destination: global or project
   const gitRoot = await detectGitRoot();
 
-  type DestinationValue = { type: "global"; path: string } | { type: "project"; path: string };
+  type DestinationValue = { type: 'global'; path: string } | { type: 'project'; path: string };
 
   let destination: DestinationValue;
 
   if (!gitRoot) {
     // Not in a git project — only offer global
     destination = {
-      type: "global",
-      path: path.join(homedir(), ".agentx", "repos.yml"),
+      type: 'global',
+      path: path.join(homedir(), '.agentx', 'repos.yml'),
     };
-    console.log("Not inside a git project. Using global destination.");
+    console.log('Not inside a git project. Using global destination.');
   } else {
     const destChoices: Array<{ name: string; value: DestinationValue }> = [
       {
         name: `Global (~/.agentx/repos.yml)`,
-        value: { type: "global", path: path.join(homedir(), ".agentx", "repos.yml") },
+        value: { type: 'global', path: path.join(homedir(), '.agentx', 'repos.yml') },
       },
       {
         name: `Project (${gitRoot}/.agentx/repos.yml)`,
-        value: { type: "project", path: path.join(gitRoot, ".agentx", "repos.yml") },
+        value: { type: 'project', path: path.join(gitRoot, '.agentx', 'repos.yml') },
       },
     ];
 
     destination = await select<DestinationValue>({
-      message: "Import destination:",
+      message: 'Import destination:',
       choices: destChoices,
     });
   }
@@ -120,7 +120,7 @@ export async function importWorkspace(filePath: string): Promise<void> {
     const wsChoices: Array<{ name: string; value: string }> = [
       ...existingWorkspaceNames.map((name) => {
         const ws = existingRegistry!.workspaces[name];
-        const label = ws.label ? ` — ${ws.label}` : "";
+        const label = ws.label ? ` — ${ws.label}` : '';
         return {
           name: `Merge into "${name}"${label} (${ws.repos.length} repos)`,
           value: name,
@@ -133,12 +133,12 @@ export async function importWorkspace(filePath: string): Promise<void> {
     ];
 
     const selection = await select<string>({
-      message: "Target workspace:",
+      message: 'Target workspace:',
       choices: wsChoices,
     });
 
-    if (selection.startsWith("__new__:")) {
-      targetWorkspaceName = selection.slice("__new__:".length);
+    if (selection.startsWith('__new__:')) {
+      targetWorkspaceName = selection.slice('__new__:'.length);
     } else {
       targetWorkspaceName = selection;
     }
@@ -160,14 +160,16 @@ export async function importWorkspace(filePath: string): Promise<void> {
 
     if (existingRepo) {
       // Existing repo: update group/tags, keep existing path
-      if (importedRepo.group && importedRepo.group !== "default") {
+      if (importedRepo.group && importedRepo.group !== 'default') {
         existingRepo.group = importedRepo.group;
       }
       if (importedRepo.tags && importedRepo.tags.length > 0) {
         const mergedTags = new Set([...existingRepo.tags, ...importedRepo.tags]);
         existingRepo.tags = [...mergedTags];
       }
-      console.log(`  Existing: ${importedRepo.name} (keeping path: ${existingRepo.path ?? "none"})`);
+      console.log(
+        `  Existing: ${importedRepo.name} (keeping path: ${existingRepo.path ?? 'none'})`,
+      );
     } else {
       // New repo: prompt for path
       const defaultPath = `~/code/${importedRepo.name}`;
@@ -184,7 +186,7 @@ export async function importWorkspace(filePath: string): Promise<void> {
         tags: [...importedRepo.tags],
       };
 
-      if (enteredPath && enteredPath !== "skip") {
+      if (enteredPath && enteredPath !== 'skip') {
         newRepo.path = enteredPath;
       }
 
@@ -216,8 +218,8 @@ export async function importWorkspace(filePath: string): Promise<void> {
   const destDir = path.dirname(destination.path);
   await mkdir(destDir, { recursive: true });
 
-  const tmpPath = destination.path + ".tmp";
-  await writeFile(tmpPath, yamlOutput, "utf-8");
+  const tmpPath = `${destination.path}.tmp`;
+  await writeFile(tmpPath, yamlOutput, 'utf-8');
   await rename(tmpPath, destination.path);
 
   console.log(`Imported workspace "${sourceWorkspaceName}" into ${destination.path}`);

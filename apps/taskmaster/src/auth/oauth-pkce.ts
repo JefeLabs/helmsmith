@@ -1,6 +1,6 @@
-import { randomBytes, createHash } from 'node:crypto';
-import { createServer, type Server } from 'node:http';
 import { execFile } from 'node:child_process';
+import { createHash, randomBytes } from 'node:crypto';
+import { createServer, type Server } from 'node:http';
 import { platform } from 'node:os';
 
 /**
@@ -22,12 +22,7 @@ export function generateCodeChallenge(verifier: string): string {
  * Uses execFile (not exec) to avoid shell injection.
  */
 export function openBrowser(url: string): void {
-  const cmd =
-    platform() === 'darwin'
-      ? 'open'
-      : platform() === 'win32'
-        ? 'start'
-        : 'xdg-open';
+  const cmd = platform() === 'darwin' ? 'open' : platform() === 'win32' ? 'start' : 'xdg-open';
 
   execFile(cmd, [url]);
 }
@@ -46,10 +41,13 @@ export function waitForCallback(
   return new Promise((resolve, reject) => {
     let server: Server;
 
-    const timeout = setTimeout(() => {
-      server?.close();
-      reject(new Error('OAuth callback timed out (5 minutes).'));
-    }, 5 * 60 * 1000);
+    const timeout = setTimeout(
+      () => {
+        server?.close();
+        reject(new Error('OAuth callback timed out (5 minutes).'));
+      },
+      5 * 60 * 1000,
+    );
 
     server = createServer((req, res) => {
       const url = new URL(req.url ?? '/', `http://localhost:${port}`);
@@ -69,9 +67,13 @@ export function waitForCallback(
 
       if (error) {
         res.writeHead(200, { 'Content-Type': 'text/html' });
-        res.end('<html><body><h2>Authorization failed.</h2><p>You can close this tab.</p></body></html>');
+        res.end(
+          '<html><body><h2>Authorization failed.</h2><p>You can close this tab.</p></body></html>',
+        );
         server.close();
-        reject(new Error(`OAuth error: ${error} — ${url.searchParams.get('error_description') ?? ''}`));
+        reject(
+          new Error(`OAuth error: ${error} — ${url.searchParams.get('error_description') ?? ''}`),
+        );
         return;
       }
 
@@ -84,7 +86,9 @@ export function waitForCallback(
       }
 
       res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end('<html><body><h2>Authorization successful!</h2><p>You can close this tab and return to the terminal.</p></body></html>');
+      res.end(
+        '<html><body><h2>Authorization successful!</h2><p>You can close this tab and return to the terminal.</p></body></html>',
+      );
       server.close();
       resolve({ code, state });
     });
@@ -92,9 +96,11 @@ export function waitForCallback(
     server.on('error', (err: NodeJS.ErrnoException) => {
       clearTimeout(timeout);
       if (err.code === 'EADDRINUSE') {
-        reject(new Error(
-          `Port ${port} is already in use. Kill the process with: lsof -ti :${port} | xargs kill -9`,
-        ));
+        reject(
+          new Error(
+            `Port ${port} is already in use. Kill the process with: lsof -ti :${port} | xargs kill -9`,
+          ),
+        );
       } else {
         reject(err);
       }

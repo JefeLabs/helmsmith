@@ -24,8 +24,8 @@
  * worth tuning by hand.
  */
 
-import { getCommand, getCommands, getWorkflows } from "./index.js";
-import type { NextReason, NextSuggestion } from "./types.js";
+import { getCommand, getWorkflows } from './index.js';
+import type { NextReason, NextSuggestion } from './types.js';
 
 /**
  * Minimal shape of `.pencil-workflow-state.json` we care about.
@@ -50,15 +50,12 @@ export interface SuggestOptions {
  */
 interface RawCandidate {
   slug: string;
-  kind: "command" | "workflow";
+  kind: 'command' | 'workflow';
   reason: NextReason;
   rationale: string;
 }
 
-export function suggestNext(
-  completedSlug: string,
-  options: SuggestOptions = {},
-): NextSuggestion[] {
+export function suggestNext(completedSlug: string, options: SuggestOptions = {}): NextSuggestion[] {
   const limit = options.limit ?? 8;
   const completed = getCommand(completedSlug);
   if (!completed) return [];
@@ -80,12 +77,12 @@ function gatherReverseDeps(completedSlug: string): RawCandidate[] {
   const out: RawCandidate[] = [];
   for (const consumerSlug of completed.referencedBy) {
     const consumer = getCommand(consumerSlug);
-    if (!consumer || consumer.kind === "context") continue; // context files aren't runnable
-    if (consumer.kind === "workflow") continue; // workflow wrappers handled by signal 2
+    if (!consumer || consumer.kind === 'context') continue; // context files aren't runnable
+    if (consumer.kind === 'workflow') continue; // workflow wrappers handled by signal 2
     out.push({
       slug: consumerSlug,
-      kind: "command",
-      reason: "consumes-X",
+      kind: 'command',
+      reason: 'consumes-X',
       rationale: `Builds on ${completedSlug}`,
     });
   }
@@ -100,8 +97,8 @@ function gatherWorkflowWrappers(completedSlug: string): RawCandidate[] {
     if (!wf.references.includes(completedSlug)) continue;
     out.push({
       slug: wf.qualifiedName,
-      kind: "workflow",
-      reason: "wraps-X",
+      kind: 'workflow',
+      reason: 'wraps-X',
       rationale: `Multi-phase workflow that includes ${completedSlug}`,
     });
   }
@@ -128,12 +125,12 @@ function gatherActiveWorkflowNext(
   // Skip ahead past any context-file refs to find the next runnable.
   for (let i = idx + 1; i < orderedRefs.length; i++) {
     const candidate = getCommand(orderedRefs[i]);
-    if (!candidate || candidate.kind === "context") continue;
+    if (!candidate || candidate.kind === 'context') continue;
     return [
       {
         slug: orderedRefs[i],
-        kind: candidate.kind === "workflow" ? "workflow" : "command",
-        reason: "next-in-active-workflow",
+        kind: candidate.kind === 'workflow' ? 'workflow' : 'command',
+        reason: 'next-in-active-workflow',
         rationale: `Next step in active workflow ${state.workflow}`,
       },
     ];
@@ -152,8 +149,8 @@ function extractReferencesInOrder(body: string): string[] {
   const seen = new Set<string>();
   const ordered: string[] = [];
   for (const match of body.matchAll(REF)) {
-    const ref = match[1].replace(/[.,;:)\]*]+$/, "");
-    if (ref.includes("*")) continue;
+    const ref = match[1].replace(/[.,;:)\]*]+$/, '');
+    if (ref.includes('*')) continue;
     if (seen.has(ref)) continue;
     seen.add(ref);
     ordered.push(ref);
@@ -176,9 +173,9 @@ function extractReferencesInOrder(body: string): string[] {
  *                                     that mention the completed slug)
  */
 const REASON_WEIGHTS: Record<NextReason, number> = {
-  "next-in-active-workflow": 1.0,
-  "wraps-X": 0.5,
-  "consumes-X": 0.3,
+  'next-in-active-workflow': 1.0,
+  'wraps-X': 0.5,
+  'consumes-X': 0.3,
 };
 
 /** Bonus added per additional signal firing on the same candidate. */
@@ -219,8 +216,7 @@ function rankSuggestions(raw: RawCandidate[]): NextSuggestion[] {
     // score stays interpretable as a probability-shaped number.
     const score = Math.min(
       1.0,
-      REASON_WEIGHTS[primary.reason] +
-        (sorted.length - 1) * MULTI_SIGNAL_BONUS,
+      REASON_WEIGHTS[primary.reason] + (sorted.length - 1) * MULTI_SIGNAL_BONUS,
     );
 
     const rationale =
@@ -229,7 +225,7 @@ function rankSuggestions(raw: RawCandidate[]): NextSuggestion[] {
         : `${primary.rationale}. Also: ${sorted
             .slice(1)
             .map((c) => c.rationale.toLowerCase())
-            .join("; ")}`;
+            .join('; ')}`;
 
     ranked.push({
       slug,
@@ -242,7 +238,7 @@ function rankSuggestions(raw: RawCandidate[]): NextSuggestion[] {
 
   ranked.sort((a, b) => {
     if (a.score !== b.score) return b.score - a.score;
-    if (a.kind !== b.kind) return a.kind === "workflow" ? -1 : 1;
+    if (a.kind !== b.kind) return a.kind === 'workflow' ? -1 : 1;
     return a.slug.localeCompare(b.slug);
   });
 

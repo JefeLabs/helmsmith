@@ -26,11 +26,12 @@ export function executeList(tasks: TaskNode[], opts: ListOpts = {}): ListResult 
   let filtered = tasks;
 
   if (opts.skills) {
-    const filterSkills = opts.skills.split(',').map((s) => s.trim()).filter(Boolean);
+    const filterSkills = opts.skills
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
     if (filterSkills.length > 0) {
-      filtered = filtered.filter((t) =>
-        t.requiredSkills.some((s) => filterSkills.includes(s)),
-      );
+      filtered = filtered.filter((t) => t.requiredSkills.some((s) => filterSkills.includes(s)));
     }
   }
 

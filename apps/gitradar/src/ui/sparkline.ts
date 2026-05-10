@@ -1,12 +1,12 @@
 const SPARK_CHARS = [
-  "\u2581", // ▁
-  "\u2582", // ▂
-  "\u2583", // ▃
-  "\u2584", // ▄
-  "\u2585", // ▅
-  "\u2586", // ▆
-  "\u2587", // ▇
-  "\u2588", // █
+  '\u2581', // ▁
+  '\u2582', // ▂
+  '\u2583', // ▃
+  '\u2584', // ▄
+  '\u2585', // ▅
+  '\u2586', // ▆
+  '\u2587', // ▇
+  '\u2588', // █
 ];
 
 export interface SparklineOptions {
@@ -22,12 +22,9 @@ export interface SparklineOptions {
  * Single values render as a mid-height bar.
  * All-same values render as mid-height bars.
  */
-export function sparkline(
-  values: number[],
-  options?: SparklineOptions
-): string {
+export function sparkline(values: number[], options?: SparklineOptions): string {
   if (values.length === 0) {
-    return "";
+    return '';
   }
 
   const min = Math.min(...values);
@@ -43,12 +40,12 @@ export function sparkline(
     const normalized = (v - min) / range;
     const index = Math.min(
       SPARK_CHARS.length - 1,
-      Math.floor(normalized * (SPARK_CHARS.length - 1))
+      Math.floor(normalized * (SPARK_CHARS.length - 1)),
     );
     return SPARK_CHARS[index];
   });
 
-  const result = chars.join("");
+  const result = chars.join('');
 
   if (options?.color) {
     return options.color(result);

@@ -1,5 +1,5 @@
-import chalk from "chalk";
-import { getAuthPath, logout as authLogout } from "../auth.js";
+import chalk from 'chalk';
+import { logout as authLogout, getAuthPath } from '../auth.js';
 
 export async function runAuthLogout(): Promise<void> {
   await authLogout();

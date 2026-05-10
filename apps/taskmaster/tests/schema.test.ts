@@ -1,9 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  TaskNodeSchema,
-  TasksFileSchema,
   ProjectConfigSchema,
   StatesConfigSchema,
+  TaskNodeSchema,
+  TasksFileSchema,
 } from '../src/config/schema.js';
 
 describe('TaskNode schema', () => {

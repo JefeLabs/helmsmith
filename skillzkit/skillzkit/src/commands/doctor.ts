@@ -1,5 +1,5 @@
-import { runDoctor } from "../doctor.js";
-import { findPackageRoot } from "./_shared/package-root.js";
+import { runDoctor } from '../doctor.js';
+import { findPackageRoot } from './_shared/package-root.js';
 
 export interface DoctorOptions {
   errorsOnly?: boolean;
@@ -13,26 +13,23 @@ export interface DoctorOptions {
 export function runDoctorCommand(options: DoctorOptions = {}): void {
   const packageRoot = findPackageRoot();
   const findings = runDoctor(packageRoot);
-  const filtered = options.errorsOnly
-    ? findings.filter((f) => f.severity === "error")
-    : findings;
+  const filtered = options.errorsOnly ? findings.filter((f) => f.severity === 'error') : findings;
 
   if (filtered.length === 0) {
-    console.log("✓ No issues found.");
+    console.log('✓ No issues found.');
     return;
   }
 
   const counts = {
-    error: findings.filter((f) => f.severity === "error").length,
-    warning: findings.filter((f) => f.severity === "warning").length,
-    info: findings.filter((f) => f.severity === "info").length,
+    error: findings.filter((f) => f.severity === 'error').length,
+    warning: findings.filter((f) => f.severity === 'warning').length,
+    info: findings.filter((f) => f.severity === 'info').length,
   };
 
-  for (const severity of ["error", "warning", "info"] as const) {
+  for (const severity of ['error', 'warning', 'info'] as const) {
     const subset = filtered.filter((f) => f.severity === severity);
     if (subset.length === 0) continue;
-    const tag =
-      severity === "error" ? "✗" : severity === "warning" ? "⚠" : "ℹ";
+    const tag = severity === 'error' ? '✗' : severity === 'warning' ? '⚠' : 'ℹ';
     console.log(`\n${tag} ${severity.toUpperCase()} (${subset.length})`);
     for (const f of subset) {
       console.log(`  ${f.source}`);
@@ -40,8 +37,6 @@ export function runDoctorCommand(options: DoctorOptions = {}): void {
     }
   }
 
-  console.log(
-    `\n${counts.error} error(s), ${counts.warning} warning(s), ${counts.info} info`,
-  );
+  console.log(`\n${counts.error} error(s), ${counts.warning} warning(s), ${counts.info} info`);
   if (counts.error > 0) process.exit(1);
 }

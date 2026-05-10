@@ -104,15 +104,15 @@ export function inferLayerFromPath(relativePath: string): PragmaticLayer {
     if (rule.segments) {
       // Special handling for tests: use the fuzzy isTestSegment matcher
       if (rule.layer === 'tests') {
-        if (segments.some(s => isTestSegment(s))) return 'tests';
+        if (segments.some((s) => isTestSegment(s))) return 'tests';
       } else {
-        if (segments.some(s => rule.segments!.includes(s))) return rule.layer;
+        if (segments.some((s) => rule.segments!.includes(s))) return rule.layer;
       }
     }
 
     // Check basename suffixes (e.g. `.test.`, `.spec.`)
     if (rule.basenameSuffixes) {
-      if (rule.basenameSuffixes.some(suffix => basename.includes(suffix))) return rule.layer;
+      if (rule.basenameSuffixes.some((suffix) => basename.includes(suffix))) return rule.layer;
     }
 
     // Check exact basenames
@@ -122,12 +122,12 @@ export function inferLayerFromPath(relativePath: string): PragmaticLayer {
 
     // Check basename prefixes (e.g. `Taskfile`)
     if (rule.basenamePrefixes && rule.layer !== 'tests') {
-      if (rule.basenamePrefixes.some(prefix => basename.startsWith(prefix))) return rule.layer;
+      if (rule.basenamePrefixes.some((prefix) => basename.startsWith(prefix))) return rule.layer;
     }
 
     // Check file extensions
     if (rule.extensions) {
-      if (rule.extensions.some(ext => basename.endsWith(ext))) return rule.layer;
+      if (rule.extensions.some((ext) => basename.endsWith(ext))) return rule.layer;
     }
   }
 
@@ -211,7 +211,11 @@ function detectNodeLayer(node: TreeNode): PragmaticLayer | null {
   }
 
   // --- CLI patterns ---
-  if (node.type === 'call_expression' || node.type === 'expression_statement' || node.type === 'new_expression') {
+  if (
+    node.type === 'call_expression' ||
+    node.type === 'expression_statement' ||
+    node.type === 'new_expression'
+  ) {
     for (const pat of CLI_PATTERNS) {
       if (text.includes(pat)) return 'cli';
       // Handle `new Command` without parens at the exact start
@@ -240,8 +244,8 @@ function detectNodeLayer(node: TreeNode): PragmaticLayer | null {
  */
 export function inferLayerFromAST(
   rootNode: unknown,
-  language: string,
-  filePath: string,
+  _language: string,
+  _filePath: string,
 ): PragmaticLayer | null {
   if (!rootNode || typeof rootNode !== 'object') return null;
 

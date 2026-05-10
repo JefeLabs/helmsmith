@@ -1,7 +1,7 @@
-import { GitRadarEngine } from "../engine/gitradar-engine.js";
-import { loadConfig } from "../config/loader.js";
-import { detectGitRoot } from "../config/git-root.js";
-import { loadAllRegistries, getAvailableWorkspaces } from "../config/repos-registry.js";
+import { detectGitRoot } from '../config/git-root.js';
+import { loadConfig } from '../config/loader.js';
+import { getAvailableWorkspaces, loadAllRegistries } from '../config/repos-registry.js';
+import { GitRadarEngine } from '../engine/gitradar-engine.js';
 
 export interface EnrichOptions {
   weeks?: number;

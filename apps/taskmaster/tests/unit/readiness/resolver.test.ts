@@ -1,11 +1,11 @@
-import { describe, it, expect } from 'vitest';
-import type { TaskNode, StateDefinition } from '../../../src/config/schema.js';
+import { describe, expect, it } from 'vitest';
+import type { StateDefinition, TaskNode } from '../../../src/config/schema.js';
 import { STANDARD_PRESET } from '../../../src/config/state-presets.js';
 import {
-  recomputeAllReadiness,
   applyReadiness,
   buildDelegationManifest,
   findNextTask,
+  recomputeAllReadiness,
   runValidation,
 } from '../../../src/readiness/resolver.js';
 
@@ -120,8 +120,8 @@ describe('recomputeAllReadiness', () => {
           { taskId: 'C', type: 'produces' },
         ],
       }),
-      makeTask({ id: 'B', status: 'done' }),    // closed
-      makeTask({ id: 'C', status: 'todo' }),     // open
+      makeTask({ id: 'B', status: 'done' }), // closed
+      makeTask({ id: 'C', status: 'todo' }), // open
     ];
     const results = recomputeAllReadiness(tasks, STATES);
     const resultA = results.find((r) => r.taskId === 'A');
@@ -184,7 +184,13 @@ describe('applyReadiness', () => {
 describe('buildDelegationManifest', () => {
   it('builds manifest with ready and blocked tasks', () => {
     const tasks = [
-      makeTask({ id: 'A', status: 'todo', priority: 'high', requiredSkills: ['backend'], outputs: ['api'] }),
+      makeTask({
+        id: 'A',
+        status: 'todo',
+        priority: 'high',
+        requiredSkills: ['backend'],
+        outputs: ['api'],
+      }),
       makeTask({
         id: 'B',
         status: 'todo',
@@ -207,10 +213,7 @@ describe('buildDelegationManifest', () => {
   });
 
   it('excludes completed tasks from ready/blocked lists', () => {
-    const tasks = [
-      makeTask({ id: 'A', status: 'done' }),
-      makeTask({ id: 'B', status: 'todo' }),
-    ];
+    const tasks = [makeTask({ id: 'A', status: 'done' }), makeTask({ id: 'B', status: 'todo' })];
 
     const manifest = buildDelegationManifest(tasks, STATES);
     expect(manifest.ready_tasks.map((t) => t.id)).toEqual(['B']);
@@ -258,15 +261,17 @@ describe('buildDelegationManifest', () => {
         status: 'qa-failed',
         priority: 'high',
         requiredSkills: ['backend'],
-        qaFeedback: [{
-          testType: 'unit',
-          result: 'fail',
-          description: 'Null pointer in parser',
-          cause: 'Missing check',
-          severity: 'critical',
-          reporter: 'qa-agent',
-          timestamp: '2026-02-01T00:00:00Z',
-        }],
+        qaFeedback: [
+          {
+            testType: 'unit',
+            result: 'fail',
+            description: 'Null pointer in parser',
+            cause: 'Missing check',
+            severity: 'critical',
+            reporter: 'qa-agent',
+            timestamp: '2026-02-01T00:00:00Z',
+          },
+        ],
       }),
       makeTask({ id: 'B', status: 'todo' }),
     ];
@@ -284,9 +289,21 @@ describe('buildDelegationManifest', () => {
 
   it('includes qa_failed count in summary', () => {
     const tasks = [
-      makeTask({ id: 'A', status: 'qa-failed', qaFeedback: [{
-        testType: 'e2e', result: 'fail', description: 'fails', cause: '', severity: 'major', reporter: 'qa', timestamp: '',
-      }] }),
+      makeTask({
+        id: 'A',
+        status: 'qa-failed',
+        qaFeedback: [
+          {
+            testType: 'e2e',
+            result: 'fail',
+            description: 'fails',
+            cause: '',
+            severity: 'major',
+            reporter: 'qa',
+            timestamp: '',
+          },
+        ],
+      }),
       makeTask({ id: 'B', status: 'todo' }),
       makeTask({ id: 'C', status: 'done' }),
     ];
@@ -351,7 +368,7 @@ describe('findNextTask', () => {
   it('only surfaces open-category tasks (not active)', () => {
     const tasks = [
       makeTask({ id: 'A', status: 'in-progress', priority: 'critical' }), // active category
-      makeTask({ id: 'B', status: 'todo', priority: 'low' }),              // open category
+      makeTask({ id: 'B', status: 'todo', priority: 'low' }), // open category
     ];
 
     const next = findNextTask(tasks, STATES);
@@ -366,9 +383,22 @@ describe('findNextTask', () => {
   it('returns qa-failed task with priority boost over regular tasks', () => {
     const tasks = [
       makeTask({ id: 'T-1', status: 'todo', priority: 'critical' }),
-      makeTask({ id: 'T-2', status: 'qa-failed', priority: 'low', qaFeedback: [{
-        testType: 'unit', result: 'fail', description: 'fails', cause: '', severity: 'major', reporter: 'qa', timestamp: '',
-      }] }),
+      makeTask({
+        id: 'T-2',
+        status: 'qa-failed',
+        priority: 'low',
+        qaFeedback: [
+          {
+            testType: 'unit',
+            result: 'fail',
+            description: 'fails',
+            cause: '',
+            severity: 'major',
+            reporter: 'qa',
+            timestamp: '',
+          },
+        ],
+      }),
     ];
 
     const next = findNextTask(tasks, STATES);
@@ -378,9 +408,22 @@ describe('findNextTask', () => {
 
   it('returns qa-failed tasks even though they are active category', () => {
     const tasks = [
-      makeTask({ id: 'T-1', status: 'qa-failed', priority: 'medium', qaFeedback: [{
-        testType: 'unit', result: 'fail', description: 'fails', cause: '', severity: 'major', reporter: 'qa', timestamp: '',
-      }] }),
+      makeTask({
+        id: 'T-1',
+        status: 'qa-failed',
+        priority: 'medium',
+        qaFeedback: [
+          {
+            testType: 'unit',
+            result: 'fail',
+            description: 'fails',
+            cause: '',
+            severity: 'major',
+            reporter: 'qa',
+            timestamp: '',
+          },
+        ],
+      }),
     ];
 
     const next = findNextTask(tasks, STATES);
@@ -408,7 +451,11 @@ describe('runValidation', () => {
   it('reports clean graph as valid', () => {
     const tasks = [
       makeTask({ id: 'A', requiredSkills: ['backend'] }),
-      makeTask({ id: 'B', requiredSkills: ['frontend'], dependencies: [{ taskId: 'A', type: 'blocks' }] }),
+      makeTask({
+        id: 'B',
+        requiredSkills: ['frontend'],
+        dependencies: [{ taskId: 'A', type: 'blocks' }],
+      }),
     ];
 
     const report = runValidation(tasks, STATES, vocabulary, false);
@@ -431,9 +478,7 @@ describe('runValidation', () => {
   });
 
   it('reports dangling references', () => {
-    const tasks = [
-      makeTask({ id: 'A', dependencies: [{ taskId: 'MISSING', type: 'blocks' }] }),
-    ];
+    const tasks = [makeTask({ id: 'A', dependencies: [{ taskId: 'MISSING', type: 'blocks' }] })];
 
     const report = runValidation(tasks, STATES, vocabulary, false);
     expect(report.isValid).toBe(false);
@@ -442,9 +487,7 @@ describe('runValidation', () => {
   });
 
   it('reports skill vocabulary issues', () => {
-    const tasks = [
-      makeTask({ id: 'A', requiredSkills: ['graphql'] }),
-    ];
+    const tasks = [makeTask({ id: 'A', requiredSkills: ['graphql'] })];
 
     const report = runValidation(tasks, STATES, vocabulary, false);
     expect(report.isValid).toBe(false);
@@ -474,9 +517,7 @@ describe('runValidation', () => {
   });
 
   it('does not auto-fix skill issues', () => {
-    const tasks = [
-      makeTask({ id: 'A', requiredSkills: ['graphql'] }),
-    ];
+    const tasks = [makeTask({ id: 'A', requiredSkills: ['graphql'] })];
 
     const report = runValidation(tasks, STATES, vocabulary, true);
     // Skill issues remain even with --fix
@@ -485,9 +526,7 @@ describe('runValidation', () => {
   });
 
   it('returns no fixes when graph is clean and fix is true', () => {
-    const tasks = [
-      makeTask({ id: 'A', requiredSkills: ['backend'] }),
-    ];
+    const tasks = [makeTask({ id: 'A', requiredSkills: ['backend'] })];
 
     const report = runValidation(tasks, STATES, vocabulary, true);
     expect(report.isValid).toBe(true);

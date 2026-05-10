@@ -1,19 +1,16 @@
 import { randomBytes } from 'node:crypto';
 import { createInterface } from 'node:readline';
 import chalk from 'chalk';
-import type { AIProvider, AIModelEntry } from '../provider.js';
+import { CLI_BIN_NAME } from '../../config/branding.js';
+import { generateCodeChallenge, openBrowser } from '../oauth-pkce.js';
+import type { AIModelEntry, AIProvider } from '../provider.js';
+import { readAuthFile, writeAuthFile } from '../token-manager.js';
 import type {
   ChatCompletionMessage,
   ChatCompletionResponse,
   OAuthCredentials,
   TokenUsage,
 } from '../types.js';
-import { readAuthFile, writeAuthFile } from '../token-manager.js';
-import {
-  generateCodeChallenge,
-  openBrowser,
-} from '../oauth-pkce.js';
-import { CLI_BIN_NAME } from '../../config/branding.js';
 
 // --- Anthropic OAuth constants ---
 const ANTHROPIC_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
@@ -32,19 +29,28 @@ const ANTHROPIC_KNOWN_MODELS: AIModelEntry[] = [
     id: 'claude-sonnet-4-20250514',
     name: 'Claude Sonnet 4',
     description: '200K in / 16K out — balanced speed and capability',
-    capabilities: { type: 'chat', limits: { max_prompt_tokens: 200_000, max_output_tokens: 16_384 } },
+    capabilities: {
+      type: 'chat',
+      limits: { max_prompt_tokens: 200_000, max_output_tokens: 16_384 },
+    },
   },
   {
     id: 'claude-opus-4-20250514',
     name: 'Claude Opus 4',
     description: '200K in / 32K out — most capable',
-    capabilities: { type: 'chat', limits: { max_prompt_tokens: 200_000, max_output_tokens: 32_768 } },
+    capabilities: {
+      type: 'chat',
+      limits: { max_prompt_tokens: 200_000, max_output_tokens: 32_768 },
+    },
   },
   {
     id: 'claude-haiku-4-20250514',
     name: 'Claude Haiku 4',
     description: '200K in / 8K out — fast, low cost',
-    capabilities: { type: 'chat', limits: { max_prompt_tokens: 200_000, max_output_tokens: 8_192 } },
+    capabilities: {
+      type: 'chat',
+      limits: { max_prompt_tokens: 200_000, max_output_tokens: 8_192 },
+    },
   },
 ];
 
@@ -101,10 +107,7 @@ export class AnthropicProvider implements AIProvider {
     return null;
   }
 
-  async callAI(
-    messages: ChatCompletionMessage[],
-    model: string,
-  ): Promise<ChatCompletionResponse> {
+  async callAI(messages: ChatCompletionMessage[], model: string): Promise<ChatCompletionResponse> {
     const accessToken = await this.resolveAccessToken();
 
     if (!accessToken) {
@@ -172,7 +175,9 @@ export class AnthropicProvider implements AIProvider {
         return ANTHROPIC_KNOWN_MODELS;
       }
 
-      const data = (await response.json()) as { data?: Array<{ id: string; display_name?: string }> };
+      const data = (await response.json()) as {
+        data?: Array<{ id: string; display_name?: string }>;
+      };
       if (Array.isArray(data.data) && data.data.length > 0) {
         return data.data.map((m) => ({
           id: m.id,
@@ -234,7 +239,9 @@ export class AnthropicProvider implements AIProvider {
     // Parse "code#state" format
     const hashIndex = pasted.indexOf('#');
     if (hashIndex === -1) {
-      throw new Error('Invalid code format. Expected {code}#{state} — copy the full string from the browser.');
+      throw new Error(
+        'Invalid code format. Expected {code}#{state} — copy the full string from the browser.',
+      );
     }
 
     const code = pasted.slice(0, hashIndex);
@@ -386,11 +393,12 @@ export class AnthropicProvider implements AIProvider {
 
     if (accessToken.startsWith('sk-ant-oat')) {
       // OAuth token — requires Claude Code-compatible request shape
-      headers['Authorization'] = `Bearer ${accessToken}`;
+      headers.Authorization = `Bearer ${accessToken}`;
       headers['User-Agent'] = 'claude-cli/2.1.7 (external, cli)';
       headers['x-app'] = 'cli';
       headers['anthropic-dangerous-direct-browser-access'] = 'true';
-      headers['anthropic-beta'] = 'oauth-2025-04-20,interleaved-thinking-2025-05-14,output-128k-2025-02-19';
+      headers['anthropic-beta'] =
+        'oauth-2025-04-20,interleaved-thinking-2025-05-14,output-128k-2025-02-19';
     } else {
       // Standard API key
       headers['x-api-key'] = accessToken;
@@ -403,9 +411,7 @@ export class AnthropicProvider implements AIProvider {
   private async normalizeResponse(response: Response): Promise<ChatCompletionResponse> {
     if (!response.ok) {
       const body = await response.text().catch(() => '');
-      throw new Error(
-        `Anthropic API error (${response.status}): ${body || response.statusText}`,
-      );
+      throw new Error(`Anthropic API error (${response.status}): ${body || response.statusText}`);
     }
 
     const data = (await response.json()) as {
@@ -419,12 +425,11 @@ export class AnthropicProvider implements AIProvider {
     // Extract usage and content types
     let usage: TokenUsage | undefined;
     if (data.usage) {
-      const contentTypes = data.content
-        ? [...new Set(data.content.map((c) => c.type))]
-        : [];
-      const thinkingTokens = data.content
-        ?.filter((c) => c.type === 'thinking')
-        .reduce((sum, c) => sum + (c.thinking?.length ?? 0), 0) ?? 0;
+      const contentTypes = data.content ? [...new Set(data.content.map((c) => c.type))] : [];
+      const thinkingTokens =
+        data.content
+          ?.filter((c) => c.type === 'thinking')
+          .reduce((sum, c) => sum + (c.thinking?.length ?? 0), 0) ?? 0;
 
       usage = {
         input_tokens: data.usage.input_tokens,

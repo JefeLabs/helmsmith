@@ -10,8 +10,7 @@
  * content lives.
  */
 
-export { ConnectView } from "./ConnectView.tsx";
-export type { ConnectViewProps } from "./ConnectView.tsx";
-
-export { runConnectView } from "./runConnectView.ts";
-export type { RunConnectViewOptions } from "./runConnectView.ts";
+export type { ConnectViewProps } from './ConnectView.tsx';
+export { ConnectView } from './ConnectView.tsx';
+export type { RunConnectViewOptions } from './runConnectView.ts';
+export { runConnectView } from './runConnectView.ts';

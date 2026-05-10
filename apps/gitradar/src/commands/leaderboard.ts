@@ -1,12 +1,17 @@
-import { queryRecords, queryRollup } from '../store/sqlite-store.js';
-import { filterRecords, getLastNWeeks, getCurrentWeek, type Filters } from '../aggregator/filters.js';
-import { computeLeaderboard } from '../aggregator/leaderboard.js';
 import { rollup } from '../aggregator/engine.js';
+import {
+  type Filters,
+  filterRecords,
+  getCurrentWeek,
+  getLastNWeeks,
+} from '../aggregator/filters.js';
+import { computeLeaderboard } from '../aggregator/leaderboard.js';
 import { calculateSegments, type Segment, type SegmentThresholds } from '../aggregator/segments.js';
-import { fmt } from '../ui/format.js';
-import { printTitle, printNoData, printJson, type Column } from '../ui/cli-renderer.js';
-import { renderTable } from '../ui/table.js';
+import { queryRecords, queryRollup } from '../store/sqlite-store.js';
 import type { UserWeekRepoRecord } from '../types/schema.js';
+import { type Column, printJson, printNoData, printTitle } from '../ui/cli-renderer.js';
+import { fmt } from '../ui/format.js';
+import { renderTable } from '../ui/table.js';
 
 export interface LeaderboardOptions {
   weeks?: number;
@@ -38,7 +43,10 @@ export async function leaderboard(options: LeaderboardOptions = {}): Promise<voi
     const weeksForSeg = getLastNWeeks(options.weeks ?? 4, getCurrentWeek());
     // Use SQL rollup when operating from DB, JS rollup when pre-loaded
     const rolled = options.records
-      ? rollup(records.filter((r) => weeksForSeg.includes(r.week)), (r: UserWeekRepoRecord) => r.member)
+      ? rollup(
+          records.filter((r) => weeksForSeg.includes(r.week)),
+          (r: UserWeekRepoRecord) => r.member,
+        )
       : queryRollup({ weeks: weeksForSeg, ...options.filters }, 'member');
     const memberTotals = new Map<string, number>();
     for (const [name, agg] of rolled) {
@@ -74,11 +82,16 @@ export async function leaderboard(options: LeaderboardOptions = {}): Promise<voi
   for (const col of columns) {
     if (col.entries.length === 0) continue;
     console.log(`  ${col.title}`);
-    console.log('  ' + renderTable({
-      columns: sectionColumns,
-      rows: col.entries,
-      borderStyle: 'minimal',
-    }).split('\n').join('\n  '));
+    console.log(
+      '  ' +
+        renderTable({
+          columns: sectionColumns,
+          rows: col.entries,
+          borderStyle: 'minimal',
+        })
+          .split('\n')
+          .join('\n  '),
+    );
     console.log('');
   }
 }

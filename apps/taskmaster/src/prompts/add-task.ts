@@ -1,10 +1,10 @@
+import type { TaskNode } from '../config/schema.js';
 import {
+  checkboxWithDefaults,
   inputWithDefault,
   listWithDefault,
-  checkboxWithDefaults,
   searchPrompt,
 } from './factory.js';
-import type { TaskNode } from '../config/schema.js';
 
 export interface AddTaskResult {
   title: string;

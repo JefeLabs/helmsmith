@@ -15,7 +15,7 @@
  *     theme can change one component's look without touching others.
  */
 
-export type ThemeAppearance = "light" | "dark";
+export type ThemeAppearance = 'light' | 'dark';
 
 // ────────────────────────────────────────────────────────────────────
 // Base16 palette — the raw 16 colors a theme provides
@@ -129,7 +129,7 @@ export interface SpacingScale {
 
 export type SpacingKey = keyof SpacingScale;
 
-export type BorderStyle = "none" | "single" | "double" | "rounded" | "heavy";
+export type BorderStyle = 'none' | 'single' | 'double' | 'rounded' | 'heavy';
 
 export interface BorderTokens {
   default: BorderStyle;
@@ -138,13 +138,13 @@ export interface BorderTokens {
 }
 
 export type TypographyPreset =
-  | "title"
-  | "heading"
-  | "subheading"
-  | "body"
-  | "caption"
-  | "code"
-  | "label";
+  | 'title'
+  | 'heading'
+  | 'subheading'
+  | 'body'
+  | 'caption'
+  | 'code'
+  | 'label';
 
 export interface TypographyStyle {
   bold?: boolean;
@@ -302,5 +302,5 @@ export interface ThemeDefinition {
    * Override any computed token. Deep-merged onto the values
    * defineTheme() generates from the palette.
    */
-  overrides?: DeepPartial<Omit<Theme, "name" | "displayName" | "appearance">>;
+  overrides?: DeepPartial<Omit<Theme, 'name' | 'displayName' | 'appearance'>>;
 }

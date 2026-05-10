@@ -1,10 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
+  KANBAN_PRESET,
+  PRESET_NAMES,
   SIMPLE_PRESET,
   STANDARD_PRESET,
-  KANBAN_PRESET,
   STATE_PRESETS,
-  PRESET_NAMES,
 } from '../src/config/state-presets.js';
 
 describe('SIMPLE_PRESET', () => {
@@ -41,7 +41,15 @@ describe('SIMPLE_PRESET', () => {
 describe('STANDARD_PRESET', () => {
   it('has 7 states: backlog, todo, in-progress, review, blocked, qa-failed, done', () => {
     const names = STANDARD_PRESET.map((s) => s.name);
-    expect(names).toEqual(['backlog', 'todo', 'in-progress', 'review', 'blocked', 'qa-failed', 'done']);
+    expect(names).toEqual([
+      'backlog',
+      'todo',
+      'in-progress',
+      'review',
+      'blocked',
+      'qa-failed',
+      'done',
+    ]);
   });
 
   it('has correct categories', () => {

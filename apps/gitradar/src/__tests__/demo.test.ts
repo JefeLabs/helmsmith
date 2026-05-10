@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { generateDemoData } from '../demo.js';
 import { ConfigSchema, UserWeekRepoRecordSchema } from '../types/schema.js';
 
@@ -14,10 +14,7 @@ describe('generateDemoData', () => {
     expect(records.length).toBeGreaterThan(0);
 
     // Validate a sample of records (first 20 + last 20)
-    const sample = [
-      ...records.slice(0, 20),
-      ...records.slice(-20),
-    ];
+    const sample = [...records.slice(0, 20), ...records.slice(-20)];
     for (const record of sample) {
       const result = UserWeekRepoRecordSchema.safeParse(record);
       expect(result.success).toBe(true);

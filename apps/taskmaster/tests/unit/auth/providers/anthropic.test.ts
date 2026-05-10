@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock token-manager
 vi.mock('../../../../src/auth/token-manager.js', () => ({
@@ -133,10 +133,9 @@ describe('AnthropicProvider', () => {
       });
 
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({ content: [{ type: 'text', text: 'ok' }] }),
-          { status: 200 },
-        ),
+        new Response(JSON.stringify({ content: [{ type: 'text', text: 'ok' }] }), {
+          status: 200,
+        }),
       );
 
       await provider.callAI([{ role: 'user', content: 'test' }], 'claude-sonnet-4');
@@ -144,7 +143,7 @@ describe('AnthropicProvider', () => {
       const headers = fetchSpy.mock.calls[0][1]!.headers as Record<string, string>;
       expect(headers['anthropic-version']).toBe('2023-06-01');
       expect(headers['x-api-key']).toBe('sk-ant-api-key-123');
-      expect(headers['Authorization']).toBeUndefined();
+      expect(headers.Authorization).toBeUndefined();
 
       fetchSpy.mockRestore();
     });
@@ -157,10 +156,9 @@ describe('AnthropicProvider', () => {
       });
 
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({ content: [{ type: 'text', text: 'ok' }] }),
-          { status: 200 },
-        ),
+        new Response(JSON.stringify({ content: [{ type: 'text', text: 'ok' }] }), {
+          status: 200,
+        }),
       );
 
       await provider.callAI([{ role: 'user', content: 'test' }], 'claude-sonnet-4');
@@ -179,16 +177,15 @@ describe('AnthropicProvider', () => {
       });
 
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({ content: [{ type: 'text', text: 'ok' }] }),
-          { status: 200 },
-        ),
+        new Response(JSON.stringify({ content: [{ type: 'text', text: 'ok' }] }), {
+          status: 200,
+        }),
       );
 
       await provider.callAI([{ role: 'user', content: 'test' }], 'claude-sonnet-4');
 
       const headers = fetchSpy.mock.calls[0][1]!.headers as Record<string, string>;
-      expect(headers['Authorization']).toBe('Bearer sk-ant-oat01-some-oauth-token');
+      expect(headers.Authorization).toBe('Bearer sk-ant-oat01-some-oauth-token');
       expect(headers['x-api-key']).toBeUndefined();
 
       fetchSpy.mockRestore();
@@ -201,10 +198,9 @@ describe('AnthropicProvider', () => {
       });
 
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({ content: [{ type: 'text', text: 'ok' }] }),
-          { status: 200 },
-        ),
+        new Response(JSON.stringify({ content: [{ type: 'text', text: 'ok' }] }), {
+          status: 200,
+        }),
       );
 
       await provider.callAI([{ role: 'user', content: 'test' }], 'claude-sonnet-4');
@@ -222,10 +218,9 @@ describe('AnthropicProvider', () => {
       });
 
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({ content: [{ type: 'text', text: 'ok' }] }),
-          { status: 200 },
-        ),
+        new Response(JSON.stringify({ content: [{ type: 'text', text: 'ok' }] }), {
+          status: 200,
+        }),
       );
 
       await provider.callAI([{ role: 'user', content: 'test' }], 'claude-sonnet-4');
@@ -267,7 +262,8 @@ describe('AnthropicProvider', () => {
         anthropic: { access_token: 'ant_token' },
       });
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
         .mockResolvedValueOnce(
           new Response('Rate limited', {
             status: 429,
@@ -283,10 +279,7 @@ describe('AnthropicProvider', () => {
           ),
         );
 
-      const result = await provider.callAI(
-        [{ role: 'user', content: 'test' }],
-        'claude-sonnet-4',
-      );
+      const result = await provider.callAI([{ role: 'user', content: 'test' }], 'claude-sonnet-4');
 
       expect(result.choices[0].message.content).toBe('ok after retry');
       expect(fetchSpy).toHaveBeenCalledTimes(2);
@@ -304,10 +297,7 @@ describe('AnthropicProvider', () => {
         new Response(JSON.stringify({ content: [] }), { status: 200 }),
       );
 
-      const result = await provider.callAI(
-        [{ role: 'user', content: 'test' }],
-        'claude-sonnet-4',
-      );
+      const result = await provider.callAI([{ role: 'user', content: 'test' }], 'claude-sonnet-4');
 
       expect(result.choices[0].message.content).toBe('');
 
@@ -337,7 +327,8 @@ describe('AnthropicProvider', () => {
           },
         });
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
         // First fetch: refresh token exchange
         .mockResolvedValueOnce(
           new Response(
@@ -359,10 +350,7 @@ describe('AnthropicProvider', () => {
           ),
         );
 
-      const result = await provider.callAI(
-        [{ role: 'user', content: 'test' }],
-        'claude-sonnet-4',
-      );
+      const result = await provider.callAI([{ role: 'user', content: 'test' }], 'claude-sonnet-4');
 
       expect(result.choices[0].message.content).toBe('ok');
 

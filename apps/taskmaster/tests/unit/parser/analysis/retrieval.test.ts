@@ -1,16 +1,16 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   buildComponentIndex,
   buildSymbolIndex,
-  queryIndex,
   formatComponentIndexForPrompt,
   formatQueryResultForPrompt,
+  queryIndex,
 } from '../../../../src/parser/analysis/retrieval.js';
 import type {
   BuildComponent,
+  ComponentIndex,
   EnhancedFileAnalysis,
   EnhancedSourceSymbol,
-  ComponentIndex,
   SymbolIndex,
 } from '../../../../src/parser/analysis/types.js';
 
@@ -191,7 +191,7 @@ describe('queryIndex', () => {
     const result = queryIndex(componentIndex, symbolIndex, { layers: ['api'] });
     expect(result.symbols).toHaveLength(1);
     expect(result.symbols[0].name).toBe('handleRequest');
-    expect(result.groupedByLayer['api']).toHaveLength(1);
+    expect(result.groupedByLayer.api).toHaveLength(1);
   });
 
   it('with kinds filter', () => {

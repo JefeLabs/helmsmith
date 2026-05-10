@@ -1,8 +1,8 @@
-import { select, editor, confirm } from '@inquirer/prompts';
+import { confirm, editor, select } from '@inquirer/prompts';
 import chalk from 'chalk';
-import { GitOperations } from './git-operations.js';
-import type { AiMode, ConflictFile, ConflictSession, RepoConfig } from '../config/schema.js';
 import { APP_NAME } from '../config/branding.js';
+import type { AiMode, ConflictFile, ConflictSession, RepoConfig } from '../config/schema.js';
+import { GitOperations } from './git-operations.js';
 
 /** Callbacks for pluggable AI resolution and progress reporting. */
 export interface ResolutionCallbacks {
@@ -22,7 +22,12 @@ export class ConflictResolver {
   private aiMode: AiMode;
   private callbacks: ResolutionCallbacks;
 
-  constructor(git: GitOperations, repo: RepoConfig, aiMode: AiMode, callbacks: ResolutionCallbacks = {}) {
+  constructor(
+    git: GitOperations,
+    repo: RepoConfig,
+    aiMode: AiMode,
+    callbacks: ResolutionCallbacks = {},
+  ) {
     this.git = git;
     this.repo = repo;
     this.aiMode = aiMode;
@@ -37,8 +42,14 @@ export class ConflictResolver {
   ): Promise<ConflictSession> {
     const files = await this.git.getConflictedFiles();
     const session: ConflictSession = {
-      repo: this.repo, operation, sourceBranch, targetBranch,
-      conflictBranch: '', files, resolvedFiles: [], status: 'in-progress',
+      repo: this.repo,
+      operation,
+      sourceBranch,
+      targetBranch,
+      conflictBranch: '',
+      files,
+      resolvedFiles: [],
+      status: 'in-progress',
     };
 
     console.log(chalk.yellow('\n╔══════════════════════════════════════════════════════════════╗'));
@@ -99,7 +110,8 @@ export class ConflictResolver {
           break;
         case 'escalate': {
           const branchName = await this.git.createConflictBranch(
-            'conflict-resolution', `${this.repo.name}-${targetBranch}`,
+            'conflict-resolution',
+            `${this.repo.name}-${targetBranch}`,
           );
           session.conflictBranch = branchName;
           session.status = 'escalated';
@@ -132,7 +144,10 @@ export class ConflictResolver {
         return true;
       case 'ai-auto': {
         const resolved = await this.callbacks.onAiResolve?.(file, 'auto');
-        if (resolved) { await this.git.resolveFile(file.path, resolved); return true; }
+        if (resolved) {
+          await this.git.resolveFile(file.path, resolved);
+          return true;
+        }
         console.log(chalk.yellow('  AI could not auto-resolve. Falling back to manual.'));
         return this.resolveFile(file);
       }
@@ -151,7 +166,10 @@ export class ConflictResolver {
               { name: 'Reject, resolve manually', value: 'reject' as const },
             ],
           });
-          if (accept === 'accept') { await this.git.resolveFile(file.path, suggestion); return true; }
+          if (accept === 'accept') {
+            await this.git.resolveFile(file.path, suggestion);
+            return true;
+          }
           if (accept === 'edit') return this.manualEdit(file, suggestion);
           return this.resolveFile(file);
         }
@@ -178,14 +196,18 @@ export class ConflictResolver {
     const theirsLines = file.theirsContent.split('\n').slice(0, maxLines);
 
     console.log(chalk.red('  <<<< OURS (current branch):'));
-    oursLines.forEach((l) => console.log(chalk.red(`    ${l}`)));
+    for (const l of oursLines) console.log(chalk.red(`    ${l}`));
     if (file.oursContent.split('\n').length > maxLines)
-      console.log(chalk.dim(`    ... (${file.oursContent.split('\n').length - maxLines} more lines)`));
+      console.log(
+        chalk.dim(`    ... (${file.oursContent.split('\n').length - maxLines} more lines)`),
+      );
 
     console.log(chalk.green('  >>>> THEIRS (incoming):'));
-    theirsLines.forEach((l) => console.log(chalk.green(`    ${l}`)));
+    for (const l of theirsLines) console.log(chalk.green(`    ${l}`));
     if (file.theirsContent.split('\n').length > maxLines)
-      console.log(chalk.dim(`    ... (${file.theirsContent.split('\n').length - maxLines} more lines)`));
+      console.log(
+        chalk.dim(`    ... (${file.theirsContent.split('\n').length - maxLines} more lines)`),
+      );
     console.log();
   }
 

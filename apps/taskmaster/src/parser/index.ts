@@ -1,16 +1,15 @@
 import { extname } from 'node:path';
 import { parseMarkdown } from './markdown.js';
+import { generateTasks } from './task-generator.js';
 import { parseText } from './text.js';
-import { parseYamlPlan } from './yaml-plan.js';
-import { parseWithAI } from './ai-parser.js';
-import { generateTasks, getNextId, renumberTasks } from './task-generator.js';
+import type { DependencyInferrer, ParseOptions, ParseResult, PlanFormat } from './types.js';
 import { noopInferrer } from './types.js';
-import type { ParseResult, ParseOptions, PlanFormat, DependencyInferrer } from './types.js';
+import { parseYamlPlan } from './yaml-plan.js';
 
-export { noopInferrer } from './types.js';
-export { getNextId, renumberTasks } from './task-generator.js';
 export { parseWithAI, parseWithArchitecturePipeline } from './ai-parser.js';
-export type { ParseResult, ParseOptions, PlanFormat, DependencyInferrer } from './types.js';
+export { getNextId, renumberTasks } from './task-generator.js';
+export type { DependencyInferrer, ParseOptions, ParseResult, PlanFormat } from './types.js';
+export { noopInferrer } from './types.js';
 
 /**
  * Detect the plan format from a filename, with content fallback.
@@ -84,6 +83,7 @@ export async function parsePlan(
   const warnings: string[] = [];
 
   // Route to the correct format parser
+  // biome-ignore lint/suspicious/noImplicitAnyLet: assigned in try/catch below
   let sections;
   switch (format) {
     case 'markdown':
@@ -120,7 +120,11 @@ export async function parsePlan(
   const sectionsFound = countSections(sections);
 
   // Handle no-content edge case: text parser returns a single "Untitled" section
-  if (sections.length === 1 && sections[0].title === 'Untitled' && sections[0].body === content.trim()) {
+  if (
+    sections.length === 1 &&
+    sections[0].title === 'Untitled' &&
+    sections[0].body === content.trim()
+  ) {
     warnings.push('No headings found; created a single task from the file content.');
   }
 

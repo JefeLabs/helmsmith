@@ -1,6 +1,6 @@
-import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /**
  * Find the skillzkit package root by walking up looking for
@@ -18,7 +18,7 @@ export function findPackageRoot(): string {
   const __dirname = dirname(fileURLToPath(import.meta.url));
   let dir = __dirname;
   for (let i = 0; i < 8; i++) {
-    if (existsSync(join(dir, "catalog.json"))) {
+    if (existsSync(join(dir, 'catalog.json'))) {
       cached = dir;
       return dir;
     }
@@ -26,7 +26,5 @@ export function findPackageRoot(): string {
     if (parent === dir) break;
     dir = parent;
   }
-  throw new Error(
-    `skillzkit package root not found searching upward from ${__dirname}`,
-  );
+  throw new Error(`skillzkit package root not found searching upward from ${__dirname}`);
 }

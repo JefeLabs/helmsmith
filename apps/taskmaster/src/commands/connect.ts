@@ -12,26 +12,22 @@
  * `apps/taskmaster/CLAUDE.md` (auth scope section).
  */
 
-import {
-  noopConnection,
-  runConnectView,
-} from "@ecruz165/tui-view-components";
+import { noopConnection, runConnectView } from '@ecruz165/tui-view-components';
 
 export async function runConnect(): Promise<void> {
   await runConnectView({
-    appName: "agentx-taskmaster",
+    appName: 'agentx-taskmaster',
     optional: [
       noopConnection({
-        id: "github-copilot",
-        displayName: "GitHub Copilot",
+        id: 'github-copilot',
+        displayName: 'GitHub Copilot',
         description:
-          "AI provider for scoring and decomposition. Wire via per-project config.ai.provider.",
+          'AI provider for scoring and decomposition. Wire via per-project config.ai.provider.',
       }),
       noopConnection({
-        id: "anthropic",
-        displayName: "Anthropic API",
-        description:
-          "Optional alternative provider. Configure via PKCE flow per project.",
+        id: 'anthropic',
+        displayName: 'Anthropic API',
+        description: 'Optional alternative provider. Configure via PKCE flow per project.',
       }),
     ],
   });

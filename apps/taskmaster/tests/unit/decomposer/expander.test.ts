@@ -1,15 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { makeTask } from '../../fixtures/tasks.js';
-import {
-  getChildType,
-  generateSubtaskId,
-  buildExpansionPrompt,
-  parseExpansionResponse,
-  heuristicExpand,
-  expandTask,
-  expandMultiple,
-} from '../../../src/decomposer/expander.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StatesConfig } from '../../../src/config/schema.js';
+import {
+  buildExpansionPrompt,
+  expandMultiple,
+  expandTask,
+  generateSubtaskId,
+  getChildType,
+  heuristicExpand,
+  parseExpansionResponse,
+} from '../../../src/decomposer/expander.js';
+import { makeTask } from '../../fixtures/tasks.js';
 
 // Mock callAI (replaces callCopilot)
 vi.mock('../../../src/auth/call-ai.js', () => ({
@@ -280,7 +280,8 @@ describe('heuristicExpand', () => {
 
   it('splits by paragraphs when no bullets', () => {
     const task = makeTask({
-      description: 'First paragraph about setup.\n\nSecond paragraph about config.\n\nThird paragraph about testing.',
+      description:
+        'First paragraph about setup.\n\nSecond paragraph about config.\n\nThird paragraph about testing.',
     });
     const result = heuristicExpand(task, 5);
 
@@ -625,9 +626,7 @@ describe('expandMultiple', () => {
   });
 
   it('collects errors for tasks at max depth', async () => {
-    const tasks = [
-      makeTask({ id: 'T-1', type: 'subtask', complexity: 7 }),
-    ];
+    const tasks = [makeTask({ id: 'T-1', type: 'subtask', complexity: 7 })];
 
     const result = await expandMultiple(tasks, 'task-only', 5, {
       statesConfig: defaultStatesConfig,
@@ -639,10 +638,7 @@ describe('expandMultiple', () => {
   });
 
   it('returns empty results when no tasks are eligible', async () => {
-    const tasks = [
-      makeTask({ id: 'T-1', complexity: 2 }),
-      makeTask({ id: 'T-2', complexity: 3 }),
-    ];
+    const tasks = [makeTask({ id: 'T-1', complexity: 2 }), makeTask({ id: 'T-2', complexity: 3 })];
 
     const result = await expandMultiple(tasks, 'task-only', 5, {
       statesConfig: defaultStatesConfig,

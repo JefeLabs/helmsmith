@@ -1,12 +1,12 @@
-import { describe, it, expect } from 'vitest';
-import { makeTask } from '../../fixtures/tasks.js';
+import { describe, expect, it } from 'vitest';
 import {
-  analyzeScopeBreadth,
-  analyzeTechnicalDepth,
-  analyzeDependencyCount,
   analyzeAmbiguity,
   analyzeCrossCutting,
+  analyzeDependencyCount,
+  analyzeScopeBreadth,
+  analyzeTechnicalDepth,
 } from '../../../src/scorer/dimensions.js';
+import { makeTask } from '../../fixtures/tasks.js';
 
 describe('analyzeScopeBreadth', () => {
   it('returns 0 for a task with no relevant keywords', () => {
@@ -27,7 +27,8 @@ describe('analyzeScopeBreadth', () => {
   it('returns higher score for multiple categories', () => {
     const task = makeTask({
       title: 'Full-stack auth feature',
-      description: 'Build frontend form, backend API endpoint, database schema, and auth token validation',
+      description:
+        'Build frontend form, backend API endpoint, database schema, and auth token validation',
     });
     const score = analyzeScopeBreadth(task);
     // Should match: ui (form, frontend), backend (api, endpoint), data (database, schema), authSecurity (auth, token)
@@ -37,7 +38,8 @@ describe('analyzeScopeBreadth', () => {
   it('returns 1.0 when all categories are matched', () => {
     const task = makeTask({
       title: 'Everything',
-      description: 'Build frontend component with api endpoint, database model, deploy docker, auth token, unit test coverage',
+      description:
+        'Build frontend component with api endpoint, database model, deploy docker, auth token, unit test coverage',
     });
     const score = analyzeScopeBreadth(task);
     expect(score).toBe(1.0);
@@ -76,7 +78,8 @@ describe('analyzeTechnicalDepth', () => {
   it('detects multiple depth categories', () => {
     const task = makeTask({
       title: 'Secure deployment pipeline',
-      description: 'Deploy to kubernetes with OAuth encryption, caching optimization, and external API webhook',
+      description:
+        'Deploy to kubernetes with OAuth encryption, caching optimization, and external API webhook',
     });
     const score = analyzeTechnicalDepth(task);
     // Should match: infrastructure (deploy, kubernetes), security (oauth, encryption),
@@ -103,10 +106,7 @@ describe('analyzeDependencyCount', () => {
 
   it('returns 0 for a task with no dependencies and no incoming refs', () => {
     const task = makeTask({ id: 'T-1', dependencies: [] });
-    const allTasks = [
-      task,
-      makeTask({ id: 'T-2', dependencies: [] }),
-    ];
+    const allTasks = [task, makeTask({ id: 'T-2', dependencies: [] })];
     expect(analyzeDependencyCount(task, allTasks)).toBe(0);
   });
 
@@ -118,11 +118,7 @@ describe('analyzeDependencyCount', () => {
         { taskId: 'T-2', type: 'produces' },
       ],
     });
-    const allTasks = [
-      makeTask({ id: 'T-1' }),
-      makeTask({ id: 'T-2' }),
-      task,
-    ];
+    const allTasks = [makeTask({ id: 'T-1' }), makeTask({ id: 'T-2' }), task];
     const score = analyzeDependencyCount(task, allTasks);
     // 2 outgoing, 0 incoming = 2/8 = 0.25
     expect(score).toBeCloseTo(0.25, 2);
@@ -169,10 +165,7 @@ describe('analyzeDependencyCount', () => {
       type: 'blocks' as const,
     }));
     const task = makeTask({ id: 'T-100', dependencies: deps });
-    const allTasks = [
-      task,
-      ...deps.map((d) => makeTask({ id: d.taskId })),
-    ];
+    const allTasks = [task, ...deps.map((d) => makeTask({ id: d.taskId }))];
     const score = analyzeDependencyCount(task, allTasks);
     expect(score).toBe(1.0);
   });
@@ -227,7 +220,8 @@ describe('analyzeAmbiguity', () => {
   it('returns 0.5 when no indicators are found', () => {
     const task = makeTask({
       title: 'neutral neutral neutral neutral neutral neutral neutral neutral',
-      description: 'neutral neutral neutral neutral neutral neutral neutral neutral neutral neutral neutral neutral',
+      description:
+        'neutral neutral neutral neutral neutral neutral neutral neutral neutral neutral neutral neutral',
     });
     const score = analyzeAmbiguity(task);
     expect(score).toBe(0.5);

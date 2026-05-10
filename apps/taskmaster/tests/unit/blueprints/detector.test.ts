@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ApplicationBlueprint } from '../../../src/blueprints/types.js';
-import type { CodebaseScanResult, BuildComponent } from '../../../src/parser/analysis/types.js';
+import type { BuildComponent, CodebaseScanResult } from '../../../src/parser/analysis/types.js';
 
 // Mock the registry to provide controlled test data
 vi.mock('../../../src/blueprints/registry.js', () => {
@@ -125,9 +125,7 @@ describe('detectBlueprints', () => {
 
   it('matches by component framework tags', () => {
     const scan = makeScanResult();
-    const components = [
-      makeComponent({ id: 'server', tags: ['framework:express'] }),
-    ];
+    const components = [makeComponent({ id: 'server', tags: ['framework:express'] })];
     const results = detectBlueprints(scan, components);
     const apiMatch = results.find((r) => r.blueprintId === 'fake-api');
     expect(apiMatch).toBeDefined();

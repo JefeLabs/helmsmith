@@ -1,8 +1,8 @@
-import type { TaskNode, ProjectConfig } from '../config/schema.js';
-import { getDefaultStatus } from '../config/state-engine.js';
-import { parsePlan, getNextId, renumberTasks } from '../parser/index.js';
-import { inferSkills } from '../skills/index.js';
 import { resolveActiveAuth } from '../auth/index.js';
+import type { ProjectConfig, TaskNode } from '../config/schema.js';
+import { getDefaultStatus } from '../config/state-engine.js';
+import { getNextId, parsePlan, renumberTasks } from '../parser/index.js';
+import { inferSkills } from '../skills/index.js';
 
 export interface ParseOpts {
   numTasks?: string;
@@ -103,7 +103,12 @@ export async function executeParse(
         try {
           log(`Single-shot AI (${config.ai.provider})...`);
           const { parseWithAI } = await import('../parser/ai-parser.js');
-          const aiResult = await parseWithAI(content, config.ai.model, parseOptions, config.ai.provider);
+          const aiResult = await parseWithAI(
+            content,
+            config.ai.model,
+            parseOptions,
+            config.ai.provider,
+          );
           if (aiResult && aiResult.tasks.length > 0) {
             parsedTasks = aiResult.tasks;
             parseMethod = 'ai';
@@ -152,7 +157,10 @@ export async function executeParse(
   let skillSummary = '';
   if (parseMethod === 'ai-architecture' || parseMethod === 'ai') {
     const countWithSkills = (tasks: TaskNode[]): number =>
-      tasks.reduce((sum, t) => sum + (t.requiredSkills.length > 0 ? 1 : 0) + countWithSkills(t.children), 0);
+      tasks.reduce(
+        (sum, t) => sum + (t.requiredSkills.length > 0 ? 1 : 0) + countWithSkills(t.children),
+        0,
+      );
     const tagged = countWithSkills(newTasks);
     if (tagged > 0) {
       skillSummary = `Skills: ${tagged} task(s) tagged by AI`;

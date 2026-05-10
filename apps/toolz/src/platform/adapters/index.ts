@@ -14,12 +14,12 @@
  * a clear "no adapter available" error rather than a silent skip.
  */
 
-import { detectPlatform } from "../detect.js";
-import type { PackageManagerAdapter } from "../package-managers.js";
-import type { PackageManagerType } from "../types.js";
-import { aptAdapter } from "./apt.js";
-import { brewAdapter } from "./brew.js";
-import { wingetAdapter } from "./winget.js";
+import { detectPlatform } from '../detect.js';
+import type { PackageManagerAdapter } from '../package-managers.js';
+import type { PackageManagerType } from '../types.js';
+import { aptAdapter } from './apt.js';
+import { brewAdapter } from './brew.js';
+import { wingetAdapter } from './winget.js';
 
 /** All adapters currently implemented, keyed by their PackageManagerType. */
 export const adapters: Partial<Record<PackageManagerType, PackageManagerAdapter>> = {
@@ -55,14 +55,14 @@ function adapterCandidates(
   platform: string,
   linuxFamily: string | undefined,
 ): PackageManagerAdapter[] {
-  if (platform === "darwin") {
+  if (platform === 'darwin') {
     return [brewAdapter];
   }
-  if (platform === "win32") {
+  if (platform === 'win32') {
     return [wingetAdapter];
   }
-  if (platform === "linux") {
-    if (linuxFamily === "debian") return [aptAdapter, brewAdapter];
+  if (platform === 'linux') {
+    if (linuxFamily === 'debian') return [aptAdapter, brewAdapter];
     // Other Linux families: brew is the only working fallback today.
     return [brewAdapter];
   }

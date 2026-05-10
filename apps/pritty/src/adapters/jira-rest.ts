@@ -16,11 +16,7 @@
  *   - network error → return null
  */
 
-import type {
-  JiraRestValidation,
-  TicketSystemAdapter,
-  ValidationResult,
-} from "./index.js";
+import type { JiraRestValidation, TicketSystemAdapter, ValidationResult } from './index.js';
 
 interface JiraIssueResponse {
   key?: string;
@@ -31,15 +27,13 @@ interface JiraIssueResponse {
 }
 
 export class JiraRestAdapter implements TicketSystemAdapter {
-  readonly name = "jira-rest" as const;
+  readonly name = 'jira-rest' as const;
 
   constructor(private readonly config: JiraRestValidation) {}
 
   async isAvailable(): Promise<boolean> {
     return Boolean(
-      this.config.baseUrl &&
-        process.env[this.config.emailEnv] &&
-        process.env[this.config.tokenEnv],
+      this.config.baseUrl && process.env[this.config.emailEnv] && process.env[this.config.tokenEnv],
     );
   }
 
@@ -48,16 +42,16 @@ export class JiraRestAdapter implements TicketSystemAdapter {
     const token = process.env[this.config.tokenEnv];
     if (!email || !token) return null;
 
-    const base = this.config.baseUrl.replace(/\/$/, "");
+    const base = this.config.baseUrl.replace(/\/$/, '');
     const url = `${base}/rest/api/3/issue/${encodeURIComponent(ticket)}?fields=summary,status`;
-    const auth = Buffer.from(`${email}:${token}`).toString("base64");
+    const auth = Buffer.from(`${email}:${token}`).toString('base64');
 
     let response: Response;
     try {
       response = await fetch(url, {
         headers: {
           Authorization: `Basic ${auth}`,
-          Accept: "application/json",
+          Accept: 'application/json',
         },
       });
     } catch {

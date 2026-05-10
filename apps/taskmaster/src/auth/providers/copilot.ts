@@ -1,20 +1,19 @@
-import type { AIProvider, AIModelEntry } from '../provider.js';
+import { login as deviceFlowLogin } from '../device-flow.js';
+import type { AIModelEntry, AIProvider } from '../provider.js';
+import { readAuthFile, writeAuthFile } from '../token-manager.js';
 import type {
   ChatCompletionMessage,
   ChatCompletionResponse,
-  CopilotCredentials,
   CopilotTokenResponse,
   TokenUsage,
 } from '../types.js';
 import {
-  COPILOT_TOKEN_URL,
   COPILOT_CHAT_URL,
   COPILOT_MODELS_URL,
+  COPILOT_TOKEN_URL,
   EDITOR_VERSION,
   TOKEN_REFRESH_THRESHOLD,
 } from '../types.js';
-import { login as deviceFlowLogin } from '../device-flow.js';
-import { readAuthFile, writeAuthFile } from '../token-manager.js';
 
 /**
  * GitHub Copilot provider — wraps the existing device-flow + token-manager logic
@@ -45,10 +44,7 @@ export class CopilotProvider implements AIProvider {
     return source ? { source: source.source } : null;
   }
 
-  async callAI(
-    messages: ChatCompletionMessage[],
-    model: string,
-  ): Promise<ChatCompletionResponse> {
+  async callAI(messages: ChatCompletionMessage[], model: string): Promise<ChatCompletionResponse> {
     const tokenSource = await this.resolveGitHubToken();
     if (!tokenSource) {
       throw new Error('Copilot: Not authenticated. Run "auth login --provider copilot" first.');
@@ -90,9 +86,7 @@ export class CopilotProvider implements AIProvider {
 
     if (!response.ok) {
       const body = await response.text().catch(() => '');
-      throw new Error(
-        `Copilot API error (${response.status}): ${body || response.statusText}`,
-      );
+      throw new Error(`Copilot API error (${response.status}): ${body || response.statusText}`);
     }
 
     return this.normalizeResponse(response);

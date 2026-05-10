@@ -7,20 +7,17 @@
  * surfaces a stub so the connect view exists across the toolbox.
  */
 
-import {
-  noopConnection,
-  runConnectView,
-} from "@ecruz165/tui-view-components";
+import { noopConnection, runConnectView } from '@ecruz165/tui-view-components';
 
 export async function runConnect(): Promise<void> {
   await runConnectView({
-    appName: "skillzkit",
+    appName: 'skillzkit',
     optional: [
       noopConnection({
-        id: "skillzkit-team-api",
-        displayName: "Skillzkit Team API",
+        id: 'skillzkit-team-api',
+        displayName: 'Skillzkit Team API',
         description:
-          "Team-mode connection (API key + PIN). Configured via `skillzkit init --mode team`.",
+          'Team-mode connection (API key + PIN). Configured via `skillzkit init --mode team`.',
       }),
     ],
   });

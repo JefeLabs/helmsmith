@@ -22,9 +22,6 @@ export interface SyncResult {
  * Execute the sync command: merge edits from YAML task files
  * back into tasks.json.
  */
-export async function executeSync(
-  projectDir: string,
-  opts: SyncOpts = {},
-): Promise<SyncResult> {
+export async function executeSync(projectDir: string, opts: SyncOpts = {}): Promise<SyncResult> {
   return syncTaskFiles(projectDir, { dryRun: opts.dryRun });
 }

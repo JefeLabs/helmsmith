@@ -10,10 +10,10 @@
  * inside dist/.
  */
 
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { parse } from "yaml";
-import { BUILT_IN_CATALOG, type CatalogEntry } from "../core/built-in-catalog.js";
-import { getUserCatalogPath } from "./paths.js";
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { parse } from 'yaml';
+import { BUILT_IN_CATALOG, type CatalogEntry } from '../core/built-in-catalog.js';
+import { getUserCatalogPath } from './paths.js';
 
 let mergedCache: Record<string, CatalogEntry> | undefined;
 let userMtimeCache: number | undefined;
@@ -28,11 +28,11 @@ export function loadUserCatalog(): Record<string, CatalogEntry> {
   const path = getUserCatalogPath();
   if (!existsSync(path)) return {};
   try {
-    const raw = readFileSync(path, "utf8");
+    const raw = readFileSync(path, 'utf8');
     const parsed = parse(raw);
-    if (!parsed || typeof parsed !== "object") return {};
+    if (!parsed || typeof parsed !== 'object') return {};
     const tools = (parsed as { tools?: unknown }).tools;
-    if (!tools || typeof tools !== "object") return {};
+    if (!tools || typeof tools !== 'object') return {};
     return tools as Record<string, CatalogEntry>;
   } catch {
     return {};

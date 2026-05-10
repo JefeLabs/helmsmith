@@ -1,6 +1,6 @@
-import { Command } from "commander";
-import type { AuthProvider } from "./auth-provider.js";
-import { noopAuthProvider } from "./auth-provider.js";
+import { Command } from 'commander';
+import type { AuthProvider } from './auth-provider.js';
+import { noopAuthProvider } from './auth-provider.js';
 
 export interface CreateCliOptions {
   /** CLI binary name as it appears in `--help` and version output. */

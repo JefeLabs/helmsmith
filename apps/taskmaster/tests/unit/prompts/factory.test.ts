@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock @inquirer/prompts before any imports
 vi.mock('@inquirer/prompts', () => ({
@@ -15,25 +15,25 @@ vi.mock('../../../src/utils/defaults.js', () => ({
   readDefaults: vi.fn(),
 }));
 
-import { readDefaults } from '../../../src/utils/defaults.js';
 import {
-  input,
-  select,
   checkbox,
   confirm,
-  search,
+  input,
   number as numberPrompt,
+  search,
+  select,
 } from '@inquirer/prompts';
 import {
-  resolveDefault,
-  resetDefaultsCache,
-  inputWithDefault,
-  listWithDefault,
   checkboxWithDefaults,
   confirmPrompt,
+  inputWithDefault,
+  listWithDefault,
   numberWithDefault,
+  resetDefaultsCache,
+  resolveDefault,
   searchPrompt,
 } from '../../../src/prompts/factory.js';
+import { readDefaults } from '../../../src/utils/defaults.js';
 
 const mockReadDefaults = vi.mocked(readDefaults);
 const mockInput = vi.mocked(input);

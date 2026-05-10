@@ -289,13 +289,7 @@ export const FRONTEND_SPA_BLUEPRINT: ApplicationBlueprint = {
       'framework:nuxt',
     ],
     capabilities: [],
-    fileIndicators: [
-      'src/components/',
-      'src/pages/',
-      'src/views/',
-      'public/',
-      'src/App.tsx',
-    ],
+    fileIndicators: ['src/components/', 'src/pages/', 'src/views/', 'public/', 'src/App.tsx'],
     weight: 0.8,
   },
 };

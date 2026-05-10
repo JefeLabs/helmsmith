@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
-import type { TaskNode, StateDefinition } from '../../../src/config/schema.js';
-import { STANDARD_PRESET } from '../../../src/config/state-presets.js';
+import { describe, expect, it } from 'vitest';
 import { executeQAFail, executeQAFailBatch } from '../../../src/commands/qa-fail.js';
+import type { StateDefinition, TaskNode } from '../../../src/config/schema.js';
+import { STANDARD_PRESET } from '../../../src/config/state-presets.js';
 
 const STATES: StateDefinition[] = [...STANDARD_PRESET];
 
@@ -111,15 +111,23 @@ describe('executeQAFail', () => {
   });
 
   it('is idempotent - appends another entry when already qa-failed', () => {
-    const tasks = [makeTask({ id: 'T-1', status: 'qa-failed', qaFeedback: [{
-      testType: 'unit',
-      result: 'fail',
-      description: 'First failure',
-      cause: '',
-      severity: 'major',
-      reporter: 'qa-agent',
-      timestamp: '2026-01-01T00:00:00Z',
-    }] })];
+    const tasks = [
+      makeTask({
+        id: 'T-1',
+        status: 'qa-failed',
+        qaFeedback: [
+          {
+            testType: 'unit',
+            result: 'fail',
+            description: 'First failure',
+            cause: '',
+            severity: 'major',
+            reporter: 'qa-agent',
+            timestamp: '2026-01-01T00:00:00Z',
+          },
+        ],
+      }),
+    ];
 
     const result = executeQAFail(tasks, 'T-1', STATES, false, {
       testType: 'integration',
@@ -262,7 +270,12 @@ describe('executeQAFailBatch', () => {
       tasks,
       [
         { taskId: 'T-1', testType: 'unit', description: 'Test A fails' },
-        { taskId: 'T-2', testType: 'integration', description: 'Test B fails', severity: 'critical' },
+        {
+          taskId: 'T-2',
+          testType: 'integration',
+          description: 'Test B fails',
+          severity: 'critical',
+        },
         { taskId: 'T-3', testType: 'e2e', description: 'Test C fails', severity: 'minor' },
       ],
       STATES,
@@ -313,9 +326,7 @@ describe('executeQAFailBatch', () => {
   });
 
   it('handles mix of valid and invalid task IDs', () => {
-    const tasks = [
-      makeTask({ id: 'T-1', status: 'done' }),
-    ];
+    const tasks = [makeTask({ id: 'T-1', status: 'done' })];
 
     const result = executeQAFailBatch(
       tasks,

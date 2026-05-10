@@ -38,10 +38,7 @@ export function findClosestMatch(skill: string, vocabulary: string[]): string | 
  * Recursively checks children. Returns issues for out-of-vocabulary skills
  * with closest-match suggestions where possible.
  */
-export function validateSkills(
-  tasks: TaskNode[],
-  vocabulary: string[],
-): SkillValidationIssue[] {
+export function validateSkills(tasks: TaskNode[], vocabulary: string[]): SkillValidationIssue[] {
   const issues: SkillValidationIssue[] = [];
 
   function check(taskList: TaskNode[]): void {

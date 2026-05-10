@@ -42,7 +42,9 @@ export async function listAuthors(options: ListAuthorsOptions = {}): Promise<voi
     for (const a of assigned) {
       const repos = a.reposSeenIn.length;
       const id = a.identifier ? ` [${a.identifier}]` : '';
-      console.log(`  ${a.name}${id}  <${a.email}>  ${a.org} → ${a.team}  (${a.commitCount} commits, ${repos} repos)`);
+      console.log(
+        `  ${a.name}${id}  <${a.email}>  ${a.org} → ${a.team}  (${a.commitCount} commits, ${repos} repos)`,
+      );
     }
   }
 
@@ -55,5 +57,7 @@ export async function listAuthors(options: ListAuthorsOptions = {}): Promise<voi
     }
   }
 
-  console.log(`\nTotal: ${authors.length} authors (${assigned.length} assigned, ${unassigned.length} unassigned)`);
+  console.log(
+    `\nTotal: ${authors.length} authors (${assigned.length} assigned, ${unassigned.length} unassigned)`,
+  );
 }

@@ -21,7 +21,7 @@
  *     manager for the current host.
  */
 
-import type { PackageManagerType } from "./types.js";
+import type { PackageManagerType } from './types.js';
 
 export interface InstallResult {
   success: boolean;

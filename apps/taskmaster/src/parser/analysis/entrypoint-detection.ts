@@ -1,11 +1,11 @@
-import { readFile } from 'node:fs/promises';
-import { join, basename, dirname, relative } from 'node:path';
 import { existsSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
+import { join, relative } from 'node:path';
 import type {
+  BuildComponent,
+  EnhancedFileAnalysis,
   EntryPoint,
   EntryPointCategory,
-  EnhancedFileAnalysis,
-  BuildComponent,
 } from './types.js';
 
 /**
@@ -103,11 +103,7 @@ const DETECTION_RULES: DetectionRule[] = [
   },
   {
     category: 'callback-webhook',
-    sourcePatterns: [
-      /['"`]\/webhook/i,
-      /['"`]\/callback/i,
-      /['"`]\/hooks?\//i,
-    ],
+    sourcePatterns: [/['"`]\/webhook/i, /['"`]\/callback/i, /['"`]\/hooks?\//i],
     symbolTags: [],
     symbolKinds: [],
     pathPatterns: [/\bwebhooks?\b/i, /\bcallbacks?\b/i],
@@ -153,9 +149,7 @@ function extractHttpMetadata(line: string): Record<string, string> {
  * Extract CLI command name from a matched source line.
  */
 function extractCliMetadata(line: string): Record<string, string> {
-  const match = line.match(
-    /\.command\s*\(\s*['"`]([^'"`]+)['"`]/,
-  );
+  const match = line.match(/\.command\s*\(\s*['"`]([^'"`]+)['"`]/);
   if (match) {
     return { commandName: match[1] };
   }
@@ -183,7 +177,7 @@ function makeEntryPointId(componentId: string, name: string): string {
 export async function detectEntryPointsFromAST(
   rootPath: string,
   enhancedFiles: EnhancedFileAnalysis[],
-  components: BuildComponent[],
+  _components: BuildComponent[],
 ): Promise<EntryPoint[]> {
   const entryPoints: EntryPoint[] = [];
   const seenIds = new Set<string>();
@@ -204,7 +198,7 @@ export async function detectEntryPointsFromAST(
     for (const rule of DETECTION_RULES) {
       // Skip internal-service detection for non-service files (too noisy)
       if (rule.category === 'internal-service') {
-        const pathMatch = rule.pathPatterns.some(p => p.test(file.path));
+        const pathMatch = rule.pathPatterns.some((p) => p.test(file.path));
         if (!pathMatch) continue;
       }
 
@@ -220,9 +214,10 @@ export async function detectEntryPointsFromAST(
 
           if (rule.category === 'http-api') {
             metadata = extractHttpMetadata(line);
-            name = metadata.method && metadata.path
-              ? `${metadata.method} ${metadata.path}`
-              : `HTTP handler at ${file.path}:${lineIdx + 1}`;
+            name =
+              metadata.method && metadata.path
+                ? `${metadata.method} ${metadata.path}`
+                : `HTTP handler at ${file.path}:${lineIdx + 1}`;
           } else if (rule.category === 'cli-command') {
             metadata = extractCliMetadata(line);
             name = metadata.commandName
@@ -230,9 +225,7 @@ export async function detectEntryPointsFromAST(
               : `CLI command at ${file.path}:${lineIdx + 1}`;
           } else if (rule.category === 'callback-webhook') {
             const pathMatch = line.match(/['"`](\/[^'"`]+)['"`]/);
-            name = pathMatch
-              ? `Webhook ${pathMatch[1]}`
-              : `Webhook at ${file.path}:${lineIdx + 1}`;
+            name = pathMatch ? `Webhook ${pathMatch[1]}` : `Webhook at ${file.path}:${lineIdx + 1}`;
             if (pathMatch) metadata.path = pathMatch[1];
           } else if (rule.category === 'event') {
             const eventMatch = line.match(/['"`](\w[\w.:-]*)['"`]/);
@@ -241,7 +234,7 @@ export async function detectEntryPointsFromAST(
               : `Event listener at ${file.path}:${lineIdx + 1}`;
             if (eventMatch) metadata.eventName = eventMatch[1];
           } else if (rule.category === 'job-cron') {
-            const scheduleMatch = line.match(/['"`]([*\/\d\s,-]+)['"`]/);
+            const scheduleMatch = line.match(/['"`]([*/\d\s,-]+)['"`]/);
             name = scheduleMatch
               ? `Cron ${scheduleMatch[1].trim()}`
               : `Scheduled job at ${file.path}:${lineIdx + 1}`;
@@ -277,7 +270,7 @@ export async function detectEntryPointsFromAST(
 
       // Also check symbol tags from enhanced analysis
       for (const sym of file.symbols) {
-        const tagMatch = rule.symbolTags.some(tag => sym.tags.includes(tag));
+        const tagMatch = rule.symbolTags.some((tag) => sym.tags.includes(tag));
         const kindMatch = rule.symbolKinds.includes(sym.kind);
 
         if (!tagMatch && !kindMatch) continue;
@@ -297,7 +290,7 @@ export async function detectEntryPointsFromAST(
           metadata: {},
           detectedBy: 'static',
           confidence: rule.confidence,
-          tags: sym.tags.filter(t => !t.startsWith('kind:') && !t.startsWith('layer:')),
+          tags: sym.tags.filter((t) => !t.startsWith('kind:') && !t.startsWith('layer:')),
         });
       }
     }
@@ -335,7 +328,7 @@ function findNearestSymbol(file: EnhancedFileAnalysis, line: number): string | u
  * Detect entry points from package manifests (package.json bin field, etc.).
  */
 export async function detectEntryPointsFromManifest(
-  rootPath: string,
+  _rootPath: string,
   components: BuildComponent[],
 ): Promise<EntryPoint[]> {
   const entryPoints: EntryPoint[] = [];
@@ -446,7 +439,8 @@ export async function detectFileBasedRoutes(
     if (!existsSync(fullDir)) continue;
 
     // Check for Next.js / SvelteKit conventions
-    const hasConfig = existsSync(join(rootPath, 'next.config.js')) ||
+    const hasConfig =
+      existsSync(join(rootPath, 'next.config.js')) ||
       existsSync(join(rootPath, 'next.config.mjs')) ||
       existsSync(join(rootPath, 'next.config.ts')) ||
       existsSync(join(rootPath, 'svelte.config.js')) ||
@@ -455,8 +449,8 @@ export async function detectFileBasedRoutes(
     if (!hasConfig && dir !== 'src/routes') continue;
 
     // Find the owning component
-    const comp = components.find(c =>
-      fullDir.startsWith(c.rootPath) || c.rootPath === rootPath,
+    const comp = components.find(
+      (c) => fullDir.startsWith(c.rootPath) || c.rootPath === rootPath,
     ) ?? { id: '__root__' };
 
     const relDir = relative(rootPath, fullDir);

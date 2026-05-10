@@ -12,15 +12,11 @@
  * Optional secondary line per item (subtle text).
  */
 
-import { Box } from "../atoms/Box.tsx";
-import { Text } from "../atoms/Text.tsx";
-import { useThemeTokens } from "../theme/hooks.ts";
+import { Box } from '../atoms/Box.tsx';
+import { Text } from '../atoms/Text.tsx';
+import { useThemeTokens } from '../theme/hooks.ts';
 
-export type StatusListItemState =
-  | "connected"
-  | "expired"
-  | "disconnected"
-  | "pending";
+export type StatusListItemState = 'connected' | 'expired' | 'disconnected' | 'pending';
 
 export interface StatusListItem {
   /** Stable id; not displayed but useful as React key. */
@@ -41,10 +37,10 @@ export interface StatusListProps {
 }
 
 const ICON: Record<StatusListItemState, string> = {
-  connected: "✓",
-  expired: "⏳",
-  disconnected: "✗",
-  pending: "·",
+  connected: '✓',
+  expired: '⏳',
+  disconnected: '✗',
+  pending: '·',
 };
 
 export function StatusList({ items, labelWidth = 32, style }: StatusListProps) {
@@ -57,26 +53,16 @@ export function StatusList({ items, labelWidth = 32, style }: StatusListProps) {
   };
 
   return (
-    <Box
-      variant="transparent"
-      style={{ flexDirection: "column", gap: 0, ...style }}
-    >
+    <Box variant="transparent" style={{ flexDirection: 'column', gap: 0, ...style }}>
       {items.map((item) => (
-        <Box
-          key={item.id}
-          variant="transparent"
-          style={{ flexDirection: "column" }}
-        >
-          <Box variant="transparent" style={{ flexDirection: "row", gap: 1 }}>
+        <Box key={item.id} variant="transparent" style={{ flexDirection: 'column' }}>
+          <Box variant="transparent" style={{ flexDirection: 'row', gap: 1 }}>
             <Text color={colorFor[item.state]}>{ICON[item.state]}</Text>
             <Text style={{ minWidth: labelWidth }}>{item.label}</Text>
             {item.badge ? <Text variant="muted">{item.badge}</Text> : null}
           </Box>
           {item.detail ? (
-            <Box
-              variant="transparent"
-              style={{ flexDirection: "row", paddingLeft: 4 }}
-            >
+            <Box variant="transparent" style={{ flexDirection: 'row', paddingLeft: 4 }}>
               <Text variant="subtle">{item.detail}</Text>
             </Box>
           ) : null}

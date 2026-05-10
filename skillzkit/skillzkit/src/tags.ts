@@ -6,9 +6,9 @@
  * install cascade — those remain strictly path-based.
  */
 
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-import type { Catalog } from "./types.js";
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import type { Catalog } from './types.js';
 
 /**
  * Parse the `## Core tags` section of TAGS.md and return the set of
@@ -19,11 +19,11 @@ import type { Catalog } from "./types.js";
  * extension).
  */
 export function loadCoreTags(packageRoot: string): Set<string> {
-  const tagsPath = join(packageRoot, "TAGS.md");
+  const tagsPath = join(packageRoot, 'TAGS.md');
   if (!existsSync(tagsPath)) return new Set();
   let raw: string;
   try {
-    raw = readFileSync(tagsPath, "utf8");
+    raw = readFileSync(tagsPath, 'utf8');
   } catch {
     return new Set();
   }
@@ -50,7 +50,7 @@ export function collectTagCounts(catalog: Catalog): Map<string, number> {
   const counts = new Map<string, number>();
   const bump = (tag: string) => counts.set(tag, (counts.get(tag) ?? 0) + 1);
   for (const cmd of catalog.commands) {
-    if (cmd.kind === "context") continue;
+    if (cmd.kind === 'context') continue;
     for (const tag of cmd.tags ?? []) bump(tag);
   }
   for (const skill of catalog.skills) {

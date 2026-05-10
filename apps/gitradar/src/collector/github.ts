@@ -1,11 +1,11 @@
-import { Octokit } from "octokit";
-import { simpleGit } from "simple-git";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { join } from "node:path";
-import { getCacheDir } from "../store/paths.js";
-import { classifyGitError } from "./git.js";
+import { execFile } from 'node:child_process';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
+import { Octokit } from 'octokit';
+import { simpleGit } from 'simple-git';
+import { getCacheDir } from '../store/paths.js';
+import { classifyGitError } from './git.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -32,13 +32,11 @@ export interface GitHubRemote {
 
 // ── Remote detection (unchanged) ────────────────────────────────────────────
 
-export async function detectGitHubRemote(
-  repoPath: string,
-): Promise<GitHubRemote | null> {
+export async function detectGitHubRemote(repoPath: string): Promise<GitHubRemote | null> {
   const git = simpleGit(repoPath);
   let url: string;
   try {
-    url = (await git.remote(["get-url", "origin"])) ?? "";
+    url = (await git.remote(['get-url', 'origin'])) ?? '';
     url = url.trim();
   } catch (error) {
     const gitErr = classifyGitError(error);
@@ -92,7 +90,7 @@ export async function createOctokit(): Promise<Octokit | null> {
 
   if (!token) {
     try {
-      const { stdout } = await execFileAsync("gh", ["auth", "token"]);
+      const { stdout } = await execFileAsync('gh', ['auth', 'token']);
       token = stdout.trim();
     } catch {
       // gh CLI not available or not authenticated
@@ -133,8 +131,8 @@ export class GitHubRateLimiter {
 
   /** Update rate-limit state from response headers. */
   update(headers: Record<string, string | undefined>): void {
-    const remaining = headers["x-ratelimit-remaining"];
-    const reset = headers["x-ratelimit-reset"];
+    const remaining = headers['x-ratelimit-remaining'];
+    const reset = headers['x-ratelimit-reset'];
 
     if (remaining !== undefined) {
       this.remaining = parseInt(remaining, 10);
@@ -211,8 +209,16 @@ interface GraphQLSearchResult {
 /** Return a zeroed-out GitHubMetrics object. */
 function emptyMetrics(): GitHubMetrics {
   return {
-    prs_opened: 0, prs_merged: 0, avg_cycle_hrs: 0, reviews_given: 0,
-    pr_feature: 0, pr_fix: 0, pr_bugfix: 0, pr_chore: 0, pr_hotfix: 0, pr_other: 0,
+    prs_opened: 0,
+    prs_merged: 0,
+    avg_cycle_hrs: 0,
+    reviews_given: 0,
+    pr_feature: 0,
+    pr_fix: 0,
+    pr_bugfix: 0,
+    pr_chore: 0,
+    pr_hotfix: 0,
+    pr_other: 0,
   };
 }
 
@@ -228,12 +234,18 @@ export type BranchType = 'feature' | 'fix' | 'bugfix' | 'chore' | 'hotfix' | 'ot
 export function classifyBranch(branchName: string): BranchType {
   const prefix = branchName.split('/')[0].toLowerCase();
   switch (prefix) {
-    case 'feature': return 'feature';
-    case 'fix': return 'fix';
-    case 'bugfix': return 'bugfix';
-    case 'chore': return 'chore';
-    case 'hotfix': return 'hotfix';
-    default: return 'other';
+    case 'feature':
+      return 'feature';
+    case 'fix':
+      return 'fix';
+    case 'bugfix':
+      return 'bugfix';
+    case 'chore':
+      return 'chore';
+    case 'hotfix':
+      return 'hotfix';
+    default:
+      return 'other';
   }
 }
 
@@ -283,7 +295,7 @@ function cacheKey(
 async function readCache(key: string): Promise<GitHubMetrics | null> {
   try {
     const cachePath = join(getCacheDir(), key);
-    const raw = await readFile(cachePath, "utf-8");
+    const raw = await readFile(cachePath, 'utf-8');
     return JSON.parse(raw) as GitHubMetrics;
   } catch {
     return null;
@@ -294,7 +306,7 @@ async function writeCache(key: string, data: GitHubMetrics): Promise<void> {
   try {
     const dir = getCacheDir();
     await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, key), JSON.stringify(data), "utf-8");
+    await writeFile(join(dir, key), JSON.stringify(data), 'utf-8');
   } catch {
     // Cache write failure is non-fatal
   }
@@ -392,8 +404,10 @@ export async function fetchGitHubMetricsBatch(options: {
     const variables: Record<string, string> = {};
     for (let i = 0; i < batch.length; i++) {
       const { githubHandle, since, until } = batch[i];
-      variables[`prs${i}`] = `repo:${owner}/${repo} is:pr author:${githubHandle} created:${since}..${until}`;
-      variables[`reviews${i}`] = `repo:${owner}/${repo} is:pr reviewed-by:${githubHandle} updated:${since}..${until}`;
+      variables[`prs${i}`] =
+        `repo:${owner}/${repo} is:pr author:${githubHandle} created:${since}..${until}`;
+      variables[`reviews${i}`] =
+        `repo:${owner}/${repo} is:pr reviewed-by:${githubHandle} updated:${since}..${until}`;
     }
 
     try {
@@ -414,8 +428,15 @@ export async function fetchGitHubMetricsBatch(options: {
         if (prsData.pageInfo.hasNextPage) {
           try {
             const full = await fetchGitHubMetrics({
-              octokit, owner, repo, githubHandle, since, until,
-              rateLimiter, skipCache: true, cacheStats,
+              octokit,
+              owner,
+              repo,
+              githubHandle,
+              since,
+              until,
+              rateLimiter,
+              skipCache: true,
+              cacheStats,
             });
             results.push({ handle: githubHandle, metrics: full });
           } catch {
@@ -428,7 +449,7 @@ export async function fetchGitHubMetricsBatch(options: {
         const branchCounts = countBranchTypes(allPRs);
         const metrics: GitHubMetrics = {
           prs_opened: allPRs.length,
-          prs_merged: allPRs.filter((pr) => pr.state === "MERGED").length,
+          prs_merged: allPRs.filter((pr) => pr.state === 'MERGED').length,
           avg_cycle_hrs: calculateCycleTime(
             allPRs
               .filter((pr) => pr.mergedAt !== null)
@@ -454,11 +475,15 @@ export async function fetchGitHubMetricsBatch(options: {
       for (const entry of batch) {
         try {
           const metrics = await fetchGitHubMetrics({
-            octokit, owner, repo,
+            octokit,
+            owner,
+            repo,
             githubHandle: entry.githubHandle,
             since: entry.since,
             until: entry.until,
-            rateLimiter, skipCache, cacheStats,
+            rateLimiter,
+            skipCache,
+            cacheStats,
           });
           results.push({ handle: entry.githubHandle, metrics });
         } catch (restErr) {
@@ -494,7 +519,8 @@ export async function fetchGitHubMetrics(options: {
   /** Optional counter to track cache hits and misses across calls. */
   cacheStats?: CacheStats;
 }): Promise<GitHubMetrics> {
-  const { octokit, owner, repo, githubHandle, since, until, rateLimiter, skipCache, cacheStats } = options;
+  const { octokit, owner, repo, githubHandle, since, until, rateLimiter, skipCache, cacheStats } =
+    options;
   const empty = emptyMetrics();
 
   // Check cache first
@@ -549,7 +575,7 @@ export async function fetchGitHubMetrics(options: {
     }
 
     result.prs_opened = allPRs.length;
-    result.prs_merged = allPRs.filter((pr) => pr.state === "MERGED").length;
+    result.prs_merged = allPRs.filter((pr) => pr.state === 'MERGED').length;
 
     result.avg_cycle_hrs = calculateCycleTime(
       allPRs
@@ -571,4 +597,3 @@ export async function fetchGitHubMetrics(options: {
 
   return result;
 }
-

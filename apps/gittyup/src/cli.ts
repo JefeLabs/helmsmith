@@ -1,24 +1,24 @@
 import { createCli } from '@ecruz165/cli-kit';
 import chalk from 'chalk';
-import { APP_NAME } from './config/branding.js';
-import { resolveManifestPath } from './config/manifest.js';
 import {
-  registerInit,
-  registerRepo,
+  registerAuth,
+  registerCache,
+  registerCompare,
+  registerConfig,
+  registerConnect,
+  registerFetch,
   registerFind,
   registerGroup,
-  registerStatus,
-  registerFetch,
-  registerCompare,
+  registerInit,
   registerMerge,
   registerPick,
   registerPrs,
-  registerCache,
-  registerAuth,
-  registerConfig,
-  registerConnect,
   registerRebrand,
+  registerRepo,
+  registerStatus,
 } from './commands/index.js';
+import { APP_NAME } from './config/branding.js';
+import { resolveManifestPath } from './config/manifest.js';
 
 // No `auth` wired — gittyup's `src/auth/` handles its own GitHub
 // OAuth/PAT flow inside the auth subcommand. cli-kit's AuthProvider

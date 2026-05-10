@@ -1,9 +1,9 @@
-import { writeFile } from "node:fs/promises";
-import { queryRecords, loadEnrichmentsSQL, getEnrichmentSQL } from "../store/sqlite-store.js";
-import { filterRecords, type Filters } from "../aggregator/filters.js";
-import { calculateSegments, type Segment, type SegmentThresholds } from "../aggregator/segments.js";
-import { testPct } from "../aggregator/metrics.js";
-import type { UserWeekRepoRecord, EnrichmentStore } from "../types/schema.js";
+import { writeFile } from 'node:fs/promises';
+import { type Filters, filterRecords } from '../aggregator/filters.js';
+import { testPct } from '../aggregator/metrics.js';
+import { calculateSegments, type Segment, type SegmentThresholds } from '../aggregator/segments.js';
+import { loadEnrichmentsSQL, queryRecords } from '../store/sqlite-store.js';
+import type { EnrichmentStore, UserWeekRepoRecord } from '../types/schema.js';
 
 export interface ExportDataOptions {
   output?: string;
@@ -12,7 +12,7 @@ export interface ExportDataOptions {
 
 // ── Row flattening ──────────────────────────────────────────────────────────
 
-const FILETYPE_CATEGORIES = ["app", "test", "config", "storybook", "doc"] as const;
+const FILETYPE_CATEGORIES = ['app', 'test', 'config', 'storybook', 'doc'] as const;
 
 /**
  * Column order: identity → dimensions → summary metrics → lines-touched
@@ -23,54 +23,54 @@ const FILETYPE_CATEGORIES = ["app", "test", "config", "storybook", "doc"] as con
  */
 const HEADERS = [
   // Identity
-  "member",
-  "email",
-  "org",
-  "org_type",
-  "team",
-  "tag",
+  'member',
+  'email',
+  'org',
+  'org_type',
+  'team',
+  'tag',
   // Dimensions
-  "week",
-  "repo",
-  "group",
+  'week',
+  'repo',
+  'group',
   // Summary metrics (match TUI columns: +ins, -del, net, tst%, cmts, days)
-  "commits",
-  "active_days",
-  "total_insertions",
-  "total_deletions",
-  "net_lines",
-  "total_files",
-  "test_pct",
+  'commits',
+  'active_days',
+  'total_insertions',
+  'total_deletions',
+  'net_lines',
+  'total_files',
+  'test_pct',
   // Lines touched per filetype (match TUI stacked bars)
-  "app_lines",
-  "test_lines",
-  "config_lines",
-  "storybook_lines",
-  "doc_lines",
+  'app_lines',
+  'test_lines',
+  'config_lines',
+  'storybook_lines',
+  'doc_lines',
   // Detailed per-filetype breakdown
-  "app_files",
-  "app_insertions",
-  "app_deletions",
-  "test_files",
-  "test_insertions",
-  "test_deletions",
-  "config_files",
-  "config_insertions",
-  "config_deletions",
-  "storybook_files",
-  "storybook_insertions",
-  "storybook_deletions",
-  "doc_files",
-  "doc_insertions",
-  "doc_deletions",
+  'app_files',
+  'app_insertions',
+  'app_deletions',
+  'test_files',
+  'test_insertions',
+  'test_deletions',
+  'config_files',
+  'config_insertions',
+  'config_deletions',
+  'storybook_files',
+  'storybook_insertions',
+  'storybook_deletions',
+  'doc_files',
+  'doc_insertions',
+  'doc_deletions',
   // Enrichment metrics (from gitradar enrich)
-  "prs_opened",
-  "prs_merged",
-  "avg_cycle_hrs",
-  "reviews_given",
-  "churn_rate_pct",
+  'prs_opened',
+  'prs_merged',
+  'avg_cycle_hrs',
+  'reviews_given',
+  'churn_rate_pct',
   // Segmentation (computed at export time)
-  "segment",
+  'segment',
 ];
 
 export function flattenRecord(
@@ -122,7 +122,13 @@ export function flattenRecord(
   // Enrichment metrics (default to 0 if not enriched)
   if (enrichmentStore) {
     const key = `${r.member}::${r.week}::${r.repo}`;
-    const defaultMetrics = { prs_opened: 0, prs_merged: 0, avg_cycle_hrs: 0, reviews_given: 0, churn_rate_pct: 0 };
+    const defaultMetrics = {
+      prs_opened: 0,
+      prs_merged: 0,
+      avg_cycle_hrs: 0,
+      reviews_given: 0,
+      churn_rate_pct: 0,
+    };
     const e = enrichmentStore?.enrichments[key] ?? defaultMetrics;
     flat.prs_opened = e.prs_opened;
     flat.prs_merged = e.prs_merged;
@@ -146,28 +152,30 @@ export function flattenRecord(
 
 function escapeCsvField(value: string | number): string {
   const str = String(value);
-  if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
     return `"${str.replace(/"/g, '""')}"`;
   }
   return str;
 }
 
-export function recordsToCsv(records: UserWeekRepoRecord[], enrichmentStore?: EnrichmentStore, segmentThresholds?: SegmentThresholds): string {
+export function recordsToCsv(
+  records: UserWeekRepoRecord[],
+  enrichmentStore?: EnrichmentStore,
+  segmentThresholds?: SegmentThresholds,
+): string {
   // Pre-compute segment map from total lines touched per member across all records
   const memberTotals = new Map<string, number>();
   for (const r of records) {
-    const total = Object.values(r.filetype).reduce(
-      (s, ft) => s + ft.insertions + ft.deletions, 0,
-    );
+    const total = Object.values(r.filetype).reduce((s, ft) => s + ft.insertions + ft.deletions, 0);
     memberTotals.set(r.member, (memberTotals.get(r.member) ?? 0) + total);
   }
   const segmentMap = calculateSegments(memberTotals, segmentThresholds);
 
   const rows = records.map((r) => {
     const flat = flattenRecord(r, enrichmentStore, segmentMap);
-    return HEADERS.map((h) => escapeCsvField(flat[h])).join(",");
+    return HEADERS.map((h) => escapeCsvField(flat[h])).join(',');
   });
-  return [HEADERS.join(","), ...rows].join("\n") + "\n";
+  return `${[HEADERS.join(','), ...rows].join('\n')}\n`;
 }
 
 export async function exportData(options: ExportDataOptions): Promise<void> {
@@ -187,7 +195,7 @@ export async function exportData(options: ExportDataOptions): Promise<void> {
   const csv = recordsToCsv(records, enrichmentStore);
 
   if (options.output) {
-    await writeFile(options.output, csv, "utf-8");
+    await writeFile(options.output, csv, 'utf-8');
     console.log(`Exported ${records.length} records to ${options.output}`);
   } else {
     process.stdout.write(csv);

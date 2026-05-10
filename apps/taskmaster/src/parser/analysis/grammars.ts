@@ -1,10 +1,18 @@
-import { extname } from 'node:path';
 import { createRequire } from 'node:module';
+import { extname } from 'node:path';
 
 /**
  * Supported languages for tree-sitter source analysis.
  */
-export type SupportedLanguage = 'typescript' | 'tsx' | 'javascript' | 'go' | 'rust' | 'java' | 'csharp' | 'bash';
+export type SupportedLanguage =
+  | 'typescript'
+  | 'tsx'
+  | 'javascript'
+  | 'go'
+  | 'rust'
+  | 'java'
+  | 'csharp'
+  | 'bash';
 
 const EXTENSION_MAP: Record<string, SupportedLanguage> = {
   '.ts': 'typescript',

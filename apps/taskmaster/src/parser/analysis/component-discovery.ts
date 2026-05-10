@@ -1,11 +1,9 @@
-import { readdir, readFile, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { join, basename, relative } from 'node:path';
+import { readdir, readFile, stat } from 'node:fs/promises';
+import { basename, join } from 'node:path';
 import type { BuildComponent, EnhancedSourceSymbol } from './types.js';
 
-const IGNORED_DIRS = new Set([
-  'node_modules', '.git', 'dist', 'build', 'target', 'vendor',
-]);
+const IGNORED_DIRS = new Set(['node_modules', '.git', 'dist', 'build', 'target', 'vendor']);
 
 // --- Language detection by file extension ---
 
@@ -39,15 +37,15 @@ const EXTENSION_TO_LANGUAGE: Record<string, string> = {
 // --- Framework detection map ---
 
 const FRAMEWORK_MAP: Record<string, string> = {
-  'express': 'framework:express',
-  'fastify': 'framework:fastify',
+  express: 'framework:express',
+  fastify: 'framework:fastify',
   '@nestjs/core': 'framework:nestjs',
-  'react': 'framework:react',
-  'vue': 'framework:vue',
-  'next': 'framework:next',
-  'nuxt': 'framework:nuxt',
+  react: 'framework:react',
+  vue: 'framework:vue',
+  next: 'framework:next',
+  nuxt: 'framework:nuxt',
   '@angular/core': 'framework:angular',
-  'hono': 'framework:hono',
+  hono: 'framework:hono',
 };
 
 // --- Helper: convert name to kebab-case ---
@@ -68,6 +66,7 @@ async function detectLanguages(dirPath: string): Promise<string[]> {
 
   async function walk(currentPath: string, depth: number): Promise<void> {
     if (depth > 4) return;
+    // biome-ignore lint/suspicious/noImplicitAnyLet: assigned in try/catch below
     let entries;
     try {
       entries = await readdir(currentPath, { withFileTypes: true });
@@ -116,9 +115,19 @@ async function findEntrypoints(rootPath: string, pkg?: Record<string, unknown>):
   // Detect common entrypoint patterns when no manifest entrypoints found
   if (entrypoints.length === 0) {
     const candidates = [
-      'src/index.ts', 'src/index.js', 'src/main.ts', 'src/main.js',
-      'src/app.ts', 'src/app.js', 'index.ts', 'index.js',
-      'lib/index.ts', 'lib/index.js', 'main.go', 'src/main.rs', 'src/lib.rs',
+      'src/index.ts',
+      'src/index.js',
+      'src/main.ts',
+      'src/main.js',
+      'src/app.ts',
+      'src/app.js',
+      'index.ts',
+      'index.js',
+      'lib/index.ts',
+      'lib/index.js',
+      'main.go',
+      'src/main.rs',
+      'src/lib.rs',
     ];
     for (const candidate of candidates) {
       if (existsSync(join(rootPath, candidate))) {
@@ -245,7 +254,7 @@ async function buildNodeComponent(
   dirPath: string,
   pkg: Record<string, unknown>,
 ): Promise<BuildComponent> {
-  const name = (typeof pkg.name === 'string' ? pkg.name : basename(dirPath));
+  const name = typeof pkg.name === 'string' ? pkg.name : basename(dirPath);
   const id = toKebabCase(name);
 
   const commands = extractNpmCommands(pkg);
@@ -312,7 +321,7 @@ async function buildGoComponent(dirPath: string): Promise<BuildComponent> {
     `component:${id}`,
     'build:go',
     'runtime:go',
-    ...languageSet.map(l => `lang:${l}`),
+    ...languageSet.map((l) => `lang:${l}`),
   ];
 
   return {
@@ -332,7 +341,7 @@ async function buildGoComponent(dirPath: string): Promise<BuildComponent> {
  * Build a BuildComponent from a Cargo.toml file at the given directory.
  */
 async function buildRustComponent(dirPath: string): Promise<BuildComponent> {
-  const id = toKebabCase(basename(dirPath));
+  const _id = toKebabCase(basename(dirPath));
   let name = basename(dirPath);
 
   // Try to extract package name from Cargo.toml
@@ -358,7 +367,7 @@ async function buildRustComponent(dirPath: string): Promise<BuildComponent> {
     `component:${toKebabCase(name)}`,
     'build:cargo',
     'runtime:rust',
-    ...languageSet.map(l => `lang:${l}`),
+    ...languageSet.map((l) => `lang:${l}`),
   ];
 
   return {
@@ -377,10 +386,7 @@ async function buildRustComponent(dirPath: string): Promise<BuildComponent> {
 /**
  * Build a BuildComponent from a JVM manifest (pom.xml, build.gradle, etc.).
  */
-async function buildJvmComponent(
-  dirPath: string,
-  manifestName: string,
-): Promise<BuildComponent> {
+async function buildJvmComponent(dirPath: string, manifestName: string): Promise<BuildComponent> {
   const id = toKebabCase(basename(dirPath));
   const name = basename(dirPath);
   const languageSet = await detectLanguages(dirPath);
@@ -395,7 +401,7 @@ async function buildJvmComponent(
     `component:${id}`,
     `build:${buildTool}`,
     `runtime:${runtime}`,
-    ...languageSet.map(l => `lang:${l}`),
+    ...languageSet.map((l) => `lang:${l}`),
   ];
 
   const howToBuild = isGradle ? './gradlew build' : 'mvn package';
@@ -432,7 +438,7 @@ async function buildDotnetComponent(
     `component:${id}`,
     'build:dotnet',
     'runtime:dotnet',
-    ...languageSet.map(l => `lang:${l}`),
+    ...languageSet.map((l) => `lang:${l}`),
   ];
 
   return {
@@ -477,7 +483,7 @@ async function buildScriptComponent(
   const tags: string[] = [
     `component:${id}`,
     `build:${buildTool}`,
-    ...languageSet.map(l => `lang:${l}`),
+    ...languageSet.map((l) => `lang:${l}`),
   ];
 
   return {
@@ -502,16 +508,13 @@ function hasSourceDir(rootPath: string): boolean {
 /**
  * Resolve Cargo workspace members from a Cargo.toml `[workspace]` section.
  */
-async function resolveCargoWorkspaces(
-  cargoContent: string,
-  rootPath: string,
-): Promise<string[]> {
+async function resolveCargoWorkspaces(cargoContent: string, rootPath: string): Promise<string[]> {
   // Simple extraction of members from [workspace] section
   const membersMatch = cargoContent.match(/\[workspace\][\s\S]*?members\s*=\s*\[([\s\S]*?)\]/);
   if (!membersMatch) return [];
 
   const membersStr = membersMatch[1];
-  const patterns = [...membersStr.matchAll(/"([^"]+)"/g)].map(m => m[1]);
+  const patterns = [...membersStr.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
 
   const resolved: string[] = [];
   for (const pattern of patterns) {
@@ -547,10 +550,7 @@ async function resolveCargoWorkspaces(
 /**
  * Resolve Go workspace directories from a go.work file.
  */
-async function resolveGoWorkspaces(
-  goWorkContent: string,
-  rootPath: string,
-): Promise<string[]> {
+async function resolveGoWorkspaces(goWorkContent: string, rootPath: string): Promise<string[]> {
   const resolved: string[] = [];
   const useMatch = goWorkContent.match(/use\s*\(([\s\S]*?)\)/);
   if (useMatch) {
@@ -693,7 +693,7 @@ export async function discoverComponents(rootPath: string): Promise<BuildCompone
     const manifestPath = join(rootPath, manifestName);
     if (existsSync(manifestPath)) {
       // Only create a script component if no other component was found for this root
-      const hasComponentAtRoot = components.some(c => c.rootPath === rootPath);
+      const hasComponentAtRoot = components.some((c) => c.rootPath === rootPath);
       if (!hasComponentAtRoot) {
         components.push(await buildScriptComponent(rootPath, manifestName));
         break;

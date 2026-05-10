@@ -1,5 +1,5 @@
-import type { Command } from 'commander';
 import chalk from 'chalk';
+import type { Command } from 'commander';
 import { CliCache } from '../core/index.js';
 
 export function registerCache(program: Command): void {

@@ -30,11 +30,11 @@
  * override the auto-assigned 1-9 via `MenuItem.hotkey`.
  */
 
-import { useState, type ReactNode } from "react";
-import { Box } from "../atoms/Box.tsx";
-import { Text } from "../atoms/Text.tsx";
-import { Panel } from "../molecules/Panel.tsx";
-import { useKeybinding } from "../keyboard/registry.tsx";
+import { type ReactNode, useState } from 'react';
+import { Box } from '../atoms/Box.tsx';
+import { Text } from '../atoms/Text.tsx';
+import { useKeybinding } from '../keyboard/registry.tsx';
+import { Panel } from '../molecules/Panel.tsx';
 
 export interface MenuItem {
   /** Stable id (React key). */
@@ -61,7 +61,7 @@ export interface MenuProps {
   onSelect?: (path: MenuItem[]) => void;
   /** "stacked" shows every visited level; "single" shows breadcrumb
    *  + only the deepest level. Default: "stacked". */
-  layout?: "stacked" | "single";
+  layout?: 'stacked' | 'single';
   /** Key name that pops one level. Default: "escape". Set to null to
    *  disable. */
   exitKey?: string | null;
@@ -89,7 +89,7 @@ const MENU_BREAKPOINT = 9; // hotkeys 1-9 only
 function hotkeyFor(item: MenuItem, idx: number): string {
   if (item.hotkey) return item.hotkey;
   if (idx < MENU_BREAKPOINT) return String(idx + 1);
-  return "";
+  return '';
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -113,28 +113,28 @@ function MenuRow({
     <Box
       variant="transparent"
       style={{
-        flexDirection: "row",
+        flexDirection: 'row',
         gap: 1,
         paddingLeft: indent,
       }}
     >
       {level.items.map((item, i) => {
         const isCursor = active && i === level.idx;
-        const hk = showHotkeys ? hotkeyFor(item, i) : "";
+        const hk = showHotkeys ? hotkeyFor(item, i) : '';
         const drillsIn = Boolean(item.submenu && item.submenu.length > 0);
         return (
           <Box
             key={item.id}
-            variant={isCursor ? "panel" : "transparent"}
+            variant={isCursor ? 'panel' : 'transparent'}
             padding="xs"
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             {...({ onPress: () => onItemClick?.(i) } as any)}
           >
-            <Text variant={isCursor ? "accent" : active ? "body" : "muted"}>
-              {hk ? `[${hk}] ` : ""}
+            <Text variant={isCursor ? 'accent' : active ? 'body' : 'muted'}>
+              {hk ? `[${hk}] ` : ''}
               {item.label}
-              {drillsIn ? " ›" : ""}
-              {item.badge ? ` (${item.badge})` : ""}
+              {drillsIn ? ' ›' : ''}
+              {item.badge ? ` (${item.badge})` : ''}
             </Text>
           </Box>
         );
@@ -147,16 +147,10 @@ function MenuRow({
 // Breadcrumb — for "single" layout
 // ────────────────────────────────────────────────────────────────────
 
-function Breadcrumb({
-  path,
-  separator,
-}: {
-  path: MenuItem[];
-  separator: string;
-}) {
+function Breadcrumb({ path, separator }: { path: MenuItem[]; separator: string }) {
   if (path.length === 0) return null;
   return (
-    <Box variant="transparent" style={{ flexDirection: "row", paddingLeft: 1 }}>
+    <Box variant="transparent" style={{ flexDirection: 'row', paddingLeft: 1 }}>
       <Text variant="subtle">
         {path.map((p) => p.label).join(separator)}
         {separator}
@@ -173,17 +167,15 @@ export function Menu({
   items,
   onChange,
   onSelect,
-  layout = "stacked",
-  exitKey = "escape",
+  layout = 'stacked',
+  exitKey = 'escape',
   showHotkeys = true,
-  breadcrumbSeparator = " › ",
+  breadcrumbSeparator = ' › ',
   title,
   footer,
 }: MenuProps) {
   // Stack of active levels. `levels[0]` is the root.
-  const [levels, setLevels] = useState<Level[]>(() => [
-    { parent: null, items, idx: 0 },
-  ]);
+  const [levels, setLevels] = useState<Level[]>(() => [{ parent: null, items, idx: 0 }]);
 
   const deepest = levels[levels.length - 1]!;
   const path: MenuItem[] = levels
@@ -211,10 +203,7 @@ export function Menu({
     const item = deepest.items[deepest.idx];
     if (!item) return;
     if (item.submenu && item.submenu.length > 0) {
-      const next = [
-        ...levels,
-        { parent: item, items: item.submenu, idx: 0 },
-      ];
+      const next = [...levels, { parent: item, items: item.submenu, idx: 0 }];
       setLevels(next);
       fireChange(next);
     } else {
@@ -233,81 +222,72 @@ export function Menu({
 
   // ── Keybindings ────────────────────────────────────────────────────
 
-  // Number hotkeys 1-9 → set cursor at current level
-  for (let i = 0; i < MENU_BREAKPOINT; i++) {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    useKeybinding(
-      String(i + 1),
-      `select`,
-      () => {
-        if (i < deepest.items.length) setCursor(i);
-      },
-      { hidden: true },
-    );
-  }
+  // Single binding for digit hotkeys 1-9. Routes to the cursor index
+  // matching the pressed key, scoped to the current (deepest) level.
+  useKeybinding(
+    (k) => Boolean(k.name && /^[1-9]$/.test(k.name)),
+    'select 1-9',
+    (key) => {
+      const i = Number(key.name) - 1;
+      if (i >= 0 && i < deepest.items.length) setCursor(i);
+    },
+    { hidden: true },
+  );
 
-  // Custom hotkey overrides (user-set per-item)
-  for (const item of deepest.items) {
-    if (item.hotkey && /^[a-z]$/i.test(item.hotkey)) {
-      // eslint-disable-next-line react-hooks/rules-of-hooks
-      useKeybinding(
-        item.hotkey,
-        item.label,
-        () => {
-          const idx = deepest.items.indexOf(item);
-          if (idx >= 0) setCursor(idx);
-        },
-        { hidden: true },
+  // Single binding for letter hotkeys. Looks up the current level's
+  // items by their `hotkey` field and routes accordingly.
+  useKeybinding(
+    (k) => Boolean(k.name && /^[a-z]$/.test(k.name)),
+    'custom hotkey',
+    (key) => {
+      const idx = deepest.items.findIndex(
+        (it) => it.hotkey?.toLowerCase() === key.name?.toLowerCase(),
       );
-    }
-  }
+      if (idx >= 0) setCursor(idx);
+    },
+    { hidden: true },
+  );
 
   useKeybinding(
-    "tab",
-    "next",
+    'tab',
+    'next',
     () => {
       if (deepest.items.length === 0) return;
       const next = (deepest.idx + 1) % deepest.items.length;
       setCursor(next);
     },
-    { keyDisplay: "⇥" },
+    { keyDisplay: '⇥' },
   );
 
   useKeybinding(
-    (k) => k.shift === true && k.name === "tab",
-    "prev",
+    (k) => k.shift === true && k.name === 'tab',
+    'prev',
     () => {
       if (deepest.items.length === 0) return;
-      const prev =
-        (deepest.idx - 1 + deepest.items.length) % deepest.items.length;
+      const prev = (deepest.idx - 1 + deepest.items.length) % deepest.items.length;
       setCursor(prev);
     },
-    { keyDisplay: "⇧⇥" },
+    { keyDisplay: '⇧⇥' },
   );
 
-  useKeybinding(
-    (k) => k.name === "return" || k.name === "enter",
-    "select / drill",
-    drill,
-    { keyDisplay: "↵" },
-  );
+  useKeybinding((k) => k.name === 'return' || k.name === 'enter', 'select / drill', drill, {
+    keyDisplay: '↵',
+  });
 
-  useKeybinding(
-    exitKey ?? "escape",
-    "back",
-    exit,
-    { hidden: levels.length <= 1 || exitKey === null, keyDisplay: "esc" },
-  );
+  useKeybinding(exitKey ?? 'escape', 'back', exit, {
+    hidden: levels.length <= 1 || exitKey === null,
+    keyDisplay: 'esc',
+  });
 
   // ── Render ─────────────────────────────────────────────────────────
 
   let content: ReactNode;
-  if (layout === "stacked") {
+  if (layout === 'stacked') {
     content = (
-      <Box variant="transparent" style={{ flexDirection: "column", gap: 0 }}>
+      <Box variant="transparent" style={{ flexDirection: 'column', gap: 0 }}>
         {levels.map((level, i) => (
           <MenuRow
-            key={i}
+            key={level.parent ? level.parent.id : '__root__'}
             level={level}
             active={i === levels.length - 1}
             showHotkeys={showHotkeys}
@@ -320,7 +300,7 @@ export function Menu({
   } else {
     // single layout
     content = (
-      <Box variant="transparent" style={{ flexDirection: "column", gap: 0 }}>
+      <Box variant="transparent" style={{ flexDirection: 'column', gap: 0 }}>
         <Breadcrumb path={path} separator={breadcrumbSeparator} />
         <MenuRow
           level={deepest}
@@ -334,7 +314,7 @@ export function Menu({
   }
 
   const body = (
-    <Box variant="transparent" style={{ flexDirection: "column", gap: 1 }}>
+    <Box variant="transparent" style={{ flexDirection: 'column', gap: 1 }}>
       {content}
       {footer ?? null}
     </Box>

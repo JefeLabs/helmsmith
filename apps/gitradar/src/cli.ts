@@ -1,14 +1,11 @@
-import { createCli } from '@ecruz165/cli-kit';
-import path from 'node:path';
 import { homedir } from 'node:os';
-import { detectGitRoot } from './config/git-root.js';
-import {
-  loadAllRegistries,
-  getAvailableWorkspaces,
-} from './config/repos-registry.js';
-import { getConfigPath, getDataDir } from './store/paths.js';
-import { runMain } from './commands/run-main.js';
+import path from 'node:path';
+import { createCli } from '@ecruz165/cli-kit';
 import { runConnect } from './commands/connect.js';
+import { runMain } from './commands/run-main.js';
+import { detectGitRoot } from './config/git-root.js';
+import { getAvailableWorkspaces, loadAllRegistries } from './config/repos-registry.js';
+import { getConfigPath, getDataDir } from './store/paths.js';
 
 // gitradar is read-only analytics with a TUI — no auth needed.
 // noopAuthProvider stays as the default; commands never call getToken.
@@ -119,53 +116,64 @@ program
   .option('-w, --weeks <n>', 'Weeks of history', parseInt)
   .option('--skip-enrich', 'Skip enrichment after scan')
   .option('--watch [interval]', 'Re-scan periodically (interval in minutes, default: 30)')
-  .action(async (cmdOpts: { workspace?: string; forceScan?: boolean; staleness?: number; weeks?: number; skipEnrich?: boolean; watch?: string | boolean }) => {
-    const g = globals();
-    const runOpts = {
-      ...g,
-      workspace: cmdOpts.workspace ?? g.workspace,
-      forceScan: cmdOpts.forceScan ?? g.forceScan,
-      staleness: cmdOpts.staleness ?? g.staleness,
-      weeks: cmdOpts.weeks ?? g.weeks,
-      skipEnrich: cmdOpts.skipEnrich,
-      scanOnly: true,
-    };
+  .action(
+    async (cmdOpts: {
+      workspace?: string;
+      forceScan?: boolean;
+      staleness?: number;
+      weeks?: number;
+      skipEnrich?: boolean;
+      watch?: string | boolean;
+    }) => {
+      const g = globals();
+      const runOpts = {
+        ...g,
+        workspace: cmdOpts.workspace ?? g.workspace,
+        forceScan: cmdOpts.forceScan ?? g.forceScan,
+        staleness: cmdOpts.staleness ?? g.staleness,
+        weeks: cmdOpts.weeks ?? g.weeks,
+        skipEnrich: cmdOpts.skipEnrich,
+        scanOnly: true,
+      };
 
-    if (cmdOpts.watch !== undefined) {
-      const intervalMin = typeof cmdOpts.watch === 'string' ? parseInt(cmdOpts.watch, 10) : 30;
-      if (isNaN(intervalMin) || intervalMin < 1) {
-        console.error('Error: --watch interval must be a positive integer (minutes).');
-        process.exitCode = 1;
-        return;
+      if (cmdOpts.watch !== undefined) {
+        const intervalMin = typeof cmdOpts.watch === 'string' ? parseInt(cmdOpts.watch, 10) : 30;
+        if (Number.isNaN(intervalMin) || intervalMin < 1) {
+          console.error('Error: --watch interval must be a positive integer (minutes).');
+          process.exitCode = 1;
+          return;
+        }
+        const intervalMs = intervalMin * 60 * 1000;
+        console.log(
+          `Background scan mode: scanning every ${Math.round(intervalMs / 60000)} minutes. Press Ctrl+C to stop.`,
+        );
+
+        const scan = async () => {
+          const timestamp = new Date().toLocaleTimeString();
+          console.log(`\n[${timestamp}] Scanning...`);
+          try {
+            await runMain(runOpts);
+          } catch (err) {
+            console.error(`  Scan error: ${err instanceof Error ? err.message : err}`);
+          }
+        };
+
+        await scan();
+        const loop = async () => {
+          while (true) {
+            await new Promise((r) => setTimeout(r, intervalMs));
+            await scan();
+          }
+        };
+        loop().catch((err) => {
+          console.error('Watch loop crashed:', err instanceof Error ? err.message : err);
+          process.exitCode = 1;
+        });
+      } else {
+        await runMain(runOpts);
       }
-      const intervalMs = intervalMin * 60 * 1000;
-      console.log(`Background scan mode: scanning every ${Math.round(intervalMs / 60000)} minutes. Press Ctrl+C to stop.`);
-
-      const scan = async () => {
-        const timestamp = new Date().toLocaleTimeString();
-        console.log(`\n[${timestamp}] Scanning...`);
-        try {
-          await runMain(runOpts);
-        } catch (err) {
-          console.error(`  Scan error: ${err instanceof Error ? err.message : err}`);
-        }
-      };
-
-      await scan();
-      const loop = async () => {
-        while (true) {
-          await new Promise(r => setTimeout(r, intervalMs));
-          await scan();
-        }
-      };
-      loop().catch(err => {
-        console.error('Watch loop crashed:', err instanceof Error ? err.message : err);
-        process.exitCode = 1;
-      });
-    } else {
-      await runMain(runOpts);
-    }
-  });
+    },
+  );
 
 // ── gitradar workspace ───────────────────────────────────────────────────────
 
@@ -209,12 +217,18 @@ workspace
     }
 
     if (globals().json) {
-      console.log(JSON.stringify(workspaces.map((w) => ({
-        name: w.name,
-        label: w.label,
-        repos: w.repos.length,
-        source: w.source.path,
-      })), null, 2));
+      console.log(
+        JSON.stringify(
+          workspaces.map((w) => ({
+            name: w.name,
+            label: w.label,
+            repos: w.repos.length,
+            source: w.source.path,
+          })),
+          null,
+          2,
+        ),
+      );
       return;
     }
 
@@ -242,10 +256,17 @@ repo
   .option('--workspace <name>', 'Select workspace by name')
   .option('--group <name>', 'Group name for discovered repos', 'default')
   .option('--depth <n>', 'Directory scan depth (1-3)', parseInt)
-  .action(async (dirPath: string, cmdOpts: { workspace?: string; group: string; depth?: number }) => {
-    const { addRepos } = await import('./commands/manage-repos.js');
-    await addRepos({ path: dirPath, group: cmdOpts.group, depth: cmdOpts.depth, workspace: cmdOpts.workspace ?? globals().workspace });
-  });
+  .action(
+    async (dirPath: string, cmdOpts: { workspace?: string; group: string; depth?: number }) => {
+      const { addRepos } = await import('./commands/manage-repos.js');
+      await addRepos({
+        path: dirPath,
+        group: cmdOpts.group,
+        depth: cmdOpts.depth,
+        workspace: cmdOpts.workspace ?? globals().workspace,
+      });
+    },
+  );
 
 repo
   .command('remove <name>')
@@ -276,15 +297,23 @@ org
   .option('--identifier <prefix>', 'Identifier prefix for auto-matching')
   .requiredOption('--team <name>', 'Initial team name')
   .option('--tag <tag>', 'Team tag (default: "default")')
-  .action(async (cmdOpts: { name: string; type: string; identifier?: string; team: string; tag?: string }) => {
-    if (cmdOpts.type !== 'core' && cmdOpts.type !== 'consultant') {
-      console.error('--type must be "core" or "consultant"');
-      process.exitCode = 1;
-      return;
-    }
-    const { addOrg } = await import('./commands/add-org.js');
-    await addOrg({ ...cmdOpts, type: cmdOpts.type, config: globals().config });
-  });
+  .action(
+    async (cmdOpts: {
+      name: string;
+      type: string;
+      identifier?: string;
+      team: string;
+      tag?: string;
+    }) => {
+      if (cmdOpts.type !== 'core' && cmdOpts.type !== 'consultant') {
+        console.error('--type must be "core" or "consultant"');
+        process.exitCode = 1;
+        return;
+      }
+      const { addOrg } = await import('./commands/add-org.js');
+      await addOrg({ ...cmdOpts, type: cmdOpts.type, config: globals().config });
+    },
+  );
 
 org
   .command('add-team')
@@ -294,7 +323,12 @@ org
   .option('--tag <tag>', 'Team tag (default: "default")')
   .action(async (cmdOpts: { name: string; team: string; tag?: string }) => {
     const { addTeamToOrg } = await import('./commands/add-org.js');
-    await addTeamToOrg({ org: cmdOpts.name, team: cmdOpts.team, tag: cmdOpts.tag, config: globals().config });
+    await addTeamToOrg({
+      org: cmdOpts.name,
+      team: cmdOpts.team,
+      tag: cmdOpts.tag,
+      config: globals().config,
+    });
   });
 
 // ── gitradar author ──────────────────────────────────────────────────────────
@@ -318,7 +352,12 @@ author
   .requiredOption('--team <name>', 'Team name')
   .action(async (email: string, cmdOpts: { org: string; team: string }) => {
     const { assignAuthorCmd } = await import('./commands/assign-author.js');
-    await assignAuthorCmd({ email, org: cmdOpts.org, team: cmdOpts.team, config: globals().config });
+    await assignAuthorCmd({
+      email,
+      org: cmdOpts.org,
+      team: cmdOpts.team,
+      config: globals().config,
+    });
   });
 
 author
@@ -329,7 +368,12 @@ author
   .requiredOption('--team <name>', 'Team name')
   .action(async (cmdOpts: { prefix: string; org: string; team: string }) => {
     const { bulkAssignCmd } = await import('./commands/assign-author.js');
-    await bulkAssignCmd({ prefix: cmdOpts.prefix, org: cmdOpts.org, team: cmdOpts.team, config: globals().config });
+    await bulkAssignCmd({
+      prefix: cmdOpts.prefix,
+      org: cmdOpts.org,
+      team: cmdOpts.team,
+      config: globals().config,
+    });
   });
 
 // ── gitradar view ────────────────────────────────────────────────────────────
@@ -424,7 +468,6 @@ data
     await importWorkspace(file);
   });
 
-
 // ── gitradar enrich ──────────────────────────────────────────────────────
 
 program
@@ -438,20 +481,31 @@ program
   .option('--concurrency <n>', 'Max concurrent GitHub API requests (default: 5)', parseInt)
   .option('--skip-cache', 'Bypass local GitHub API response cache (force fresh fetch)')
   .option('--workspace <name>', 'Workspace to use for repo paths')
-  .action(async (cmdOpts: { weeks?: number; repo?: string; force?: boolean; skipChurn?: boolean; deepChurn?: boolean; concurrency?: number; skipCache?: boolean; workspace?: string }) => {
-    const { enrich: enrichCmd } = await import('./commands/enrich.js');
-    await enrichCmd({
-      weeks: cmdOpts.weeks,
-      repo: cmdOpts.repo,
-      force: cmdOpts.force,
-      skipChurn: cmdOpts.skipChurn,
-      deepChurn: cmdOpts.deepChurn,
-      concurrency: cmdOpts.concurrency,
-      skipCache: cmdOpts.skipCache,
-      config: globals().config,
-      workspace: cmdOpts.workspace,
-    });
-  });
+  .action(
+    async (cmdOpts: {
+      weeks?: number;
+      repo?: string;
+      force?: boolean;
+      skipChurn?: boolean;
+      deepChurn?: boolean;
+      concurrency?: number;
+      skipCache?: boolean;
+      workspace?: string;
+    }) => {
+      const { enrich: enrichCmd } = await import('./commands/enrich.js');
+      await enrichCmd({
+        weeks: cmdOpts.weeks,
+        repo: cmdOpts.repo,
+        force: cmdOpts.force,
+        skipChurn: cmdOpts.skipChurn,
+        deepChurn: cmdOpts.deepChurn,
+        concurrency: cmdOpts.concurrency,
+        skipCache: cmdOpts.skipCache,
+        config: globals().config,
+        workspace: cmdOpts.workspace,
+      });
+    },
+  );
 
 // ── Default action (no subcommand → TUI) ────────────────────────────────────
 

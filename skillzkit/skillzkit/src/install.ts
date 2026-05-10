@@ -26,16 +26,10 @@
  *                   installed via the always-copy-all-skills loop.
  */
 
-import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
-import { dirname, join } from "node:path";
-import { getInterfaces } from "./interfaces.js";
-import type { Catalog } from "./types.js";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { getInterfaces } from './interfaces.js';
+import type { Catalog } from './types.js';
 
 export interface InstallOptions {
   /** Overwrite existing files in the target. Off by default. */
@@ -61,10 +55,10 @@ export function installSlugs(
   options: InstallOptions = {},
 ): InstallResult {
   const force = options.force ?? false;
-  const sourceCommands = join(packageRoot, ".claude", "commands");
-  const sourceSkills = join(packageRoot, ".claude", "skills");
-  const targetCommands = join(targetDir, ".claude", "commands");
-  const targetSkills = join(targetDir, ".claude", "skills");
+  const sourceCommands = join(packageRoot, '.claude', 'commands');
+  const sourceSkills = join(packageRoot, '.claude', 'skills');
+  const targetCommands = join(targetDir, '.claude', 'commands');
+  const targetSkills = join(targetDir, '.claude', 'skills');
 
   let installedFiles = 0;
   let skippedExisting = 0;
@@ -73,21 +67,17 @@ export function installSlugs(
   // 1. Always-install infrastructure.
   const infra = catalog.commands.filter(
     (c) =>
-      c.slug.startsWith("core:audit") ||
-      c.slug.startsWith("core:workflows") ||
-      c.slug === "_context" ||
-      c.slug === "core:_context",
+      c.slug.startsWith('core:audit') ||
+      c.slug.startsWith('core:workflows') ||
+      c.slug === '_context' ||
+      c.slug === 'core:_context',
   );
   for (const cmd of infra) {
-    const result = copyFile(
-      join(sourceCommands, cmd.path),
-      join(targetCommands, cmd.path),
-      force,
-    );
-    if (result === "written") {
+    const result = copyFile(join(sourceCommands, cmd.path), join(targetCommands, cmd.path), force);
+    if (result === 'written') {
       installedFiles++;
       alwaysInstalledCount++;
-    } else if (result === "skipped") {
+    } else if (result === 'skipped') {
       skippedExisting++;
     }
   }
@@ -97,24 +87,16 @@ export function installSlugs(
   for (const slug of selectedSlugs) {
     const cmd = catalog.commands.find((c) => c.slug === slug);
     if (!cmd) continue;
-    const result = copyFile(
-      join(sourceCommands, cmd.path),
-      join(targetCommands, cmd.path),
-      force,
-    );
-    if (result === "written") installedFiles++;
-    else if (result === "skipped") skippedExisting++;
+    const result = copyFile(join(sourceCommands, cmd.path), join(targetCommands, cmd.path), force);
+    if (result === 'written') installedFiles++;
+    else if (result === 'skipped') skippedExisting++;
   }
 
   // 3. All skills, always.
   for (const skill of catalog.skills) {
-    const result = copyFile(
-      join(sourceSkills, skill.path),
-      join(targetSkills, skill.path),
-      force,
-    );
-    if (result === "written") installedFiles++;
-    else if (result === "skipped") skippedExisting++;
+    const result = copyFile(join(sourceSkills, skill.path), join(targetSkills, skill.path), force);
+    if (result === 'written') installedFiles++;
+    else if (result === 'skipped') skippedExisting++;
   }
 
   // 4. Runtime manifests for picked tools/integrations.
@@ -128,16 +110,12 @@ export function installSlugs(
   };
 }
 
-function copyFile(
-  src: string,
-  dest: string,
-  force: boolean,
-): "written" | "skipped" | "missing" {
-  if (!existsSync(src)) return "missing";
-  if (existsSync(dest) && !force) return "skipped";
+function copyFile(src: string, dest: string, force: boolean): 'written' | 'skipped' | 'missing' {
+  if (!existsSync(src)) return 'missing';
+  if (existsSync(dest) && !force) return 'skipped';
   mkdirSync(dirname(dest), { recursive: true });
   copyFileSync(src, dest);
-  return "written";
+  return 'written';
 }
 
 interface IntegrationManifestEntry {
@@ -167,22 +145,18 @@ interface ToolManifest {
  * install. Never writes credentials — the user runs
  * /core:integrations:setup or /core:tools:setup later.
  */
-function writeRuntimeManifests(
-  picked: Set<string>,
-  targetDir: string,
-  force: boolean,
-): void {
-  const productDir = join(targetDir, "product");
+function writeRuntimeManifests(picked: Set<string>, targetDir: string, force: boolean): void {
+  const productDir = join(targetDir, 'product');
   mkdirSync(productDir, { recursive: true });
 
-  const integrationsPath = join(productDir, ".pencil-integrations.json");
-  const integrationsManifest: IntegrationManifest = readJsonOrDefault(
-    integrationsPath,
-    { version: 1, integrations: {} },
-  );
+  const integrationsPath = join(productDir, '.pencil-integrations.json');
+  const integrationsManifest: IntegrationManifest = readJsonOrDefault(integrationsPath, {
+    version: 1,
+    integrations: {},
+  });
   for (const slug of picked) {
-    if (!slug.startsWith("core:integrations:")) continue;
-    const leaf = slug.slice("core:integrations:".length).split(":")[0];
+    if (!slug.startsWith('core:integrations:')) continue;
+    const leaf = slug.slice('core:integrations:'.length).split(':')[0];
     const interfaces = getInterfaces(slug);
     if (interfaces.length === 0) continue;
     if (integrationsManifest.integrations[leaf] && !force) continue;
@@ -192,19 +166,16 @@ function writeRuntimeManifests(
       credentialsConfigured: false,
     };
   }
-  writeFileSync(
-    integrationsPath,
-    JSON.stringify(integrationsManifest, null, 2) + "\n",
-  );
+  writeFileSync(integrationsPath, `${JSON.stringify(integrationsManifest, null, 2)}\n`);
 
-  const toolsPath = join(productDir, ".pencil-tools.json");
+  const toolsPath = join(productDir, '.pencil-tools.json');
   const toolsManifest: ToolManifest = readJsonOrDefault(toolsPath, {
     version: 1,
     tools: {},
   });
   for (const slug of picked) {
-    if (!slug.startsWith("core:tools:")) continue;
-    const leaf = slug.slice("core:tools:".length).split(":")[0];
+    if (!slug.startsWith('core:tools:')) continue;
+    const leaf = slug.slice('core:tools:'.length).split(':')[0];
     const interfaces = getInterfaces(slug);
     if (interfaces.length === 0) continue;
     if (toolsManifest.tools[leaf] && !force) continue;
@@ -213,13 +184,13 @@ function writeRuntimeManifests(
       preferred: interfaces[0],
     };
   }
-  writeFileSync(toolsPath, JSON.stringify(toolsManifest, null, 2) + "\n");
+  writeFileSync(toolsPath, `${JSON.stringify(toolsManifest, null, 2)}\n`);
 }
 
 function readJsonOrDefault<T>(path: string, fallback: T): T {
   if (!existsSync(path)) return fallback;
   try {
-    return JSON.parse(readFileSync(path, "utf8")) as T;
+    return JSON.parse(readFileSync(path, 'utf8')) as T;
   } catch {
     return fallback;
   }

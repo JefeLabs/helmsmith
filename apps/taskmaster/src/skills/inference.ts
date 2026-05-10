@@ -1,22 +1,126 @@
-import type { TaskNode } from '../config/schema.js';
-import type { ProjectConfig } from '../config/schema.js';
-import type { ChatCompletionMessage } from '../auth/types.js';
 import { callAI, resolveActiveAuth } from '../auth/call-ai.js';
+import type { ChatCompletionMessage } from '../auth/types.js';
+import type { ProjectConfig, TaskNode } from '../config/schema.js';
 import { BUILT_IN_SKILLS, type SkillInferenceResult } from './types.js';
 
 // --- Keyword-to-skill mapping ---
 
 const SKILL_KEYWORDS: Record<string, readonly string[]> = {
-  backend: ['api', 'endpoint', 'server', 'route', 'middleware', 'controller', 'service', 'handler', 'microservice'],
-  frontend: ['ui', 'component', 'page', 'form', 'modal', 'css', 'responsive', 'layout', 'view', 'react', 'vue', 'angular'],
-  database: ['database', 'schema', 'migration', 'query', 'sql', 'orm', 'table', 'index', 'storage', 'postgres', 'mysql', 'mongodb'],
-  devops: ['deploy', 'ci/cd', 'docker', 'kubernetes', 'pipeline', 'monitoring', 'hosting', 'nginx', 'helm'],
-  testing: ['test', 'coverage', 'e2e', 'integration', 'unit', 'mock', 'fixture', 'vitest', 'jest', 'playwright'],
-  auth: ['auth', 'oauth', 'token', 'permission', 'encryption', 'rbac', 'cors', 'credential', 'jwt', 'session'],
-  'api-design': ['rest', 'graphql', 'openapi', 'swagger', 'endpoint design', 'api contract', 'grpc', 'websocket'],
-  'ui-ux': ['design', 'wireframe', 'prototype', 'accessibility', 'a11y', 'usability', 'figma', 'sketch'],
-  infrastructure: ['scaling', 'load balancer', 'cdn', 'cloud', 'aws', 'gcp', 'azure', 'terraform', 'serverless'],
-  documentation: ['docs', 'readme', 'guide', 'tutorial', 'changelog', 'jsdoc', 'typedoc', 'man page'],
+  backend: [
+    'api',
+    'endpoint',
+    'server',
+    'route',
+    'middleware',
+    'controller',
+    'service',
+    'handler',
+    'microservice',
+  ],
+  frontend: [
+    'ui',
+    'component',
+    'page',
+    'form',
+    'modal',
+    'css',
+    'responsive',
+    'layout',
+    'view',
+    'react',
+    'vue',
+    'angular',
+  ],
+  database: [
+    'database',
+    'schema',
+    'migration',
+    'query',
+    'sql',
+    'orm',
+    'table',
+    'index',
+    'storage',
+    'postgres',
+    'mysql',
+    'mongodb',
+  ],
+  devops: [
+    'deploy',
+    'ci/cd',
+    'docker',
+    'kubernetes',
+    'pipeline',
+    'monitoring',
+    'hosting',
+    'nginx',
+    'helm',
+  ],
+  testing: [
+    'test',
+    'coverage',
+    'e2e',
+    'integration',
+    'unit',
+    'mock',
+    'fixture',
+    'vitest',
+    'jest',
+    'playwright',
+  ],
+  auth: [
+    'auth',
+    'oauth',
+    'token',
+    'permission',
+    'encryption',
+    'rbac',
+    'cors',
+    'credential',
+    'jwt',
+    'session',
+  ],
+  'api-design': [
+    'rest',
+    'graphql',
+    'openapi',
+    'swagger',
+    'endpoint design',
+    'api contract',
+    'grpc',
+    'websocket',
+  ],
+  'ui-ux': [
+    'design',
+    'wireframe',
+    'prototype',
+    'accessibility',
+    'a11y',
+    'usability',
+    'figma',
+    'sketch',
+  ],
+  infrastructure: [
+    'scaling',
+    'load balancer',
+    'cdn',
+    'cloud',
+    'aws',
+    'gcp',
+    'azure',
+    'terraform',
+    'serverless',
+  ],
+  documentation: [
+    'docs',
+    'readme',
+    'guide',
+    'tutorial',
+    'changelog',
+    'jsdoc',
+    'typedoc',
+    'man page',
+  ],
 } as const;
 
 // --- Helpers ---
@@ -120,9 +224,7 @@ export function parseSkillInferenceResponse(
     }
 
     // Filter to only skills in the vocabulary
-    const valid = parsed.skills.filter(
-      (s) => typeof s === 'string' && vocabulary.includes(s),
-    );
+    const valid = parsed.skills.filter((s) => typeof s === 'string' && vocabulary.includes(s));
 
     return valid.length > 0 ? valid : null;
   } catch {

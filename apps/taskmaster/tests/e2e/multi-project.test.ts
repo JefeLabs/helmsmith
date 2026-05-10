@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { runCli, createTempHome, cleanupTempHome, FIXTURE_PLAN_MD } from './helpers.js';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { cleanupTempHome, createTempHome, FIXTURE_PLAN_MD, runCli } from './helpers.js';
 
 describe('E2E: Multi-project isolation', () => {
   let tempHome: string;
@@ -49,7 +49,10 @@ describe('E2E: Multi-project isolation', () => {
     expect(parse.exitCode).toBe(0);
 
     // Score alpha (use --format json to avoid template rendering in bundled CLI)
-    const score = await runCli(['score', '--heuristic-only', '--format', 'json', '--project', 'alpha'], env);
+    const score = await runCli(
+      ['score', '--heuristic-only', '--format', 'json', '--project', 'alpha'],
+      env,
+    );
     expect(score.exitCode).toBe(0);
     expect(score.stdout).toContain('heuristic');
   });

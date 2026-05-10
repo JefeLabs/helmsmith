@@ -1,13 +1,20 @@
-import type { TaskNode, StateDefinition } from '../config/schema.js';
-import { isClosedState, isActiveState, isOpenState } from '../config/state-engine.js';
+import type { StateDefinition, TaskNode } from '../config/schema.js';
+import { isActiveState, isClosedState, isOpenState } from '../config/state-engine.js';
 import { validateSkills } from '../skills/validation.js';
-import { flattenTasks, buildTaskMap, buildDag, detectDanglingRefs, fixCycles, fixDanglingRefs } from './dag.js';
+import {
+  buildDag,
+  buildTaskMap,
+  detectDanglingRefs,
+  fixCycles,
+  fixDanglingRefs,
+  flattenTasks,
+} from './dag.js';
 import type {
-  ReadinessResult,
-  DelegationManifest,
-  ReadyTaskEntry,
   BlockedTaskEntry,
+  DelegationManifest,
   QAFailedTaskEntry,
+  ReadinessResult,
+  ReadyTaskEntry,
   ValidationReport,
 } from './types.js';
 
@@ -135,9 +142,8 @@ export function buildDelegationManifest(
     if (task.status === 'qa-failed') {
       totalQAFailed++;
       totalInProgress++;
-      const latestFeedback = task.qaFeedback.length > 0
-        ? task.qaFeedback[task.qaFeedback.length - 1]
-        : undefined;
+      const latestFeedback =
+        task.qaFeedback.length > 0 ? task.qaFeedback[task.qaFeedback.length - 1] : undefined;
       qaFailedTasks.push({
         id: task.id,
         title: task.title,
@@ -151,7 +157,12 @@ export function buildDelegationManifest(
               severity: latestFeedback.severity,
               reporter: latestFeedback.reporter,
             }
-          : { test_type: 'other', description: 'No feedback recorded', severity: 'major', reporter: 'unknown' },
+          : {
+              test_type: 'other',
+              description: 'No feedback recorded',
+              severity: 'major',
+              reporter: 'unknown',
+            },
       });
       continue;
     }
@@ -210,10 +221,7 @@ export function buildDelegationManifest(
  * Surfaces tasks in 'open' category with readiness ready or pending.
  * Tie-breaks by task ID (lowest/earliest first).
  */
-export function findNextTask(
-  tasks: TaskNode[],
-  states: StateDefinition[],
-): TaskNode | null {
+export function findNextTask(tasks: TaskNode[], states: StateDefinition[]): TaskNode | null {
   const flat = flattenTasks(tasks);
   const results = recomputeAllReadiness(tasks, states);
   applyReadiness(tasks, results);
@@ -264,7 +272,7 @@ export function findNextTask(
  */
 export function runValidation(
   tasks: TaskNode[],
-  states: StateDefinition[],
+  _states: StateDefinition[],
   vocabulary: string[],
   fix: boolean,
 ): ValidationReport {
@@ -306,9 +314,7 @@ export function runValidation(
   }
 
   const isValid =
-    !dagResult.hasCycle &&
-    orphanResult.danglingRefs.length === 0 &&
-    skillIssues.length === 0;
+    !dagResult.hasCycle && orphanResult.danglingRefs.length === 0 && skillIssues.length === 0;
 
   return {
     cycles: {

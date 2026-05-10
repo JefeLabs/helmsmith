@@ -1,7 +1,7 @@
 import type { ChatCompletionMessage } from '../../auth/types.js';
-import type { ArchitectureAnalysis, CodebaseScanResult, SourceAnalysisResult } from './types.js';
 import type { ApplicationBlueprint, BlueprintConcern } from '../../blueprints/types.js';
 import { formatScanForPrompt } from './codebase-scanner.js';
+import type { ArchitectureAnalysis, CodebaseScanResult, SourceAnalysisResult } from './types.js';
 
 /**
  * Build the Phase 1 prompt: Architecture Discovery.
@@ -89,7 +89,7 @@ export function buildArchitectureDiscoveryPrompt(
     userParts.push(formatScanForPrompt(scanResult));
   }
 
-  if (sourceAnalysis && sourceAnalysis.summary) {
+  if (sourceAnalysis?.summary) {
     userParts.push('');
     userParts.push('=== SOURCE ANALYSIS ===');
     userParts.push(sourceAnalysis.summary);
@@ -106,7 +106,9 @@ export function buildArchitectureDiscoveryPrompt(
     userParts.push('=== ENTRY POINT INDEX (pre-detected) ===');
     userParts.push(entryPointIndexSummary);
     userParts.push('');
-    userParts.push('Refine these entry points: correct categories, add missing ones, infer side effects and traces.');
+    userParts.push(
+      'Refine these entry points: correct categories, add missing ones, infer side effects and traces.',
+    );
   }
 
   return [
@@ -216,7 +218,9 @@ export function buildTaskGenerationPrompt(
       blueprintLines.push('');
     }
 
-    blueprintLines.push(`Tag blueprint tasks: blueprint:${bp.id}, urgency:<tier>, concern:<category>`);
+    blueprintLines.push(
+      `Tag blueprint tasks: blueprint:${bp.id}, urgency:<tier>, concern:<category>`,
+    );
 
     systemParts.push(...blueprintLines);
   }

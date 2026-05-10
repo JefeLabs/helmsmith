@@ -33,7 +33,7 @@ export interface AuthProvider {
 export const noopAuthProvider: AuthProvider = {
   async getToken(): Promise<string> {
     throw new Error(
-      "noopAuthProvider.getToken() called — wire a real AuthProvider via createCli({ auth })",
+      'noopAuthProvider.getToken() called — wire a real AuthProvider via createCli({ auth })',
     );
   },
   async whoami() {

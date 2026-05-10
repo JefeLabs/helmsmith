@@ -1,11 +1,10 @@
-import type { Command } from 'commander';
 import chalk from 'chalk';
-import { ManifestManager } from '../config/index.js';
-import { Orchestrator } from '../core/index.js';
-import { CliCache } from '../core/index.js';
-import { gatherCompareData, renderCompare } from '../ui/index.js';
-import { GitHubClient } from '../github/index.js';
+import type { Command } from 'commander';
 import type { PRInfo } from '../config/index.js';
+import { ManifestManager } from '../config/index.js';
+import { CliCache, Orchestrator } from '../core/index.js';
+import { GitHubClient } from '../github/index.js';
+import { gatherCompareData, renderCompare } from '../ui/index.js';
 
 export function registerCompare(program: Command): void {
   program
@@ -20,51 +19,88 @@ export function registerCompare(program: Command): void {
     .option('--no-conflicts', 'Skip conflict detection')
     .option('--no-pr', 'Skip PR lookup from GitHub')
     .option('-f, --force', 'Bypass cache and force fresh data', false)
-    .action(async (left: string, right: string, opts: { group?: string; repo?: string; fetch?: boolean; conflicts?: boolean; pr?: boolean; force?: boolean }) => {
-      const manifest = new ManifestManager();
-      const orchestrator = new Orchestrator(manifest);
-      const target = opts.group ?? opts.repo;
+    .action(
+      async (
+        left: string,
+        right: string,
+        opts: {
+          group?: string;
+          repo?: string;
+          fetch?: boolean;
+          conflicts?: boolean;
+          pr?: boolean;
+          force?: boolean;
+        },
+      ) => {
+        const manifest = new ManifestManager();
+        const orchestrator = new Orchestrator(manifest);
+        const target = opts.group ?? opts.repo;
 
-      // Cache check
-      const cache = new CliCache();
-      cache.prune();
+        // Cache check
+        const cache = new CliCache();
+        cache.prune();
 
-      const cacheKey = CliCache.buildKey('compare', { left, right, group: opts.group, repo: opts.repo, conflicts: opts.conflicts, pr: opts.pr });
+        const cacheKey = CliCache.buildKey('compare', {
+          left,
+          right,
+          group: opts.group,
+          repo: opts.repo,
+          conflicts: opts.conflicts,
+          pr: opts.pr,
+        });
 
-      if (!opts.force && !opts.fetch) {
-        const cached = cache.get<{ rows: any[]; prData: Record<string, any> | null }>(cacheKey);
-        if (cached.hit) {
-          CliCache.printCacheNotice(cached.ageMs);
-          const prMap = cached.data.prData ? new Map(Object.entries(cached.data.prData)) as Map<string, PRInfo> : undefined;
-          renderCompare(cached.data.rows, left, right, prMap);
-          return;
-        }
-      }
-
-      const rows = await gatherCompareData(manifest, orchestrator.repos, target, left, right, { fetch: opts.fetch, checkConflicts: opts.conflicts });
-
-      // PR lookup (on by default)
-      let prData: Map<string, PRInfo> | undefined;
-      if (opts.pr !== false) {
-        try {
-          const gh = await GitHubClient.create();
-          prData = new Map();
-          for (const row of rows) {
-            if (!row.repo.url?.includes('github.com')) continue;
-            try {
-              const { owner, repo: repoName } = await gh.getRepoOwner(row.repo.url!);
-              const rightRef = row.repo.branches[right] ?? right;
-              const leftRef = row.repo.branches[left] ?? left;
-              const existing = await gh.findExistingPR(owner, repoName, rightRef, leftRef);
-              if (existing) prData.set(row.repo.name, { number: existing.number, state: 'open', url: existing.html_url, date: existing.created_at.slice(0, 10) });
-            } catch {}
+        if (!opts.force && !opts.fetch) {
+          const cached = cache.get<{ rows: any[]; prData: Record<string, any> | null }>(cacheKey);
+          if (cached.hit) {
+            CliCache.printCacheNotice(cached.ageMs);
+            const prMap = cached.data.prData
+              ? (new Map(Object.entries(cached.data.prData)) as Map<string, PRInfo>)
+              : undefined;
+            renderCompare(cached.data.rows, left, right, prMap);
+            return;
           }
-        } catch (err: any) { console.log(chalk.yellow(`  Could not fetch PR data: ${err.message}`)); }
-      }
+        }
 
-      // Cache result
-      cache.set(cacheKey, { rows, prData: prData ? Object.fromEntries(prData.entries()) : null }, { command: 'compare', args: [left, right] });
+        const rows = await gatherCompareData(manifest, orchestrator.repos, target, left, right, {
+          fetch: opts.fetch,
+          checkConflicts: opts.conflicts,
+        });
 
-      renderCompare(rows, left, right, prData);
-    });
+        // PR lookup (on by default)
+        let prData: Map<string, PRInfo> | undefined;
+        if (opts.pr !== false) {
+          try {
+            const gh = await GitHubClient.create();
+            prData = new Map();
+            for (const row of rows) {
+              if (!row.repo.url?.includes('github.com')) continue;
+              try {
+                const { owner, repo: repoName } = await gh.getRepoOwner(row.repo.url!);
+                const rightRef = row.repo.branches[right] ?? right;
+                const leftRef = row.repo.branches[left] ?? left;
+                const existing = await gh.findExistingPR(owner, repoName, rightRef, leftRef);
+                if (existing)
+                  prData.set(row.repo.name, {
+                    number: existing.number,
+                    state: 'open',
+                    url: existing.html_url,
+                    date: existing.created_at.slice(0, 10),
+                  });
+              } catch {}
+            }
+          } catch (err: any) {
+            console.log(chalk.yellow(`  Could not fetch PR data: ${err.message}`));
+          }
+        }
+
+        // Cache result
+        cache.set(
+          cacheKey,
+          { rows, prData: prData ? Object.fromEntries(prData.entries()) : null },
+          { command: 'compare', args: [left, right] },
+        );
+
+        renderCompare(rows, left, right, prData);
+      },
+    );
 }

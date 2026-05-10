@@ -1,5 +1,5 @@
 import type { TaskNode } from '../config/schema.js';
-import type { DagResult, OrphanResult, FixAction } from './types.js';
+import type { DagResult, FixAction, OrphanResult } from './types.js';
 
 /**
  * Recursively flatten a hierarchical task tree into a flat array.

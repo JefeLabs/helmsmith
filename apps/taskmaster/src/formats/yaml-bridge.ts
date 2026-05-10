@@ -46,7 +46,7 @@ export function safeDump(data: unknown): string {
     lineWidth: -1,
     noRefs: true,
     sortKeys: false,
-    quotingType: '\'',
+    quotingType: "'",
     forceQuotes: false,
   });
 }

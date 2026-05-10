@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { parseYamlPlan } from '../../../src/parser/yaml-plan.js';
 
 describe('parseYamlPlan', () => {
@@ -58,10 +58,7 @@ describe('parseYamlPlan', () => {
   });
 
   it('handles missing optional fields', () => {
-    const content = [
-      'tasks:',
-      '  - title: Minimal Task',
-    ].join('\n');
+    const content = ['tasks:', '  - title: Minimal Task'].join('\n');
 
     const sections = parseYamlPlan(content);
 
@@ -73,11 +70,7 @@ describe('parseYamlPlan', () => {
   });
 
   it('handles the optional plan-level title', () => {
-    const content = [
-      'title: My Project Plan',
-      'tasks:',
-      '  - title: First Task',
-    ].join('\n');
+    const content = ['title: My Project Plan', 'tasks:', '  - title: First Task'].join('\n');
 
     // Plan title is not used as a task, just the tasks array
     const sections = parseYamlPlan(content);
@@ -91,10 +84,7 @@ describe('parseYamlPlan', () => {
   });
 
   it('rejects tasks without title', () => {
-    const content = [
-      'tasks:',
-      '  - description: No title here',
-    ].join('\n');
+    const content = ['tasks:', '  - description: No title here'].join('\n');
 
     expect(() => parseYamlPlan(content)).toThrow();
   });

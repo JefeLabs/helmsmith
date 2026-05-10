@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { makeTask } from '../../fixtures/tasks.js';
+import { describe, expect, it } from 'vitest';
 import { HeuristicScorer, scoreTask, scoreTasks } from '../../../src/scorer/heuristic.js';
+import { makeTask } from '../../fixtures/tasks.js';
 
 describe('HeuristicScorer', () => {
   it('has name "heuristic"', () => {
@@ -152,8 +152,16 @@ describe('scoreTasks', () => {
   it('scores all provided tasks', async () => {
     const tasks = [
       makeTask({ id: 'T-1', title: 'Simple task', description: 'A simple focused task' }),
-      makeTask({ id: 'T-2', title: 'Complex task', description: 'Build API with OAuth and database' }),
-      makeTask({ id: 'T-3', title: 'Medium task', description: 'Create a new frontend component with tests' }),
+      makeTask({
+        id: 'T-2',
+        title: 'Complex task',
+        description: 'Build API with OAuth and database',
+      }),
+      makeTask({
+        id: 'T-3',
+        title: 'Medium task',
+        description: 'Create a new frontend component with tests',
+      }),
     ];
     const results = await scoreTasks(tasks);
     expect(results).toHaveLength(3);

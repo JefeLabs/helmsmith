@@ -1,8 +1,5 @@
-import type { TaskNode, StateDefinition } from '../config/schema.js';
-import {
-  recomputeAllReadiness,
-  applyReadiness,
-} from '../readiness/index.js';
+import type { StateDefinition, TaskNode } from '../config/schema.js';
+import { applyReadiness, recomputeAllReadiness } from '../readiness/index.js';
 import { aggregateReport, REPORT_TYPE_TO_TEMPLATE } from '../reports/index.js';
 import type { ReportType } from '../reports/types.js';
 

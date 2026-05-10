@@ -1,17 +1,14 @@
-import { writeFile, mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { safeDump } from './yaml-bridge.js';
 import type { TaskNode } from '../config/schema.js';
+import { safeDump } from './yaml-bridge.js';
 
 /**
  * Generate individual YAML task files from an array of TaskNode objects.
  * Each task becomes a file named `{id}.yaml` in the project's `tasks/` directory.
  * Subtask children are included inline in the parent's YAML.
  */
-export async function generateTaskFiles(
-  projectPath: string,
-  tasks: TaskNode[],
-): Promise<string[]> {
+export async function generateTaskFiles(projectPath: string, tasks: TaskNode[]): Promise<string[]> {
   const tasksDir = join(projectPath, 'tasks');
   await mkdir(tasksDir, { recursive: true });
 

@@ -22,10 +22,10 @@
  */
 
 /** Distinguishes runnable commands, multi-phase workflows, and context-only artifacts. */
-export type ItemKind = "command" | "workflow" | "context";
+export type ItemKind = 'command' | 'workflow' | 'context';
 
 /** Invocation interface a tool/integration supports. */
-export type Interface = "cli" | "mcp" | "rest";
+export type Interface = 'cli' | 'mcp' | 'rest';
 
 /**
  * Arbitrary YAML frontmatter from the source `.md` file. The schema

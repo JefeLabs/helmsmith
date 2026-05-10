@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock chalk to avoid ANSI codes in test output
 vi.mock('chalk', () => ({
@@ -29,11 +29,16 @@ vi.mock('../../../../src/parser/analysis/entrypoint-validation.js', () => ({
   generateValidationWarnings: vi.fn().mockReturnValue([]),
 }));
 
-import { runScanPipeline } from '../../../../src/parser/analysis/scanner.js';
-import { discoverComponents } from '../../../../src/parser/analysis/component-discovery.js';
 import { scanCodebase } from '../../../../src/parser/analysis/codebase-scanner.js';
+import { discoverComponents } from '../../../../src/parser/analysis/component-discovery.js';
+import { runScanPipeline } from '../../../../src/parser/analysis/scanner.js';
 import { analyzeSourceEnhanced } from '../../../../src/parser/analysis/source-analyzer.js';
-import type { CodebaseScanResult, BuildComponent, EnhancedFileAnalysis, SourceAnalysisResult } from '../../../../src/parser/analysis/types.js';
+import type {
+  BuildComponent,
+  CodebaseScanResult,
+  EnhancedFileAnalysis,
+  SourceAnalysisResult,
+} from '../../../../src/parser/analysis/types.js';
 
 const mockedDiscoverComponents = vi.mocked(discoverComponents);
 const mockedScanCodebase = vi.mocked(scanCodebase);
@@ -118,7 +123,9 @@ describe('runScanPipeline', () => {
     mockedDiscoverComponents.mockResolvedValue([]);
     mockedScanCodebase.mockRejectedValue(new Error('permission denied'));
 
-    await expect(runScanPipeline('/test')).rejects.toThrow('Codebase scan failed: permission denied');
+    await expect(runScanPipeline('/test')).rejects.toThrow(
+      'Codebase scan failed: permission denied',
+    );
   });
 
   it('adds warning when component discovery fails but continues', async () => {

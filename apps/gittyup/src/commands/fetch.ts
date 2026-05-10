@@ -1,5 +1,5 @@
-import type { Command } from 'commander';
 import chalk from 'chalk';
+import type { Command } from 'commander';
 import { ManifestManager } from '../config/manifest.js';
 import { Orchestrator } from '../core/orchestrator.js';
 
@@ -15,9 +15,10 @@ export function registerFetch(program: Command): void {
         console.log(chalk.dim(`  ${repo}: ${status}`));
       });
       const failed = results.filter((r) => !r.success);
-      console.log(failed.length === 0
-        ? chalk.green(`\n✓ Fetched ${results.length} repos`)
-        : chalk.yellow(`\n⚠ ${failed.length}/${results.length} failed`),
+      console.log(
+        failed.length === 0
+          ? chalk.green(`\n✓ Fetched ${results.length} repos`)
+          : chalk.yellow(`\n⚠ ${failed.length}/${results.length} failed`),
       );
     });
 }

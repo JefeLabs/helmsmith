@@ -1,19 +1,19 @@
 import chalk from 'chalk';
-import type { ViewContext, NavigationAction } from './types.js';
+import { rollup } from '../aggregator/engine.js';
+import { filterRecords, getLastNWeeks } from '../aggregator/filters.js';
 import type { UserWeekRepoRecord } from '../types/schema.js';
 import { renderBanner } from '../ui/banner.js';
-import { renderGroupedHBarChart } from '../ui/grouped-hbar-chart.js';
-import type { HBarGroup } from '../ui/grouped-hbar-chart.js';
-import { renderLineChart } from '../ui/line-chart.js';
-import { renderTable } from '../ui/table.js';
-import { renderLegend } from '../ui/legend.js';
-import { renderHotkeyBar } from '../ui/tab-bar.js';
-import { readKey } from '../ui/keypress.js';
 import { stackedBar } from '../ui/bar.js';
-import { rollup } from '../aggregator/engine.js';
-import { filterRecords, getLastNWeeks, computeDeltas } from '../aggregator/filters.js';
-import { SEGMENT_DEFS, FILETYPE_COLORS, FILETYPE_CHARS } from '../ui/constants.js';
-import { fmt, weekShort, delta } from '../ui/format.js';
+import { FILETYPE_CHARS, FILETYPE_COLORS, SEGMENT_DEFS } from '../ui/constants.js';
+import { delta, fmt, weekShort } from '../ui/format.js';
+import type { HBarGroup } from '../ui/grouped-hbar-chart.js';
+import { renderGroupedHBarChart } from '../ui/grouped-hbar-chart.js';
+import { readKey } from '../ui/keypress.js';
+import { renderLegend } from '../ui/legend.js';
+import { renderLineChart } from '../ui/line-chart.js';
+import { renderHotkeyBar } from '../ui/tab-bar.js';
+import { renderTable } from '../ui/table.js';
+import type { NavigationAction, ViewContext } from './types.js';
 
 /**
  * Build file-type-by-week grouped bar chart for a member (last 3 weeks).
@@ -48,8 +48,14 @@ function buildWeeklyBars(
           segments: [
             { key: 'app', value: agg.filetype.app.insertions + agg.filetype.app.deletions },
             { key: 'test', value: agg.filetype.test.insertions + agg.filetype.test.deletions },
-            { key: 'config', value: agg.filetype.config.insertions + agg.filetype.config.deletions },
-            { key: 'storybook', value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions },
+            {
+              key: 'config',
+              value: agg.filetype.config.insertions + agg.filetype.config.deletions,
+            },
+            {
+              key: 'storybook',
+              value: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions,
+            },
             { key: 'doc', value: agg.filetype.doc.insertions + agg.filetype.doc.deletions },
           ],
           total: totalLines,
@@ -110,7 +116,10 @@ function buildMemberReposTable(
   // Get previous week for delta
   const prevWeeks = getLastNWeeks(2, currentWeek);
   const prevWeek = prevWeeks.length >= 2 ? prevWeeks[0] : null;
-  let prevRolled: Map<string, ReturnType<typeof rollup> extends Map<string, infer V> ? V : never> | null = null;
+  let prevRolled: Map<
+    string,
+    ReturnType<typeof rollup> extends Map<string, infer V> ? V : never
+  > | null = null;
   if (prevWeek) {
     const prevRecords = filterRecords(records, { weeks: [prevWeek], member: memberName });
     prevRolled = rollup(prevRecords, (r) => r.repo);
@@ -134,7 +143,8 @@ function buildMemberReposTable(
         storybook: agg.filetype.storybook.insertions + agg.filetype.storybook.deletions,
         doc: agg.filetype.doc.insertions + agg.filetype.doc.deletions,
       },
-      delta: prevTotal > 0 || totalLines > 0 ? delta(totalLines, prevTotal) : chalk.dim('\u2500 0%'),
+      delta:
+        prevTotal > 0 || totalLines > 0 ? delta(totalLines, prevTotal) : chalk.dim('\u2500 0%'),
     });
   }
 
@@ -161,8 +171,11 @@ function computeSummary(
 
   for (const r of memberRecords) {
     totalCommits += r.commits;
-    totalInsertions += r.filetype.app.insertions + r.filetype.test.insertions +
-      r.filetype.config.insertions + r.filetype.storybook.insertions;
+    totalInsertions +=
+      r.filetype.app.insertions +
+      r.filetype.test.insertions +
+      r.filetype.config.insertions +
+      r.filetype.storybook.insertions;
     totalApp += r.filetype.app.insertions + r.filetype.app.deletions;
     totalTest += r.filetype.test.insertions + r.filetype.test.deletions;
     activeWeeks.add(r.week);
@@ -221,7 +234,7 @@ export async function memberDetailView(
     SEGMENT_DEFS.map((d) => ({ label: d.label, color: d.color, char: d.char })),
     { inline: true },
   );
-  console.log(chalk.bold('File Type by Week') + '  ' + legend);
+  console.log(`${chalk.bold('File Type by Week')}  ${legend}`);
   console.log('');
 
   const weeklyGroups = buildWeeklyBars(ctx.records, memberName, ctx.currentWeek);
@@ -257,8 +270,20 @@ export async function memberDetailView(
       columns: [
         { key: 'repo', label: 'Repo', minWidth: 14 },
         { key: 'commits', label: 'Commits', align: 'right', minWidth: 7 },
-        { key: 'insertions', label: '+Ins', align: 'right', minWidth: 6, format: (v) => chalk.green(fmt(v)) },
-        { key: 'deletions', label: '-Del', align: 'right', minWidth: 6, format: (v) => chalk.red(fmt(v)) },
+        {
+          key: 'insertions',
+          label: '+Ins',
+          align: 'right',
+          minWidth: 6,
+          format: (v) => chalk.green(fmt(v)),
+        },
+        {
+          key: 'deletions',
+          label: '-Del',
+          align: 'right',
+          minWidth: 6,
+          format: (v) => chalk.red(fmt(v)),
+        },
         {
           key: 'breakdown',
           label: 'Breakdown',
@@ -269,7 +294,11 @@ export async function memberDetailView(
                 { value: v.app, color: FILETYPE_COLORS.app, char: FILETYPE_CHARS.app },
                 { value: v.test, color: FILETYPE_COLORS.test, char: FILETYPE_CHARS.test },
                 { value: v.config, color: FILETYPE_COLORS.config, char: FILETYPE_CHARS.config },
-                { value: v.storybook, color: FILETYPE_COLORS.storybook, char: FILETYPE_CHARS.storybook },
+                {
+                  value: v.storybook,
+                  color: FILETYPE_COLORS.storybook,
+                  char: FILETYPE_CHARS.storybook,
+                },
               ],
               15,
             ),
@@ -295,10 +324,12 @@ export async function memberDetailView(
   console.log('');
 
   // Hotkey bar
-  console.log(renderHotkeyBar([
-    { key: 'B', label: `Back to ${teamName}` },
-    { key: 'Q', label: 'Quit' },
-  ]));
+  console.log(
+    renderHotkeyBar([
+      { key: 'B', label: `Back to ${teamName}` },
+      { key: 'Q', label: 'Quit' },
+    ]),
+  );
 
   // Wait for keypress
   try {

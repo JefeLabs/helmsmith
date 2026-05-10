@@ -1,11 +1,11 @@
-import { simpleGit } from "simple-git";
-import { spawn } from "node:child_process";
-import { createInterface } from "node:readline";
-import type { UserWeekRepoRecord } from "../types/schema.js";
-import type { AuthorMap } from "./author-map.js";
-import { resolveAuthor } from "./author-map.js";
-import { classifyFile, buildIgnoreMatcher, buildClassifier } from "./classifier.js";
-import type { FileType } from "./classifier.js";
+import { spawn } from 'node:child_process';
+import { createInterface } from 'node:readline';
+import { simpleGit } from 'simple-git';
+import type { UserWeekRepoRecord } from '../types/schema.js';
+import type { AuthorMap } from './author-map.js';
+import { resolveAuthor } from './author-map.js';
+import type { FileType } from './classifier.js';
+import { buildClassifier, buildIgnoreMatcher, classifyFile } from './classifier.js';
 
 // Note: spawn is used with array arguments (no shell interpretation),
 // equivalent to simple-git's internal execFile usage. All args are
@@ -70,7 +70,8 @@ export function classifyGitError(error: unknown): GitErrorInfo {
   }
 
   // ENOENT / EACCES at the OS level (repo path doesn't exist / not accessible)
-  if (/ENOENT/.test(msg)) return { severity: 'transient', reason: 'repository path not found', original: msg };
+  if (/ENOENT/.test(msg))
+    return { severity: 'transient', reason: 'repository path not found', original: msg };
   if (/EACCES/.test(msg)) return { severity: 'fatal', reason: 'permission denied', original: msg };
 
   // Default: treat unknown errors as transient (log a warning but don't crash)
@@ -113,7 +114,7 @@ export interface ScanOptions {
   identifierRules?: Array<{
     prefix: string;
     org: string;
-    orgType: "core" | "consultant";
+    orgType: 'core' | 'consultant';
     team: string;
     tag: string;
   }>;
@@ -152,7 +153,8 @@ export interface ScanResult {
  * Matches patterns like "feat:", "feat(scope):", "fix!:", "feat(auth)!:".
  * Falls back to "other" for non-conventional commits.
  */
-const CONVENTIONAL_RE = /^(feat|fix|refactor|docs|test|tests|chore|ci|build|perf|style|revert)(\(([^)]+)\))?([!])?:/i;
+const CONVENTIONAL_RE =
+  /^(feat|fix|refactor|docs|test|tests|chore|ci|build|perf|style|revert)(\(([^)]+)\))?([!])?:/i;
 
 export interface ParsedIntent {
   intent: IntentType;
@@ -169,12 +171,19 @@ export function parseConventionalCommit(subject: string): ParsedIntent {
   if (!match) return { intent: 'other', breaking: false };
 
   const prefix = match[1].toLowerCase();
-  const scope = match[3] || undefined;  // capture group 3 = inner scope text
+  const scope = match[3] || undefined; // capture group 3 = inner scope text
   const bang = match[4] === '!';
 
   let intent: IntentType;
   if (prefix === 'tests') intent = 'test';
-  else if (prefix === 'ci' || prefix === 'build' || prefix === 'perf' || prefix === 'style' || prefix === 'revert') intent = 'chore';
+  else if (
+    prefix === 'ci' ||
+    prefix === 'build' ||
+    prefix === 'perf' ||
+    prefix === 'style' ||
+    prefix === 'revert'
+  )
+    intent = 'chore';
   else intent = prefix as IntentType;
 
   return { intent, scope, breaking: bang };
@@ -186,7 +195,7 @@ export function parseConventionalCommit(subject: string): ParsedIntent {
  * Falls back to 4-part headers for backwards compatibility.
  */
 function isHeaderLine(line: string): boolean {
-  const parts = line.split("|");
+  const parts = line.split('|');
   return parts.length >= 4 && /^[0-9a-f]{6,40}$/.test(parts[0]);
 }
 
@@ -216,7 +225,7 @@ export function parseGitLogOutput(output: string): ParsedCommit[] {
   const commits: ParsedCommit[] = [];
   if (!output.trim()) return commits;
 
-  const lines = output.split("\n");
+  const lines = output.split('\n');
   let current: ParsedCommit | null = null;
   let statusMap = new Map<string, FileStatus>();
 
@@ -237,14 +246,14 @@ export function parseGitLogOutput(output: string): ParsedCommit[] {
     const trimmed = line.trim();
 
     // Skip blank lines (they separate sections within a commit, not commits themselves)
-    if (trimmed === "") continue;
+    if (trimmed === '') continue;
 
     // Check if this is a commit header line
     if (isHeaderLine(trimmed)) {
       // Push the previous commit if any
       pushCurrent();
 
-      const parts = trimmed.split("|");
+      const parts = trimmed.split('|');
       // Format: hash|email|name|date|subject (subject may contain |)
       // Backwards-compatible with old 4-field format (hash|email|name|date)
       const hash = parts[0];
@@ -256,10 +265,10 @@ export function parseGitLogOutput(output: string): ParsedCommit[] {
         // New format: hash|email|name|date|subject...
         name = parts[2];
         date = parts[3];
-        subject = parts.slice(4).join("|"); // subject may contain |
+        subject = parts.slice(4).join('|'); // subject may contain |
       } else {
         // Old format: hash|email|name|date (name may contain |)
-        name = parts.slice(2, -1).join("|");
+        name = parts.slice(2, -1).join('|');
         date = parts[parts.length - 1];
         subject = '';
       }
@@ -300,21 +309,20 @@ export function parseGitLogOutput(output: string): ParsedCommit[] {
     // Try numstat line: insertions\tdeletions\tpath
     const numMatch = NUMSTAT_RE.exec(trimmed);
     if (numMatch) {
-      const ins = numMatch[1] === "-" ? 0 : parseInt(numMatch[1], 10) || 0;
-      const del = numMatch[2] === "-" ? 0 : parseInt(numMatch[2], 10) || 0;
-      const filePath = trimmed.split("\t").slice(2).join("\t"); // path may contain tabs (rare)
+      const ins = numMatch[1] === '-' ? 0 : parseInt(numMatch[1], 10) || 0;
+      const del = numMatch[2] === '-' ? 0 : parseInt(numMatch[2], 10) || 0;
+      const filePath = trimmed.split('\t').slice(2).join('\t'); // path may contain tabs (rare)
 
       // For renames in numstat, path is "old => new" or "{old => new}/rest"
       // Try to extract new path for status lookup
       let lookupPath = filePath;
-      const arrowIdx = filePath.indexOf(" => ");
+      const arrowIdx = filePath.indexOf(' => ');
       if (arrowIdx !== -1) {
         lookupPath = filePath.slice(arrowIdx + 4);
       }
 
       const status = statusMap.get(filePath) ?? statusMap.get(lookupPath) ?? 'unknown';
       current.files.push({ insertions: ins, deletions: del, path: filePath, status });
-      continue;
     }
   }
 
@@ -350,12 +358,12 @@ export class GitLogLineParser {
    */
   processLine(line: string): ParsedCommit | null {
     const trimmed = line.trim();
-    if (trimmed === "") return null;
+    if (trimmed === '') return null;
 
     if (isHeaderLine(trimmed)) {
       const completed = this.finalizeCurrent();
 
-      const parts = trimmed.split("|");
+      const parts = trimmed.split('|');
       const hash = parts[0];
       const email = parts[1];
       let name: string;
@@ -364,15 +372,19 @@ export class GitLogLineParser {
       if (parts.length >= 5) {
         name = parts[2];
         date = parts[3];
-        subject = parts.slice(4).join("|");
+        subject = parts.slice(4).join('|');
       } else {
-        name = parts.slice(2, -1).join("|");
+        name = parts.slice(2, -1).join('|');
         date = parts[parts.length - 1];
         subject = '';
       }
       const parsed = parseConventionalCommit(subject);
       this.current = {
-        hash, email, name, date, subject,
+        hash,
+        email,
+        name,
+        date,
+        subject,
         intent: parsed.intent,
         scope: parsed.scope,
         breaking: parsed.breaking,
@@ -402,12 +414,12 @@ export class GitLogLineParser {
     // Numstat line
     const numMatch = NUMSTAT_RE.exec(trimmed);
     if (numMatch) {
-      const ins = numMatch[1] === "-" ? 0 : parseInt(numMatch[1], 10) || 0;
-      const del = numMatch[2] === "-" ? 0 : parseInt(numMatch[2], 10) || 0;
-      const filePath = trimmed.split("\t").slice(2).join("\t");
+      const ins = numMatch[1] === '-' ? 0 : parseInt(numMatch[1], 10) || 0;
+      const del = numMatch[2] === '-' ? 0 : parseInt(numMatch[2], 10) || 0;
+      const filePath = trimmed.split('\t').slice(2).join('\t');
 
       let lookupPath = filePath;
-      const arrowIdx = filePath.indexOf(" => ");
+      const arrowIdx = filePath.indexOf(' => ');
       if (arrowIdx !== -1) {
         lookupPath = filePath.slice(arrowIdx + 4);
       }
@@ -457,13 +469,13 @@ async function streamGitLog(
     activeDaysMap: Map<string, Set<string>>;
     newHashes: string[];
     rawAuthorsMap: Map<string, RawAuthor>;
-    identifierRules?: ScanOptions["identifierRules"];
+    identifierRules?: ScanOptions['identifierRules'];
     shouldIgnore?: (filePath: string) => boolean;
     classify?: (filePath: string) => FileType;
   },
 ): Promise<{ commitCount: number; skippedCount: number }> {
   return new Promise((resolve, reject) => {
-    const child = spawn("git", args, { cwd: repoPath, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn('git', args, { cwd: repoPath, stdio: ['ignore', 'pipe', 'pipe'] });
 
     const parser = new GitLogLineParser();
     let commitCount = 0;
@@ -490,21 +502,21 @@ async function streamGitLog(
 
     const rl = createInterface({ input: child.stdout!, crlfDelay: Infinity });
 
-    rl.on("line", (line) => {
+    rl.on('line', (line) => {
       const commit = parser.processLine(line);
       if (commit) handleCommit(commit);
     });
 
-    child.stderr!.on("data", (chunk: Buffer) => {
+    child.stderr!.on('data', (chunk: Buffer) => {
       stderrChunks.push(chunk);
     });
 
-    child.on("error", (err) => {
+    child.on('error', (err) => {
       rl.close();
       reject(err);
     });
 
-    child.on("close", (code) => {
+    child.on('close', (code) => {
       // Flush the last commit from the parser
       const last = parser.flush();
       if (last) handleCommit(last);
@@ -525,24 +537,20 @@ async function streamGitLog(
  */
 export function getISOWeek(dateStr: string): string {
   const d = new Date(dateStr);
-  const utc = new Date(
-    Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())
-  );
+  const utc = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   const dayOfWeek = utc.getUTCDay() || 7; // Make Sunday = 7
   utc.setUTCDate(utc.getUTCDate() + 4 - dayOfWeek); // Set to nearest Thursday
 
   const yearStart = new Date(Date.UTC(utc.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil(
-    ((utc.getTime() - yearStart.getTime()) / 86400000 + 1) / 7
-  );
+  const weekNo = Math.ceil(((utc.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 
-  return `${utc.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+  return `${utc.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
 }
 
 /**
  * Create an empty filetype metrics structure.
  */
-function emptyFiletype(): UserWeekRepoRecord["filetype"] {
+function emptyFiletype(): UserWeekRepoRecord['filetype'] {
   return {
     app: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
     test: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
@@ -555,7 +563,7 @@ function emptyFiletype(): UserWeekRepoRecord["filetype"] {
 /**
  * Create an empty intent metrics structure.
  */
-function emptyIntent(): NonNullable<UserWeekRepoRecord["intent"]> {
+function emptyIntent(): NonNullable<UserWeekRepoRecord['intent']> {
   return { feat: 0, fix: 0, refactor: 0, docs: 0, test: 0, chore: 0, other: 0 };
 }
 
@@ -563,33 +571,26 @@ function emptyIntent(): NonNullable<UserWeekRepoRecord["intent"]> {
  * A date range for chunked scanning.
  */
 export interface DateRange {
-  since: string;  // YYYY-MM-DD
-  until: string;  // YYYY-MM-DD
+  since: string; // YYYY-MM-DD
+  until: string; // YYYY-MM-DD
 }
 
 /**
  * Generate non-overlapping date ranges from startDate to endDate,
  * each spanning `months` calendar months. Oldest-first.
  */
-export function generateDateChunks(
-  startDate: Date,
-  endDate: Date,
-  months: number,
-): DateRange[] {
+export function generateDateChunks(startDate: Date, endDate: Date, months: number): DateRange[] {
   const chunks: DateRange[] = [];
   // Use UTC throughout to avoid local-timezone drift with setMonth
-  const cursor = new Date(Date.UTC(
-    startDate.getUTCFullYear(),
-    startDate.getUTCMonth(),
-    startDate.getUTCDate(),
-  ));
+  const cursor = new Date(
+    Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate()),
+  );
 
   while (cursor < endDate) {
     const chunkSince = cursor.toISOString().slice(0, 10);
     cursor.setUTCMonth(cursor.getUTCMonth() + months);
-    const chunkUntil = cursor >= endDate
-      ? endDate.toISOString().slice(0, 10)
-      : cursor.toISOString().slice(0, 10);
+    const chunkUntil =
+      cursor >= endDate ? endDate.toISOString().slice(0, 10) : cursor.toISOString().slice(0, 10);
     chunks.push({ since: chunkSince, until: chunkUntil });
   }
 
@@ -633,7 +634,7 @@ function processCommitBatch(
   activeDaysMap: Map<string, Set<string>>,
   newHashes: string[],
   rawAuthorsMap: Map<string, RawAuthor>,
-  identifierRules?: ScanOptions["identifierRules"],
+  identifierRules?: ScanOptions['identifierRules'],
   shouldIgnore?: (filePath: string) => boolean,
   classify?: (filePath: string) => FileType,
 ): number {
@@ -716,7 +717,8 @@ function processCommitBatch(
       record.breakingChanges = (record.breakingChanges ?? 0) + 1;
     }
     if (commit.scope && !record.scopes?.includes(commit.scope)) {
-      (record.scopes ??= []).push(commit.scope);
+      record.scopes ??= [];
+      record.scopes.push(commit.scope);
     }
 
     const classifyFn = classify ?? classifyFile;
@@ -748,11 +750,18 @@ function processCommitBatch(
  * Deduplicates against recentHashes, resolves authors, classifies files,
  * and accumulates metrics into per-member/week/repo records.
  */
-export async function scanRepo(
-  repoPath: string,
-  options: ScanOptions
-): Promise<ScanResult> {
-  const { repoName, group, authorMap, recentHashes, since, chunkMonths, identifierRules, ignorePatterns, classificationRules } = options;
+export async function scanRepo(repoPath: string, options: ScanOptions): Promise<ScanResult> {
+  const {
+    repoName,
+    group,
+    authorMap,
+    recentHashes,
+    since,
+    chunkMonths,
+    identifierRules,
+    ignorePatterns,
+    classificationRules,
+  } = options;
 
   const shouldIgnore = buildIgnoreMatcher(ignorePatterns);
   const classify = buildClassifier(classificationRules);
@@ -768,13 +777,21 @@ export async function scanRepo(
   let skippedCount = 0;
 
   const batchArgs = {
-    repoName, group, authorMap, recentHashes,
-    recordMap, activeDaysMap, newHashes, rawAuthorsMap,
-    identifierRules, shouldIgnore, classify,
+    repoName,
+    group,
+    authorMap,
+    recentHashes,
+    recordMap,
+    activeDaysMap,
+    newHashes,
+    rawAuthorsMap,
+    identifierRules,
+    shouldIgnore,
+    classify,
   };
 
   for (const range of ranges) {
-    const args = ["log", "--raw", "--numstat", "--no-merges", "--format=%H|%ae|%an|%aI|%s"];
+    const args = ['log', '--raw', '--numstat', '--no-merges', '--format=%H|%ae|%an|%aI|%s'];
     if (range.since) args.splice(1, 0, `--since=${range.since}`);
     if (range.until) args.splice(1, 0, `--until=${range.until}`);
 
@@ -786,16 +803,27 @@ export async function scanRepo(
       const gitErr = classifyGitError(error);
       if (gitErr.severity === 'fatal') {
         console.error(`  Error: ${repoName}: ${gitErr.reason}`);
-        return { newRecords: [], newHashes: [], commitCount: 0, skippedCount: 0, discoveredAuthors: [] };
+        return {
+          newRecords: [],
+          newHashes: [],
+          commitCount: 0,
+          skippedCount: 0,
+          discoveredAuthors: [],
+        };
       }
       if (gitErr.severity === 'transient') {
         console.log(`  Warning: git error in ${repoName}: ${gitErr.reason}`);
       }
       // 'expected' errors are silently skipped (e.g. empty repo, no commits in range)
       if (ranges.length === 1) {
-        return { newRecords: [], newHashes: [], commitCount: 0, skippedCount: 0, discoveredAuthors: [] };
+        return {
+          newRecords: [],
+          newHashes: [],
+          commitCount: 0,
+          skippedCount: 0,
+          discoveredAuthors: [],
+        };
       }
-      continue; // skip this chunk, try next
     }
   }
 
@@ -843,13 +871,13 @@ export async function calculateChurnRate(
   let logOutput: string;
   try {
     logOutput = await git.raw([
-      "log",
+      'log',
       `--since=${since}`,
       `--until=${until}`,
       `--author=${authorEmail}`,
-      "--no-merges",
-      "--format=%H",
-      "--numstat",
+      '--no-merges',
+      '--format=%H',
+      '--numstat',
     ]);
   } catch (error) {
     const gitErr = classifyGitError(error);
@@ -865,9 +893,8 @@ export async function calculateChurnRate(
   const commitFiles = parseChurnLog(logOutput);
 
   // Sample if too many commits
-  const sampled = commitFiles.length > maxCommits
-    ? sampleEvenly(commitFiles, maxCommits)
-    : commitFiles;
+  const sampled =
+    commitFiles.length > maxCommits ? sampleEvenly(commitFiles, maxCommits) : commitFiles;
 
   let totalLines = 0;
   let churnLines = 0;
@@ -876,7 +903,7 @@ export async function calculateChurnRate(
     // Get the commit date for this commit
     let dateStr: string;
     try {
-      dateStr = (await git.raw(["log", "-1", "--format=%aI", hash])).trim();
+      dateStr = (await git.raw(['log', '-1', '--format=%aI', hash])).trim();
     } catch (error) {
       const gitErr = classifyGitError(error);
       if (gitErr.severity === 'fatal') {
@@ -898,15 +925,18 @@ export async function calculateChurnRate(
       // Check if this file was modified by anyone in the instability window
       try {
         const priorLog = await git.raw([
-          "log",
+          'log',
           `--since=${windowSince}`,
           `--until=${windowUntil}`,
-          "--format=%H",
-          "--",
+          '--format=%H',
+          '--',
           file.path,
         ]);
         // If there are prior commits to this file (excluding current commit)
-        const priorHashes = priorLog.trim().split("\n").filter((h) => h && h !== hash);
+        const priorHashes = priorLog
+          .trim()
+          .split('\n')
+          .filter((h) => h && h !== hash);
         if (priorHashes.length > 0) {
           churnLines += lines;
         }
@@ -952,13 +982,13 @@ export async function calculateFastChurnRate(
   let authorOutput: string;
   try {
     authorOutput = await git.raw([
-      "log",
+      'log',
       `--since=${since}`,
       `--until=${until}`,
       `--author=${authorEmail}`,
-      "--no-merges",
-      "--format=%H",
-      "--numstat",
+      '--no-merges',
+      '--format=%H',
+      '--numstat',
     ]);
   } catch (error) {
     const gitErr = classifyGitError(error);
@@ -983,12 +1013,12 @@ export async function calculateFastChurnRate(
   let allOutput: string;
   try {
     allOutput = await git.raw([
-      "log",
+      'log',
       `--since=${windowSince}`,
       `--until=${until}`,
-      "--no-merges",
-      "--format=%H|%s",
-      "--name-only",
+      '--no-merges',
+      '--format=%H|%s',
+      '--name-only',
     ]);
   } catch (error) {
     const gitErr = classifyGitError(error);
@@ -1005,17 +1035,17 @@ export async function calculateFastChurnRate(
   let currentHash: string | null = null;
   let skipCurrentCommit = false;
 
-  for (const line of allOutput.split("\n")) {
+  for (const line of allOutput.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
     // Header line: hash|subject
-    const pipeIdx = trimmed.indexOf("|");
+    const pipeIdx = trimmed.indexOf('|');
     if (pipeIdx >= 40 && /^[0-9a-f]{40}$/.test(trimmed.slice(0, 40))) {
       currentHash = trimmed.slice(0, 40);
       const subject = trimmed.slice(pipeIdx + 1);
       const intent = parseIntent(subject);
-      skipCurrentCommit = authorHashes.has(currentHash) || intent === "chore" || intent === "docs";
+      skipCurrentCommit = authorHashes.has(currentHash) || intent === 'chore' || intent === 'docs';
       continue;
     }
 
@@ -1056,7 +1086,7 @@ export function parseChurnLog(output: string): ChurnCommit[] {
   const commits: ChurnCommit[] = [];
   let current: ChurnCommit | null = null;
 
-  for (const line of output.split("\n")) {
+  for (const line of output.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
@@ -1071,9 +1101,9 @@ export function parseChurnLog(output: string): ChurnCommit[] {
     if (current) {
       const match = NUMSTAT_RE.exec(trimmed);
       if (match) {
-        const ins = match[1] === "-" ? 0 : parseInt(match[1], 10) || 0;
-        const del = match[2] === "-" ? 0 : parseInt(match[2], 10) || 0;
-        const path = trimmed.split("\t").slice(2).join("\t");
+        const ins = match[1] === '-' ? 0 : parseInt(match[1], 10) || 0;
+        const del = match[2] === '-' ? 0 : parseInt(match[2], 10) || 0;
+        const path = trimmed.split('\t').slice(2).join('\t');
         current.files.push({ path, insertions: ins, deletions: del });
       }
     }

@@ -1,8 +1,17 @@
-import type { TaskNode, StateDefinition } from '../config/schema.js';
-import type { ComplexityReportContext, ProgressReportContext, DependencyGraphContext } from '../generator/types.js';
+import type { StateDefinition, TaskNode } from '../config/schema.js';
+import { isActiveState, isClosedState, isOpenState } from '../config/state-engine.js';
+import type {
+  ComplexityReportContext,
+  DependencyGraphContext,
+  ProgressReportContext,
+} from '../generator/types.js';
 import { flattenTasks } from '../readiness/dag.js';
-import { isClosedState, isActiveState, isOpenState } from '../config/state-engine.js';
-import type { SummaryReportContext, SkillCoverage, QAReportContext, QAReportFailure } from './types.js';
+import type {
+  QAReportContext,
+  QAReportFailure,
+  SkillCoverage,
+  SummaryReportContext,
+} from './types.js';
 
 /**
  * Aggregate data for the summary report (project health dashboard).
@@ -179,10 +188,7 @@ export function generateMermaidSyntax(tasks: TaskNode[]): string {
  * Aggregate data for the QA report.
  * Collects all qa-failed tasks, qa-review-needed tasks, and summary stats.
  */
-export function aggregateQA(
-  tasks: TaskNode[],
-  _states: StateDefinition[],
-): QAReportContext {
+export function aggregateQA(tasks: TaskNode[], _states: StateDefinition[]): QAReportContext {
   const flat = flattenTasks(tasks);
 
   // Collect qa-failed tasks with their latest feedback

@@ -1,11 +1,15 @@
-import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import {
   buildArchitectureDiscoveryPrompt,
   buildTaskGenerationPrompt,
 } from '../../../../src/parser/analysis/prompts.js';
-import type { ArchitectureAnalysis, CodebaseScanResult, SourceAnalysisResult } from '../../../../src/parser/analysis/types.js';
+import type {
+  ArchitectureAnalysis,
+  CodebaseScanResult,
+  SourceAnalysisResult,
+} from '../../../../src/parser/analysis/types.js';
 
 const fixturesDir = join(import.meta.dirname, '../../../fixtures/analysis');
 
@@ -76,7 +80,8 @@ describe('buildArchitectureDiscoveryPrompt', () => {
   });
 
   it('includes component index summary when provided', () => {
-    const summary = 'Components (1):\n\n  [my-service] (langs: typescript)\n    Build: npm run build';
+    const summary =
+      'Components (1):\n\n  [my-service] (langs: typescript)\n    Build: npm run build';
 
     const messages = buildArchitectureDiscoveryPrompt(prd, null, null, summary);
 

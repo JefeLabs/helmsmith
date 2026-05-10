@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Command } from 'commander';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SETTINGS } from '../types/schema.js';
 
 // ── Mock all external modules ────────────────────────────────────────────────
@@ -71,9 +71,7 @@ vi.mock('../demo.js', () => ({
             {
               name: 'Team1',
               tag: 'default',
-              members: [
-                { name: 'Demo User', email: 'demo@demo.com', aliases: [] },
-              ],
+              members: [{ name: 'Demo User', email: 'demo@demo.com', aliases: [] }],
             },
           ],
         },
@@ -118,13 +116,12 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 
 // ── Import mocked modules for assertions ─────────────────────────────────────
 
-import { loadConfig } from '../config/loader.js';
 import { scanAllRepos } from '../collector/index.js';
-import { runNavigator } from '../views/navigator.js';
-import { dashboardView } from '../views/dashboard.js';
-import { trendsView } from '../views/trends.js';
-import { generateDemoData } from '../demo.js';
 import { getAvailableWorkspaces } from '../config/repos-registry.js';
+import { generateDemoData } from '../demo.js';
+import { dashboardView } from '../views/dashboard.js';
+import { runNavigator } from '../views/navigator.js';
+import { trendsView } from '../views/trends.js';
 
 // ── Spy on console ───────────────────────────────────────────────────────────
 
@@ -257,14 +254,7 @@ describe('CLI argument parsing', () => {
   });
 
   it('parses multiple flags together', () => {
-    const opts = parseArgs([
-      '--demo',
-      '--json',
-      '-w',
-      '4',
-      '--org',
-      'TestOrg',
-    ]);
+    const opts = parseArgs(['--demo', '--json', '-w', '4', '--org', 'TestOrg']);
     expect(opts.demo).toBe(true);
     expect(opts.json).toBe(true);
     expect(opts.weeks).toBe(4);
@@ -375,10 +365,14 @@ describe('CLI scan integration', () => {
       settings: { ...DEFAULT_SETTINGS },
     };
 
-    await mockedScan(config, { version: 1, repos: {} }, {
-      forceScan: true,
-      stalenessMinutes: 30,
-    });
+    await mockedScan(
+      config,
+      { version: 1, repos: {} },
+      {
+        forceScan: true,
+        stalenessMinutes: 30,
+      },
+    );
 
     expect(mockedScan).toHaveBeenCalledWith(
       config,
