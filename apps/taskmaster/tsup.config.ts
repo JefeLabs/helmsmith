@@ -15,4 +15,9 @@ export default defineConfig({
   // package.json exports point at .ts source, so a built JS bundle
   // must inline them to be runnable.
   noExternal: [/^@ecruz165\//],
+  // @opentui/* uses Bun-specific import attributes (`with { type: "file" }`)
+  // for embedded WASM/SCM assets, which esbuild can't bundle. Keep them
+  // external so they resolve from node_modules at runtime — taskmaster
+  // runs on Bun (see bin shebang), which handles those imports natively.
+  external: [/^@opentui\//],
 });
