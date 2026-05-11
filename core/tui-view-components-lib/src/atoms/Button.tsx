@@ -5,7 +5,14 @@
  * Variants: primary, secondary, ghost, danger, success
  * Sizes:    sm, md, lg
  *
- * Focus: pass `focused` to use the `bgFocus`/`fgFocus` slots.
+ * State (orthogonal to variant):
+ *   selected  — persistent "this is the active option". Fills bg with
+ *               the variant's intent color (bgActive).
+ *   focused   — transient "keyboard cursor is here". Fills bg with
+ *               the variant's accent shade (bgFocus). Wins over
+ *               selected when both are true.
+ *   disabled  — dim fg on default bg. Suppresses other states.
+ *
  * Click handling on terminal "buttons" varies by openTUI version
  * (no native onClick); we forward `onPress` and `onClick` for both.
  */
@@ -20,6 +27,9 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
 export interface ButtonProps {
   variant?: ButtonVariant;
   size?: ButtonSize;
+  /** Persistent active state — e.g. the currently-selected tab. */
+  selected?: boolean;
+  /** Transient keyboard-focus state — follows the cursor. */
   focused?: boolean;
   disabled?: boolean;
   onPress?: () => void;
@@ -31,6 +41,7 @@ export interface ButtonProps {
 export function Button({
   variant = 'primary',
   size = 'md',
+  selected = false,
   focused = false,
   disabled = false,
   onPress,
@@ -42,12 +53,25 @@ export function Button({
   const v = theme.components.button.variants[variant];
   const s = theme.components.button.sizes[size];
 
-  // Block-style state indication:
-  //  - focused → bg fill changes (uses bgFocus); border chars/style stay static
-  //  - disabled → dim fg on default bg; border stays static
-  const isFocusActive = focused && !disabled;
-  const bg = disabled ? theme.colors.background : isFocusActive && v.bgFocus ? v.bgFocus : v.bg;
-  const fg = disabled ? theme.colors.textSubtle : isFocusActive && v.fgFocus ? v.fgFocus : v.fg;
+  // Block-style state indication. Precedence (highest → lowest):
+  //   disabled  > focused  > selected  > default
+  // Border characters/style stay static across all states; only the bg
+  // fill (and fg for contrast) shifts.
+  let bg: string;
+  let fg: string;
+  if (disabled) {
+    bg = theme.colors.background;
+    fg = theme.colors.textSubtle;
+  } else if (focused) {
+    bg = v.bgFocus ?? v.bg;
+    fg = v.fgFocus ?? v.fg;
+  } else if (selected) {
+    bg = v.bgActive ?? v.bg;
+    fg = v.fgActive ?? v.fg;
+  } else {
+    bg = v.bg;
+    fg = v.fg;
+  }
 
   // Fixed width + explicit height = consistent rows. Height = content (1) +
   // top/bottom padding + 2 for the single-line border.

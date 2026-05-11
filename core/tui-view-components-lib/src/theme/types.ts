@@ -176,12 +176,17 @@ export interface TextVariantStyle {
 }
 
 export interface ButtonVariantStyle {
+  /** At-rest background. For outlined buttons, typically c.background. */
   bg: string;
   fg: string;
   borderColor: string;
-  /** Background when the button has focus / is hovered. */
+  /** Background when persistently selected/active (app state). */
+  bgActive?: string;
+  /** Foreground when persistently selected/active. */
+  fgActive?: string;
+  /** Background when the keyboard cursor is on the button. */
   bgFocus?: string;
-  /** Foreground when the button has focus / is hovered. */
+  /** Foreground when the keyboard cursor is on the button. */
   fgFocus?: string;
 }
 

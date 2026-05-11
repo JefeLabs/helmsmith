@@ -165,10 +165,16 @@ export function persistAgentxTheme(theme: Theme, opts: PersistAgentxThemeOptions
 }
 
 /**
- * Reverse of `loadThemeFile()` for the rich format: produce a
- * minimal ThemeDefinition that round-trips. We store the resolved
- * `colors`/`components`/`spacing`/`typography` under `overrides` so
- * any token touched by a theme author is preserved verbatim.
+ * Reverse of `loadThemeFile()` — produce a minimal ThemeDefinition
+ * (palette only) so the components/typography/colors re-derive from
+ * the live `defaultComponents()` pipeline on every reload. Persisting
+ * the *expanded* form would freeze the on-disk file against future
+ * code changes (e.g. a tweaked button variant would be silently
+ * overridden by the snapshot saved last week).
+ *
+ * If a theme author needs custom component tweaks, they hand-author
+ * a YAML/JSON file with explicit `overrides.components` — the
+ * in-app theme switcher only round-trips the palette.
  */
 function themeToDefinition(theme: Theme): Record<string, unknown> {
   return {
@@ -176,21 +182,7 @@ function themeToDefinition(theme: Theme): Record<string, unknown> {
     displayName: theme.displayName,
     appearance: theme.appearance,
     palette: theme.colors.palette,
-    overrides: {
-      colors: stripPaletteAndSyntax(theme.colors),
-      // Spacing/borders/typography/components could differ from the
-      // defaults computed from the palette, so we round-trip them too.
-      spacing: theme.spacing,
-      borders: theme.borders,
-      typography: theme.typography,
-      components: theme.components,
-    },
   };
-}
-
-function stripPaletteAndSyntax(colors: Theme['colors']): Record<string, unknown> {
-  const { palette: _p, syntax, ...rest } = colors;
-  return { ...rest, syntax };
 }
 
 // ────────────────────────────────────────────────────────────────────

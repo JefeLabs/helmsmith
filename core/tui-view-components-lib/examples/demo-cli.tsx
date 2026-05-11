@@ -141,6 +141,96 @@ function ButtonsDisabled() {
   );
 }
 
+// Selected / focused state showcase — variant × state matrix.
+// Each row demonstrates one state across all five variants so the
+// orthogonal-axis design (variant vs. state) is visible at a glance.
+function ButtonsSelected() {
+  const variants = ['primary', 'secondary', 'ghost', 'danger', 'success'] as const;
+  const tabs = ['overview', 'connections', 'logs', 'settings'] as const;
+  const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>('overview');
+  const [focusedTab, setFocusedTab] = useState<(typeof tabs)[number] | null>(null);
+
+  return (
+    <Panel title="Buttons · selected & focused states" padding="md">
+      <Box variant="transparent" style={{ flexDirection: 'column', gap: 1 }}>
+        <Text variant="muted">
+          <Span variant="accent">selected</Span> is a persistent state (set by app);{' '}
+          <Span variant="accent">focused</Span> is transient (keyboard cursor). Both fill the bg but
+          with different shades. When both apply, focus wins.
+        </Text>
+
+        <Text variant="subtle">at rest (default)</Text>
+        <Box variant="transparent" style={{ flexDirection: 'row', gap: 1 }}>
+          {variants.map((v) => (
+            <Button key={v} variant={v}>
+              {v}
+            </Button>
+          ))}
+        </Box>
+
+        <Text variant="subtle">
+          selected — intent color fills bg (<Span variant="accent">bgActive</Span>)
+        </Text>
+        <Box variant="transparent" style={{ flexDirection: 'row', gap: 1 }}>
+          {variants.map((v) => (
+            <Button key={v} variant={v} selected>
+              {v}
+            </Button>
+          ))}
+        </Box>
+
+        <Text variant="subtle">
+          focused — accent shade fills bg (<Span variant="accent">bgFocus</Span>)
+        </Text>
+        <Box variant="transparent" style={{ flexDirection: 'row', gap: 1 }}>
+          {variants.map((v) => (
+            <Button key={v} variant={v} focused>
+              {v}
+            </Button>
+          ))}
+        </Box>
+
+        <Text variant="subtle">selected + focused — focus wins</Text>
+        <Box variant="transparent" style={{ flexDirection: 'row', gap: 1 }}>
+          {variants.map((v) => (
+            <Button key={v} variant={v} selected focused>
+              {v}
+            </Button>
+          ))}
+        </Box>
+
+        <Text variant="subtle">
+          interactive tab bar — click a tab to <Span variant="accent">select</Span> it;
+          hover-equivalent <Span variant="accent">focus</Span> tracks the most recently moused-over
+          tab
+        </Text>
+        <Box variant="transparent" style={{ flexDirection: 'row', gap: 1 }}>
+          {tabs.map((t) => (
+            <Button
+              key={t}
+              variant="ghost"
+              selected={activeTab === t}
+              focused={focusedTab === t}
+              onPress={() => {
+                setActiveTab(t);
+                setFocusedTab(t);
+              }}
+            >
+              {t}
+            </Button>
+          ))}
+        </Box>
+        <Text variant="muted">
+          active view: <Span variant="accent">{activeTab}</Span>
+          {focusedTab && focusedTab !== activeTab ? (
+            <Span variant="muted"> · cursor on {focusedTab}</Span>
+          ) : null}
+        </Text>
+      </Box>
+    </Panel>
+  );
+}
+
 // ════════════════════════════════════════════════════════════════════
 // SECTION: Inputs (atoms)
 // ════════════════════════════════════════════════════════════════════
@@ -852,6 +942,7 @@ const SECTIONS: DemoSection[] = [
     label: 'Buttons',
     scenarios: [
       { id: 'variants', label: 'Variants × sizes', Component: ButtonsAllVariants },
+      { id: 'states', label: 'Selected & focused', Component: ButtonsSelected },
       { id: 'disabled', label: 'Disabled', Component: ButtonsDisabled },
     ],
   },

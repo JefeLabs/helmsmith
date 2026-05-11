@@ -102,40 +102,67 @@ const BUTTON_SIZES: ButtonComponent['sizes'] = {
 } as const;
 
 function defaultButton(c: ThemeColors): ButtonComponent {
+  // Canonical design: every variant is an OUTLINED button at rest —
+  // intent-colored border + intent-colored text + transparent (page-bg)
+  // interior. Every variant has the identical silhouette (thin frame
+  // around a 1-cell interior), so visual weight is uniform across the
+  // row regardless of which variant you pick.
+  //
+  // The "filled" look is reserved for state changes:
+  //   selected → variant's intent color fills the bg (persistent)
+  //   focused  → accent shade fills the bg (transient, follows cursor)
+  // When both apply, focused wins.
+  //
+  // Two axes, orthogonal:
+  //   variant  → color (primary/secondary/ghost/danger/success)
+  //   state    → silhouette (outlined / filled-active / filled-focused)
   return {
     variants: {
       primary: {
-        bg: c.primary,
-        fg: c.primaryFg,
+        bg: c.background,
+        fg: c.primary,
         borderColor: c.primary,
+        bgActive: c.primary,
+        fgActive: c.primaryFg,
         bgFocus: c.accent,
         fgFocus: c.primaryFg,
       },
       secondary: {
-        bg: c.surface,
-        fg: c.text,
-        borderColor: c.border,
-        bgFocus: c.surfaceMuted,
-        fgFocus: c.text,
-      },
-      ghost: {
         bg: c.background,
         fg: c.text,
         borderColor: c.border,
-        bgFocus: c.surface,
+        bgActive: c.surfaceMuted,
+        fgActive: c.text,
+        bgFocus: c.border,
+        fgFocus: c.text,
+      },
+      ghost: {
+        // Subtler than secondary: dimmer fg, same neutral border.
+        // Use for tertiary actions that should be discoverable but not
+        // compete visually with primary/secondary.
+        bg: c.background,
+        fg: c.textMuted,
+        borderColor: c.border,
+        bgActive: c.surface,
+        fgActive: c.text,
+        bgFocus: c.surfaceMuted,
         fgFocus: c.text,
       },
       danger: {
-        bg: c.danger,
-        fg: c.dangerFg,
+        bg: c.background,
+        fg: c.danger,
         borderColor: c.danger,
+        bgActive: c.danger,
+        fgActive: c.dangerFg,
         bgFocus: c.danger,
         fgFocus: c.dangerFg,
       },
       success: {
-        bg: c.success,
-        fg: c.successFg,
+        bg: c.background,
+        fg: c.success,
         borderColor: c.success,
+        bgActive: c.success,
+        fgActive: c.successFg,
         bgFocus: c.success,
         fgFocus: c.successFg,
       },
