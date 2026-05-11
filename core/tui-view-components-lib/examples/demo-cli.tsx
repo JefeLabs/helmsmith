@@ -33,6 +33,7 @@ import {
   Panel,
   SelectList,
   type SelectListItem,
+  Span,
   Spinner,
   StatusList,
   type StatusListItem,
@@ -53,7 +54,7 @@ import {
 interface Scenario {
   id: string;
   label: string;
-  render: () => JSX.Element;
+  Component: () => JSX.Element;
 }
 
 interface DemoSection {
@@ -420,8 +421,8 @@ function TableColumnHelp() {
     <Panel title="TableHelp · column reference tied to a Table" padding="md">
       <Box variant="transparent" style={{ flexDirection: 'column', gap: 1 }}>
         <Text variant="muted">
-          A 2-column reference page generated from the same <Text variant="accent">columns</Text>{' '}
-          array passed to the data Table. Each column's <Text variant="accent">description</Text>{' '}
+          A 2-column reference page generated from the same <Span variant="accent">columns</Span>{' '}
+          array passed to the data Table. Each column's <Span variant="accent">description</Span>{' '}
           field is the source of truth.
         </Text>
         <TableHelp
@@ -488,6 +489,291 @@ function TableStreaming() {
   );
 }
 
+// ────────────────────────────────────────────────────────────────────
+// Wide table (15 columns) — demonstrates horizontal scroll via scrollbox
+// ────────────────────────────────────────────────────────────────────
+
+interface WideRow {
+  id: string;
+  name: string;
+  status: string;
+  team: string;
+  region: string;
+  pricing: string;
+  capacity: string;
+  latency: string;
+  uptime: string;
+  version: string;
+  owner: string;
+  created: string;
+  updated: string;
+  alerts: string;
+  notes: string;
+}
+
+const wideColumns: TableColumn<WideRow>[] = [
+  { key: 'id', label: 'ID', width: 6 },
+  { key: 'name', label: 'Service', width: 18 },
+  { key: 'status', label: 'Status', width: 12 },
+  { key: 'team', label: 'Team', width: 12 },
+  { key: 'region', label: 'Region', width: 12 },
+  { key: 'pricing', label: 'Tier', width: 10 },
+  { key: 'capacity', label: 'Capacity', width: 10, align: 'right' },
+  { key: 'latency', label: 'p95 (ms)', width: 10, align: 'right' },
+  { key: 'uptime', label: 'Uptime', width: 10, align: 'right' },
+  { key: 'version', label: 'Version', width: 10 },
+  { key: 'owner', label: 'Owner', width: 14 },
+  { key: 'created', label: 'Created', width: 12 },
+  { key: 'updated', label: 'Updated', width: 12 },
+  { key: 'alerts', label: 'Alerts', width: 8, align: 'right' },
+  { key: 'notes', label: 'Notes', width: 30 },
+];
+
+const wideRows: WideRow[] = [
+  {
+    id: 'svc-01',
+    name: 'github-copilot',
+    status: 'healthy',
+    team: 'platform',
+    region: 'us-east-1',
+    pricing: 'enterprise',
+    capacity: '85%',
+    latency: '127',
+    uptime: '99.97%',
+    version: '2.4.1',
+    owner: '@platform',
+    created: '2025-01-12',
+    updated: '2026-05-09',
+    alerts: '0',
+    notes: 'Primary AI provider — autoscale enabled.',
+  },
+  {
+    id: 'svc-02',
+    name: 'anthropic-claude',
+    status: 'degraded',
+    team: 'platform',
+    region: 'us-west-2',
+    pricing: 'pro',
+    capacity: '92%',
+    latency: '340',
+    uptime: '99.81%',
+    version: '3.5.0',
+    owner: '@ai-infra',
+    created: '2025-03-04',
+    updated: '2026-05-09',
+    alerts: '2',
+    notes: 'Token expired — re-auth needed.',
+  },
+  {
+    id: 'svc-03',
+    name: 'openai-gpt4',
+    status: 'offline',
+    team: 'platform',
+    region: 'eu-west-1',
+    pricing: 'free',
+    capacity: '0%',
+    latency: '—',
+    uptime: '0%',
+    version: '—',
+    owner: '@ai-infra',
+    created: '2024-11-22',
+    updated: '2026-05-09',
+    alerts: '1',
+    notes: 'Not configured. Optional fallback only.',
+  },
+  {
+    id: 'svc-04',
+    name: 'github-pat',
+    status: 'healthy',
+    team: 'platform',
+    region: 'us-east-1',
+    pricing: 'enterprise',
+    capacity: '12%',
+    latency: '45',
+    uptime: '99.99%',
+    version: '—',
+    owner: '@platform',
+    created: '2025-01-12',
+    updated: '2026-05-09',
+    alerts: '0',
+    notes: 'Used for octokit enrichment.',
+  },
+  {
+    id: 'svc-05',
+    name: 'linear',
+    status: 'offline',
+    team: 'product',
+    region: 'us-east-1',
+    pricing: 'team',
+    capacity: '0%',
+    latency: '—',
+    uptime: '0%',
+    version: '1.32',
+    owner: '@product',
+    created: '2025-08-19',
+    updated: '2026-05-09',
+    alerts: '0',
+    notes: 'Optional ticket integration.',
+  },
+  {
+    id: 'svc-06',
+    name: 'datadog-apm',
+    status: 'healthy',
+    team: 'observability',
+    region: 'us-east-1',
+    pricing: 'enterprise',
+    capacity: '68%',
+    latency: '95',
+    uptime: '99.95%',
+    version: '7.51',
+    owner: '@obs',
+    created: '2024-06-10',
+    updated: '2026-05-09',
+    alerts: '0',
+    notes: 'APM + log forwarding.',
+  },
+  {
+    id: 'svc-07',
+    name: 'pagerduty',
+    status: 'healthy',
+    team: 'sre',
+    region: 'global',
+    pricing: 'business',
+    capacity: '4%',
+    latency: '210',
+    uptime: '99.99%',
+    version: '—',
+    owner: '@sre',
+    created: '2024-02-28',
+    updated: '2026-05-09',
+    alerts: '0',
+    notes: 'Oncall routing.',
+  },
+];
+
+function TableWideColumns() {
+  return (
+    <Panel title="Table · 15 columns (horizontal scroll)" padding="md">
+      <Box variant="transparent" style={{ flexDirection: 'column', gap: 1 }}>
+        <Text variant="muted">
+          Total column width exceeds the viewport. Wrapped in a{' '}
+          <Span variant="accent">scrollbox</Span> with <Span variant="accent">scrollX</Span> so the
+          table scrolls horizontally — use the mouse wheel (or shift+wheel) to scroll right and
+          reveal the rest of the columns.
+        </Text>
+        {/*
+          openTUI's <scrollbox> provides a bounded viewport with built-in
+          scrollbars. We set a fixed height so the viewport can't grow to
+          fit the content, which is what triggers the horizontal scroll.
+          The Table itself is unmodified — scrolling is a pure container
+          concern, just like overflow: scroll on the web.
+        */}
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        <scrollbox
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          {...({
+            style: { width: '100%', height: 14 },
+            scrollX: true,
+            scrollY: false,
+          } as any)}
+        >
+          <Table
+            rows={wideRows}
+            columns={wideColumns}
+            rowKey="id"
+            pinHeader
+            selectable
+            alwaysCapture
+          />
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        </scrollbox>
+      </Box>
+    </Panel>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Tall table (100 rows) — demonstrates vertical scroll via scrollbox
+// ────────────────────────────────────────────────────────────────────
+
+const manyRows: DemoRow[] = Array.from({ length: 100 }, (_, i) => {
+  const idx = i + 1;
+  const statusCycle: DemoRow['status'][] = ['connected', 'expired', 'disconnected'];
+  return {
+    id: `r-${String(idx).padStart(3, '0')}`,
+    name: `Service ${idx}`,
+    status: statusCycle[i % 3]!,
+    priority: (i % 9) + 1,
+    description: `Synthetic row ${idx} — used for vertical-scroll demo.`,
+  };
+});
+
+// Minimal type for the openTUI ScrollBoxRenderable surface we use.
+interface ScrollBoxRef {
+  scrollTop: number;
+  scrollHeight: number;
+  height: number;
+}
+
+function TableManyRows() {
+  // Ref to the openTUI scrollbox so we can drive scrollTop from the
+  // cursor position. Each Table row renders as one line; pinHeader adds
+  // one line above the rows.
+  const scrollRef = useRef<ScrollBoxRef | null>(null);
+  const VIEWPORT_HEIGHT = 18;
+  // Subtract 2 for the scrollbox's own border so the cursor never sits
+  // on the last visible line where it would feel "stuck".
+  const VISIBLE_ROWS = VIEWPORT_HEIGHT - 2;
+
+  const handleCursorChange = (_row: DemoRow, idx: number) => {
+    const box = scrollRef.current;
+    if (!box) return;
+    // y-position of this row within the scrollbox's content area
+    const cursorY = idx + 1; // +1 because pinHeader occupies row 0
+    const currentTop = box.scrollTop;
+    if (cursorY < currentTop) {
+      box.scrollTop = Math.max(0, cursorY);
+    } else if (cursorY >= currentTop + VISIBLE_ROWS) {
+      box.scrollTop = cursorY - VISIBLE_ROWS + 1;
+    }
+  };
+
+  return (
+    <Panel title="Table · 100 rows (vertical scroll)" padding="md">
+      <Box variant="transparent" style={{ flexDirection: 'column', gap: 1 }}>
+        <Text variant="muted">
+          100 rows in a bounded <Span variant="accent">scrollbox</Span>. Use{' '}
+          <Span variant="accent">↑↓</Span> (or <Span variant="accent">j/k</Span>) to navigate — the
+          viewport auto-scrolls to keep the cursor visible. Mouse wheel still works for
+          free-scrolling.
+        </Text>
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        <scrollbox
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ref={scrollRef as any}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          {...({
+            style: { width: '100%', height: VIEWPORT_HEIGHT },
+            scrollX: false,
+            scrollY: true,
+          } as any)}
+        >
+          <Table
+            rows={manyRows}
+            columns={tableColumns}
+            rowKey="id"
+            pinHeader
+            selectable
+            alwaysCapture
+            onChange={handleCursorChange}
+          />
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        </scrollbox>
+      </Box>
+    </Panel>
+  );
+}
+
 // ════════════════════════════════════════════════════════════════════
 // SECTION: Confirm (organism)
 // ════════════════════════════════════════════════════════════════════
@@ -500,7 +786,7 @@ function ConfirmOverview() {
     <Panel title="Confirm · yes/no modal" padding="md">
       <Box variant="transparent" style={{ flexDirection: 'column', gap: 1 }}>
         <Text variant="muted">
-          Press <Text variant="accent">c</Text> to open the modal.
+          Press <Span variant="accent">c</Span> to open the modal.
         </Text>
         {result ? (
           <Text variant={result === 'yes' ? 'accent' : 'subtle'}>Last answer: {result}</Text>
@@ -538,7 +824,7 @@ function ThemePicker() {
     <Panel title="Theme · interactive picker" padding="md">
       <Box variant="transparent" style={{ flexDirection: 'column', gap: 1 }}>
         <Text variant="muted">
-          Press <Text variant="accent">p</Text> to open the picker.
+          Press <Span variant="accent">p</Span> to open the picker.
         </Text>
         <Text variant="subtle">
           Or use Ctrl+T to cycle directly · Ctrl+Shift+T to toggle dark/light.
@@ -559,62 +845,64 @@ const SECTIONS: DemoSection[] = [
   {
     id: 'typography',
     label: 'Typography',
-    scenarios: [{ id: 'all', label: 'Overview', render: TypographyOverview }],
+    scenarios: [{ id: 'all', label: 'Overview', Component: TypographyOverview }],
   },
   {
     id: 'buttons',
     label: 'Buttons',
     scenarios: [
-      { id: 'variants', label: 'Variants × sizes', render: ButtonsAllVariants },
-      { id: 'disabled', label: 'Disabled', render: ButtonsDisabled },
+      { id: 'variants', label: 'Variants × sizes', Component: ButtonsAllVariants },
+      { id: 'disabled', label: 'Disabled', Component: ButtonsDisabled },
     ],
   },
   {
     id: 'inputs',
     label: 'Inputs',
-    scenarios: [{ id: 'variants', label: 'Variants', render: InputsAllVariants }],
+    scenarios: [{ id: 'variants', label: 'Variants', Component: InputsAllVariants }],
   },
   {
     id: 'spinner',
     label: 'Spinner',
-    scenarios: [{ id: 'all', label: 'Variants', render: SpinnerOverview }],
+    scenarios: [{ id: 'all', label: 'Variants', Component: SpinnerOverview }],
   },
   {
     id: 'status',
     label: 'StatusList',
     scenarios: [
-      { id: 'basic', label: 'Basic', render: StatusListBasic },
-      { id: 'details', label: 'Details + badges', render: StatusListWithDetails },
+      { id: 'basic', label: 'Basic', Component: StatusListBasic },
+      { id: 'details', label: 'Details + badges', Component: StatusListWithDetails },
     ],
   },
   {
     id: 'select',
     label: 'SelectList',
     scenarios: [
-      { id: 'basic', label: 'Basic', render: SelectListBasic },
-      { id: 'disabled', label: 'With disabled', render: SelectListWithDisabled },
+      { id: 'basic', label: 'Basic', Component: SelectListBasic },
+      { id: 'disabled', label: 'With disabled', Component: SelectListWithDisabled },
     ],
   },
   {
     id: 'table',
     label: 'Table',
     scenarios: [
-      { id: 'basic', label: 'Basic', render: TableBasic },
-      { id: 'sorted', label: 'Sort + cursor follow', render: TableSorted },
-      { id: 'master-detail', label: 'Master/detail', render: TableMasterDetail },
-      { id: 'streaming', label: 'Live streaming', render: TableStreaming },
-      { id: 'help', label: 'Column help (TableHelp)', render: TableColumnHelp },
+      { id: 'basic', label: 'Basic', Component: TableBasic },
+      { id: 'sorted', label: 'Sort + cursor follow', Component: TableSorted },
+      { id: 'master-detail', label: 'Master/detail', Component: TableMasterDetail },
+      { id: 'streaming', label: 'Live streaming', Component: TableStreaming },
+      { id: 'help', label: 'Column help (TableHelp)', Component: TableColumnHelp },
+      { id: 'wide', label: '15 columns (h-scroll)', Component: TableWideColumns },
+      { id: 'many', label: '100 rows (v-scroll)', Component: TableManyRows },
     ],
   },
   {
     id: 'confirm',
     label: 'Confirm',
-    scenarios: [{ id: 'modal', label: 'Modal', render: ConfirmOverview }],
+    scenarios: [{ id: 'modal', label: 'Modal', Component: ConfirmOverview }],
   },
   {
     id: 'theme',
     label: 'Theme',
-    scenarios: [{ id: 'picker', label: 'Picker', render: ThemePicker }],
+    scenarios: [{ id: 'picker', label: 'Picker', Component: ThemePicker }],
   },
 ];
 
@@ -655,6 +943,10 @@ function App({ onQuit }: { onQuit: () => void }) {
   const scenarios = section?.scenarios ?? [];
   const scenario =
     (scenarioItem && scenarios.find((s) => s.id === scenarioItem.id)) ?? scenarios[0]!;
+  // Mount the scenario as a React element so its hooks belong to its own fiber.
+  // Calling scenario.Component() inline would inline its hooks into App and break
+  // the rules of hooks the moment a scenario with a different hook count loads.
+  const Scenario = scenario?.Component;
 
   return (
     <Box variant="default" padding="md" style={{ flexDirection: 'column', gap: 1 }}>
@@ -667,7 +959,7 @@ function App({ onQuit }: { onQuit: () => void }) {
       <Menu items={menuItems} layout="stacked" exitKey="escape" onChange={setPath} />
 
       <Box variant="transparent" style={{ flexDirection: 'column', gap: 1 }}>
-        {scenario ? scenario.render() : null}
+        {Scenario ? <Scenario /> : null}
       </Box>
 
       <KeybindingsBar />

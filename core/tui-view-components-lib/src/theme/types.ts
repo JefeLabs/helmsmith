@@ -188,6 +188,9 @@ export interface ButtonVariantStyle {
 export interface ButtonSizeStyle {
   paddingX: number;
   paddingY: number;
+  /** Fixed width per size so every button in a row aligns regardless of label length. */
+  width: number;
+  /** Floor — only used when a consumer explicitly opts out of `width`. */
   minWidth: number;
 }
 

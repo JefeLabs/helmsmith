@@ -41,18 +41,23 @@ export function Input({
   const theme = useThemeTokens();
   const v = theme.components.input.variants[variant];
 
-  const merged: Record<string, unknown> = {
+  // openTUI's <input> uses `textColor` (not `fg`), has no border slot of its
+  // own, and collapses to width 0 if not given an explicit width. The
+  // renderable always paints a bg, so the theme picks a per-variant fill
+  // (flushed → surface, to blend into Panels — see input tokens).
+  const inputStyle: Record<string, unknown> = {
     backgroundColor: v.bg,
-    fg: v.fg,
-    borderColor: v.borderColor,
+    textColor: v.fg,
+    focusedBackgroundColor: v.bg,
+    focusedTextColor: v.fg,
     placeholderColor: v.placeholderFg,
-    ...style,
+    width: '100%',
   };
 
-  return (
+  const inputEl = (
     <input
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      style={merged as any}
+      style={inputStyle as any}
       value={value}
       placeholder={placeholder}
       focused={focused}
@@ -63,4 +68,30 @@ export function Input({
       {...(rest as Record<string, unknown>)}
     />
   );
+
+  // Always wrap so every variant has a consistent inner content column.
+  // Variants differ only in whether they paint a border and whether the
+  // wrapper has its own bg fill; border characters and style are static.
+  //
+  // Padding is tuned per-variant so content aligns horizontally when
+  // form fields stack vertically. A border occupies 1 cell on each side,
+  // so flushed (no border) absorbs that cell into its padding to keep
+  // the cursor column identical to the bordered variants.
+  const hasBorder = variant === 'default';
+  const contentPad = hasBorder ? 1 : 2;
+  const boxStyle: Record<string, unknown> = {
+    border: hasBorder,
+    borderStyle: 'single',
+    borderColor: v.borderColor,
+    // Wrapper uses the same fill as the input so the padding region
+    // doesn't show a different color than the editable area.
+    backgroundColor: v.bg,
+    width: '100%',
+    paddingLeft: contentPad,
+    paddingRight: contentPad,
+    ...style,
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return <box style={boxStyle as any}>{inputEl}</box>;
 }

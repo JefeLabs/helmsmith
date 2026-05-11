@@ -49,8 +49,11 @@ export interface KeybindingEntry {
   /** Hide from the help bar. Useful for invisible global bindings. */
   hidden?: boolean;
   /** Handler receives the matched KeyEvent so a single binding can
-   *  match a class of keys (e.g. any digit) and dispatch on the value. */
-  handler: (key: KeyEvent) => void;
+   *  match a class of keys (e.g. any digit) and dispatch on the value.
+   *  Return `false` to indicate the handler declined to consume the
+   *  key — dispatch will continue to the next matching binding. Any
+   *  other return value (including `undefined`) counts as consumed. */
+  handler: (key: KeyEvent) => undefined | false;
 }
 
 interface KeyboardContextValue {
@@ -88,12 +91,14 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
   }, []);
 
   // Mount the actual openTUI keyboard listener once at the provider.
+  // Iterate bindings in priority order; the first handler that returns
+  // anything other than `false` consumes the key and dispatch stops.
+  // A handler that returns `false` declines the key — we keep looking.
   useKeyboard((key: KeyEvent) => {
     for (const b of bindingsRef.current) {
-      if (matches(b.match, key)) {
-        b.handler(key);
-        return;
-      }
+      if (!matches(b.match, key)) continue;
+      const consumed = b.handler(key);
+      if (consumed !== false) return;
     }
   });
 
@@ -129,7 +134,7 @@ export interface UseKeybindingOptions {
 export function useKeybinding(
   match: KeyMatcher,
   label: string,
-  handler: (key: KeyEvent) => void,
+  handler: (key: KeyEvent) => undefined | false,
   opts: UseKeybindingOptions = {},
 ): void {
   const ctx = useContext(KeyboardContext);

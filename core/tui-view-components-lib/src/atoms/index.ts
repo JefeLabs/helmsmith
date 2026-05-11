@@ -15,5 +15,7 @@ export type { HeadingLevel, HeadingProps } from './Heading.tsx';
 export { Heading } from './Heading.tsx';
 export type { InputProps, InputVariant } from './Input.tsx';
 export { Input } from './Input.tsx';
+export type { SpanProps } from './Span.tsx';
+export { Span } from './Span.tsx';
 export type { TextProps, TextVariant } from './Text.tsx';
 export { Text } from './Text.tsx';

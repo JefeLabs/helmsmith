@@ -74,7 +74,7 @@ import {
 import { Box } from '../atoms/Box.tsx';
 import { Text } from '../atoms/Text.tsx';
 import { useFocus } from '../focus/manager.tsx';
-import { useKeybinding } from '../keyboard/registry.ts';
+import { useKeybinding } from '../keyboard/registry.tsx';
 import { useThemeTokens } from '../theme/hooks.ts';
 
 export interface TableColumn<T> {
@@ -237,12 +237,15 @@ function Cell({
   children,
   bold = false,
   variant,
+  bg,
 }: {
   width: number;
   align?: 'left' | 'center' | 'right';
   children: ReactNode;
   bold?: boolean;
   variant?: 'muted' | 'subtle' | 'accent' | 'body';
+  /** Per-state bg fill (e.g. for highlighted rows). Borders never change. */
+  bg?: string;
 }) {
   return (
     <Box
@@ -251,9 +254,10 @@ function Cell({
         width,
         flexDirection: 'row',
         justifyContent: ALIGN_TO_FLEX[align],
+        ...(bg ? { backgroundColor: bg } : {}),
       }}
     >
-      <Text variant={variant ?? 'body'} preset={bold ? 'label' : undefined}>
+      <Text variant={variant ?? 'body'} preset={bold ? 'label' : undefined} bg={bg}>
         {children}
       </Text>
     </Box>
@@ -269,19 +273,25 @@ interface RowProps<T> {
 }
 
 function RowImpl<T>({ row, index, columns, highlighted, pinned }: RowProps<T>) {
+  const theme = useThemeTokens();
   const cursorMarkerWidth = 2;
+  // Block-style state: highlighted row gets a bg fill; borders stay static
+  // (never toggled per row state). useContext keeps this in sync across
+  // theme changes even though Row is wrapped in React.memo.
+  const highlightBg = highlighted ? theme.colors.surfaceMuted : undefined;
   return (
     <Box
-      variant={highlighted ? 'panel' : 'transparent'}
+      variant="transparent"
       style={{
         flexDirection: 'row',
         gap: 1,
         paddingLeft: 1,
         paddingRight: 1,
+        ...(highlightBg ? { backgroundColor: highlightBg } : {}),
       }}
     >
       <Box variant="transparent" style={{ width: cursorMarkerWidth }}>
-        <Text variant={highlighted ? 'accent' : 'subtle'}>
+        <Text variant={highlighted ? 'accent' : 'subtle'} bg={highlightBg}>
           {highlighted ? '▸' : pinned ? '•' : ' '}
         </Text>
       </Box>
@@ -291,6 +301,7 @@ function RowImpl<T>({ row, index, columns, highlighted, pinned }: RowProps<T>) {
           width={col.width}
           align={col.align}
           variant={highlighted ? 'accent' : pinned ? 'muted' : 'body'}
+          bg={highlightBg}
         >
           {resolveCell(row, index, col)}
         </Cell>
@@ -319,26 +330,31 @@ interface SkeletonRowProps<T> {
 }
 
 function SkeletonRowImpl<T>({ columns, highlighted }: SkeletonRowProps<T>) {
+  const theme = useThemeTokens();
   const cursorMarkerWidth = 2;
+  const highlightBg = highlighted ? theme.colors.surfaceMuted : undefined;
   return (
     <Box
-      variant={highlighted ? 'panel' : 'transparent'}
+      variant="transparent"
       style={{
         flexDirection: 'row',
         gap: 1,
         paddingLeft: 1,
         paddingRight: 1,
+        ...(highlightBg ? { backgroundColor: highlightBg } : {}),
       }}
     >
       <Box variant="transparent" style={{ width: cursorMarkerWidth }}>
-        <Text variant={highlighted ? 'accent' : 'subtle'}>{highlighted ? '▸' : ' '}</Text>
+        <Text variant={highlighted ? 'accent' : 'subtle'} bg={highlightBg}>
+          {highlighted ? '▸' : ' '}
+        </Text>
       </Box>
       {columns.map((col) => {
         // Bar of dim chars at ~70% of the column width feels less
         // monolithic than filling the whole cell.
         const barWidth = Math.max(2, Math.floor(col.width * 0.7));
         return (
-          <Cell key={col.key} width={col.width} align="left" variant="subtle">
+          <Cell key={col.key} width={col.width} align="left" variant="subtle" bg={highlightBg}>
             {'━'.repeat(barWidth)}
           </Cell>
         );

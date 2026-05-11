@@ -12,7 +12,6 @@ import { deepMerge } from './base16.ts';
 import type {
   Base16Palette,
   ButtonComponent,
-  ButtonSizeStyle,
   DeepPartial,
   InputComponent,
   Theme,
@@ -97,9 +96,9 @@ function defaultTypography(c: ThemeColors): Typography {
 // ────────────────────────────────────────────────────────────────────
 
 const BUTTON_SIZES: ButtonComponent['sizes'] = {
-  sm: { paddingX: 1, paddingY: 0, minWidth: 6 },
-  md: { paddingX: 2, paddingY: 0, minWidth: 10 },
-  lg: { paddingX: 3, paddingY: 1, minWidth: 14 },
+  sm: { paddingX: 1, paddingY: 0, width: 14, minWidth: 6 },
+  md: { paddingX: 2, paddingY: 0, width: 16, minWidth: 10 },
+  lg: { paddingX: 3, paddingY: 1, width: 20, minWidth: 14 },
 } as const;
 
 function defaultButton(c: ThemeColors): ButtonComponent {
@@ -145,11 +144,11 @@ function defaultButton(c: ThemeColors): ButtonComponent {
   };
 }
 
-function cloneSizes(sizes: Record<string, ButtonSizeStyle>): ButtonComponent['sizes'] {
+function cloneSizes(sizes: ButtonComponent['sizes']): ButtonComponent['sizes'] {
   return {
-    sm: { ...sizes.sm! },
-    md: { ...sizes.md! },
-    lg: { ...sizes.lg! },
+    sm: { ...sizes.sm },
+    md: { ...sizes.md },
+    lg: { ...sizes.lg },
   };
 }
 
@@ -169,9 +168,13 @@ function defaultInput(c: ThemeColors): InputComponent {
         placeholderFg: c.textSubtle,
       },
       flushed: {
-        bg: c.background,
+        // Match Panel's surface so flushed inputs visually inherit their
+        // container (the most common case). openTUI's <input> can't be
+        // truly transparent — its renderable always paints something — so
+        // we pick the bg that most often blends in.
+        bg: c.surface,
         fg: c.text,
-        borderColor: c.background,
+        borderColor: c.surface,
         placeholderFg: c.textSubtle,
       },
     },

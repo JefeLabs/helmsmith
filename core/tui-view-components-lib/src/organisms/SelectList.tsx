@@ -15,6 +15,7 @@ import { Box } from '../atoms/Box.tsx';
 import { Text } from '../atoms/Text.tsx';
 import { useFocus } from '../focus/manager.tsx';
 import { useKeybinding } from '../keyboard/registry.tsx';
+import { useThemeTokens } from '../theme/hooks.ts';
 
 export interface SelectListItem {
   id: string;
@@ -93,23 +94,39 @@ export function SelectList({
     hidden: !onCancel,
   });
 
+  const theme = useThemeTokens();
+
   return (
     <Box variant="transparent" style={{ flexDirection: 'column', gap: 0, ...style }}>
       {items.map((item, i) => {
         const isCursor = i === idx;
+        // Block-style state: cursor row gets a bg fill, never a border.
+        // Borders stay static across states so rows don't reflow when the
+        // cursor moves.
+        const cursorBg = isCursor ? theme.colors.surfaceMuted : undefined;
         return (
           <Box
             key={item.id}
-            variant={isCursor ? 'panel' : 'transparent'}
-            style={{ flexDirection: 'row', gap: 1, paddingLeft: 1, paddingRight: 1 }}
+            variant="transparent"
+            style={{
+              flexDirection: 'row',
+              gap: 1,
+              paddingLeft: 1,
+              paddingRight: 1,
+              ...(cursorBg ? { backgroundColor: cursorBg } : {}),
+            }}
           >
-            <Text variant={isCursor ? 'accent' : item.disabled ? 'subtle' : 'body'}>
+            <Text variant={isCursor ? 'accent' : item.disabled ? 'subtle' : 'body'} bg={cursorBg}>
               {isCursor ? '▸' : ' '}
             </Text>
-            <Text variant={item.disabled ? 'subtle' : isCursor ? 'accent' : 'body'}>
+            <Text variant={item.disabled ? 'subtle' : isCursor ? 'accent' : 'body'} bg={cursorBg}>
               {item.label}
             </Text>
-            {item.detail ? <Text variant="subtle">{item.detail}</Text> : null}
+            {item.detail ? (
+              <Text variant="subtle" bg={cursorBg}>
+                {item.detail}
+              </Text>
+            ) : null}
           </Box>
         );
       })}

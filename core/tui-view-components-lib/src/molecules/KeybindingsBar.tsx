@@ -24,7 +24,13 @@ export function KeybindingsBar({ separator = ' · ', style }: KeybindingsBarProp
 
   return (
     <Box variant="transparent" style={style}>
-      <Text variant="subtle">
+      <Text
+        variant="subtle"
+        // No wrap + truncate so the bar clips cleanly when the terminal is
+        // narrower than the binding list, instead of corrupting on overflow.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        {...({ wrapMode: 'none', truncate: true } as any)}
+      >
         {bindings.map((b) => `${b.keyDisplay ?? b.label} ${b.label}`).join(separator)}
       </Text>
     </Box>

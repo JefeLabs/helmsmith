@@ -35,6 +35,7 @@ import { Box } from '../atoms/Box.tsx';
 import { Text } from '../atoms/Text.tsx';
 import { useKeybinding } from '../keyboard/registry.tsx';
 import { Panel } from '../molecules/Panel.tsx';
+import { useThemeTokens } from '../theme/hooks.ts';
 
 export interface MenuItem {
   /** Stable id (React key). */
@@ -109,6 +110,7 @@ function MenuRow({
   indent: number;
   onItemClick?: (idx: number) => void;
 }) {
+  const theme = useThemeTokens();
   return (
     <Box
       variant="transparent"
@@ -122,15 +124,22 @@ function MenuRow({
         const isCursor = active && i === level.idx;
         const hk = showHotkeys ? hotkeyFor(item, i) : '';
         const drillsIn = Boolean(item.submenu && item.submenu.length > 0);
+        // Highlight cursor with a background color rather than a border —
+        // keeps every item the same height so the row doesn't jump as the
+        // cursor moves and all items stay on a single baseline.
+        const cursorBg = isCursor ? theme.colors.surfaceMuted : undefined;
         return (
           <Box
             key={item.id}
-            variant={isCursor ? 'panel' : 'transparent'}
+            variant="transparent"
             padding="xs"
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            {...({ onPress: () => onItemClick?.(i) } as any)}
+            {...({
+              onPress: () => onItemClick?.(i),
+              style: cursorBg ? { backgroundColor: cursorBg } : undefined,
+            } as any)}
           >
-            <Text variant={isCursor ? 'accent' : active ? 'body' : 'muted'}>
+            <Text variant={isCursor ? 'accent' : active ? 'body' : 'muted'} bg={cursorBg}>
               {hk ? `[${hk}] ` : ''}
               {item.label}
               {drillsIn ? ' ›' : ''}
@@ -178,17 +187,24 @@ export function Menu({
   const [levels, setLevels] = useState<Level[]>(() => [{ parent: null, items, idx: 0 }]);
 
   const deepest = levels[levels.length - 1]!;
-  const path: MenuItem[] = levels
-    .slice(1) // exclude root
-    .map((l) => l.parent!)
-    .filter(Boolean);
 
-  const fireChange = (newLevels: Level[]) => {
-    const newPath = newLevels
-      .slice(1)
+  /** Full navigation address: drilled-into items + the currently cursored
+   *  item at the deepest level. So cursor movement at the root previews
+   *  each top-level section, and drilling appends another item. */
+  const pathFor = (ls: Level[]): MenuItem[] => {
+    const drilled = ls
+      .slice(1) // exclude root
       .map((l) => l.parent!)
       .filter(Boolean);
-    onChange?.(newPath);
+    const tip = ls[ls.length - 1];
+    const cursored = tip?.items[tip.idx];
+    return cursored ? [...drilled, cursored] : drilled;
+  };
+
+  const path: MenuItem[] = pathFor(levels);
+
+  const fireChange = (newLevels: Level[]) => {
+    onChange?.(pathFor(newLevels));
   };
 
   const setCursor = (newIdx: number) => {
@@ -224,18 +240,23 @@ export function Menu({
 
   // Single binding for digit hotkeys 1-9. Routes to the cursor index
   // matching the pressed key, scoped to the current (deepest) level.
+  // Returns `false` to pass the key through when no item exists at that
+  // index, so consumers can bind digits to their own actions.
   useKeybinding(
     (k) => Boolean(k.name && /^[1-9]$/.test(k.name)),
     'select 1-9',
     (key) => {
       const i = Number(key.name) - 1;
-      if (i >= 0 && i < deepest.items.length) setCursor(i);
+      if (i < 0 || i >= deepest.items.length) return false;
+      setCursor(i);
     },
     { hidden: true },
   );
 
   // Single binding for letter hotkeys. Looks up the current level's
-  // items by their `hotkey` field and routes accordingly.
+  // items by their `hotkey` field; returns `false` if no item claims
+  // this letter so scenario-level bindings (e.g. "c" to open a modal)
+  // can still fire.
   useKeybinding(
     (k) => Boolean(k.name && /^[a-z]$/.test(k.name)),
     'custom hotkey',
@@ -243,7 +264,8 @@ export function Menu({
       const idx = deepest.items.findIndex(
         (it) => it.hotkey?.toLowerCase() === key.name?.toLowerCase(),
       );
-      if (idx >= 0) setCursor(idx);
+      if (idx < 0) return false;
+      setCursor(idx);
     },
     { hidden: true },
   );
@@ -256,7 +278,7 @@ export function Menu({
       const next = (deepest.idx + 1) % deepest.items.length;
       setCursor(next);
     },
-    { keyDisplay: '⇥' },
+    { keyDisplay: 'Tab' },
   );
 
   useKeybinding(
@@ -267,16 +289,16 @@ export function Menu({
       const prev = (deepest.idx - 1 + deepest.items.length) % deepest.items.length;
       setCursor(prev);
     },
-    { keyDisplay: '⇧⇥' },
+    { keyDisplay: 'S-Tab' },
   );
 
   useKeybinding((k) => k.name === 'return' || k.name === 'enter', 'select / drill', drill, {
-    keyDisplay: '↵',
+    keyDisplay: 'Enter',
   });
 
   useKeybinding(exitKey ?? 'escape', 'back', exit, {
     hidden: levels.length <= 1 || exitKey === null,
-    keyDisplay: 'esc',
+    keyDisplay: 'Esc',
   });
 
   // ── Render ─────────────────────────────────────────────────────────

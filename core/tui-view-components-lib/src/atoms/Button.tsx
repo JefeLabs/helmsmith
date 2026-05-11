@@ -42,19 +42,33 @@ export function Button({
   const v = theme.components.button.variants[variant];
   const s = theme.components.button.sizes[size];
 
-  const bg = focused && v.bgFocus ? v.bgFocus : v.bg;
-  const fg = focused && v.fgFocus ? v.fgFocus : v.fg;
+  // Block-style state indication:
+  //  - focused → bg fill changes (uses bgFocus); border chars/style stay static
+  //  - disabled → dim fg on default bg; border stays static
+  const isFocusActive = focused && !disabled;
+  const bg = disabled ? theme.colors.background : isFocusActive && v.bgFocus ? v.bgFocus : v.bg;
+  const fg = disabled ? theme.colors.textSubtle : isFocusActive && v.fgFocus ? v.fgFocus : v.fg;
+
+  // Fixed width + explicit height = consistent rows. Height = content (1) +
+  // top/bottom padding + 2 for the single-line border.
+  const buttonHeight = 1 + s.paddingY * 2 + 2;
 
   const boxStyle: Record<string, unknown> = {
     backgroundColor: bg,
     border: true,
     borderStyle: 'single',
+    // Border color is static per variant — never restyled for focus/disabled
+    // (only the cell background changes on state).
     borderColor: v.borderColor,
     paddingLeft: s.paddingX,
     paddingRight: s.paddingX,
     paddingTop: s.paddingY,
     paddingBottom: s.paddingY,
-    minWidth: s.minWidth,
+    width: s.width,
+    height: buttonHeight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
     ...style,
   };
 
