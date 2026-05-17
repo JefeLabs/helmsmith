@@ -1,0 +1,730 @@
+{
+  "version": "2.11",
+  "imports": {
+    "brand": "../brand.lib.pen"
+  },
+  "children": [
+    {
+      "id": "group-overlays",
+      "type": "frame",
+      "name": "Overlays",
+      "x": 0,
+      "y": 0,
+      "layout": "vertical",
+      "gap": 40,
+      "padding": 40,
+      "fill": "$brand:color.background",
+      "children": [
+        {
+          "id": "group-overlays-title",
+          "type": "text",
+          "content": "Overlays · HeroUI v3",
+          "fill": "$brand:color.foreground",
+          "fontFamily": "$brand:font.family",
+          "fontSize": 24,
+          "fontWeight": "700"
+        },
+        {
+          "id": "g-overlays-molecule",
+          "type": "frame",
+          "name": "molecules",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "g-overlays-molecule-h",
+              "type": "text",
+              "content": "MOLECULES",
+              "fill": "$brand:color.muted",
+              "fontFamily": "$brand:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "g-overlays-molecule-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "tooltip",
+                  "type": "frame",
+                  "name": "Tooltip",
+                  "layout": "horizontal",
+                  "width": "fit_content",
+                  "alignItems": "center",
+                  "padding": [
+                    10,
+                    6
+                  ],
+                  "fill": "$brand:color.foreground",
+                  "cornerRadius": "$brand:radius.sm",
+                  "children": [
+                    {
+                      "id": "tooltip-label",
+                      "type": "text",
+                      "content": "Tooltip",
+                      "fill": "$brand:color.background",
+                      "fontFamily": "$brand:font.family",
+                      "fontSize": "$brand:font.size-sm"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "Tooltip",
+                    "package": "@heroui/react",
+                    "slug": "tooltip",
+                    "category": "Overlays",
+                    "source": [
+                      "brand.lib.pen",
+                      "groups/overlays.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "g-overlays-organism",
+          "type": "frame",
+          "name": "organisms",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "g-overlays-organism-h",
+              "type": "text",
+              "content": "ORGANISMS",
+              "fill": "$brand:color.muted",
+              "fontFamily": "$brand:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "g-overlays-organism-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "alert-dialog",
+                  "type": "frame",
+                  "name": "AlertDialog",
+                  "width": 420,
+                  "layout": "vertical",
+                  "gap": 16,
+                  "padding": 24,
+                  "fill": "$brand:color.surface",
+                  "cornerRadius": "$brand:radius.lg",
+                  "stroke": {
+                    "thickness": "$brand:border.width",
+                    "fill": "$brand:color.border"
+                  },
+                  "effect": {
+                    "type": "shadow",
+                    "shadowType": "outer",
+                    "offset": {
+                      "x": 0,
+                      "y": 8
+                    },
+                    "blur": 24,
+                    "spread": 0,
+                    "color": "#00000026"
+                  },
+                  "children": [
+                    {
+                      "id": "alert-dialog-hd",
+                      "type": "frame",
+                      "layout": "horizontal",
+                      "width": "fill_container",
+                      "alignItems": "center",
+                      "justifyContent": "space_between",
+                      "children": [
+                        {
+                          "id": "alert-dialog-title",
+                          "type": "text",
+                          "content": "Delete project?",
+                          "fill": "$brand:color.foreground",
+                          "fontFamily": "$brand:font.family",
+                          "fontSize": "$brand:font.size-lg",
+                          "fontWeight": "700"
+                        },
+                        {
+                          "id": "alert-dialog-x",
+                          "type": "text",
+                          "content": "✕",
+                          "fill": "$brand:color.muted",
+                          "fontFamily": "$brand:font.family",
+                          "fontSize": "$brand:font.size-md"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "alert-dialog-body",
+                      "type": "text",
+                      "content": "This action cannot be undone. This will permanently delete the project.",
+                      "fill": "$brand:color.muted",
+                      "fontFamily": "$brand:font.family",
+                      "fontSize": "$brand:font.size-md",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container"
+                    },
+                    {
+                      "id": "alert-dialog-ft",
+                      "type": "frame",
+                      "layout": "horizontal",
+                      "width": "fill_container",
+                      "justifyContent": "end",
+                      "gap": 12,
+                      "children": [
+                        {
+                          "id": "alert-dialog-cancel",
+                          "type": "frame",
+                          "name": "Cancel",
+                          "layout": "horizontal",
+                          "width": "fit_content",
+                          "alignItems": "center",
+                          "justifyContent": "center",
+                          "padding": [
+                            16,
+                            10
+                          ],
+                          "cornerRadius": "$brand:radius.md",
+                          "fill": "$brand:color.surface",
+                          "stroke": {
+                            "thickness": "$brand:border.width",
+                            "fill": "$brand:color.border"
+                          },
+                          "children": [
+                            {
+                              "id": "alert-dialog-cancel-l",
+                              "type": "text",
+                              "content": "Cancel",
+                              "fill": "$brand:color.foreground",
+                              "fontFamily": "$brand:font.family",
+                              "fontSize": "$brand:font.size-md",
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "id": "alert-dialog-ok",
+                          "type": "frame",
+                          "name": "Confirm",
+                          "layout": "horizontal",
+                          "width": "fit_content",
+                          "alignItems": "center",
+                          "justifyContent": "center",
+                          "padding": [
+                            16,
+                            10
+                          ],
+                          "cornerRadius": "$brand:radius.md",
+                          "fill": "$brand:color.accent",
+                          "children": [
+                            {
+                              "id": "alert-dialog-ok-l",
+                              "type": "text",
+                              "content": "Confirm",
+                              "fill": "$brand:color.accent-foreground",
+                              "fontFamily": "$brand:font.family",
+                              "fontSize": "$brand:font.size-md",
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "organism",
+                    "fidelity": "full",
+                    "react": "AlertDialog",
+                    "package": "@heroui/react",
+                    "slug": "alert-dialog",
+                    "category": "Overlays",
+                    "source": [
+                      "brand.lib.pen",
+                      "groups/overlays.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "drawer",
+                  "type": "frame",
+                  "name": "Drawer",
+                  "width": 320,
+                  "height": 480,
+                  "layout": "vertical",
+                  "fill": "$brand:color.surface",
+                  "stroke": {
+                    "thickness": {
+                      "left": "$brand:border.width"
+                    },
+                    "fill": "$brand:color.border"
+                  },
+                  "effect": {
+                    "type": "shadow",
+                    "shadowType": "outer",
+                    "offset": {
+                      "x": 0,
+                      "y": 8
+                    },
+                    "blur": 24,
+                    "spread": 0,
+                    "color": "#00000026"
+                  },
+                  "children": [
+                    {
+                      "id": "drawer-hd",
+                      "type": "frame",
+                      "layout": "horizontal",
+                      "width": "fill_container",
+                      "alignItems": "center",
+                      "justifyContent": "space_between",
+                      "padding": 20,
+                      "stroke": {
+                        "thickness": {
+                          "bottom": "$brand:border.width"
+                        },
+                        "fill": "$brand:color.border"
+                      },
+                      "children": [
+                        {
+                          "id": "drawer-title",
+                          "type": "text",
+                          "content": "Filters",
+                          "fill": "$brand:color.foreground",
+                          "fontFamily": "$brand:font.family",
+                          "fontSize": "$brand:font.size-lg",
+                          "fontWeight": "700"
+                        },
+                        {
+                          "id": "drawer-x",
+                          "type": "text",
+                          "content": "✕",
+                          "fill": "$brand:color.muted",
+                          "fontFamily": "$brand:font.family",
+                          "fontSize": "$brand:font.size-md"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "drawer-body",
+                      "type": "frame",
+                      "layout": "vertical",
+                      "width": "fill_container",
+                      "gap": 12,
+                      "padding": 20,
+                      "children": [
+                        {
+                          "id": "drawer-f1",
+                          "type": "frame",
+                          "name": "Field",
+                          "width": "fill_container",
+                          "height": 40,
+                          "layout": "horizontal",
+                          "alignItems": "center",
+                          "justifyContent": "space_between",
+                          "padding": [
+                            12,
+                            0
+                          ],
+                          "cornerRadius": "$brand:radius.md",
+                          "fill": "$brand:color.field-background",
+                          "stroke": {
+                            "thickness": "$brand:border.width",
+                            "fill": "$brand:color.border"
+                          },
+                          "children": [
+                            {
+                              "id": "drawer-f1-v",
+                              "type": "text",
+                              "content": "Category",
+                              "fill": "$brand:color.field-placeholder",
+                              "fontFamily": "$brand:font.family",
+                              "fontSize": "$brand:font.size-md"
+                            },
+                            {
+                              "id": "drawer-f1-c",
+                              "type": "text",
+                              "content": "▾",
+                              "fill": "$brand:color.muted",
+                              "fontFamily": "$brand:font.family",
+                              "fontSize": "$brand:font.size-md"
+                            }
+                          ]
+                        },
+                        {
+                          "id": "drawer-f2",
+                          "type": "frame",
+                          "name": "Field",
+                          "width": "fill_container",
+                          "height": 40,
+                          "layout": "horizontal",
+                          "alignItems": "center",
+                          "justifyContent": "space_between",
+                          "padding": [
+                            12,
+                            0
+                          ],
+                          "cornerRadius": "$brand:radius.md",
+                          "fill": "$brand:color.field-background",
+                          "stroke": {
+                            "thickness": "$brand:border.width",
+                            "fill": "$brand:color.border"
+                          },
+                          "children": [
+                            {
+                              "id": "drawer-f2-v",
+                              "type": "text",
+                              "content": "Status",
+                              "fill": "$brand:color.field-placeholder",
+                              "fontFamily": "$brand:font.family",
+                              "fontSize": "$brand:font.size-md"
+                            },
+                            {
+                              "id": "drawer-f2-c",
+                              "type": "text",
+                              "content": "▾",
+                              "fill": "$brand:color.muted",
+                              "fontFamily": "$brand:font.family",
+                              "fontSize": "$brand:font.size-md"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "organism",
+                    "fidelity": "full",
+                    "react": "Drawer",
+                    "package": "@heroui/react",
+                    "slug": "drawer",
+                    "category": "Overlays",
+                    "source": [
+                      "brand.lib.pen",
+                      "groups/overlays.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "modal",
+                  "type": "frame",
+                  "name": "Modal",
+                  "width": 480,
+                  "layout": "vertical",
+                  "gap": 16,
+                  "padding": 24,
+                  "fill": "$brand:color.surface",
+                  "cornerRadius": "$brand:radius.lg",
+                  "stroke": {
+                    "thickness": "$brand:border.width",
+                    "fill": "$brand:color.border"
+                  },
+                  "effect": {
+                    "type": "shadow",
+                    "shadowType": "outer",
+                    "offset": {
+                      "x": 0,
+                      "y": 8
+                    },
+                    "blur": 24,
+                    "spread": 0,
+                    "color": "#00000026"
+                  },
+                  "children": [
+                    {
+                      "id": "modal-hd",
+                      "type": "frame",
+                      "layout": "horizontal",
+                      "width": "fill_container",
+                      "alignItems": "center",
+                      "justifyContent": "space_between",
+                      "children": [
+                        {
+                          "id": "modal-title",
+                          "type": "text",
+                          "content": "Modal title",
+                          "fill": "$brand:color.foreground",
+                          "fontFamily": "$brand:font.family",
+                          "fontSize": "$brand:font.size-lg",
+                          "fontWeight": "700"
+                        },
+                        {
+                          "id": "modal-x",
+                          "type": "text",
+                          "content": "✕",
+                          "fill": "$brand:color.muted",
+                          "fontFamily": "$brand:font.family",
+                          "fontSize": "$brand:font.size-md"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "modal-body",
+                      "type": "text",
+                      "content": "Modal content explaining the action the user is about to take.",
+                      "fill": "$brand:color.muted",
+                      "fontFamily": "$brand:font.family",
+                      "fontSize": "$brand:font.size-md",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container"
+                    },
+                    {
+                      "id": "modal-ft",
+                      "type": "frame",
+                      "layout": "horizontal",
+                      "width": "fill_container",
+                      "justifyContent": "end",
+                      "gap": 12,
+                      "children": [
+                        {
+                          "id": "modal-cancel",
+                          "type": "frame",
+                          "name": "Cancel",
+                          "layout": "horizontal",
+                          "width": "fit_content",
+                          "alignItems": "center",
+                          "justifyContent": "center",
+                          "padding": [
+                            16,
+                            10
+                          ],
+                          "cornerRadius": "$brand:radius.md",
+                          "fill": "$brand:color.surface",
+                          "stroke": {
+                            "thickness": "$brand:border.width",
+                            "fill": "$brand:color.border"
+                          },
+                          "children": [
+                            {
+                              "id": "modal-cancel-l",
+                              "type": "text",
+                              "content": "Cancel",
+                              "fill": "$brand:color.foreground",
+                              "fontFamily": "$brand:font.family",
+                              "fontSize": "$brand:font.size-md",
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "id": "modal-ok",
+                          "type": "frame",
+                          "name": "Confirm",
+                          "layout": "horizontal",
+                          "width": "fit_content",
+                          "alignItems": "center",
+                          "justifyContent": "center",
+                          "padding": [
+                            16,
+                            10
+                          ],
+                          "cornerRadius": "$brand:radius.md",
+                          "fill": "$brand:color.accent",
+                          "children": [
+                            {
+                              "id": "modal-ok-l",
+                              "type": "text",
+                              "content": "Confirm",
+                              "fill": "$brand:color.accent-foreground",
+                              "fontFamily": "$brand:font.family",
+                              "fontSize": "$brand:font.size-md",
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "organism",
+                    "fidelity": "full",
+                    "react": "Modal",
+                    "package": "@heroui/react",
+                    "slug": "modal",
+                    "category": "Overlays",
+                    "source": [
+                      "brand.lib.pen",
+                      "groups/overlays.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "popover",
+                  "type": "frame",
+                  "name": "Popover",
+                  "width": 260,
+                  "layout": "vertical",
+                  "gap": 8,
+                  "padding": 16,
+                  "fill": "$brand:color.surface",
+                  "cornerRadius": "$brand:radius.md",
+                  "stroke": {
+                    "thickness": "$brand:border.width",
+                    "fill": "$brand:color.border"
+                  },
+                  "effect": {
+                    "type": "shadow",
+                    "shadowType": "outer",
+                    "offset": {
+                      "x": 0,
+                      "y": 8
+                    },
+                    "blur": 24,
+                    "spread": 0,
+                    "color": "#00000026"
+                  },
+                  "children": [
+                    {
+                      "id": "popover-title",
+                      "type": "text",
+                      "content": "Quick tip",
+                      "fill": "$brand:color.foreground",
+                      "fontFamily": "$brand:font.family",
+                      "fontSize": "$brand:font.size-md",
+                      "fontWeight": "700"
+                    },
+                    {
+                      "id": "popover-body",
+                      "type": "text",
+                      "content": "Popovers float above content and point at their trigger.",
+                      "fill": "$brand:color.muted",
+                      "fontFamily": "$brand:font.family",
+                      "fontSize": "$brand:font.size-sm",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "organism",
+                    "fidelity": "full",
+                    "react": "Popover",
+                    "package": "@heroui/react",
+                    "slug": "popover",
+                    "category": "Overlays",
+                    "source": [
+                      "brand.lib.pen",
+                      "groups/overlays.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "toast",
+                  "type": "frame",
+                  "name": "Toast",
+                  "width": 380,
+                  "layout": "horizontal",
+                  "alignItems": "start",
+                  "gap": 12,
+                  "padding": 16,
+                  "fill": "$brand:color.surface",
+                  "cornerRadius": "$brand:radius.md",
+                  "stroke": {
+                    "thickness": "$brand:border.width",
+                    "fill": "$brand:color.border"
+                  },
+                  "effect": {
+                    "type": "shadow",
+                    "shadowType": "outer",
+                    "offset": {
+                      "x": 0,
+                      "y": 8
+                    },
+                    "blur": 24,
+                    "spread": 0,
+                    "color": "#00000026"
+                  },
+                  "children": [
+                    {
+                      "id": "toast-dot",
+                      "type": "frame",
+                      "width": 10,
+                      "height": 10,
+                      "cornerRadius": 9999,
+                      "fill": "$brand:color.accent"
+                    },
+                    {
+                      "id": "toast-content",
+                      "type": "frame",
+                      "layout": "vertical",
+                      "width": "fill_container",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "id": "toast-title",
+                          "type": "text",
+                          "content": "Changes saved",
+                          "fill": "$brand:color.foreground",
+                          "fontFamily": "$brand:font.family",
+                          "fontSize": "$brand:font.size-md",
+                          "fontWeight": "600"
+                        },
+                        {
+                          "id": "toast-body",
+                          "type": "text",
+                          "content": "Your preferences were updated.",
+                          "fill": "$brand:color.muted",
+                          "fontFamily": "$brand:font.family",
+                          "fontSize": "$brand:font.size-sm"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "toast-x",
+                      "type": "text",
+                      "content": "✕",
+                      "fill": "$brand:color.muted",
+                      "fontFamily": "$brand:font.family",
+                      "fontSize": "$brand:font.size-md"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "organism",
+                    "fidelity": "full",
+                    "react": "Toast",
+                    "package": "@heroui/react",
+                    "slug": "toast",
+                    "category": "Overlays",
+                    "source": [
+                      "brand.lib.pen",
+                      "groups/overlays.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

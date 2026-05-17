@@ -1,0 +1,431 @@
+{
+  "version": "2.11",
+  "imports": {
+    "brand": "../brand.lib.pen"
+  },
+  "children": [
+    {
+      "id": "group-buttons",
+      "type": "frame",
+      "name": "Buttons",
+      "x": 0,
+      "y": 0,
+      "layout": "vertical",
+      "gap": 40,
+      "padding": 40,
+      "fill": "$brand:color.background",
+      "children": [
+        {
+          "id": "group-buttons-title",
+          "type": "text",
+          "content": "Buttons · HeroUI v3",
+          "fill": "$brand:color.foreground",
+          "fontFamily": "$brand:font.family",
+          "fontSize": 24,
+          "fontWeight": "700"
+        },
+        {
+          "id": "g-buttons-atom",
+          "type": "frame",
+          "name": "atoms",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "g-buttons-atom-h",
+              "type": "text",
+              "content": "ATOMS",
+              "fill": "$brand:color.muted",
+              "fontFamily": "$brand:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "g-buttons-atom-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "button",
+                  "type": "frame",
+                  "name": "Button",
+                  "height": 40,
+                  "fill": "$brand:color.accent",
+                  "cornerRadius": "$brand:radius.md",
+                  "layout": "horizontal",
+                  "gap": "$brand:space.unit",
+                  "padding": [
+                    16,
+                    10
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "id": "button-label",
+                      "type": "text",
+                      "content": "Button",
+                      "fill": "$brand:color.accent-foreground",
+                      "fontFamily": "$brand:font.family",
+                      "fontSize": "$brand:font.size-md",
+                      "fontWeight": "600"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Button",
+                    "package": "@heroui/react",
+                    "slug": "button",
+                    "category": "Buttons",
+                    "source": [
+                      "brand.lib.pen",
+                      "groups/buttons.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "close-button",
+                  "type": "frame",
+                  "name": "CloseButton",
+                  "width": 32,
+                  "height": 32,
+                  "layout": "horizontal",
+                  "alignItems": "center",
+                  "justifyContent": "center",
+                  "cornerRadius": 9999,
+                  "fill": "$brand:color.accent-soft",
+                  "children": [
+                    {
+                      "id": "close-button-icon",
+                      "type": "text",
+                      "content": "✕",
+                      "fill": "$brand:color.muted",
+                      "fontFamily": "$brand:font.family",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "CloseButton",
+                    "package": "@heroui/react",
+                    "slug": "close-button",
+                    "category": "Buttons",
+                    "source": [
+                      "brand.lib.pen",
+                      "groups/buttons.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "toggle-button",
+                  "type": "frame",
+                  "name": "ToggleButton",
+                  "layout": "horizontal",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "alignItems": "center",
+                  "justifyContent": "center",
+                  "padding": [
+                    16,
+                    10
+                  ],
+                  "cornerRadius": "$brand:radius.md",
+                  "fill": "$brand:color.accent-soft",
+                  "stroke": {
+                    "thickness": "$brand:border.width",
+                    "fill": "$brand:color.accent"
+                  },
+                  "children": [
+                    {
+                      "id": "toggle-button-label",
+                      "type": "text",
+                      "content": "Toggle",
+                      "fill": "$brand:color.accent",
+                      "fontFamily": "$brand:font.family",
+                      "fontSize": "$brand:font.size-md",
+                      "fontWeight": "600"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "ToggleButton",
+                    "package": "@heroui/react",
+                    "slug": "toggle-button",
+                    "category": "Buttons",
+                    "source": [
+                      "brand.lib.pen",
+                      "groups/buttons.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "g-buttons-molecule",
+          "type": "frame",
+          "name": "molecules",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "g-buttons-molecule-h",
+              "type": "text",
+              "content": "MOLECULES",
+              "fill": "$brand:color.muted",
+              "fontFamily": "$brand:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "g-buttons-molecule-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "button-group",
+                  "type": "frame",
+                  "name": "ButtonGroup",
+                  "layout": "horizontal",
+                  "width": "fit_content",
+                  "cornerRadius": "$brand:radius.md",
+                  "clip": true,
+                  "children": [
+                    {
+                      "id": "button-group-0",
+                      "type": "frame",
+                      "name": "Day",
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "justifyContent": "center",
+                      "padding": [
+                        16,
+                        10
+                      ],
+                      "fill": "$brand:color.accent",
+                      "stroke": {
+                        "thickness": "$brand:border.width",
+                        "fill": "$brand:color.border"
+                      },
+                      "children": [
+                        {
+                          "id": "button-group-0-label",
+                          "type": "text",
+                          "content": "Day",
+                          "fill": "$brand:color.accent-foreground",
+                          "fontFamily": "$brand:font.family",
+                          "fontSize": "$brand:font.size-md",
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "button-group-1",
+                      "type": "frame",
+                      "name": "Week",
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "justifyContent": "center",
+                      "padding": [
+                        16,
+                        10
+                      ],
+                      "fill": "$brand:color.surface",
+                      "stroke": {
+                        "thickness": "$brand:border.width",
+                        "fill": "$brand:color.border"
+                      },
+                      "children": [
+                        {
+                          "id": "button-group-1-label",
+                          "type": "text",
+                          "content": "Week",
+                          "fill": "$brand:color.foreground",
+                          "fontFamily": "$brand:font.family",
+                          "fontSize": "$brand:font.size-md",
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "button-group-2",
+                      "type": "frame",
+                      "name": "Month",
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "justifyContent": "center",
+                      "padding": [
+                        16,
+                        10
+                      ],
+                      "fill": "$brand:color.surface",
+                      "stroke": {
+                        "thickness": "$brand:border.width",
+                        "fill": "$brand:color.border"
+                      },
+                      "children": [
+                        {
+                          "id": "button-group-2-label",
+                          "type": "text",
+                          "content": "Month",
+                          "fill": "$brand:color.foreground",
+                          "fontFamily": "$brand:font.family",
+                          "fontSize": "$brand:font.size-md",
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "ButtonGroup",
+                    "package": "@heroui/react",
+                    "slug": "button-group",
+                    "category": "Buttons",
+                    "source": [
+                      "brand.lib.pen",
+                      "groups/buttons.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "toggle-button-group",
+                  "type": "frame",
+                  "name": "ToggleButtonGroup",
+                  "layout": "horizontal",
+                  "width": "fit_content",
+                  "gap": 4,
+                  "padding": 4,
+                  "cornerRadius": "$brand:radius.md",
+                  "fill": "$brand:color.surface",
+                  "stroke": {
+                    "thickness": "$brand:border.width",
+                    "fill": "$brand:color.border"
+                  },
+                  "children": [
+                    {
+                      "id": "toggle-button-group-0",
+                      "type": "frame",
+                      "name": "B",
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "justifyContent": "center",
+                      "padding": [
+                        14,
+                        9
+                      ],
+                      "cornerRadius": "$brand:radius.sm",
+                      "fill": "$brand:color.accent-soft",
+                      "children": [
+                        {
+                          "id": "toggle-button-group-0-label",
+                          "type": "text",
+                          "content": "B",
+                          "fill": "$brand:color.accent",
+                          "fontFamily": "$brand:font.family",
+                          "fontSize": "$brand:font.size-sm",
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "toggle-button-group-1",
+                      "type": "frame",
+                      "name": "I",
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "justifyContent": "center",
+                      "padding": [
+                        14,
+                        9
+                      ],
+                      "cornerRadius": "$brand:radius.sm",
+                      "fill": "transparent",
+                      "children": [
+                        {
+                          "id": "toggle-button-group-1-label",
+                          "type": "text",
+                          "content": "I",
+                          "fill": "$brand:color.muted",
+                          "fontFamily": "$brand:font.family",
+                          "fontSize": "$brand:font.size-sm",
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "toggle-button-group-2",
+                      "type": "frame",
+                      "name": "U",
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "justifyContent": "center",
+                      "padding": [
+                        14,
+                        9
+                      ],
+                      "cornerRadius": "$brand:radius.sm",
+                      "fill": "transparent",
+                      "children": [
+                        {
+                          "id": "toggle-button-group-2-label",
+                          "type": "text",
+                          "content": "U",
+                          "fill": "$brand:color.muted",
+                          "fontFamily": "$brand:font.family",
+                          "fontSize": "$brand:font.size-sm",
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "ToggleButtonGroup",
+                    "package": "@heroui/react",
+                    "slug": "toggle-button-group",
+                    "category": "Buttons",
+                    "source": [
+                      "brand.lib.pen",
+                      "groups/buttons.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

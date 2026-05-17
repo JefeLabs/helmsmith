@@ -1,0 +1,425 @@
+{
+  "version": "2.11",
+  "imports": {
+    "brand": "../brand.lib.pen"
+  },
+  "children": [
+    {
+      "id": "group-feedback",
+      "type": "frame",
+      "name": "Feedback",
+      "x": 0,
+      "y": 0,
+      "layout": "vertical",
+      "gap": 40,
+      "padding": 40,
+      "fill": "$brand:color.background",
+      "children": [
+        {
+          "id": "group-feedback-title",
+          "type": "text",
+          "content": "Feedback · HeroUI v3",
+          "fill": "$brand:color.foreground",
+          "fontFamily": "$brand:font.family",
+          "fontSize": 24,
+          "fontWeight": "700"
+        },
+        {
+          "id": "g-feedback-atom",
+          "type": "frame",
+          "name": "atoms",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "g-feedback-atom-h",
+              "type": "text",
+              "content": "ATOMS",
+              "fill": "$brand:color.muted",
+              "fontFamily": "$brand:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "g-feedback-atom-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "spinner",
+                  "type": "frame",
+                  "name": "Spinner",
+                  "width": 32,
+                  "height": 32,
+                  "layout": "none",
+                  "children": [
+                    {
+                      "id": "spinner-track",
+                      "type": "ellipse",
+                      "width": 32,
+                      "height": 32,
+                      "fill": "$brand:color.border",
+                      "innerRadius": 0.8,
+                      "startAngle": 0,
+                      "sweepAngle": 360
+                    },
+                    {
+                      "id": "spinner-arc",
+                      "type": "ellipse",
+                      "width": 32,
+                      "height": 32,
+                      "fill": "$brand:color.accent",
+                      "innerRadius": 0.8,
+                      "startAngle": 90,
+                      "sweepAngle": 280
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Spinner",
+                    "package": "@heroui/react",
+                    "slug": "spinner",
+                    "category": "Feedback",
+                    "source": [
+                      "brand.lib.pen",
+                      "groups/feedback.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "skeleton",
+                  "type": "frame",
+                  "name": "Skeleton",
+                  "width": 240,
+                  "layout": "vertical",
+                  "gap": 10,
+                  "children": [
+                    {
+                      "id": "skeleton-a",
+                      "type": "frame",
+                      "width": 240,
+                      "height": 16,
+                      "cornerRadius": "$brand:radius.sm",
+                      "fill": "$brand:color.border"
+                    },
+                    {
+                      "id": "skeleton-b",
+                      "type": "frame",
+                      "width": 180,
+                      "height": 16,
+                      "cornerRadius": "$brand:radius.sm",
+                      "fill": "$brand:color.border"
+                    },
+                    {
+                      "id": "skeleton-c",
+                      "type": "frame",
+                      "width": 210,
+                      "height": 16,
+                      "cornerRadius": "$brand:radius.sm",
+                      "fill": "$brand:color.border"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Skeleton",
+                    "package": "@heroui/react",
+                    "slug": "skeleton",
+                    "category": "Feedback",
+                    "source": [
+                      "brand.lib.pen",
+                      "groups/feedback.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "meter",
+                  "type": "frame",
+                  "name": "Meter",
+                  "width": 240,
+                  "layout": "vertical",
+                  "gap": 6,
+                  "children": [
+                    {
+                      "id": "meter-track",
+                      "type": "frame",
+                      "name": "Track",
+                      "width": 240,
+                      "height": 8,
+                      "cornerRadius": 9999,
+                      "fill": "$brand:color.border",
+                      "layout": "none",
+                      "children": [
+                        {
+                          "id": "meter-track-fill",
+                          "type": "frame",
+                          "x": 0,
+                          "y": 0,
+                          "width": 168,
+                          "height": 8,
+                          "cornerRadius": 9999,
+                          "fill": "$brand:color.accent"
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Meter",
+                    "package": "@heroui/react",
+                    "slug": "meter",
+                    "category": "Feedback",
+                    "source": [
+                      "brand.lib.pen",
+                      "groups/feedback.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "progress-bar",
+                  "type": "frame",
+                  "name": "ProgressBar",
+                  "width": 240,
+                  "layout": "vertical",
+                  "gap": 6,
+                  "children": [
+                    {
+                      "id": "progress-bar-row",
+                      "type": "frame",
+                      "layout": "horizontal",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "children": [
+                        {
+                          "id": "progress-bar-label",
+                          "type": "text",
+                          "content": "Uploading",
+                          "fill": "$brand:color.foreground",
+                          "fontFamily": "$brand:font.family",
+                          "fontSize": "$brand:font.size-sm",
+                          "fontWeight": "600"
+                        },
+                        {
+                          "id": "progress-bar-pct",
+                          "type": "text",
+                          "content": "60%",
+                          "fill": "$brand:color.muted",
+                          "fontFamily": "$brand:font.family",
+                          "fontSize": "$brand:font.size-sm"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "progress-bar-track",
+                      "type": "frame",
+                      "name": "Track",
+                      "width": 240,
+                      "height": 8,
+                      "cornerRadius": 9999,
+                      "fill": "$brand:color.border",
+                      "layout": "none",
+                      "children": [
+                        {
+                          "id": "progress-bar-track-fill",
+                          "type": "frame",
+                          "x": 0,
+                          "y": 0,
+                          "width": 144,
+                          "height": 8,
+                          "cornerRadius": 9999,
+                          "fill": "$brand:color.accent"
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "ProgressBar",
+                    "package": "@heroui/react",
+                    "slug": "progress-bar",
+                    "category": "Feedback",
+                    "source": [
+                      "brand.lib.pen",
+                      "groups/feedback.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "progress-circle",
+                  "type": "frame",
+                  "name": "ProgressCircle",
+                  "width": 64,
+                  "height": 64,
+                  "layout": "none",
+                  "children": [
+                    {
+                      "id": "progress-circle-track",
+                      "type": "ellipse",
+                      "width": 64,
+                      "height": 64,
+                      "fill": "$brand:color.border",
+                      "innerRadius": 0.8,
+                      "startAngle": 0,
+                      "sweepAngle": 360
+                    },
+                    {
+                      "id": "progress-circle-arc",
+                      "type": "ellipse",
+                      "width": 64,
+                      "height": 64,
+                      "fill": "$brand:color.accent",
+                      "innerRadius": 0.8,
+                      "startAngle": 90,
+                      "sweepAngle": 252
+                    },
+                    {
+                      "id": "progress-circle-text",
+                      "type": "text",
+                      "content": "70%",
+                      "x": 18,
+                      "y": 24,
+                      "fill": "$brand:color.foreground",
+                      "fontFamily": "$brand:font.family",
+                      "fontSize": "$brand:font.size-sm",
+                      "fontWeight": "600"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "ProgressCircle",
+                    "package": "@heroui/react",
+                    "slug": "progress-circle",
+                    "category": "Feedback",
+                    "source": [
+                      "brand.lib.pen",
+                      "groups/feedback.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "g-feedback-molecule",
+          "type": "frame",
+          "name": "molecules",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "g-feedback-molecule-h",
+              "type": "text",
+              "content": "MOLECULES",
+              "fill": "$brand:color.muted",
+              "fontFamily": "$brand:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "g-feedback-molecule-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "alert",
+                  "type": "frame",
+                  "name": "Alert",
+                  "width": 380,
+                  "layout": "horizontal",
+                  "alignItems": "start",
+                  "gap": 12,
+                  "padding": 16,
+                  "fill": "$brand:color.accent-soft",
+                  "cornerRadius": "$brand:radius.md",
+                  "children": [
+                    {
+                      "id": "alert-dot",
+                      "type": "frame",
+                      "name": "Dot",
+                      "width": 10,
+                      "height": 10,
+                      "fill": "$brand:color.accent",
+                      "cornerRadius": 9999
+                    },
+                    {
+                      "id": "alert-content",
+                      "type": "frame",
+                      "name": "Content",
+                      "layout": "vertical",
+                      "width": "fill_container",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "id": "alert-title",
+                          "type": "text",
+                          "content": "Heads up",
+                          "fill": "$brand:color.foreground",
+                          "fontFamily": "$brand:font.family",
+                          "fontSize": "$brand:font.size-md",
+                          "fontWeight": "600"
+                        },
+                        {
+                          "id": "alert-body",
+                          "type": "text",
+                          "content": "Something needs your attention.",
+                          "fill": "$brand:color.muted",
+                          "fontFamily": "$brand:font.family",
+                          "fontSize": "$brand:font.size-sm",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container"
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "Alert",
+                    "package": "@heroui/react",
+                    "slug": "alert",
+                    "category": "Feedback",
+                    "source": [
+                      "brand.lib.pen",
+                      "groups/feedback.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

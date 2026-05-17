@@ -1,0 +1,124 @@
+{
+  "version": "2.11",
+  "imports": {
+    "brand": "../brand.lib.pen"
+  },
+  "children": [
+    {
+      "id": "group-utilities",
+      "type": "frame",
+      "name": "Utilities",
+      "x": 0,
+      "y": 0,
+      "layout": "vertical",
+      "gap": 40,
+      "padding": 40,
+      "fill": "$brand:color.background",
+      "children": [
+        {
+          "id": "group-utilities-title",
+          "type": "text",
+          "content": "Utilities · HeroUI v3",
+          "fill": "$brand:color.foreground",
+          "fontFamily": "$brand:font.family",
+          "fontSize": 24,
+          "fontWeight": "700"
+        },
+        {
+          "id": "g-utilities-atom",
+          "type": "frame",
+          "name": "atoms",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "g-utilities-atom-h",
+              "type": "text",
+              "content": "ATOMS",
+              "fill": "$brand:color.muted",
+              "fontFamily": "$brand:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "g-utilities-atom-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "scroll-shadow",
+                  "type": "frame",
+                  "name": "ScrollShadow",
+                  "width": 240,
+                  "height": 120,
+                  "fill": "$brand:color.surface",
+                  "cornerRadius": "$brand:radius.md",
+                  "stroke": {
+                    "thickness": "$brand:border.width",
+                    "fill": "$brand:color.border"
+                  },
+                  "clip": true,
+                  "layout": "none",
+                  "children": [
+                    {
+                      "id": "scroll-shadow-text",
+                      "type": "text",
+                      "content": "scrollable…",
+                      "x": 16,
+                      "y": 16,
+                      "fill": "$brand:color.muted",
+                      "fontFamily": "$brand:font.family",
+                      "fontSize": "$brand:font.size-sm"
+                    },
+                    {
+                      "id": "scroll-shadow-fade",
+                      "type": "frame",
+                      "x": 0,
+                      "y": 84,
+                      "width": 240,
+                      "height": 36,
+                      "fill": {
+                        "type": "gradient",
+                        "gradientType": "linear",
+                        "rotation": 180,
+                        "colors": [
+                          {
+                            "color": "#00000000",
+                            "position": 0
+                          },
+                          {
+                            "color": "#00000022",
+                            "position": 1
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "ScrollShadow",
+                    "package": "@heroui/react",
+                    "slug": "scroll-shadow",
+                    "category": "Utilities",
+                    "source": [
+                      "brand.lib.pen",
+                      "groups/utilities.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

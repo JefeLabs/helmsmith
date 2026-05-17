@@ -1,0 +1,439 @@
+{
+  "version": "2.11",
+  "imports": {
+    "brand": "../brand.lib.pen"
+  },
+  "children": [
+    {
+      "id": "mock-homepage-components",
+      "type": "frame",
+      "name": "Components",
+      "x": 1500,
+      "y": 0,
+      "layout": "vertical",
+      "gap": 40,
+      "padding": 40,
+      "fill": "$brand:color.background",
+      "children": [
+        {
+          "id": "mock-homepage-ctitle",
+          "type": "text",
+          "content": "Components (local — customizable)",
+          "fill": "$brand:color.foreground",
+          "fontFamily": "$brand:font.family",
+          "fontSize": 24,
+          "fontWeight": "700"
+        },
+        {
+          "id": "m-homepage-atom",
+          "type": "frame",
+          "name": "atoms",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "m-homepage-atom-h",
+              "type": "text",
+              "content": "ATOMS",
+              "fill": "$brand:color.muted",
+              "fontFamily": "$brand:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "m-homepage-atom-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "button",
+                  "type": "frame",
+                  "name": "Button",
+                  "height": 40,
+                  "fill": "$brand:color.accent",
+                  "cornerRadius": "$brand:radius.md",
+                  "layout": "horizontal",
+                  "gap": "$brand:space.unit",
+                  "padding": [
+                    16,
+                    10
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "id": "button-label",
+                      "type": "text",
+                      "content": "Button",
+                      "fill": "$brand:color.accent-foreground",
+                      "fontFamily": "$brand:font.family",
+                      "fontSize": "$brand:font.size-md",
+                      "fontWeight": "600"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Button",
+                    "package": "@heroui/react",
+                    "slug": "button",
+                    "category": "Buttons",
+                    "source": [
+                      "brand.lib.pen",
+                      "groups/buttons.lib.pen",
+                      "design-system.lib.pen",
+                      "mocks/homepage.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "m-homepage-molecule",
+          "type": "frame",
+          "name": "molecules",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "m-homepage-molecule-h",
+              "type": "text",
+              "content": "MOLECULES",
+              "fill": "$brand:color.muted",
+              "fontFamily": "$brand:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "m-homepage-molecule-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "card",
+                  "type": "frame",
+                  "name": "Card",
+                  "width": 360,
+                  "fill": "$brand:color.surface",
+                  "cornerRadius": "$brand:radius.lg",
+                  "stroke": {
+                    "thickness": "$brand:border.width",
+                    "fill": "$brand:color.border"
+                  },
+                  "effect": {
+                    "type": "shadow",
+                    "shadowType": "outer",
+                    "offset": {
+                      "x": 0,
+                      "y": 2
+                    },
+                    "blur": 8,
+                    "spread": 0,
+                    "color": "#0000001f"
+                  },
+                  "layout": "vertical",
+                  "gap": 16,
+                  "clip": true,
+                  "children": [
+                    {
+                      "id": "card-header",
+                      "type": "frame",
+                      "name": "Header",
+                      "layout": "vertical",
+                      "gap": "$brand:space.unit",
+                      "width": "fill_container",
+                      "padding": [
+                        20,
+                        20,
+                        0,
+                        20
+                      ],
+                      "children": [
+                        {
+                          "id": "card-title",
+                          "type": "text",
+                          "content": "Card title",
+                          "fill": "$brand:color.surface-foreground",
+                          "fontFamily": "$brand:font.family",
+                          "fontSize": "$brand:font.size-lg",
+                          "fontWeight": "600"
+                        },
+                        {
+                          "id": "card-subtitle",
+                          "type": "text",
+                          "content": "Supporting copy goes here.",
+                          "fill": "$brand:color.muted",
+                          "fontFamily": "$brand:font.family",
+                          "fontSize": "$brand:font.size-sm"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "card-body",
+                      "type": "frame",
+                      "name": "Body",
+                      "width": "fill_container",
+                      "padding": 20,
+                      "layout": "vertical",
+                      "gap": "$brand:space.unit",
+                      "children": [
+                        {
+                          "id": "card-body-text",
+                          "type": "text",
+                          "content": "Body content.",
+                          "fill": "$brand:color.muted",
+                          "fontFamily": "$brand:font.family",
+                          "fontSize": "$brand:font.size-sm"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "card-footer",
+                      "type": "frame",
+                      "name": "Footer",
+                      "width": "fill_container",
+                      "padding": [
+                        0,
+                        20,
+                        20,
+                        20
+                      ],
+                      "layout": "horizontal",
+                      "justifyContent": "end",
+                      "gap": "$brand:space.unit"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "Card",
+                    "package": "@heroui/react",
+                    "slug": "card",
+                    "category": "Layout",
+                    "source": [
+                      "brand.lib.pen",
+                      "groups/layout.lib.pen",
+                      "design-system.lib.pen",
+                      "mocks/homepage.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "screen",
+      "type": "frame",
+      "name": "Homepage",
+      "width": 1280,
+      "height": 1024,
+      "fill": "$brand:color.background",
+      "theme": {
+        "mode": "light"
+      },
+      "layout": "vertical",
+      "gap": 48,
+      "padding": [
+        80,
+        64,
+        80,
+        64
+      ],
+      "children": [
+        {
+          "id": "hp-nav",
+          "type": "frame",
+          "name": "Nav",
+          "layout": "horizontal",
+          "width": "fill_container",
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "id": "hp-brand",
+              "type": "text",
+              "content": "mech-pencil",
+              "fill": "$brand:color.foreground",
+              "fontFamily": "$brand:font.family",
+              "fontSize": 18,
+              "fontWeight": "700"
+            },
+            {
+              "id": "hp-navlinks",
+              "type": "text",
+              "content": "Docs   Components   Pricing",
+              "fill": "$brand:color.muted",
+              "fontFamily": "$brand:font.family",
+              "fontSize": 14
+            }
+          ]
+        },
+        {
+          "id": "hp-hero",
+          "type": "frame",
+          "name": "Hero",
+          "layout": "vertical",
+          "width": "fill_container",
+          "gap": 20,
+          "children": [
+            {
+              "id": "hp-eyebrow",
+              "type": "text",
+              "content": "HeroUI v3 · generated by mech-pencil",
+              "fill": "$brand:color.muted",
+              "fontFamily": "$brand:font.family",
+              "fontSize": 14,
+              "fontWeight": "600"
+            },
+            {
+              "id": "hp-title",
+              "type": "text",
+              "content": "Build interfaces that feel inevitable.",
+              "fill": "$brand:color.foreground",
+              "fontFamily": "$brand:font.family",
+              "fontSize": 56,
+              "fontWeight": "800"
+            },
+            {
+              "id": "hp-sub",
+              "type": "text",
+              "content": "A themeable design system, assembled from reusable components and design tokens.",
+              "fill": "$brand:color.muted",
+              "fontFamily": "$brand:font.family",
+              "fontSize": 20,
+              "textGrowth": "fixed-width",
+              "width": "fill_container"
+            },
+            {
+              "id": "hp-ctas",
+              "type": "frame",
+              "name": "CTAs",
+              "layout": "horizontal",
+              "gap": 16,
+              "alignItems": "center",
+              "children": [
+                {
+                  "id": "hp-cta-primary",
+                  "type": "ref",
+                  "ref": "button",
+                  "descendants": {
+                    "button-label": {
+                      "content": "Get started"
+                    }
+                  }
+                },
+                {
+                  "id": "hp-cta-secondary",
+                  "type": "ref",
+                  "ref": "button",
+                  "fill": "$brand:color.surface",
+                  "stroke": {
+                    "thickness": "$brand:border.width",
+                    "fill": "$brand:color.border"
+                  },
+                  "descendants": {
+                    "button-label": {
+                      "content": "Documentation",
+                      "fill": "$brand:color.foreground"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "hp-features",
+          "type": "frame",
+          "name": "Features",
+          "layout": "horizontal",
+          "width": "fill_container",
+          "gap": 24,
+          "alignItems": "start",
+          "children": [
+            {
+              "id": "hp-card-0",
+              "type": "ref",
+              "ref": "card",
+              "width": "fill_container",
+              "descendants": {
+                "card-title": {
+                  "content": "Tokens, not hex"
+                },
+                "card-subtitle": {
+                  "content": "Every value flows from themeable design tokens."
+                },
+                "card-body-text": {
+                  "content": "Learn how it fits your stack."
+                }
+              }
+            },
+            {
+              "id": "hp-card-1",
+              "type": "ref",
+              "ref": "card",
+              "width": "fill_container",
+              "descendants": {
+                "card-title": {
+                  "content": "Atomic by default"
+                },
+                "card-subtitle": {
+                  "content": "Reusable components compose into screens."
+                },
+                "card-body-text": {
+                  "content": "Learn how it fits your stack."
+                }
+              }
+            },
+            {
+              "id": "hp-card-2",
+              "type": "ref",
+              "ref": "card",
+              "width": "fill_container",
+              "descendants": {
+                "card-title": {
+                  "content": "Pencil-native"
+                },
+                "card-subtitle": {
+                  "content": "Single-file .pen that opens in the app."
+                },
+                "card-body-text": {
+                  "content": "Learn how it fits your stack."
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "hp-footer",
+          "type": "text",
+          "content": "Generated with mech-pencil — single-file .pen",
+          "fill": "$brand:color.muted",
+          "fontFamily": "$brand:font.family",
+          "fontSize": 14
+        }
+      ],
+      "x": 0,
+      "y": 0
+    }
+  ]
+}

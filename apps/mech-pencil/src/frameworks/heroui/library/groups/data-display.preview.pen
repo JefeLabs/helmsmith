@@ -1,0 +1,540 @@
+{
+  "version": "2.11",
+  "imports": {
+    "brand": "../brand.lib.pen"
+  },
+  "children": [
+    {
+      "id": "group-data-display",
+      "type": "frame",
+      "name": "Data Display",
+      "x": 0,
+      "y": 0,
+      "layout": "vertical",
+      "gap": 40,
+      "padding": 40,
+      "fill": "$brand:color.background",
+      "children": [
+        {
+          "id": "group-data-display-title",
+          "type": "text",
+          "content": "Data Display · HeroUI v3",
+          "fill": "$brand:color.foreground",
+          "fontFamily": "$brand:font.family",
+          "fontSize": 24,
+          "fontWeight": "700"
+        },
+        {
+          "id": "g-data-display-atom",
+          "type": "frame",
+          "name": "atoms",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "g-data-display-atom-h",
+              "type": "text",
+              "content": "ATOMS",
+              "fill": "$brand:color.muted",
+              "fontFamily": "$brand:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "g-data-display-atom-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "badge",
+                  "type": "frame",
+                  "name": "Badge",
+                  "layout": "horizontal",
+                  "width": "fit_content",
+                  "alignItems": "center",
+                  "justifyContent": "center",
+                  "padding": [
+                    8,
+                    3
+                  ],
+                  "fill": "$brand:color.accent",
+                  "cornerRadius": 9999,
+                  "children": [
+                    {
+                      "id": "badge-label",
+                      "type": "text",
+                      "content": "New",
+                      "fill": "$brand:color.accent-foreground",
+                      "fontFamily": "$brand:font.family",
+                      "fontSize": 12,
+                      "fontWeight": "600"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Badge",
+                    "package": "@heroui/react",
+                    "slug": "badge",
+                    "category": "Data Display",
+                    "source": [
+                      "brand.lib.pen",
+                      "groups/data-display.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "chip",
+                  "type": "frame",
+                  "name": "Chip",
+                  "layout": "horizontal",
+                  "width": "fit_content",
+                  "alignItems": "center",
+                  "gap": "$brand:space.unit",
+                  "padding": [
+                    12,
+                    6
+                  ],
+                  "fill": "$brand:color.accent-soft",
+                  "cornerRadius": 9999,
+                  "children": [
+                    {
+                      "id": "chip-label",
+                      "type": "text",
+                      "content": "Chip",
+                      "fill": "$brand:color.accent",
+                      "fontFamily": "$brand:font.family",
+                      "fontSize": "$brand:font.size-sm",
+                      "fontWeight": "500"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Chip",
+                    "package": "@heroui/react",
+                    "slug": "chip",
+                    "category": "Data Display",
+                    "source": [
+                      "brand.lib.pen",
+                      "groups/data-display.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "g-data-display-organism",
+          "type": "frame",
+          "name": "organisms",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "g-data-display-organism-h",
+              "type": "text",
+              "content": "ORGANISMS",
+              "fill": "$brand:color.muted",
+              "fontFamily": "$brand:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "g-data-display-organism-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "table",
+                  "type": "frame",
+                  "name": "Table",
+                  "width": 520,
+                  "layout": "vertical",
+                  "cornerRadius": "$brand:radius.lg",
+                  "stroke": {
+                    "thickness": "$brand:border.width",
+                    "fill": "$brand:color.border"
+                  },
+                  "clip": true,
+                  "children": [
+                    {
+                      "id": "table-h",
+                      "type": "frame",
+                      "name": "Header",
+                      "layout": "horizontal",
+                      "width": "fill_container",
+                      "fill": "$brand:color.accent-soft",
+                      "stroke": {
+                        "thickness": {
+                          "bottom": "$brand:border.width"
+                        },
+                        "fill": "$brand:color.border"
+                      },
+                      "children": [
+                        {
+                          "id": "table-h-c0",
+                          "type": "frame",
+                          "name": "Cell",
+                          "width": "fill_container",
+                          "layout": "horizontal",
+                          "alignItems": "center",
+                          "padding": [
+                            16,
+                            12
+                          ],
+                          "children": [
+                            {
+                              "id": "table-h-c0-t",
+                              "type": "text",
+                              "content": "Name",
+                              "fill": "$brand:color.muted",
+                              "fontFamily": "$brand:font.family",
+                              "fontSize": "$brand:font.size-sm",
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "id": "table-h-c1",
+                          "type": "frame",
+                          "name": "Cell",
+                          "width": "fill_container",
+                          "layout": "horizontal",
+                          "alignItems": "center",
+                          "padding": [
+                            16,
+                            12
+                          ],
+                          "children": [
+                            {
+                              "id": "table-h-c1-t",
+                              "type": "text",
+                              "content": "Email",
+                              "fill": "$brand:color.muted",
+                              "fontFamily": "$brand:font.family",
+                              "fontSize": "$brand:font.size-sm",
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "id": "table-h-c2",
+                          "type": "frame",
+                          "name": "Cell",
+                          "width": "fill_container",
+                          "layout": "horizontal",
+                          "alignItems": "center",
+                          "padding": [
+                            16,
+                            12
+                          ],
+                          "children": [
+                            {
+                              "id": "table-h-c2-t",
+                              "type": "text",
+                              "content": "Role",
+                              "fill": "$brand:color.muted",
+                              "fontFamily": "$brand:font.family",
+                              "fontSize": "$brand:font.size-sm",
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "id": "table-r0",
+                      "type": "frame",
+                      "name": "Row",
+                      "layout": "horizontal",
+                      "width": "fill_container",
+                      "fill": "$brand:color.surface",
+                      "stroke": {
+                        "thickness": {
+                          "bottom": "$brand:border.width"
+                        },
+                        "fill": "$brand:color.border"
+                      },
+                      "children": [
+                        {
+                          "id": "table-r0-c0",
+                          "type": "frame",
+                          "name": "Cell",
+                          "width": "fill_container",
+                          "layout": "horizontal",
+                          "alignItems": "center",
+                          "padding": [
+                            16,
+                            12
+                          ],
+                          "children": [
+                            {
+                              "id": "table-r0-c0-t",
+                              "type": "text",
+                              "content": "Ada Lovelace",
+                              "fill": "$brand:color.foreground",
+                              "fontFamily": "$brand:font.family",
+                              "fontSize": "$brand:font.size-md",
+                              "fontWeight": "400"
+                            }
+                          ]
+                        },
+                        {
+                          "id": "table-r0-c1",
+                          "type": "frame",
+                          "name": "Cell",
+                          "width": "fill_container",
+                          "layout": "horizontal",
+                          "alignItems": "center",
+                          "padding": [
+                            16,
+                            12
+                          ],
+                          "children": [
+                            {
+                              "id": "table-r0-c1-t",
+                              "type": "text",
+                              "content": "ada@ex.com",
+                              "fill": "$brand:color.foreground",
+                              "fontFamily": "$brand:font.family",
+                              "fontSize": "$brand:font.size-md",
+                              "fontWeight": "400"
+                            }
+                          ]
+                        },
+                        {
+                          "id": "table-r0-c2",
+                          "type": "frame",
+                          "name": "Cell",
+                          "width": "fill_container",
+                          "layout": "horizontal",
+                          "alignItems": "center",
+                          "padding": [
+                            16,
+                            12
+                          ],
+                          "children": [
+                            {
+                              "id": "table-r0-c2-t",
+                              "type": "text",
+                              "content": "Owner",
+                              "fill": "$brand:color.foreground",
+                              "fontFamily": "$brand:font.family",
+                              "fontSize": "$brand:font.size-md",
+                              "fontWeight": "400"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "id": "table-r1",
+                      "type": "frame",
+                      "name": "Row",
+                      "layout": "horizontal",
+                      "width": "fill_container",
+                      "fill": "$brand:color.surface",
+                      "stroke": {
+                        "thickness": {
+                          "bottom": "$brand:border.width"
+                        },
+                        "fill": "$brand:color.border"
+                      },
+                      "children": [
+                        {
+                          "id": "table-r1-c0",
+                          "type": "frame",
+                          "name": "Cell",
+                          "width": "fill_container",
+                          "layout": "horizontal",
+                          "alignItems": "center",
+                          "padding": [
+                            16,
+                            12
+                          ],
+                          "children": [
+                            {
+                              "id": "table-r1-c0-t",
+                              "type": "text",
+                              "content": "Alan Turing",
+                              "fill": "$brand:color.foreground",
+                              "fontFamily": "$brand:font.family",
+                              "fontSize": "$brand:font.size-md",
+                              "fontWeight": "400"
+                            }
+                          ]
+                        },
+                        {
+                          "id": "table-r1-c1",
+                          "type": "frame",
+                          "name": "Cell",
+                          "width": "fill_container",
+                          "layout": "horizontal",
+                          "alignItems": "center",
+                          "padding": [
+                            16,
+                            12
+                          ],
+                          "children": [
+                            {
+                              "id": "table-r1-c1-t",
+                              "type": "text",
+                              "content": "alan@ex.com",
+                              "fill": "$brand:color.foreground",
+                              "fontFamily": "$brand:font.family",
+                              "fontSize": "$brand:font.size-md",
+                              "fontWeight": "400"
+                            }
+                          ]
+                        },
+                        {
+                          "id": "table-r1-c2",
+                          "type": "frame",
+                          "name": "Cell",
+                          "width": "fill_container",
+                          "layout": "horizontal",
+                          "alignItems": "center",
+                          "padding": [
+                            16,
+                            12
+                          ],
+                          "children": [
+                            {
+                              "id": "table-r1-c2-t",
+                              "type": "text",
+                              "content": "Admin",
+                              "fill": "$brand:color.foreground",
+                              "fontFamily": "$brand:font.family",
+                              "fontSize": "$brand:font.size-md",
+                              "fontWeight": "400"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "id": "table-r2",
+                      "type": "frame",
+                      "name": "Row",
+                      "layout": "horizontal",
+                      "width": "fill_container",
+                      "fill": "$brand:color.surface",
+                      "stroke": {
+                        "thickness": {
+                          "bottom": "$brand:border.width"
+                        },
+                        "fill": "$brand:color.border"
+                      },
+                      "children": [
+                        {
+                          "id": "table-r2-c0",
+                          "type": "frame",
+                          "name": "Cell",
+                          "width": "fill_container",
+                          "layout": "horizontal",
+                          "alignItems": "center",
+                          "padding": [
+                            16,
+                            12
+                          ],
+                          "children": [
+                            {
+                              "id": "table-r2-c0-t",
+                              "type": "text",
+                              "content": "Grace Hopper",
+                              "fill": "$brand:color.foreground",
+                              "fontFamily": "$brand:font.family",
+                              "fontSize": "$brand:font.size-md",
+                              "fontWeight": "400"
+                            }
+                          ]
+                        },
+                        {
+                          "id": "table-r2-c1",
+                          "type": "frame",
+                          "name": "Cell",
+                          "width": "fill_container",
+                          "layout": "horizontal",
+                          "alignItems": "center",
+                          "padding": [
+                            16,
+                            12
+                          ],
+                          "children": [
+                            {
+                              "id": "table-r2-c1-t",
+                              "type": "text",
+                              "content": "grace@ex.com",
+                              "fill": "$brand:color.foreground",
+                              "fontFamily": "$brand:font.family",
+                              "fontSize": "$brand:font.size-md",
+                              "fontWeight": "400"
+                            }
+                          ]
+                        },
+                        {
+                          "id": "table-r2-c2",
+                          "type": "frame",
+                          "name": "Cell",
+                          "width": "fill_container",
+                          "layout": "horizontal",
+                          "alignItems": "center",
+                          "padding": [
+                            16,
+                            12
+                          ],
+                          "children": [
+                            {
+                              "id": "table-r2-c2-t",
+                              "type": "text",
+                              "content": "Member",
+                              "fill": "$brand:color.foreground",
+                              "fontFamily": "$brand:font.family",
+                              "fontSize": "$brand:font.size-md",
+                              "fontWeight": "400"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "organism",
+                    "fidelity": "full",
+                    "react": "Table",
+                    "package": "@heroui/react",
+                    "slug": "table",
+                    "category": "Data Display",
+                    "source": [
+                      "brand.lib.pen",
+                      "groups/data-display.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
