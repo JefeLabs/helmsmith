@@ -23,9 +23,9 @@ describe('emitBundle', () => {
     expect(a.brand.doc.toJSON()).not.toBe(z.brand.doc.toJSON()); // only brand changes
   });
 
-  it('LAYER 1 brand.lib.pen is variables-only and valid', () => {
+  it('LAYER 1 design-tokens.lib.pen is variables-only and valid', () => {
     const o = b.brand.doc.toObject();
-    expect(b.brand.path).toBe('brand.lib.pen');
+    expect(b.brand.path).toBe('design-tokens.lib.pen');
     expect(o.children).toEqual([]);
     expect(Object.keys(o.variables ?? {}).length).toBeGreaterThan(40);
     expect(b.brand.validation.ok).toBe(true);
@@ -35,13 +35,13 @@ describe('emitBundle', () => {
     expect(b.groups.length).toBe(15);
     const buttons = b.groups.find((g) => g.category === 'Buttons');
     expect(buttons?.path).toBe('groups/buttons.lib.pen');
-    expect(buttons?.doc.toObject().imports).toEqual({ brand: '../brand.lib.pen' });
+    expect(buttons?.doc.toObject().imports).toEqual({ tokens: '../design-tokens.lib.pen' });
     expect(b.groups.every((g) => g.validation.ok)).toBe(true);
     expect(b.groups.reduce((n, g) => n + g.count, 0)).toBe(71);
 
     // each lib has a viewable .preview.pen twin (same content, regular .pen)
     expect(buttons?.preview.path).toBe('groups/buttons.preview.pen');
-    expect(buttons?.preview.doc.toObject().imports).toEqual({ brand: '../brand.lib.pen' });
+    expect(buttons?.preview.doc.toObject().imports).toEqual({ tokens: '../design-tokens.lib.pen' });
     expect(b.groups.every((g) => g.preview.validation.ok)).toBe(true);
     const lib = JSON.stringify(buttons?.doc.toObject().children);
     const pv = JSON.stringify(buttons?.preview.doc.toObject().children);
@@ -50,12 +50,12 @@ describe('emitBundle', () => {
 
   it('LAYER 3 design-system.lib.pen aggregates all 71 + has a .preview.pen twin', () => {
     expect(b.designSystem.path).toBe('design-system.lib.pen');
-    expect(b.designSystem.doc.toObject().imports).toEqual({ brand: './brand.lib.pen' });
+    expect(b.designSystem.doc.toObject().imports).toEqual({ tokens: './design-tokens.lib.pen' });
     expect(b.designSystem.validation.ok).toBe(true);
 
     const pv = b.designSystem.preview;
     expect(pv.path).toBe('design-system.preview.pen');
-    expect(pv.doc.toObject().imports).toEqual({ brand: './brand.lib.pen' });
+    expect(pv.doc.toObject().imports).toEqual({ tokens: './design-tokens.lib.pen' });
     expect(pv.validation.ok).toBe(true);
     // twin = identical content, only the file role differs
     expect(JSON.stringify(pv.doc.toObject().children)).toBe(
@@ -71,16 +71,16 @@ describe('emitBundle', () => {
     const hp = b.mocks.find((m) => m.path === 'mocks/homepage.pen');
     expect(hp).toBeTruthy();
     expect(hp?.components.sort()).toEqual(['button', 'card']);
-    expect(hp?.doc.toObject().imports).toEqual({ brand: '../brand.lib.pen' });
+    expect(hp?.doc.toObject().imports).toEqual({ tokens: '../design-tokens.lib.pen' });
     expect(hp?.validation.ok).toBe(true);
     const json = JSON.stringify(hp?.doc.toObject().children);
     expect(json).toContain('"id":"button"');
     expect(json).toContain('"id":"card"');
     // provenance lineage stamped on the local components
     expect(json).toContain(
-      '"source":["brand.lib.pen","groups/buttons.lib.pen","design-system.lib.pen","mocks/homepage.pen"]',
+      '"source":["design-tokens.lib.pen","groups/buttons.lib.pen","design-system.lib.pen","mocks/homepage.pen"]',
     );
-    // components reference brand tokens cross-file ($brand:)
-    expect(json).toContain('$brand:color.accent');
+    // components reference brand tokens cross-file ($tokens:)
+    expect(json).toContain('$tokens:color.accent');
   });
 });

@@ -1,7 +1,7 @@
 {
   "version": "2.11",
   "imports": {
-    "brand": "../brand.lib.pen"
+    "tokens": "../design-tokens.lib.pen"
   },
   "children": [
     {
@@ -13,14 +13,14 @@
       "layout": "vertical",
       "gap": 40,
       "padding": 40,
-      "fill": "$brand:color.background",
+      "fill": "$tokens:color.background",
       "children": [
         {
           "id": "group-feedback-title",
           "type": "text",
           "content": "Feedback · HeroUI v3",
-          "fill": "$brand:color.foreground",
-          "fontFamily": "$brand:font.family",
+          "fill": "$tokens:color.foreground",
+          "fontFamily": "$tokens:font.family",
           "fontSize": 24,
           "fontWeight": "700"
         },
@@ -36,8 +36,8 @@
               "id": "g-feedback-atom-h",
               "type": "text",
               "content": "ATOMS",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -62,7 +62,7 @@
                       "type": "ellipse",
                       "width": 32,
                       "height": 32,
-                      "fill": "$brand:color.border",
+                      "fill": "$tokens:color.border",
                       "innerRadius": 0.8,
                       "startAngle": 0,
                       "sweepAngle": 360
@@ -72,7 +72,7 @@
                       "type": "ellipse",
                       "width": 32,
                       "height": 32,
-                      "fill": "$brand:color.accent",
+                      "fill": "$tokens:color.accent",
                       "innerRadius": 0.8,
                       "startAngle": 90,
                       "sweepAngle": 280
@@ -89,7 +89,7 @@
                     "slug": "spinner",
                     "category": "Feedback",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/feedback.lib.pen"
                     ]
                   }
@@ -107,24 +107,24 @@
                       "type": "frame",
                       "width": 240,
                       "height": 16,
-                      "cornerRadius": "$brand:radius.sm",
-                      "fill": "$brand:color.border"
+                      "cornerRadius": "$tokens:radius.sm",
+                      "fill": "$tokens:color.border"
                     },
                     {
                       "id": "skeleton-b",
                       "type": "frame",
                       "width": 180,
                       "height": 16,
-                      "cornerRadius": "$brand:radius.sm",
-                      "fill": "$brand:color.border"
+                      "cornerRadius": "$tokens:radius.sm",
+                      "fill": "$tokens:color.border"
                     },
                     {
                       "id": "skeleton-c",
                       "type": "frame",
                       "width": 210,
                       "height": 16,
-                      "cornerRadius": "$brand:radius.sm",
-                      "fill": "$brand:color.border"
+                      "cornerRadius": "$tokens:radius.sm",
+                      "fill": "$tokens:color.border"
                     }
                   ],
                   "reusable": true,
@@ -138,7 +138,7 @@
                     "slug": "skeleton",
                     "category": "Feedback",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/feedback.lib.pen"
                     ]
                   }
@@ -158,7 +158,7 @@
                       "width": 240,
                       "height": 8,
                       "cornerRadius": 9999,
-                      "fill": "$brand:color.border",
+                      "fill": "$tokens:color.border",
                       "layout": "none",
                       "children": [
                         {
@@ -169,7 +169,7 @@
                           "width": 168,
                           "height": 8,
                           "cornerRadius": 9999,
-                          "fill": "$brand:color.accent"
+                          "fill": "$tokens:color.accent"
                         }
                       ]
                     }
@@ -185,7 +185,7 @@
                     "slug": "meter",
                     "category": "Feedback",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/feedback.lib.pen"
                     ]
                   }
@@ -209,18 +209,18 @@
                           "id": "progress-bar-label",
                           "type": "text",
                           "content": "Uploading",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-sm",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
                           "fontWeight": "600"
                         },
                         {
                           "id": "progress-bar-pct",
                           "type": "text",
                           "content": "60%",
-                          "fill": "$brand:color.muted",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-sm"
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm"
                         }
                       ]
                     },
@@ -231,7 +231,7 @@
                       "width": 240,
                       "height": 8,
                       "cornerRadius": 9999,
-                      "fill": "$brand:color.border",
+                      "fill": "$tokens:color.border",
                       "layout": "none",
                       "children": [
                         {
@@ -242,7 +242,7 @@
                           "width": 144,
                           "height": 8,
                           "cornerRadius": 9999,
-                          "fill": "$brand:color.accent"
+                          "fill": "$tokens:color.accent"
                         }
                       ]
                     }
@@ -258,7 +258,7 @@
                     "slug": "progress-bar",
                     "category": "Feedback",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/feedback.lib.pen"
                     ]
                   }
@@ -276,7 +276,7 @@
                       "type": "ellipse",
                       "width": 64,
                       "height": 64,
-                      "fill": "$brand:color.border",
+                      "fill": "$tokens:color.border",
                       "innerRadius": 0.8,
                       "startAngle": 0,
                       "sweepAngle": 360
@@ -286,7 +286,7 @@
                       "type": "ellipse",
                       "width": 64,
                       "height": 64,
-                      "fill": "$brand:color.accent",
+                      "fill": "$tokens:color.accent",
                       "innerRadius": 0.8,
                       "startAngle": 90,
                       "sweepAngle": 252
@@ -297,9 +297,9 @@
                       "content": "70%",
                       "x": 18,
                       "y": 24,
-                      "fill": "$brand:color.foreground",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-sm",
+                      "fill": "$tokens:color.foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm",
                       "fontWeight": "600"
                     }
                   ],
@@ -314,7 +314,7 @@
                     "slug": "progress-circle",
                     "category": "Feedback",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/feedback.lib.pen"
                     ]
                   }
@@ -335,8 +335,8 @@
               "id": "g-feedback-molecule-h",
               "type": "text",
               "content": "MOLECULES",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -357,8 +357,8 @@
                   "alignItems": "start",
                   "gap": 12,
                   "padding": 16,
-                  "fill": "$brand:color.accent-soft",
-                  "cornerRadius": "$brand:radius.md",
+                  "fill": "$tokens:color.accent-soft",
+                  "cornerRadius": "$tokens:radius.md",
                   "children": [
                     {
                       "id": "alert-dot",
@@ -366,7 +366,7 @@
                       "name": "Dot",
                       "width": 10,
                       "height": 10,
-                      "fill": "$brand:color.accent",
+                      "fill": "$tokens:color.accent",
                       "cornerRadius": 9999
                     },
                     {
@@ -381,18 +381,18 @@
                           "id": "alert-title",
                           "type": "text",
                           "content": "Heads up",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md",
                           "fontWeight": "600"
                         },
                         {
                           "id": "alert-body",
                           "type": "text",
                           "content": "Something needs your attention.",
-                          "fill": "$brand:color.muted",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-sm",
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
                           "textGrowth": "fixed-width",
                           "width": "fill_container"
                         }
@@ -410,7 +410,7 @@
                     "slug": "alert",
                     "category": "Feedback",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/feedback.lib.pen"
                     ]
                   }

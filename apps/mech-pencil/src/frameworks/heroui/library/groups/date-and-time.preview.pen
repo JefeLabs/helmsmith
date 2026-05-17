@@ -1,7 +1,7 @@
 {
   "version": "2.11",
   "imports": {
-    "brand": "../brand.lib.pen"
+    "tokens": "../design-tokens.lib.pen"
   },
   "children": [
     {
@@ -13,14 +13,14 @@
       "layout": "vertical",
       "gap": 40,
       "padding": 40,
-      "fill": "$brand:color.background",
+      "fill": "$tokens:color.background",
       "children": [
         {
           "id": "group-date-and-time-title",
           "type": "text",
           "content": "Date and Time · HeroUI v3",
-          "fill": "$brand:color.foreground",
-          "fontFamily": "$brand:font.family",
+          "fill": "$tokens:color.foreground",
+          "fontFamily": "$tokens:font.family",
           "fontSize": 24,
           "fontWeight": "700"
         },
@@ -36,8 +36,8 @@
               "id": "g-date-and-time-molecule-h",
               "type": "text",
               "content": "MOLECULES",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -62,28 +62,28 @@
                     12,
                     0
                   ],
-                  "cornerRadius": "$brand:radius.md",
-                  "fill": "$brand:color.field-background",
+                  "cornerRadius": "$tokens:radius.md",
+                  "fill": "$tokens:color.field-background",
                   "stroke": {
-                    "thickness": "$brand:border.width",
-                    "fill": "$brand:color.border"
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
                   },
                   "children": [
                     {
                       "id": "date-field-val",
                       "type": "text",
                       "content": "MM / DD / YYYY",
-                      "fill": "$brand:color.field-placeholder",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-md"
+                      "fill": "$tokens:color.field-placeholder",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md"
                     },
                     {
                       "id": "date-field-icon",
                       "type": "text",
                       "content": "▦",
-                      "fill": "$brand:color.muted",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-md"
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md"
                     }
                   ],
                   "reusable": true,
@@ -97,7 +97,7 @@
                     "slug": "date-field",
                     "category": "Date and Time",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/date-and-time.lib.pen"
                     ]
                   }
@@ -115,28 +115,28 @@
                     12,
                     0
                   ],
-                  "cornerRadius": "$brand:radius.md",
-                  "fill": "$brand:color.field-background",
+                  "cornerRadius": "$tokens:radius.md",
+                  "fill": "$tokens:color.field-background",
                   "stroke": {
-                    "thickness": "$brand:border.width",
-                    "fill": "$brand:color.border"
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
                   },
                   "children": [
                     {
                       "id": "time-field-val",
                       "type": "text",
                       "content": "HH : MM",
-                      "fill": "$brand:color.field-placeholder",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-md"
+                      "fill": "$tokens:color.field-placeholder",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md"
                     },
                     {
                       "id": "time-field-icon",
                       "type": "text",
                       "content": "◷",
-                      "fill": "$brand:color.muted",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-md"
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md"
                     }
                   ],
                   "reusable": true,
@@ -150,7 +150,7 @@
                     "slug": "time-field",
                     "category": "Date and Time",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/date-and-time.lib.pen"
                     ]
                   }
@@ -171,8 +171,8 @@
               "id": "g-date-and-time-organism-h",
               "type": "text",
               "content": "ORGANISMS",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -199,11 +199,11 @@
                       "width": "fit_content",
                       "gap": 4,
                       "padding": 12,
-                      "fill": "$brand:color.surface",
-                      "cornerRadius": "$brand:radius.lg",
+                      "fill": "$tokens:color.surface",
+                      "cornerRadius": "$tokens:radius.lg",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
@@ -222,26 +222,26 @@
                               "id": "calendar-prev",
                               "type": "text",
                               "content": "‹",
-                              "fill": "$brand:color.muted",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md"
+                              "fill": "$tokens:color.muted",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md"
                             },
                             {
                               "id": "calendar-mon",
                               "type": "text",
                               "content": "June 2026",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "600"
                             },
                             {
                               "id": "calendar-next",
                               "type": "text",
                               "content": "›",
-                              "fill": "$brand:color.muted",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md"
+                              "fill": "$tokens:color.muted",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md"
                             }
                           ]
                         },
@@ -264,8 +264,8 @@
                                   "id": "calendar-wk-0-t",
                                   "type": "text",
                                   "content": "S",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -284,8 +284,8 @@
                                   "id": "calendar-wk-1-t",
                                   "type": "text",
                                   "content": "M",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -304,8 +304,8 @@
                                   "id": "calendar-wk-2-t",
                                   "type": "text",
                                   "content": "T",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -324,8 +324,8 @@
                                   "id": "calendar-wk-3-t",
                                   "type": "text",
                                   "content": "W",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -344,8 +344,8 @@
                                   "id": "calendar-wk-4-t",
                                   "type": "text",
                                   "content": "T",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -364,8 +364,8 @@
                                   "id": "calendar-wk-5-t",
                                   "type": "text",
                                   "content": "F",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -384,8 +384,8 @@
                                   "id": "calendar-wk-6-t",
                                   "type": "text",
                                   "content": "S",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -414,9 +414,9 @@
                                   "id": "calendar-r0-0-t",
                                   "type": "text",
                                   "content": "",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -435,9 +435,9 @@
                                   "id": "calendar-r0-1-t",
                                   "type": "text",
                                   "content": "",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -456,9 +456,9 @@
                                   "id": "calendar-r0-2-t",
                                   "type": "text",
                                   "content": "",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -477,9 +477,9 @@
                                   "id": "calendar-r0-3-t",
                                   "type": "text",
                                   "content": "1",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -498,9 +498,9 @@
                                   "id": "calendar-r0-4-t",
                                   "type": "text",
                                   "content": "2",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -519,9 +519,9 @@
                                   "id": "calendar-r0-5-t",
                                   "type": "text",
                                   "content": "3",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -540,9 +540,9 @@
                                   "id": "calendar-r0-6-t",
                                   "type": "text",
                                   "content": "4",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             }
@@ -569,9 +569,9 @@
                                   "id": "calendar-r1-0-t",
                                   "type": "text",
                                   "content": "5",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -590,9 +590,9 @@
                                   "id": "calendar-r1-1-t",
                                   "type": "text",
                                   "content": "6",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -611,9 +611,9 @@
                                   "id": "calendar-r1-2-t",
                                   "type": "text",
                                   "content": "7",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -632,9 +632,9 @@
                                   "id": "calendar-r1-3-t",
                                   "type": "text",
                                   "content": "8",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -653,9 +653,9 @@
                                   "id": "calendar-r1-4-t",
                                   "type": "text",
                                   "content": "9",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -674,9 +674,9 @@
                                   "id": "calendar-r1-5-t",
                                   "type": "text",
                                   "content": "10",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -695,9 +695,9 @@
                                   "id": "calendar-r1-6-t",
                                   "type": "text",
                                   "content": "11",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             }
@@ -724,9 +724,9 @@
                                   "id": "calendar-r2-0-t",
                                   "type": "text",
                                   "content": "12",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -745,9 +745,9 @@
                                   "id": "calendar-r2-1-t",
                                   "type": "text",
                                   "content": "13",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -760,15 +760,15 @@
                               "alignItems": "center",
                               "justifyContent": "center",
                               "cornerRadius": 9999,
-                              "fill": "$brand:color.accent",
+                              "fill": "$tokens:color.accent",
                               "children": [
                                 {
                                   "id": "calendar-r2-2-t",
                                   "type": "text",
                                   "content": "14",
-                                  "fill": "$brand:color.accent-foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.accent-foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -787,9 +787,9 @@
                                   "id": "calendar-r2-3-t",
                                   "type": "text",
                                   "content": "15",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -808,9 +808,9 @@
                                   "id": "calendar-r2-4-t",
                                   "type": "text",
                                   "content": "16",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -829,9 +829,9 @@
                                   "id": "calendar-r2-5-t",
                                   "type": "text",
                                   "content": "17",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -850,9 +850,9 @@
                                   "id": "calendar-r2-6-t",
                                   "type": "text",
                                   "content": "18",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             }
@@ -879,9 +879,9 @@
                                   "id": "calendar-r3-0-t",
                                   "type": "text",
                                   "content": "19",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -900,9 +900,9 @@
                                   "id": "calendar-r3-1-t",
                                   "type": "text",
                                   "content": "20",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -921,9 +921,9 @@
                                   "id": "calendar-r3-2-t",
                                   "type": "text",
                                   "content": "21",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -942,9 +942,9 @@
                                   "id": "calendar-r3-3-t",
                                   "type": "text",
                                   "content": "22",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -963,9 +963,9 @@
                                   "id": "calendar-r3-4-t",
                                   "type": "text",
                                   "content": "23",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -984,9 +984,9 @@
                                   "id": "calendar-r3-5-t",
                                   "type": "text",
                                   "content": "24",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1005,9 +1005,9 @@
                                   "id": "calendar-r3-6-t",
                                   "type": "text",
                                   "content": "25",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             }
@@ -1034,9 +1034,9 @@
                                   "id": "calendar-r4-0-t",
                                   "type": "text",
                                   "content": "26",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1055,9 +1055,9 @@
                                   "id": "calendar-r4-1-t",
                                   "type": "text",
                                   "content": "27",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1076,9 +1076,9 @@
                                   "id": "calendar-r4-2-t",
                                   "type": "text",
                                   "content": "28",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1097,9 +1097,9 @@
                                   "id": "calendar-r4-3-t",
                                   "type": "text",
                                   "content": "29",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1118,9 +1118,9 @@
                                   "id": "calendar-r4-4-t",
                                   "type": "text",
                                   "content": "30",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1139,9 +1139,9 @@
                                   "id": "calendar-r4-5-t",
                                   "type": "text",
                                   "content": "",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1160,9 +1160,9 @@
                                   "id": "calendar-r4-6-t",
                                   "type": "text",
                                   "content": "",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             }
@@ -1182,7 +1182,7 @@
                     "slug": "calendar",
                     "category": "Date and Time",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/date-and-time.lib.pen"
                     ]
                   }
@@ -1202,11 +1202,11 @@
                       "width": "fit_content",
                       "gap": 4,
                       "padding": 12,
-                      "fill": "$brand:color.surface",
-                      "cornerRadius": "$brand:radius.lg",
+                      "fill": "$tokens:color.surface",
+                      "cornerRadius": "$tokens:radius.lg",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
@@ -1225,26 +1225,26 @@
                               "id": "range-calendar-prev",
                               "type": "text",
                               "content": "‹",
-                              "fill": "$brand:color.muted",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md"
+                              "fill": "$tokens:color.muted",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md"
                             },
                             {
                               "id": "range-calendar-mon",
                               "type": "text",
                               "content": "June 2026",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "600"
                             },
                             {
                               "id": "range-calendar-next",
                               "type": "text",
                               "content": "›",
-                              "fill": "$brand:color.muted",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md"
+                              "fill": "$tokens:color.muted",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md"
                             }
                           ]
                         },
@@ -1267,8 +1267,8 @@
                                   "id": "range-calendar-wk-0-t",
                                   "type": "text",
                                   "content": "S",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -1287,8 +1287,8 @@
                                   "id": "range-calendar-wk-1-t",
                                   "type": "text",
                                   "content": "M",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -1307,8 +1307,8 @@
                                   "id": "range-calendar-wk-2-t",
                                   "type": "text",
                                   "content": "T",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -1327,8 +1327,8 @@
                                   "id": "range-calendar-wk-3-t",
                                   "type": "text",
                                   "content": "W",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -1347,8 +1347,8 @@
                                   "id": "range-calendar-wk-4-t",
                                   "type": "text",
                                   "content": "T",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -1367,8 +1367,8 @@
                                   "id": "range-calendar-wk-5-t",
                                   "type": "text",
                                   "content": "F",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -1387,8 +1387,8 @@
                                   "id": "range-calendar-wk-6-t",
                                   "type": "text",
                                   "content": "S",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -1417,9 +1417,9 @@
                                   "id": "range-calendar-r0-0-t",
                                   "type": "text",
                                   "content": "",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1438,9 +1438,9 @@
                                   "id": "range-calendar-r0-1-t",
                                   "type": "text",
                                   "content": "",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1459,9 +1459,9 @@
                                   "id": "range-calendar-r0-2-t",
                                   "type": "text",
                                   "content": "",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1480,9 +1480,9 @@
                                   "id": "range-calendar-r0-3-t",
                                   "type": "text",
                                   "content": "1",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1501,9 +1501,9 @@
                                   "id": "range-calendar-r0-4-t",
                                   "type": "text",
                                   "content": "2",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1522,9 +1522,9 @@
                                   "id": "range-calendar-r0-5-t",
                                   "type": "text",
                                   "content": "3",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1543,9 +1543,9 @@
                                   "id": "range-calendar-r0-6-t",
                                   "type": "text",
                                   "content": "4",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             }
@@ -1572,9 +1572,9 @@
                                   "id": "range-calendar-r1-0-t",
                                   "type": "text",
                                   "content": "5",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1593,9 +1593,9 @@
                                   "id": "range-calendar-r1-1-t",
                                   "type": "text",
                                   "content": "6",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1614,9 +1614,9 @@
                                   "id": "range-calendar-r1-2-t",
                                   "type": "text",
                                   "content": "7",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1635,9 +1635,9 @@
                                   "id": "range-calendar-r1-3-t",
                                   "type": "text",
                                   "content": "8",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1656,9 +1656,9 @@
                                   "id": "range-calendar-r1-4-t",
                                   "type": "text",
                                   "content": "9",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1671,15 +1671,15 @@
                               "alignItems": "center",
                               "justifyContent": "center",
                               "cornerRadius": 0,
-                              "fill": "$brand:color.accent-soft",
+                              "fill": "$tokens:color.accent-soft",
                               "children": [
                                 {
                                   "id": "range-calendar-r1-5-t",
                                   "type": "text",
                                   "content": "10",
-                                  "fill": "$brand:color.accent",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.accent",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1692,15 +1692,15 @@
                               "alignItems": "center",
                               "justifyContent": "center",
                               "cornerRadius": 0,
-                              "fill": "$brand:color.accent-soft",
+                              "fill": "$tokens:color.accent-soft",
                               "children": [
                                 {
                                   "id": "range-calendar-r1-6-t",
                                   "type": "text",
                                   "content": "11",
-                                  "fill": "$brand:color.accent",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.accent",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             }
@@ -1721,15 +1721,15 @@
                               "alignItems": "center",
                               "justifyContent": "center",
                               "cornerRadius": 0,
-                              "fill": "$brand:color.accent-soft",
+                              "fill": "$tokens:color.accent-soft",
                               "children": [
                                 {
                                   "id": "range-calendar-r2-0-t",
                                   "type": "text",
                                   "content": "12",
-                                  "fill": "$brand:color.accent",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.accent",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1742,15 +1742,15 @@
                               "alignItems": "center",
                               "justifyContent": "center",
                               "cornerRadius": 0,
-                              "fill": "$brand:color.accent-soft",
+                              "fill": "$tokens:color.accent-soft",
                               "children": [
                                 {
                                   "id": "range-calendar-r2-1-t",
                                   "type": "text",
                                   "content": "13",
-                                  "fill": "$brand:color.accent",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.accent",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1763,15 +1763,15 @@
                               "alignItems": "center",
                               "justifyContent": "center",
                               "cornerRadius": 0,
-                              "fill": "$brand:color.accent-soft",
+                              "fill": "$tokens:color.accent-soft",
                               "children": [
                                 {
                                   "id": "range-calendar-r2-2-t",
                                   "type": "text",
                                   "content": "14",
-                                  "fill": "$brand:color.accent",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.accent",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1784,15 +1784,15 @@
                               "alignItems": "center",
                               "justifyContent": "center",
                               "cornerRadius": 0,
-                              "fill": "$brand:color.accent-soft",
+                              "fill": "$tokens:color.accent-soft",
                               "children": [
                                 {
                                   "id": "range-calendar-r2-3-t",
                                   "type": "text",
                                   "content": "15",
-                                  "fill": "$brand:color.accent",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.accent",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1805,15 +1805,15 @@
                               "alignItems": "center",
                               "justifyContent": "center",
                               "cornerRadius": 0,
-                              "fill": "$brand:color.accent-soft",
+                              "fill": "$tokens:color.accent-soft",
                               "children": [
                                 {
                                   "id": "range-calendar-r2-4-t",
                                   "type": "text",
                                   "content": "16",
-                                  "fill": "$brand:color.accent",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.accent",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1832,9 +1832,9 @@
                                   "id": "range-calendar-r2-5-t",
                                   "type": "text",
                                   "content": "17",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1853,9 +1853,9 @@
                                   "id": "range-calendar-r2-6-t",
                                   "type": "text",
                                   "content": "18",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             }
@@ -1882,9 +1882,9 @@
                                   "id": "range-calendar-r3-0-t",
                                   "type": "text",
                                   "content": "19",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1903,9 +1903,9 @@
                                   "id": "range-calendar-r3-1-t",
                                   "type": "text",
                                   "content": "20",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1924,9 +1924,9 @@
                                   "id": "range-calendar-r3-2-t",
                                   "type": "text",
                                   "content": "21",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1945,9 +1945,9 @@
                                   "id": "range-calendar-r3-3-t",
                                   "type": "text",
                                   "content": "22",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1966,9 +1966,9 @@
                                   "id": "range-calendar-r3-4-t",
                                   "type": "text",
                                   "content": "23",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -1987,9 +1987,9 @@
                                   "id": "range-calendar-r3-5-t",
                                   "type": "text",
                                   "content": "24",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2008,9 +2008,9 @@
                                   "id": "range-calendar-r3-6-t",
                                   "type": "text",
                                   "content": "25",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             }
@@ -2037,9 +2037,9 @@
                                   "id": "range-calendar-r4-0-t",
                                   "type": "text",
                                   "content": "26",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2058,9 +2058,9 @@
                                   "id": "range-calendar-r4-1-t",
                                   "type": "text",
                                   "content": "27",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2079,9 +2079,9 @@
                                   "id": "range-calendar-r4-2-t",
                                   "type": "text",
                                   "content": "28",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2100,9 +2100,9 @@
                                   "id": "range-calendar-r4-3-t",
                                   "type": "text",
                                   "content": "29",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2121,9 +2121,9 @@
                                   "id": "range-calendar-r4-4-t",
                                   "type": "text",
                                   "content": "30",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2142,9 +2142,9 @@
                                   "id": "range-calendar-r4-5-t",
                                   "type": "text",
                                   "content": "",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2163,9 +2163,9 @@
                                   "id": "range-calendar-r4-6-t",
                                   "type": "text",
                                   "content": "",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             }
@@ -2185,7 +2185,7 @@
                     "slug": "range-calendar",
                     "category": "Date and Time",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/date-and-time.lib.pen"
                     ]
                   }
@@ -2211,28 +2211,28 @@
                         12,
                         0
                       ],
-                      "cornerRadius": "$brand:radius.md",
-                      "fill": "$brand:color.field-background",
+                      "cornerRadius": "$tokens:radius.md",
+                      "fill": "$tokens:color.field-background",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
                           "id": "date-picker-f-v",
                           "type": "text",
                           "content": "14 / 06 / 2026",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md"
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
                         },
                         {
                           "id": "date-picker-f-c",
                           "type": "text",
                           "content": "▾",
-                          "fill": "$brand:color.muted",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md"
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
                         }
                       ]
                     },
@@ -2244,11 +2244,11 @@
                       "width": "fit_content",
                       "gap": 4,
                       "padding": 12,
-                      "fill": "$brand:color.surface",
-                      "cornerRadius": "$brand:radius.lg",
+                      "fill": "$tokens:color.surface",
+                      "cornerRadius": "$tokens:radius.lg",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
@@ -2267,26 +2267,26 @@
                               "id": "date-picker-prev",
                               "type": "text",
                               "content": "‹",
-                              "fill": "$brand:color.muted",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md"
+                              "fill": "$tokens:color.muted",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md"
                             },
                             {
                               "id": "date-picker-mon",
                               "type": "text",
                               "content": "June 2026",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "600"
                             },
                             {
                               "id": "date-picker-next",
                               "type": "text",
                               "content": "›",
-                              "fill": "$brand:color.muted",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md"
+                              "fill": "$tokens:color.muted",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md"
                             }
                           ]
                         },
@@ -2309,8 +2309,8 @@
                                   "id": "date-picker-wk-0-t",
                                   "type": "text",
                                   "content": "S",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -2329,8 +2329,8 @@
                                   "id": "date-picker-wk-1-t",
                                   "type": "text",
                                   "content": "M",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -2349,8 +2349,8 @@
                                   "id": "date-picker-wk-2-t",
                                   "type": "text",
                                   "content": "T",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -2369,8 +2369,8 @@
                                   "id": "date-picker-wk-3-t",
                                   "type": "text",
                                   "content": "W",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -2389,8 +2389,8 @@
                                   "id": "date-picker-wk-4-t",
                                   "type": "text",
                                   "content": "T",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -2409,8 +2409,8 @@
                                   "id": "date-picker-wk-5-t",
                                   "type": "text",
                                   "content": "F",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -2429,8 +2429,8 @@
                                   "id": "date-picker-wk-6-t",
                                   "type": "text",
                                   "content": "S",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -2459,9 +2459,9 @@
                                   "id": "date-picker-r0-0-t",
                                   "type": "text",
                                   "content": "",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2480,9 +2480,9 @@
                                   "id": "date-picker-r0-1-t",
                                   "type": "text",
                                   "content": "",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2501,9 +2501,9 @@
                                   "id": "date-picker-r0-2-t",
                                   "type": "text",
                                   "content": "",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2522,9 +2522,9 @@
                                   "id": "date-picker-r0-3-t",
                                   "type": "text",
                                   "content": "1",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2543,9 +2543,9 @@
                                   "id": "date-picker-r0-4-t",
                                   "type": "text",
                                   "content": "2",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2564,9 +2564,9 @@
                                   "id": "date-picker-r0-5-t",
                                   "type": "text",
                                   "content": "3",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2585,9 +2585,9 @@
                                   "id": "date-picker-r0-6-t",
                                   "type": "text",
                                   "content": "4",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             }
@@ -2614,9 +2614,9 @@
                                   "id": "date-picker-r1-0-t",
                                   "type": "text",
                                   "content": "5",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2635,9 +2635,9 @@
                                   "id": "date-picker-r1-1-t",
                                   "type": "text",
                                   "content": "6",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2656,9 +2656,9 @@
                                   "id": "date-picker-r1-2-t",
                                   "type": "text",
                                   "content": "7",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2677,9 +2677,9 @@
                                   "id": "date-picker-r1-3-t",
                                   "type": "text",
                                   "content": "8",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2698,9 +2698,9 @@
                                   "id": "date-picker-r1-4-t",
                                   "type": "text",
                                   "content": "9",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2719,9 +2719,9 @@
                                   "id": "date-picker-r1-5-t",
                                   "type": "text",
                                   "content": "10",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2740,9 +2740,9 @@
                                   "id": "date-picker-r1-6-t",
                                   "type": "text",
                                   "content": "11",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             }
@@ -2769,9 +2769,9 @@
                                   "id": "date-picker-r2-0-t",
                                   "type": "text",
                                   "content": "12",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2790,9 +2790,9 @@
                                   "id": "date-picker-r2-1-t",
                                   "type": "text",
                                   "content": "13",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2805,15 +2805,15 @@
                               "alignItems": "center",
                               "justifyContent": "center",
                               "cornerRadius": 9999,
-                              "fill": "$brand:color.accent",
+                              "fill": "$tokens:color.accent",
                               "children": [
                                 {
                                   "id": "date-picker-r2-2-t",
                                   "type": "text",
                                   "content": "14",
-                                  "fill": "$brand:color.accent-foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.accent-foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2832,9 +2832,9 @@
                                   "id": "date-picker-r2-3-t",
                                   "type": "text",
                                   "content": "15",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2853,9 +2853,9 @@
                                   "id": "date-picker-r2-4-t",
                                   "type": "text",
                                   "content": "16",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2874,9 +2874,9 @@
                                   "id": "date-picker-r2-5-t",
                                   "type": "text",
                                   "content": "17",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2895,9 +2895,9 @@
                                   "id": "date-picker-r2-6-t",
                                   "type": "text",
                                   "content": "18",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             }
@@ -2924,9 +2924,9 @@
                                   "id": "date-picker-r3-0-t",
                                   "type": "text",
                                   "content": "19",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2945,9 +2945,9 @@
                                   "id": "date-picker-r3-1-t",
                                   "type": "text",
                                   "content": "20",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2966,9 +2966,9 @@
                                   "id": "date-picker-r3-2-t",
                                   "type": "text",
                                   "content": "21",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -2987,9 +2987,9 @@
                                   "id": "date-picker-r3-3-t",
                                   "type": "text",
                                   "content": "22",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3008,9 +3008,9 @@
                                   "id": "date-picker-r3-4-t",
                                   "type": "text",
                                   "content": "23",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3029,9 +3029,9 @@
                                   "id": "date-picker-r3-5-t",
                                   "type": "text",
                                   "content": "24",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3050,9 +3050,9 @@
                                   "id": "date-picker-r3-6-t",
                                   "type": "text",
                                   "content": "25",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             }
@@ -3079,9 +3079,9 @@
                                   "id": "date-picker-r4-0-t",
                                   "type": "text",
                                   "content": "26",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3100,9 +3100,9 @@
                                   "id": "date-picker-r4-1-t",
                                   "type": "text",
                                   "content": "27",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3121,9 +3121,9 @@
                                   "id": "date-picker-r4-2-t",
                                   "type": "text",
                                   "content": "28",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3142,9 +3142,9 @@
                                   "id": "date-picker-r4-3-t",
                                   "type": "text",
                                   "content": "29",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3163,9 +3163,9 @@
                                   "id": "date-picker-r4-4-t",
                                   "type": "text",
                                   "content": "30",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3184,9 +3184,9 @@
                                   "id": "date-picker-r4-5-t",
                                   "type": "text",
                                   "content": "",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3205,9 +3205,9 @@
                                   "id": "date-picker-r4-6-t",
                                   "type": "text",
                                   "content": "",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             }
@@ -3227,7 +3227,7 @@
                     "slug": "date-picker",
                     "category": "Date and Time",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/date-and-time.lib.pen"
                     ]
                   }
@@ -3260,28 +3260,28 @@
                             12,
                             0
                           ],
-                          "cornerRadius": "$brand:radius.md",
-                          "fill": "$brand:color.field-background",
+                          "cornerRadius": "$tokens:radius.md",
+                          "fill": "$tokens:color.field-background",
                           "stroke": {
-                            "thickness": "$brand:border.width",
-                            "fill": "$brand:color.border"
+                            "thickness": "$tokens:border.width",
+                            "fill": "$tokens:color.border"
                           },
                           "children": [
                             {
                               "id": "date-range-picker-s-v",
                               "type": "text",
                               "content": "Jun 10",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md"
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md"
                             },
                             {
                               "id": "date-range-picker-s-c",
                               "type": "text",
                               "content": "▾",
-                              "fill": "$brand:color.muted",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md"
+                              "fill": "$tokens:color.muted",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md"
                             }
                           ]
                         },
@@ -3298,28 +3298,28 @@
                             12,
                             0
                           ],
-                          "cornerRadius": "$brand:radius.md",
-                          "fill": "$brand:color.field-background",
+                          "cornerRadius": "$tokens:radius.md",
+                          "fill": "$tokens:color.field-background",
                           "stroke": {
-                            "thickness": "$brand:border.width",
-                            "fill": "$brand:color.border"
+                            "thickness": "$tokens:border.width",
+                            "fill": "$tokens:color.border"
                           },
                           "children": [
                             {
                               "id": "date-range-picker-e-v",
                               "type": "text",
                               "content": "Jun 16",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md"
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md"
                             },
                             {
                               "id": "date-range-picker-e-c",
                               "type": "text",
                               "content": "▾",
-                              "fill": "$brand:color.muted",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md"
+                              "fill": "$tokens:color.muted",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md"
                             }
                           ]
                         }
@@ -3333,11 +3333,11 @@
                       "width": "fit_content",
                       "gap": 4,
                       "padding": 12,
-                      "fill": "$brand:color.surface",
-                      "cornerRadius": "$brand:radius.lg",
+                      "fill": "$tokens:color.surface",
+                      "cornerRadius": "$tokens:radius.lg",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
@@ -3356,26 +3356,26 @@
                               "id": "date-range-picker-prev",
                               "type": "text",
                               "content": "‹",
-                              "fill": "$brand:color.muted",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md"
+                              "fill": "$tokens:color.muted",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md"
                             },
                             {
                               "id": "date-range-picker-mon",
                               "type": "text",
                               "content": "June 2026",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "600"
                             },
                             {
                               "id": "date-range-picker-next",
                               "type": "text",
                               "content": "›",
-                              "fill": "$brand:color.muted",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md"
+                              "fill": "$tokens:color.muted",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md"
                             }
                           ]
                         },
@@ -3398,8 +3398,8 @@
                                   "id": "date-range-picker-wk-0-t",
                                   "type": "text",
                                   "content": "S",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -3418,8 +3418,8 @@
                                   "id": "date-range-picker-wk-1-t",
                                   "type": "text",
                                   "content": "M",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -3438,8 +3438,8 @@
                                   "id": "date-range-picker-wk-2-t",
                                   "type": "text",
                                   "content": "T",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -3458,8 +3458,8 @@
                                   "id": "date-range-picker-wk-3-t",
                                   "type": "text",
                                   "content": "W",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -3478,8 +3478,8 @@
                                   "id": "date-range-picker-wk-4-t",
                                   "type": "text",
                                   "content": "T",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -3498,8 +3498,8 @@
                                   "id": "date-range-picker-wk-5-t",
                                   "type": "text",
                                   "content": "F",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -3518,8 +3518,8 @@
                                   "id": "date-range-picker-wk-6-t",
                                   "type": "text",
                                   "content": "S",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
                                   "fontSize": 12,
                                   "fontWeight": "600"
                                 }
@@ -3548,9 +3548,9 @@
                                   "id": "date-range-picker-r0-0-t",
                                   "type": "text",
                                   "content": "",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3569,9 +3569,9 @@
                                   "id": "date-range-picker-r0-1-t",
                                   "type": "text",
                                   "content": "",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3590,9 +3590,9 @@
                                   "id": "date-range-picker-r0-2-t",
                                   "type": "text",
                                   "content": "",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3611,9 +3611,9 @@
                                   "id": "date-range-picker-r0-3-t",
                                   "type": "text",
                                   "content": "1",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3632,9 +3632,9 @@
                                   "id": "date-range-picker-r0-4-t",
                                   "type": "text",
                                   "content": "2",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3653,9 +3653,9 @@
                                   "id": "date-range-picker-r0-5-t",
                                   "type": "text",
                                   "content": "3",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3674,9 +3674,9 @@
                                   "id": "date-range-picker-r0-6-t",
                                   "type": "text",
                                   "content": "4",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             }
@@ -3703,9 +3703,9 @@
                                   "id": "date-range-picker-r1-0-t",
                                   "type": "text",
                                   "content": "5",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3724,9 +3724,9 @@
                                   "id": "date-range-picker-r1-1-t",
                                   "type": "text",
                                   "content": "6",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3745,9 +3745,9 @@
                                   "id": "date-range-picker-r1-2-t",
                                   "type": "text",
                                   "content": "7",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3766,9 +3766,9 @@
                                   "id": "date-range-picker-r1-3-t",
                                   "type": "text",
                                   "content": "8",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3787,9 +3787,9 @@
                                   "id": "date-range-picker-r1-4-t",
                                   "type": "text",
                                   "content": "9",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3802,15 +3802,15 @@
                               "alignItems": "center",
                               "justifyContent": "center",
                               "cornerRadius": 0,
-                              "fill": "$brand:color.accent-soft",
+                              "fill": "$tokens:color.accent-soft",
                               "children": [
                                 {
                                   "id": "date-range-picker-r1-5-t",
                                   "type": "text",
                                   "content": "10",
-                                  "fill": "$brand:color.accent",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.accent",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3823,15 +3823,15 @@
                               "alignItems": "center",
                               "justifyContent": "center",
                               "cornerRadius": 0,
-                              "fill": "$brand:color.accent-soft",
+                              "fill": "$tokens:color.accent-soft",
                               "children": [
                                 {
                                   "id": "date-range-picker-r1-6-t",
                                   "type": "text",
                                   "content": "11",
-                                  "fill": "$brand:color.accent",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.accent",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             }
@@ -3852,15 +3852,15 @@
                               "alignItems": "center",
                               "justifyContent": "center",
                               "cornerRadius": 0,
-                              "fill": "$brand:color.accent-soft",
+                              "fill": "$tokens:color.accent-soft",
                               "children": [
                                 {
                                   "id": "date-range-picker-r2-0-t",
                                   "type": "text",
                                   "content": "12",
-                                  "fill": "$brand:color.accent",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.accent",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3873,15 +3873,15 @@
                               "alignItems": "center",
                               "justifyContent": "center",
                               "cornerRadius": 0,
-                              "fill": "$brand:color.accent-soft",
+                              "fill": "$tokens:color.accent-soft",
                               "children": [
                                 {
                                   "id": "date-range-picker-r2-1-t",
                                   "type": "text",
                                   "content": "13",
-                                  "fill": "$brand:color.accent",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.accent",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3894,15 +3894,15 @@
                               "alignItems": "center",
                               "justifyContent": "center",
                               "cornerRadius": 0,
-                              "fill": "$brand:color.accent-soft",
+                              "fill": "$tokens:color.accent-soft",
                               "children": [
                                 {
                                   "id": "date-range-picker-r2-2-t",
                                   "type": "text",
                                   "content": "14",
-                                  "fill": "$brand:color.accent",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.accent",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3915,15 +3915,15 @@
                               "alignItems": "center",
                               "justifyContent": "center",
                               "cornerRadius": 0,
-                              "fill": "$brand:color.accent-soft",
+                              "fill": "$tokens:color.accent-soft",
                               "children": [
                                 {
                                   "id": "date-range-picker-r2-3-t",
                                   "type": "text",
                                   "content": "15",
-                                  "fill": "$brand:color.accent",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.accent",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3936,15 +3936,15 @@
                               "alignItems": "center",
                               "justifyContent": "center",
                               "cornerRadius": 0,
-                              "fill": "$brand:color.accent-soft",
+                              "fill": "$tokens:color.accent-soft",
                               "children": [
                                 {
                                   "id": "date-range-picker-r2-4-t",
                                   "type": "text",
                                   "content": "16",
-                                  "fill": "$brand:color.accent",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.accent",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3963,9 +3963,9 @@
                                   "id": "date-range-picker-r2-5-t",
                                   "type": "text",
                                   "content": "17",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -3984,9 +3984,9 @@
                                   "id": "date-range-picker-r2-6-t",
                                   "type": "text",
                                   "content": "18",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             }
@@ -4013,9 +4013,9 @@
                                   "id": "date-range-picker-r3-0-t",
                                   "type": "text",
                                   "content": "19",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -4034,9 +4034,9 @@
                                   "id": "date-range-picker-r3-1-t",
                                   "type": "text",
                                   "content": "20",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -4055,9 +4055,9 @@
                                   "id": "date-range-picker-r3-2-t",
                                   "type": "text",
                                   "content": "21",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -4076,9 +4076,9 @@
                                   "id": "date-range-picker-r3-3-t",
                                   "type": "text",
                                   "content": "22",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -4097,9 +4097,9 @@
                                   "id": "date-range-picker-r3-4-t",
                                   "type": "text",
                                   "content": "23",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -4118,9 +4118,9 @@
                                   "id": "date-range-picker-r3-5-t",
                                   "type": "text",
                                   "content": "24",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -4139,9 +4139,9 @@
                                   "id": "date-range-picker-r3-6-t",
                                   "type": "text",
                                   "content": "25",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             }
@@ -4168,9 +4168,9 @@
                                   "id": "date-range-picker-r4-0-t",
                                   "type": "text",
                                   "content": "26",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -4189,9 +4189,9 @@
                                   "id": "date-range-picker-r4-1-t",
                                   "type": "text",
                                   "content": "27",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -4210,9 +4210,9 @@
                                   "id": "date-range-picker-r4-2-t",
                                   "type": "text",
                                   "content": "28",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -4231,9 +4231,9 @@
                                   "id": "date-range-picker-r4-3-t",
                                   "type": "text",
                                   "content": "29",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -4252,9 +4252,9 @@
                                   "id": "date-range-picker-r4-4-t",
                                   "type": "text",
                                   "content": "30",
-                                  "fill": "$brand:color.foreground",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.foreground",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -4273,9 +4273,9 @@
                                   "id": "date-range-picker-r4-5-t",
                                   "type": "text",
                                   "content": "",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             },
@@ -4294,9 +4294,9 @@
                                   "id": "date-range-picker-r4-6-t",
                                   "type": "text",
                                   "content": "",
-                                  "fill": "$brand:color.muted",
-                                  "fontFamily": "$brand:font.family",
-                                  "fontSize": "$brand:font.size-sm"
+                                  "fill": "$tokens:color.muted",
+                                  "fontFamily": "$tokens:font.family",
+                                  "fontSize": "$tokens:font.size-sm"
                                 }
                               ]
                             }
@@ -4316,7 +4316,7 @@
                     "slug": "date-range-picker",
                     "category": "Date and Time",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/date-and-time.lib.pen"
                     ]
                   }

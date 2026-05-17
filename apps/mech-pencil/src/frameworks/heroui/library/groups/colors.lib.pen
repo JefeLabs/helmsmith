@@ -1,7 +1,7 @@
 {
   "version": "2.11",
   "imports": {
-    "brand": "../brand.lib.pen"
+    "tokens": "../design-tokens.lib.pen"
   },
   "children": [
     {
@@ -13,14 +13,14 @@
       "layout": "vertical",
       "gap": 40,
       "padding": 40,
-      "fill": "$brand:color.background",
+      "fill": "$tokens:color.background",
       "children": [
         {
           "id": "group-colors-title",
           "type": "text",
           "content": "Colors · HeroUI v3",
-          "fill": "$brand:color.foreground",
-          "fontFamily": "$brand:font.family",
+          "fill": "$tokens:color.foreground",
+          "fontFamily": "$tokens:font.family",
           "fontSize": 24,
           "fontWeight": "700"
         },
@@ -36,8 +36,8 @@
               "id": "g-colors-atom-h",
               "type": "text",
               "content": "ATOMS",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -55,11 +55,11 @@
                   "name": "ColorSwatch",
                   "width": 40,
                   "height": 40,
-                  "cornerRadius": "$brand:radius.md",
-                  "fill": "$brand:color.accent",
+                  "cornerRadius": "$tokens:radius.md",
+                  "fill": "$tokens:color.accent",
                   "stroke": {
-                    "thickness": "$brand:border.width",
-                    "fill": "$brand:color.border"
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
                   },
                   "reusable": true,
                   "metadata": {
@@ -72,7 +72,7 @@
                     "slug": "color-swatch",
                     "category": "Colors",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/colors.lib.pen"
                     ]
                   }
@@ -93,8 +93,8 @@
               "id": "g-colors-molecule-h",
               "type": "text",
               "content": "MOLECULES",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -119,11 +119,11 @@
                     12,
                     0
                   ],
-                  "cornerRadius": "$brand:radius.md",
-                  "fill": "$brand:color.field-background",
+                  "cornerRadius": "$tokens:radius.md",
+                  "fill": "$tokens:color.field-background",
                   "stroke": {
-                    "thickness": "$brand:border.width",
-                    "fill": "$brand:color.border"
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
                   },
                   "children": [
                     {
@@ -131,16 +131,16 @@
                       "type": "frame",
                       "width": 20,
                       "height": 20,
-                      "cornerRadius": "$brand:radius.sm",
-                      "fill": "$brand:color.accent"
+                      "cornerRadius": "$tokens:radius.sm",
+                      "fill": "$tokens:color.accent"
                     },
                     {
                       "id": "color-field-val",
                       "type": "text",
                       "content": "#3F5694",
-                      "fill": "$brand:color.foreground",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-md"
+                      "fill": "$tokens:color.foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md"
                     }
                   ],
                   "reusable": true,
@@ -154,7 +154,7 @@
                     "slug": "color-field",
                     "category": "Colors",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/colors.lib.pen"
                     ]
                   }
@@ -203,10 +203,10 @@
                       "width": 16,
                       "height": 16,
                       "cornerRadius": 9999,
-                      "fill": "$brand:color.surface",
+                      "fill": "$tokens:color.surface",
                       "stroke": {
                         "thickness": 2,
-                        "fill": "$brand:color.border"
+                        "fill": "$tokens:color.border"
                       }
                     }
                   ],
@@ -221,7 +221,7 @@
                     "slug": "color-slider",
                     "category": "Colors",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/colors.lib.pen"
                     ]
                   }
@@ -232,7 +232,7 @@
                   "name": "ColorArea",
                   "width": 220,
                   "height": 140,
-                  "cornerRadius": "$brand:radius.md",
+                  "cornerRadius": "$tokens:radius.md",
                   "layout": "none",
                   "fill": {
                     "type": "gradient",
@@ -244,7 +244,7 @@
                         "position": 0
                       },
                       {
-                        "color": "$brand:color.accent",
+                        "color": "$tokens:color.accent",
                         "position": 1
                       }
                     ]
@@ -276,7 +276,7 @@
                     "slug": "color-area",
                     "category": "Colors",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/colors.lib.pen"
                     ]
                   }
@@ -294,11 +294,11 @@
                       "type": "frame",
                       "width": 28,
                       "height": 28,
-                      "cornerRadius": "$brand:radius.sm",
+                      "cornerRadius": "$tokens:radius.sm",
                       "fill": "#c2453f",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       }
                     },
                     {
@@ -306,11 +306,11 @@
                       "type": "frame",
                       "width": 28,
                       "height": 28,
-                      "cornerRadius": "$brand:radius.sm",
+                      "cornerRadius": "$tokens:radius.sm",
                       "fill": "#c98a2e",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       }
                     },
                     {
@@ -318,11 +318,11 @@
                       "type": "frame",
                       "width": 28,
                       "height": 28,
-                      "cornerRadius": "$brand:radius.sm",
+                      "cornerRadius": "$tokens:radius.sm",
                       "fill": "#2f9e6e",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       }
                     },
                     {
@@ -330,11 +330,11 @@
                       "type": "frame",
                       "width": 28,
                       "height": 28,
-                      "cornerRadius": "$brand:radius.sm",
+                      "cornerRadius": "$tokens:radius.sm",
                       "fill": "#3a72b8",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       }
                     },
                     {
@@ -342,11 +342,11 @@
                       "type": "frame",
                       "width": 28,
                       "height": 28,
-                      "cornerRadius": "$brand:radius.sm",
+                      "cornerRadius": "$tokens:radius.sm",
                       "fill": "#3f5694",
                       "stroke": {
                         "thickness": 2,
-                        "fill": "$brand:color.foreground"
+                        "fill": "$tokens:color.foreground"
                       }
                     }
                   ],
@@ -361,7 +361,7 @@
                     "slug": "color-swatch-picker",
                     "category": "Colors",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/colors.lib.pen"
                     ]
                   }
@@ -382,8 +382,8 @@
               "id": "g-colors-organism-h",
               "type": "text",
               "content": "ORGANISMS",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -403,11 +403,11 @@
                   "layout": "vertical",
                   "gap": 12,
                   "padding": 16,
-                  "fill": "$brand:color.surface",
-                  "cornerRadius": "$brand:radius.lg",
+                  "fill": "$tokens:color.surface",
+                  "cornerRadius": "$tokens:radius.lg",
                   "stroke": {
-                    "thickness": "$brand:border.width",
-                    "fill": "$brand:color.border"
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
                   },
                   "effect": {
                     "type": "shadow",
@@ -426,7 +426,7 @@
                       "type": "frame",
                       "width": "fill_container",
                       "height": 120,
-                      "cornerRadius": "$brand:radius.md",
+                      "cornerRadius": "$tokens:radius.md",
                       "fill": {
                         "type": "gradient",
                         "gradientType": "linear",
@@ -437,7 +437,7 @@
                             "position": 0
                           },
                           {
-                            "color": "$brand:color.accent",
+                            "color": "$tokens:color.accent",
                             "position": 1
                           }
                         ]
@@ -482,16 +482,16 @@
                           "type": "frame",
                           "width": 24,
                           "height": 24,
-                          "cornerRadius": "$brand:radius.sm",
-                          "fill": "$brand:color.accent"
+                          "cornerRadius": "$tokens:radius.sm",
+                          "fill": "$tokens:color.accent"
                         },
                         {
                           "id": "color-picker-hex",
                           "type": "text",
                           "content": "#3F5694",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md"
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
                         }
                       ]
                     }
@@ -507,7 +507,7 @@
                     "slug": "color-picker",
                     "category": "Colors",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/colors.lib.pen"
                     ]
                   }

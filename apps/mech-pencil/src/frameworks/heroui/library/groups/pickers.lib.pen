@@ -1,7 +1,7 @@
 {
   "version": "2.11",
   "imports": {
-    "brand": "../brand.lib.pen"
+    "tokens": "../design-tokens.lib.pen"
   },
   "children": [
     {
@@ -13,14 +13,14 @@
       "layout": "vertical",
       "gap": 40,
       "padding": 40,
-      "fill": "$brand:color.background",
+      "fill": "$tokens:color.background",
       "children": [
         {
           "id": "group-pickers-title",
           "type": "text",
           "content": "Pickers · HeroUI v3",
-          "fill": "$brand:color.foreground",
-          "fontFamily": "$brand:font.family",
+          "fill": "$tokens:color.foreground",
+          "fontFamily": "$tokens:font.family",
           "fontSize": 24,
           "fontWeight": "700"
         },
@@ -36,8 +36,8 @@
               "id": "g-pickers-organism-h",
               "type": "text",
               "content": "ORGANISMS",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -70,28 +70,28 @@
                         12,
                         0
                       ],
-                      "cornerRadius": "$brand:radius.md",
-                      "fill": "$brand:color.field-background",
+                      "cornerRadius": "$tokens:radius.md",
+                      "fill": "$tokens:color.field-background",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
                           "id": "autocomplete-f-v",
                           "type": "text",
                           "content": "Type to search…",
-                          "fill": "$brand:color.field-placeholder",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md"
+                          "fill": "$tokens:color.field-placeholder",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
                         },
                         {
                           "id": "autocomplete-f-c",
                           "type": "text",
                           "content": "▾",
-                          "fill": "$brand:color.muted",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md"
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
                         }
                       ]
                     },
@@ -102,11 +102,11 @@
                       "width": 260,
                       "layout": "vertical",
                       "padding": 6,
-                      "fill": "$brand:color.surface",
-                      "cornerRadius": "$brand:radius.md",
+                      "fill": "$tokens:color.surface",
+                      "cornerRadius": "$tokens:radius.md",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "effect": {
                         "type": "shadow",
@@ -131,16 +131,16 @@
                             10,
                             8
                           ],
-                          "cornerRadius": "$brand:radius.sm",
-                          "fill": "$brand:color.accent-soft",
+                          "cornerRadius": "$tokens:radius.sm",
+                          "fill": "$tokens:color.accent-soft",
                           "children": [
                             {
                               "id": "autocomplete-m-0-l",
                               "type": "text",
                               "content": "Argentina",
-                              "fill": "$brand:color.accent",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.accent",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "600"
                             }
                           ]
@@ -156,16 +156,16 @@
                             10,
                             8
                           ],
-                          "cornerRadius": "$brand:radius.sm",
+                          "cornerRadius": "$tokens:radius.sm",
                           "fill": "transparent",
                           "children": [
                             {
                               "id": "autocomplete-m-1-l",
                               "type": "text",
                               "content": "Australia",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "400"
                             }
                           ]
@@ -181,16 +181,16 @@
                             10,
                             8
                           ],
-                          "cornerRadius": "$brand:radius.sm",
+                          "cornerRadius": "$tokens:radius.sm",
                           "fill": "transparent",
                           "children": [
                             {
                               "id": "autocomplete-m-2-l",
                               "type": "text",
                               "content": "Austria",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "400"
                             }
                           ]
@@ -209,7 +209,7 @@
                     "slug": "autocomplete",
                     "category": "Pickers",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/pickers.lib.pen"
                     ]
                   }
@@ -235,28 +235,28 @@
                         12,
                         0
                       ],
-                      "cornerRadius": "$brand:radius.md",
-                      "fill": "$brand:color.field-background",
+                      "cornerRadius": "$tokens:radius.md",
+                      "fill": "$tokens:color.field-background",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
                           "id": "combo-box-f-v",
                           "type": "text",
                           "content": "Select a framework",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md"
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
                         },
                         {
                           "id": "combo-box-f-c",
                           "type": "text",
                           "content": "▾",
-                          "fill": "$brand:color.muted",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md"
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
                         }
                       ]
                     },
@@ -267,11 +267,11 @@
                       "width": 260,
                       "layout": "vertical",
                       "padding": 6,
-                      "fill": "$brand:color.surface",
-                      "cornerRadius": "$brand:radius.md",
+                      "fill": "$tokens:color.surface",
+                      "cornerRadius": "$tokens:radius.md",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "effect": {
                         "type": "shadow",
@@ -296,16 +296,16 @@
                             10,
                             8
                           ],
-                          "cornerRadius": "$brand:radius.sm",
-                          "fill": "$brand:color.accent-soft",
+                          "cornerRadius": "$tokens:radius.sm",
+                          "fill": "$tokens:color.accent-soft",
                           "children": [
                             {
                               "id": "combo-box-m-0-l",
                               "type": "text",
                               "content": "React",
-                              "fill": "$brand:color.accent",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.accent",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "600"
                             }
                           ]
@@ -321,16 +321,16 @@
                             10,
                             8
                           ],
-                          "cornerRadius": "$brand:radius.sm",
+                          "cornerRadius": "$tokens:radius.sm",
                           "fill": "transparent",
                           "children": [
                             {
                               "id": "combo-box-m-1-l",
                               "type": "text",
                               "content": "Vue",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "400"
                             }
                           ]
@@ -346,16 +346,16 @@
                             10,
                             8
                           ],
-                          "cornerRadius": "$brand:radius.sm",
+                          "cornerRadius": "$tokens:radius.sm",
                           "fill": "transparent",
                           "children": [
                             {
                               "id": "combo-box-m-2-l",
                               "type": "text",
                               "content": "Svelte",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "400"
                             }
                           ]
@@ -371,16 +371,16 @@
                             10,
                             8
                           ],
-                          "cornerRadius": "$brand:radius.sm",
+                          "cornerRadius": "$tokens:radius.sm",
                           "fill": "transparent",
                           "children": [
                             {
                               "id": "combo-box-m-3-l",
                               "type": "text",
                               "content": "Solid",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "400"
                             }
                           ]
@@ -399,7 +399,7 @@
                     "slug": "combo-box",
                     "category": "Pickers",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/pickers.lib.pen"
                     ]
                   }
@@ -425,28 +425,28 @@
                         12,
                         0
                       ],
-                      "cornerRadius": "$brand:radius.md",
-                      "fill": "$brand:color.field-background",
+                      "cornerRadius": "$tokens:radius.md",
+                      "fill": "$tokens:color.field-background",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
                           "id": "select-f-v",
                           "type": "text",
                           "content": "Choose a plan",
-                          "fill": "$brand:color.field-placeholder",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md"
+                          "fill": "$tokens:color.field-placeholder",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
                         },
                         {
                           "id": "select-f-c",
                           "type": "text",
                           "content": "▾",
-                          "fill": "$brand:color.muted",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md"
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
                         }
                       ]
                     },
@@ -457,11 +457,11 @@
                       "width": 260,
                       "layout": "vertical",
                       "padding": 6,
-                      "fill": "$brand:color.surface",
-                      "cornerRadius": "$brand:radius.md",
+                      "fill": "$tokens:color.surface",
+                      "cornerRadius": "$tokens:radius.md",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "effect": {
                         "type": "shadow",
@@ -486,16 +486,16 @@
                             10,
                             8
                           ],
-                          "cornerRadius": "$brand:radius.sm",
+                          "cornerRadius": "$tokens:radius.sm",
                           "fill": "transparent",
                           "children": [
                             {
                               "id": "select-m-0-l",
                               "type": "text",
                               "content": "Starter",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "400"
                             }
                           ]
@@ -511,16 +511,16 @@
                             10,
                             8
                           ],
-                          "cornerRadius": "$brand:radius.sm",
-                          "fill": "$brand:color.accent-soft",
+                          "cornerRadius": "$tokens:radius.sm",
+                          "fill": "$tokens:color.accent-soft",
                           "children": [
                             {
                               "id": "select-m-1-l",
                               "type": "text",
                               "content": "Team",
-                              "fill": "$brand:color.accent",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.accent",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "600"
                             }
                           ]
@@ -536,16 +536,16 @@
                             10,
                             8
                           ],
-                          "cornerRadius": "$brand:radius.sm",
+                          "cornerRadius": "$tokens:radius.sm",
                           "fill": "transparent",
                           "children": [
                             {
                               "id": "select-m-2-l",
                               "type": "text",
                               "content": "Enterprise",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "400"
                             }
                           ]
@@ -564,7 +564,7 @@
                     "slug": "select",
                     "category": "Pickers",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/pickers.lib.pen"
                     ]
                   }

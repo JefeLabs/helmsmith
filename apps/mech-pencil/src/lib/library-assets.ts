@@ -3,9 +3,9 @@
  *
  * The HeroUI component layer (groups + previews + design-system +
  * catalog + mock skeletons) is byte-identical across every theme —
- * it's pure `$brand:` references (verified). So it's generated ONCE
+ * it's pure `$tokens:` references (verified). So it's generated ONCE
  * by `mech-pencil build-library`, committed under the heroui
- * framework, and `bundle` REUSES it: only `brand.lib.pen` is
+ * framework, and `bundle` REUSES it: only `design-tokens.lib.pen` is
  * per-project (defaults + CLI overrides).
  */
 

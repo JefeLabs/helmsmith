@@ -1,7 +1,7 @@
 {
   "version": "2.11",
   "imports": {
-    "brand": "../brand.lib.pen"
+    "tokens": "../design-tokens.lib.pen"
   },
   "children": [
     {
@@ -13,14 +13,14 @@
       "layout": "vertical",
       "gap": 40,
       "padding": 40,
-      "fill": "$brand:color.background",
+      "fill": "$tokens:color.background",
       "children": [
         {
           "id": "group-collections-title",
           "type": "text",
           "content": "Collections · HeroUI v3",
-          "fill": "$brand:color.foreground",
-          "fontFamily": "$brand:font.family",
+          "fill": "$tokens:color.foreground",
+          "fontFamily": "$tokens:font.family",
           "fontSize": 24,
           "fontWeight": "700"
         },
@@ -36,8 +36,8 @@
               "id": "g-collections-molecule-h",
               "type": "text",
               "content": "MOLECULES",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -70,23 +70,23 @@
                         5
                       ],
                       "cornerRadius": 9999,
-                      "fill": "$brand:color.accent-soft",
+                      "fill": "$tokens:color.accent-soft",
                       "children": [
                         {
                           "id": "tag-group-0-label",
                           "type": "text",
                           "content": "Design",
-                          "fill": "$brand:color.accent",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-sm",
+                          "fill": "$tokens:color.accent",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
                           "fontWeight": "500"
                         },
                         {
                           "id": "tag-group-0-x",
                           "type": "text",
                           "content": "✕",
-                          "fill": "$brand:color.accent",
-                          "fontFamily": "$brand:font.family",
+                          "fill": "$tokens:color.accent",
+                          "fontFamily": "$tokens:font.family",
                           "fontSize": 11
                         }
                       ]
@@ -104,23 +104,23 @@
                         5
                       ],
                       "cornerRadius": 9999,
-                      "fill": "$brand:color.accent-soft",
+                      "fill": "$tokens:color.accent-soft",
                       "children": [
                         {
                           "id": "tag-group-1-label",
                           "type": "text",
                           "content": "Eng",
-                          "fill": "$brand:color.accent",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-sm",
+                          "fill": "$tokens:color.accent",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
                           "fontWeight": "500"
                         },
                         {
                           "id": "tag-group-1-x",
                           "type": "text",
                           "content": "✕",
-                          "fill": "$brand:color.accent",
-                          "fontFamily": "$brand:font.family",
+                          "fill": "$tokens:color.accent",
+                          "fontFamily": "$tokens:font.family",
                           "fontSize": 11
                         }
                       ]
@@ -138,23 +138,23 @@
                         5
                       ],
                       "cornerRadius": 9999,
-                      "fill": "$brand:color.accent-soft",
+                      "fill": "$tokens:color.accent-soft",
                       "children": [
                         {
                           "id": "tag-group-2-label",
                           "type": "text",
                           "content": "Ops",
-                          "fill": "$brand:color.accent",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-sm",
+                          "fill": "$tokens:color.accent",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
                           "fontWeight": "500"
                         },
                         {
                           "id": "tag-group-2-x",
                           "type": "text",
                           "content": "✕",
-                          "fill": "$brand:color.accent",
-                          "fontFamily": "$brand:font.family",
+                          "fill": "$tokens:color.accent",
+                          "fontFamily": "$tokens:font.family",
                           "fontSize": 11
                         }
                       ]
@@ -171,7 +171,7 @@
                     "slug": "tag-group",
                     "category": "Collections",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/collections.lib.pen"
                     ]
                   }
@@ -192,8 +192,8 @@
               "id": "g-collections-organism-h",
               "type": "text",
               "content": "ORGANISMS",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -212,11 +212,11 @@
                   "width": 260,
                   "layout": "vertical",
                   "padding": 6,
-                  "fill": "$brand:color.surface",
-                  "cornerRadius": "$brand:radius.md",
+                  "fill": "$tokens:color.surface",
+                  "cornerRadius": "$tokens:radius.md",
                   "stroke": {
-                    "thickness": "$brand:border.width",
-                    "fill": "$brand:color.border"
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
                   },
                   "children": [
                     {
@@ -230,16 +230,16 @@
                         10,
                         8
                       ],
-                      "cornerRadius": "$brand:radius.sm",
+                      "cornerRadius": "$tokens:radius.sm",
                       "fill": "transparent",
                       "children": [
                         {
                           "id": "list-box-0-l",
                           "type": "text",
                           "content": "Profile",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md",
                           "fontWeight": "400"
                         }
                       ]
@@ -255,16 +255,16 @@
                         10,
                         8
                       ],
-                      "cornerRadius": "$brand:radius.sm",
-                      "fill": "$brand:color.accent-soft",
+                      "cornerRadius": "$tokens:radius.sm",
+                      "fill": "$tokens:color.accent-soft",
                       "children": [
                         {
                           "id": "list-box-1-l",
                           "type": "text",
                           "content": "Billing",
-                          "fill": "$brand:color.accent",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md",
+                          "fill": "$tokens:color.accent",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md",
                           "fontWeight": "600"
                         }
                       ]
@@ -280,16 +280,16 @@
                         10,
                         8
                       ],
-                      "cornerRadius": "$brand:radius.sm",
+                      "cornerRadius": "$tokens:radius.sm",
                       "fill": "transparent",
                       "children": [
                         {
                           "id": "list-box-2-l",
                           "type": "text",
                           "content": "Team",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md",
                           "fontWeight": "400"
                         }
                       ]
@@ -305,16 +305,16 @@
                         10,
                         8
                       ],
-                      "cornerRadius": "$brand:radius.sm",
+                      "cornerRadius": "$tokens:radius.sm",
                       "fill": "transparent",
                       "children": [
                         {
                           "id": "list-box-3-l",
                           "type": "text",
                           "content": "Settings",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md",
                           "fontWeight": "400"
                         }
                       ]
@@ -331,7 +331,7 @@
                     "slug": "list-box",
                     "category": "Collections",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/collections.lib.pen"
                     ]
                   }
@@ -356,20 +356,20 @@
                         16,
                         10
                       ],
-                      "cornerRadius": "$brand:radius.md",
-                      "fill": "$brand:color.surface",
+                      "cornerRadius": "$tokens:radius.md",
+                      "fill": "$tokens:color.surface",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
                           "id": "dropdown-trigger-l",
                           "type": "text",
                           "content": "Actions  ▾",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md",
                           "fontWeight": "600"
                         }
                       ]
@@ -381,11 +381,11 @@
                       "width": 260,
                       "layout": "vertical",
                       "padding": 6,
-                      "fill": "$brand:color.surface",
-                      "cornerRadius": "$brand:radius.md",
+                      "fill": "$tokens:color.surface",
+                      "cornerRadius": "$tokens:radius.md",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "effect": {
                         "type": "shadow",
@@ -410,16 +410,16 @@
                             10,
                             8
                           ],
-                          "cornerRadius": "$brand:radius.sm",
+                          "cornerRadius": "$tokens:radius.sm",
                           "fill": "transparent",
                           "children": [
                             {
                               "id": "dropdown-menu-0-l",
                               "type": "text",
                               "content": "Edit",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "400"
                             }
                           ]
@@ -435,16 +435,16 @@
                             10,
                             8
                           ],
-                          "cornerRadius": "$brand:radius.sm",
+                          "cornerRadius": "$tokens:radius.sm",
                           "fill": "transparent",
                           "children": [
                             {
                               "id": "dropdown-menu-1-l",
                               "type": "text",
                               "content": "Duplicate",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "400"
                             }
                           ]
@@ -460,16 +460,16 @@
                             10,
                             8
                           ],
-                          "cornerRadius": "$brand:radius.sm",
+                          "cornerRadius": "$tokens:radius.sm",
                           "fill": "transparent",
                           "children": [
                             {
                               "id": "dropdown-menu-2-l",
                               "type": "text",
                               "content": "Archive",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "400"
                             }
                           ]
@@ -485,16 +485,16 @@
                             10,
                             8
                           ],
-                          "cornerRadius": "$brand:radius.sm",
+                          "cornerRadius": "$tokens:radius.sm",
                           "fill": "transparent",
                           "children": [
                             {
                               "id": "dropdown-menu-3-l",
                               "type": "text",
                               "content": "Delete",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "400"
                             }
                           ]
@@ -513,7 +513,7 @@
                     "slug": "dropdown",
                     "category": "Collections",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/collections.lib.pen"
                     ]
                   }

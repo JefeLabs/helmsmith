@@ -1,7 +1,7 @@
 {
   "version": "2.11",
   "imports": {
-    "brand": "../brand.lib.pen"
+    "tokens": "../design-tokens.lib.pen"
   },
   "children": [
     {
@@ -13,14 +13,14 @@
       "layout": "vertical",
       "gap": 40,
       "padding": 40,
-      "fill": "$brand:color.background",
+      "fill": "$tokens:color.background",
       "children": [
         {
           "id": "mock-homepage-ctitle",
           "type": "text",
           "content": "Components (local — customizable)",
-          "fill": "$brand:color.foreground",
-          "fontFamily": "$brand:font.family",
+          "fill": "$tokens:color.foreground",
+          "fontFamily": "$tokens:font.family",
           "fontSize": 24,
           "fontWeight": "700"
         },
@@ -36,8 +36,8 @@
               "id": "m-homepage-atom-h",
               "type": "text",
               "content": "ATOMS",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -54,10 +54,10 @@
                   "type": "frame",
                   "name": "Button",
                   "height": 40,
-                  "fill": "$brand:color.accent",
-                  "cornerRadius": "$brand:radius.md",
+                  "fill": "$tokens:color.accent",
+                  "cornerRadius": "$tokens:radius.md",
                   "layout": "horizontal",
-                  "gap": "$brand:space.unit",
+                  "gap": "$tokens:space.unit",
                   "padding": [
                     16,
                     10
@@ -69,9 +69,9 @@
                       "id": "button-label",
                       "type": "text",
                       "content": "Button",
-                      "fill": "$brand:color.accent-foreground",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-md",
+                      "fill": "$tokens:color.accent-foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md",
                       "fontWeight": "600"
                     }
                   ],
@@ -86,7 +86,7 @@
                     "slug": "button",
                     "category": "Buttons",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/buttons.lib.pen",
                       "design-system.lib.pen",
                       "mocks/homepage.pen"
@@ -109,8 +109,8 @@
               "id": "m-homepage-molecule-h",
               "type": "text",
               "content": "MOLECULES",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -127,11 +127,11 @@
                   "type": "frame",
                   "name": "Card",
                   "width": 360,
-                  "fill": "$brand:color.surface",
-                  "cornerRadius": "$brand:radius.lg",
+                  "fill": "$tokens:color.surface",
+                  "cornerRadius": "$tokens:radius.lg",
                   "stroke": {
-                    "thickness": "$brand:border.width",
-                    "fill": "$brand:color.border"
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
                   },
                   "effect": {
                     "type": "shadow",
@@ -153,7 +153,7 @@
                       "type": "frame",
                       "name": "Header",
                       "layout": "vertical",
-                      "gap": "$brand:space.unit",
+                      "gap": "$tokens:space.unit",
                       "width": "fill_container",
                       "padding": [
                         20,
@@ -166,18 +166,18 @@
                           "id": "card-title",
                           "type": "text",
                           "content": "Card title",
-                          "fill": "$brand:color.surface-foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-lg",
+                          "fill": "$tokens:color.surface-foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-lg",
                           "fontWeight": "600"
                         },
                         {
                           "id": "card-subtitle",
                           "type": "text",
                           "content": "Supporting copy goes here.",
-                          "fill": "$brand:color.muted",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-sm"
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm"
                         }
                       ]
                     },
@@ -188,15 +188,15 @@
                       "width": "fill_container",
                       "padding": 20,
                       "layout": "vertical",
-                      "gap": "$brand:space.unit",
+                      "gap": "$tokens:space.unit",
                       "children": [
                         {
                           "id": "card-body-text",
                           "type": "text",
                           "content": "Body content.",
-                          "fill": "$brand:color.muted",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-sm"
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm"
                         }
                       ]
                     },
@@ -213,7 +213,7 @@
                       ],
                       "layout": "horizontal",
                       "justifyContent": "end",
-                      "gap": "$brand:space.unit"
+                      "gap": "$tokens:space.unit"
                     }
                   ],
                   "reusable": true,
@@ -227,7 +227,7 @@
                     "slug": "card",
                     "category": "Layout",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/layout.lib.pen",
                       "design-system.lib.pen",
                       "mocks/homepage.pen"
@@ -246,7 +246,7 @@
       "name": "Homepage",
       "width": 1280,
       "height": 1024,
-      "fill": "$brand:color.background",
+      "fill": "$tokens:color.background",
       "theme": {
         "mode": "light"
       },
@@ -272,8 +272,8 @@
               "id": "hp-brand",
               "type": "text",
               "content": "mech-pencil",
-              "fill": "$brand:color.foreground",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.foreground",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 18,
               "fontWeight": "700"
             },
@@ -281,8 +281,8 @@
               "id": "hp-navlinks",
               "type": "text",
               "content": "Docs   Components   Pricing",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 14
             }
           ]
@@ -299,8 +299,8 @@
               "id": "hp-eyebrow",
               "type": "text",
               "content": "HeroUI v3 · generated by mech-pencil",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 14,
               "fontWeight": "600"
             },
@@ -308,8 +308,8 @@
               "id": "hp-title",
               "type": "text",
               "content": "Build interfaces that feel inevitable.",
-              "fill": "$brand:color.foreground",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.foreground",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 56,
               "fontWeight": "800"
             },
@@ -317,8 +317,8 @@
               "id": "hp-sub",
               "type": "text",
               "content": "A themeable design system, assembled from reusable components and design tokens.",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 20,
               "textGrowth": "fixed-width",
               "width": "fill_container"
@@ -345,15 +345,15 @@
                   "id": "hp-cta-secondary",
                   "type": "ref",
                   "ref": "button",
-                  "fill": "$brand:color.surface",
+                  "fill": "$tokens:color.surface",
                   "stroke": {
-                    "thickness": "$brand:border.width",
-                    "fill": "$brand:color.border"
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
                   },
                   "descendants": {
                     "button-label": {
                       "content": "Documentation",
-                      "fill": "$brand:color.foreground"
+                      "fill": "$tokens:color.foreground"
                     }
                   }
                 }
@@ -427,8 +427,8 @@
           "id": "hp-footer",
           "type": "text",
           "content": "Generated with mech-pencil — single-file .pen",
-          "fill": "$brand:color.muted",
-          "fontFamily": "$brand:font.family",
+          "fill": "$tokens:color.muted",
+          "fontFamily": "$tokens:font.family",
           "fontSize": 14
         }
       ],

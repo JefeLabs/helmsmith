@@ -1,7 +1,7 @@
 {
   "version": "2.11",
   "imports": {
-    "brand": "../brand.lib.pen"
+    "tokens": "../design-tokens.lib.pen"
   },
   "children": [
     {
@@ -13,14 +13,14 @@
       "layout": "vertical",
       "gap": 40,
       "padding": 40,
-      "fill": "$brand:color.background",
+      "fill": "$tokens:color.background",
       "children": [
         {
           "id": "group-media-title",
           "type": "text",
           "content": "Media · HeroUI v3",
-          "fill": "$brand:color.foreground",
-          "fontFamily": "$brand:font.family",
+          "fill": "$tokens:color.foreground",
+          "fontFamily": "$tokens:font.family",
           "fontSize": 24,
           "fontWeight": "700"
         },
@@ -36,8 +36,8 @@
               "id": "g-media-atom-h",
               "type": "text",
               "content": "ATOMS",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -58,15 +58,15 @@
                   "layout": "horizontal",
                   "alignItems": "center",
                   "justifyContent": "center",
-                  "fill": "$brand:color.accent",
+                  "fill": "$tokens:color.accent",
                   "cornerRadius": 9999,
                   "children": [
                     {
                       "id": "avatar-initials",
                       "type": "text",
                       "content": "AB",
-                      "fill": "$brand:color.accent-foreground",
-                      "fontFamily": "$brand:font.family",
+                      "fill": "$tokens:color.accent-foreground",
+                      "fontFamily": "$tokens:font.family",
                       "fontSize": 14,
                       "fontWeight": "600"
                     }
@@ -82,7 +82,7 @@
                     "slug": "avatar",
                     "category": "Media",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/media.lib.pen"
                     ]
                   }

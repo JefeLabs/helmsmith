@@ -1,7 +1,7 @@
 {
   "version": "2.11",
   "imports": {
-    "brand": "../brand.lib.pen"
+    "tokens": "../design-tokens.lib.pen"
   },
   "children": [
     {
@@ -13,14 +13,14 @@
       "layout": "vertical",
       "gap": 40,
       "padding": 40,
-      "fill": "$brand:color.background",
+      "fill": "$tokens:color.background",
       "children": [
         {
           "id": "group-navigation-title",
           "type": "text",
           "content": "Navigation · HeroUI v3",
-          "fill": "$brand:color.foreground",
-          "fontFamily": "$brand:font.family",
+          "fill": "$tokens:color.foreground",
+          "fontFamily": "$tokens:font.family",
           "fontSize": 24,
           "fontWeight": "700"
         },
@@ -36,8 +36,8 @@
               "id": "g-navigation-atom-h",
               "type": "text",
               "content": "ATOMS",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -61,9 +61,9 @@
                       "id": "link-label",
                       "type": "text",
                       "content": "Learn more",
-                      "fill": "$brand:color.accent",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-md",
+                      "fill": "$tokens:color.accent",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md",
                       "fontWeight": "500",
                       "underline": true
                     }
@@ -79,7 +79,7 @@
                     "slug": "link",
                     "category": "Navigation",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/navigation.lib.pen"
                     ]
                   }
@@ -100,8 +100,8 @@
               "id": "g-navigation-molecule-h",
               "type": "text",
               "content": "MOLECULES",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -126,43 +126,43 @@
                       "id": "breadcrumbs-0",
                       "type": "text",
                       "content": "Home",
-                      "fill": "$brand:color.muted",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-sm",
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm",
                       "fontWeight": "400"
                     },
                     {
                       "id": "breadcrumbs-sep-0",
                       "type": "text",
                       "content": "/",
-                      "fill": "$brand:color.muted",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-sm"
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm"
                     },
                     {
                       "id": "breadcrumbs-1",
                       "type": "text",
                       "content": "Library",
-                      "fill": "$brand:color.muted",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-sm",
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm",
                       "fontWeight": "400"
                     },
                     {
                       "id": "breadcrumbs-sep-1",
                       "type": "text",
                       "content": "/",
-                      "fill": "$brand:color.muted",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-sm"
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm"
                     },
                     {
                       "id": "breadcrumbs-2",
                       "type": "text",
                       "content": "Data",
-                      "fill": "$brand:color.foreground",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-sm",
+                      "fill": "$tokens:color.foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm",
                       "fontWeight": "600"
                     }
                   ],
@@ -177,7 +177,7 @@
                     "slug": "breadcrumbs",
                     "category": "Navigation",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/navigation.lib.pen"
                     ]
                   }
@@ -199,16 +199,16 @@
                       "layout": "horizontal",
                       "alignItems": "center",
                       "justifyContent": "center",
-                      "fill": "$brand:color.accent",
-                      "cornerRadius": "$brand:radius.md",
+                      "fill": "$tokens:color.accent",
+                      "cornerRadius": "$tokens:radius.md",
                       "children": [
                         {
                           "id": "pagination-page-0-label",
                           "type": "text",
                           "content": "1",
-                          "fill": "$brand:color.accent-foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-sm",
+                          "fill": "$tokens:color.accent-foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
                           "fontWeight": "600"
                         }
                       ]
@@ -222,20 +222,20 @@
                       "layout": "horizontal",
                       "alignItems": "center",
                       "justifyContent": "center",
-                      "fill": "$brand:color.surface",
-                      "cornerRadius": "$brand:radius.md",
+                      "fill": "$tokens:color.surface",
+                      "cornerRadius": "$tokens:radius.md",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
                           "id": "pagination-page-1-label",
                           "type": "text",
                           "content": "2",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-sm",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
                           "fontWeight": "500"
                         }
                       ]
@@ -249,20 +249,20 @@
                       "layout": "horizontal",
                       "alignItems": "center",
                       "justifyContent": "center",
-                      "fill": "$brand:color.surface",
-                      "cornerRadius": "$brand:radius.md",
+                      "fill": "$tokens:color.surface",
+                      "cornerRadius": "$tokens:radius.md",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
                           "id": "pagination-page-2-label",
                           "type": "text",
                           "content": "3",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-sm",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
                           "fontWeight": "500"
                         }
                       ]
@@ -276,20 +276,20 @@
                       "layout": "horizontal",
                       "alignItems": "center",
                       "justifyContent": "center",
-                      "fill": "$brand:color.surface",
-                      "cornerRadius": "$brand:radius.md",
+                      "fill": "$tokens:color.surface",
+                      "cornerRadius": "$tokens:radius.md",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
                           "id": "pagination-page-3-label",
                           "type": "text",
                           "content": "4",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-sm",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
                           "fontWeight": "500"
                         }
                       ]
@@ -303,20 +303,20 @@
                       "layout": "horizontal",
                       "alignItems": "center",
                       "justifyContent": "center",
-                      "fill": "$brand:color.surface",
-                      "cornerRadius": "$brand:radius.md",
+                      "fill": "$tokens:color.surface",
+                      "cornerRadius": "$tokens:radius.md",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
                           "id": "pagination-page-4-label",
                           "type": "text",
                           "content": "5",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-sm",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
                           "fontWeight": "500"
                         }
                       ]
@@ -333,7 +333,7 @@
                     "slug": "pagination",
                     "category": "Navigation",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/navigation.lib.pen"
                     ]
                   }
@@ -346,11 +346,11 @@
                   "width": "fit_content",
                   "gap": 4,
                   "padding": 4,
-                  "fill": "$brand:color.surface",
-                  "cornerRadius": "$brand:radius.md",
+                  "fill": "$tokens:color.surface",
+                  "cornerRadius": "$tokens:radius.md",
                   "stroke": {
-                    "thickness": "$brand:border.width",
-                    "fill": "$brand:color.border"
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
                   },
                   "children": [
                     {
@@ -364,16 +364,16 @@
                         16,
                         8
                       ],
-                      "fill": "$brand:color.accent-soft",
-                      "cornerRadius": "$brand:radius.sm",
+                      "fill": "$tokens:color.accent-soft",
+                      "cornerRadius": "$tokens:radius.sm",
                       "children": [
                         {
                           "id": "tabs-tab-0-label",
                           "type": "text",
                           "content": "Overview",
-                          "fill": "$brand:color.accent",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-sm",
+                          "fill": "$tokens:color.accent",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
                           "fontWeight": "600"
                         }
                       ]
@@ -389,16 +389,16 @@
                         16,
                         8
                       ],
-                      "fill": "$brand:color.surface",
-                      "cornerRadius": "$brand:radius.sm",
+                      "fill": "$tokens:color.surface",
+                      "cornerRadius": "$tokens:radius.sm",
                       "children": [
                         {
                           "id": "tabs-tab-1-label",
                           "type": "text",
                           "content": "Activity",
-                          "fill": "$brand:color.muted",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-sm",
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
                           "fontWeight": "500"
                         }
                       ]
@@ -414,16 +414,16 @@
                         16,
                         8
                       ],
-                      "fill": "$brand:color.surface",
-                      "cornerRadius": "$brand:radius.sm",
+                      "fill": "$tokens:color.surface",
+                      "cornerRadius": "$tokens:radius.sm",
                       "children": [
                         {
                           "id": "tabs-tab-2-label",
                           "type": "text",
                           "content": "Settings",
-                          "fill": "$brand:color.muted",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-sm",
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
                           "fontWeight": "500"
                         }
                       ]
@@ -440,7 +440,7 @@
                     "slug": "tabs",
                     "category": "Navigation",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/navigation.lib.pen"
                     ]
                   }
@@ -451,10 +451,10 @@
                   "name": "Disclosure",
                   "width": 320,
                   "layout": "vertical",
-                  "cornerRadius": "$brand:radius.md",
+                  "cornerRadius": "$tokens:radius.md",
                   "stroke": {
-                    "thickness": "$brand:border.width",
-                    "fill": "$brand:color.border"
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
                   },
                   "clip": true,
                   "children": [
@@ -466,24 +466,24 @@
                       "alignItems": "center",
                       "justifyContent": "space_between",
                       "padding": 16,
-                      "fill": "$brand:color.surface",
+                      "fill": "$tokens:color.surface",
                       "children": [
                         {
                           "id": "disclosure-title",
                           "type": "text",
                           "content": "What is included?",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md",
                           "fontWeight": "600"
                         },
                         {
                           "id": "disclosure-chev",
                           "type": "text",
                           "content": "▾",
-                          "fill": "$brand:color.muted",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md"
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
                         }
                       ]
                     },
@@ -503,9 +503,9 @@
                           "id": "disclosure-body-text",
                           "type": "text",
                           "content": "Everything in the design system, themeable via tokens.",
-                          "fill": "$brand:color.muted",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-sm",
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
                           "textGrowth": "fixed-width",
                           "width": "fill_container"
                         }
@@ -523,7 +523,7 @@
                     "slug": "disclosure",
                     "category": "Navigation",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/navigation.lib.pen"
                     ]
                   }
@@ -544,8 +544,8 @@
               "id": "g-navigation-organism-h",
               "type": "text",
               "content": "ORGANISMS",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -563,10 +563,10 @@
                   "name": "Accordion",
                   "width": 360,
                   "layout": "vertical",
-                  "cornerRadius": "$brand:radius.md",
+                  "cornerRadius": "$tokens:radius.md",
                   "stroke": {
-                    "thickness": "$brand:border.width",
-                    "fill": "$brand:color.border"
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
                   },
                   "clip": true,
                   "children": [
@@ -578,9 +578,9 @@
                       "width": "fill_container",
                       "stroke": {
                         "thickness": {
-                          "bottom": "$brand:border.width"
+                          "bottom": "$tokens:border.width"
                         },
-                        "fill": "$brand:color.border"
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
@@ -596,18 +596,18 @@
                               "id": "accordion-0-t",
                               "type": "text",
                               "content": "Overview",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "600"
                             },
                             {
                               "id": "accordion-0-c",
                               "type": "text",
                               "content": "▾",
-                              "fill": "$brand:color.muted",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md"
+                              "fill": "$tokens:color.muted",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md"
                             }
                           ]
                         },
@@ -627,9 +627,9 @@
                               "id": "accordion-0-bt",
                               "type": "text",
                               "content": "Details for this section live here.",
-                              "fill": "$brand:color.muted",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-sm",
+                              "fill": "$tokens:color.muted",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-sm",
                               "textGrowth": "fixed-width",
                               "width": "fill_container"
                             }
@@ -645,9 +645,9 @@
                       "width": "fill_container",
                       "stroke": {
                         "thickness": {
-                          "bottom": "$brand:border.width"
+                          "bottom": "$tokens:border.width"
                         },
-                        "fill": "$brand:color.border"
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
@@ -663,18 +663,18 @@
                               "id": "accordion-1-t",
                               "type": "text",
                               "content": "Pricing",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "600"
                             },
                             {
                               "id": "accordion-1-c",
                               "type": "text",
                               "content": "▸",
-                              "fill": "$brand:color.muted",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md"
+                              "fill": "$tokens:color.muted",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md"
                             }
                           ]
                         }
@@ -688,9 +688,9 @@
                       "width": "fill_container",
                       "stroke": {
                         "thickness": {
-                          "bottom": "$brand:border.width"
+                          "bottom": "$tokens:border.width"
                         },
-                        "fill": "$brand:color.border"
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
@@ -706,18 +706,18 @@
                               "id": "accordion-2-t",
                               "type": "text",
                               "content": "FAQ",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "600"
                             },
                             {
                               "id": "accordion-2-c",
                               "type": "text",
                               "content": "▸",
-                              "fill": "$brand:color.muted",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md"
+                              "fill": "$tokens:color.muted",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md"
                             }
                           ]
                         }
@@ -735,7 +735,7 @@
                     "slug": "accordion",
                     "category": "Navigation",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/navigation.lib.pen"
                     ]
                   }
@@ -753,10 +753,10 @@
                       "type": "frame",
                       "layout": "vertical",
                       "width": "fill_container",
-                      "cornerRadius": "$brand:radius.md",
+                      "cornerRadius": "$tokens:radius.md",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "clip": true,
                       "children": [
@@ -768,24 +768,24 @@
                           "alignItems": "center",
                           "justifyContent": "space_between",
                           "padding": 14,
-                          "fill": "$brand:color.surface",
+                          "fill": "$tokens:color.surface",
                           "children": [
                             {
                               "id": "disclosure-group-0-t",
                               "type": "text",
                               "content": "Account",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "600"
                             },
                             {
                               "id": "disclosure-group-0-c",
                               "type": "text",
                               "content": "▾",
-                              "fill": "$brand:color.muted",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md"
+                              "fill": "$tokens:color.muted",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md"
                             }
                           ]
                         }
@@ -796,10 +796,10 @@
                       "type": "frame",
                       "layout": "vertical",
                       "width": "fill_container",
-                      "cornerRadius": "$brand:radius.md",
+                      "cornerRadius": "$tokens:radius.md",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "clip": true,
                       "children": [
@@ -811,24 +811,24 @@
                           "alignItems": "center",
                           "justifyContent": "space_between",
                           "padding": 14,
-                          "fill": "$brand:color.surface",
+                          "fill": "$tokens:color.surface",
                           "children": [
                             {
                               "id": "disclosure-group-1-t",
                               "type": "text",
                               "content": "Security",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "600"
                             },
                             {
                               "id": "disclosure-group-1-c",
                               "type": "text",
                               "content": "▸",
-                              "fill": "$brand:color.muted",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md"
+                              "fill": "$tokens:color.muted",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md"
                             }
                           ]
                         }
@@ -846,7 +846,7 @@
                     "slug": "disclosure-group",
                     "category": "Navigation",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/navigation.lib.pen"
                     ]
                   }

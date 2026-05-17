@@ -1,7 +1,7 @@
 {
   "version": "2.11",
   "imports": {
-    "brand": "../brand.lib.pen"
+    "tokens": "../design-tokens.lib.pen"
   },
   "children": [
     {
@@ -13,14 +13,14 @@
       "layout": "vertical",
       "gap": 40,
       "padding": 40,
-      "fill": "$brand:color.background",
+      "fill": "$tokens:color.background",
       "children": [
         {
           "id": "group-typography-title",
           "type": "text",
           "content": "Typography · HeroUI v3",
-          "fill": "$brand:color.foreground",
-          "fontFamily": "$brand:font.family",
+          "fill": "$tokens:color.foreground",
+          "fontFamily": "$tokens:font.family",
           "fontSize": 24,
           "fontWeight": "700"
         },
@@ -36,8 +36,8 @@
               "id": "g-typography-atom-h",
               "type": "text",
               "content": "ATOMS",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -62,19 +62,19 @@
                     8,
                     4
                   ],
-                  "cornerRadius": "$brand:radius.sm",
-                  "fill": "$brand:color.surface",
+                  "cornerRadius": "$tokens:radius.sm",
+                  "fill": "$tokens:color.surface",
                   "stroke": {
-                    "thickness": "$brand:border.width",
-                    "fill": "$brand:color.border"
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
                   },
                   "children": [
                     {
                       "id": "kbd-label",
                       "type": "text",
                       "content": "⌘ K",
-                      "fill": "$brand:color.foreground",
-                      "fontFamily": "$brand:font.family",
+                      "fill": "$tokens:color.foreground",
+                      "fontFamily": "$tokens:font.family",
                       "fontSize": 12,
                       "fontWeight": "600"
                     }
@@ -90,7 +90,7 @@
                     "slug": "kbd",
                     "category": "Typography",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/typography.lib.pen"
                     ]
                   }
@@ -107,8 +107,8 @@
                       "id": "typography-h",
                       "type": "text",
                       "content": "Heading",
-                      "fill": "$brand:color.foreground",
-                      "fontFamily": "$brand:font.family",
+                      "fill": "$tokens:color.foreground",
+                      "fontFamily": "$tokens:font.family",
                       "fontSize": 28,
                       "fontWeight": "800"
                     },
@@ -116,16 +116,16 @@
                       "id": "typography-b",
                       "type": "text",
                       "content": "Body text that explains the heading above.",
-                      "fill": "$brand:color.foreground",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-md"
+                      "fill": "$tokens:color.foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md"
                     },
                     {
                       "id": "typography-c",
                       "type": "text",
                       "content": "CAPTION",
-                      "fill": "$brand:color.muted",
-                      "fontFamily": "$brand:font.family",
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
                       "fontSize": 12,
                       "fontWeight": "600"
                     }
@@ -141,7 +141,7 @@
                     "slug": "typography",
                     "category": "Typography",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/typography.lib.pen"
                     ]
                   }

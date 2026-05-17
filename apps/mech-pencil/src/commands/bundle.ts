@@ -4,14 +4,14 @@
  * Default (reuse): COPY the committed, theme-invariant HeroUI library
  * (`src/frameworks/heroui/library/` — groups + previews +
  * design-system + catalog + mock skeletons) into `<dir>`, then write
- * the ONLY per-project file, `<dir>/brand.lib.pen` = HeroUI token
+ * the ONLY per-project file, `<dir>/design-tokens.lib.pen` = HeroUI token
  * defaults overridden by the CLI knobs (accent/base/font/radius).
  *
  * `--regenerate`: rebuild every file from scratch (dev / when the
  * committed library is stale or missing). Same output, slower.
  *
- * Tokens are framework-specific: `brand.lib.pen` is HeroUI's token
- * contract; the library references it via `$brand:`.
+ * Tokens are framework-specific: `design-tokens.lib.pen` is HeroUI's token
+ * contract; the library references it via `$tokens:`.
  */
 
 import { join, resolve } from 'node:path';
@@ -89,7 +89,7 @@ export function runBundle(options: BundleCmdOptions): void {
 
   // --- Reuse path (default) ------------------------------------------
   if (!bundle.brand.validation.ok) {
-    console.error(err('brand.lib.pen invalid:'));
+    console.error(err('design-tokens.lib.pen invalid:'));
     for (const i of bundle.brand.validation.issues) {
       console.error(dim(`  ${i.path}: ${i.message}`));
     }

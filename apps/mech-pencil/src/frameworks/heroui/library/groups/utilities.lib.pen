@@ -1,7 +1,7 @@
 {
   "version": "2.11",
   "imports": {
-    "brand": "../brand.lib.pen"
+    "tokens": "../design-tokens.lib.pen"
   },
   "children": [
     {
@@ -13,14 +13,14 @@
       "layout": "vertical",
       "gap": 40,
       "padding": 40,
-      "fill": "$brand:color.background",
+      "fill": "$tokens:color.background",
       "children": [
         {
           "id": "group-utilities-title",
           "type": "text",
           "content": "Utilities · HeroUI v3",
-          "fill": "$brand:color.foreground",
-          "fontFamily": "$brand:font.family",
+          "fill": "$tokens:color.foreground",
+          "fontFamily": "$tokens:font.family",
           "fontSize": 24,
           "fontWeight": "700"
         },
@@ -36,8 +36,8 @@
               "id": "g-utilities-atom-h",
               "type": "text",
               "content": "ATOMS",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -55,11 +55,11 @@
                   "name": "ScrollShadow",
                   "width": 240,
                   "height": 120,
-                  "fill": "$brand:color.surface",
-                  "cornerRadius": "$brand:radius.md",
+                  "fill": "$tokens:color.surface",
+                  "cornerRadius": "$tokens:radius.md",
                   "stroke": {
-                    "thickness": "$brand:border.width",
-                    "fill": "$brand:color.border"
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
                   },
                   "clip": true,
                   "layout": "none",
@@ -70,9 +70,9 @@
                       "content": "scrollable…",
                       "x": 16,
                       "y": 16,
-                      "fill": "$brand:color.muted",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-sm"
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm"
                     },
                     {
                       "id": "scroll-shadow-fade",
@@ -109,7 +109,7 @@
                     "slug": "scroll-shadow",
                     "category": "Utilities",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/utilities.lib.pen"
                     ]
                   }

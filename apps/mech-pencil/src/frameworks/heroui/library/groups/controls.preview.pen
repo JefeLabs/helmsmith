@@ -1,7 +1,7 @@
 {
   "version": "2.11",
   "imports": {
-    "brand": "../brand.lib.pen"
+    "tokens": "../design-tokens.lib.pen"
   },
   "children": [
     {
@@ -13,14 +13,14 @@
       "layout": "vertical",
       "gap": 40,
       "padding": 40,
-      "fill": "$brand:color.background",
+      "fill": "$tokens:color.background",
       "children": [
         {
           "id": "group-controls-title",
           "type": "text",
           "content": "Controls · HeroUI v3",
-          "fill": "$brand:color.foreground",
-          "fontFamily": "$brand:font.family",
+          "fill": "$tokens:color.foreground",
+          "fontFamily": "$tokens:font.family",
           "fontSize": 24,
           "fontWeight": "700"
         },
@@ -36,8 +36,8 @@
               "id": "g-controls-atom-h",
               "type": "text",
               "content": "ATOMS",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -62,7 +62,7 @@
                     2,
                     2
                   ],
-                  "fill": "$brand:color.accent",
+                  "fill": "$tokens:color.accent",
                   "cornerRadius": 9999,
                   "children": [
                     {
@@ -71,7 +71,7 @@
                       "name": "Knob",
                       "width": 20,
                       "height": 20,
-                      "fill": "$brand:color.surface",
+                      "fill": "$tokens:color.surface",
                       "cornerRadius": 9999
                     }
                   ],
@@ -86,7 +86,7 @@
                     "slug": "switch",
                     "category": "Controls",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/controls.lib.pen"
                     ]
                   }
@@ -108,7 +108,7 @@
                       "width": 240,
                       "height": 6,
                       "cornerRadius": 9999,
-                      "fill": "$brand:color.border"
+                      "fill": "$tokens:color.border"
                     },
                     {
                       "id": "slider-fill",
@@ -119,7 +119,7 @@
                       "width": 108,
                       "height": 6,
                       "cornerRadius": 9999,
-                      "fill": "$brand:color.accent"
+                      "fill": "$tokens:color.accent"
                     },
                     {
                       "id": "slider-thumb",
@@ -130,10 +130,10 @@
                       "width": 18,
                       "height": 18,
                       "cornerRadius": 9999,
-                      "fill": "$brand:color.surface",
+                      "fill": "$tokens:color.surface",
                       "stroke": {
                         "thickness": 2,
-                        "fill": "$brand:color.accent"
+                        "fill": "$tokens:color.accent"
                       }
                     }
                   ],
@@ -148,7 +148,7 @@
                     "slug": "slider",
                     "category": "Controls",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/controls.lib.pen"
                     ]
                   }

@@ -5,10 +5,10 @@
  * `src/frameworks/heroui/library/` (groups + previews +
  * design-system + catalog + mock skeletons). Run this only when the
  * component catalog changes — NOT per project. Per-project theming is
- * just `brand.lib.pen` (see `bundle`).
+ * just `design-tokens.lib.pen` (see `bundle`).
  *
  * Tokens are framework-specific: this library is HeroUI's, referencing
- * HeroUI's `$brand:` token contract.
+ * HeroUI's `$tokens:` token contract.
  */
 
 import { join } from 'node:path';
@@ -19,10 +19,14 @@ import { resolveTheme } from '../theme/config.ts';
 import { dim, err, heading, ok } from '../ui.ts';
 
 export function runBuildLibrary(): void {
-  // Theme is irrelevant to these files (verified byte-invariant); use
-  // defaults so the run is deterministic.
+  // Theme is irrelevant to the component files (verified byte-invariant);
+  // use defaults. We DO commit a default `design-tokens.lib.pen` too so the
+  // committed previews/aggregate resolve their `$tokens:` refs when
+  // opened in place. `bundle` copies everything, then overwrites
+  // design-tokens.lib.pen with the project's resolved (defaults + overrides) one.
   const b = emitBundle(resolveTheme({}));
   const files = [
+    b.brand, // default design-tokens.lib.pen — makes committed previews viewable
     b.designSystem,
     b.designSystem.preview,
     ...b.groups,
@@ -47,5 +51,5 @@ export function runBuildLibrary(): void {
       `  ${b.groups.length} categories (.lib + .preview) · design-system · catalog · ${b.mocks.length} mock(s)`,
     ),
   );
-  console.log(dim('  commit this; `bundle` reuses it (only brand.lib.pen is per-project).'));
+  console.log(dim('  commit this; `bundle` reuses it (only design-tokens.lib.pen is per-project).'));
 }

@@ -1,7 +1,7 @@
 {
   "version": "2.11",
   "imports": {
-    "brand": "../brand.lib.pen"
+    "tokens": "../design-tokens.lib.pen"
   },
   "children": [
     {
@@ -13,14 +13,14 @@
       "layout": "vertical",
       "gap": 40,
       "padding": 40,
-      "fill": "$brand:color.background",
+      "fill": "$tokens:color.background",
       "children": [
         {
           "id": "group-data-display-title",
           "type": "text",
           "content": "Data Display · HeroUI v3",
-          "fill": "$brand:color.foreground",
-          "fontFamily": "$brand:font.family",
+          "fill": "$tokens:color.foreground",
+          "fontFamily": "$tokens:font.family",
           "fontSize": 24,
           "fontWeight": "700"
         },
@@ -36,8 +36,8 @@
               "id": "g-data-display-atom-h",
               "type": "text",
               "content": "ATOMS",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -61,15 +61,15 @@
                     8,
                     3
                   ],
-                  "fill": "$brand:color.accent",
+                  "fill": "$tokens:color.accent",
                   "cornerRadius": 9999,
                   "children": [
                     {
                       "id": "badge-label",
                       "type": "text",
                       "content": "New",
-                      "fill": "$brand:color.accent-foreground",
-                      "fontFamily": "$brand:font.family",
+                      "fill": "$tokens:color.accent-foreground",
+                      "fontFamily": "$tokens:font.family",
                       "fontSize": 12,
                       "fontWeight": "600"
                     }
@@ -85,7 +85,7 @@
                     "slug": "badge",
                     "category": "Data Display",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/data-display.lib.pen"
                     ]
                   }
@@ -97,21 +97,21 @@
                   "layout": "horizontal",
                   "width": "fit_content",
                   "alignItems": "center",
-                  "gap": "$brand:space.unit",
+                  "gap": "$tokens:space.unit",
                   "padding": [
                     12,
                     6
                   ],
-                  "fill": "$brand:color.accent-soft",
+                  "fill": "$tokens:color.accent-soft",
                   "cornerRadius": 9999,
                   "children": [
                     {
                       "id": "chip-label",
                       "type": "text",
                       "content": "Chip",
-                      "fill": "$brand:color.accent",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-sm",
+                      "fill": "$tokens:color.accent",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm",
                       "fontWeight": "500"
                     }
                   ],
@@ -126,7 +126,7 @@
                     "slug": "chip",
                     "category": "Data Display",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/data-display.lib.pen"
                     ]
                   }
@@ -147,8 +147,8 @@
               "id": "g-data-display-organism-h",
               "type": "text",
               "content": "ORGANISMS",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -166,10 +166,10 @@
                   "name": "Table",
                   "width": 520,
                   "layout": "vertical",
-                  "cornerRadius": "$brand:radius.lg",
+                  "cornerRadius": "$tokens:radius.lg",
                   "stroke": {
-                    "thickness": "$brand:border.width",
-                    "fill": "$brand:color.border"
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
                   },
                   "clip": true,
                   "children": [
@@ -179,12 +179,12 @@
                       "name": "Header",
                       "layout": "horizontal",
                       "width": "fill_container",
-                      "fill": "$brand:color.accent-soft",
+                      "fill": "$tokens:color.accent-soft",
                       "stroke": {
                         "thickness": {
-                          "bottom": "$brand:border.width"
+                          "bottom": "$tokens:border.width"
                         },
-                        "fill": "$brand:color.border"
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
@@ -203,9 +203,9 @@
                               "id": "table-h-c0-t",
                               "type": "text",
                               "content": "Name",
-                              "fill": "$brand:color.muted",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-sm",
+                              "fill": "$tokens:color.muted",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-sm",
                               "fontWeight": "600"
                             }
                           ]
@@ -226,9 +226,9 @@
                               "id": "table-h-c1-t",
                               "type": "text",
                               "content": "Email",
-                              "fill": "$brand:color.muted",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-sm",
+                              "fill": "$tokens:color.muted",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-sm",
                               "fontWeight": "600"
                             }
                           ]
@@ -249,9 +249,9 @@
                               "id": "table-h-c2-t",
                               "type": "text",
                               "content": "Role",
-                              "fill": "$brand:color.muted",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-sm",
+                              "fill": "$tokens:color.muted",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-sm",
                               "fontWeight": "600"
                             }
                           ]
@@ -264,12 +264,12 @@
                       "name": "Row",
                       "layout": "horizontal",
                       "width": "fill_container",
-                      "fill": "$brand:color.surface",
+                      "fill": "$tokens:color.surface",
                       "stroke": {
                         "thickness": {
-                          "bottom": "$brand:border.width"
+                          "bottom": "$tokens:border.width"
                         },
-                        "fill": "$brand:color.border"
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
@@ -288,9 +288,9 @@
                               "id": "table-r0-c0-t",
                               "type": "text",
                               "content": "Ada Lovelace",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "400"
                             }
                           ]
@@ -311,9 +311,9 @@
                               "id": "table-r0-c1-t",
                               "type": "text",
                               "content": "ada@ex.com",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "400"
                             }
                           ]
@@ -334,9 +334,9 @@
                               "id": "table-r0-c2-t",
                               "type": "text",
                               "content": "Owner",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "400"
                             }
                           ]
@@ -349,12 +349,12 @@
                       "name": "Row",
                       "layout": "horizontal",
                       "width": "fill_container",
-                      "fill": "$brand:color.surface",
+                      "fill": "$tokens:color.surface",
                       "stroke": {
                         "thickness": {
-                          "bottom": "$brand:border.width"
+                          "bottom": "$tokens:border.width"
                         },
-                        "fill": "$brand:color.border"
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
@@ -373,9 +373,9 @@
                               "id": "table-r1-c0-t",
                               "type": "text",
                               "content": "Alan Turing",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "400"
                             }
                           ]
@@ -396,9 +396,9 @@
                               "id": "table-r1-c1-t",
                               "type": "text",
                               "content": "alan@ex.com",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "400"
                             }
                           ]
@@ -419,9 +419,9 @@
                               "id": "table-r1-c2-t",
                               "type": "text",
                               "content": "Admin",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "400"
                             }
                           ]
@@ -434,12 +434,12 @@
                       "name": "Row",
                       "layout": "horizontal",
                       "width": "fill_container",
-                      "fill": "$brand:color.surface",
+                      "fill": "$tokens:color.surface",
                       "stroke": {
                         "thickness": {
-                          "bottom": "$brand:border.width"
+                          "bottom": "$tokens:border.width"
                         },
-                        "fill": "$brand:color.border"
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
@@ -458,9 +458,9 @@
                               "id": "table-r2-c0-t",
                               "type": "text",
                               "content": "Grace Hopper",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "400"
                             }
                           ]
@@ -481,9 +481,9 @@
                               "id": "table-r2-c1-t",
                               "type": "text",
                               "content": "grace@ex.com",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "400"
                             }
                           ]
@@ -504,9 +504,9 @@
                               "id": "table-r2-c2-t",
                               "type": "text",
                               "content": "Member",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "400"
                             }
                           ]
@@ -525,7 +525,7 @@
                     "slug": "table",
                     "category": "Data Display",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/data-display.lib.pen"
                     ]
                   }

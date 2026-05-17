@@ -1,7 +1,7 @@
 {
   "version": "2.11",
   "imports": {
-    "brand": "../brand.lib.pen"
+    "tokens": "../design-tokens.lib.pen"
   },
   "children": [
     {
@@ -13,14 +13,14 @@
       "layout": "vertical",
       "gap": 40,
       "padding": 40,
-      "fill": "$brand:color.background",
+      "fill": "$tokens:color.background",
       "children": [
         {
           "id": "group-buttons-title",
           "type": "text",
           "content": "Buttons · HeroUI v3",
-          "fill": "$brand:color.foreground",
-          "fontFamily": "$brand:font.family",
+          "fill": "$tokens:color.foreground",
+          "fontFamily": "$tokens:font.family",
           "fontSize": 24,
           "fontWeight": "700"
         },
@@ -36,8 +36,8 @@
               "id": "g-buttons-atom-h",
               "type": "text",
               "content": "ATOMS",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -54,10 +54,10 @@
                   "type": "frame",
                   "name": "Button",
                   "height": 40,
-                  "fill": "$brand:color.accent",
-                  "cornerRadius": "$brand:radius.md",
+                  "fill": "$tokens:color.accent",
+                  "cornerRadius": "$tokens:radius.md",
                   "layout": "horizontal",
-                  "gap": "$brand:space.unit",
+                  "gap": "$tokens:space.unit",
                   "padding": [
                     16,
                     10
@@ -69,9 +69,9 @@
                       "id": "button-label",
                       "type": "text",
                       "content": "Button",
-                      "fill": "$brand:color.accent-foreground",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-md",
+                      "fill": "$tokens:color.accent-foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md",
                       "fontWeight": "600"
                     }
                   ],
@@ -86,7 +86,7 @@
                     "slug": "button",
                     "category": "Buttons",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/buttons.lib.pen"
                     ]
                   }
@@ -101,14 +101,14 @@
                   "alignItems": "center",
                   "justifyContent": "center",
                   "cornerRadius": 9999,
-                  "fill": "$brand:color.accent-soft",
+                  "fill": "$tokens:color.accent-soft",
                   "children": [
                     {
                       "id": "close-button-icon",
                       "type": "text",
                       "content": "✕",
-                      "fill": "$brand:color.muted",
-                      "fontFamily": "$brand:font.family",
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
                       "fontSize": 14,
                       "fontWeight": "600"
                     }
@@ -124,7 +124,7 @@
                     "slug": "close-button",
                     "category": "Buttons",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/buttons.lib.pen"
                     ]
                   }
@@ -142,20 +142,20 @@
                     16,
                     10
                   ],
-                  "cornerRadius": "$brand:radius.md",
-                  "fill": "$brand:color.accent-soft",
+                  "cornerRadius": "$tokens:radius.md",
+                  "fill": "$tokens:color.accent-soft",
                   "stroke": {
-                    "thickness": "$brand:border.width",
-                    "fill": "$brand:color.accent"
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.accent"
                   },
                   "children": [
                     {
                       "id": "toggle-button-label",
                       "type": "text",
                       "content": "Toggle",
-                      "fill": "$brand:color.accent",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-md",
+                      "fill": "$tokens:color.accent",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md",
                       "fontWeight": "600"
                     }
                   ],
@@ -170,7 +170,7 @@
                     "slug": "toggle-button",
                     "category": "Buttons",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/buttons.lib.pen"
                     ]
                   }
@@ -191,8 +191,8 @@
               "id": "g-buttons-molecule-h",
               "type": "text",
               "content": "MOLECULES",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -210,7 +210,7 @@
                   "name": "ButtonGroup",
                   "layout": "horizontal",
                   "width": "fit_content",
-                  "cornerRadius": "$brand:radius.md",
+                  "cornerRadius": "$tokens:radius.md",
                   "clip": true,
                   "children": [
                     {
@@ -224,19 +224,19 @@
                         16,
                         10
                       ],
-                      "fill": "$brand:color.accent",
+                      "fill": "$tokens:color.accent",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
                           "id": "button-group-0-label",
                           "type": "text",
                           "content": "Day",
-                          "fill": "$brand:color.accent-foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md",
+                          "fill": "$tokens:color.accent-foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md",
                           "fontWeight": "600"
                         }
                       ]
@@ -252,19 +252,19 @@
                         16,
                         10
                       ],
-                      "fill": "$brand:color.surface",
+                      "fill": "$tokens:color.surface",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
                           "id": "button-group-1-label",
                           "type": "text",
                           "content": "Week",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md",
                           "fontWeight": "600"
                         }
                       ]
@@ -280,19 +280,19 @@
                         16,
                         10
                       ],
-                      "fill": "$brand:color.surface",
+                      "fill": "$tokens:color.surface",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
                           "id": "button-group-2-label",
                           "type": "text",
                           "content": "Month",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md",
                           "fontWeight": "600"
                         }
                       ]
@@ -309,7 +309,7 @@
                     "slug": "button-group",
                     "category": "Buttons",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/buttons.lib.pen"
                     ]
                   }
@@ -322,11 +322,11 @@
                   "width": "fit_content",
                   "gap": 4,
                   "padding": 4,
-                  "cornerRadius": "$brand:radius.md",
-                  "fill": "$brand:color.surface",
+                  "cornerRadius": "$tokens:radius.md",
+                  "fill": "$tokens:color.surface",
                   "stroke": {
-                    "thickness": "$brand:border.width",
-                    "fill": "$brand:color.border"
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
                   },
                   "children": [
                     {
@@ -340,16 +340,16 @@
                         14,
                         9
                       ],
-                      "cornerRadius": "$brand:radius.sm",
-                      "fill": "$brand:color.accent-soft",
+                      "cornerRadius": "$tokens:radius.sm",
+                      "fill": "$tokens:color.accent-soft",
                       "children": [
                         {
                           "id": "toggle-button-group-0-label",
                           "type": "text",
                           "content": "B",
-                          "fill": "$brand:color.accent",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-sm",
+                          "fill": "$tokens:color.accent",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
                           "fontWeight": "600"
                         }
                       ]
@@ -365,16 +365,16 @@
                         14,
                         9
                       ],
-                      "cornerRadius": "$brand:radius.sm",
+                      "cornerRadius": "$tokens:radius.sm",
                       "fill": "transparent",
                       "children": [
                         {
                           "id": "toggle-button-group-1-label",
                           "type": "text",
                           "content": "I",
-                          "fill": "$brand:color.muted",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-sm",
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
                           "fontWeight": "600"
                         }
                       ]
@@ -390,16 +390,16 @@
                         14,
                         9
                       ],
-                      "cornerRadius": "$brand:radius.sm",
+                      "cornerRadius": "$tokens:radius.sm",
                       "fill": "transparent",
                       "children": [
                         {
                           "id": "toggle-button-group-2-label",
                           "type": "text",
                           "content": "U",
-                          "fill": "$brand:color.muted",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-sm",
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
                           "fontWeight": "600"
                         }
                       ]
@@ -416,7 +416,7 @@
                     "slug": "toggle-button-group",
                     "category": "Buttons",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/buttons.lib.pen"
                     ]
                   }

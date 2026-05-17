@@ -1,7 +1,7 @@
 {
   "version": "2.11",
   "imports": {
-    "brand": "../brand.lib.pen"
+    "tokens": "../design-tokens.lib.pen"
   },
   "children": [
     {
@@ -13,14 +13,14 @@
       "layout": "vertical",
       "gap": 40,
       "padding": 40,
-      "fill": "$brand:color.background",
+      "fill": "$tokens:color.background",
       "children": [
         {
           "id": "group-forms-title",
           "type": "text",
           "content": "Forms · HeroUI v3",
-          "fill": "$brand:color.foreground",
-          "fontFamily": "$brand:font.family",
+          "fill": "$tokens:color.foreground",
+          "fontFamily": "$tokens:font.family",
           "fontSize": 24,
           "fontWeight": "700"
         },
@@ -36,8 +36,8 @@
               "id": "g-forms-atom-h",
               "type": "text",
               "content": "ATOMS",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -61,9 +61,9 @@
                       "id": "label-text",
                       "type": "text",
                       "content": "Email address",
-                      "fill": "$brand:color.foreground",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-sm",
+                      "fill": "$tokens:color.foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm",
                       "fontWeight": "600"
                     }
                   ],
@@ -78,7 +78,7 @@
                     "slug": "label",
                     "category": "Forms",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/forms.lib.pen"
                     ]
                   }
@@ -95,9 +95,9 @@
                       "id": "description-text",
                       "type": "text",
                       "content": "We never share your email.",
-                      "fill": "$brand:color.muted",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-sm"
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm"
                     }
                   ],
                   "reusable": true,
@@ -111,7 +111,7 @@
                     "slug": "description",
                     "category": "Forms",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/forms.lib.pen"
                     ]
                   }
@@ -125,15 +125,15 @@
                   "layout": "horizontal",
                   "alignItems": "center",
                   "justifyContent": "center",
-                  "fill": "$brand:color.accent",
-                  "cornerRadius": "$brand:radius.sm",
+                  "fill": "$tokens:color.accent",
+                  "cornerRadius": "$tokens:radius.sm",
                   "children": [
                     {
                       "id": "checkbox-check",
                       "type": "text",
                       "content": "✓",
-                      "fill": "$brand:color.accent-foreground",
-                      "fontFamily": "$brand:font.family",
+                      "fill": "$tokens:color.accent-foreground",
+                      "fontFamily": "$tokens:font.family",
                       "fontSize": 14,
                       "fontWeight": "700"
                     }
@@ -149,7 +149,7 @@
                     "slug": "checkbox",
                     "category": "Forms",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/forms.lib.pen"
                     ]
                   }
@@ -165,9 +165,9 @@
                       "id": "error-message-text",
                       "type": "text",
                       "content": "Something went wrong.",
-                      "fill": "$brand:color.danger",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-sm"
+                      "fill": "$tokens:color.danger",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm"
                     }
                   ],
                   "reusable": true,
@@ -181,7 +181,7 @@
                     "slug": "error-message",
                     "category": "Forms",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/forms.lib.pen"
                     ]
                   }
@@ -199,17 +199,17 @@
                       "id": "field-error-icon",
                       "type": "text",
                       "content": "⚠",
-                      "fill": "$brand:color.danger",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-sm"
+                      "fill": "$tokens:color.danger",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm"
                     },
                     {
                       "id": "field-error-text",
                       "type": "text",
                       "content": "This field is required",
-                      "fill": "$brand:color.danger",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-sm"
+                      "fill": "$tokens:color.danger",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm"
                     }
                   ],
                   "reusable": true,
@@ -223,7 +223,7 @@
                     "slug": "field-error",
                     "category": "Forms",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/forms.lib.pen"
                     ]
                   }
@@ -240,20 +240,20 @@
                     12,
                     0
                   ],
-                  "fill": "$brand:color.field-background",
-                  "cornerRadius": "$brand:radius.md",
+                  "fill": "$tokens:color.field-background",
+                  "cornerRadius": "$tokens:radius.md",
                   "stroke": {
-                    "thickness": "$brand:border.width",
-                    "fill": "$brand:color.border"
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
                   },
                   "children": [
                     {
                       "id": "input-text",
                       "type": "text",
                       "content": "Placeholder",
-                      "fill": "$brand:color.field-placeholder",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-md"
+                      "fill": "$tokens:color.field-placeholder",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md"
                     }
                   ],
                   "reusable": true,
@@ -267,7 +267,7 @@
                     "slug": "input",
                     "category": "Forms",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/forms.lib.pen"
                     ]
                   }
@@ -280,20 +280,20 @@
                   "height": 110,
                   "layout": "vertical",
                   "padding": 12,
-                  "cornerRadius": "$brand:radius.md",
-                  "fill": "$brand:color.field-background",
+                  "cornerRadius": "$tokens:radius.md",
+                  "fill": "$tokens:color.field-background",
                   "stroke": {
-                    "thickness": "$brand:border.width",
-                    "fill": "$brand:color.border"
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
                   },
                   "children": [
                     {
                       "id": "text-area-text",
                       "type": "text",
                       "content": "Write something…",
-                      "fill": "$brand:color.field-placeholder",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-md"
+                      "fill": "$tokens:color.field-placeholder",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md"
                     }
                   ],
                   "reusable": true,
@@ -307,7 +307,7 @@
                     "slug": "text-area",
                     "category": "Forms",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/forms.lib.pen"
                     ]
                   }
@@ -328,8 +328,8 @@
               "id": "g-forms-molecule-h",
               "type": "text",
               "content": "MOLECULES",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -353,9 +353,9 @@
                       "id": "text-field-label",
                       "type": "text",
                       "content": "Email",
-                      "fill": "$brand:color.foreground",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-sm",
+                      "fill": "$tokens:color.foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm",
                       "fontWeight": "600"
                     },
                     {
@@ -370,20 +370,20 @@
                         12,
                         0
                       ],
-                      "cornerRadius": "$brand:radius.md",
-                      "fill": "$brand:color.field-background",
+                      "cornerRadius": "$tokens:radius.md",
+                      "fill": "$tokens:color.field-background",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
                           "id": "text-field-input-text",
                           "type": "text",
                           "content": "you@example.com",
-                          "fill": "$brand:color.field-placeholder",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md"
+                          "fill": "$tokens:color.field-placeholder",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
                         }
                       ]
                     },
@@ -391,8 +391,8 @@
                       "id": "text-field-help",
                       "type": "text",
                       "content": "We never share your email.",
-                      "fill": "$brand:color.muted",
-                      "fontFamily": "$brand:font.family",
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
                       "fontSize": 12
                     }
                   ],
@@ -407,7 +407,7 @@
                     "slug": "text-field",
                     "category": "Forms",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/forms.lib.pen"
                     ]
                   }
@@ -425,29 +425,29 @@
                     12,
                     0
                   ],
-                  "cornerRadius": "$brand:radius.md",
-                  "fill": "$brand:color.field-background",
+                  "cornerRadius": "$tokens:radius.md",
+                  "fill": "$tokens:color.field-background",
                   "stroke": {
-                    "thickness": "$brand:border.width",
-                    "fill": "$brand:color.border"
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
                   },
                   "children": [
                     {
                       "id": "search-field-icon",
                       "type": "text",
                       "content": "⌕",
-                      "fill": "$brand:color.muted",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-md",
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md",
                       "fontWeight": "700"
                     },
                     {
                       "id": "search-field-text",
                       "type": "text",
                       "content": "Search",
-                      "fill": "$brand:color.field-placeholder",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-md"
+                      "fill": "$tokens:color.field-placeholder",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md"
                     }
                   ],
                   "reusable": true,
@@ -461,7 +461,7 @@
                     "slug": "search-field",
                     "category": "Forms",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/forms.lib.pen"
                     ]
                   }
@@ -478,20 +478,20 @@
                     12,
                     0
                   ],
-                  "cornerRadius": "$brand:radius.md",
-                  "fill": "$brand:color.field-background",
+                  "cornerRadius": "$tokens:radius.md",
+                  "fill": "$tokens:color.field-background",
                   "stroke": {
-                    "thickness": "$brand:border.width",
-                    "fill": "$brand:color.border"
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
                   },
                   "children": [
                     {
                       "id": "number-field-value",
                       "type": "text",
                       "content": "12",
-                      "fill": "$brand:color.foreground",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-md",
+                      "fill": "$tokens:color.foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md",
                       "width": "fill_container",
                       "textGrowth": "fixed-width"
                     },
@@ -506,16 +506,16 @@
                           "id": "number-field-up",
                           "type": "text",
                           "content": "▴",
-                          "fill": "$brand:color.muted",
-                          "fontFamily": "$brand:font.family",
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
                           "fontSize": 10
                         },
                         {
                           "id": "number-field-down",
                           "type": "text",
                           "content": "▾",
-                          "fill": "$brand:color.muted",
-                          "fontFamily": "$brand:font.family",
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
                           "fontSize": 10
                         }
                       ]
@@ -532,7 +532,7 @@
                     "slug": "number-field",
                     "category": "Forms",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/forms.lib.pen"
                     ]
                   }
@@ -557,21 +557,21 @@
                         12,
                         0
                       ],
-                      "fill": "$brand:color.accent-soft",
+                      "fill": "$tokens:color.accent-soft",
                       "cornerRadius": [
-                        "$brand:radius.md",
+                        "$tokens:radius.md",
                         0,
                         0,
-                        "$brand:radius.md"
+                        "$tokens:radius.md"
                       ],
                       "children": [
                         {
                           "id": "input-group-addon-text",
                           "type": "text",
                           "content": "https://",
-                          "fill": "$brand:color.muted",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md"
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
                         }
                       ]
                     },
@@ -587,15 +587,15 @@
                         12,
                         0
                       ],
-                      "fill": "$brand:color.field-background",
+                      "fill": "$tokens:color.field-background",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "cornerRadius": [
                         0,
-                        "$brand:radius.md",
-                        "$brand:radius.md",
+                        "$tokens:radius.md",
+                        "$tokens:radius.md",
                         0
                       ],
                       "children": [
@@ -603,9 +603,9 @@
                           "id": "input-group-input-text",
                           "type": "text",
                           "content": "your-site",
-                          "fill": "$brand:color.field-placeholder",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md"
+                          "fill": "$tokens:color.field-placeholder",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
                         }
                       ]
                     }
@@ -621,7 +621,7 @@
                     "slug": "input-group",
                     "category": "Forms",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/forms.lib.pen"
                     ]
                   }
@@ -643,19 +643,19 @@
                       "layout": "horizontal",
                       "alignItems": "center",
                       "justifyContent": "center",
-                      "cornerRadius": "$brand:radius.md",
-                      "fill": "$brand:color.field-background",
+                      "cornerRadius": "$tokens:radius.md",
+                      "fill": "$tokens:color.field-background",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
                           "id": "input-otp-0-d",
                           "type": "text",
                           "content": "4",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
                           "fontSize": 20,
                           "fontWeight": "600"
                         }
@@ -670,19 +670,19 @@
                       "layout": "horizontal",
                       "alignItems": "center",
                       "justifyContent": "center",
-                      "cornerRadius": "$brand:radius.md",
-                      "fill": "$brand:color.field-background",
+                      "cornerRadius": "$tokens:radius.md",
+                      "fill": "$tokens:color.field-background",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
                           "id": "input-otp-1-d",
                           "type": "text",
                           "content": "2",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
                           "fontSize": 20,
                           "fontWeight": "600"
                         }
@@ -697,19 +697,19 @@
                       "layout": "horizontal",
                       "alignItems": "center",
                       "justifyContent": "center",
-                      "cornerRadius": "$brand:radius.md",
-                      "fill": "$brand:color.field-background",
+                      "cornerRadius": "$tokens:radius.md",
+                      "fill": "$tokens:color.field-background",
                       "stroke": {
                         "thickness": 2,
-                        "fill": "$brand:color.accent"
+                        "fill": "$tokens:color.accent"
                       },
                       "children": [
                         {
                           "id": "input-otp-2-d",
                           "type": "text",
                           "content": "",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
                           "fontSize": 20,
                           "fontWeight": "600"
                         }
@@ -724,19 +724,19 @@
                       "layout": "horizontal",
                       "alignItems": "center",
                       "justifyContent": "center",
-                      "cornerRadius": "$brand:radius.md",
-                      "fill": "$brand:color.field-background",
+                      "cornerRadius": "$tokens:radius.md",
+                      "fill": "$tokens:color.field-background",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
                           "id": "input-otp-3-d",
                           "type": "text",
                           "content": "",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
                           "fontSize": 20,
                           "fontWeight": "600"
                         }
@@ -754,7 +754,7 @@
                     "slug": "input-otp",
                     "category": "Forms",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/forms.lib.pen"
                     ]
                   }
@@ -767,19 +767,19 @@
                   "layout": "vertical",
                   "gap": 12,
                   "padding": 16,
-                  "cornerRadius": "$brand:radius.md",
+                  "cornerRadius": "$tokens:radius.md",
                   "stroke": {
-                    "thickness": "$brand:border.width",
-                    "fill": "$brand:color.border"
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
                   },
                   "children": [
                     {
                       "id": "fieldset-legend",
                       "type": "text",
                       "content": "Notifications",
-                      "fill": "$brand:color.foreground",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-md",
+                      "fill": "$tokens:color.foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md",
                       "fontWeight": "600"
                     },
                     {
@@ -794,20 +794,20 @@
                         12,
                         0
                       ],
-                      "cornerRadius": "$brand:radius.md",
-                      "fill": "$brand:color.field-background",
+                      "cornerRadius": "$tokens:radius.md",
+                      "fill": "$tokens:color.field-background",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
                           "id": "fieldset-field-1-text",
                           "type": "text",
                           "content": "Email",
-                          "fill": "$brand:color.field-placeholder",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md"
+                          "fill": "$tokens:color.field-placeholder",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
                         }
                       ]
                     },
@@ -823,20 +823,20 @@
                         12,
                         0
                       ],
-                      "cornerRadius": "$brand:radius.md",
-                      "fill": "$brand:color.field-background",
+                      "cornerRadius": "$tokens:radius.md",
+                      "fill": "$tokens:color.field-background",
                       "stroke": {
-                        "thickness": "$brand:border.width",
-                        "fill": "$brand:color.border"
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
                           "id": "fieldset-field-2-text",
                           "type": "text",
                           "content": "SMS",
-                          "fill": "$brand:color.field-placeholder",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md"
+                          "fill": "$tokens:color.field-placeholder",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
                         }
                       ]
                     }
@@ -852,7 +852,7 @@
                     "slug": "fieldset",
                     "category": "Forms",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/forms.lib.pen"
                     ]
                   }
@@ -883,15 +883,15 @@
                           "layout": "horizontal",
                           "alignItems": "center",
                           "justifyContent": "center",
-                          "cornerRadius": "$brand:radius.sm",
-                          "fill": "$brand:color.accent",
+                          "cornerRadius": "$tokens:radius.sm",
+                          "fill": "$tokens:color.accent",
                           "children": [
                             {
                               "id": "checkbox-group-0-chk",
                               "type": "text",
                               "content": "✓",
-                              "fill": "$brand:color.accent-foreground",
-                              "fontFamily": "$brand:font.family",
+                              "fill": "$tokens:color.accent-foreground",
+                              "fontFamily": "$tokens:font.family",
                               "fontSize": 12,
                               "fontWeight": "700"
                             }
@@ -901,9 +901,9 @@
                           "id": "checkbox-group-0-label",
                           "type": "text",
                           "content": "Newsletter",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md"
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
                         }
                       ]
                     },
@@ -925,20 +925,20 @@
                           "layout": "horizontal",
                           "alignItems": "center",
                           "justifyContent": "center",
-                          "cornerRadius": "$brand:radius.sm",
-                          "fill": "$brand:color.surface",
+                          "cornerRadius": "$tokens:radius.sm",
+                          "fill": "$tokens:color.surface",
                           "stroke": {
-                            "thickness": "$brand:border.width",
-                            "fill": "$brand:color.border"
+                            "thickness": "$tokens:border.width",
+                            "fill": "$tokens:color.border"
                           }
                         },
                         {
                           "id": "checkbox-group-1-label",
                           "type": "text",
                           "content": "Product updates",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md"
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
                         }
                       ]
                     }
@@ -954,7 +954,7 @@
                     "slug": "checkbox-group",
                     "category": "Forms",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/forms.lib.pen"
                     ]
                   }
@@ -986,10 +986,10 @@
                           "alignItems": "center",
                           "justifyContent": "center",
                           "cornerRadius": 9999,
-                          "fill": "$brand:color.surface",
+                          "fill": "$tokens:color.surface",
                           "stroke": {
                             "thickness": 2,
-                            "fill": "$brand:color.accent"
+                            "fill": "$tokens:color.accent"
                           },
                           "children": [
                             {
@@ -999,7 +999,7 @@
                               "width": 8,
                               "height": 8,
                               "cornerRadius": 9999,
-                              "fill": "$brand:color.accent"
+                              "fill": "$tokens:color.accent"
                             }
                           ]
                         },
@@ -1007,9 +1007,9 @@
                           "id": "radio-group-0-label",
                           "type": "text",
                           "content": "Monthly",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md"
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
                         }
                       ]
                     },
@@ -1032,19 +1032,19 @@
                           "alignItems": "center",
                           "justifyContent": "center",
                           "cornerRadius": 9999,
-                          "fill": "$brand:color.surface",
+                          "fill": "$tokens:color.surface",
                           "stroke": {
                             "thickness": 2,
-                            "fill": "$brand:color.border"
+                            "fill": "$tokens:color.border"
                           }
                         },
                         {
                           "id": "radio-group-1-label",
                           "type": "text",
                           "content": "Yearly",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md"
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
                         }
                       ]
                     }
@@ -1060,7 +1060,7 @@
                     "slug": "radio-group",
                     "category": "Forms",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/forms.lib.pen"
                     ]
                   }
@@ -1081,8 +1081,8 @@
               "id": "g-forms-organism-h",
               "type": "text",
               "content": "ORGANISMS",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -1113,9 +1113,9 @@
                           "id": "form-name-lab",
                           "type": "text",
                           "content": "Full name",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-sm",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
                           "fontWeight": "600"
                         },
                         {
@@ -1129,20 +1129,20 @@
                             12,
                             0
                           ],
-                          "cornerRadius": "$brand:radius.md",
-                          "fill": "$brand:color.field-background",
+                          "cornerRadius": "$tokens:radius.md",
+                          "fill": "$tokens:color.field-background",
                           "stroke": {
-                            "thickness": "$brand:border.width",
-                            "fill": "$brand:color.border"
+                            "thickness": "$tokens:border.width",
+                            "fill": "$tokens:color.border"
                           },
                           "children": [
                             {
                               "id": "form-name-in-t",
                               "type": "text",
                               "content": "Ada Lovelace",
-                              "fill": "$brand:color.field-placeholder",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md"
+                              "fill": "$tokens:color.field-placeholder",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md"
                             }
                           ]
                         }
@@ -1159,9 +1159,9 @@
                           "id": "form-email-lab",
                           "type": "text",
                           "content": "Email",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-sm",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
                           "fontWeight": "600"
                         },
                         {
@@ -1175,20 +1175,20 @@
                             12,
                             0
                           ],
-                          "cornerRadius": "$brand:radius.md",
-                          "fill": "$brand:color.field-background",
+                          "cornerRadius": "$tokens:radius.md",
+                          "fill": "$tokens:color.field-background",
                           "stroke": {
-                            "thickness": "$brand:border.width",
-                            "fill": "$brand:color.border"
+                            "thickness": "$tokens:border.width",
+                            "fill": "$tokens:color.border"
                           },
                           "children": [
                             {
                               "id": "form-email-in-t",
                               "type": "text",
                               "content": "ada@example.com",
-                              "fill": "$brand:color.field-placeholder",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md"
+                              "fill": "$tokens:color.field-placeholder",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md"
                             }
                           ]
                         }
@@ -1214,20 +1214,20 @@
                             16,
                             10
                           ],
-                          "cornerRadius": "$brand:radius.md",
-                          "fill": "$brand:color.surface",
+                          "cornerRadius": "$tokens:radius.md",
+                          "fill": "$tokens:color.surface",
                           "stroke": {
-                            "thickness": "$brand:border.width",
-                            "fill": "$brand:color.border"
+                            "thickness": "$tokens:border.width",
+                            "fill": "$tokens:color.border"
                           },
                           "children": [
                             {
                               "id": "form-cancel-l",
                               "type": "text",
                               "content": "Cancel",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "600"
                             }
                           ]
@@ -1244,16 +1244,16 @@
                             16,
                             10
                           ],
-                          "cornerRadius": "$brand:radius.md",
-                          "fill": "$brand:color.accent",
+                          "cornerRadius": "$tokens:radius.md",
+                          "fill": "$tokens:color.accent",
                           "children": [
                             {
                               "id": "form-submit-l",
                               "type": "text",
                               "content": "Submit",
-                              "fill": "$brand:color.accent-foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.accent-foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "600"
                             }
                           ]
@@ -1272,7 +1272,7 @@
                     "slug": "form",
                     "category": "Forms",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/forms.lib.pen"
                     ]
                   }

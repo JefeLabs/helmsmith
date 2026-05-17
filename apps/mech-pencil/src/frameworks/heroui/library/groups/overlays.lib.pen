@@ -1,7 +1,7 @@
 {
   "version": "2.11",
   "imports": {
-    "brand": "../brand.lib.pen"
+    "tokens": "../design-tokens.lib.pen"
   },
   "children": [
     {
@@ -13,14 +13,14 @@
       "layout": "vertical",
       "gap": 40,
       "padding": 40,
-      "fill": "$brand:color.background",
+      "fill": "$tokens:color.background",
       "children": [
         {
           "id": "group-overlays-title",
           "type": "text",
           "content": "Overlays · HeroUI v3",
-          "fill": "$brand:color.foreground",
-          "fontFamily": "$brand:font.family",
+          "fill": "$tokens:color.foreground",
+          "fontFamily": "$tokens:font.family",
           "fontSize": 24,
           "fontWeight": "700"
         },
@@ -36,8 +36,8 @@
               "id": "g-overlays-molecule-h",
               "type": "text",
               "content": "MOLECULES",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -60,16 +60,16 @@
                     10,
                     6
                   ],
-                  "fill": "$brand:color.foreground",
-                  "cornerRadius": "$brand:radius.sm",
+                  "fill": "$tokens:color.foreground",
+                  "cornerRadius": "$tokens:radius.sm",
                   "children": [
                     {
                       "id": "tooltip-label",
                       "type": "text",
                       "content": "Tooltip",
-                      "fill": "$brand:color.background",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-sm"
+                      "fill": "$tokens:color.background",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm"
                     }
                   ],
                   "reusable": true,
@@ -83,7 +83,7 @@
                     "slug": "tooltip",
                     "category": "Overlays",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/overlays.lib.pen"
                     ]
                   }
@@ -104,8 +104,8 @@
               "id": "g-overlays-organism-h",
               "type": "text",
               "content": "ORGANISMS",
-              "fill": "$brand:color.muted",
-              "fontFamily": "$brand:font.family",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
               "fontSize": 13,
               "fontWeight": "600"
             },
@@ -125,11 +125,11 @@
                   "layout": "vertical",
                   "gap": 16,
                   "padding": 24,
-                  "fill": "$brand:color.surface",
-                  "cornerRadius": "$brand:radius.lg",
+                  "fill": "$tokens:color.surface",
+                  "cornerRadius": "$tokens:radius.lg",
                   "stroke": {
-                    "thickness": "$brand:border.width",
-                    "fill": "$brand:color.border"
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
                   },
                   "effect": {
                     "type": "shadow",
@@ -155,18 +155,18 @@
                           "id": "alert-dialog-title",
                           "type": "text",
                           "content": "Delete project?",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-lg",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-lg",
                           "fontWeight": "700"
                         },
                         {
                           "id": "alert-dialog-x",
                           "type": "text",
                           "content": "✕",
-                          "fill": "$brand:color.muted",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md"
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
                         }
                       ]
                     },
@@ -174,9 +174,9 @@
                       "id": "alert-dialog-body",
                       "type": "text",
                       "content": "This action cannot be undone. This will permanently delete the project.",
-                      "fill": "$brand:color.muted",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-md",
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md",
                       "textGrowth": "fixed-width",
                       "width": "fill_container"
                     },
@@ -200,20 +200,20 @@
                             16,
                             10
                           ],
-                          "cornerRadius": "$brand:radius.md",
-                          "fill": "$brand:color.surface",
+                          "cornerRadius": "$tokens:radius.md",
+                          "fill": "$tokens:color.surface",
                           "stroke": {
-                            "thickness": "$brand:border.width",
-                            "fill": "$brand:color.border"
+                            "thickness": "$tokens:border.width",
+                            "fill": "$tokens:color.border"
                           },
                           "children": [
                             {
                               "id": "alert-dialog-cancel-l",
                               "type": "text",
                               "content": "Cancel",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "600"
                             }
                           ]
@@ -230,16 +230,16 @@
                             16,
                             10
                           ],
-                          "cornerRadius": "$brand:radius.md",
-                          "fill": "$brand:color.accent",
+                          "cornerRadius": "$tokens:radius.md",
+                          "fill": "$tokens:color.accent",
                           "children": [
                             {
                               "id": "alert-dialog-ok-l",
                               "type": "text",
                               "content": "Confirm",
-                              "fill": "$brand:color.accent-foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.accent-foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "600"
                             }
                           ]
@@ -258,7 +258,7 @@
                     "slug": "alert-dialog",
                     "category": "Overlays",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/overlays.lib.pen"
                     ]
                   }
@@ -270,12 +270,12 @@
                   "width": 320,
                   "height": 480,
                   "layout": "vertical",
-                  "fill": "$brand:color.surface",
+                  "fill": "$tokens:color.surface",
                   "stroke": {
                     "thickness": {
-                      "left": "$brand:border.width"
+                      "left": "$tokens:border.width"
                     },
-                    "fill": "$brand:color.border"
+                    "fill": "$tokens:color.border"
                   },
                   "effect": {
                     "type": "shadow",
@@ -299,27 +299,27 @@
                       "padding": 20,
                       "stroke": {
                         "thickness": {
-                          "bottom": "$brand:border.width"
+                          "bottom": "$tokens:border.width"
                         },
-                        "fill": "$brand:color.border"
+                        "fill": "$tokens:color.border"
                       },
                       "children": [
                         {
                           "id": "drawer-title",
                           "type": "text",
                           "content": "Filters",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-lg",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-lg",
                           "fontWeight": "700"
                         },
                         {
                           "id": "drawer-x",
                           "type": "text",
                           "content": "✕",
-                          "fill": "$brand:color.muted",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md"
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
                         }
                       ]
                     },
@@ -344,28 +344,28 @@
                             12,
                             0
                           ],
-                          "cornerRadius": "$brand:radius.md",
-                          "fill": "$brand:color.field-background",
+                          "cornerRadius": "$tokens:radius.md",
+                          "fill": "$tokens:color.field-background",
                           "stroke": {
-                            "thickness": "$brand:border.width",
-                            "fill": "$brand:color.border"
+                            "thickness": "$tokens:border.width",
+                            "fill": "$tokens:color.border"
                           },
                           "children": [
                             {
                               "id": "drawer-f1-v",
                               "type": "text",
                               "content": "Category",
-                              "fill": "$brand:color.field-placeholder",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md"
+                              "fill": "$tokens:color.field-placeholder",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md"
                             },
                             {
                               "id": "drawer-f1-c",
                               "type": "text",
                               "content": "▾",
-                              "fill": "$brand:color.muted",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md"
+                              "fill": "$tokens:color.muted",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md"
                             }
                           ]
                         },
@@ -382,28 +382,28 @@
                             12,
                             0
                           ],
-                          "cornerRadius": "$brand:radius.md",
-                          "fill": "$brand:color.field-background",
+                          "cornerRadius": "$tokens:radius.md",
+                          "fill": "$tokens:color.field-background",
                           "stroke": {
-                            "thickness": "$brand:border.width",
-                            "fill": "$brand:color.border"
+                            "thickness": "$tokens:border.width",
+                            "fill": "$tokens:color.border"
                           },
                           "children": [
                             {
                               "id": "drawer-f2-v",
                               "type": "text",
                               "content": "Status",
-                              "fill": "$brand:color.field-placeholder",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md"
+                              "fill": "$tokens:color.field-placeholder",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md"
                             },
                             {
                               "id": "drawer-f2-c",
                               "type": "text",
                               "content": "▾",
-                              "fill": "$brand:color.muted",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md"
+                              "fill": "$tokens:color.muted",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md"
                             }
                           ]
                         }
@@ -421,7 +421,7 @@
                     "slug": "drawer",
                     "category": "Overlays",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/overlays.lib.pen"
                     ]
                   }
@@ -434,11 +434,11 @@
                   "layout": "vertical",
                   "gap": 16,
                   "padding": 24,
-                  "fill": "$brand:color.surface",
-                  "cornerRadius": "$brand:radius.lg",
+                  "fill": "$tokens:color.surface",
+                  "cornerRadius": "$tokens:radius.lg",
                   "stroke": {
-                    "thickness": "$brand:border.width",
-                    "fill": "$brand:color.border"
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
                   },
                   "effect": {
                     "type": "shadow",
@@ -464,18 +464,18 @@
                           "id": "modal-title",
                           "type": "text",
                           "content": "Modal title",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-lg",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-lg",
                           "fontWeight": "700"
                         },
                         {
                           "id": "modal-x",
                           "type": "text",
                           "content": "✕",
-                          "fill": "$brand:color.muted",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md"
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
                         }
                       ]
                     },
@@ -483,9 +483,9 @@
                       "id": "modal-body",
                       "type": "text",
                       "content": "Modal content explaining the action the user is about to take.",
-                      "fill": "$brand:color.muted",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-md",
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md",
                       "textGrowth": "fixed-width",
                       "width": "fill_container"
                     },
@@ -509,20 +509,20 @@
                             16,
                             10
                           ],
-                          "cornerRadius": "$brand:radius.md",
-                          "fill": "$brand:color.surface",
+                          "cornerRadius": "$tokens:radius.md",
+                          "fill": "$tokens:color.surface",
                           "stroke": {
-                            "thickness": "$brand:border.width",
-                            "fill": "$brand:color.border"
+                            "thickness": "$tokens:border.width",
+                            "fill": "$tokens:color.border"
                           },
                           "children": [
                             {
                               "id": "modal-cancel-l",
                               "type": "text",
                               "content": "Cancel",
-                              "fill": "$brand:color.foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "600"
                             }
                           ]
@@ -539,16 +539,16 @@
                             16,
                             10
                           ],
-                          "cornerRadius": "$brand:radius.md",
-                          "fill": "$brand:color.accent",
+                          "cornerRadius": "$tokens:radius.md",
+                          "fill": "$tokens:color.accent",
                           "children": [
                             {
                               "id": "modal-ok-l",
                               "type": "text",
                               "content": "Confirm",
-                              "fill": "$brand:color.accent-foreground",
-                              "fontFamily": "$brand:font.family",
-                              "fontSize": "$brand:font.size-md",
+                              "fill": "$tokens:color.accent-foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
                               "fontWeight": "600"
                             }
                           ]
@@ -567,7 +567,7 @@
                     "slug": "modal",
                     "category": "Overlays",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/overlays.lib.pen"
                     ]
                   }
@@ -580,11 +580,11 @@
                   "layout": "vertical",
                   "gap": 8,
                   "padding": 16,
-                  "fill": "$brand:color.surface",
-                  "cornerRadius": "$brand:radius.md",
+                  "fill": "$tokens:color.surface",
+                  "cornerRadius": "$tokens:radius.md",
                   "stroke": {
-                    "thickness": "$brand:border.width",
-                    "fill": "$brand:color.border"
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
                   },
                   "effect": {
                     "type": "shadow",
@@ -602,18 +602,18 @@
                       "id": "popover-title",
                       "type": "text",
                       "content": "Quick tip",
-                      "fill": "$brand:color.foreground",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-md",
+                      "fill": "$tokens:color.foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md",
                       "fontWeight": "700"
                     },
                     {
                       "id": "popover-body",
                       "type": "text",
                       "content": "Popovers float above content and point at their trigger.",
-                      "fill": "$brand:color.muted",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-sm",
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm",
                       "textGrowth": "fixed-width",
                       "width": "fill_container"
                     }
@@ -629,7 +629,7 @@
                     "slug": "popover",
                     "category": "Overlays",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/overlays.lib.pen"
                     ]
                   }
@@ -643,11 +643,11 @@
                   "alignItems": "start",
                   "gap": 12,
                   "padding": 16,
-                  "fill": "$brand:color.surface",
-                  "cornerRadius": "$brand:radius.md",
+                  "fill": "$tokens:color.surface",
+                  "cornerRadius": "$tokens:radius.md",
                   "stroke": {
-                    "thickness": "$brand:border.width",
-                    "fill": "$brand:color.border"
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
                   },
                   "effect": {
                     "type": "shadow",
@@ -667,7 +667,7 @@
                       "width": 10,
                       "height": 10,
                       "cornerRadius": 9999,
-                      "fill": "$brand:color.accent"
+                      "fill": "$tokens:color.accent"
                     },
                     {
                       "id": "toast-content",
@@ -680,18 +680,18 @@
                           "id": "toast-title",
                           "type": "text",
                           "content": "Changes saved",
-                          "fill": "$brand:color.foreground",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-md",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md",
                           "fontWeight": "600"
                         },
                         {
                           "id": "toast-body",
                           "type": "text",
                           "content": "Your preferences were updated.",
-                          "fill": "$brand:color.muted",
-                          "fontFamily": "$brand:font.family",
-                          "fontSize": "$brand:font.size-sm"
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm"
                         }
                       ]
                     },
@@ -699,9 +699,9 @@
                       "id": "toast-x",
                       "type": "text",
                       "content": "✕",
-                      "fill": "$brand:color.muted",
-                      "fontFamily": "$brand:font.family",
-                      "fontSize": "$brand:font.size-md"
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md"
                     }
                   ],
                   "reusable": true,
@@ -715,7 +715,7 @@
                     "slug": "toast",
                     "category": "Overlays",
                     "source": [
-                      "brand.lib.pen",
+                      "design-tokens.lib.pen",
                       "groups/overlays.lib.pen"
                     ]
                   }

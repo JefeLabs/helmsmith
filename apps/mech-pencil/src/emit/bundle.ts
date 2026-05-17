@@ -28,9 +28,13 @@ import { type ValidationResult, validateDocument } from '../pen/validate.ts';
 import type { ThemeConfig } from '../theme/config.ts';
 import { themeTokens } from '../theme/generate.ts';
 
-const ALIAS = 'brand';
-const BRAND_FILE = 'brand.lib.pen';
-/** Relative path back to brand.lib.pen — root files vs subdir files. */
+// The token layer's import alias + filename. Refs are `$tokens:<key>`;
+// the file is `design-tokens.lib.pen` (internal identifiers below
+// still say "brand" — the doc this app produces — but the emitted
+// alias/filename are the user-facing names).
+const ALIAS = 'tokens';
+const BRAND_FILE = 'design-tokens.lib.pen';
+/** Relative path back to design-tokens.lib.pen (root vs subdir files). */
 const relBrand = (subdir: boolean) => `${subdir ? '..' : '.'}/${BRAND_FILE}`;
 
 const ctxFor = (alias: string): BuildContext => ({
