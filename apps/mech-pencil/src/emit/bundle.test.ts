@@ -61,7 +61,7 @@ describe('emitBundle', () => {
   });
 
   it('LAYER 4 mock: local components, token-linked, provenance up the chain', () => {
-    const hp = b.mocks.find((m) => m.path === 'mocks/homepage.pen');
+    const hp = b.mocks.find((m) => m.path === 'mocks/template.pen');
     expect(hp).toBeTruthy();
     expect(hp?.components.sort()).toEqual(['button', 'card']);
     expect(hp?.doc.toObject().imports).toEqual({ tokens: '../design-tokens.lib.pen' });
@@ -76,7 +76,7 @@ describe('emitBundle', () => {
     }
     // button = atom / Buttons category → provenance through the new layout
     expect(json).toContain(
-      '"source":["design-tokens.lib.pen","core/buttons.lib.pen","design-system/atoms.lib.pen","mocks/homepage.pen"]',
+      '"source":["design-tokens.lib.pen","core/buttons.lib.pen","design-system/atoms.lib.pen","mocks/template.pen"]',
     );
     expect(json).toContain('$tokens:color.accent');
   });

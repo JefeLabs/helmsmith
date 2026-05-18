@@ -3,7 +3,7 @@
  *
  *   tokens     ← derive.ts (raw OKLCH data → static per-theme hex)
  *   components ← catalog.ts (~72 atomic components)
- *   mockups    ← a homepage screen built from LOCAL component refs
+ *   mockups    ← a seed `template` screen built from LOCAL component refs
  *
  * Mockups instantiate components via `ctx.component(id)` → a bare,
  * local id (the emitter is single-file; cross-file refs can't be
@@ -26,11 +26,15 @@ function derived(): DeriveResult {
   return cached;
 }
 
-/** A marketing homepage assembled from local component refs. */
-function homepageMockup(): MockupSpec {
+/**
+ * The seed mockup template (a marketing-homepage starter assembled
+ * from local component refs). Emitted as `mocks/template.pen`; the
+ * CLI copies+renames it when creating a new mockup.
+ */
+function templateMockup(): MockupSpec {
   return {
-    slug: 'homepage',
-    name: 'Homepage',
+    slug: 'template',
+    name: 'Template',
     build: (ctx: MockupContext): Child[] => {
       // Inline header — HeroUI v3 has no Navbar component, so this is
       // a plain frame rather than a component ref.
@@ -140,7 +144,7 @@ function homepageMockup(): MockupSpec {
         frame(
           'screen',
           {
-            name: 'Homepage',
+            name: 'Template',
             width: 1280,
             height: 1024,
             fill: ctx.token('color.background'),
@@ -173,7 +177,7 @@ export const heroUIAdapter: FrameworkAdapter = {
   },
 
   mockups(): MockupSpec[] {
-    return [homepageMockup()];
+    return [templateMockup()];
   },
 
   notes(): string[] {

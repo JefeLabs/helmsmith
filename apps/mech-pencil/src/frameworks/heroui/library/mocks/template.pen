@@ -5,7 +5,7 @@
   },
   "children": [
     {
-      "id": "mock-homepage-components",
+      "id": "mock-template-components",
       "type": "frame",
       "name": "Components",
       "x": 1500,
@@ -16,7 +16,7 @@
       "fill": "$tokens:color.background",
       "children": [
         {
-          "id": "mock-homepage-ctitle",
+          "id": "mock-template-ctitle",
           "type": "text",
           "content": "Components · 71 (drag any onto the screen — local & editable)",
           "fill": "$tokens:color.foreground",
@@ -25,7 +25,7 @@
           "fontWeight": "700"
         },
         {
-          "id": "m-homepage-atom",
+          "id": "m-template-atom",
           "type": "frame",
           "name": "atoms",
           "layout": "vertical",
@@ -33,7 +33,7 @@
           "gap": 16,
           "children": [
             {
-              "id": "m-homepage-atom-h",
+              "id": "m-template-atom-h",
               "type": "text",
               "content": "ATOMS",
               "fill": "$tokens:color.muted",
@@ -42,7 +42,7 @@
               "fontWeight": "600"
             },
             {
-              "id": "m-homepage-atom-items",
+              "id": "m-template-atom-items",
               "type": "frame",
               "name": "Items",
               "layout": "vertical",
@@ -89,7 +89,7 @@
                       "design-tokens.lib.pen",
                       "core/buttons.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -129,7 +129,7 @@
                       "design-tokens.lib.pen",
                       "core/buttons.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -177,7 +177,7 @@
                       "design-tokens.lib.pen",
                       "core/buttons.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -214,7 +214,7 @@
                       "design-tokens.lib.pen",
                       "core/navigation.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -262,7 +262,7 @@
                       "design-tokens.lib.pen",
                       "core/typography.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -298,7 +298,7 @@
                       "design-tokens.lib.pen",
                       "core/forms.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -333,7 +333,7 @@
                       "design-tokens.lib.pen",
                       "core/forms.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -376,7 +376,7 @@
                       "design-tokens.lib.pen",
                       "core/data-display.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -419,7 +419,7 @@
                       "design-tokens.lib.pen",
                       "core/data-display.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -459,7 +459,7 @@
                       "design-tokens.lib.pen",
                       "core/media.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -506,7 +506,7 @@
                       "design-tokens.lib.pen",
                       "core/feedback.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -557,7 +557,7 @@
                       "design-tokens.lib.pen",
                       "core/feedback.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -582,7 +582,7 @@
                       "design-tokens.lib.pen",
                       "core/layout.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -636,7 +636,7 @@
                       "design-tokens.lib.pen",
                       "core/layout.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -703,7 +703,7 @@
                       "design-tokens.lib.pen",
                       "core/utilities.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -747,7 +747,7 @@
                       "design-tokens.lib.pen",
                       "core/controls.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -787,7 +787,7 @@
                       "design-tokens.lib.pen",
                       "core/forms.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -851,7 +851,7 @@
                       "design-tokens.lib.pen",
                       "core/controls.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -900,7 +900,7 @@
                       "design-tokens.lib.pen",
                       "core/feedback.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -975,7 +975,7 @@
                       "design-tokens.lib.pen",
                       "core/feedback.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -1033,7 +1033,7 @@
                       "design-tokens.lib.pen",
                       "core/feedback.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -1063,7 +1063,7 @@
                       "design-tokens.lib.pen",
                       "core/colors.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -1097,7 +1097,7 @@
                       "design-tokens.lib.pen",
                       "core/forms.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -1141,7 +1141,7 @@
                       "design-tokens.lib.pen",
                       "core/forms.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -1187,7 +1187,7 @@
                       "design-tokens.lib.pen",
                       "core/forms.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -1229,7 +1229,7 @@
                       "design-tokens.lib.pen",
                       "core/forms.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -1282,7 +1282,7 @@
                       "design-tokens.lib.pen",
                       "core/typography.lib.pen",
                       "design-system/atoms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 }
@@ -1291,7 +1291,7 @@
           ]
         },
         {
-          "id": "m-homepage-molecule",
+          "id": "m-template-molecule",
           "type": "frame",
           "name": "molecules",
           "layout": "vertical",
@@ -1299,7 +1299,7 @@
           "gap": 16,
           "children": [
             {
-              "id": "m-homepage-molecule-h",
+              "id": "m-template-molecule-h",
               "type": "text",
               "content": "MOLECULES",
               "fill": "$tokens:color.muted",
@@ -1308,7 +1308,7 @@
               "fontWeight": "600"
             },
             {
-              "id": "m-homepage-molecule-items",
+              "id": "m-template-molecule-items",
               "type": "frame",
               "name": "Items",
               "layout": "vertical",
@@ -1423,7 +1423,7 @@
                       "design-tokens.lib.pen",
                       "core/buttons.lib.pen",
                       "design-system/molecules.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -1532,7 +1532,7 @@
                       "design-tokens.lib.pen",
                       "core/buttons.lib.pen",
                       "design-system/molecules.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -1605,7 +1605,7 @@
                       "design-tokens.lib.pen",
                       "core/forms.lib.pen",
                       "design-system/molecules.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -1661,7 +1661,7 @@
                       "design-tokens.lib.pen",
                       "core/forms.lib.pen",
                       "design-system/molecules.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -1734,7 +1734,7 @@
                       "design-tokens.lib.pen",
                       "core/forms.lib.pen",
                       "design-system/molecules.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -1789,7 +1789,7 @@
                       "design-tokens.lib.pen",
                       "core/colors.lib.pen",
                       "design-system/molecules.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -1844,7 +1844,7 @@
                       "design-tokens.lib.pen",
                       "core/date-and-time.lib.pen",
                       "design-system/molecules.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -1899,7 +1899,7 @@
                       "design-tokens.lib.pen",
                       "core/date-and-time.lib.pen",
                       "design-system/molecules.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -1990,7 +1990,7 @@
                       "design-tokens.lib.pen",
                       "core/forms.lib.pen",
                       "design-system/molecules.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -2125,7 +2125,7 @@
                       "design-tokens.lib.pen",
                       "core/forms.lib.pen",
                       "design-system/molecules.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -2225,7 +2225,7 @@
                       "design-tokens.lib.pen",
                       "core/forms.lib.pen",
                       "design-system/molecules.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -2329,7 +2329,7 @@
                       "design-tokens.lib.pen",
                       "core/forms.lib.pen",
                       "design-system/molecules.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -2437,7 +2437,7 @@
                       "design-tokens.lib.pen",
                       "core/forms.lib.pen",
                       "design-system/molecules.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -2566,7 +2566,7 @@
                       "design-tokens.lib.pen",
                       "core/collections.lib.pen",
                       "design-system/molecules.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -2635,7 +2635,7 @@
                       "design-tokens.lib.pen",
                       "core/colors.lib.pen",
                       "design-system/molecules.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -2692,7 +2692,7 @@
                       "design-tokens.lib.pen",
                       "core/colors.lib.pen",
                       "design-system/molecules.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -2779,7 +2779,7 @@
                       "design-tokens.lib.pen",
                       "core/colors.lib.pen",
                       "design-system/molecules.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -2820,7 +2820,7 @@
                       "design-tokens.lib.pen",
                       "core/overlays.lib.pen",
                       "design-system/molecules.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -2891,7 +2891,7 @@
                       "design-tokens.lib.pen",
                       "core/navigation.lib.pen",
                       "design-system/molecules.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -3049,7 +3049,7 @@
                       "design-tokens.lib.pen",
                       "core/navigation.lib.pen",
                       "design-system/molecules.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -3158,7 +3158,7 @@
                       "design-tokens.lib.pen",
                       "core/navigation.lib.pen",
                       "design-system/molecules.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -3227,7 +3227,7 @@
                       "design-tokens.lib.pen",
                       "core/feedback.lib.pen",
                       "design-system/molecules.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -3312,7 +3312,7 @@
                       "design-tokens.lib.pen",
                       "core/navigation.lib.pen",
                       "design-system/molecules.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -3424,7 +3424,7 @@
                       "design-tokens.lib.pen",
                       "core/layout.lib.pen",
                       "design-system/molecules.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 }
@@ -3433,7 +3433,7 @@
           ]
         },
         {
-          "id": "m-homepage-organism",
+          "id": "m-template-organism",
           "type": "frame",
           "name": "organisms",
           "layout": "vertical",
@@ -3441,7 +3441,7 @@
           "gap": 16,
           "children": [
             {
-              "id": "m-homepage-organism-h",
+              "id": "m-template-organism-h",
               "type": "text",
               "content": "ORGANISMS",
               "fill": "$tokens:color.muted",
@@ -3450,7 +3450,7 @@
               "fontWeight": "600"
             },
             {
-              "id": "m-homepage-organism-items",
+              "id": "m-template-organism-items",
               "type": "frame",
               "name": "Items",
               "layout": "vertical",
@@ -3638,7 +3638,7 @@
                       "design-tokens.lib.pen",
                       "core/forms.lib.pen",
                       "design-system/organisms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -4010,7 +4010,7 @@
                       "design-tokens.lib.pen",
                       "core/data-display.lib.pen",
                       "design-system/organisms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -4143,7 +4143,7 @@
                       "design-tokens.lib.pen",
                       "core/collections.lib.pen",
                       "design-system/organisms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -4327,7 +4327,7 @@
                       "design-tokens.lib.pen",
                       "core/collections.lib.pen",
                       "design-system/organisms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -4512,7 +4512,7 @@
                       "design-tokens.lib.pen",
                       "core/navigation.lib.pen",
                       "design-system/organisms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -4625,7 +4625,7 @@
                       "design-tokens.lib.pen",
                       "core/navigation.lib.pen",
                       "design-system/organisms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -4772,7 +4772,7 @@
                       "design-tokens.lib.pen",
                       "core/layout.lib.pen",
                       "design-system/organisms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -5777,7 +5777,7 @@
                       "design-tokens.lib.pen",
                       "core/date-and-time.lib.pen",
                       "design-system/organisms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -6782,7 +6782,7 @@
                       "design-tokens.lib.pen",
                       "core/date-and-time.lib.pen",
                       "design-system/organisms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -7826,7 +7826,7 @@
                       "design-tokens.lib.pen",
                       "core/date-and-time.lib.pen",
                       "design-system/organisms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -8917,7 +8917,7 @@
                       "design-tokens.lib.pen",
                       "core/date-and-time.lib.pen",
                       "design-system/organisms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -9036,7 +9036,7 @@
                       "design-tokens.lib.pen",
                       "core/colors.lib.pen",
                       "design-system/organisms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -9203,7 +9203,7 @@
                       "design-tokens.lib.pen",
                       "core/pickers.lib.pen",
                       "design-system/organisms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -9395,7 +9395,7 @@
                       "design-tokens.lib.pen",
                       "core/pickers.lib.pen",
                       "design-system/organisms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -9562,7 +9562,7 @@
                       "design-tokens.lib.pen",
                       "core/pickers.lib.pen",
                       "design-system/organisms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -9710,7 +9710,7 @@
                       "design-tokens.lib.pen",
                       "core/overlays.lib.pen",
                       "design-system/organisms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -9875,7 +9875,7 @@
                       "design-tokens.lib.pen",
                       "core/overlays.lib.pen",
                       "design-system/organisms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -10023,7 +10023,7 @@
                       "design-tokens.lib.pen",
                       "core/overlays.lib.pen",
                       "design-system/organisms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -10087,7 +10087,7 @@
                       "design-tokens.lib.pen",
                       "core/overlays.lib.pen",
                       "design-system/organisms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 },
@@ -10175,7 +10175,7 @@
                       "design-tokens.lib.pen",
                       "core/overlays.lib.pen",
                       "design-system/organisms.lib.pen",
-                      "mocks/homepage.pen"
+                      "mocks/template.pen"
                     ]
                   }
                 }
@@ -10188,7 +10188,7 @@
     {
       "id": "screen",
       "type": "frame",
-      "name": "Homepage",
+      "name": "Template",
       "width": 1280,
       "height": 1024,
       "fill": "$tokens:color.background",
