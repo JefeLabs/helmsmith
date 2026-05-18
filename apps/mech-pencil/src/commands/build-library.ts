@@ -13,7 +13,7 @@
 
 import { join } from 'node:path';
 import { emitBundle } from '../emit/bundle.ts';
-import { libraryDir, resetLibraryDir } from '../lib/library-assets.ts';
+import { libraryDir, resetLibraryDir, writeEmbedManifest } from '../lib/library-assets.ts';
 import { writeText } from '../lib/workspace.ts';
 import { resolveTheme } from '../theme/config.ts';
 import { dim, err, heading, ok } from '../ui.ts';
@@ -46,6 +46,10 @@ export function runBuildLibrary(): void {
   const dir = libraryDir();
   for (const f of files) writeText(join(dir, f.path), f.doc.toJSON());
 
+  // Keep the static embed manifest in lockstep with what we just wrote
+  // (so `bun build --compile` embeds exactly this set).
+  writeEmbedManifest();
+
   console.log(heading('HeroUI library rebuilt (committed, theme-invariant)'));
   console.log(ok(dir));
   console.log(
@@ -53,5 +57,7 @@ export function runBuildLibrary(): void {
       `  design-tokens.lib.pen · design-system/ (${b.designSystem.length} levels ×{lib,preview}) · core/ (${b.groups.length} categories ×{lib,preview}) · ${b.mocks.length} mock(s)`,
     ),
   );
-  console.log(dim('  commit this; `bundle` reuses it (only design-tokens.lib.pen is per-project).'));
+  console.log(
+    dim('  commit this; `bundle` reuses it (only design-tokens.lib.pen is per-project).'),
+  );
 }

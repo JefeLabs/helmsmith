@@ -105,6 +105,9 @@ interface CatalogEntry {
   id: string;
   name: string;
   level: AtomicLevel;
+  /** HeroUI functional group (see `categoryOf`); every CATALOG entry
+   *  is built with it and consumers read it — the field was missing. */
+  category: string;
 }
 
 /**
