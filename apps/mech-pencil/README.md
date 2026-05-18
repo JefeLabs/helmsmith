@@ -51,8 +51,13 @@ Pencil to view themed. `*.lib.pen` are for importing, not previewing.
 | `build-library` | **Maintainer**: regenerate the committed HeroUI library                 |
 | `init`          | One self-contained `.pen` (static HeroUI default theme)                  |
 | `list`          | List frameworks / a framework's atomic component catalog                |
+| `manifest`      | Emit the compact component/token/constraint index (agent context)       |
 | `validate`      | Structurally validate a `.pen` (v2.11 rules)                            |
 | `connect`       | Uniform connections TUI (offline — no connections required)             |
+
+The `manifest` JSON is what agents (and the `skill/pencil-skill-router`
+Agent Skill, shipped under `skill/`) consult to compose screens or
+generate React from the system — never the raw library.
 
 `bundle` knobs (HeroUI Themes parity): `-a/--accent <hex|oklch>`,
 `-b/--base <0–0.02>`, `--font <name>`, `-r/--radius <preset>`,

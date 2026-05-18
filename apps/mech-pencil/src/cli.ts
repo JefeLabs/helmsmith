@@ -15,6 +15,7 @@ import { runConnect } from './commands/connect.ts';
 import { runGen } from './commands/gen-library.ts';
 import { runInit } from './commands/init.ts';
 import { runList } from './commands/list.ts';
+import { runManifest } from './commands/manifest.ts';
 import { runTheme } from './commands/theme.ts';
 import { runValidate } from './commands/validate.ts';
 import { DEFAULT_FRAMEWORK } from './frameworks/registry.ts';
@@ -151,6 +152,12 @@ program
         name: opts.name,
       }),
   );
+
+program
+  .command('manifest')
+  .description('Emit the compact component/token/constraint index (stdout or -o file)')
+  .option('-o, --out <file>', 'Write JSON to a file instead of stdout')
+  .action((opts: { out?: string }) => runManifest({ out: opts.out }));
 
 program
   .command('list')

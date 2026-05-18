@@ -50,6 +50,12 @@ export {
 export { type EmittedBrand, emitBrand } from './emit/brand.ts';
 export { type EmittedBundle, emitBundle } from './emit/bundle.ts';
 export {
+  type Manifest,
+  type ManifestComponent,
+  type ManifestToken,
+  buildManifest,
+} from './manifest/build.ts';
+export {
   CATEGORY_ORDER,
   categoryOf,
   heroUIComponents,
