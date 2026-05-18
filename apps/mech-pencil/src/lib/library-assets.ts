@@ -14,6 +14,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  rmSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -43,6 +44,17 @@ export function libraryDir(): string {
 
 export function libraryExists(): boolean {
   return existsSync(join(libraryDir(), 'design-system.lib.pen'));
+}
+
+/**
+ * Wipe + recreate the committed library dir so a regenerate can never
+ * leave orphans behind (e.g. files removed/renamed in the catalog).
+ * `build-library` calls this before writing.
+ */
+export function resetLibraryDir(): void {
+  const dir = libraryDir();
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
 }
 
 /** Recursively copy the committed library tree into `dest`. */

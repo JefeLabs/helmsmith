@@ -13,7 +13,7 @@
 
 import { join } from 'node:path';
 import { emitBundle } from '../emit/bundle.ts';
-import { libraryDir } from '../lib/library-assets.ts';
+import { libraryDir, resetLibraryDir } from '../lib/library-assets.ts';
 import { writeText } from '../lib/workspace.ts';
 import { resolveTheme } from '../theme/config.ts';
 import { dim, err, heading, ok } from '../ui.ts';
@@ -41,6 +41,8 @@ export function runBuildLibrary(): void {
     return;
   }
 
+  // Wipe first so a rename/removal in the catalog can't leave orphans.
+  resetLibraryDir();
   const dir = libraryDir();
   for (const f of files) writeText(join(dir, f.path), f.doc.toJSON());
 
@@ -48,7 +50,7 @@ export function runBuildLibrary(): void {
   console.log(ok(dir));
   console.log(
     dim(
-      `  ${b.groups.length} categories (.lib + .preview) · design-system · catalog · ${b.mocks.length} mock(s)`,
+      `  default design-tokens.lib.pen · design-system(.lib+.preview) · ${b.groups.length} categories (.lib+.preview) · ${b.mocks.length} mock(s)`,
     ),
   );
   console.log(dim('  commit this; `bundle` reuses it (only design-tokens.lib.pen is per-project).'));

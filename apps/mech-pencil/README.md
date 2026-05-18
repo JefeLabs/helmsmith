@@ -1,96 +1,146 @@
 # @ecruz165/mech-pencil
 
-Generate [Pencil](https://docs.pencil.dev) `.pen` design systems and
-base mockups, programmatically, from pluggable framework adapters.
+Generate [Pencil](https://docs.pencil.dev) `.pen` design systems, themes,
+and mockups from a faithful **HeroUI v3** component catalog — all 71
+documented components, React-named, token-bound, themeable.
 
-`mech-pencil` understands the [`.pen` v2.10
-format](https://docs.pencil.dev/for-developers/the-pen-format) and
-emits two coordinated artifacts:
+A `.pen` / `.lib.pen` is plain pretty-printed JSON on disk (schema
+**v2.11**). `mech-pencil` writes it directly. Two file roles matter:
 
-- **`design-system.lib.pen`** — a Pencil design library: every design
-  token as a themed `variable`, every framework component as a
-  `reusable` node, atomic-design ordered (atoms → molecules →
-  organisms).
-- **base mockups** (`mockups/*.pen`) — screens that `import` the
-  library and compose it via `ref` instances, exactly the cross-file
-  mechanism the spec describes.
-
-First adapter: **HeroUI v3** (and `heroui-pro`, which reuses v3's
-tokens/components and adds Pro composed blocks).
-
-> A `.pen`/`.lib.pen` is plain, pretty-printed JSON on disk — this is
-> the documented developer path. (Distinct from the Pencil *editor*
-> MCP, which treats live editor files as opaque.)
+- **`.pen`** — a document. Opened in Pencil, it *resolves its
+  `imports`* (so it themes standalone).
+- **`.lib.pen`** — an import-only library. Opened by itself it does
+  **not** resolve its imports (renders unthemed); it's meant to be
+  imported by a `.pen`. Every importable `.lib.pen` ships with a
+  `.preview.pen` twin you can open to view it themed.
 
 ## Install
 
 ```bash
-npm install -g @ecruz165/mech-pencil
+npm install -g @ecruz165/mech-pencil   # or: bun run src/cli.ts <cmd>
 ```
 
 ## Quick start
 
 ```bash
-# Scaffold a full workspace (library + mockups) into ./design
-mech-pencil init --framework heroui --dir ./design
+# Single self-contained, themed .pen (HeroUI Themes knobs)
+mech-pencil theme -a "#3f5694" -b 0.0015 --font inter -r medium -d ./out
 
-# Or step by step
-mech-pencil gen-library --framework heroui --out ./design
-mech-pencil gen-mockup  --framework heroui --out ./design
+# Two-file swappable: design-tokens.lib.pen + design.pen (imports it)
+mech-pencil brand ./brand.json -d ./out
 
-# Inspect a framework's atomic catalog
+# Full layered bundle (reuses the committed HeroUI library; only
+# design-tokens.lib.pen is per-project)
+mech-pencil bundle -a "#3f5694" -r large -d ./out
+
+# Inspect / validate
 mech-pencil list --framework heroui
-
-# Validate any .pen (a mockup checks against its library)
-mech-pencil validate ./design/design-system.lib.pen
-mech-pencil validate ./design/mockups/app-shell.pen --lib ./design/design-system.lib.pen
+mech-pencil validate ./out/design.pen
 ```
+
+Open `*.preview.pen`, `mocks/*.pen`, or the `theme`/`init` output in
+Pencil to view themed. `*.lib.pen` are for importing, not previewing.
 
 ## Commands
 
-| Command       | Purpose                                                        |
-| ------------- | -------------------------------------------------------------- |
-| `init`        | One-shot scaffold: `design-system.lib.pen` + base mockups      |
-| `gen-library` | Emit the design system library only                            |
-| `gen-mockup`  | Emit base mockups that import an existing library              |
-| `list`        | List frameworks, or one framework's atomic component catalog   |
-| `validate`    | Structurally validate a `.pen` against the v2.10 schema rules  |
-| `connect`     | Uniform connections TUI (no connections required — offline)    |
+| Command         | Purpose                                                                 |
+| --------------- | ----------------------------------------------------------------------- |
+| `theme`         | One themed `.pen` from HeroUI Themes knobs (accent/base/font/radius)     |
+| `brand`         | Two files: swappable `design-tokens.lib.pen` + `design.pen`             |
+| `bundle`        | Layered set; reuses the committed HeroUI library, writes only tokens    |
+| `build-library` | **Maintainer**: regenerate the committed HeroUI library                 |
+| `init`          | One self-contained `.pen` (static HeroUI default theme)                  |
+| `list`          | List frameworks / a framework's atomic component catalog                |
+| `validate`      | Structurally validate a `.pen` (v2.11 rules)                            |
+| `connect`       | Uniform connections TUI (offline — no connections required)             |
+
+`bundle` knobs (HeroUI Themes parity): `-a/--accent <hex|oklch>`,
+`-b/--base <0–0.02>`, `--font <name>`, `-r/--radius <preset>`,
+`--form-radius <preset>`, `--regenerate` (rebuild instead of reuse).
+
+## Layered bundle topology
+
+```
+out/
+├── design-tokens.lib.pen        LAYER 1  variables only — the only per-project file
+├── groups/<category>.lib.pen    LAYER 2  HeroUI Storybook categories (import tokens)
+│   └── <category>.preview.pen            viewable twin (themes standalone)
+├── design-system.lib.pen        LAYER 3  atomic aggregate of all 71 (imports tokens)
+│   └── design-system.preview.pen         viewable twin
+└── mocks/<slug>.pen             LAYER 4  imports tokens; LOCAL component copies +
+                                          screen — customizable, brand-linked
+```
+
+Components reference tokens cross-file as `$tokens:color.accent`,
+`$tokens:radius.md`, … Swap or regenerate `design-tokens.lib.pen`
+(different accent/base/radius/font) and the whole system reskins —
+no other file changes.
+
+## Generate vs. reuse
+
+The HeroUI component layer (groups, design-system, mock skeletons +
+their previews) is **theme-invariant** — pure `$tokens:` references,
+byte-identical across every theme (enforced by a regression test). So
+it's generated **once** and committed at
+`src/frameworks/heroui/library/` (shipped via `package.json#files`).
+
+- `mech-pencil build-library` — maintainer command: wipes and
+  regenerates the committed library (run when the component catalog
+  changes; custom components flow into every layer + preview).
+- `mech-pencil bundle` (default) — **copies** the committed library
+  and writes only `design-tokens.lib.pen` (defaults + your overrides).
+  `--regenerate` rebuilds everything from scratch instead.
+
+So in steady-state per-project use the component builders don't run —
+the committed library is the baked artifact.
+
+## Verified Pencil constraints (why it's shaped this way)
+
+Empirically established against the live Pencil app:
+
+- Node `id` MUST NOT contain `/` (the slash is the `descendants`
+  path separator). Ids are slugged accordingly.
+- Cross-file **variables** resolve via `$<alias>:<key>` for the
+  importer's own nodes — this is how theming flows from
+  `design-tokens.lib.pen`.
+- Cross-file **component `descendants` overrides do not apply**
+  (only root-prop overrides cross). So mocks keep **local** copies of
+  the components they customize (titles/labels) — never live refs into
+  the libs. Lineage is recorded in each component's `metadata.source`.
+- A `.lib.pen` opened standalone doesn't resolve its `imports` →
+  hence the `.preview.pen` twins for viewing.
 
 ## Architecture
 
 ```
 src/
-├── pen/           .pen v2.10 schema engine (schema, builder, document, validate)
-├── color/         OKLCH/OKLab engine — pre-resolves HeroUI's color-mix() tokens
-├── design-system/ framework-agnostic token + atomic-design model
-├── frameworks/    FrameworkAdapter seam + heroui (v3) + heroui-pro adapters
-├── emit/          adapter → library / mockup PenDocument
-└── commands/      one file per CLI verb
+├── pen/            .pen v2.11 schema engine (schema/builder/document/validate)
+├── color/          OKLCH/OKLab engine (mixOklab → resolves HeroUI color-mix)
+├── theme/          HeroUI Themes `generateThemeColors` port (config + generate)
+├── brand/          brand.json schema → token variables
+├── design-system/  framework-agnostic token + atomic model
+├── frameworks/
+│   ├── adapter.ts        FrameworkAdapter seam + registry (heroui, heroui-pro)
+│   └── heroui/
+│       ├── catalog.ts    71-component catalog; RICH builder registry;
+│       │                 React names + category + atomic + metadata
+│       ├── components/   the builders: button, card, primitives, controls,
+│       │                 display, complex, stub  (run at generation time)
+│       ├── tokens.ts / derive.ts   HeroUI v3 token data + shared derive engine
+│       └── library/      COMMITTED baked output (build-library) — reused by bundle
+├── emit/           document (init/theme) · brand · bundle
+└── commands/       one file per CLI verb
 ```
 
-Adding a framework = implement `FrameworkAdapter` and register it in
-`src/frameworks/registry.ts`. No emitter or command changes.
-
-## Two intentional contribution points
-
-This app was scaffolded leaving two genuine design decisions explicit
-(both degrade gracefully so the CLI works before they're filled in):
-
-1. **`src/color/mix.ts` — `mixOklab()`**: the `color-mix(in oklab, …)`
-   semantics HeroUI uses to derive every hover/soft/border token.
-   Premultiplied vs. straight alpha, weight normalization — your call.
-   Until implemented, derived tokens are skipped (base tokens still
-   emit, with a warning).
-2. **`src/frameworks/heroui/components/button.ts` — `buildButton()`**:
-   how Button's variant×color×size matrix maps onto reusable `.pen`
-   nodes. Modeled on the fully-authored `components/card.ts`. Until
-   implemented, Button falls back to the generic token-driven stub.
+Adding a framework = implement `FrameworkAdapter`, register it in
+`src/frameworks/registry.ts`. Adding/altering a component = edit a
+`components/*.ts` builder (or the `RICH` map in `catalog.ts`), then
+`mech-pencil build-library` and commit the regenerated library.
 
 ## Development
 
 ```bash
-bun run src/cli.ts list      # run from source
+bun run src/cli.ts <cmd>     # run from source
 npm test                     # vitest unit tests
 npm run test:e2e             # drives the real CLI end-to-end
 npm run typecheck
