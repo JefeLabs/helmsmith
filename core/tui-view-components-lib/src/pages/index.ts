@@ -14,3 +14,5 @@ export type { ConnectViewProps } from './ConnectView.tsx';
 export { ConnectView } from './ConnectView.tsx';
 export type { RunConnectViewOptions } from './runConnectView.ts';
 export { runConnectView } from './runConnectView.ts';
+export type { RunTuiViewOptions } from './runTuiView.ts';
+export { runTuiView } from './runTuiView.ts';

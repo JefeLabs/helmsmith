@@ -18,6 +18,7 @@ import { runList } from './commands/list.ts';
 import { runManifest } from './commands/manifest.ts';
 import { runTheme } from './commands/theme.ts';
 import { runValidate } from './commands/validate.ts';
+import { runWizard } from './commands/wizard.ts';
 import { DEFAULT_FRAMEWORK } from './frameworks/_core/registry.ts';
 import { banner } from './ui.ts';
 
@@ -43,7 +44,8 @@ const version = readVersion();
 const { program } = createCli({
   name: 'mech-pencil',
   version,
-  description: 'Generate a single-file Pencil .pen (tokens + components + mockups) from framework adapters',
+  description:
+    'Generate a single-file Pencil .pen (tokens + components + mockups) from framework adapters',
 });
 
 program
@@ -176,11 +178,23 @@ program
   .action(() => runConnect());
 
 if (process.argv.length <= 2) {
-  banner(version);
-  process.exit(0);
+  // No args → interactive wizard, but ONLY on a real terminal. Piped /
+  // CI (non-TTY) gets the static banner so automation never hangs on a
+  // prompt (CONVENTIONS.md). The emit verbs are the non-interactive path.
+  if (process.stdout.isTTY && process.stdin.isTTY) {
+    runWizard()
+      .then(() => process.exit(0))
+      .catch((e) => {
+        console.error(e instanceof Error ? e.message : e);
+        process.exit(1);
+      });
+  } else {
+    banner(version);
+    process.exit(0);
+  }
+} else {
+  program.parseAsync(process.argv).catch((e) => {
+    console.error(e instanceof Error ? e.message : e);
+    process.exit(1);
+  });
 }
-
-program.parseAsync(process.argv).catch((e) => {
-  console.error(e instanceof Error ? e.message : e);
-  process.exit(1);
-});

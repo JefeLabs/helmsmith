@@ -43,8 +43,14 @@ Pencil to view themed. `*.lib.pen` are for importing, not previewing.
 
 ## Commands
 
+Run `mech-pencil` with **no arguments** in a terminal → an interactive
+wizard (choose framework → theme values → review → emits the layered
+bundle). Piped / CI (non-TTY) prints the static banner instead — the
+verbs below are the non-interactive equivalents.
+
 | Command         | Purpose                                                                 |
 | --------------- | ----------------------------------------------------------------------- |
+| _(no args)_     | Interactive wizard → layered bundle (TTY only; banner otherwise)        |
 | `theme`         | One themed `.pen` from HeroUI Themes knobs (accent/base/font/radius)     |
 | `brand`         | Two files: swappable `design-tokens.lib.pen` + `design.pen`             |
 | `bundle`        | Layered set; reuses the committed HeroUI library, writes only tokens    |
@@ -141,7 +147,10 @@ src/
 │   │   └── library/      COMMITTED baked output (build-library) — reused by bundle
 │   └── heroui-pro/ index.ts — reuses heroui's tokens/components/mockups
 ├── emit/           document (init/theme) · brand · bundle
-└── commands/       one file per CLI verb
+├── tui/            no-args wizard: WizardView.tsx (React/openTUI page,
+│                   composed from @ecruz165/tui-view-components) +
+│                   wizard-config.ts (pure, testable step/validate logic)
+└── commands/       one file per CLI verb (incl. wizard.ts → runs the TUI)
 ```
 
 All framework-specific code lives under `frameworks/<id>/` (one
