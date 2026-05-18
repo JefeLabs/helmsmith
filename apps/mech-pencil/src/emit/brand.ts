@@ -12,7 +12,7 @@
 
 import type { BrandFile } from '../brand/schema.ts';
 import { brandToTokens } from '../brand/to-tokens.ts';
-import type { FrameworkAdapter } from '../frameworks/adapter.ts';
+import type { FrameworkAdapter } from '../frameworks/_core/adapter.ts';
 import { PenDocument } from '../pen/document.ts';
 import { type ValidationResult, validateDocument } from '../pen/validate.ts';
 import { type EmittedDocument, emitDocument } from './document.ts';

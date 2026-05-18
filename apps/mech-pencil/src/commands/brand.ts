@@ -7,7 +7,7 @@
 import { resolve } from 'node:path';
 import { assertBrandFile, type BrandFile } from '../brand/schema.ts';
 import { emitBrand } from '../emit/brand.ts';
-import { getFramework } from '../frameworks/registry.ts';
+import { getFramework } from '../frameworks/_core/registry.ts';
 import { dim, err, heading, ok, warn } from '../ui.ts';
 import { documentPath, readJson, writeText } from '../lib/workspace.ts';
 

@@ -6,8 +6,8 @@
  */
 
 import type { FrameworkAdapter } from './adapter.ts';
-import { heroUIAdapter } from './heroui/index.ts';
-import { heroUIProAdapter } from './heroui-pro.ts';
+import { heroUIAdapter } from '../heroui/index.ts';
+import { heroUIProAdapter } from '../heroui-pro/index.ts';
 
 const ADAPTERS: FrameworkAdapter[] = [heroUIAdapter, heroUIProAdapter];
 

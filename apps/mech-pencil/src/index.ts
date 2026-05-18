@@ -34,12 +34,12 @@ export type {
   FrameworkAdapter,
   MockupContext,
   MockupSpec,
-} from './frameworks/adapter.ts';
+} from './frameworks/_core/adapter.ts';
 export {
   DEFAULT_FRAMEWORK,
   getFramework,
   listFrameworks,
-} from './frameworks/registry.ts';
+} from './frameworks/_core/registry.ts';
 
 // Emitters
 export {

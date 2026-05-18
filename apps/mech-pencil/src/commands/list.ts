@@ -4,7 +4,7 @@
  */
 
 import { ATOMIC_ORDER } from '../design-system/atomic.ts';
-import { getFramework, listFrameworks } from '../frameworks/registry.ts';
+import { getFramework, listFrameworks } from '../frameworks/_core/registry.ts';
 import { bullet, dim, heading } from '../ui.ts';
 
 export interface ListOptions {

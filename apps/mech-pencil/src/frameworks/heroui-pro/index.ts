@@ -8,8 +8,8 @@
  * must use the same local-ref + descendants rules as `heroui`.)
  */
 
-import type { FrameworkAdapter, MockupSpec } from './adapter.ts';
-import { heroUIAdapter } from './heroui/index.ts';
+import type { FrameworkAdapter, MockupSpec } from '../_core/adapter.ts';
+import { heroUIAdapter } from '../heroui/index.ts';
 
 export const heroUIProAdapter: FrameworkAdapter = {
   id: 'heroui-pro',

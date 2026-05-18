@@ -18,7 +18,7 @@ import { runList } from './commands/list.ts';
 import { runManifest } from './commands/manifest.ts';
 import { runTheme } from './commands/theme.ts';
 import { runValidate } from './commands/validate.ts';
-import { DEFAULT_FRAMEWORK } from './frameworks/registry.ts';
+import { DEFAULT_FRAMEWORK } from './frameworks/_core/registry.ts';
 import { banner } from './ui.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

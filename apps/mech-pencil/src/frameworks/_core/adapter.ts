@@ -17,9 +17,9 @@
  * `registry.ts` — no emitter or command changes.
  */
 
-import type { ComponentSpec } from '../design-system/atomic.ts';
-import type { TokenSet } from '../design-system/tokens.ts';
-import type { Child } from '../pen/schema.ts';
+import type { ComponentSpec } from '../../design-system/atomic.ts';
+import type { TokenSet } from '../../design-system/tokens.ts';
+import type { Child } from '../../pen/schema.ts';
 
 /**
  * A base mockup the adapter ships as a starting point. It is emitted as

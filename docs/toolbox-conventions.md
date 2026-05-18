@@ -199,6 +199,9 @@ apps/<name>/
 │   │   └── foo.test.ts   # co-located unit test
 │   ├── lib/              # app-internal helpers (not commands, not TUI)
 │   ├── tui/              # openTUI views (only if the app has a TUI surface)
+│   ├── frameworks/       # only if the app targets pluggable UI frameworks
+│   │   ├── _core/        #   the framework-agnostic seam (adapter + registry)
+│   │   └── <framework>/  #   ALL code specific to one framework, e.g. heroui/
 │   └── server/           # only if the app exposes an HTTP/REST surface
 ├── tests/
 │   └── e2e/              # end-to-end tests that spawn the CLI as a subprocess
@@ -218,6 +221,18 @@ apps/<name>/
 Integration tests (between layers but no subprocess) go co-located with
 the layer they're testing. If you have a test that needs the CLI to be
 *built* before running, it's e2e — put it in `tests/e2e/`.
+
+**Framework-specific code (`src/frameworks/`).** When an app targets
+more than one UI framework, ALL code specific to a framework lives under
+`src/frameworks/<framework>/` — one directory per framework, never a
+flat `src/frameworks/<framework>.ts`. The only thing allowed directly
+under `src/frameworks/` is the agnostic seam (the adapter interface +
+the id→adapter registry), quarantined under the `_`-prefixed
+`src/frameworks/_core/`. Commands and emitters depend only on `_core/`,
+never on a concrete `<framework>/`. Net effect: every non-`_` child of
+`src/frameworks/` is, by construction, a framework namespace — the rule
+is mechanically checkable, not a judgement call. (Today only
+`apps/mech-pencil` has this surface; see its README for the live tree.)
 
 ## Required `package.json` shape
 

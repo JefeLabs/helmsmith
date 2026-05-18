@@ -18,7 +18,7 @@
 
 import { ATOMIC_ORDER, type BuildContext } from '../design-system/atomic.ts';
 import type { TokenSet } from '../design-system/tokens.ts';
-import type { FrameworkAdapter, MockupContext } from '../frameworks/adapter.ts';
+import type { FrameworkAdapter, MockupContext } from '../frameworks/_core/adapter.ts';
 import { frame } from '../pen/builder.ts';
 import { PenDocument } from '../pen/document.ts';
 import type { Child, VariableDecl } from '../pen/schema.ts';

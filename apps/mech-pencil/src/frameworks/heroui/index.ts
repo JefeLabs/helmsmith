@@ -16,7 +16,7 @@ import type { ComponentSpec } from '../../design-system/atomic.ts';
 import type { TokenSet } from '../../design-system/tokens.ts';
 import { frame, ref, text } from '../../pen/builder.ts';
 import type { Child } from '../../pen/schema.ts';
-import type { FrameworkAdapter, MockupContext, MockupSpec } from '../adapter.ts';
+import type { FrameworkAdapter, MockupContext, MockupSpec } from '../_core/adapter.ts';
 import { catalogStats, heroUIComponents } from './catalog.ts';
 import { type DeriveResult, deriveHeroUITokens } from './derive.ts';
 

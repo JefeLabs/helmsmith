@@ -9,7 +9,7 @@
 
 import { resolve } from 'node:path';
 import { emitDocument } from '../emit/document.ts';
-import { getFramework } from '../frameworks/registry.ts';
+import { getFramework } from '../frameworks/_core/registry.ts';
 import { dim, err, heading, ok, warn } from '../ui.ts';
 import { documentPath, writeText } from '../lib/workspace.ts';
 

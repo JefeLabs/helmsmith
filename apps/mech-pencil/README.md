@@ -129,21 +129,29 @@ src/
 ├── theme/          HeroUI Themes `generateThemeColors` port (config + generate)
 ├── brand/          brand.json schema → token variables
 ├── design-system/  framework-agnostic token + atomic model
-├── frameworks/
-│   ├── adapter.ts        FrameworkAdapter seam + registry (heroui, heroui-pro)
-│   └── heroui/
-│       ├── catalog.ts    71-component catalog; RICH builder registry;
-│       │                 React names + category + atomic + metadata
-│       ├── components/   the builders: button, card, primitives, controls,
-│       │                 display, complex, stub  (run at generation time)
-│       ├── tokens.ts / derive.ts   HeroUI v3 token data + shared derive engine
-│       └── library/      COMMITTED baked output (build-library) — reused by bundle
+├── frameworks/     every child is a framework namespace `<id>/`, except
+│   ├── _core/      `_`-prefixed agnostic seam: adapter.ts + registry.ts
+│   ├── heroui/
+│   │   ├── index.ts      the FrameworkAdapter implementation
+│   │   ├── catalog.ts    71-component catalog; RICH builder registry;
+│   │   │                 React names + category + atomic + metadata
+│   │   ├── components/   the builders: button, card, primitives, controls,
+│   │   │                 display, complex, stub  (run at generation time)
+│   │   ├── tokens.ts / derive.ts   HeroUI v3 token data + shared derive engine
+│   │   └── library/      COMMITTED baked output (build-library) — reused by bundle
+│   └── heroui-pro/ index.ts — reuses heroui's tokens/components/mockups
 ├── emit/           document (init/theme) · brand · bundle
 └── commands/       one file per CLI verb
 ```
 
-Adding a framework = implement `FrameworkAdapter`, register it in
-`src/frameworks/registry.ts`. Adding/altering a component = edit a
+All framework-specific code lives under `frameworks/<id>/` (one
+directory per framework). The framework-agnostic seam is the sole
+exception and is quarantined under the `_`-prefixed `frameworks/_core/`,
+so every non-`_` child of `frameworks/` is a framework by construction.
+
+Adding a framework = create `src/frameworks/<id>/index.ts` implementing
+`FrameworkAdapter`, register it in `src/frameworks/_core/registry.ts`.
+Adding/altering a component = edit a
 `components/*.ts` builder (or the `RICH` map in `catalog.ts`), then
 `mech-pencil build-library` and commit the regenerated library.
 

@@ -7,7 +7,7 @@
 
 import { resolve } from 'node:path';
 import { emitDocument } from '../emit/document.ts';
-import type { FrameworkAdapter } from '../frameworks/adapter.ts';
+import type { FrameworkAdapter } from '../frameworks/_core/adapter.ts';
 import { heroUIAdapter } from '../frameworks/heroui/index.ts';
 import { documentPath, writeText } from '../lib/workspace.ts';
 import { type ThemeConfig, resolveTheme } from '../theme/config.ts';
