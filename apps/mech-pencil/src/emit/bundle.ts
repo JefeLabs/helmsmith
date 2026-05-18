@@ -309,8 +309,11 @@ export function emitBundle(cfg: ThemeConfig): EmittedBundle {
     };
   });
 
-  // LAYER 4: each mock — local copies of only the components it uses.
-  const byId = new Map(specs.map((s) => [s.id, s]));
+  // LAYER 4: each mock embeds the FULL local component palette (all 71,
+  // organized) — every component is a local `reusable` node, so it
+  // shows in Pencil's component panel and can be dragged onto the
+  // screen AND customized (local ⇒ `descendants` work; cross-file
+  // would not). `used` is just what the prebuilt screen references.
   const mocks: EmittedBundle['mocks'] = [];
   for (const spec of heroUIAdapter.mockups?.() ?? []) {
     const screenNodes = spec.build({
@@ -320,9 +323,6 @@ export function emitBundle(cfg: ThemeConfig): EmittedBundle {
 
     const used = new Set<string>();
     for (const n of screenNodes) collectRefs(n, used);
-    const usedSpecs = [...used]
-      .map((id) => byId.get(id))
-      .filter((s): s is ComponentSpec => Boolean(s));
 
     const mockSource = (s: ComponentSpec) => [
       ...dsSource(s),
@@ -342,8 +342,11 @@ export function emitBundle(cfg: ThemeConfig): EmittedBundle {
           fill: `$${ALIAS}:color.background`,
         },
         [
-          headingNode(`mock-${spec.slug}-ctitle`, 'Components (local — customizable)'),
-          ...atomicSections(`m-${spec.slug}`, usedSpecs, ctx, mockSource),
+          headingNode(
+            `mock-${spec.slug}-ctitle`,
+            `Components · ${specs.length} (drag any onto the screen — local & editable)`,
+          ),
+          ...atomicSections(`m-${spec.slug}`, specs, ctx, mockSource),
         ],
       ),
     );

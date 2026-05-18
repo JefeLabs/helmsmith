@@ -69,6 +69,11 @@ describe('emitBundle', () => {
     const json = JSON.stringify(hp?.doc.toObject().children);
     expect(json).toContain('"id":"button"');
     expect(json).toContain('"id":"card"');
+    // FULL local palette — components the screen does NOT use are still
+    // embedded (so they show in Pencil's panel and can be dragged in)
+    for (const id of ['table', 'modal', 'date-range-picker', 'toast', 'select']) {
+      expect(json).toContain(`"id":"${id}"`);
+    }
     // button = atom / Buttons category → provenance through the new layout
     expect(json).toContain(
       '"source":["design-tokens.lib.pen","core/buttons.lib.pen","design-system/atoms.lib.pen","mocks/homepage.pen"]',
