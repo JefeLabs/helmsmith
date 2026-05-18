@@ -144,13 +144,17 @@ export interface BundleFile {
 export interface EmittedBundle {
   /** LAYER 1 — variables only; the swappable brand/token source. */
   brand: BundleFile;
-  /** LAYER 3 — `.lib.pen` aggregate of all components, atomic-organized,
-   * imports brand (import-only) + a `.preview.pen` twin (regular
-   * `.pen`, themes standalone — the browse-everything file). Custom
-   * components added to the catalog flow into both automatically. */
-  designSystem: BundleFile & { preview: BundleFile };
-  /** LAYER 2 — one `.lib.pen` per HeroUI category (import-only) plus a
-   * `.preview.pen` viewable twin (regular `.pen`, themes standalone). */
+  /** LAYER 3 — `design-system/` folder: ONE file per atomic level
+   * (atoms/molecules/organisms/templates), each an import-only
+   * `.lib.pen` + a `.preview.pen` viewable twin. */
+  designSystem: (BundleFile & {
+    level: string;
+    count: number;
+    preview: BundleFile;
+  })[];
+  /** LAYER 2 — `core/` folder: one `.lib.pen` per HeroUI category
+   * (import-only) + a `.preview.pen` viewable twin. (Internal field
+   * name `groups` retained; the emitted folder is `core/`.) */
   groups: (BundleFile & {
     category: string;
     count: number;
@@ -174,12 +178,14 @@ export function emitBundle(cfg: ThemeConfig): EmittedBundle {
   };
 
   // Provenance chains (metadata.source) up the layering.
-  const groupFile = (s: ComponentSpec) => `groups/${slugify(s.category)}.lib.pen`;
-  const groupSource = (s: ComponentSpec) => [BRAND_FILE, groupFile(s)];
+  // (Internal field stays `groups`; the emitted folder is `core/`.)
+  const coreFile = (s: ComponentSpec) => `core/${slugify(s.category)}.lib.pen`;
+  const dsLevelFile = (s: ComponentSpec) => `design-system/${s.level}s.lib.pen`;
+  const groupSource = (s: ComponentSpec) => [BRAND_FILE, coreFile(s)];
   const dsSource = (s: ComponentSpec) => [
     BRAND_FILE,
-    groupFile(s),
-    'design-system.lib.pen',
+    coreFile(s),
+    dsLevelFile(s),
   ];
 
   // LAYER 2: one .lib.pen per HeroUI category, atomic-ordered inside.
@@ -216,76 +222,92 @@ export function emitBundle(cfg: ThemeConfig): EmittedBundle {
     preview.add(structuredClone(groupFrame));
 
     groups.push({
-      path: `groups/${slug}.lib.pen`,
+      path: `core/${slug}.lib.pen`,
       category,
       count: inCat.length,
       doc: lib,
       validation: validateDocument(lib.toObject()),
       preview: {
-        path: `groups/${slug}.preview.pen`,
+        path: `core/${slug}.preview.pen`,
         doc: preview,
         validation: validateDocument(preview.toObject()),
       },
     });
   }
 
-  // The category → atomic section tree, shared by the importable
-  // design-system.lib.pen and its design-system.preview.pen twin.
-  const dsSections = (): Child[] => {
-    const sections: Child[] = [];
+  // LAYER 3: design-system/ — ONE file per atomic level
+  // (atoms/molecules/organisms/templates), each an import-only
+  // `.lib.pen` + a viewable `.preview.pen` twin. Components are local
+  // (the proven-customizable form); within a level they're grouped by
+  // HeroUI category for legibility. `templates` has no components yet
+  // — emitted as a valid placeholder so the structure is complete.
+  const levelRoot = (level: string): Child => {
+    const inLevel = specs.filter((s) => s.level === level);
+    const sections: Child[] = [
+      headingNode(`ds-${level}s-h`, `Design System · ${level}s (${inLevel.length})`),
+    ];
+    if (inLevel.length === 0) {
+      sections.push(
+        headingNode(`ds-${level}s-empty`, 'No components at this level yet.', false),
+      );
+    }
     for (const category of CATEGORY_ORDER) {
-      const inCat = specs.filter((s) => s.category === category);
+      const inCat = inLevel.filter((s) => s.category === category);
       if (inCat.length === 0) continue;
       const cslug = slugify(category);
       sections.push(
         frame(
-          `cat-${cslug}`,
-          { name: category, layout: 'vertical', width: 'fit_content', gap: 24 },
+          `ds-${level}s-${cslug}`,
+          { name: category, layout: 'vertical', width: 'fit_content', gap: 16 },
           [
-            headingNode(`cat-${cslug}-h`, category),
-            ...atomicSections(`c-${cslug}`, inCat, ctx, dsSource),
+            headingNode(`ds-${level}s-${cslug}-h`, category, false),
+            frame(
+              `ds-${level}s-${cslug}-items`,
+              { name: 'Items', layout: 'vertical', width: 'fit_content', gap: 16 },
+              inCat.map((s) => {
+                const node = s.build(ctx);
+                node.metadata = { type: 'component', ...node.metadata, source: dsSource(s) };
+                return node;
+              }),
+            ),
           ],
         ),
       );
     }
-    return sections;
-  };
-  const dsRoot = (): Child =>
-    frame(
-      'design-system',
+    return frame(
+      `design-system-${level}s`,
       {
-        name: 'Design System',
+        name: `Design System · ${level}s`,
         x: 0,
         y: 0,
         layout: 'vertical',
-        gap: 56,
+        gap: 48,
         padding: 48,
         fill: `$${ALIAS}:color.background`,
       },
-      [
-        headingNode('ds-title', `HeroUI v3 · ${specs.length} components`),
-        ...dsSections(),
-      ],
+      sections,
     );
-
-  // LAYER 3: design-system.lib.pen (import-only aggregate) + a
-  // .preview.pen twin (regular `.pen` → themes standalone; the
-  // browse-everything file). Custom components added to the catalog
-  // flow into both automatically.
-  const dsLib = new PenDocument().importLib(ALIAS, relBrand(false));
-  dsLib.add(dsRoot());
-  const dsPrev = new PenDocument().importLib(ALIAS, relBrand(false));
-  dsPrev.add(dsRoot()); // fresh tree (dsRoot builds new nodes each call)
-  const designSystem: EmittedBundle['designSystem'] = {
-    path: 'design-system.lib.pen',
-    doc: dsLib,
-    validation: validateDocument(dsLib.toObject()),
-    preview: {
-      path: 'design-system.preview.pen',
-      doc: dsPrev,
-      validation: validateDocument(dsPrev.toObject()),
-    },
   };
+
+  const designSystem: EmittedBundle['designSystem'] = ATOMIC_ORDER.map((level) => {
+    const lvl = `${level}s`;
+    const lib = new PenDocument().importLib(ALIAS, relBrand(true));
+    lib.add(levelRoot(level));
+    const prev = new PenDocument().importLib(ALIAS, relBrand(true));
+    prev.add(levelRoot(level)); // fresh tree (levelRoot rebuilds each call)
+    return {
+      level: lvl,
+      count: specs.filter((s) => s.level === level).length,
+      path: `design-system/${lvl}.lib.pen`,
+      doc: lib,
+      validation: validateDocument(lib.toObject()),
+      preview: {
+        path: `design-system/${lvl}.preview.pen`,
+        doc: prev,
+        validation: validateDocument(prev.toObject()),
+      },
+    };
+  });
 
   // LAYER 4: each mock — local copies of only the components it uses.
   const byId = new Map(specs.map((s) => [s.id, s]));

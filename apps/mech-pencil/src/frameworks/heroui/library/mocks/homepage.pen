@@ -87,8 +87,8 @@
                     "category": "Buttons",
                     "source": [
                       "design-tokens.lib.pen",
-                      "groups/buttons.lib.pen",
-                      "design-system.lib.pen",
+                      "core/buttons.lib.pen",
+                      "design-system/atoms.lib.pen",
                       "mocks/homepage.pen"
                     ]
                   }
@@ -228,8 +228,8 @@
                     "category": "Layout",
                     "source": [
                       "design-tokens.lib.pen",
-                      "groups/layout.lib.pen",
-                      "design-system.lib.pen",
+                      "core/layout.lib.pen",
+                      "design-system/molecules.lib.pen",
                       "mocks/homepage.pen"
                     ]
                   }

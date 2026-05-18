@@ -62,14 +62,19 @@ Pencil to view themed. `*.lib.pen` are for importing, not previewing.
 
 ```
 out/
-├── design-tokens.lib.pen        LAYER 1  variables only — the only per-project file
-├── groups/<category>.lib.pen    LAYER 2  HeroUI Storybook categories (import tokens)
-│   └── <category>.preview.pen            viewable twin (themes standalone)
-├── design-system.lib.pen        LAYER 3  atomic aggregate of all 71 (imports tokens)
-│   └── design-system.preview.pen         viewable twin
-└── mocks/<slug>.pen             LAYER 4  imports tokens; LOCAL component copies +
-                                          screen — customizable, brand-linked
+├── design-tokens.lib.pen          LAYER 1  variables only — the only per-project file
+├── core/<category>.lib.pen        LAYER 2  HeroUI Storybook categories (import tokens)
+│   └── core/<category>.preview.pen          viewable twin (themes standalone)
+├── design-system/<level>.lib.pen  LAYER 3  one file per atomic level —
+│   └── design-system/<level>.preview.pen     atoms · molecules · organisms ·
+│                                              templates (+ viewable twins)
+└── mocks/<slug>.pen               LAYER 4  imports tokens; LOCAL component copies +
+                                            screen — customizable, brand-linked
 ```
+
+(`<level>` = `atoms` | `molecules` | `organisms` | `templates`;
+`templates` is an empty placeholder until template-level components
+exist.)
 
 Components reference tokens cross-file as `$tokens:color.accent`,
 `$tokens:radius.md`, … Swap or regenerate `design-tokens.lib.pen`
@@ -78,8 +83,8 @@ no other file changes.
 
 ## Generate vs. reuse
 
-The HeroUI component layer (groups, design-system, mock skeletons +
-their previews) is **theme-invariant** — pure `$tokens:` references,
+The HeroUI component layer (`core/`, `design-system/`, mock skeletons
++ their previews) is **theme-invariant** — pure `$tokens:` references,
 byte-identical across every theme (enforced by a regression test). So
 it's generated **once** and committed at
 `src/frameworks/heroui/library/` (shipped via `package.json#files`).

@@ -5,14 +5,14 @@ import { emitBundle } from './bundle.ts';
 describe('emitBundle', () => {
   const b = emitBundle(resolveTheme({ accent: '#3f5694' }));
 
-  it('every non-brand file is theme-INVARIANT (the reuse guarantee)', () => {
+  it('every non-token file is theme-INVARIANT (the reuse guarantee)', () => {
     const a = emitBundle(resolveTheme({ accent: '#3f5694' }));
     const z = emitBundle(
       resolveTheme({ accent: '#aa0000', base: 0.02, radius: 'large', fontFamily: 'instrument-sans' }),
     );
     const nonBrand = (e: typeof a) => [
-      e.designSystem,
-      e.designSystem.preview,
+      ...e.designSystem,
+      ...e.designSystem.map((d) => d.preview),
       ...e.groups,
       ...e.groups.map((g) => g.preview),
       ...e.mocks,
@@ -20,7 +20,7 @@ describe('emitBundle', () => {
     const dump = (e: typeof a) =>
       nonBrand(e).map((f) => `${f.path}\n${f.doc.toJSON()}`).join('\n');
     expect(dump(a)).toBe(dump(z)); // identical regardless of theme
-    expect(a.brand.doc.toJSON()).not.toBe(z.brand.doc.toJSON()); // only brand changes
+    expect(a.brand.doc.toJSON()).not.toBe(z.brand.doc.toJSON()); // only tokens change
   });
 
   it('LAYER 1 design-tokens.lib.pen is variables-only and valid', () => {
@@ -31,43 +31,36 @@ describe('emitBundle', () => {
     expect(b.brand.validation.ok).toBe(true);
   });
 
-  it('LAYER 2: one valid .lib.pen per HeroUI category, importing brand', () => {
+  it('LAYER 2: core/<category>.lib.pen + .preview.pen, importing tokens', () => {
     expect(b.groups.length).toBe(15);
     const buttons = b.groups.find((g) => g.category === 'Buttons');
-    expect(buttons?.path).toBe('groups/buttons.lib.pen');
+    expect(buttons?.path).toBe('core/buttons.lib.pen');
     expect(buttons?.doc.toObject().imports).toEqual({ tokens: '../design-tokens.lib.pen' });
-    expect(b.groups.every((g) => g.validation.ok)).toBe(true);
+    expect(buttons?.preview.path).toBe('core/buttons.preview.pen');
+    expect(b.groups.every((g) => g.validation.ok && g.preview.validation.ok)).toBe(true);
     expect(b.groups.reduce((n, g) => n + g.count, 0)).toBe(71);
-
-    // each lib has a viewable .preview.pen twin (same content, regular .pen)
-    expect(buttons?.preview.path).toBe('groups/buttons.preview.pen');
-    expect(buttons?.preview.doc.toObject().imports).toEqual({ tokens: '../design-tokens.lib.pen' });
-    expect(b.groups.every((g) => g.preview.validation.ok)).toBe(true);
-    const lib = JSON.stringify(buttons?.doc.toObject().children);
-    const pv = JSON.stringify(buttons?.preview.doc.toObject().children);
-    expect(pv).toBe(lib); // identical content, only the file role differs
-  });
-
-  it('LAYER 3 design-system.lib.pen aggregates all 71 + has a .preview.pen twin', () => {
-    expect(b.designSystem.path).toBe('design-system.lib.pen');
-    expect(b.designSystem.doc.toObject().imports).toEqual({ tokens: './design-tokens.lib.pen' });
-    expect(b.designSystem.validation.ok).toBe(true);
-
-    const pv = b.designSystem.preview;
-    expect(pv.path).toBe('design-system.preview.pen');
-    expect(pv.doc.toObject().imports).toEqual({ tokens: './design-tokens.lib.pen' });
-    expect(pv.validation.ok).toBe(true);
-    // twin = identical content, only the file role differs
-    expect(JSON.stringify(pv.doc.toObject().children)).toBe(
-      JSON.stringify(b.designSystem.doc.toObject().children),
+    expect(JSON.stringify(buttons?.preview.doc.toObject().children)).toBe(
+      JSON.stringify(buttons?.doc.toObject().children),
     );
-    const json = JSON.stringify(pv.doc.toObject());
-    for (const id of ['button', 'card', 'list-box', 'date-range-picker', 'toast']) {
-      expect(json).toContain(`"id":"${id}"`);
-    }
   });
 
-  it('LAYER 4 mock: local components, brand-linked, with provenance', () => {
+  it('LAYER 3: design-system/ one file per atomic level + previews', () => {
+    const levels = b.designSystem.map((d) => d.level).sort();
+    expect(levels).toEqual(['atoms', 'molecules', 'organisms', 'templates']);
+    const atoms = b.designSystem.find((d) => d.level === 'atoms');
+    expect(atoms?.path).toBe('design-system/atoms.lib.pen');
+    expect(atoms?.preview.path).toBe('design-system/atoms.preview.pen');
+    expect(atoms?.doc.toObject().imports).toEqual({ tokens: '../design-tokens.lib.pen' });
+    expect((atoms?.count ?? 0)).toBeGreaterThan(0);
+    // templates has no components yet but is still a valid placeholder
+    const templates = b.designSystem.find((d) => d.level === 'templates');
+    expect(templates?.count).toBe(0);
+    expect(b.designSystem.every((d) => d.validation.ok && d.preview.validation.ok)).toBe(true);
+    // every component lands in exactly one level file
+    expect(b.designSystem.reduce((n, d) => n + d.count, 0)).toBe(71);
+  });
+
+  it('LAYER 4 mock: local components, token-linked, provenance up the chain', () => {
     const hp = b.mocks.find((m) => m.path === 'mocks/homepage.pen');
     expect(hp).toBeTruthy();
     expect(hp?.components.sort()).toEqual(['button', 'card']);
@@ -76,11 +69,10 @@ describe('emitBundle', () => {
     const json = JSON.stringify(hp?.doc.toObject().children);
     expect(json).toContain('"id":"button"');
     expect(json).toContain('"id":"card"');
-    // provenance lineage stamped on the local components
+    // button = atom / Buttons category → provenance through the new layout
     expect(json).toContain(
-      '"source":["design-tokens.lib.pen","groups/buttons.lib.pen","design-system.lib.pen","mocks/homepage.pen"]',
+      '"source":["design-tokens.lib.pen","core/buttons.lib.pen","design-system/atoms.lib.pen","mocks/homepage.pen"]',
     );
-    // components reference brand tokens cross-file ($tokens:)
     expect(json).toContain('$tokens:color.accent');
   });
 });

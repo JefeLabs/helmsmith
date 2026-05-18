@@ -65,8 +65,8 @@ export function runBundle(options: BundleCmdOptions): void {
     }
     const all = [
       bundle.brand,
-      bundle.designSystem,
-      bundle.designSystem.preview,
+      ...bundle.designSystem,
+      ...bundle.designSystem.map((d) => d.preview),
       ...bundle.groups,
       ...bundle.groups.map((g) => g.preview),
       ...bundle.mocks,
@@ -103,7 +103,7 @@ export function runBundle(options: BundleCmdOptions): void {
   console.log(themeLine);
   console.log(ok(`${join(root, bundle.brand.path)}  ${dim('per-project (defaults + your overrides)')}`));
   console.log(
-    dim(`  + reused committed library: ${bundle.groups.length} categories (.lib+.preview) · design-system · catalog · mocks`),
+    dim(`  + reused committed library: core/ (${bundle.groups.length} categories) · design-system/ (${bundle.designSystem.length} levels) · mocks (all ×{lib,preview})`),
   );
-  console.log(dim('  open design-system.preview.pen / groups/*.preview.pen / mocks/*.pen to view themed.'));
+  console.log(dim('  open design-system/*.preview.pen / core/*.preview.pen / mocks/*.pen to view themed.'));
 }

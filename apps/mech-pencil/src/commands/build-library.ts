@@ -27,8 +27,8 @@ export function runBuildLibrary(): void {
   const b = emitBundle(resolveTheme({}));
   const files = [
     b.brand, // default design-tokens.lib.pen — makes committed previews viewable
-    b.designSystem,
-    b.designSystem.preview,
+    ...b.designSystem,
+    ...b.designSystem.map((d) => d.preview),
     ...b.groups,
     ...b.groups.map((g) => g.preview),
     ...b.mocks,
@@ -50,7 +50,7 @@ export function runBuildLibrary(): void {
   console.log(ok(dir));
   console.log(
     dim(
-      `  default design-tokens.lib.pen · design-system(.lib+.preview) · ${b.groups.length} categories (.lib+.preview) · ${b.mocks.length} mock(s)`,
+      `  design-tokens.lib.pen · design-system/ (${b.designSystem.length} levels ×{lib,preview}) · core/ (${b.groups.length} categories ×{lib,preview}) · ${b.mocks.length} mock(s)`,
     ),
   );
   console.log(dim('  commit this; `bundle` reuses it (only design-tokens.lib.pen is per-project).'));

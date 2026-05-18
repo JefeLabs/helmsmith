@@ -43,7 +43,9 @@ export function libraryDir(): string {
 }
 
 export function libraryExists(): boolean {
-  return existsSync(join(libraryDir(), 'design-system.lib.pen'));
+  // design-tokens.lib.pen is always emitted by build-library and is a
+  // stable sentinel regardless of the core/design-system layout.
+  return existsSync(join(libraryDir(), 'design-tokens.lib.pen'));
 }
 
 /**
