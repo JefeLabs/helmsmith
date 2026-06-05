@@ -1,0 +1,528 @@
+{
+  "version": "2.11",
+  "imports": {
+    "tokens": "../design-tokens.lib.pen"
+  },
+  "children": [
+    {
+      "id": "group-collections",
+      "type": "frame",
+      "name": "Collections",
+      "x": 0,
+      "y": 0,
+      "layout": "vertical",
+      "gap": 40,
+      "padding": 40,
+      "fill": "$tokens:color.background",
+      "children": [
+        {
+          "id": "group-collections-title",
+          "type": "text",
+          "content": "Collections · HeroUI v3",
+          "fill": "$tokens:color.foreground",
+          "fontFamily": "$tokens:font.family",
+          "fontSize": 24,
+          "fontWeight": "700"
+        },
+        {
+          "id": "g-collections-molecule",
+          "type": "frame",
+          "name": "molecules",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "g-collections-molecule-h",
+              "type": "text",
+              "content": "MOLECULES",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "g-collections-molecule-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "tag-group",
+                  "type": "frame",
+                  "name": "TagGroup",
+                  "layout": "horizontal",
+                  "width": "fit_content",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "id": "tag-group-0",
+                      "type": "frame",
+                      "name": "Design",
+                      "layout": "horizontal",
+                      "width": "fit_content",
+                      "alignItems": "center",
+                      "gap": 6,
+                      "padding": [
+                        10,
+                        5
+                      ],
+                      "cornerRadius": 9999,
+                      "fill": "$tokens:color.accent-soft",
+                      "children": [
+                        {
+                          "id": "tag-group-0-label",
+                          "type": "text",
+                          "content": "Design",
+                          "fill": "$tokens:color.accent",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
+                          "fontWeight": "500"
+                        },
+                        {
+                          "id": "tag-group-0-x",
+                          "type": "text",
+                          "content": "✕",
+                          "fill": "$tokens:color.accent",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": 11
+                        }
+                      ]
+                    },
+                    {
+                      "id": "tag-group-1",
+                      "type": "frame",
+                      "name": "Eng",
+                      "layout": "horizontal",
+                      "width": "fit_content",
+                      "alignItems": "center",
+                      "gap": 6,
+                      "padding": [
+                        10,
+                        5
+                      ],
+                      "cornerRadius": 9999,
+                      "fill": "$tokens:color.accent-soft",
+                      "children": [
+                        {
+                          "id": "tag-group-1-label",
+                          "type": "text",
+                          "content": "Eng",
+                          "fill": "$tokens:color.accent",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
+                          "fontWeight": "500"
+                        },
+                        {
+                          "id": "tag-group-1-x",
+                          "type": "text",
+                          "content": "✕",
+                          "fill": "$tokens:color.accent",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": 11
+                        }
+                      ]
+                    },
+                    {
+                      "id": "tag-group-2",
+                      "type": "frame",
+                      "name": "Ops",
+                      "layout": "horizontal",
+                      "width": "fit_content",
+                      "alignItems": "center",
+                      "gap": 6,
+                      "padding": [
+                        10,
+                        5
+                      ],
+                      "cornerRadius": 9999,
+                      "fill": "$tokens:color.accent-soft",
+                      "children": [
+                        {
+                          "id": "tag-group-2-label",
+                          "type": "text",
+                          "content": "Ops",
+                          "fill": "$tokens:color.accent",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
+                          "fontWeight": "500"
+                        },
+                        {
+                          "id": "tag-group-2-x",
+                          "type": "text",
+                          "content": "✕",
+                          "fill": "$tokens:color.accent",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": 11
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "TagGroup",
+                    "package": "@heroui/react",
+                    "slug": "tag-group",
+                    "category": "Collections",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/collections.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "g-collections-organism",
+          "type": "frame",
+          "name": "organisms",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "g-collections-organism-h",
+              "type": "text",
+              "content": "ORGANISMS",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "g-collections-organism-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "list-box",
+                  "type": "frame",
+                  "name": "ListBox",
+                  "width": 260,
+                  "layout": "vertical",
+                  "padding": 6,
+                  "fill": "$tokens:color.surface",
+                  "cornerRadius": "$tokens:radius.md",
+                  "stroke": {
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
+                  },
+                  "children": [
+                    {
+                      "id": "list-box-0",
+                      "type": "frame",
+                      "name": "Profile",
+                      "layout": "horizontal",
+                      "width": "fill_container",
+                      "alignItems": "center",
+                      "padding": [
+                        10,
+                        8
+                      ],
+                      "cornerRadius": "$tokens:radius.sm",
+                      "fill": "transparent",
+                      "children": [
+                        {
+                          "id": "list-box-0-l",
+                          "type": "text",
+                          "content": "Profile",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md",
+                          "fontWeight": "400"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "list-box-1",
+                      "type": "frame",
+                      "name": "Billing",
+                      "layout": "horizontal",
+                      "width": "fill_container",
+                      "alignItems": "center",
+                      "padding": [
+                        10,
+                        8
+                      ],
+                      "cornerRadius": "$tokens:radius.sm",
+                      "fill": "$tokens:color.accent-soft",
+                      "children": [
+                        {
+                          "id": "list-box-1-l",
+                          "type": "text",
+                          "content": "Billing",
+                          "fill": "$tokens:color.accent",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md",
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "list-box-2",
+                      "type": "frame",
+                      "name": "Team",
+                      "layout": "horizontal",
+                      "width": "fill_container",
+                      "alignItems": "center",
+                      "padding": [
+                        10,
+                        8
+                      ],
+                      "cornerRadius": "$tokens:radius.sm",
+                      "fill": "transparent",
+                      "children": [
+                        {
+                          "id": "list-box-2-l",
+                          "type": "text",
+                          "content": "Team",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md",
+                          "fontWeight": "400"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "list-box-3",
+                      "type": "frame",
+                      "name": "Settings",
+                      "layout": "horizontal",
+                      "width": "fill_container",
+                      "alignItems": "center",
+                      "padding": [
+                        10,
+                        8
+                      ],
+                      "cornerRadius": "$tokens:radius.sm",
+                      "fill": "transparent",
+                      "children": [
+                        {
+                          "id": "list-box-3-l",
+                          "type": "text",
+                          "content": "Settings",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md",
+                          "fontWeight": "400"
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "organism",
+                    "fidelity": "full",
+                    "react": "ListBox",
+                    "package": "@heroui/react",
+                    "slug": "list-box",
+                    "category": "Collections",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/collections.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "dropdown",
+                  "type": "frame",
+                  "name": "Dropdown",
+                  "width": 260,
+                  "layout": "vertical",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "id": "dropdown-trigger",
+                      "type": "frame",
+                      "name": "Actions  ▾",
+                      "layout": "horizontal",
+                      "width": "fit_content",
+                      "alignItems": "center",
+                      "justifyContent": "center",
+                      "padding": [
+                        16,
+                        10
+                      ],
+                      "cornerRadius": "$tokens:radius.md",
+                      "fill": "$tokens:color.surface",
+                      "stroke": {
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
+                      },
+                      "children": [
+                        {
+                          "id": "dropdown-trigger-l",
+                          "type": "text",
+                          "content": "Actions  ▾",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md",
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "dropdown-menu",
+                      "type": "frame",
+                      "name": "Menu",
+                      "width": 260,
+                      "layout": "vertical",
+                      "padding": 6,
+                      "fill": "$tokens:color.surface",
+                      "cornerRadius": "$tokens:radius.md",
+                      "stroke": {
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
+                      },
+                      "effect": {
+                        "type": "shadow",
+                        "shadowType": "outer",
+                        "offset": {
+                          "x": 0,
+                          "y": 8
+                        },
+                        "blur": 24,
+                        "spread": 0,
+                        "color": "#00000026"
+                      },
+                      "children": [
+                        {
+                          "id": "dropdown-menu-0",
+                          "type": "frame",
+                          "name": "Edit",
+                          "layout": "horizontal",
+                          "width": "fill_container",
+                          "alignItems": "center",
+                          "padding": [
+                            10,
+                            8
+                          ],
+                          "cornerRadius": "$tokens:radius.sm",
+                          "fill": "transparent",
+                          "children": [
+                            {
+                              "id": "dropdown-menu-0-l",
+                              "type": "text",
+                              "content": "Edit",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
+                              "fontWeight": "400"
+                            }
+                          ]
+                        },
+                        {
+                          "id": "dropdown-menu-1",
+                          "type": "frame",
+                          "name": "Duplicate",
+                          "layout": "horizontal",
+                          "width": "fill_container",
+                          "alignItems": "center",
+                          "padding": [
+                            10,
+                            8
+                          ],
+                          "cornerRadius": "$tokens:radius.sm",
+                          "fill": "transparent",
+                          "children": [
+                            {
+                              "id": "dropdown-menu-1-l",
+                              "type": "text",
+                              "content": "Duplicate",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
+                              "fontWeight": "400"
+                            }
+                          ]
+                        },
+                        {
+                          "id": "dropdown-menu-2",
+                          "type": "frame",
+                          "name": "Archive",
+                          "layout": "horizontal",
+                          "width": "fill_container",
+                          "alignItems": "center",
+                          "padding": [
+                            10,
+                            8
+                          ],
+                          "cornerRadius": "$tokens:radius.sm",
+                          "fill": "transparent",
+                          "children": [
+                            {
+                              "id": "dropdown-menu-2-l",
+                              "type": "text",
+                              "content": "Archive",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
+                              "fontWeight": "400"
+                            }
+                          ]
+                        },
+                        {
+                          "id": "dropdown-menu-3",
+                          "type": "frame",
+                          "name": "Delete",
+                          "layout": "horizontal",
+                          "width": "fill_container",
+                          "alignItems": "center",
+                          "padding": [
+                            10,
+                            8
+                          ],
+                          "cornerRadius": "$tokens:radius.sm",
+                          "fill": "transparent",
+                          "children": [
+                            {
+                              "id": "dropdown-menu-3-l",
+                              "type": "text",
+                              "content": "Delete",
+                              "fill": "$tokens:color.foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": "$tokens:font.size-md",
+                              "fontWeight": "400"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "organism",
+                    "fidelity": "full",
+                    "react": "Dropdown",
+                    "package": "@heroui/react",
+                    "slug": "dropdown",
+                    "category": "Collections",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/collections.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

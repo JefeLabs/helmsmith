@@ -1,0 +1,9 @@
+dist/
+node_modules/
+coverage/
+*.tsbuildinfo
+
+# Generated Pencil output — regenerate via `mech-pencil init|theme|brand|bundle`.
+# (examples/ stays a scratch area; brand-sample.json + *.png stay tracked.)
+examples/*.pen
+examples/**/*.pen

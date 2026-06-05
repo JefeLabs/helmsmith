@@ -52,8 +52,11 @@ export interface KeybindingEntry {
    *  match a class of keys (e.g. any digit) and dispatch on the value.
    *  Return `false` to indicate the handler declined to consume the
    *  key — dispatch will continue to the next matching binding. Any
-   *  other return value (including `undefined`) counts as consumed. */
-  handler: (key: KeyEvent) => undefined | false;
+   *  other return value (including `undefined`) counts as consumed.
+   *  `void` is in the union because every caller passes a `() => void`
+   *  handler — opting out via `false` is the rare, explicit case. */
+  // biome-ignore lint/suspicious/noConfusingVoidType: the union is intentional — `void` keeps the ubiquitous `() => void` handlers assignable, `false` is the documented decline signal the dispatch loop reads.
+  handler: (key: KeyEvent) => void | false;
 }
 
 interface KeyboardContextValue {
@@ -134,7 +137,8 @@ export interface UseKeybindingOptions {
 export function useKeybinding(
   match: KeyMatcher,
   label: string,
-  handler: (key: KeyEvent) => undefined | false,
+  // biome-ignore lint/suspicious/noConfusingVoidType: matches KeybindingEntry.handler — `void` keeps `() => void` callers assignable, `false` is the decline signal.
+  handler: (key: KeyEvent) => void | false,
   opts: UseKeybindingOptions = {},
 ): void {
   const ctx = useContext(KeyboardContext);

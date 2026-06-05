@@ -1,0 +1,39 @@
+{
+  "version": "2.11",
+  "imports": {
+    "tokens": "../design-tokens.lib.pen"
+  },
+  "children": [
+    {
+      "id": "design-system-templates",
+      "type": "frame",
+      "name": "Design System · templates",
+      "x": 0,
+      "y": 0,
+      "layout": "vertical",
+      "gap": 48,
+      "padding": 48,
+      "fill": "$tokens:color.background",
+      "children": [
+        {
+          "id": "ds-templates-h",
+          "type": "text",
+          "content": "Design System · templates (0)",
+          "fill": "$tokens:color.foreground",
+          "fontFamily": "$tokens:font.family",
+          "fontSize": 24,
+          "fontWeight": "700"
+        },
+        {
+          "id": "ds-templates-empty",
+          "type": "text",
+          "content": "No components at this level yet.",
+          "fill": "$tokens:color.muted",
+          "fontFamily": "$tokens:font.family",
+          "fontSize": 13,
+          "fontWeight": "600"
+        }
+      ]
+    }
+  ]
+}

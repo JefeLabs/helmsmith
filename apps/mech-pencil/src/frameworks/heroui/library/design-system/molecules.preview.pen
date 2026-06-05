@@ -1,0 +1,2380 @@
+{
+  "version": "2.11",
+  "imports": {
+    "tokens": "../design-tokens.lib.pen"
+  },
+  "children": [
+    {
+      "id": "design-system-molecules",
+      "type": "frame",
+      "name": "Design System · molecules",
+      "x": 0,
+      "y": 0,
+      "layout": "vertical",
+      "gap": 48,
+      "padding": 48,
+      "fill": "$tokens:color.background",
+      "children": [
+        {
+          "id": "ds-molecules-h",
+          "type": "text",
+          "content": "Design System · molecules (24)",
+          "fill": "$tokens:color.foreground",
+          "fontFamily": "$tokens:font.family",
+          "fontSize": 24,
+          "fontWeight": "700"
+        },
+        {
+          "id": "ds-molecules-buttons",
+          "type": "frame",
+          "name": "Buttons",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "ds-molecules-buttons-h",
+              "type": "text",
+              "content": "Buttons",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "ds-molecules-buttons-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "button-group",
+                  "type": "frame",
+                  "name": "ButtonGroup",
+                  "layout": "horizontal",
+                  "width": "fit_content",
+                  "cornerRadius": "$tokens:radius.md",
+                  "clip": true,
+                  "children": [
+                    {
+                      "id": "button-group-0",
+                      "type": "frame",
+                      "name": "Day",
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "justifyContent": "center",
+                      "padding": [
+                        16,
+                        10
+                      ],
+                      "fill": "$tokens:color.accent",
+                      "stroke": {
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
+                      },
+                      "children": [
+                        {
+                          "id": "button-group-0-label",
+                          "type": "text",
+                          "content": "Day",
+                          "fill": "$tokens:color.accent-foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md",
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "button-group-1",
+                      "type": "frame",
+                      "name": "Week",
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "justifyContent": "center",
+                      "padding": [
+                        16,
+                        10
+                      ],
+                      "fill": "$tokens:color.surface",
+                      "stroke": {
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
+                      },
+                      "children": [
+                        {
+                          "id": "button-group-1-label",
+                          "type": "text",
+                          "content": "Week",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md",
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "button-group-2",
+                      "type": "frame",
+                      "name": "Month",
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "justifyContent": "center",
+                      "padding": [
+                        16,
+                        10
+                      ],
+                      "fill": "$tokens:color.surface",
+                      "stroke": {
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
+                      },
+                      "children": [
+                        {
+                          "id": "button-group-2-label",
+                          "type": "text",
+                          "content": "Month",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md",
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "ButtonGroup",
+                    "package": "@heroui/react",
+                    "slug": "button-group",
+                    "category": "Buttons",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/buttons.lib.pen",
+                      "design-system/molecules.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "toggle-button-group",
+                  "type": "frame",
+                  "name": "ToggleButtonGroup",
+                  "layout": "horizontal",
+                  "width": "fit_content",
+                  "gap": 4,
+                  "padding": 4,
+                  "cornerRadius": "$tokens:radius.md",
+                  "fill": "$tokens:color.surface",
+                  "stroke": {
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
+                  },
+                  "children": [
+                    {
+                      "id": "toggle-button-group-0",
+                      "type": "frame",
+                      "name": "B",
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "justifyContent": "center",
+                      "padding": [
+                        14,
+                        9
+                      ],
+                      "cornerRadius": "$tokens:radius.sm",
+                      "fill": "$tokens:color.accent-soft",
+                      "children": [
+                        {
+                          "id": "toggle-button-group-0-label",
+                          "type": "text",
+                          "content": "B",
+                          "fill": "$tokens:color.accent",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "toggle-button-group-1",
+                      "type": "frame",
+                      "name": "I",
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "justifyContent": "center",
+                      "padding": [
+                        14,
+                        9
+                      ],
+                      "cornerRadius": "$tokens:radius.sm",
+                      "fill": "transparent",
+                      "children": [
+                        {
+                          "id": "toggle-button-group-1-label",
+                          "type": "text",
+                          "content": "I",
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "toggle-button-group-2",
+                      "type": "frame",
+                      "name": "U",
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "justifyContent": "center",
+                      "padding": [
+                        14,
+                        9
+                      ],
+                      "cornerRadius": "$tokens:radius.sm",
+                      "fill": "transparent",
+                      "children": [
+                        {
+                          "id": "toggle-button-group-2-label",
+                          "type": "text",
+                          "content": "U",
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "ToggleButtonGroup",
+                    "package": "@heroui/react",
+                    "slug": "toggle-button-group",
+                    "category": "Buttons",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/buttons.lib.pen",
+                      "design-system/molecules.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ds-molecules-collections",
+          "type": "frame",
+          "name": "Collections",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "ds-molecules-collections-h",
+              "type": "text",
+              "content": "Collections",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "ds-molecules-collections-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "tag-group",
+                  "type": "frame",
+                  "name": "TagGroup",
+                  "layout": "horizontal",
+                  "width": "fit_content",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "id": "tag-group-0",
+                      "type": "frame",
+                      "name": "Design",
+                      "layout": "horizontal",
+                      "width": "fit_content",
+                      "alignItems": "center",
+                      "gap": 6,
+                      "padding": [
+                        10,
+                        5
+                      ],
+                      "cornerRadius": 9999,
+                      "fill": "$tokens:color.accent-soft",
+                      "children": [
+                        {
+                          "id": "tag-group-0-label",
+                          "type": "text",
+                          "content": "Design",
+                          "fill": "$tokens:color.accent",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
+                          "fontWeight": "500"
+                        },
+                        {
+                          "id": "tag-group-0-x",
+                          "type": "text",
+                          "content": "✕",
+                          "fill": "$tokens:color.accent",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": 11
+                        }
+                      ]
+                    },
+                    {
+                      "id": "tag-group-1",
+                      "type": "frame",
+                      "name": "Eng",
+                      "layout": "horizontal",
+                      "width": "fit_content",
+                      "alignItems": "center",
+                      "gap": 6,
+                      "padding": [
+                        10,
+                        5
+                      ],
+                      "cornerRadius": 9999,
+                      "fill": "$tokens:color.accent-soft",
+                      "children": [
+                        {
+                          "id": "tag-group-1-label",
+                          "type": "text",
+                          "content": "Eng",
+                          "fill": "$tokens:color.accent",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
+                          "fontWeight": "500"
+                        },
+                        {
+                          "id": "tag-group-1-x",
+                          "type": "text",
+                          "content": "✕",
+                          "fill": "$tokens:color.accent",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": 11
+                        }
+                      ]
+                    },
+                    {
+                      "id": "tag-group-2",
+                      "type": "frame",
+                      "name": "Ops",
+                      "layout": "horizontal",
+                      "width": "fit_content",
+                      "alignItems": "center",
+                      "gap": 6,
+                      "padding": [
+                        10,
+                        5
+                      ],
+                      "cornerRadius": 9999,
+                      "fill": "$tokens:color.accent-soft",
+                      "children": [
+                        {
+                          "id": "tag-group-2-label",
+                          "type": "text",
+                          "content": "Ops",
+                          "fill": "$tokens:color.accent",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
+                          "fontWeight": "500"
+                        },
+                        {
+                          "id": "tag-group-2-x",
+                          "type": "text",
+                          "content": "✕",
+                          "fill": "$tokens:color.accent",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": 11
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "TagGroup",
+                    "package": "@heroui/react",
+                    "slug": "tag-group",
+                    "category": "Collections",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/collections.lib.pen",
+                      "design-system/molecules.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ds-molecules-colors",
+          "type": "frame",
+          "name": "Colors",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "ds-molecules-colors-h",
+              "type": "text",
+              "content": "Colors",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "ds-molecules-colors-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "color-field",
+                  "type": "frame",
+                  "name": "ColorField",
+                  "width": 220,
+                  "height": 40,
+                  "layout": "horizontal",
+                  "alignItems": "center",
+                  "gap": 10,
+                  "padding": [
+                    12,
+                    0
+                  ],
+                  "cornerRadius": "$tokens:radius.md",
+                  "fill": "$tokens:color.field-background",
+                  "stroke": {
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
+                  },
+                  "children": [
+                    {
+                      "id": "color-field-sw",
+                      "type": "frame",
+                      "width": 20,
+                      "height": 20,
+                      "cornerRadius": "$tokens:radius.sm",
+                      "fill": "$tokens:color.accent"
+                    },
+                    {
+                      "id": "color-field-val",
+                      "type": "text",
+                      "content": "#3F5694",
+                      "fill": "$tokens:color.foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "ColorField",
+                    "package": "@heroui/react",
+                    "slug": "color-field",
+                    "category": "Colors",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/colors.lib.pen",
+                      "design-system/molecules.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "color-slider",
+                  "type": "frame",
+                  "name": "ColorSlider",
+                  "width": 240,
+                  "height": 16,
+                  "layout": "none",
+                  "children": [
+                    {
+                      "id": "color-slider-bar",
+                      "type": "frame",
+                      "x": 0,
+                      "y": 2,
+                      "width": 240,
+                      "height": 12,
+                      "cornerRadius": 9999,
+                      "fill": {
+                        "type": "gradient",
+                        "gradientType": "linear",
+                        "rotation": 90,
+                        "colors": [
+                          {
+                            "color": "#ff0000",
+                            "position": 0
+                          },
+                          {
+                            "color": "#00ff00",
+                            "position": 0.5
+                          },
+                          {
+                            "color": "#0000ff",
+                            "position": 1
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "id": "color-slider-thumb",
+                      "type": "frame",
+                      "x": 150,
+                      "y": 0,
+                      "width": 16,
+                      "height": 16,
+                      "cornerRadius": 9999,
+                      "fill": "$tokens:color.surface",
+                      "stroke": {
+                        "thickness": 2,
+                        "fill": "$tokens:color.border"
+                      }
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "ColorSlider",
+                    "package": "@heroui/react",
+                    "slug": "color-slider",
+                    "category": "Colors",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/colors.lib.pen",
+                      "design-system/molecules.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "color-area",
+                  "type": "frame",
+                  "name": "ColorArea",
+                  "width": 220,
+                  "height": 140,
+                  "cornerRadius": "$tokens:radius.md",
+                  "layout": "none",
+                  "fill": {
+                    "type": "gradient",
+                    "gradientType": "linear",
+                    "rotation": 90,
+                    "colors": [
+                      {
+                        "color": "#ffffff",
+                        "position": 0
+                      },
+                      {
+                        "color": "$tokens:color.accent",
+                        "position": 1
+                      }
+                    ]
+                  },
+                  "children": [
+                    {
+                      "id": "color-area-thumb",
+                      "type": "frame",
+                      "x": 150,
+                      "y": 40,
+                      "width": 16,
+                      "height": 16,
+                      "cornerRadius": 9999,
+                      "fill": "#00000000",
+                      "stroke": {
+                        "thickness": 2,
+                        "fill": "#ffffff"
+                      }
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "ColorArea",
+                    "package": "@heroui/react",
+                    "slug": "color-area",
+                    "category": "Colors",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/colors.lib.pen",
+                      "design-system/molecules.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "color-swatch-picker",
+                  "type": "frame",
+                  "name": "ColorSwatchPicker",
+                  "layout": "horizontal",
+                  "width": "fit_content",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "id": "color-swatch-picker-0",
+                      "type": "frame",
+                      "width": 28,
+                      "height": 28,
+                      "cornerRadius": "$tokens:radius.sm",
+                      "fill": "#c2453f",
+                      "stroke": {
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
+                      }
+                    },
+                    {
+                      "id": "color-swatch-picker-1",
+                      "type": "frame",
+                      "width": 28,
+                      "height": 28,
+                      "cornerRadius": "$tokens:radius.sm",
+                      "fill": "#c98a2e",
+                      "stroke": {
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
+                      }
+                    },
+                    {
+                      "id": "color-swatch-picker-2",
+                      "type": "frame",
+                      "width": 28,
+                      "height": 28,
+                      "cornerRadius": "$tokens:radius.sm",
+                      "fill": "#2f9e6e",
+                      "stroke": {
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
+                      }
+                    },
+                    {
+                      "id": "color-swatch-picker-3",
+                      "type": "frame",
+                      "width": 28,
+                      "height": 28,
+                      "cornerRadius": "$tokens:radius.sm",
+                      "fill": "#3a72b8",
+                      "stroke": {
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
+                      }
+                    },
+                    {
+                      "id": "color-swatch-picker-4",
+                      "type": "frame",
+                      "width": 28,
+                      "height": 28,
+                      "cornerRadius": "$tokens:radius.sm",
+                      "fill": "#3f5694",
+                      "stroke": {
+                        "thickness": 2,
+                        "fill": "$tokens:color.foreground"
+                      }
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "ColorSwatchPicker",
+                    "package": "@heroui/react",
+                    "slug": "color-swatch-picker",
+                    "category": "Colors",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/colors.lib.pen",
+                      "design-system/molecules.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ds-molecules-date-and-time",
+          "type": "frame",
+          "name": "Date and Time",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "ds-molecules-date-and-time-h",
+              "type": "text",
+              "content": "Date and Time",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "ds-molecules-date-and-time-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "date-field",
+                  "type": "frame",
+                  "name": "DateField",
+                  "width": 220,
+                  "height": 40,
+                  "layout": "horizontal",
+                  "alignItems": "center",
+                  "justifyContent": "space_between",
+                  "padding": [
+                    12,
+                    0
+                  ],
+                  "cornerRadius": "$tokens:radius.md",
+                  "fill": "$tokens:color.field-background",
+                  "stroke": {
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
+                  },
+                  "children": [
+                    {
+                      "id": "date-field-val",
+                      "type": "text",
+                      "content": "MM / DD / YYYY",
+                      "fill": "$tokens:color.field-placeholder",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md"
+                    },
+                    {
+                      "id": "date-field-icon",
+                      "type": "text",
+                      "content": "▦",
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "DateField",
+                    "package": "@heroui/react",
+                    "slug": "date-field",
+                    "category": "Date and Time",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/date-and-time.lib.pen",
+                      "design-system/molecules.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "time-field",
+                  "type": "frame",
+                  "name": "TimeField",
+                  "width": 220,
+                  "height": 40,
+                  "layout": "horizontal",
+                  "alignItems": "center",
+                  "justifyContent": "space_between",
+                  "padding": [
+                    12,
+                    0
+                  ],
+                  "cornerRadius": "$tokens:radius.md",
+                  "fill": "$tokens:color.field-background",
+                  "stroke": {
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
+                  },
+                  "children": [
+                    {
+                      "id": "time-field-val",
+                      "type": "text",
+                      "content": "HH : MM",
+                      "fill": "$tokens:color.field-placeholder",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md"
+                    },
+                    {
+                      "id": "time-field-icon",
+                      "type": "text",
+                      "content": "◷",
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "TimeField",
+                    "package": "@heroui/react",
+                    "slug": "time-field",
+                    "category": "Date and Time",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/date-and-time.lib.pen",
+                      "design-system/molecules.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ds-molecules-feedback",
+          "type": "frame",
+          "name": "Feedback",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "ds-molecules-feedback-h",
+              "type": "text",
+              "content": "Feedback",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "ds-molecules-feedback-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "alert",
+                  "type": "frame",
+                  "name": "Alert",
+                  "width": 380,
+                  "layout": "horizontal",
+                  "alignItems": "start",
+                  "gap": 12,
+                  "padding": 16,
+                  "fill": "$tokens:color.accent-soft",
+                  "cornerRadius": "$tokens:radius.md",
+                  "children": [
+                    {
+                      "id": "alert-dot",
+                      "type": "frame",
+                      "name": "Dot",
+                      "width": 10,
+                      "height": 10,
+                      "fill": "$tokens:color.accent",
+                      "cornerRadius": 9999
+                    },
+                    {
+                      "id": "alert-content",
+                      "type": "frame",
+                      "name": "Content",
+                      "layout": "vertical",
+                      "width": "fill_container",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "id": "alert-title",
+                          "type": "text",
+                          "content": "Heads up",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md",
+                          "fontWeight": "600"
+                        },
+                        {
+                          "id": "alert-body",
+                          "type": "text",
+                          "content": "Something needs your attention.",
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container"
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "Alert",
+                    "package": "@heroui/react",
+                    "slug": "alert",
+                    "category": "Feedback",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/feedback.lib.pen",
+                      "design-system/molecules.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ds-molecules-forms",
+          "type": "frame",
+          "name": "Forms",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "ds-molecules-forms-h",
+              "type": "text",
+              "content": "Forms",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "ds-molecules-forms-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "text-field",
+                  "type": "frame",
+                  "name": "TextField",
+                  "width": 300,
+                  "layout": "vertical",
+                  "gap": 6,
+                  "children": [
+                    {
+                      "id": "text-field-label",
+                      "type": "text",
+                      "content": "Email",
+                      "fill": "$tokens:color.foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm",
+                      "fontWeight": "600"
+                    },
+                    {
+                      "id": "text-field-input",
+                      "type": "frame",
+                      "name": "Field",
+                      "width": "fill_container",
+                      "height": 40,
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "padding": [
+                        12,
+                        0
+                      ],
+                      "cornerRadius": "$tokens:radius.md",
+                      "fill": "$tokens:color.field-background",
+                      "stroke": {
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
+                      },
+                      "children": [
+                        {
+                          "id": "text-field-input-text",
+                          "type": "text",
+                          "content": "you@example.com",
+                          "fill": "$tokens:color.field-placeholder",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "text-field-help",
+                      "type": "text",
+                      "content": "We never share your email.",
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": 12
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "TextField",
+                    "package": "@heroui/react",
+                    "slug": "text-field",
+                    "category": "Forms",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/forms.lib.pen",
+                      "design-system/molecules.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "search-field",
+                  "type": "frame",
+                  "name": "SearchField",
+                  "width": 300,
+                  "height": 40,
+                  "layout": "horizontal",
+                  "alignItems": "center",
+                  "gap": 8,
+                  "padding": [
+                    12,
+                    0
+                  ],
+                  "cornerRadius": "$tokens:radius.md",
+                  "fill": "$tokens:color.field-background",
+                  "stroke": {
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
+                  },
+                  "children": [
+                    {
+                      "id": "search-field-icon",
+                      "type": "text",
+                      "content": "⌕",
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md",
+                      "fontWeight": "700"
+                    },
+                    {
+                      "id": "search-field-text",
+                      "type": "text",
+                      "content": "Search",
+                      "fill": "$tokens:color.field-placeholder",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "SearchField",
+                    "package": "@heroui/react",
+                    "slug": "search-field",
+                    "category": "Forms",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/forms.lib.pen",
+                      "design-system/molecules.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "number-field",
+                  "type": "frame",
+                  "name": "NumberField",
+                  "width": 180,
+                  "height": 40,
+                  "layout": "horizontal",
+                  "alignItems": "center",
+                  "padding": [
+                    12,
+                    0
+                  ],
+                  "cornerRadius": "$tokens:radius.md",
+                  "fill": "$tokens:color.field-background",
+                  "stroke": {
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
+                  },
+                  "children": [
+                    {
+                      "id": "number-field-value",
+                      "type": "text",
+                      "content": "12",
+                      "fill": "$tokens:color.foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md",
+                      "width": "fill_container",
+                      "textGrowth": "fixed-width"
+                    },
+                    {
+                      "id": "number-field-step",
+                      "type": "frame",
+                      "name": "Steppers",
+                      "layout": "vertical",
+                      "width": "fit_content",
+                      "children": [
+                        {
+                          "id": "number-field-up",
+                          "type": "text",
+                          "content": "▴",
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": 10
+                        },
+                        {
+                          "id": "number-field-down",
+                          "type": "text",
+                          "content": "▾",
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": 10
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "NumberField",
+                    "package": "@heroui/react",
+                    "slug": "number-field",
+                    "category": "Forms",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/forms.lib.pen",
+                      "design-system/molecules.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "input-group",
+                  "type": "frame",
+                  "name": "InputGroup",
+                  "width": 320,
+                  "height": 40,
+                  "layout": "horizontal",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "id": "input-group-addon",
+                      "type": "frame",
+                      "name": "Addon",
+                      "height": 40,
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "padding": [
+                        12,
+                        0
+                      ],
+                      "fill": "$tokens:color.accent-soft",
+                      "cornerRadius": [
+                        "$tokens:radius.md",
+                        0,
+                        0,
+                        "$tokens:radius.md"
+                      ],
+                      "children": [
+                        {
+                          "id": "input-group-addon-text",
+                          "type": "text",
+                          "content": "https://",
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "input-group-input",
+                      "type": "frame",
+                      "name": "Input",
+                      "width": "fill_container",
+                      "height": 40,
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "padding": [
+                        12,
+                        0
+                      ],
+                      "fill": "$tokens:color.field-background",
+                      "stroke": {
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
+                      },
+                      "cornerRadius": [
+                        0,
+                        "$tokens:radius.md",
+                        "$tokens:radius.md",
+                        0
+                      ],
+                      "children": [
+                        {
+                          "id": "input-group-input-text",
+                          "type": "text",
+                          "content": "your-site",
+                          "fill": "$tokens:color.field-placeholder",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "InputGroup",
+                    "package": "@heroui/react",
+                    "slug": "input-group",
+                    "category": "Forms",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/forms.lib.pen",
+                      "design-system/molecules.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "input-otp",
+                  "type": "frame",
+                  "name": "InputOTP",
+                  "layout": "horizontal",
+                  "width": "fit_content",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "id": "input-otp-0",
+                      "type": "frame",
+                      "name": "Cell 0",
+                      "width": 44,
+                      "height": 48,
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "justifyContent": "center",
+                      "cornerRadius": "$tokens:radius.md",
+                      "fill": "$tokens:color.field-background",
+                      "stroke": {
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
+                      },
+                      "children": [
+                        {
+                          "id": "input-otp-0-d",
+                          "type": "text",
+                          "content": "4",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": 20,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "input-otp-1",
+                      "type": "frame",
+                      "name": "Cell 1",
+                      "width": 44,
+                      "height": 48,
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "justifyContent": "center",
+                      "cornerRadius": "$tokens:radius.md",
+                      "fill": "$tokens:color.field-background",
+                      "stroke": {
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
+                      },
+                      "children": [
+                        {
+                          "id": "input-otp-1-d",
+                          "type": "text",
+                          "content": "2",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": 20,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "input-otp-2",
+                      "type": "frame",
+                      "name": "Cell 2",
+                      "width": 44,
+                      "height": 48,
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "justifyContent": "center",
+                      "cornerRadius": "$tokens:radius.md",
+                      "fill": "$tokens:color.field-background",
+                      "stroke": {
+                        "thickness": 2,
+                        "fill": "$tokens:color.accent"
+                      },
+                      "children": [
+                        {
+                          "id": "input-otp-2-d",
+                          "type": "text",
+                          "content": "",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": 20,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "input-otp-3",
+                      "type": "frame",
+                      "name": "Cell 3",
+                      "width": 44,
+                      "height": 48,
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "justifyContent": "center",
+                      "cornerRadius": "$tokens:radius.md",
+                      "fill": "$tokens:color.field-background",
+                      "stroke": {
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
+                      },
+                      "children": [
+                        {
+                          "id": "input-otp-3-d",
+                          "type": "text",
+                          "content": "",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": 20,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "InputOTP",
+                    "package": "@heroui/react",
+                    "slug": "input-otp",
+                    "category": "Forms",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/forms.lib.pen",
+                      "design-system/molecules.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "fieldset",
+                  "type": "frame",
+                  "name": "Fieldset",
+                  "width": 320,
+                  "layout": "vertical",
+                  "gap": 12,
+                  "padding": 16,
+                  "cornerRadius": "$tokens:radius.md",
+                  "stroke": {
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
+                  },
+                  "children": [
+                    {
+                      "id": "fieldset-legend",
+                      "type": "text",
+                      "content": "Notifications",
+                      "fill": "$tokens:color.foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md",
+                      "fontWeight": "600"
+                    },
+                    {
+                      "id": "fieldset-field-1",
+                      "type": "frame",
+                      "name": "Field",
+                      "width": "fill_container",
+                      "height": 40,
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "padding": [
+                        12,
+                        0
+                      ],
+                      "cornerRadius": "$tokens:radius.md",
+                      "fill": "$tokens:color.field-background",
+                      "stroke": {
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
+                      },
+                      "children": [
+                        {
+                          "id": "fieldset-field-1-text",
+                          "type": "text",
+                          "content": "Email",
+                          "fill": "$tokens:color.field-placeholder",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "fieldset-field-2",
+                      "type": "frame",
+                      "name": "Field",
+                      "width": "fill_container",
+                      "height": 40,
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "padding": [
+                        12,
+                        0
+                      ],
+                      "cornerRadius": "$tokens:radius.md",
+                      "fill": "$tokens:color.field-background",
+                      "stroke": {
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
+                      },
+                      "children": [
+                        {
+                          "id": "fieldset-field-2-text",
+                          "type": "text",
+                          "content": "SMS",
+                          "fill": "$tokens:color.field-placeholder",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "Fieldset",
+                    "package": "@heroui/react",
+                    "slug": "fieldset",
+                    "category": "Forms",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/forms.lib.pen",
+                      "design-system/molecules.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "checkbox-group",
+                  "type": "frame",
+                  "name": "CheckboxGroup",
+                  "layout": "vertical",
+                  "width": "fit_content",
+                  "gap": 12,
+                  "children": [
+                    {
+                      "id": "checkbox-group-0",
+                      "type": "frame",
+                      "name": "Newsletter",
+                      "layout": "horizontal",
+                      "width": "fit_content",
+                      "alignItems": "center",
+                      "gap": 10,
+                      "children": [
+                        {
+                          "id": "checkbox-group-0-box",
+                          "type": "frame",
+                          "name": "Box",
+                          "width": 18,
+                          "height": 18,
+                          "layout": "horizontal",
+                          "alignItems": "center",
+                          "justifyContent": "center",
+                          "cornerRadius": "$tokens:radius.sm",
+                          "fill": "$tokens:color.accent",
+                          "children": [
+                            {
+                              "id": "checkbox-group-0-chk",
+                              "type": "text",
+                              "content": "✓",
+                              "fill": "$tokens:color.accent-foreground",
+                              "fontFamily": "$tokens:font.family",
+                              "fontSize": 12,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "id": "checkbox-group-0-label",
+                          "type": "text",
+                          "content": "Newsletter",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "checkbox-group-1",
+                      "type": "frame",
+                      "name": "Product updates",
+                      "layout": "horizontal",
+                      "width": "fit_content",
+                      "alignItems": "center",
+                      "gap": 10,
+                      "children": [
+                        {
+                          "id": "checkbox-group-1-box",
+                          "type": "frame",
+                          "name": "Box",
+                          "width": 18,
+                          "height": 18,
+                          "layout": "horizontal",
+                          "alignItems": "center",
+                          "justifyContent": "center",
+                          "cornerRadius": "$tokens:radius.sm",
+                          "fill": "$tokens:color.surface",
+                          "stroke": {
+                            "thickness": "$tokens:border.width",
+                            "fill": "$tokens:color.border"
+                          }
+                        },
+                        {
+                          "id": "checkbox-group-1-label",
+                          "type": "text",
+                          "content": "Product updates",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "CheckboxGroup",
+                    "package": "@heroui/react",
+                    "slug": "checkbox-group",
+                    "category": "Forms",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/forms.lib.pen",
+                      "design-system/molecules.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "radio-group",
+                  "type": "frame",
+                  "name": "RadioGroup",
+                  "layout": "vertical",
+                  "width": "fit_content",
+                  "gap": 12,
+                  "children": [
+                    {
+                      "id": "radio-group-0",
+                      "type": "frame",
+                      "name": "Monthly",
+                      "layout": "horizontal",
+                      "width": "fit_content",
+                      "alignItems": "center",
+                      "gap": 10,
+                      "children": [
+                        {
+                          "id": "radio-group-0-o",
+                          "type": "frame",
+                          "name": "O",
+                          "width": 18,
+                          "height": 18,
+                          "layout": "horizontal",
+                          "alignItems": "center",
+                          "justifyContent": "center",
+                          "cornerRadius": 9999,
+                          "fill": "$tokens:color.surface",
+                          "stroke": {
+                            "thickness": 2,
+                            "fill": "$tokens:color.accent"
+                          },
+                          "children": [
+                            {
+                              "id": "radio-group-0-dot",
+                              "type": "frame",
+                              "name": "Dot",
+                              "width": 8,
+                              "height": 8,
+                              "cornerRadius": 9999,
+                              "fill": "$tokens:color.accent"
+                            }
+                          ]
+                        },
+                        {
+                          "id": "radio-group-0-label",
+                          "type": "text",
+                          "content": "Monthly",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "radio-group-1",
+                      "type": "frame",
+                      "name": "Yearly",
+                      "layout": "horizontal",
+                      "width": "fit_content",
+                      "alignItems": "center",
+                      "gap": 10,
+                      "children": [
+                        {
+                          "id": "radio-group-1-o",
+                          "type": "frame",
+                          "name": "O",
+                          "width": 18,
+                          "height": 18,
+                          "layout": "horizontal",
+                          "alignItems": "center",
+                          "justifyContent": "center",
+                          "cornerRadius": 9999,
+                          "fill": "$tokens:color.surface",
+                          "stroke": {
+                            "thickness": 2,
+                            "fill": "$tokens:color.border"
+                          }
+                        },
+                        {
+                          "id": "radio-group-1-label",
+                          "type": "text",
+                          "content": "Yearly",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "RadioGroup",
+                    "package": "@heroui/react",
+                    "slug": "radio-group",
+                    "category": "Forms",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/forms.lib.pen",
+                      "design-system/molecules.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ds-molecules-layout",
+          "type": "frame",
+          "name": "Layout",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "ds-molecules-layout-h",
+              "type": "text",
+              "content": "Layout",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "ds-molecules-layout-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "card",
+                  "type": "frame",
+                  "name": "Card",
+                  "width": 360,
+                  "fill": "$tokens:color.surface",
+                  "cornerRadius": "$tokens:radius.lg",
+                  "stroke": {
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
+                  },
+                  "effect": {
+                    "type": "shadow",
+                    "shadowType": "outer",
+                    "offset": {
+                      "x": 0,
+                      "y": 2
+                    },
+                    "blur": 8,
+                    "spread": 0,
+                    "color": "#0000001f"
+                  },
+                  "layout": "vertical",
+                  "gap": 16,
+                  "clip": true,
+                  "children": [
+                    {
+                      "id": "card-header",
+                      "type": "frame",
+                      "name": "Header",
+                      "layout": "vertical",
+                      "gap": "$tokens:space.unit",
+                      "width": "fill_container",
+                      "padding": [
+                        20,
+                        20,
+                        0,
+                        20
+                      ],
+                      "children": [
+                        {
+                          "id": "card-title",
+                          "type": "text",
+                          "content": "Card title",
+                          "fill": "$tokens:color.surface-foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-lg",
+                          "fontWeight": "600"
+                        },
+                        {
+                          "id": "card-subtitle",
+                          "type": "text",
+                          "content": "Supporting copy goes here.",
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "card-body",
+                      "type": "frame",
+                      "name": "Body",
+                      "width": "fill_container",
+                      "padding": 20,
+                      "layout": "vertical",
+                      "gap": "$tokens:space.unit",
+                      "children": [
+                        {
+                          "id": "card-body-text",
+                          "type": "text",
+                          "content": "Body content.",
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "card-footer",
+                      "type": "frame",
+                      "name": "Footer",
+                      "width": "fill_container",
+                      "padding": [
+                        0,
+                        20,
+                        20,
+                        20
+                      ],
+                      "layout": "horizontal",
+                      "justifyContent": "end",
+                      "gap": "$tokens:space.unit"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "Card",
+                    "package": "@heroui/react",
+                    "slug": "card",
+                    "category": "Layout",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/layout.lib.pen",
+                      "design-system/molecules.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ds-molecules-navigation",
+          "type": "frame",
+          "name": "Navigation",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "ds-molecules-navigation-h",
+              "type": "text",
+              "content": "Navigation",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "ds-molecules-navigation-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "breadcrumbs",
+                  "type": "frame",
+                  "name": "Breadcrumbs",
+                  "layout": "horizontal",
+                  "width": "fit_content",
+                  "alignItems": "center",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "id": "breadcrumbs-0",
+                      "type": "text",
+                      "content": "Home",
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm",
+                      "fontWeight": "400"
+                    },
+                    {
+                      "id": "breadcrumbs-sep-0",
+                      "type": "text",
+                      "content": "/",
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm"
+                    },
+                    {
+                      "id": "breadcrumbs-1",
+                      "type": "text",
+                      "content": "Library",
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm",
+                      "fontWeight": "400"
+                    },
+                    {
+                      "id": "breadcrumbs-sep-1",
+                      "type": "text",
+                      "content": "/",
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm"
+                    },
+                    {
+                      "id": "breadcrumbs-2",
+                      "type": "text",
+                      "content": "Data",
+                      "fill": "$tokens:color.foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm",
+                      "fontWeight": "600"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "Breadcrumbs",
+                    "package": "@heroui/react",
+                    "slug": "breadcrumbs",
+                    "category": "Navigation",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/navigation.lib.pen",
+                      "design-system/molecules.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "pagination",
+                  "type": "frame",
+                  "name": "Pagination",
+                  "layout": "horizontal",
+                  "width": "fit_content",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "id": "pagination-page-0",
+                      "type": "frame",
+                      "name": "Page 1",
+                      "width": 32,
+                      "height": 32,
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "justifyContent": "center",
+                      "fill": "$tokens:color.accent",
+                      "cornerRadius": "$tokens:radius.md",
+                      "children": [
+                        {
+                          "id": "pagination-page-0-label",
+                          "type": "text",
+                          "content": "1",
+                          "fill": "$tokens:color.accent-foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "pagination-page-1",
+                      "type": "frame",
+                      "name": "Page 2",
+                      "width": 32,
+                      "height": 32,
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "justifyContent": "center",
+                      "fill": "$tokens:color.surface",
+                      "cornerRadius": "$tokens:radius.md",
+                      "stroke": {
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
+                      },
+                      "children": [
+                        {
+                          "id": "pagination-page-1-label",
+                          "type": "text",
+                          "content": "2",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "pagination-page-2",
+                      "type": "frame",
+                      "name": "Page 3",
+                      "width": 32,
+                      "height": 32,
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "justifyContent": "center",
+                      "fill": "$tokens:color.surface",
+                      "cornerRadius": "$tokens:radius.md",
+                      "stroke": {
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
+                      },
+                      "children": [
+                        {
+                          "id": "pagination-page-2-label",
+                          "type": "text",
+                          "content": "3",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "pagination-page-3",
+                      "type": "frame",
+                      "name": "Page 4",
+                      "width": 32,
+                      "height": 32,
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "justifyContent": "center",
+                      "fill": "$tokens:color.surface",
+                      "cornerRadius": "$tokens:radius.md",
+                      "stroke": {
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
+                      },
+                      "children": [
+                        {
+                          "id": "pagination-page-3-label",
+                          "type": "text",
+                          "content": "4",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "pagination-page-4",
+                      "type": "frame",
+                      "name": "Page 5",
+                      "width": 32,
+                      "height": 32,
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "justifyContent": "center",
+                      "fill": "$tokens:color.surface",
+                      "cornerRadius": "$tokens:radius.md",
+                      "stroke": {
+                        "thickness": "$tokens:border.width",
+                        "fill": "$tokens:color.border"
+                      },
+                      "children": [
+                        {
+                          "id": "pagination-page-4-label",
+                          "type": "text",
+                          "content": "5",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
+                          "fontWeight": "500"
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "Pagination",
+                    "package": "@heroui/react",
+                    "slug": "pagination",
+                    "category": "Navigation",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/navigation.lib.pen",
+                      "design-system/molecules.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "tabs",
+                  "type": "frame",
+                  "name": "Tabs",
+                  "layout": "horizontal",
+                  "width": "fit_content",
+                  "gap": 4,
+                  "padding": 4,
+                  "fill": "$tokens:color.surface",
+                  "cornerRadius": "$tokens:radius.md",
+                  "stroke": {
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
+                  },
+                  "children": [
+                    {
+                      "id": "tabs-tab-0",
+                      "type": "frame",
+                      "name": "Overview",
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "justifyContent": "center",
+                      "padding": [
+                        16,
+                        8
+                      ],
+                      "fill": "$tokens:color.accent-soft",
+                      "cornerRadius": "$tokens:radius.sm",
+                      "children": [
+                        {
+                          "id": "tabs-tab-0-label",
+                          "type": "text",
+                          "content": "Overview",
+                          "fill": "$tokens:color.accent",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "tabs-tab-1",
+                      "type": "frame",
+                      "name": "Activity",
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "justifyContent": "center",
+                      "padding": [
+                        16,
+                        8
+                      ],
+                      "fill": "$tokens:color.surface",
+                      "cornerRadius": "$tokens:radius.sm",
+                      "children": [
+                        {
+                          "id": "tabs-tab-1-label",
+                          "type": "text",
+                          "content": "Activity",
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "tabs-tab-2",
+                      "type": "frame",
+                      "name": "Settings",
+                      "layout": "horizontal",
+                      "alignItems": "center",
+                      "justifyContent": "center",
+                      "padding": [
+                        16,
+                        8
+                      ],
+                      "fill": "$tokens:color.surface",
+                      "cornerRadius": "$tokens:radius.sm",
+                      "children": [
+                        {
+                          "id": "tabs-tab-2-label",
+                          "type": "text",
+                          "content": "Settings",
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
+                          "fontWeight": "500"
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "Tabs",
+                    "package": "@heroui/react",
+                    "slug": "tabs",
+                    "category": "Navigation",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/navigation.lib.pen",
+                      "design-system/molecules.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "disclosure",
+                  "type": "frame",
+                  "name": "Disclosure",
+                  "width": 320,
+                  "layout": "vertical",
+                  "cornerRadius": "$tokens:radius.md",
+                  "stroke": {
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
+                  },
+                  "clip": true,
+                  "children": [
+                    {
+                      "id": "disclosure-header",
+                      "type": "frame",
+                      "layout": "horizontal",
+                      "width": "fill_container",
+                      "alignItems": "center",
+                      "justifyContent": "space_between",
+                      "padding": 16,
+                      "fill": "$tokens:color.surface",
+                      "children": [
+                        {
+                          "id": "disclosure-title",
+                          "type": "text",
+                          "content": "What is included?",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md",
+                          "fontWeight": "600"
+                        },
+                        {
+                          "id": "disclosure-chev",
+                          "type": "text",
+                          "content": "▾",
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-md"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "disclosure-body",
+                      "type": "frame",
+                      "layout": "vertical",
+                      "width": "fill_container",
+                      "padding": [
+                        16,
+                        0,
+                        16,
+                        16
+                      ],
+                      "children": [
+                        {
+                          "id": "disclosure-body-text",
+                          "type": "text",
+                          "content": "Everything in the design system, themeable via tokens.",
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container"
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "Disclosure",
+                    "package": "@heroui/react",
+                    "slug": "disclosure",
+                    "category": "Navigation",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/navigation.lib.pen",
+                      "design-system/molecules.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ds-molecules-overlays",
+          "type": "frame",
+          "name": "Overlays",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "ds-molecules-overlays-h",
+              "type": "text",
+              "content": "Overlays",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "ds-molecules-overlays-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "tooltip",
+                  "type": "frame",
+                  "name": "Tooltip",
+                  "layout": "horizontal",
+                  "width": "fit_content",
+                  "alignItems": "center",
+                  "padding": [
+                    10,
+                    6
+                  ],
+                  "fill": "$tokens:color.foreground",
+                  "cornerRadius": "$tokens:radius.sm",
+                  "children": [
+                    {
+                      "id": "tooltip-label",
+                      "type": "text",
+                      "content": "Tooltip",
+                      "fill": "$tokens:color.background",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "molecule",
+                    "fidelity": "full",
+                    "react": "Tooltip",
+                    "package": "@heroui/react",
+                    "slug": "tooltip",
+                    "category": "Overlays",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/overlays.lib.pen",
+                      "design-system/molecules.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
