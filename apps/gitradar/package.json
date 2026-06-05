@@ -4,7 +4,7 @@
   "description": "Terminal-based TUI analytics tool for git contribution data. Part of the agentx-toolbox monorepo.",
   "type": "module",
   "bin": {
-    "gitradar": "dist/cli.js"
+    "gitradar": "bin/gitradar"
   },
   "scripts": {
     "build": "tsup",
