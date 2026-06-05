@@ -1,5 +1,5 @@
+import { Database } from 'bun:sqlite';
 import { join } from 'node:path';
-import Database from 'better-sqlite3';
 import type {
   AuthorRegistry,
   CommitsByFiletype,
@@ -11,6 +11,14 @@ import type {
 } from '../types/schema.js';
 import { getDataDir } from './paths.js';
 
+/**
+ * Values we bind into prepared statements (named or positional). Matches the
+ * primitive set bun:sqlite accepts for a named-parameter object — note it is
+ * NOT the recursive `SQLQueryBindings` (whose Record variant only permits
+ * these primitives as values, not nested bindings).
+ */
+type BindParams = Record<string, string | number | bigint | boolean | null>;
+
 // ── Database path ───────────────────────────────────────────────────────────
 
 export function getSQLitePath(): string {
@@ -19,14 +27,16 @@ export function getSQLitePath(): string {
 
 // ── Database singleton ──────────────────────────────────────────────────────
 
-let _db: Database.Database | null = null;
+let _db: Database | null = null;
 
-export function getDB(): Database.Database {
+export function getDB(): Database {
   if (!_db) {
-    _db = new Database(getSQLitePath());
-    _db.pragma('journal_mode = WAL');
-    _db.pragma('synchronous = NORMAL');
-    _db.pragma('busy_timeout = 5000');
+    // `strict: true` lets us bind named params with bare keys (e.g. `@member`
+    // ← { member }), matching the better-sqlite3 call sites verbatim.
+    _db = new Database(getSQLitePath(), { create: true, strict: true });
+    _db.exec('PRAGMA journal_mode = WAL;');
+    _db.exec('PRAGMA synchronous = NORMAL;');
+    _db.exec('PRAGMA busy_timeout = 5000;');
     ensureSchema(_db);
   }
   return _db;
@@ -41,7 +51,7 @@ export function closeDB(): void {
 
 // ── Schema ──────────────────────────────────────────────────────────────────
 
-function ensureSchema(db: Database.Database): void {
+function ensureSchema(db: Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS records (
       member TEXT NOT NULL,
@@ -145,8 +155,8 @@ function ensureSchema(db: Database.Database): void {
 }
 
 /** Add pr_branch columns to enrichments if they don't exist (migration v2). */
-function migrateEnrichmentBranchColumns(db: Database.Database): void {
-  const columns = db.pragma('table_info(enrichments)') as Array<{ name: string }>;
+function migrateEnrichmentBranchColumns(db: Database): void {
+  const columns = db.query('PRAGMA table_info(enrichments)').all() as Array<{ name: string }>;
   const colNames = new Set(columns.map((c) => c.name));
 
   if (!colNames.has('pr_feature')) {
@@ -162,8 +172,8 @@ function migrateEnrichmentBranchColumns(db: Database.Database): void {
 }
 
 /** Add breaking_changes and scopes columns to records if they don't exist (migration v3). */
-function migrateRecordsScopeColumns(db: Database.Database): void {
-  const columns = db.pragma('table_info(records)') as Array<{ name: string }>;
+function migrateRecordsScopeColumns(db: Database): void {
+  const columns = db.query('PRAGMA table_info(records)').all() as Array<{ name: string }>;
   const colNames = new Set(columns.map((c) => c.name));
 
   if (!colNames.has('breaking_changes')) {
@@ -176,7 +186,7 @@ function migrateRecordsScopeColumns(db: Database.Database): void {
 
 // ── Record serialization ────────────────────────────────────────────────────
 
-function recordToRow(r: UserWeekRepoRecord): Record<string, unknown> {
+function recordToRow(r: UserWeekRepoRecord): BindParams {
   return {
     member: r.member,
     email: r.email,
@@ -558,7 +568,7 @@ export function queryRollup(filters: RollupFilters, groupBy: RollupGroupBy): Map
 
   const groupCol = GROUP_BY_COLUMN[groupBy];
   const clauses: string[] = [];
-  const params: Record<string, unknown> = {};
+  const params: BindParams = {};
 
   if (filters.weeks && filters.weeks.length > 0) {
     clauses.push('week IN (SELECT value FROM json_each(@weeks_json))');
@@ -850,7 +860,7 @@ export function saveEnrichmentBatchSQL(
 export function hasEnrichment(key: string): boolean {
   const db = getDB();
   const row = db.prepare('SELECT 1 FROM enrichments WHERE key = ?').get(key);
-  return row !== undefined;
+  return row != null;
 }
 
 /** Get a single enrichment by key, or default zeros. */

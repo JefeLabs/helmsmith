@@ -12,10 +12,10 @@
  * Scans are limited to 4 weeks to keep the test fast.
  */
 
+import { afterAll, beforeAll, describe, expect, it, mock, spyOn } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 // ── Real repos on disk ──────────────────────────────────────────────────────
 
@@ -40,7 +40,7 @@ const TEST_REPOS = [
 
 let testDataDir = '';
 
-vi.mock('../store/paths.js', () => ({
+mock.module('../store/paths.js', () => ({
   getDataDir: () => testDataDir,
   getConfigDir: () => testDataDir,
   expandTilde: (p: string) => p,
@@ -594,7 +594,7 @@ describe('Functional: Full CLI Pipeline (Engine + SQLite)', () => {
     const { contributions } = await import('../commands/contributions.js');
 
     const logs: string[] = [];
-    const spy = vi.spyOn(console, 'log').mockImplementation((...args: any[]) => {
+    const spy = spyOn(console, 'log').mockImplementation((...args: any[]) => {
       logs.push(args.map(String).join(' '));
     });
 
@@ -641,7 +641,7 @@ describe('Functional: Full CLI Pipeline (Engine + SQLite)', () => {
     const { leaderboard } = await import('../commands/leaderboard.js');
 
     const logs: string[] = [];
-    const spy = vi.spyOn(console, 'log').mockImplementation((...args: any[]) => {
+    const spy = spyOn(console, 'log').mockImplementation((...args: any[]) => {
       logs.push(args.map(String).join(' '));
     });
 
@@ -688,7 +688,7 @@ describe('Functional: Full CLI Pipeline (Engine + SQLite)', () => {
     const { repoActivity } = await import('../commands/repo-activity.js');
 
     const logs: string[] = [];
-    const spy = vi.spyOn(console, 'log').mockImplementation((...args: any[]) => {
+    const spy = spyOn(console, 'log').mockImplementation((...args: any[]) => {
       logs.push(args.map(String).join(' '));
     });
 
