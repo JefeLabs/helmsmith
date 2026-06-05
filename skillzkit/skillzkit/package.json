@@ -30,7 +30,7 @@
     "test:e2e": "npm run catalog && vitest run tests/e2e",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build",
-    "cli": "tsx src/cli.ts"
+    "cli": "bun src/cli.ts"
   },
   "dependencies": {
     "@ecruz165/cli-kit": "workspace:*",
@@ -54,7 +54,7 @@
     "vitest": "^4.1.5"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com",
