@@ -1,0 +1,17 @@
+#!/bin/sh
+# Launcher for the globally-linked `gitradar` command.
+#
+# gitradar's bundle (dist/cli.js) requires the Bun runtime, which ships as a
+# package dependency rather than a global install. This wrapper resolves its
+# own real location (the global bin entry is a symlink) and runs the bundle
+# with the vendored Bun, so `gitradar` works anywhere without a global Bun.
+self="$0"
+while [ -L "$self" ]; do
+  link="$(readlink "$self")"
+  case "$link" in
+    /*) self="$link" ;;
+    *) self="$(dirname "$self")/$link" ;;
+  esac
+done
+dir="$(cd "$(dirname "$self")/.." && pwd)"
+exec "$dir/node_modules/.bin/bun" "$dir/dist/cli.js" "$@"

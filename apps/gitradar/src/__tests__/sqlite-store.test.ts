@@ -1,8 +1,8 @@
+import { Database } from 'bun:sqlite';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import Database from 'better-sqlite3';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { UserWeekRepoRecord } from '../types/schema.js';
 
 function makeRecord(overrides?: Partial<UserWeekRepoRecord>): UserWeekRepoRecord {
@@ -43,8 +43,8 @@ describe('SQLite store', () => {
 
   it('round-trips a record through SQLite schema', () => {
     const dbPath = join(tmpDir, 'test.db');
-    const db = new Database(dbPath);
-    db.pragma('journal_mode = WAL');
+    const db = new Database(dbPath, { create: true, strict: true });
+    db.exec('PRAGMA journal_mode = WAL;');
 
     db.exec(`
       CREATE TABLE records (
@@ -159,9 +159,9 @@ describe('SQLite store', () => {
 
   it('merges records with ON CONFLICT DO UPDATE (additive)', () => {
     const dbPath = join(tmpDir, 'upsert.db');
-    const db = new Database(dbPath);
+    const db = new Database(dbPath, { create: true, strict: true });
 
-    db.pragma('journal_mode = WAL');
+    db.exec('PRAGMA journal_mode = WAL;');
 
     db.prepare(`
       CREATE TABLE records (
@@ -199,7 +199,7 @@ describe('SQLite store', () => {
 
   it('filters records with WHERE clauses', () => {
     const dbPath = join(tmpDir, 'filter.db');
-    const db = new Database(dbPath);
+    const db = new Database(dbPath, { create: true, strict: true });
 
     db.exec(`
       CREATE TABLE records (
@@ -223,9 +223,9 @@ describe('SQLite store', () => {
 
   it('stores and retrieves enrichments', () => {
     const dbPath = join(tmpDir, 'enrichments.db');
-    const db = new Database(dbPath);
+    const db = new Database(dbPath, { create: true, strict: true });
 
-    db.pragma('journal_mode = WAL');
+    db.exec('PRAGMA journal_mode = WAL;');
 
     db.prepare(`
       CREATE TABLE enrichments (
@@ -257,9 +257,9 @@ describe('SQLite store', () => {
 
   it('merges enrichments with ON CONFLICT DO UPDATE (additive counts, replace rates)', () => {
     const dbPath = join(tmpDir, 'enrich-merge.db');
-    const db = new Database(dbPath);
+    const db = new Database(dbPath, { create: true, strict: true });
 
-    db.pragma('journal_mode = WAL');
+    db.exec('PRAGMA journal_mode = WAL;');
 
     db.prepare(`
       CREATE TABLE enrichments (
@@ -300,7 +300,7 @@ describe('SQLite store', () => {
 
   it('handles transaction batching for bulk inserts', () => {
     const dbPath = join(tmpDir, 'batch.db');
-    const db = new Database(dbPath);
+    const db = new Database(dbPath, { create: true, strict: true });
 
     db.exec(
       'CREATE TABLE records (member TEXT, week TEXT, repo TEXT, commits INTEGER, PRIMARY KEY (member, week, repo))',
@@ -324,7 +324,7 @@ describe('SQLite store', () => {
 
   it('prunes records by week comparison', () => {
     const dbPath = join(tmpDir, 'prune.db');
-    const db = new Database(dbPath);
+    const db = new Database(dbPath, { create: true, strict: true });
 
     db.exec(
       'CREATE TABLE records (member TEXT, week TEXT, repo TEXT, PRIMARY KEY (member, week, repo))',
@@ -346,7 +346,7 @@ describe('SQLite store', () => {
 
   it('getMetaTimestamps returns nulls when meta table is empty', () => {
     const dbPath = join(tmpDir, 'meta-empty.db');
-    const db = new Database(dbPath);
+    const db = new Database(dbPath, { create: true, strict: true });
     db.exec('CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
 
     const rows = db
@@ -361,7 +361,7 @@ describe('SQLite store', () => {
 
   it('getMetaTimestamps returns both timestamps when present', () => {
     const dbPath = join(tmpDir, 'meta-ts.db');
-    const db = new Database(dbPath);
+    const db = new Database(dbPath, { create: true, strict: true });
     db.exec('CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
 
     db.prepare('INSERT INTO meta (key, value) VALUES (?, ?)').run(
@@ -388,7 +388,7 @@ describe('SQLite store', () => {
 
   it('meta timestamps update on INSERT OR REPLACE', () => {
     const dbPath = join(tmpDir, 'meta-update.db');
-    const db = new Database(dbPath);
+    const db = new Database(dbPath, { create: true, strict: true });
     db.exec('CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
 
     db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('commits_last_updated', ?)").run(
@@ -421,8 +421,8 @@ describe('SQLite store', () => {
   describe('queryRollup SQL aggregation', () => {
     function createFullSchemaDB(dir: string) {
       const dbPath = join(dir, 'rollup.db');
-      const db = new Database(dbPath);
-      db.pragma('journal_mode = WAL');
+      const db = new Database(dbPath, { create: true, strict: true });
+      db.exec('PRAGMA journal_mode = WAL;');
       db.exec(`
         CREATE TABLE records (
           member TEXT NOT NULL, email TEXT NOT NULL, org TEXT NOT NULL, org_type TEXT NOT NULL,
@@ -450,7 +450,7 @@ describe('SQLite store', () => {
     }
 
     function insertRecord(
-      db: Database.Database,
+      db: Database,
       overrides: Partial<{
         member: string;
         email: string;
@@ -498,10 +498,10 @@ describe('SQLite store', () => {
 
     // Directly test the SQL aggregation query that queryRollup uses
     function runRollupSQL(
-      db: Database.Database,
+      db: Database,
       groupCol: string,
       where: string,
-      params: Record<string, unknown>,
+      params: Record<string, string | number | bigint | boolean | null>,
     ) {
       const groupByClause = groupCol === "'all'" ? '' : `GROUP BY ${groupCol}`;
       const sql = `

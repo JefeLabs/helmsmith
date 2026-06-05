@@ -7,6 +7,8 @@ export default defineConfig({
   dts: true,
   shims: true,
   clean: true,
+  // Bun builtin — esbuild can't resolve it, leave it for the Bun runtime.
+  external: ['bun:sqlite'],
   banner: {
     js: '#!/usr/bin/env bun',
   },
