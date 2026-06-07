@@ -27,9 +27,15 @@ export class PenDocument {
     return this;
   }
 
-  /** Add an import alias → relative path to a `.pen`/`.lib.pen`. */
+  /**
+   * Add an import alias → relative path to a `.pen`/`.lib.pen`. The leading
+   * `./` is stripped: Pencil expects `foundations/x.lib.pen`, not
+   * `./foundations/x.lib.pen` — the `./` form fails import resolution and
+   * crashes the app when a node referencing the import is clicked. (`../`
+   * parent-relative paths are preserved.)
+   */
   importLib(alias: string, relativePath: string): this {
-    this.imports[alias] = relativePath;
+    this.imports[alias] = relativePath.replace(/^\.\//, '');
     return this;
   }
 

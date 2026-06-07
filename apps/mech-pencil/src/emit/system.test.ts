@@ -30,7 +30,7 @@ describe('emitSystem (option A, B3)', () => {
 
   it('base imports all four foundation libs and demos at least one screen', () => {
     const imp = sys.base.doc.toObject().imports ?? {};
-    for (const a of FOUNDS) expect(imp[a]).toMatch(/^\.\/foundations\/.*\.lib\.pen$/);
+    for (const a of FOUNDS) expect(imp[a]).toMatch(/^foundations\/.*\.lib\.pen$/);
     expect(sys.base.screens.length).toBeGreaterThan(0);
   });
 

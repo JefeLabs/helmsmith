@@ -40,7 +40,8 @@ describe('emitFoundations', () => {
     // literal-sized FA paths, so it doesn't import the icons lib itself)
     expect(bySlug.icons.imports).toEqual(expect.arrayContaining(['colors', 'type']));
     const imp = bySlug.icons.preview.toObject().imports ?? {};
-    expect(imp.colors).toBe('./colors.lib.pen');
-    expect(imp.type).toBe('./typography.lib.pen');
+    // import paths carry no leading `./` — Pencil chokes on that form
+    expect(imp.colors).toBe('colors.lib.pen');
+    expect(imp.type).toBe('typography.lib.pen');
   });
 });
