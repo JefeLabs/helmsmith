@@ -46,13 +46,31 @@ describe('validateDocument', () => {
     expect(r.issues.some((i) => i.message.includes("contains '/'"))).toBe(true);
   });
 
-  it('rejects a cross-file (colon/slash) ref — single-file only', () => {
+  it('rejects a cross-file ref to an UNDECLARED import alias', () => {
     const doc = new PenDocument()
       .add({ id: 'inst', type: 'ref', ref: 'ds:button' })
       .toObject();
     const r = validateDocument(doc);
     expect(r.ok).toBe(false);
-    expect(r.issues.some((i) => i.message.includes('cross-file'))).toBe(true);
+    expect(r.issues.some((i) => i.message.includes('unknown import alias'))).toBe(true);
+  });
+
+  it('allows a cross-file ref to a DECLARED import (Pencil resolves it)', () => {
+    const doc = new PenDocument()
+      .importLib('ds', './design-system.lib.pen')
+      .add({ id: 'inst', type: 'ref', ref: 'ds:button' })
+      .toObject();
+    expect(validateDocument(doc).ok).toBe(true);
+  });
+
+  it('rejects descendants on a cross-file ref (they do not cross files)', () => {
+    const doc = new PenDocument()
+      .importLib('ds', './design-system.lib.pen')
+      .add({ id: 'inst', type: 'ref', ref: 'ds:button', descendants: { 'ds:label': { content: 'x' } } })
+      .toObject();
+    const r = validateDocument(doc);
+    expect(r.ok).toBe(false);
+    expect(r.issues.some((i) => i.message.includes('descendant'))).toBe(true);
   });
 
   it('resolves a local ref to a reusable component', () => {

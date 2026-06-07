@@ -26,11 +26,12 @@ import {
   slugForAlias,
 } from '../frameworks/heroui/foundations.ts';
 import { heroUIAdapter } from '../frameworks/heroui/index.ts';
-import { frame, text } from '../pen/builder.ts';
+import { frame, ref, text } from '../pen/builder.ts';
 import { PenDocument } from '../pen/document.ts';
 import type { Child } from '../pen/schema.ts';
 import { type ValidationResult, validateDocument } from '../pen/validate.ts';
 import { type FoundationArtifact, emitFoundations } from './foundations.ts';
+import { type TemplateArtifact, emitTemplates } from './templates.ts';
 
 const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
@@ -70,11 +71,13 @@ export interface SystemFile {
 export interface SystemBundle {
   foundations: FoundationArtifact[];
   components: (SystemFile & { category: string; count: number; imports: string[]; preview: SystemFile })[];
-  base: SystemFile & { imports: string[]; screens: string[] };
+  templates: TemplateArtifact[];
+  base: SystemFile & { imports: string[]; screens: string[]; demos: string[] };
 }
 
 export function emitSystem(tokens: TokenSet): SystemBundle {
   const foundations = emitFoundations(tokens);
+  const templates = emitTemplates(tokens);
   const specs = heroUIComponents();
 
   // Per-category component libs — import only the foundation libs referenced.
@@ -130,15 +133,29 @@ export function emitSystem(tokens: TokenSet): SystemBundle {
     screens.push(spec.slug);
   }
 
+  // Demo the desktop page templates: import each lib + ref its page, parked in
+  // their own column left of the screens.
+  const demos: string[] = [];
+  let tplIdx = 0;
+  for (const t of templates.filter((x) => x.viewport === 'desktop')) {
+    const alias = `tpl${tplIdx}`;
+    base.importLib(alias, `./templates/${t.slug}.lib.pen`);
+    base.add(ref(`base-demo-${t.slug}`, `${alias}:${t.pageId}`, { x: -1700, y: tplIdx * 1000 }));
+    demos.push(t.slug);
+    tplIdx++;
+  }
+
   return {
     foundations,
     components,
+    templates,
     base: {
       path: 'base.pen',
       doc: base,
       validation: validateDocument(base.toObject()),
       imports: FOUNDATIONS.map((f) => f.alias),
       screens,
+      demos,
     },
   };
 }

@@ -33,4 +33,12 @@ describe('emitSystem (option A, B3)', () => {
     for (const a of FOUNDS) expect(imp[a]).toMatch(/^\.\/foundations\/.*\.lib\.pen$/);
     expect(sys.base.screens.length).toBeGreaterThan(0);
   });
+
+  it('includes page templates and the base demos the desktop ones', () => {
+    expect(sys.templates).toHaveLength(12); // 4 templates × 3 viewports
+    expect(sys.base.demos).toHaveLength(4); // one per desktop template
+    const imp = sys.base.doc.toObject().imports ?? {};
+    // base imports the desktop template libs under tpl* aliases
+    expect(Object.keys(imp).some((k) => /^tpl\d+$/.test(k))).toBe(true);
+  });
 });

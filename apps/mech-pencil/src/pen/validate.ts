@@ -8,11 +8,10 @@
  *   3. an `id` containing `/` — illegal; the slash is reserved as the
  *      `descendants` id-path separator, never part of a node id
  *   4. duplicate ids within the same parent scope
- *   5. a `ref` whose target is not a local `reusable` component.
- *      Cross-file (`alias:id`) refs resolve in Pencil but CANNOT be
- *      customized via `descendants`, so this generator is single-file
- *      and every ref must resolve locally — a `:` or `/` in a ref
- *      target is therefore flagged.
+ *   5. a `ref` target that resolves nowhere. A LOCAL ref (`id`) must match
+ *      a local `reusable`. A cross-file ref (`alias:id`) is valid when
+ *      `alias` is a declared import (Pencil resolves these) — but cross-file
+ *      `descendants` are rejected, since overrides don't cross files.
  *   6. a `$variable` reference to an undeclared key
  *
  * Every problem is collected (not just the first) so a generated
@@ -83,13 +82,25 @@ function walk(
 
     if (type === 'ref') {
       const target = (node as { ref?: string }).ref;
+      const hasDescendants = !!(node as { descendants?: unknown }).descendants;
       if (!target) {
         issues.push({ path: `${here} (${node.id})`, message: 'ref node is missing `ref` target' });
       } else if (target.includes(':') || target.includes('/')) {
-        issues.push({
-          path: `${here} (${node.id})`,
-          message: `ref target "${target}" looks cross-file; this generator emits single-file documents where every ref must resolve to a LOCAL reusable component (cross-file refs can't be customized via descendants)`,
-        });
+        // Cross-file ref (`alias:id`): Pencil resolves these against a declared
+        // import (verified). The only true limitation is that `descendants`
+        // don't cross files — so allow the ref, but reject cross-file overrides.
+        const alias = target.split(/[:/]/)[0];
+        if (!importAliases.has(alias)) {
+          issues.push({
+            path: `${here} (${node.id})`,
+            message: `ref target "${target}" uses unknown import alias "${alias}" — declare it in \`imports\``,
+          });
+        } else if (hasDescendants) {
+          issues.push({
+            path: `${here} (${node.id})`,
+            message: `ref target "${target}" is cross-file but has \`descendants\` — descendant overrides don't cross files; inline a local copy to customize`,
+          });
+        }
       } else if (!reusableIds.has(target)) {
         issues.push({
           path: `${here} (${node.id})`,
