@@ -16,6 +16,7 @@ import { runGen } from './commands/gen-library.ts';
 import { runInit } from './commands/init.ts';
 import { runList } from './commands/list.ts';
 import { runManifest } from './commands/manifest.ts';
+import { runSystem } from './commands/system.ts';
 import { runTheme } from './commands/theme.ts';
 import { runValidate } from './commands/validate.ts';
 import { runWizard } from './commands/wizard.ts';
@@ -152,6 +153,27 @@ program
         formRadius: opts.formRadius,
         dir: opts.dir,
         name: opts.name,
+      }),
+  );
+
+program
+  .command('system')
+  .description('Emit the full system: per-foundation + component + template .lib.pen + base.pen, each with a faithful PNG (Pencil headless export)')
+  .option('-a, --accent <color>', 'Accent color (hex or oklch())')
+  .option('-b, --base <number>', 'Neutral gray-tint (HeroUI base; 0–0.02)')
+  .option('--font <name>', 'Sans font family (inter, instrument-sans, …)')
+  .option('-r, --radius <preset>', 'none|extra-small|small|medium|large|extra-large')
+  .option('--form-radius <preset>', 'Form-field radius preset')
+  .option('-d, --dir <path>', 'Output directory', '.')
+  .action(
+    (opts: { accent?: string; base?: string; font?: string; radius?: string; formRadius?: string; dir: string }) =>
+      runSystem({
+        accent: opts.accent,
+        base: opts.base,
+        font: opts.font,
+        radius: opts.radius,
+        formRadius: opts.formRadius,
+        dir: opts.dir,
       }),
   );
 
