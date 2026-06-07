@@ -1,52 +1,57 @@
 /**
  * HeroUI icon foundation — the `icons` DECISION page.
  *
- * `HEROUI_ICONS` is the data (lucide family · the `$icon.*` size scale ·
- * a semantic role→glyph map). `iconsFoundation()` emits it as a token-bound
- * Pencil page: a size-scale strip (each glyph sized by a `$icon.*` token) and
- * a grouped semantic grid (each glyph tinted by a `$color.*` token). Because
- * the page references the same scalars a component would, the foundation and
- * the catalog stay in lockstep — change `icon.md` once, both move.
+ * Icons are emitted as `path` nodes from Font Awesome glyph geometry
+ * (`fa-icons.ts`), so they render headlessly (vector, no icon font) AND match
+ * the brand's Font Awesome set. Free-solid geometry today; swap to FA Pro
+ * Sharp-Solid via the same `path` mechanism when the Pro kit is available.
+ * Sizes bind `$icon.*`, tints bind `$color.*` — same lockstep as the others.
  */
 
 import type { IconFoundation } from '../../design-system/icons.ts';
-import { frame, icon, text } from '../../pen/builder.ts';
+import { frame, text } from '../../pen/builder.ts';
 import type { Child } from '../../pen/schema.ts';
 import type { FoundationSpec, MockupContext } from '../_core/adapter.ts';
+import { faIconNode } from './fa-icons.ts';
 
-/** lucide glyph names (matches `icon()`'s `iconFontFamily: 'lucide'`). */
+/** Semantic role → Font Awesome glyph name (keys exist in FA_GLYPHS). */
 export const HEROUI_ICONS: IconFoundation = {
-  family: 'lucide',
+  family: 'fontawesome',
   sizeKeys: ['icon.xs', 'icon.sm', 'icon.md', 'icon.lg', 'icon.xl', 'icon.2xl'],
   semantic: [
     { group: 'Actions', role: 'add', icon: 'plus' },
-    { group: 'Actions', role: 'edit', icon: 'pencil' },
-    { group: 'Actions', role: 'delete', icon: 'trash-2' },
+    { group: 'Actions', role: 'edit', icon: 'pen-to-square' },
+    { group: 'Actions', role: 'delete', icon: 'trash-can' },
     { group: 'Actions', role: 'duplicate', icon: 'copy' },
-    { group: 'Actions', role: 'save', icon: 'save' },
-    { group: 'Actions', role: 'search', icon: 'search' },
+    { group: 'Actions', role: 'save', icon: 'floppy-disk' },
+    { group: 'Actions', role: 'search', icon: 'magnifying-glass' },
     { group: 'Actions', role: 'filter', icon: 'filter' },
-    { group: 'Actions', role: 'settings', icon: 'settings' },
+    { group: 'Actions', role: 'settings', icon: 'gear' },
     { group: 'Actions', role: 'download', icon: 'download' },
     { group: 'Actions', role: 'upload', icon: 'upload' },
-    { group: 'Actions', role: 'share', icon: 'share-2' },
-    { group: 'Navigation', role: 'menu', icon: 'menu' },
-    { group: 'Navigation', role: 'close', icon: 'x' },
+    { group: 'Actions', role: 'share', icon: 'share-nodes' },
+    { group: 'Navigation', role: 'menu', icon: 'bars' },
+    { group: 'Navigation', role: 'close', icon: 'xmark' },
     { group: 'Navigation', role: 'back', icon: 'chevron-left' },
     { group: 'Navigation', role: 'forward', icon: 'chevron-right' },
     { group: 'Navigation', role: 'expand', icon: 'chevron-down' },
     { group: 'Navigation', role: 'collapse', icon: 'chevron-up' },
-    { group: 'Navigation', role: 'external', icon: 'external-link' },
+    { group: 'Navigation', role: 'external', icon: 'arrow-up-right-from-square' },
     { group: 'Navigation', role: 'more', icon: 'ellipsis' },
-    { group: 'Status', role: 'info', icon: 'info' },
+    { group: 'Status', role: 'info', icon: 'circle-info' },
     { group: 'Status', role: 'success', icon: 'circle-check' },
-    { group: 'Status', role: 'warning', icon: 'triangle-alert' },
-    { group: 'Status', role: 'danger', icon: 'octagon-alert' },
-    { group: 'Status', role: 'help', icon: 'circle-help' },
+    { group: 'Status', role: 'warning', icon: 'triangle-exclamation' },
+    { group: 'Status', role: 'danger', icon: 'circle-exclamation' },
+    { group: 'Status', role: 'help', icon: 'circle-question' },
+    { group: 'Domain', role: 'agent', icon: 'robot' },
+    { group: 'Domain', role: 'job', icon: 'list-check' },
+    { group: 'Domain', role: 'session', icon: 'terminal' },
+    { group: 'Domain', role: 'run', icon: 'play' },
+    { group: 'Domain', role: 'benchmark', icon: 'gauge-high' },
+    { group: 'Domain', role: 'diff', icon: 'code-compare' },
   ],
 };
 
-/** Semantic group → tint token (Status maps to status colors; rest neutral). */
 const STATUS_TINT: Record<string, string> = {
   info: 'color.accent',
   success: 'color.success',
@@ -64,7 +69,6 @@ function chunk<T>(arr: T[], n: number): T[][] {
   return out;
 }
 
-/** Build the icons foundation page from `HEROUI_ICONS`, token-bound. */
 function buildIconsPage(ctx: MockupContext): Child[] {
   let seq = 0;
   const nid = (p: string) => `fi-${p}-${seq++}`;
@@ -73,10 +77,10 @@ function buildIconsPage(ctx: MockupContext): Child[] {
   const fam = ctx.token('font.family');
 
   const header = frame('fi-header', { name: 'Header', layout: 'vertical', gap: 4 }, [
-    text('fi-title', 'Icons', { fill: fg, fontFamily: fam, fontSize: 28, fontWeight: '700' }),
-    text('fi-sub', `${HEROUI_ICONS.family} · ${HEROUI_ICONS.sizeKeys.length} sizes · ${HEROUI_ICONS.semantic.length} semantic roles`, {
+    text('fi-title', 'Icons', { fill: fg, fontFamily: ctx.token('font.display'), fontSize: 28, fontWeight: '700' }),
+    text('fi-sub', `Font Awesome · ${HEROUI_ICONS.sizeKeys.length} sizes · ${HEROUI_ICONS.semantic.length} semantic roles`, {
       fill: muted,
-      fontFamily: fam,
+      fontFamily: ctx.token('font.mono'),
       fontSize: 14,
     }),
   ]);
@@ -84,11 +88,7 @@ function buildIconsPage(ctx: MockupContext): Child[] {
   // Size scale — one representative glyph at each $icon.* token size.
   const sizeCells = HEROUI_ICONS.sizeKeys.map((key) =>
     frame(nid('size'), { name: key, layout: 'vertical', gap: 6, alignItems: 'center', width: CELL }, [
-      icon(nid('sizeglyph'), 'star', {
-        width: ctx.token(key),
-        height: ctx.token(key),
-        fill: fg,
-      }),
+      faIconNode(nid('sizeglyph'), 'gear', ctx.token(key), fg),
       text(nid('sizelabel'), key.replace('icon.', ''), { fill: muted, fontFamily: fam, fontSize: 11 }),
     ]),
   );
@@ -105,13 +105,9 @@ function buildIconsPage(ctx: MockupContext): Child[] {
     const rows = chunk(entries, PER_ROW).map((row) =>
       frame(nid('semrow'), { name: 'row', layout: 'horizontal', gap: 8 }, row.map((e) =>
         frame(nid('cell'), { name: e.role, layout: 'vertical', gap: 5, alignItems: 'center', width: CELL }, [
-          icon(nid('glyph'), e.icon, {
-            width: ctx.token('icon.lg'),
-            height: ctx.token('icon.lg'),
-            fill: ctx.token(STATUS_TINT[e.role] ?? 'color.foreground'),
-          }),
+          faIconNode(nid('glyph'), e.icon, ctx.token('icon.lg'), ctx.token(STATUS_TINT[e.role] ?? 'color.foreground')),
           text(nid('role'), e.role, { fill: fg, fontFamily: fam, fontSize: 11 }),
-          text(nid('glyphname'), e.icon, { fill: muted, fontFamily: fam, fontSize: 9 }),
+          text(nid('glyphname'), e.icon, { fill: muted, fontFamily: ctx.token('font.mono'), fontSize: 9 }),
         ]),
       )),
     );

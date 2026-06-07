@@ -19,10 +19,11 @@ describe('icons foundation', () => {
     const json = JSON.stringify(nodes);
     // the size strip binds every $icon.* size token (foundation ↔ components)
     for (const k of HEROUI_ICONS.sizeKeys) expect(json).toContain(`$${k}`);
-    // tints reference color tokens; glyphs are the declared lucide names
+    // tints reference color tokens; glyphs are FA path nodes (render headless)
     expect(json).toContain('$color.foreground');
-    expect(json).toContain('octagon-alert');
-    expect(json).toContain('"iconFontFamily":"lucide"');
+    expect(json).toContain('"type":"path"');
+    expect(json).toContain('"geometry"');
+    expect(json).toContain('robot'); // an FA domain glyph name
   });
 
   it('emits the icons page into the document and stays valid', () => {

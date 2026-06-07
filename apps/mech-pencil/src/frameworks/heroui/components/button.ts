@@ -45,8 +45,9 @@
  */
 
 import type { BuildContext } from '../../../design-system/atomic.ts';
-import { frame, icon, reusable, text, withMeta } from '../../../pen/builder.ts';
+import { frame, reusable, text, withMeta } from '../../../pen/builder.ts';
 import type { Child } from '../../../pen/schema.ts';
+import { faIconNode } from '../fa-icons.ts';
 
 export class ButtonSpecNotImplemented extends Error {
   constructor() {
@@ -66,12 +67,8 @@ export class ButtonSpecNotImplemented extends Error {
  * the button's structure. Mirrors `card.ts`.
  */
 export function buildButton(ctx: BuildContext): Child {
-  // Leading glyph — consumes the ICON foundation (`$icon.sm`).
-  const glyph = icon('button-icon', 'plus', {
-    width: ctx.token('icon.sm'),
-    height: ctx.token('icon.sm'),
-    fill: ctx.color('accent-foreground'),
-  });
+  // Leading glyph — an FA path icon sized by the ICON foundation (`$icon.sm`).
+  const glyph = faIconNode('button-icon', 'plus', ctx.token('icon.sm'), ctx.color('accent-foreground'));
   // Label — consumes the TYPOGRAPHY foundation (`$font.body-md.size`).
   const label = text('button-label', 'Button', {
     fill: ctx.color('accent-foreground'),
