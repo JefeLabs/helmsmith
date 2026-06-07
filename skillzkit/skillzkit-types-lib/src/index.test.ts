@@ -14,7 +14,7 @@ describe('@ecruz165/skillzkit-types', () => {
     expect(catalog.version).toBe(1);
   });
 
-  it('Command requires slug/path/kind/description/references/referencedBy/body/frontmatter; outcome optional', () => {
+  it('Command requires slug/path/kind/description/references/referencedBy/dependsOn/dependents/body/frontmatter; outcome optional', () => {
     const cmd: Command = {
       slug: 'core:tools:npm',
       path: 'core/tools/npm.md',
@@ -22,11 +22,15 @@ describe('@ecruz165/skillzkit-types', () => {
       description: 'Install npm packages',
       references: [],
       referencedBy: [],
+      dependsOn: [],
+      dependents: [],
       body: '# npm tool\n\nInstall packages.',
       frontmatter: {},
     };
     expect(cmd.outcome).toBeUndefined();
     expect(cmd.tags).toBeUndefined();
+    expect(cmd.requires).toBeUndefined();
+    expect(cmd.produces).toBeUndefined();
   });
 
   it('ItemKind union is exhaustive', () => {

@@ -21,10 +21,10 @@ describe('suggestNext', () => {
   });
 
   it('scores workflow-wrapper suggestions at 0.5 above reverse-dep baselines', () => {
-    // buttons is referenced by product:greenfield (wraps-X at 0.5) AND
-    // by reverse-dep tasks (consumes-X at 0.3). The workflow should
-    // sort first.
-    const result = suggestNext('core:frameworks:heroui:components:buttons');
+    // colors-select is referenced by product:greenfield (wraps-X at 0.5) AND
+    // by reverse-dep tasks like scaffold/research (consumes-X at 0.3). The
+    // workflow should sort first.
+    const result = suggestNext('product:design:foundations:colors-select');
     expect(result.length).toBeGreaterThan(1);
     const workflow = result.find((s) => s.kind === 'workflow');
     expect(workflow).toBeDefined();
@@ -33,10 +33,10 @@ describe('suggestNext', () => {
   });
 
   it('scores active-workflow positional next at 1.0', () => {
-    const result = suggestNext('core:frameworks:heroui:components:buttons', {
+    const result = suggestNext('product:design:foundations:colors-select', {
       activeWorkflowState: {
         workflow: 'product:greenfield',
-        currentStep: 'buttons',
+        currentStep: 'colors-select',
       },
     });
     const positional = result.find((s) => s.reason === 'next-in-active-workflow');

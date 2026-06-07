@@ -64,6 +64,27 @@ export interface Command {
   /** Inverse of `references`. Computed at catalog-build time. */
   referencedBy: string[];
   /**
+   * Artifact paths/globs this command needs to exist before it runs,
+   * declared in frontmatter (e.g. `["product/.pencil-brand.json"]`).
+   * Drives the build-order graph — distinct from `references` (which is
+   * "mentions /slug in prose"); `requires` is "needs this artifact".
+   */
+  requires?: string[];
+  /**
+   * Artifact paths/globs this command creates, declared in frontmatter
+   * (e.g. `["design/foundations/*.pen"]`). A command B `dependsOn` A
+   * when one of A's `produces` satisfies one of B's `requires`.
+   */
+  produces?: string[];
+  /**
+   * Command slugs that must run first — those whose `produces` satisfy
+   * this command's `requires`. Computed at catalog-build time; a
+   * topological sort over this edge set yields build order.
+   */
+  dependsOn: string[];
+  /** Inverse of `dependsOn`. Computed at catalog-build time. */
+  dependents: string[];
+  /**
    * Orthogonal discovery metadata. Two-tier: curated `core` tags
    * (TAGS.md) plus free-form `extension` tags.
    */

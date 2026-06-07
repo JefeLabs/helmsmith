@@ -2,6 +2,10 @@
 description: Generate the Forms component page — TextField, Input, InputGroup, InputOTP, NumberField, SearchField, TextArea, Checkbox, RadioGroup, Switch, Form primitives.
 argument-hint: [--no-dark]
 allowed-tools: Read, Write, Edit, Bash, mcp__pencil__*
+requires:
+  - design/components/buttons.pen
+produces:
+  - design/components/forms.pen
 ---
 
 Generate `design/components/forms.pen` — every form input and its states.
