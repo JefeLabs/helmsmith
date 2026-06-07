@@ -26,7 +26,8 @@ import {
   slugForAlias,
 } from '../frameworks/heroui/foundations.ts';
 import { heroUIAdapter } from '../frameworks/heroui/index.ts';
-import { frame, ref, text } from '../pen/builder.ts';
+import { PAGE_TEMPLATES, VIEWPORTS } from '../frameworks/heroui/templates.ts';
+import { frame, text } from '../pen/builder.ts';
 import { PenDocument } from '../pen/document.ts';
 import type { Child } from '../pen/schema.ts';
 import { type ValidationResult, validateDocument } from '../pen/validate.ts';
@@ -133,16 +134,21 @@ export function emitSystem(tokens: TokenSet): SystemBundle {
     screens.push(spec.slug);
   }
 
-  // Demo the desktop page templates: import each lib + ref its page, parked in
-  // their own column left of the screens.
+  // Demo the desktop page templates by INLINING them (local copies). A cross-file
+  // ref to an IMPORTED page doesn't resolve its nested component refs (renders
+  // black), so we rebuild each page here: its card/button refs resolve against
+  // base's local palette, and its $tokens against the foundation imports.
   const demos: string[] = [];
-  let tplIdx = 0;
-  for (const t of templates.filter((x) => x.viewport === 'desktop')) {
-    const alias = `tpl${tplIdx}`;
-    base.importLib(alias, `./templates/${t.slug}.lib.pen`);
-    base.add(ref(`base-demo-${t.slug}`, `${alias}:${t.pageId}`, { x: -1700, y: tplIdx * 1000 }));
-    demos.push(t.slug);
-    tplIdx++;
+  const desktop = VIEWPORTS.find((v) => v.id === 'desktop') ?? VIEWPORTS[0];
+  let demoX = -1800;
+  for (const t of PAGE_TEMPLATES) {
+    const page = t.build(mockCtx, desktop);
+    const p = page as Child & { x?: number; y?: number };
+    p.x = demoX;
+    p.y = 0;
+    demoX -= desktop.width + 160;
+    base.add(page);
+    demos.push(`${t.id}-desktop`);
   }
 
   return {

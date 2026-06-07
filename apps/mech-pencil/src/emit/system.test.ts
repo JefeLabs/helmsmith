@@ -36,9 +36,10 @@ describe('emitSystem (option A, B3)', () => {
 
   it('includes page templates and the base demos the desktop ones', () => {
     expect(sys.templates).toHaveLength(12); // 4 templates × 3 viewports
-    expect(sys.base.demos).toHaveLength(4); // one per desktop template
+    expect(sys.base.demos).toHaveLength(4); // one per desktop template, inlined
     const imp = sys.base.doc.toObject().imports ?? {};
-    // base imports the desktop template libs under tpl* aliases
-    expect(Object.keys(imp).some((k) => /^tpl\d+$/.test(k))).toBe(true);
+    // demos are INLINED local copies (cross-file page refs render black), so the
+    // base does NOT import template libs — only the foundation libs.
+    expect(Object.keys(imp).some((k) => /^tpl\d+$/.test(k))).toBe(false);
   });
 });
