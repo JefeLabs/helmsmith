@@ -6,13 +6,14 @@ import { aliasesReferenced, multiAliasBuildContext } from './foundations.ts';
 const ctx = multiAliasBuildContext();
 
 describe('components → multi-alias (option A, B1)', () => {
-  it('Button references all four foundation libs by alias', () => {
+  it('Button references the colors/type/grids foundation libs by alias', () => {
     const json = JSON.stringify(buildButton(ctx));
     expect(json).toContain('$colors:color.accent');
     expect(json).toContain('$type:font.body-md.size');
-    expect(json).toContain('$icons:icon.sm');
     expect(json).toMatch(/\$grids:(space|radius)\./);
-    expect(aliasesReferenced(json).sort()).toEqual(['colors', 'grids', 'icons', 'type']);
+    // its FA glyph is a path with a LITERAL size (path widths can't be $tokens),
+    // so the button doesn't reference the icons lib in the .pen.
+    expect(aliasesReferenced(json).sort()).toEqual(['colors', 'grids', 'type']);
   });
 
   it('the whole catalog builds with only known foundation aliases (no legacy $tokens:)', () => {

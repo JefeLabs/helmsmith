@@ -36,8 +36,9 @@ describe('emitFoundations', () => {
   });
 
   it('preview pages import the foundation libs they reference (cross-alias)', () => {
-    // the icons page tints via $colors and labels via $type → imports all three
-    expect(bySlug.icons.imports).toEqual(expect.arrayContaining(['icons', 'colors', 'type']));
+    // the icons page tints via $colors and labels via $type (its own glyphs are
+    // literal-sized FA paths, so it doesn't import the icons lib itself)
+    expect(bySlug.icons.imports).toEqual(expect.arrayContaining(['colors', 'type']));
     const imp = bySlug.icons.preview.toObject().imports ?? {};
     expect(imp.colors).toBe('./colors.lib.pen');
     expect(imp.type).toBe('./typography.lib.pen');

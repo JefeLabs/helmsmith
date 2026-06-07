@@ -13,16 +13,15 @@ describe('icons foundation', () => {
     for (const k of HEROUI_ICONS.sizeKeys) expect(keys).toContain(k);
   });
 
-  it('builds a token-bound icons decision page', () => {
+  it('builds an icons decision page from FA path glyphs', () => {
     const nodes = iconsFoundation().build(ctx);
     expect(nodes).toHaveLength(1);
     const json = JSON.stringify(nodes);
-    // the size strip binds every $icon.* size token (foundation ↔ components)
-    for (const k of HEROUI_ICONS.sizeKeys) expect(json).toContain(`$${k}`);
-    // tints reference color tokens; glyphs are FA path nodes (render headless)
-    expect(json).toContain('$color.foreground');
+    // glyphs are FA path nodes (render headless); sizes are literal px (a
+    // $token on a path width renders 0), tints stay themed via $color.*
     expect(json).toContain('"type":"path"');
     expect(json).toContain('"geometry"');
+    expect(json).toContain('$color.foreground');
     expect(json).toContain('robot'); // an FA domain glyph name
   });
 

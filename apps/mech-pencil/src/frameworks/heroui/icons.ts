@@ -52,6 +52,13 @@ export const HEROUI_ICONS: IconFoundation = {
   ],
 };
 
+// path width/height must be LITERAL px — a $token ref on a path's size renders
+// 0 (verified). The icon scale still lives in tokens (code-gen); the .pen bakes
+// the px from it. Mirrors the icon.* SCALAR values in tokens.ts.
+const ICON_PX: Record<string, number> = {
+  'icon.xs': 12, 'icon.sm': 16, 'icon.md': 20, 'icon.lg': 24, 'icon.xl': 32, 'icon.2xl': 40,
+};
+
 const STATUS_TINT: Record<string, string> = {
   info: 'color.accent',
   success: 'color.success',
@@ -88,7 +95,7 @@ function buildIconsPage(ctx: MockupContext): Child[] {
   // Size scale — one representative glyph at each $icon.* token size.
   const sizeCells = HEROUI_ICONS.sizeKeys.map((key) =>
     frame(nid('size'), { name: key, layout: 'vertical', gap: 6, alignItems: 'center', width: CELL }, [
-      faIconNode(nid('sizeglyph'), 'gear', ctx.token(key), fg),
+      faIconNode(nid('sizeglyph'), 'gear', ICON_PX[key] ?? 24, fg),
       text(nid('sizelabel'), key.replace('icon.', ''), { fill: muted, fontFamily: fam, fontSize: 11 }),
     ]),
   );
@@ -105,7 +112,7 @@ function buildIconsPage(ctx: MockupContext): Child[] {
     const rows = chunk(entries, PER_ROW).map((row) =>
       frame(nid('semrow'), { name: 'row', layout: 'horizontal', gap: 8 }, row.map((e) =>
         frame(nid('cell'), { name: e.role, layout: 'vertical', gap: 5, alignItems: 'center', width: CELL }, [
-          faIconNode(nid('glyph'), e.icon, ctx.token('icon.lg'), ctx.token(STATUS_TINT[e.role] ?? 'color.foreground')),
+          faIconNode(nid('glyph'), e.icon, ICON_PX['icon.lg'], ctx.token(STATUS_TINT[e.role] ?? 'color.foreground')),
           text(nid('role'), e.role, { fill: fg, fontFamily: fam, fontSize: 11 }),
           text(nid('glyphname'), e.icon, { fill: muted, fontFamily: ctx.token('font.mono'), fontSize: 9 }),
         ]),
