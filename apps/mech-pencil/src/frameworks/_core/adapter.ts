@@ -42,6 +42,22 @@ export interface MockupContext {
   token: (key: string) => string;
 }
 
+/**
+ * A foundation DECISION page (colors · typography · icons · grids/spacing).
+ * Unlike a mockup it composes raw nodes that visualize a foundation and
+ * reference its `$tokens` — the canonical, themeable record of a decision
+ * that the component catalog then consumes. Emitted as a top-level page in
+ * the document, same `ctx.token(...)` binding as mockups.
+ */
+export interface FoundationSpec {
+  /** Foundation slug, e.g. `"icons"` (becomes the page name/id seed). */
+  slug: string;
+  /** Human title. */
+  name: string;
+  /** Top-level nodes of the foundation page. */
+  build: (ctx: MockupContext) => Child[];
+}
+
 export interface FrameworkAdapter {
   /** Stable id used as `--framework <id>` and in the registry. */
   id: string;
@@ -56,6 +72,8 @@ export interface FrameworkAdapter {
   tokens(): TokenSet;
   /** The atomic component catalog emitted into the library. */
   components(): ComponentSpec[];
+  /** Optional foundation decision pages (colors · typography · icons · …). */
+  foundations?(): FoundationSpec[];
   /** Optional starter mockups that reference the library. */
   mockups?(): MockupSpec[];
   /**

@@ -134,4 +134,31 @@ export const SCALARS: { key: string; type: 'number' | 'string'; value: number | 
   { key: 'font.size-sm', type: 'number', value: 14 },
   { key: 'font.size-md', type: 'number', value: 16 },
   { key: 'font.size-lg', type: 'number', value: 18 },
+  // Icon foundation — size scale (px). Components size glyphs via these
+  // (`$icon.sm` in a button, etc.); the icons foundation page renders them.
+  { key: 'icon.xs', type: 'number', value: 12 },
+  { key: 'icon.sm', type: 'number', value: 16 },
+  { key: 'icon.md', type: 'number', value: 20 },
+  { key: 'icon.lg', type: 'number', value: 24 },
+  { key: 'icon.xl', type: 'number', value: 32 },
+  { key: 'icon.2xl', type: 'number', value: 40 },
+  // Typography foundation — mono family + the type-scale sizes (px).
+  // Components size text via these (`$font.body-md.size`); the typography
+  // page specimens each step from the same tokens. Weights/line-heights
+  // live in the foundation data (heroui/typography.ts).
+  { key: 'font.display', type: 'string', value: 'Inter' },
+  { key: 'font.mono', type: 'string', value: 'JetBrains Mono' },
+  { key: 'font.display-2xl.size', type: 'number', value: 60 },
+  { key: 'font.display-xl.size', type: 'number', value: 48 },
+  { key: 'font.h1.size', type: 'number', value: 36 },
+  { key: 'font.h2.size', type: 'number', value: 30 },
+  { key: 'font.h3.size', type: 'number', value: 24 },
+  { key: 'font.h4.size', type: 'number', value: 20 },
+  { key: 'font.h5.size', type: 'number', value: 16 },
+  { key: 'font.body-lg.size', type: 'number', value: 16 },
+  { key: 'font.body-md.size', type: 'number', value: 14 },
+  { key: 'font.body-sm.size', type: 'number', value: 13 },
+  { key: 'font.caption.size', type: 'number', value: 12 },
+  { key: 'font.code-md.size', type: 'number', value: 13 },
+  { key: 'font.code-sm.size', type: 'number', value: 12 },
 ];
