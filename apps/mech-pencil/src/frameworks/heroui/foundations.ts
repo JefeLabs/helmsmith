@@ -9,6 +9,7 @@
  * `space.4`/`grid.gutter`/`radius.md` → `$grids:…`.
  */
 
+import type { BuildContext } from '../../design-system/atomic.ts';
 import type { FoundationSpec, MockupContext } from '../_core/adapter.ts';
 import { colorsFoundation } from './colors.ts';
 import { gridsFoundation } from './grids.ts';
@@ -60,4 +61,26 @@ export function multiAliasContext(): MockupContext {
     component: (id) => id,
     token: (key) => `$${aliasForKey(key)}:${key}`,
   };
+}
+
+/**
+ * Component build context for option A: colors go to `$colors:`, every other
+ * token routes by prefix. The 71-component catalog builds through this so each
+ * component's refs cross to the correct foundation `.lib.pen`.
+ */
+export function multiAliasBuildContext(): BuildContext {
+  return {
+    color: (name) => `$colors:color.${name}`,
+    token: (key) => `$${aliasForKey(key)}:${key}`,
+  };
+}
+
+/** The foundation aliases a built node tree references (for import wiring). */
+export function aliasesReferenced(json: string): string[] {
+  const out = new Set<string>();
+  const re = /\$([a-z][a-z0-9]*):/g;
+  let m: RegExpExecArray | null;
+  // biome-ignore lint/suspicious/noAssignInExpressions: standard regex exec loop
+  while ((m = re.exec(json)) !== null) if (slugForAlias(m[1])) out.add(m[1]);
+  return [...out];
 }
