@@ -45,7 +45,7 @@
  */
 
 import type { BuildContext } from '../../../design-system/atomic.ts';
-import { frame, reusable, text, withMeta } from '../../../pen/builder.ts';
+import { frame, icon, reusable, text, withMeta } from '../../../pen/builder.ts';
 import type { Child } from '../../../pen/schema.ts';
 
 export class ButtonSpecNotImplemented extends Error {
@@ -66,10 +66,17 @@ export class ButtonSpecNotImplemented extends Error {
  * the button's structure. Mirrors `card.ts`.
  */
 export function buildButton(ctx: BuildContext): Child {
+  // Leading glyph — consumes the ICON foundation (`$icon.sm`).
+  const glyph = icon('button-icon', 'plus', {
+    width: ctx.token('icon.sm'),
+    height: ctx.token('icon.sm'),
+    fill: ctx.color('accent-foreground'),
+  });
+  // Label — consumes the TYPOGRAPHY foundation (`$font.body-md.size`).
   const label = text('button-label', 'Button', {
     fill: ctx.color('accent-foreground'),
     fontFamily: ctx.token('font.family'),
-    fontSize: ctx.token('font.size-md'),
+    fontSize: ctx.token('font.body-md.size'),
     fontWeight: '600',
   });
 
@@ -83,12 +90,13 @@ export function buildButton(ctx: BuildContext): Child {
           fill: ctx.color('accent'),
           cornerRadius: ctx.token('radius.md'),
           layout: 'horizontal',
-          gap: ctx.token('space.unit'),
-          padding: [16, 10],
+          // gap + padding consume the SPACING foundation (`$space.*`).
+          gap: ctx.token('space.2'),
+          padding: [ctx.token('space.3'), ctx.token('space.4')],
           justifyContent: 'center',
           alignItems: 'center',
         },
-        [label],
+        [glyph, label],
       ),
     ),
     { type: 'component', framework: 'heroui', atomic: 'atom', fidelity: 'full' },
