@@ -29,7 +29,7 @@ export function emitBrand(
   brand: BrandFile,
   brandFileName = 'brand',
 ): EmittedBrand {
-  const { variables, counts } = brandToTokens(brand);
+  const { variables, counts } = brandToTokens(brand, adapter.tokens().scalars);
 
   const brandDoc = new PenDocument();
   for (const [key, decl] of Object.entries(variables)) brandDoc.variable(key, decl);
