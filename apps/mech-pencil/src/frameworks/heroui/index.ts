@@ -24,6 +24,7 @@ import type {
 } from '../_core/adapter.ts';
 import { catalogStats, heroUIComponents } from './catalog.ts';
 import { type DeriveResult, deriveHeroUITokens } from './derive.ts';
+import { gridsFoundation } from './grids.ts';
 import { iconsFoundation } from './icons.ts';
 import { typographyFoundation } from './typography.ts';
 
@@ -184,7 +185,7 @@ export const heroUIAdapter: FrameworkAdapter = {
   },
 
   foundations(): FoundationSpec[] {
-    return [iconsFoundation(), typographyFoundation()];
+    return [iconsFoundation(), typographyFoundation(), gridsFoundation()];
   },
 
   mockups(): MockupSpec[] {
