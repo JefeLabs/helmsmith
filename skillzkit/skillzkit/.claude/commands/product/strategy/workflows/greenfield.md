@@ -1,376 +1,256 @@
 ---
 type: workflow
-outcome: Set up a new design system
-description: Setup a new design system from scratch. Brand definition through production-ready foundation, components, patterns, templates, and the first production page.
+outcome: Set up a new product design system end to end
+description: The parent product workflow for a new product from zero — UX (personas, journeys, stories, story maps), low-fi wireframes, research, brand decisions, deterministic design-system generation (mech-pencil), audit, and the first production page. Every product workflow runs as a phase here; optional phases prompt to skip.
 estimatedDuration: 4-8 hours interactive
-phases: 10
+phases: 8
 prerequisites:
-  - Pencil CLI or MCP server installed
+  - Pencil MCP server (for wireframes / pages) and/or @ecruz165/mech-pencil (for system generation)
   - LLM provider credentials configured
-  - Empty or new project repo (no design/ folder, or empty design/)
+  - Empty or new project repo
 ---
 
-# Workflow — Greenfield
+# Workflow — Greenfield (parent)
 
-> **When to use**: starting a new product from zero. No existing
-> brand, no existing pages, nothing in `design/`.
+> **When to use**: starting a new product from zero.
 >
-> **When NOT to use**: any existing product UI worth preserving —
-> use `migrate-to-pencil` instead.
+> **When NOT to use**: an existing product UI worth preserving — use
+> `migrate-to-pencil` instead. To add to / improve an existing system,
+> use the `brownfield-*` workflows.
+
+This is the **parent workflow**. Every other product workflow/command runs
+as a phase below. The dependency graph (not strict linear order):
+
+```
+ux-foundation ─┬─→ wireframes ───────────────────────────────┐
+               └─→ stories ──────────────────────────────────┤
+research ──────────→ brand-foundation → foundation-selection → system-generation → audit → first-production-page
+                     (research feeds brand + selection)        (HITL gate)         (system)   (page + page-audit)
+```
+
+Two tracks run in parallel and **converge at the first page**: the
+**UX/structure** track (`ux:*` → `design:explore`) and the **brand/system**
+track (`research` → `scaffold` → `*-select` → `mech-pencil system`).
+
+## Optional-step convention (skip prompts)
+
+Phases marked **OPTIONAL** must **prompt the user before running**:
+
+> *"Run **<phase>**? — <one-line value>. It's optional; skip if <reason>.
+> [run / skip]"*
+
+- On **run**: execute the phase, then `/core:workflows:manage complete <phase>`.
+- On **skip**: `/core:workflows:manage complete <phase> --skip` and continue.
+  Never silently skip or silently run — always surface the choice.
+
+**Required** phases run without a skip prompt (they still pause for review
+where noted). If a required phase's input is missing because an upstream
+optional phase was skipped, use the documented **fallback**.
 
 ## Outputs of a complete run
 
-- `product/.pencil-brand.json` (brand state)
-- `design/foundations/*.pen` (16 foundation files)
-- `app/globals.css` `@theme` block (tokens written)
-- `design/heroui/components/*.pen` (12 component group files)
-- `src/components/*` (React components)
-- `design/research/<industry>.{md,pen,json}` (if research run)
-- `product/.pencil-recommended-patterns.md`
-- `product/.pencil-recommended-templates.md`
-- `design/patterns/*.pen` (8–10 pattern files based on selection)
-- `design/templates/*.pen` (5–14 template files based on selection)
-- `design/briefs/<first-page>.md`
-- `design/pages/<first-page>.pen`
-- `src/pages/<first-page>.tsx`
+- `product/.pencil-ux.json` + `docs/ux/**` — personas, journeys, stories, story map *(if UX run)*
+- `design/explorations/<story>.pen` — low-fi wireframes *(if wireframes run)*
+- `design/research/<industry>.{md,pen,json}` *(if research run)*
+- `product/.pencil-brand.json` — brand decisions (colors/typography/icons/grids)
+- `product/design/system/**` — generated system: `foundations/`, `components/`, `templates/`, `base.pen` (each `.lib.pen` + PNG)
+- `design/pages/<first-page>.pen` + `src/pages/<first-page>.tsx` — first production page
 
-## Phase 1 — Brand foundation
+---
 
-**Prerequisite**: empty `design/` folder, or `design/` doesn't exist.
+## Phase 1 — UX foundation  **(OPTIONAL, recommended)**
 
-**Action**: define core brand inputs.
+Prompt: *"Run UX foundation? — personas, journeys, stories, and a story
+map that justify every screen. Skip only if you already have these or the
+surface is trivial. [run / skip]"*
 
 ```bash
-# Interactive (recommended for first run):
-/product:strategy:scaffold
-
-# Non-interactive (when inputs are known):
-/product:strategy:scaffold "Acme" --primary "#0A84FF" --secondary "#7C3AED" --no-dark
+/product:ux:personas:define            # who (+ define-jtbd)
+/product:ux:journeys:map <name>        # user journeys (+ pain-points)
+/product:ux:stories:write              # user stories (+ acceptance-criteria)
+/product:ux:story-maps:build <name>    # backbone + stories per journey (+ slice for MVP)
 ```
 
-The `scaffold` command's Phase 1 prompts for: brand name,
-industry, audience, audience-regulation, primary + secondary
-colors, fonts, dark-mode support, multilingual scripts.
+⇒ `product/.pencil-ux.json`. **These stories are the source of truth reused
+by Phase 2 and Phase 8 — they are not regenerated downstream.**
 
-After this phase, `product/.pencil-brand.json` exists with the
-core brand fields populated.
+**Mark complete**: `/core:workflows:manage complete ux-foundation`
+
+## Phase 2 — Low-fi wireframes  **(OPTIONAL, recommended)**
+
+Prompt: *"Run low-fi wireframes? — grayscale structural explorations per
+story before committing to a direction. Skip if layouts are obvious.
+[run / skip]"*
+
+Per MVP story, generate structurally-different low-fi wireframes (grayscale,
+FA icons, storyboard rows). Token-independent — does **not** need the brand:
+
+```bash
+/product:design:explore "@docs/ux/stories/<id>.md" --n 3 --device desktop
+```
+
+**Input / fallback:** consumes Phase 1 stories. **If Phase 1 was skipped**,
+`design:explore` also accepts a brief/intent string directly —
+`/product:design:explore "<one-line page intent>"` — so it never blocks on
+missing stories. Note the chosen structural direction per screen; it feeds
+Phase 8.
+
+**Mark complete**: `/core:workflows:manage complete wireframes`
+
+## Phase 3 — Research  **(OPTIONAL)**
+
+Prompt: *"Run competitive/industry research? Surfaces category conventions
++ differentiation (~1h). Skip if the industry is novel or budget is tight.
+[run / skip]"*
+
+```bash
+/product:strategy:research "<industry>" --depth standard --competitors <urls>
+```
+
+**Sequencing:** research runs **before brand (Phase 4)** so it can shape
+brand strategy, and it feeds **foundation-selection (Phase 5)**. It may also
+run first (parallel to Phase 1) to inform the UX framing. Both
+`strategy:scaffold` and the `*-select` deciders accept
+`--informed-by design/research/<industry>.json`.
+
+**Mark complete**: `/core:workflows:manage complete research` (or `--skip`)
+
+## Phase 4 — Brand foundation  **(required)**
+
+Define core brand inputs — this **authors `product/.pencil-brand.json`**.
+Pass research from Phase 3 so it actually shapes the brand:
+
+```bash
+/product:strategy:scaffold [--informed-by design/research/<industry>.json]
+# interactive: brand name, industry, audience, audience-regulation,
+# primary/secondary, fonts, dark-mode, scripts
+```
 
 **Mark complete**: `/core:workflows:manage complete brand-foundation`
 
-**Optional — early stakeholder review.** If brand inputs warrant
-buy-in before committing to component generation, export the brand
-JSON's foundation directions to `.fig` for stakeholder review:
+## Phase 5 — Foundation selection  **(required)**
+
+The `*-select` deciders — they **update `product/.pencil-brand.json`** (the
+single source Phase 6 generates from). Pass `--informed-by` if Phase 3 ran:
 
 ```bash
-# Render a quick foundations.pen preview, then export:
-/product:design:foundations:colors
-/product:design:export design/foundations/colors.pen --to figma --include-tokens
-```
-
-Stakeholders review the `.fig` in Figma, return feedback. Bring
-changes back via `/product:design:export --from-fig --diff-merge` before
-proceeding to Phase 2. This adds 1-2 days but reduces the
-likelihood of having to rework foundations after Phase 5.
-
-## Phase 2 — Research (recommended)
-
-**Decision**: do you want competitive / industry research before
-foundations?
-
-- **Yes** (default for B2B / consumer products): research surfaces
-  category conventions and differentiation opportunities. Adds
-  ~1 hour.
-- **No** (when industry is novel or budget is tight): foundations
-  driven by brief alone. Brand decisions are less data-driven.
-
-```bash
-# Yes:
-/product:strategy:research "B2B ed-tech" --depth standard --competitors <urls>
-
-# No: skip
-/core:workflows:manage complete research --skip
-```
-
-After research completes:
-- `design/research/<industry>.json` exists
-- `design/research/<industry>.md` (narrative summary)
-- `design/research/<industry>.pen` (visual comparison grid)
-
-**Mark complete**: `/core:workflows:manage complete research`
-
-## Phase 3 — Foundation selection
-
-**Prerequisite**: Phase 1 complete. Phase 2 outputs available if run.
-
-Run the four selection commands. Each writes to brand JSON +
-`@theme` atomically. Use `--informed-by` if research was run.
-
-```bash
-# Run in this order — each pauses for review:
-/product:design:foundations:colors-select  --informed-by design/research/<industry>.json
-/product:design:foundations:fonts-select   --informed-by design/research/<industry>.json
+/product:design:foundations:colors-select  [--informed-by design/research/<industry>.json]
+/product:design:foundations:fonts-select
 /product:design:foundations:icons-select
-/product:design:foundations:imagery-select --informed-by design/research/<industry>.json
+/product:design:foundations:imagery-select
 ```
 
-For each select command, review candidates and confirm the choice.
-The chosen tokens persist atomically.
-
-**Tip**: pass `--dry-run` first to preview the diff if you're
-careful about the brand JSON state.
+**Ordering note (a choice, not a hard rule):** this is linear — colors are
+chosen before icons/imagery, so icons/imagery don't feed back into the
+palette. If `icons-select`/`imagery-select` surface a reason to shift the
+ramp, re-run `colors-select` (selection is safe to iterate; each writes
+atomically). Each step pauses for review.
 
 **Mark complete**: `/core:workflows:manage complete foundation-selection`
 
-## Phase 4 — Foundation rendering
+## Phase 6 — Design-system generation  **(required)**
 
-**Prerequisite**: Phase 3 complete (brand JSON + `@theme` populated).
-
-Render the foundation `.pen` files for visual reference. Some
-foundations also write additional tokens (motion, z-index, a11y,
-density, i18n).
+Generate the entire system **deterministically (zero-LLM)** from the brand
+JSON with **`@ecruz165/mech-pencil`** — this **replaces** the kit's former
+foundation-rendering, component, pattern, and template phases:
 
 ```bash
-# Pure render (read brand JSON, produce .pen):
-/product:design:foundations:colors
-/product:design:foundations:typography
-/product:design:foundations:icons
-/product:design:foundations:imagery
-/product:design:foundations:logos
-/product:design:foundations:spaces
-/product:design:foundations:grids
-
-# Token-writing + render:
-/product:design:foundations:motion
-/product:design:foundations:z-index
-/product:design:foundations:a11y
-/product:design:foundations:density
-/product:design:foundations:i18n  # follow the font-loading strategy in the output
+# from agentx-toolbox/apps/mech-pencil (run under bun):
+mech-pencil system -a <accent> -b <base> --font <family> -r <radius> -d product/design/system
+# (or: the no-args wizard → same system)
 ```
 
-These are mostly parallelizable — run them in batches if the
-Pencil CLI's task file mode is set up.
+Produces `product/design/system/`: `foundations/{colors,typography,icons,grids}.lib.pen`,
+`components/<category>.lib.pen`, `templates/<page>-<viewport>.lib.pen`, and `base.pen` —
+each with a faithful PNG (Pencil headless export; auth-gated).
 
-**Mark complete**: `/core:workflows:manage complete foundation-rendering`
+> **Single-source goal:** route this from `product/.pencil-brand.json` (the
+> brand path) so the file Phase 5 wrote actually drives generation.
+> See [[reference_mech_pencil_design_system_generator]].
+>
+> **Legacy kit path** (only if not using mech-pencil): the former
+> `foundations:*`, `core:frameworks:heroui:components:*`, `patterns:*`, and
+> `templates:*` render commands. Deprecated by the deterministic generator.
 
-## Phase 5 — Component generation
+**Review gate (HITL — required before audit).** This one phase replaces four
+former phases in a single shot, so do **not** auto-flow into audit. Open
+`product/design/system/base.pen` in Pencil and skim the foundation /
+component / template PNGs.
 
-**Prerequisite**: Phase 4 complete.
+> Prompt: *"System generated — review `base.pen` + the PNGs (palette, type,
+> icons, component fidelity). Proceed to audit, or regenerate? [proceed /
+> regenerate]"*
 
-Generate component `.pen` files in dependency order. Each command
-produces visual specs; React generation happens at the end of this
-phase.
+On **regenerate**: adjust Phase 5 (or the brand path) and re-run Phase 6.
 
-```bash
-# In dependency order (per .product-dependencies.json):
-/core:frameworks:heroui:components:surfaces
-/core:frameworks:heroui:components:buttons
-/core:frameworks:heroui:components:forms
-/core:frameworks:heroui:components:selection
-/core:frameworks:heroui:components:feedback
-/core:frameworks:heroui:components:overlays
-/core:frameworks:heroui:components:navigation
-/core:frameworks:heroui:components:data-display
-/core:frameworks:heroui:components:date-time
-/core:frameworks:heroui:components:color-system
-/core:frameworks:heroui:components:charts
-/core:frameworks:heroui:components:media
+**Mark complete**: `/core:workflows:manage complete system-generation`
 
-# Then build React for the foundation:
-/core:frameworks:heroui:build-components --foundation-only
-```
+## Phase 7 — System audit  **(required)**
 
-After this, `src/components/*` contains the React components and
-`product/.pencil-build-manifest.json` exists with foundation
-component entries.
-
-**Parallelization note**: the commands above are listed
-sequentially for clarity, but the dependency graph allows
-substantial parallelism. `surfaces` has no dependencies on other
-components, so it must run first; once it's done, `buttons`,
-`feedback`, `data-display`, and `media` can run in parallel
-(none depend on each other); `forms` depends on `buttons` so it
-runs after; `selection` depends on `forms`; and so on per
-`.product-dependencies.json`. The agent should batch parallel-safe
-commands rather than executing them one at a time. Phase 4
-(foundation rendering) is even more parallel-friendly — most
-foundations have no inter-foundation dependencies and can all run
-concurrently.
-
-**Mark complete**: `/core:workflows:manage complete component-generation`
-
-## Phase 6 — Pattern + template selection
-
-**Prerequisite**: Phase 5 complete. Phase 2 research available
-(strongly recommended for selection).
-
-```bash
-/product:design:patterns:select   --informed-by design/research/<industry>.json --strategy hybrid
-/product:design:templates:select  --informed-by design/research/<industry>.json --product-type saas
-```
-
-These produce `product/.pencil-recommended-patterns.md` and
-`product/.pencil-recommended-templates.md` — manifests with
-required / recommended / skipped entries. Review these before
-proceeding.
-
-**If no research was run**: select commands recommend the universal
-catalog (everything). Customize via `--force` / `--exclude` flags.
-
-**Mark complete**: `/core:workflows:manage complete pattern-template-selection`
-
-## Phase 7 — Pattern generation
-
-**Prerequisite**: Phase 6 complete.
-
-Generate the patterns marked as required / recommended:
-
-```bash
-# states is universal — always required:
-/product:design:patterns:states
-
-# The rest depend on selection. Common required:
-/product:design:patterns:hero
-/product:design:patterns:footer
-/product:design:patterns:cta
-/product:design:patterns:feature-grid
-/product:design:patterns:pricing-tier
-/product:design:patterns:faq
-/product:design:patterns:testimonial
-/product:design:patterns:banner
-/product:design:patterns:stat-section
-```
-
-Optionally build React for patterns:
-
-```bash
-/core:frameworks:heroui:build-components --include-patterns
-```
-
-**Mark complete**: `/core:workflows:manage complete pattern-generation`
-
-## Phase 8 — Template generation
-
-**Prerequisite**: Phase 7 complete.
-
-Generate templates marked as required / recommended in Phase 6.
-Common ones for SaaS products:
-
-```bash
-/product:design:templates:landing-page
-/product:design:templates:error-page
-/product:design:templates:auth                  # add --with-passkeys, --with-guardian-consent per brand
-/product:design:templates:dashboard
-/product:design:templates:settings
-/product:design:templates:pricing
-/product:design:templates:legal                 # add k-12 variants if applicable
-```
-
-Templates aren't built into React by default — they're per-page
-artifacts consumed when actual production pages are designed.
-
-**Mark complete**: `/core:workflows:manage complete template-generation`
-
-## Phase 9 — Audit
-
-**Prerequisite**: Phases 1–8 complete.
-
-Run the full audit to catch any drift from the generation pipeline:
+A quick **system-level** audit — spec conformance only:
 
 ```bash
 /audit
 ```
 
-Address all `fail`-severity findings before proceeding. Specifically
-watch for:
-- Plane 3 contrast violations (palette has insufficient contrast)
-- Plane 7c brand-fit failures (k-12 / regulated audience missing
-  required variants)
-- Plane 1 design-layer lint (when open-pencil is installed) —
-  catches issues in the `.pen` files themselves: contrast in
-  component variant frames, naming inconsistencies, layout
-  primitives that violate accessibility patterns
-
-Warnings are fine to defer — log them as follow-up tasks.
+This catches **generation** problems (contrast, regulated-audience variants,
+design-layer lint) but **not usage** problems — a system audited in isolation
+looks fine until a real page exercises it. So this is the *cheap* pass; the
+real stress test (a page-level audit) is folded into Phase 8. Address all
+`fail`-severity findings; warnings are deferrable.
 
 **Mark complete**: `/core:workflows:manage complete audit`
 
-## Phase 10 — First production page
+## Phase 8 — First production page + page audit  **(required to ship)**
 
-**Prerequisite**: Phases 1–9 complete. Audit passed (no fails).
+Compose the first real page — the cheapest real stress test of the system —
+then audit *in use*.
 
-Now design and ship the first real production page. The full per-
-page pipeline:
+**Reuse, don't regenerate:** this phase consumes Phase 1 stories and Phase 2
+wireframes directly. Only fall back to writing a brief / deriving stories /
+exploring here if those phases were skipped.
 
 ```bash
-# 1. Capture the page's intent:
+# brief + stories ONLY if Phase 1 was skipped (else reuse Phase 1 stories):
 /product:strategy:brief
-
-# 2. Derive user stories:
 /product:strategy:user-stories <brief-slug>
-
-# 3. Low-fi structural exploration:
+# wireframe ONLY if Phase 2 was skipped (else reuse design/explorations/<story>.pen):
 /product:design:explore "<story>"
 
-# 4. (Optional, only for greenfield brand-direction refinement)
-#    High-fi direction-set exploration:
-/product:design:design-page --based-on design/explorations/<story>.pen \
-                    --page-set saas --directions 3
-# Review, pick a direction, then:
-/product:design:design-page --finalize <direction>
-
-# 5. Per-page production design:
 /product:design:design-page <page-name> --based-on design/explorations/<story>.pen
-
-# 6. Build React:
 /core:frameworks:heroui:build-components <page-slug>
+
+# page-level audit — the usage stress test the system audit can't do:
+/audit --scope page:<page-name>
 ```
 
-After this, the first real product page is shipped.
-
-**Optional — designer handoff.** If your team has designers who
-prefer to review pages in Figma rather than Pencil, hand off the
-finalized page via `.fig` for review. If feedback comes back as an
-edited `.fig`, use `/product:design:export --from-fig --diff-merge` to
-bring changes back surgically. See `figma-roundtrip` workflow for
-the full review-and-iterate loop.
+Fold any **system**-level issues the page surfaces back into Phase 5/6 and
+re-run those phases — the first page is where system gaps actually show up.
 
 **Mark complete**: `/core:workflows:manage complete first-production-page`
 
 ## Workflow complete
 
-State is moved to `history` with `status: "complete"`. The project
-is now fully Pencil-managed and ready for ongoing brownfield work
-(adding more features, improving pages, etc.).
+State moves to `history` with `status: "complete"`. The project is now ready
+for ongoing `brownfield-*` work.
 
 ## Resume points
 
-Common pause points and how to resume:
-
-- **Paused after Phase 1**: brand is defined; resume runs Phase 2 prompt.
-- **Paused after Phase 4**: foundations rendered; pick up at component
-  generation.
-- **Paused mid-Phase 5**: workflow tracks which components are done;
-  resume continues from the next undone component.
-- **Paused after Phase 6**: recommendation manifests are written but
-  patterns / templates not generated. Resume continues at the first
-  recommended pattern.
-- **Paused after Phase 9 (audit)**: all foundation work done; resume
-  prompts for the first production page brief.
+- After **Phase 4** (brand): resume runs Phase 5 (selection).
+- After **Phase 5**: resume runs Phase 6 (system generation).
+- After **Phase 6**: resume pauses at the HITL review gate, then audit.
+- After **Phase 7**: resume reuses Phase 1/2 inputs for the first page.
+- Skipped optional phases are recorded (`--skip`) so resume doesn't re-prompt.
 
 ## Troubleshooting
 
-- **Audit fails after Phase 5**: most often a contrast issue from
-  `colors-select` choices. Re-run `/product:design:foundations:colors-select`
-  with adjusted palette and re-render.
-- **Pattern selection has zero recommended patterns**: research
-  produced empty `patternFrequency`. Fix by re-running
-  `/product:strategy:research --update` with more competitor URLs, or fall back
-  to universal-catalog mode (run all patterns regardless).
-- **Template select recommends very few templates**: product-type
-  inference picked the wrong type. Override with explicit
-  `--product-type saas` (or app, marketing, content, commerce,
-  hybrid).
-- **Foundation rendering fails on i18n**: most likely the font
-  loading strategy isn't fully configured. Read
-  `design/foundations/i18n.pen` for the chosen strategy and confirm
-  `app/globals.css` has matching `@font-face` declarations.
+- **System audit fails after Phase 6**: usually a contrast issue from
+  `colors-select`. Re-run `/product:design:foundations:colors-select`, then re-run Phase 6.
+- **`mech-pencil system` PNGs skipped**: the Pencil CLI isn't authenticated —
+  `pencil login` or set `PENCIL_CLI_KEY` (the `.lib.pen` files still emit).
+- **Generated system doesn't match the brand JSON**: confirm Phase 6 runs the
+  brand path (consuming `.pencil-brand.json`), not the accent-only theme path.
+- **Research didn't influence the brand**: it must run before Phase 4 and be
+  passed via `--informed-by` to `scaffold`; running it after only affects selection.
+- **Page (Phase 8) reveals a system gap**: don't patch the page — fix Phase 5/6
+  and regenerate, so the fix lives in the system, not the page.
