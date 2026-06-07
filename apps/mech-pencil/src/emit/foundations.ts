@@ -80,14 +80,23 @@ export function emitFoundations(tokens: TokenSet): FoundationArtifact[] {
     const preview = new PenDocument();
     for (const { axis, values } of tokens.axes) preview.axis(axis, values);
     for (const alias of imports) preview.importLib(alias, `./${slugForAlias(alias)}.lib.pen`);
-    for (const node of page) preview.add(node);
+    // Position page roots so the headless export can compute a valid bbox
+    // (document root has no layout — unpositioned nodes break `--export`).
+    let py = 0;
+    for (const node of page) {
+      const p = node as Child & { x?: number; y?: number; height?: unknown };
+      p.x = 0;
+      p.y = py;
+      py += (typeof p.height === 'number' ? p.height : 900) + 96;
+      preview.add(node);
+    }
 
     arts.push({
       slug: f.slug,
-      libPath: `${f.slug}.lib.pen`,
+      libPath: `foundations/${f.slug}.lib.pen`,
       lib,
       libValidation: validateDocument(lib.toObject()),
-      previewPath: `${f.slug}.preview.pen`,
+      previewPath: `foundations/${f.slug}.preview.pen`,
       preview,
       previewValidation: validateDocument(preview.toObject()),
       imports,
