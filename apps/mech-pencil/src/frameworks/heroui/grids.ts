@@ -76,7 +76,6 @@ function buildGridsPage(ctx: MockupContext, gs: GridSpacingFoundation): Child[] 
         name: 'Foundations / Grids & Spacing',
         width: 920,
         fill: ctx.token('color.background'),
-        theme: { mode: 'light' },
         layout: 'vertical',
         gap: 28,
         padding: 40,

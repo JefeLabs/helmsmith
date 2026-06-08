@@ -124,7 +124,6 @@ function buildTypographyPage(ctx: MockupContext, tf: TypographyFoundation): Chil
         name: 'Foundations / Typography',
         width: 920,
         fill: ctx.token('color.background'),
-        theme: { mode: 'light' },
         layout: 'vertical',
         gap: 24,
         padding: 40,

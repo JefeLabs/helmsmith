@@ -52,7 +52,7 @@ function topbar(ctx: MockupContext, id: (p: string) => string, title: string): C
 function screen(ctx: MockupContext, id: (p: string) => string, vp: Viewport, name: string, body: Child[]): Child {
   return frame(id('screen'), {
     name: `${name} · ${vp.id}`, width: vp.width, height: vp.height, fill: ctx.token('color.background'),
-    theme: { mode: 'light' }, layout: 'vertical', gap: 0,
+    layout: 'vertical', gap: 0,
   }, body);
 }
 
@@ -108,7 +108,7 @@ function buildModal(ctx: MockupContext, vp: Viewport): Child {
   // backdrop fills the screen; the dialog is centered.
   const backdrop = frame(id('backdrop'), {
     name: 'Backdrop', width: vp.width, height: vp.height, fill: ctx.token('color.background'),
-    theme: { mode: 'light' }, layout: 'vertical', justifyContent: 'center', alignItems: 'center', padding: ctx.token('space.6'),
+    layout: 'vertical', justifyContent: 'center', alignItems: 'center', padding: ctx.token('space.6'),
   }, [dialog]);
   return backdrop;
 }

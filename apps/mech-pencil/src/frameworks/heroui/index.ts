@@ -156,7 +156,6 @@ function templateMockup(): MockupSpec {
             width: 1280,
             height: 1024,
             fill: ctx.token('color.background'),
-            theme: { mode: 'light' },
             layout: 'vertical',
             gap: 48,
             padding: [80, 64, 80, 64],

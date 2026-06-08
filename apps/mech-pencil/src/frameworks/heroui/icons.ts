@@ -134,7 +134,6 @@ function buildIconsPage(ctx: MockupContext): Child[] {
         name: 'Foundations / Icons',
         width: 1040,
         fill: ctx.token('color.background'),
-        theme: { mode: 'light' },
         layout: 'vertical',
         gap: 28,
         padding: 40,

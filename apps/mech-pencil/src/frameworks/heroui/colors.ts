@@ -56,7 +56,6 @@ function buildColorsPage(ctx: MockupContext): Child[] {
         name: 'Foundations / Colors',
         width: 760,
         fill: ctx.token('color.background'),
-        theme: { mode: 'light' },
         layout: 'vertical',
         gap: 24,
         padding: 40,
