@@ -16,7 +16,7 @@
  * breaking changes"), so the version literal is pinned.
  */
 
-export const PEN_VERSION = '2.11' as const;
+export const PEN_VERSION = '2.13' as const;
 export type PenVersion = typeof PEN_VERSION;
 
 /** A theme-axis selector, e.g. `{ mode: "dark" }`. */
@@ -166,8 +166,29 @@ export type Effect =
 
 export type Effects = Effect | Effect[];
 
+/** Border thickness — a number/variable, or per-side. */
+export type StrokeWidth =
+  | NumberOrVariable
+  | {
+      top?: NumberOrVariable;
+      right?: NumberOrVariable;
+      bottom?: NumberOrVariable;
+      left?: NumberOrVariable;
+    };
+
 export interface CanHaveGraphics {
-  stroke?: Stroke;
+  /**
+   * Current (2.13) schema: `stroke` is a Fill (color/gradient), with
+   * `strokeWidth`/`strokeAlignment` as siblings. The legacy nested
+   * `Stroke` (`{thickness, fill, align}`) is still accepted as *builder
+   * input* and normalized — the nested form crashes the Pencil app when a
+   * node referencing it is clicked.
+   */
+  stroke?: Fills | Stroke;
+  strokeWidth?: StrokeWidth;
+  strokeAlignment?: 'inner' | 'center' | 'outer';
+  strokeLinecap?: 'none' | 'round' | 'square';
+  strokeLinejoin?: 'miter' | 'bevel' | 'round';
   fill?: Fills;
   effect?: Effects;
 }

@@ -30,20 +30,61 @@ export function slug(label: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+/**
+ * Normalize a legacy `stroke: {thickness, fill, align}` into the current
+ * schema — `stroke` as a Fill, with `strokeWidth`/`strokeAlignment` as
+ * siblings. The nested form renders but **crashes the Pencil app when a
+ * node referencing it is clicked**; this lets call sites stay terse while
+ * emitting the resolvable shape. A Fill stroke (string / Fill object /
+ * array) passes through untouched.
+ */
+function normalizeStroke<T extends { stroke?: unknown }>(opts: T): T {
+  const s = opts.stroke;
+  if (s == null || typeof s !== 'object' || Array.isArray(s)) return opts; // string Fill or none
+  const obj = s as Record<string, unknown>;
+  const isLegacy = 'thickness' in obj || 'align' in obj || ('fill' in obj && !('type' in obj));
+  if (!isLegacy) return opts; // a Fill object (has `type`) — leave it
+  const { stroke: _legacy, ...rest } = opts;
+  const align = obj.align;
+  return {
+    ...rest,
+    ...(obj.fill !== undefined ? { stroke: obj.fill } : {}),
+    ...(obj.thickness !== undefined ? { strokeWidth: obj.thickness } : {}),
+    strokeAlignment: align === 'center' ? 'center' : align === 'outside' ? 'outer' : 'inner',
+  } as unknown as T;
+}
+
 type FrameOpts = Omit<Frame, 'type' | 'id'> & Layout;
 type RectOpts = Omit<Rectangle, 'type' | 'id'>;
 type TextOpts = Omit<Text, 'type' | 'id' | 'content'>;
 type IconOpts = Omit<IconFont, 'type' | 'id'>;
 type RefOpts = Omit<Ref, 'type' | 'id' | 'ref'>;
 
+/**
+ * Bare `fit_content` is a legacy size form; Pencil's current schema wants the
+ * parenthesized `fit_content(0)` (min fallback) and the bare form trips node
+ * interaction (clicking crashes). `fill_container` stays bare.
+ */
+function fixFitContent(node: { width?: unknown; height?: unknown }): void {
+  if (node.width === 'fit_content') node.width = 'fit_content(0)';
+  if (node.height === 'fit_content') node.height = 'fit_content(0)';
+}
+
 export function frame(id: string, opts: FrameOpts = {}, children: Child[] = []): Frame {
-  const node: Frame = { id, type: 'frame', ...opts };
+  const node: Frame = { id, type: 'frame', ...normalizeStroke(opts) };
+  // `horizontal` is Pencil's IMPLICIT default layout — the app never writes it,
+  // and the explicit `layout:"horizontal"` form trips up node interaction
+  // (clicking crashes). Emit only `vertical`/`none`; drop explicit horizontal.
+  if (node.layout === 'horizontal') delete node.layout;
+  fixFitContent(node);
   if (children.length > 0) node.children = children;
   return node;
 }
 
 export function rect(id: string, opts: RectOpts = {}): Rectangle {
-  return { id, type: 'rectangle', ...opts };
+  const node: Rectangle = { id, type: 'rectangle', ...normalizeStroke(opts) };
+  fixFitContent(node);
+  return node;
 }
 
 export function text(id: string, content: string, opts: TextOpts = {}): Text {
@@ -60,7 +101,7 @@ export function icon(id: string, name: string, opts: IconOpts = {}): IconFont {
  * library). Pass `descendants` to patch nested children by id path.
  */
 export function ref(id: string, target: string, opts: RefOpts = {}): Ref {
-  return { id, type: 'ref', ref: target, ...opts };
+  return { id, type: 'ref', ref: target, ...normalizeStroke(opts) };
 }
 
 /** Mark any node as a reusable component definition (a library export). */

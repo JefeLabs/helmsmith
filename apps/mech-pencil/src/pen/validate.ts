@@ -3,7 +3,7 @@
  * actually break Pencil (all empirically verified against the live
  * app, schema v2.11):
  *
- *   1. wrong/absent `version` literal (must be "2.11")
+ *   1. wrong/absent `version` literal (must be "2.13")
  *   2. a node missing `id`/`type`, or an unknown `type`
  *   3. an `id` containing `/` — illegal; the slash is reserved as the
  *      `descendants` id-path separator, never part of a node id

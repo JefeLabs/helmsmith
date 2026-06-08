@@ -41,7 +41,7 @@ describe('mech-pencil CLI (e2e)', () => {
     const file = join(work, 'design.pen');
     const doc = JSON.parse(readFileSync(file, 'utf8'));
 
-    expect(doc.version).toBe('2.11');
+    expect(doc.version).toBe('2.13');
     expect(doc.themes.mode).toEqual(['light', 'dark']);
     expect(doc.imports).toBeUndefined(); // single-file: no cross-file imports
 
