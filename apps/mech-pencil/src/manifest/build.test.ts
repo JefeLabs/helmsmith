@@ -8,7 +8,7 @@ describe('buildManifest', () => {
     expect(m.componentCount).toBe(71);
     expect(m.framework).toBe('heroui');
     expect(m.package).toBe('@heroui/react');
-    expect(m.pencilVersion).toBe('2.11');
+    expect(m.pencilVersion).toBe('2.13');
     const byId = Object.fromEntries(m.components.map((c) => [c.id, c]));
     expect(byId['list-box'].react).toBe('ListBox');
     expect(byId['date-range-picker'].react).toBe('DateRangePicker');
