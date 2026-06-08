@@ -13,7 +13,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { TokenSet } from '../design-system/tokens.ts';
 import { flattenForRender } from './flatten.ts';
@@ -32,6 +32,12 @@ export function pencilRender(penPath: string, pngPath: string): RenderOutcome {
   const bin = process.env.PENCIL_BIN ?? '/opt/homebrew/bin/pencil';
   try {
     execFileSync(bin, ['--in', penPath, '--export', pngPath], { stdio: 'pipe', timeout: 180_000 });
+    // Don't trust the exit code: the pencil CLI exits 0 even when the export
+    // fails (e.g. "bounding box invalid") and writes nothing. Verify the
+    // artifact actually landed, otherwise this is a silent no-op.
+    if (!existsSync(pngPath) || statSync(pngPath).size === 0) {
+      return { ok: false, reason: 'no-output-written' };
+    }
     return { ok: true };
   } catch (e) {
     const err = e as { stderr?: Buffer; stdout?: Buffer; message?: string; code?: string };
