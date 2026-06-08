@@ -158,15 +158,24 @@ program
 
 program
   .command('system')
-  .description('Emit the full system: per-foundation + component + template .lib.pen + base.pen, each with a faithful PNG (Pencil headless export)')
+  .description('Emit the full system: per-foundation + component + template .lib.pen + base.pen (deterministic; PNG previews are opt-in via --png)')
   .option('-a, --accent <color>', 'Accent color (hex or oklch())')
   .option('-b, --base <number>', 'Neutral gray-tint (HeroUI base; 0–0.02)')
   .option('--font <name>', 'Sans font family (inter, instrument-sans, …)')
   .option('-r, --radius <preset>', 'none|extra-small|small|medium|large|extra-large')
   .option('--form-radius <preset>', 'Form-field radius preset')
   .option('-d, --dir <path>', 'Output directory', '.')
+  .option('--png', 'Also render preview PNGs (headless Pencil export; off by default)')
   .action(
-    (opts: { accent?: string; base?: string; font?: string; radius?: string; formRadius?: string; dir: string }) =>
+    (opts: {
+      accent?: string;
+      base?: string;
+      font?: string;
+      radius?: string;
+      formRadius?: string;
+      dir: string;
+      png?: boolean;
+    }) =>
       runSystem({
         accent: opts.accent,
         base: opts.base,
@@ -174,6 +183,7 @@ program
         radius: opts.radius,
         formRadius: opts.formRadius,
         dir: opts.dir,
+        png: opts.png,
       }),
   );
 

@@ -11,7 +11,7 @@
 
 import { resolve } from 'node:path';
 import { emitSystem } from '../emit/system.ts';
-import { writeSystem } from '../emit/write.ts';
+import { renderSystemPngs, writeSystem } from '../emit/write.ts';
 import { type RadiusId, resolveTheme } from '../theme/config.ts';
 import { themeTokens } from '../theme/generate.ts';
 import { dim, err, heading, ok, warn } from '../ui.ts';
@@ -23,6 +23,8 @@ export interface SystemCmdOptions {
   radius?: string;
   formRadius?: string;
   dir: string;
+  /** Also render preview PNGs (headless Pencil export; off by default). */
+  png?: boolean;
 }
 
 export function runSystem(options: SystemCmdOptions): void {
@@ -59,7 +61,7 @@ export function runSystem(options: SystemCmdOptions): void {
   }
 
   const dir = resolve(options.dir);
-  const res = writeSystem(sys, tokens, dir);
+  const res = writeSystem(sys, dir);
 
   console.log(heading('HeroUI v3 → option-A system'));
   console.log(ok(`${dir}  (${res.files.length} files)`));
@@ -68,10 +70,18 @@ export function runSystem(options: SystemCmdOptions): void {
       `  ${sys.foundations.length} foundations · ${sys.components.length} component libs · ${sys.templates.length} templates · base.pen`,
     ),
   );
-  console.log(ok(`${res.pngs.length} PNGs rendered (Pencil headless export)`));
-  if (res.skippedPngs.length > 0) {
-    console.log(warn(`${res.skippedPngs.length} PNGs skipped — e.g. ${res.skippedPngs[0]}`));
-    console.log(dim('  run `pencil login` or set PENCIL_CLI_KEY to render PNGs.'));
+
+  // PNG previews are decoupled from the deterministic .pen emit above — opt in
+  // with --png. The headless export is auth-gated and may render nothing.
+  if (options.png) {
+    const r = renderSystemPngs(sys, tokens, dir);
+    console.log(ok(`${r.pngs.length} PNGs rendered (Pencil headless export)`));
+    if (r.skippedPngs.length > 0) {
+      console.log(warn(`${r.skippedPngs.length} PNGs skipped — e.g. ${r.skippedPngs[0]}`));
+      console.log(dim('  run `pencil login` or set PENCIL_CLI_KEY to render PNGs.'));
+    }
+  } else {
+    console.log(dim('  PNG previews skipped — re-run with --png to render (headless Pencil export).'));
   }
   console.log(dim('  base.pen imports the libs; open it in Pencil to view/edit.'));
 }

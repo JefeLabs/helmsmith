@@ -53,59 +53,67 @@ export function pencilRender(penPath: string, pngPath: string): RenderOutcome {
 export interface WriteResult {
   /** Persisted `.lib.pen` (+ `base.pen`) files. */
   files: string[];
+}
+
+/**
+ * Write the system's `.pen`/`.lib.pen` docs to disk. Deterministic and
+ * dependency-free — no renderer, no auth, no network. PNG previews are a
+ * separate, opt-in step (`renderSystemPngs`) so this hot path can never
+ * silently fail on a broken / auth-gated / AI-coupled headless render.
+ */
+export function writeSystem(sys: SystemBundle, outDir: string): WriteResult {
+  const files: string[] = [];
+  const write = (rel: string, json: string): void => {
+    const abs = join(outDir, rel);
+    mkdirSync(dirname(abs), { recursive: true });
+    writeFileSync(abs, json);
+    files.push(rel);
+  };
+
+  for (const f of sys.foundations) write(f.libPath, f.lib.toJSON());
+  for (const c of sys.components) write(c.path, c.doc.toJSON());
+  for (const t of sys.templates) write(t.libPath, t.lib.toJSON());
+  write(sys.base.path, sys.base.doc.toJSON());
+
+  return { files };
+}
+
+export interface RenderResult {
   /** Rendered `.png` files. */
   pngs: string[];
   /** PNGs skipped, with reason. */
   skippedPngs: string[];
 }
 
-export function writeSystem(
+/**
+ * Render a preview PNG for each visual doc, from a throwaway flattened
+ * (self-contained) copy. Opt-in and isolated from `writeSystem`: the headless
+ * Pencil export is auth-gated and AI-coupled, so it may legitimately render
+ * nothing — callers surface `skippedPngs` rather than failing the emit. Does
+ * not require `writeSystem` to have run; it renders from the in-memory docs.
+ */
+export function renderSystemPngs(
   sys: SystemBundle,
   tokens: TokenSet,
   outDir: string,
   render: Renderer = pencilRender,
-): WriteResult {
-  const res: WriteResult = { files: [], pngs: [], skippedPngs: [] };
+): RenderResult {
+  const res: RenderResult = { pngs: [], skippedPngs: [] };
 
-  const write = (rel: string, json: string): void => {
-    const abs = join(outDir, rel);
-    mkdirSync(dirname(abs), { recursive: true });
-    writeFileSync(abs, json);
-  };
-
-  // Render a doc's PNG from a throwaway flattened (self-contained) copy.
   const renderPng = (doc: { toObject(): unknown }, pngRel: string): void => {
-    const tmpRel = pngRel.replace(/\.png$/, '.__render.pen');
+    const tmpAbs = join(outDir, pngRel.replace(/\.png$/, '.__render.pen'));
+    mkdirSync(dirname(tmpAbs), { recursive: true });
     const obj = doc.toObject() as unknown as Record<string, unknown>;
-    write(tmpRel, JSON.stringify(flattenForRender(obj, tokens)));
-    const r = render(join(outDir, tmpRel), join(outDir, pngRel));
-    rmSync(join(outDir, tmpRel), { force: true });
+    writeFileSync(tmpAbs, JSON.stringify(flattenForRender(obj, tokens)));
+    const r = render(tmpAbs, join(outDir, pngRel));
+    rmSync(tmpAbs, { force: true });
     if (r.ok) res.pngs.push(pngRel);
     else res.skippedPngs.push(`${pngRel} (${r.reason})`);
   };
 
-  // Foundations: token lib (not visual) + its decision-page PNG.
-  for (const f of sys.foundations) {
-    write(f.libPath, f.lib.toJSON());
-    res.files.push(f.libPath);
-    renderPng(f.preview, f.libPath.replace(/\.lib\.pen$/, '.png'));
-  }
-
-  // Components + templates: persist .lib.pen, render the (flattened) lib → PNG.
-  for (const c of sys.components) {
-    write(c.path, c.doc.toJSON());
-    res.files.push(c.path);
-    renderPng(c.doc, c.path.replace(/\.lib\.pen$/, '.png'));
-  }
-  for (const t of sys.templates) {
-    write(t.libPath, t.lib.toJSON());
-    res.files.push(t.libPath);
-    renderPng(t.lib, t.libPath.replace(/\.lib\.pen$/, '.png'));
-  }
-
-  // Base: the consumer entry doc stays a .pen; render it too.
-  write(sys.base.path, sys.base.doc.toJSON());
-  res.files.push(sys.base.path);
+  for (const f of sys.foundations) renderPng(f.preview, f.libPath.replace(/\.lib\.pen$/, '.png'));
+  for (const c of sys.components) renderPng(c.doc, c.path.replace(/\.lib\.pen$/, '.png'));
+  for (const t of sys.templates) renderPng(t.lib, t.libPath.replace(/\.lib\.pen$/, '.png'));
   renderPng(sys.base.doc, 'base.png');
 
   return res;
