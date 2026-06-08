@@ -17,9 +17,9 @@ import { runTuiView } from '@ecruz165/tui-view-components/pages';
 import { createElement } from 'react';
 import { listFrameworks } from '../frameworks/_core/registry.ts';
 import { WizardView } from '../tui/WizardView.tsx';
-import { finalizeTheme, themeToBundleOptions, type WizardResult } from '../tui/wizard-config.ts';
+import { finalizeTheme, type WizardResult } from '../tui/wizard-config.ts';
 import { dim, heading } from '../ui.ts';
-import { runBundle } from './bundle.ts';
+import { runSystem } from './system.ts';
 
 export async function runWizard(): Promise<void> {
   let result: WizardResult | null = null;
@@ -44,9 +44,9 @@ export async function runWizard(): Promise<void> {
   }
 
   const { frameworkId, draft } = result;
-  let opts: ReturnType<typeof themeToBundleOptions>;
+  let cfg: ReturnType<typeof finalizeTheme>;
   try {
-    opts = themeToBundleOptions(frameworkId, finalizeTheme(draft));
+    cfg = finalizeTheme(draft);
   } catch (e) {
     // resolveTheme rejected a value validateField let through — surface
     // it rather than crash. (Tightening validateField shrinks this gap.)
@@ -55,6 +55,13 @@ export async function runWizard(): Promise<void> {
     return;
   }
 
-  console.log(heading(`mech-pencil · ${frameworkId} → layered bundle`));
-  runBundle(opts);
+  console.log(heading(`mech-pencil · ${frameworkId} → option-A system`));
+  runSystem({
+    accent: cfg.accent,
+    base: String(cfg.base),
+    font: cfg.fontFamily,
+    radius: cfg.radius,
+    formRadius: cfg.formRadius,
+    dir: '.',
+  });
 }

@@ -134,4 +134,48 @@ export const SCALARS: { key: string; type: 'number' | 'string'; value: number | 
   { key: 'font.size-sm', type: 'number', value: 14 },
   { key: 'font.size-md', type: 'number', value: 16 },
   { key: 'font.size-lg', type: 'number', value: 18 },
+  // Icon foundation — size scale (px). Components size glyphs via these
+  // (`$icon.sm` in a button, etc.); the icons foundation page renders them.
+  { key: 'icon.xs', type: 'number', value: 12 },
+  { key: 'icon.sm', type: 'number', value: 16 },
+  { key: 'icon.md', type: 'number', value: 20 },
+  { key: 'icon.lg', type: 'number', value: 24 },
+  { key: 'icon.xl', type: 'number', value: 32 },
+  { key: 'icon.2xl', type: 'number', value: 40 },
+  // Typography foundation — mono family + the type-scale sizes (px).
+  // Components size text via these (`$font.body-md.size`); the typography
+  // page specimens each step from the same tokens. Weights/line-heights
+  // live in the foundation data (heroui/typography.ts).
+  { key: 'font.display', type: 'string', value: 'Inter' },
+  { key: 'font.mono', type: 'string', value: 'JetBrains Mono' },
+  { key: 'font.display-2xl.size', type: 'number', value: 60 },
+  { key: 'font.display-xl.size', type: 'number', value: 48 },
+  { key: 'font.h1.size', type: 'number', value: 36 },
+  { key: 'font.h2.size', type: 'number', value: 30 },
+  { key: 'font.h3.size', type: 'number', value: 24 },
+  { key: 'font.h4.size', type: 'number', value: 20 },
+  { key: 'font.h5.size', type: 'number', value: 16 },
+  { key: 'font.body-lg.size', type: 'number', value: 16 },
+  { key: 'font.body-md.size', type: 'number', value: 14 },
+  { key: 'font.body-sm.size', type: 'number', value: 13 },
+  { key: 'font.caption.size', type: 'number', value: 12 },
+  { key: 'font.code-md.size', type: 'number', value: 13 },
+  { key: 'font.code-sm.size', type: 'number', value: 12 },
+  // Spacing foundation — a 4px-based scale. Components pad/gap via these
+  // (`$space.4`); the grids/spacing page renders the scale + the grid.
+  { key: 'space.1', type: 'number', value: 4 },
+  { key: 'space.2', type: 'number', value: 8 },
+  { key: 'space.3', type: 'number', value: 12 },
+  { key: 'space.4', type: 'number', value: 16 },
+  { key: 'space.5', type: 'number', value: 20 },
+  { key: 'space.6', type: 'number', value: 24 },
+  { key: 'space.8', type: 'number', value: 32 },
+  { key: 'space.10', type: 'number', value: 40 },
+  { key: 'space.12', type: 'number', value: 48 },
+  { key: 'space.16', type: 'number', value: 64 },
+  // Grid foundation — layout grid decision.
+  { key: 'grid.columns', type: 'number', value: 12 },
+  { key: 'grid.gutter', type: 'number', value: 24 },
+  { key: 'grid.margin', type: 'number', value: 32 },
+  { key: 'grid.max', type: 'number', value: 1280 },
 ];

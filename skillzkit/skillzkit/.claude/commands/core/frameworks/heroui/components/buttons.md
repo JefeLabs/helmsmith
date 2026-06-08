@@ -2,6 +2,10 @@
 description: Generate the Buttons component page — Button, ButtonGroup, ToggleButton, ToggleButtonGroup, CloseButton.
 argument-hint: [--no-dark]
 allowed-tools: Read, Write, Edit, Bash, mcp__pencil__*
+requires:
+  - design/components/surfaces.pen
+produces:
+  - design/components/buttons.pen
 ---
 
 Generate `design/components/buttons.pen` — every button-family variant and state.

@@ -1,0 +1,27 @@
+import { describe, expect, it } from 'vitest';
+import { heroUIComponents } from './catalog.ts';
+import { buildButton } from './components/button.ts';
+import { aliasesReferenced, multiAliasBuildContext } from './foundations.ts';
+
+const ctx = multiAliasBuildContext();
+
+describe('components → multi-alias (option A, B1)', () => {
+  it('Button references the colors/type/grids foundation libs by alias', () => {
+    const json = JSON.stringify(buildButton(ctx));
+    expect(json).toContain('$colors:color.accent');
+    expect(json).toContain('$type:font.body-md.size');
+    expect(json).toMatch(/\$grids:(space|radius)\./);
+    // its FA glyph is a path with a LITERAL size (path widths can't be $tokens),
+    // so the button doesn't reference the icons lib in the .pen.
+    expect(aliasesReferenced(json).sort()).toEqual(['colors', 'grids', 'type']);
+  });
+
+  it('the whole catalog builds with only known foundation aliases (no legacy $tokens:)', () => {
+    const json = JSON.stringify(heroUIComponents().map((s) => s.build(ctx)));
+    expect(json).not.toContain('$tokens:');
+    const aliases = new Set([...json.matchAll(/\$([a-z][a-z0-9]*):/g)].map((m) => m[1]));
+    for (const a of aliases) {
+      expect(['colors', 'type', 'icons', 'grids']).toContain(a);
+    }
+  });
+});

@@ -67,6 +67,20 @@
           "description": "Full markdown body of the source `.md` file (no frontmatter).",
           "type": "string"
         },
+        "dependents": {
+          "description": "Inverse of `dependsOn`. Computed at catalog-build time.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "dependsOn": {
+          "description": "Command slugs that must run first — those whose `produces` satisfy this command's `requires`. Computed at catalog-build time; a topological sort over this edge set yields build order.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "description": {
           "type": "string"
         },
@@ -84,6 +98,13 @@
           "description": "Filesystem path relative to `.claude/commands/`, e.g. `\"core/tools/npm.md\"`.",
           "type": "string"
         },
+        "produces": {
+          "description": "Artifact paths/globs this command creates, declared in frontmatter (e.g. `[\"design/foundations/*.pen\"]`). A command B `dependsOn` A when one of A's `produces` satisfies one of B's `requires`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "referencedBy": {
           "description": "Inverse of `references`. Computed at catalog-build time.",
           "items": {
@@ -93,6 +114,13 @@
         },
         "references": {
           "description": "Slash-command slugs referenced in this item's body. Computed at catalog-build time.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "requires": {
+          "description": "Artifact paths/globs this command needs to exist before it runs, declared in frontmatter (e.g. `[\"product/.pencil-brand.json\"]`). Drives the build-order graph — distinct from `references` (which is \"mentions /slug in prose\"); `requires` is \"needs this artifact\".",
           "items": {
             "type": "string"
           },
@@ -118,6 +146,8 @@
         "description",
         "references",
         "referencedBy",
+        "dependsOn",
+        "dependents",
         "body",
         "frontmatter"
       ],

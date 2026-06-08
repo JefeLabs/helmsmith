@@ -60,7 +60,10 @@ export interface BrandTokens {
   counts: { ramps: number; status: number; semantic: number; scalars: number };
 }
 
-export function brandToTokens(brand: BrandFile): BrandTokens {
+/** A scalar token from the framework adapter (the single source for the scale). */
+export type AdapterScalar = { key: string; type: 'number' | 'string'; value: number | string };
+
+export function brandToTokens(brand: BrandFile, adapterScalars?: AdapterScalar[]): BrandTokens {
   const variables: Record<string, VariableDecl> = {};
 
   // 3. semantic layer first (easy to find; what components reference)
@@ -91,11 +94,23 @@ export function brandToTokens(brand: BrandFile): BrandTokens {
     status++;
   }
 
-  // scalars (defaults, overridable by brand.sizes by key) + font family
+  // scalars — prefer the adapter's full set (covers the foundation tokens:
+  // icon.*, font.<step>.size, space.*, grid.*); else the legacy defaults.
+  // brand.sizes overrides numerics by key.
   let scalars = 0;
-  for (const [key, def] of Object.entries(SCALAR_DEFAULTS)) {
-    variables[key] = { type: 'number', value: brand.sizes?.[key] ?? def };
-    scalars++;
+  if (adapterScalars) {
+    for (const s of adapterScalars) {
+      variables[s.key] =
+        s.type === 'number'
+          ? { type: 'number', value: brand.sizes?.[s.key] ?? (s.value as number) }
+          : { type: 'string', value: s.value as string };
+      scalars++;
+    }
+  } else {
+    for (const [key, def] of Object.entries(SCALAR_DEFAULTS)) {
+      variables[key] = { type: 'number', value: brand.sizes?.[key] ?? def };
+      scalars++;
+    }
   }
   for (const [key, n] of Object.entries(brand.sizes ?? {})) {
     if (!(key in variables)) {
@@ -103,8 +118,18 @@ export function brandToTokens(brand: BrandFile): BrandTokens {
       scalars++;
     }
   }
-  variables['font.family'] = { type: 'string', value: brand.fonts?.family ?? 'Inter' };
-  scalars++;
+  // font faces — brand.fonts overrides; single voice keeps display = body.
+  const fam = brand.fonts?.family;
+  if (adapterScalars) {
+    if (fam) {
+      variables['font.family'] = { type: 'string', value: fam };
+      variables['font.display'] = { type: 'string', value: brand.fonts?.display ?? fam };
+    }
+    if (brand.fonts?.mono) variables['font.mono'] = { type: 'string', value: brand.fonts.mono };
+  } else {
+    variables['font.family'] = { type: 'string', value: fam ?? 'Inter' };
+    scalars++;
+  }
 
   return {
     variables,

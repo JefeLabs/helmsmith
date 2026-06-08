@@ -2,6 +2,8 @@
 description: Generate the Surfaces component page — Surface, Separator, Accordion, Disclosure, DisclosureGroup, ScrollShadow.
 argument-hint: [--no-dark]
 allowed-tools: Read, Write, Edit, Bash, mcp__pencil__*
+produces:
+  - design/components/surfaces.pen
 ---
 
 Generate `design/components/surfaces.pen` — the structural layout primitives.

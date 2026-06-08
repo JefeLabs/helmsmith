@@ -47,6 +47,7 @@
 import type { BuildContext } from '../../../design-system/atomic.ts';
 import { frame, reusable, text, withMeta } from '../../../pen/builder.ts';
 import type { Child } from '../../../pen/schema.ts';
+import { faIconNode } from '../fa-icons.ts';
 
 export class ButtonSpecNotImplemented extends Error {
   constructor() {
@@ -66,10 +67,14 @@ export class ButtonSpecNotImplemented extends Error {
  * the button's structure. Mirrors `card.ts`.
  */
 export function buildButton(ctx: BuildContext): Child {
+  // Leading glyph — an FA path icon. Path size must be literal px (a $token on
+  // a path's width renders 0); 16 = the icon.sm scale value. Fill stays themed.
+  const glyph = faIconNode('button-icon', 'plus', 16, ctx.color('accent-foreground'));
+  // Label — consumes the TYPOGRAPHY foundation (`$font.body-md.size`).
   const label = text('button-label', 'Button', {
     fill: ctx.color('accent-foreground'),
     fontFamily: ctx.token('font.family'),
-    fontSize: ctx.token('font.size-md'),
+    fontSize: ctx.token('font.body-md.size'),
     fontWeight: '600',
   });
 
@@ -83,12 +88,13 @@ export function buildButton(ctx: BuildContext): Child {
           fill: ctx.color('accent'),
           cornerRadius: ctx.token('radius.md'),
           layout: 'horizontal',
-          gap: ctx.token('space.unit'),
-          padding: [16, 10],
+          // gap + padding consume the SPACING foundation (`$space.*`).
+          gap: ctx.token('space.2'),
+          padding: [ctx.token('space.3'), ctx.token('space.4')],
           justifyContent: 'center',
           alignItems: 'center',
         },
-        [label],
+        [glyph, label],
       ),
     ),
     { type: 'component', framework: 'heroui', atomic: 'atom', fidelity: 'full' },

@@ -16,9 +16,17 @@ import type { ComponentSpec } from '../../design-system/atomic.ts';
 import type { TokenSet } from '../../design-system/tokens.ts';
 import { frame, ref, text } from '../../pen/builder.ts';
 import type { Child } from '../../pen/schema.ts';
-import type { FrameworkAdapter, MockupContext, MockupSpec } from '../_core/adapter.ts';
+import type {
+  FoundationSpec,
+  FrameworkAdapter,
+  MockupContext,
+  MockupSpec,
+} from '../_core/adapter.ts';
 import { catalogStats, heroUIComponents } from './catalog.ts';
 import { type DeriveResult, deriveHeroUITokens } from './derive.ts';
+import { gridsFoundation } from './grids.ts';
+import { iconsFoundation } from './icons.ts';
+import { typographyFoundation } from './typography.ts';
 
 let cached: DeriveResult | undefined;
 function derived(): DeriveResult {
@@ -148,7 +156,6 @@ function templateMockup(): MockupSpec {
             width: 1280,
             height: 1024,
             fill: ctx.token('color.background'),
-            theme: { mode: 'light' },
             layout: 'vertical',
             gap: 48,
             padding: [80, 64, 80, 64],
@@ -174,6 +181,10 @@ export const heroUIAdapter: FrameworkAdapter = {
 
   components(): ComponentSpec[] {
     return heroUIComponents();
+  },
+
+  foundations(): FoundationSpec[] {
+    return [iconsFoundation(), typographyFoundation(), gridsFoundation()];
   },
 
   mockups(): MockupSpec[] {

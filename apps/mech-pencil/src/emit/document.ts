@@ -30,10 +30,13 @@ export interface EmittedDocument {
   variableKeys: string[];
   componentIds: string[];
   screenSlugs: string[];
+  foundationSlugs: string[];
 }
 
 /** Where the design-system palette parks, clear of the screens. */
 const DS_X = 1600;
+/** Foundation decision pages park in their own column, left of the screens. */
+const FOUNDATION_X = -1280;
 const SCREEN_GAP = 96;
 const DEFAULT_SCREEN_HEIGHT = 900;
 
@@ -140,11 +143,29 @@ export function emitDocument(
     screenSlugs.push(spec.slug);
   }
 
+  // Foundation decision pages: their own column left of the screens, each
+  // page a top-level frame that references the same `$tokens` the catalog
+  // consumes (icons → `$icon.*`, tints → `$color.*`).
+  const foundationSlugs: string[] = [];
+  let foundationY = 0;
+  for (const spec of adapter.foundations?.() ?? []) {
+    for (const node of spec.build(ctx)) {
+      const positioned = node as Child & { x?: number; y?: number; height?: unknown };
+      positioned.x = FOUNDATION_X;
+      positioned.y = foundationY;
+      const h = typeof positioned.height === 'number' ? positioned.height : DEFAULT_SCREEN_HEIGHT;
+      foundationY += h + SCREEN_GAP;
+      doc.add(node);
+    }
+    foundationSlugs.push(spec.slug);
+  }
+
   return {
     doc,
     validation: validateDocument(doc.toObject()),
     variableKeys,
     componentIds,
     screenSlugs,
+    foundationSlugs,
   };
 }

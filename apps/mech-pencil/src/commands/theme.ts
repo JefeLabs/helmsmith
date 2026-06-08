@@ -33,6 +33,7 @@ function themedAdapter(cfg: ThemeConfig): FrameworkAdapter {
     reference: 'https://heroui.com/themes',
     tokens: () => themeTokens(cfg).tokens,
     components: () => heroUIAdapter.components(),
+    foundations: () => heroUIAdapter.foundations?.() ?? [],
     mockups: () => heroUIAdapter.mockups?.() ?? [],
     notes: () => heroUIAdapter.notes?.() ?? [],
   };
