@@ -12,10 +12,24 @@ async function seedDay(
   s: StorageAdapter,
   userId: string,
   date: string,
-  v: { online?: number; voice?: number; ci?: number; msgs?: number },
+  v: {
+    online?: number;
+    idle?: number;
+    voice?: number;
+    ci?: number;
+    msgs?: number;
+    start?: string; // first-seen present (drives span)
+    end?: string; // last-seen present (drives span)
+  },
 ) {
   const a = emptyDay(userId, date, `${date}T00:00:00Z`);
-  a.presence = { samples: v.online ?? 0, online: v.online ?? 0 };
+  a.presence = {
+    samples: (v.online ?? 0) + (v.idle ?? 0),
+    online: v.online ?? 0,
+    idle: v.idle ?? 0,
+    firstOnlineAt: v.start,
+    lastOnlineAt: v.end,
+  };
   a.engagementVoiceSamples = v.voice ?? 0;
   a.ciSubmissions = v.ci ?? 0;
   a.engagementMessages = v.msgs ?? 0;
@@ -31,20 +45,43 @@ describe('ReportService', () => {
     reports = new ReportService(storage, 'monday');
   });
 
-  it('daily: folds samples to minutes and sorts by online desc', async () => {
-    await seedDay(storage, U1, '2026-06-10', { online: 6, voice: 2, ci: 3, msgs: 4 }); // 30m online
-    await seedDay(storage, U2, '2026-06-10', { online: 12 }); // 60m online → first
-    const s = await reports.daily('2026-06-10');
+  it('daily: computes idle/span/active (span − idle) and sorts by active desc', async () => {
+    // U1: present 09:00–12:00 (span 180m), 6 idle ticks (30m) → active 150m
+    await seedDay(storage, U1, '2026-06-10', {
+      online: 30,
+      idle: 6,
+      voice: 2,
+      ci: 3,
+      msgs: 4,
+      start: '2026-06-10T09:00:00Z',
+      end: '2026-06-10T12:00:00Z',
+    });
+    // U2: present 09:00–13:00 (span 240m), no idle → active 240m → first
+    await seedDay(storage, U2, '2026-06-10', {
+      online: 48,
+      start: '2026-06-10T09:00:00Z',
+      end: '2026-06-10T13:00:00Z',
+    });
+    const s = await reports.daily('2026-06-10', new Date('2026-06-10T18:00:00Z'));
     expect(s.period).toBe('daily');
-    expect(s.users[0].userId).toBe(U2); // most online first
-    expect(s.users[0].onlineMinutes).toBe(60);
+    expect(s.users[0].userId).toBe(U2); // most active first
+    expect(s.users[0].activeMinutes).toBe(240);
     const u1 = s.users.find((u) => u.userId === U1);
     expect(u1).toMatchObject({
-      onlineMinutes: 30,
+      spanMinutes: 180,
+      idleMinutes: 30,
+      activeMinutes: 150, // 180 span − 30 idle
       voiceMinutes: 10,
       ciSubmissions: 3,
       engagementMessages: 4,
     });
+  });
+
+  it('daily: an open day (no end-of-day) spans start → now', async () => {
+    await seedDay(storage, U1, '2026-06-10', { start: '2026-06-10T09:00:00Z' }); // no end yet
+    const s = await reports.daily('2026-06-10', new Date('2026-06-10T11:00:00Z'));
+    expect(s.users[0].spanMinutes).toBe(120); // 09:00 → now (11:00)
+    expect(s.users[0].activeMinutes).toBe(120); // no idle observed
   });
 
   it('weekly: sums across the Mon–Sun window, counts active days, dense perDay', async () => {

@@ -31,7 +31,7 @@ import {
   type StartOfDay,
   type UserId,
 } from '../../domain/types.js';
-import type { StorageAdapter } from '../StorageAdapter.js';
+import type { PresenceState, StorageAdapter } from '../StorageAdapter.js';
 
 const nowIso = () => new Date().toISOString();
 const dayKeys = { pk: (u: UserId) => `USER#${u}`, sk: (d: ISODate) => `DAY#${d}` };
@@ -118,48 +118,30 @@ export class DynamoAdapter implements StorageAdapter {
   async recordPresenceSample(
     userId: UserId,
     date: ISODate,
-    online: boolean,
+    state: PresenceState,
     at: string,
   ): Promise<void> {
-    const base = {
-      TableName: this.table,
-      Key: { PK: dayKeys.pk(userId), SK: dayKeys.sk(date) },
-    };
-    if (online) {
-      await this.doc.send(
-        new UpdateCommand({
-          ...base,
-          UpdateExpression:
-            'ADD presenceSamples :one, presenceOnline :one ' +
-            'SET updatedAt = :u, gsi1pk = :g, gsi1sk = :s, userId = :uid, #d = :date, ' +
-            'firstOnlineAt = if_not_exists(firstOnlineAt, :at), lastOnlineAt = :at',
-          ExpressionAttributeNames: { '#d': 'date' },
-          ExpressionAttributeValues: {
-            ':one': 1,
-            ':u': nowIso(),
-            ':g': `DAY#${date}`,
-            ':s': dayKeys.pk(userId),
-            ':uid': userId,
-            ':date': date,
-            ':at': at,
-          },
-        }),
-      );
-      return;
-    }
+    // Both active and idle count as "present": bump the matching counter (ADD 0
+    // for the other) and advance the first/last-seen timestamps that bound span.
     await this.doc.send(
       new UpdateCommand({
-        ...base,
+        TableName: this.table,
+        Key: { PK: dayKeys.pk(userId), SK: dayKeys.sk(date) },
         UpdateExpression:
-          'ADD presenceSamples :one SET updatedAt = :u, gsi1pk = :g, gsi1sk = :s, userId = :uid, #d = :date',
+          'ADD presenceSamples :one, presenceOnline :active, presenceIdle :idle ' +
+          'SET updatedAt = :u, gsi1pk = :g, gsi1sk = :s, userId = :uid, #d = :date, ' +
+          'firstOnlineAt = if_not_exists(firstOnlineAt, :at), lastOnlineAt = :at',
         ExpressionAttributeNames: { '#d': 'date' },
         ExpressionAttributeValues: {
           ':one': 1,
+          ':active': state === 'active' ? 1 : 0,
+          ':idle': state === 'idle' ? 1 : 0,
           ':u': nowIso(),
           ':g': `DAY#${date}`,
           ':s': dayKeys.pk(userId),
           ':uid': userId,
           ':date': date,
+          ':at': at,
         },
       }),
     );
@@ -318,6 +300,7 @@ function activityToItem(a: DailyActivity): Record<string, unknown> {
     engagementVoiceSamples: a.engagementVoiceSamples,
     presenceSamples: a.presence.samples,
     presenceOnline: a.presence.online,
+    presenceIdle: a.presence.idle,
     firstOnlineAt: a.presence.firstOnlineAt,
     lastOnlineAt: a.presence.lastOnlineAt,
     startOfDay: a.startOfDay,
@@ -331,6 +314,7 @@ function itemToActivity(i: Record<string, unknown>): DailyActivity {
   a.presence = {
     samples: Number(i.presenceSamples ?? 0),
     online: Number(i.presenceOnline ?? 0),
+    idle: Number(i.presenceIdle ?? 0),
     firstOnlineAt: (i.firstOnlineAt as string) ?? undefined,
     lastOnlineAt: (i.lastOnlineAt as string) ?? undefined,
   };

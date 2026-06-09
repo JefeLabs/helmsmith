@@ -26,7 +26,7 @@ function makeConfig(over: Partial<Config> = {}): Config {
 const snap = (over: Partial<MemberSnapshot> & { userId: string }): MemberSnapshot => ({
   isBot: false,
   displayName: 'Member',
-  online: false,
+  presence: 'offline',
   voiceChannelId: null,
   ...over,
 });
@@ -42,11 +42,11 @@ describe('M4 applyPoll', () => {
 
   it('samples presence for online members and voice for tracked-channel members', async () => {
     const members: MemberSnapshot[] = [
-      snap({ userId: 'U1', online: true, voiceChannelId: 'VOICE1' }), // presence + voice
-      snap({ userId: 'U2', online: false, voiceChannelId: 'VOICE1' }), // voice only (offline)
-      snap({ userId: 'U3', online: true, voiceChannelId: null }), // presence only
-      snap({ userId: 'U4', online: true, voiceChannelId: 'OTHER' }), // presence only (untracked voice)
-      snap({ userId: 'BOT', online: true, voiceChannelId: 'VOICE1', isBot: true }), // ignored
+      snap({ userId: 'U1', presence: 'active', voiceChannelId: 'VOICE1' }), // presence + voice
+      snap({ userId: 'U2', presence: 'offline', voiceChannelId: 'VOICE1' }), // voice only (offline)
+      snap({ userId: 'U3', presence: 'active', voiceChannelId: null }), // presence only
+      snap({ userId: 'U4', presence: 'active', voiceChannelId: 'OTHER' }), // presence only (untracked voice)
+      snap({ userId: 'BOT', presence: 'active', voiceChannelId: 'VOICE1', isBot: true }), // ignored
     ];
     const counts = await applyPoll(members, deps, NOW);
     expect(counts).toEqual({ presence: 3, voice: 2 }); // U1,U3,U4 online; U1,U2 voice
@@ -64,7 +64,7 @@ describe('M4 applyPoll', () => {
   });
 
   it('accrues across ticks: 3 online ticks ≈ 15 minutes', async () => {
-    const members = [snap({ userId: 'U1', online: true, voiceChannelId: 'VOICE2' })];
+    const members = [snap({ userId: 'U1', presence: 'active', voiceChannelId: 'VOICE2' })];
     await applyPoll(members, deps, NOW);
     await applyPoll(members, deps, new Date('2026-06-08T15:05:00Z'));
     await applyPoll(members, deps, new Date('2026-06-08T15:10:00Z'));
@@ -75,11 +75,20 @@ describe('M4 applyPoll', () => {
   });
 
   it('records first/last online timestamps across ticks', async () => {
-    const m = [snap({ userId: 'U1', online: true })];
+    const m = [snap({ userId: 'U1', presence: 'active' })];
     await applyPoll(m, deps, new Date('2026-06-08T09:00:00Z'));
     await applyPoll(m, deps, new Date('2026-06-08T17:00:00Z'));
     const day = await storage.getDay('U1', DAY);
     expect(day?.presence.firstOnlineAt).toBe('2026-06-08T09:00:00.000Z');
     expect(day?.presence.lastOnlineAt).toBe('2026-06-08T17:00:00.000Z');
+  });
+
+  it('counts idle members as present-but-idle, not active', async () => {
+    const counts = await applyPoll([snap({ userId: 'U1', presence: 'idle' })], deps, NOW);
+    expect(counts.presence).toBe(1); // idle still counts as present
+    const day = await storage.getDay('U1', DAY);
+    expect(day?.presence.samples).toBe(1);
+    expect(day?.presence.online).toBe(0); // not active
+    expect(day?.presence.idle).toBe(1);
   });
 });

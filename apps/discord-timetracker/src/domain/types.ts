@@ -24,10 +24,11 @@ export interface EndOfDay {
 }
 
 export interface PresenceAggregate {
-  samples: number; // total 5-min ticks recorded for this user/day
-  online: number; // ticks where status was online/idle/dnd
-  firstOnlineAt?: string;
-  lastOnlineAt?: string;
+  samples: number; // total 5-min ticks the user was present (active or idle)
+  online: number; // ticks where status was active (online/dnd) — excludes idle
+  idle: number; // ticks where status was idle (away)
+  firstOnlineAt?: string; // first tick seen present (active or idle)
+  lastOnlineAt?: string; // last tick seen present — provisional "end" for span
 }
 
 export interface DailyActivity {
@@ -49,7 +50,7 @@ export function emptyDay(userId: UserId, date: ISODate, now: string): DailyActiv
   return {
     userId,
     date,
-    presence: { samples: 0, online: 0 },
+    presence: { samples: 0, online: 0, idle: 0 },
     ciSubmissions: 0,
     engagementMessages: 0,
     engagementVoiceSamples: 0,

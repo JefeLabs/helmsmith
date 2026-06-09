@@ -8,10 +8,16 @@ import type { ISODate, UserId } from '../domain/types.js';
 export interface UserDayRow {
   userId: UserId;
   displayName?: string; // resolved from the users table; falls back to userId
-  onlineMinutes: number; // presence.online × poll interval
+  onlineMinutes: number; // raw active ticks (presence.online) × poll interval
   voiceMinutes: number; // engagementVoiceSamples × poll interval
+  /** Idle ticks × poll interval. */
+  idleMinutes: number;
+  /** start-of-day → end-of-day (or last-seen if no end yet), in minutes. */
+  spanMinutes: number;
+  /** span − idle: working time, lenient on Discord disconnects. */
+  activeMinutes: number;
   startedAt?: string; // ISO timestamp of start-of-day post
-  endedAt?: string; // ISO timestamp of end-of-day post
+  endedAt?: string; // ISO timestamp of end-of-day post (undefined → still open)
   ciSubmissions: number;
   engagementMessages: number;
 }

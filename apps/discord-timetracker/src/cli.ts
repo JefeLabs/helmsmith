@@ -8,6 +8,7 @@
  * deliverable here; behaviour lands in M1–M8 (see .plan/05-build-sequence.md).
  */
 import { createCli, noopAuthProvider } from '@ecruz165/cli-kit';
+import { runBackfill } from './commands/backfill.js';
 import { runLink } from './commands/link.js';
 import { runReport } from './commands/report.js';
 import { runSetup } from './commands/setup.js';
@@ -46,6 +47,14 @@ program
   .option('-d, --date <iso>', 'anchor date (YYYY-MM-DD); defaults to today')
   .option('--json', 'machine-readable JSON output')
   .action((opts) => runReport(opts));
+
+program
+  .command('backfill')
+  .description('Replay channel history to recover message-driven activity (e.g. a late start)')
+  .option('-s, --since <iso>', 'earliest local day to include (YYYY-MM-DD); defaults to today')
+  .option('-n, --days <count>', 'alternative to --since: include the last N days (today inclusive)')
+  .option('--dry-run', 'report what would be replayed without writing')
+  .action((opts) => runBackfill(opts));
 
 program
   .command('link')

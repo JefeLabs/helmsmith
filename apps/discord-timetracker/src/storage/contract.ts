@@ -42,15 +42,16 @@ export function storageContract(label: string, makeAdapter: () => Promise<Storag
       expect(day?.engagementVoiceSamples).toBe(6);
     });
 
-    it('aggregates presence and tracks first/last online', async () => {
-      await store.recordPresenceSample(U(4), DAY, true, '2026-06-08T09:00:00Z');
-      await store.recordPresenceSample(U(4), DAY, false, '2026-06-08T09:05:00Z');
-      await store.recordPresenceSample(U(4), DAY, true, '2026-06-08T17:00:00Z');
+    it('aggregates presence, splitting active vs idle, tracks first/last seen', async () => {
+      await store.recordPresenceSample(U(4), DAY, 'active', '2026-06-08T09:00:00Z');
+      await store.recordPresenceSample(U(4), DAY, 'idle', '2026-06-08T09:05:00Z');
+      await store.recordPresenceSample(U(4), DAY, 'active', '2026-06-08T17:00:00Z');
       const day = await store.getDay(U(4), DAY);
       expect(day?.presence.samples).toBe(3);
-      expect(day?.presence.online).toBe(2);
+      expect(day?.presence.online).toBe(2); // active ticks
+      expect(day?.presence.idle).toBe(1); // idle ticks
       expect(day?.presence.firstOnlineAt).toBe('2026-06-08T09:00:00Z');
-      expect(day?.presence.lastOnlineAt).toBe('2026-06-08T17:00:00Z');
+      expect(day?.presence.lastOnlineAt).toBe('2026-06-08T17:00:00Z'); // last seen present
     });
 
     it('sets start and end of day', async () => {
@@ -75,6 +76,7 @@ export function storageContract(label: string, makeAdapter: () => Promise<Storag
       a.presence = {
         samples: 10,
         online: 8,
+        idle: 2,
         firstOnlineAt: '2026-06-08T09:00:00Z',
         lastOnlineAt: '2026-06-08T17:00:00Z',
       };
@@ -82,6 +84,7 @@ export function storageContract(label: string, makeAdapter: () => Promise<Storag
       const got = await store.getDay(U(6), DAY);
       expect(got?.ciSubmissions).toBe(3);
       expect(got?.presence.online).toBe(8);
+      expect(got?.presence.idle).toBe(2);
     });
 
     it('lists a day and an inclusive range', async () => {

@@ -7,6 +7,7 @@
 import { type Client, Events, type Guild } from 'discord.js';
 import { POLL_INTERVAL_MS } from '../domain/constants.js';
 import { dayKeyFor } from '../domain/dayKey.js';
+import type { PresenceState } from '../storage/StorageAdapter.js';
 import type { BotDeps } from './handlers.js';
 
 export { POLL_INTERVAL_MS };
@@ -16,16 +17,17 @@ export interface MemberSnapshot {
   userId: string;
   isBot: boolean;
   displayName: string;
-  /** status ∈ {online, idle, dnd} — offline/invisible/unknown → false. */
-  online: boolean;
+  /** active (online/dnd) · idle (away) · offline (offline/invisible/unknown). */
+  presence: PresenceState | 'offline';
   /** Voice channel the member is connected to right now, or null. */
   voiceChannelId: string | null;
 }
 
 /**
- * Apply one poll tick. For each non-bot member: if online, record a presence
- * sample; if sitting in a tracked voice channel, record a voice sample. Pure
- * over storage — only depends on the snapshot + config + `now`.
+ * Apply one poll tick. For each non-bot member: if present (active or idle),
+ * record a presence sample tagged with that state; if sitting in a tracked
+ * voice channel, record a voice sample. Offline members are skipped. Pure over
+ * storage — only depends on the snapshot + config + `now`.
  */
 export async function applyPoll(
   members: MemberSnapshot[],
@@ -40,8 +42,8 @@ export async function applyPoll(
   for (const m of members) {
     if (m.isBot) continue;
     await deps.storage.setUserName(m.userId, m.displayName);
-    if (m.online) {
-      await deps.storage.recordPresenceSample(m.userId, date, true, at);
+    if (m.presence !== 'offline') {
+      await deps.storage.recordPresenceSample(m.userId, date, m.presence, at);
       presence++;
     }
     if (m.voiceChannelId && trackedVoice.has(m.voiceChannelId)) {
@@ -59,11 +61,13 @@ export function collectSnapshots(guild: Guild, deps: BotDeps): MemberSnapshot[] 
   for (const member of guild.members.cache.values()) {
     if (trackedRoleId && !member.roles.cache.has(trackedRoleId)) continue;
     const status = member.presence?.status; // 'online'|'idle'|'dnd'|'offline'|undefined
+    const presence: PresenceState | 'offline' =
+      status === 'online' || status === 'dnd' ? 'active' : status === 'idle' ? 'idle' : 'offline';
     snapshots.push({
       userId: member.id,
       isBot: member.user.bot,
       displayName: member.displayName,
-      online: status === 'online' || status === 'idle' || status === 'dnd',
+      presence,
       voiceChannelId: member.voice.channelId ?? null,
     });
   }

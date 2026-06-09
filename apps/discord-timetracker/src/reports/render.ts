@@ -43,7 +43,9 @@ export function renderDaily(s: DailySummary, tz: string): string {
   if (s.users.length === 0) return `Daily summary — ${s.date}\n(no activity recorded)`;
   const rows = s.users.map((u) => [
     u.displayName ?? u.userId,
-    formatDuration(u.onlineMinutes),
+    formatDuration(u.activeMinutes),
+    formatDuration(u.idleMinutes),
+    formatDuration(u.spanMinutes),
     formatDuration(u.voiceMinutes),
     String(u.ciSubmissions),
     String(u.engagementMessages),
@@ -51,7 +53,7 @@ export function renderDaily(s: DailySummary, tz: string): string {
     formatTime(u.endedAt, tz),
   ]);
   return `Daily summary — ${s.date} (${tz})\n\n${table(
-    ['User', 'Online', 'Voice', 'CI', 'Msgs', 'Start', 'End'],
+    ['User', 'Active', 'Idle', 'Span', 'Voice', 'CI', 'Msgs', 'Start', 'End'],
     rows,
   )}`;
 }

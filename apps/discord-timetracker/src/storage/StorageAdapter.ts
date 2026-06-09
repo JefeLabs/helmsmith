@@ -10,6 +10,9 @@
  */
 import type { DailyActivity, EndOfDay, ISODate, StartOfDay, UserId } from '../domain/types.js';
 
+/** A present member's status at a poll tick. Offline members aren't recorded. */
+export type PresenceState = 'active' | 'idle';
+
 export interface StorageAdapter {
   /** Create tables / verify the backing store is reachable. */
   init(): Promise<void>;
@@ -24,8 +27,13 @@ export interface StorageAdapter {
   incrementEngagement(userId: UserId, date: ISODate, by?: number): Promise<void>;
   /** One 5-min tick a user was connected to a tracked voice channel. */
   incrementVoiceSamples(userId: UserId, date: ISODate, by?: number): Promise<void>;
-  /** Record one presence tick; `at` is the ISO timestamp of the sample. */
-  recordPresenceSample(userId: UserId, date: ISODate, online: boolean, at: string): Promise<void>;
+  /** Record one presence tick for a present member; `at` is its ISO timestamp. */
+  recordPresenceSample(
+    userId: UserId,
+    date: ISODate,
+    state: PresenceState,
+    at: string,
+  ): Promise<void>;
   setStartOfDay(userId: UserId, date: ISODate, value: StartOfDay): Promise<void>;
   setEndOfDay(userId: UserId, date: ISODate, value: EndOfDay): Promise<void>;
 

@@ -15,7 +15,7 @@ import {
   type StartOfDay,
   type UserId,
 } from '../../domain/types.js';
-import type { StorageAdapter } from '../StorageAdapter.js';
+import type { PresenceState, StorageAdapter } from '../StorageAdapter.js';
 import { openSqlite, type SqliteDb } from './driver.js';
 
 const nowIso = () => new Date().toISOString();
@@ -38,6 +38,7 @@ export class SqliteAdapter implements StorageAdapter {
         end_at           TEXT, end_msg_id   TEXT, summary TEXT,
         presence_samples INTEGER NOT NULL DEFAULT 0,
         presence_online  INTEGER NOT NULL DEFAULT 0,
+        presence_idle    INTEGER NOT NULL DEFAULT 0,
         first_online_at  TEXT,
         last_online_at   TEXT,
         ci_submissions   INTEGER NOT NULL DEFAULT 0,
@@ -67,6 +68,15 @@ export class SqliteAdapter implements StorageAdapter {
         at         TEXT NOT NULL
       );
     `);
+    // Migration: add presence_idle to DBs created before idle tracking. The
+    // CREATE above covers fresh DBs; this ALTER covers existing ones (and is a
+    // harmless no-op error on fresh ones, hence the swallow).
+    try {
+      this.db.exec('ALTER TABLE daily_activity ADD COLUMN presence_idle INTEGER NOT NULL DEFAULT 0');
+    } catch {
+      // column already exists — nothing to do
+    }
+
     // Bound the dedup table: a redelivery only ever follows shortly after the
     // original, so anything older than a week is safe to forget.
     const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -89,13 +99,14 @@ export class SqliteAdapter implements StorageAdapter {
       .prepare(
         `INSERT INTO daily_activity (
            user_id, date, start_at, start_msg_id, goals, end_at, end_msg_id, summary,
-           presence_samples, presence_online, first_online_at, last_online_at,
+           presence_samples, presence_online, presence_idle, first_online_at, last_online_at,
            ci_submissions, engagement_msgs, voice_samples, updated_at
-         ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
          ON CONFLICT(user_id, date) DO UPDATE SET
            start_at=excluded.start_at, start_msg_id=excluded.start_msg_id, goals=excluded.goals,
            end_at=excluded.end_at, end_msg_id=excluded.end_msg_id, summary=excluded.summary,
            presence_samples=excluded.presence_samples, presence_online=excluded.presence_online,
+           presence_idle=excluded.presence_idle,
            first_online_at=excluded.first_online_at, last_online_at=excluded.last_online_at,
            ci_submissions=excluded.ci_submissions, engagement_msgs=excluded.engagement_msgs,
            voice_samples=excluded.voice_samples, updated_at=excluded.updated_at`,
@@ -111,6 +122,7 @@ export class SqliteAdapter implements StorageAdapter {
         a.endOfDay?.summary ?? null,
         a.presence.samples,
         a.presence.online,
+        a.presence.idle,
         a.presence.firstOnlineAt ?? null,
         a.presence.lastOnlineAt ?? null,
         a.ciSubmissions,
@@ -153,25 +165,29 @@ export class SqliteAdapter implements StorageAdapter {
   async recordPresenceSample(
     userId: UserId,
     date: ISODate,
-    online: boolean,
+    state: PresenceState,
     at: string,
   ): Promise<void> {
-    const onlineInt = online ? 1 : 0;
-    const onlineAt = online ? at : null; // null leaves timestamps untouched via COALESCE
+    // A present member is either active (online/dnd) or idle; both advance the
+    // first/last-seen timestamps that bound the "span". Offline members aren't
+    // recorded at all (the poller skips them), so every call counts as a sample.
+    const activeInt = state === 'active' ? 1 : 0;
+    const idleInt = state === 'idle' ? 1 : 0;
     const now = nowIso();
     this.db
       .prepare(
         `INSERT INTO daily_activity
-           (user_id, date, presence_samples, presence_online, first_online_at, last_online_at, updated_at)
-         VALUES (?, ?, 1, ?, ?, ?, ?)
+           (user_id, date, presence_samples, presence_online, presence_idle, first_online_at, last_online_at, updated_at)
+         VALUES (?, ?, 1, ?, ?, ?, ?, ?)
          ON CONFLICT(user_id, date) DO UPDATE SET
            presence_samples = presence_samples + 1,
            presence_online  = presence_online + ?,
+           presence_idle    = presence_idle + ?,
            first_online_at  = COALESCE(first_online_at, ?),
-           last_online_at   = COALESCE(?, last_online_at),
+           last_online_at   = ?,
            updated_at       = ?`,
       )
-      .run(userId, date, onlineInt, onlineAt, onlineAt, now, onlineInt, onlineAt, onlineAt, now);
+      .run(userId, date, activeInt, idleInt, at, at, now, activeInt, idleInt, at, at, now);
   }
 
   async setStartOfDay(userId: UserId, date: ISODate, v: StartOfDay): Promise<void> {
@@ -285,6 +301,7 @@ function rowToActivity(r: Record<string, unknown>): DailyActivity {
   a.presence = {
     samples: Number(r.presence_samples ?? 0),
     online: Number(r.presence_online ?? 0),
+    idle: Number(r.presence_idle ?? 0),
     firstOnlineAt: (r.first_online_at as string) ?? undefined,
     lastOnlineAt: (r.last_online_at as string) ?? undefined,
   };
