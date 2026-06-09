@@ -22,8 +22,35 @@ const nowIso = () => new Date().toISOString();
 
 export class SqliteAdapter implements StorageAdapter {
   private db!: SqliteDb;
+  private txDepth = 0;
 
   constructor(private readonly opts: SqliteStorageConfig) {}
+
+  /**
+   * Atomic unit of work. On success the whole `fn` commits; if it throws, the
+   * transaction rolls back. A hard process kill before COMMIT is rolled back by
+   * SQLite's own crash recovery on next open. Nested calls join the outer
+   * transaction (single-connection, single-process), so this is reentrant-safe.
+   *
+   * Safe because every handler `fn` only touches this synchronous SQLite
+   * connection — no real async I/O yields the event loop mid-transaction, so no
+   * other writer can interleave between BEGIN and COMMIT.
+   */
+  async transaction<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.txDepth > 0) return fn(); // already inside a transaction — join it
+    this.db.exec('BEGIN');
+    this.txDepth++;
+    try {
+      const result = await fn();
+      this.db.exec('COMMIT');
+      return result;
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    } finally {
+      this.txDepth--;
+    }
+  }
 
   async init(): Promise<void> {
     if (this.opts.path !== ':memory:') {

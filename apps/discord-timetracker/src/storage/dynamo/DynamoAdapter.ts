@@ -285,6 +285,17 @@ export class DynamoAdapter implements StorageAdapter {
       throw err;
     }
   }
+
+  /**
+   * Pass-through: DynamoDB has no ambient transaction spanning the arbitrary
+   * set of writes a handler performs (TransactWriteItems needs all items known
+   * up front). The atomic-dedup guarantee therefore applies to the SQLite
+   * backend; on DynamoDB an interrupted handler can still strand a claim. v1
+   * runs on SQLite, so this is acceptable until a real unit-of-work is added.
+   */
+  async transaction<T>(fn: () => Promise<T>): Promise<T> {
+    return fn();
+  }
 }
 
 function activityToItem(a: DailyActivity): Record<string, unknown> {

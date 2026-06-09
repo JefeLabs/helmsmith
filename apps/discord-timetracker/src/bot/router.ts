@@ -29,7 +29,14 @@ function selectHandler(m: IncomingMessage, config: BotDeps['config']): Handler |
 export async function routeMessage(m: IncomingMessage, deps: BotDeps): Promise<void> {
   const handler = selectHandler(m, deps.config);
   if (!handler) return;
-  // Idempotency: only the first delivery of a message id is processed.
-  if (!(await deps.storage.markProcessed(m.id))) return;
-  await handler(m, deps);
+  // Claim + handle atomically: the dedup marker and the handler's writes commit
+  // together, or roll back together. Claiming alone (the old order) meant an
+  // interrupted handler left a marker with no effect — and `markProcessed`
+  // returns false forever after, so neither a redelivery nor `backfill` could
+  // ever recover it. Now an interrupted message stays unclaimed and replayable.
+  await deps.storage.transaction(async () => {
+    // Idempotency: only the first delivery of a message id is processed.
+    if (!(await deps.storage.markProcessed(m.id))) return;
+    await handler(m, deps);
+  });
 }

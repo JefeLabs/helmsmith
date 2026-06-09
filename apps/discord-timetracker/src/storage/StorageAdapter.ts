@@ -63,4 +63,12 @@ export interface StorageAdapter {
    * handlers (CI, engagement) idempotent across reconnects.
    */
   markProcessed(messageId: string): Promise<boolean>;
+
+  /**
+   * Run `fn` atomically: every write inside it commits together, or — if `fn`
+   * throws or the process dies mid-flight — rolls back together. The router
+   * uses this to wrap `markProcessed` + the handler, so an interrupted message
+   * never leaves a claim with no effect (which would make it unrecoverable).
+   */
+  transaction<T>(fn: () => Promise<T>): Promise<T>;
 }
