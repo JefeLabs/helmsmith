@@ -1,0 +1,6 @@
+# Local runtime artifacts (root .gitignore already covers dist/, node_modules/)
+.env
+data/
+*.db
+*.db-shm
+*.db-wal
