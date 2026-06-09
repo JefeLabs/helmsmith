@@ -58,7 +58,7 @@ const backend = await select({
   choices: [{ value: 'sqlite', name: 'SQLite (local file) — recommended for v1' },
             { value: 'dynamodb', name: 'DynamoDB (AWS us-east-1)' }],
 });
-// …channel IDs, admin role, timezone… → write ./timetracker.config.json (token to .env / secret store)
+// …channel IDs, admin role, timezone… → write ./timetracker.config.json (token to .env.bak / secret store)
 ```
 
 ## TUI summary viewer (`view`)

@@ -42,7 +42,11 @@ export function loadDotEnv(cwd = process.cwd()): void {
       (value.startsWith('"') && value.endsWith('"')) ||
       (value.startsWith("'") && value.endsWith("'"))
     ) {
-      value = value.slice(1, -1);
+      value = value.slice(1, -1); // quoted: keep contents verbatim
+    } else {
+      // Unquoted: strip an inline ` #…` comment (e.g. `TIMEZONE=America/New_York # tz`).
+      const comment = value.search(/\s#/);
+      if (comment !== -1) value = value.slice(0, comment).trimEnd();
     }
     process.env[key] = value;
   }
@@ -75,23 +79,32 @@ function defined<T extends Record<string, unknown>>(obj: T): Partial<T> {
 }
 
 /**
+ * Treat an empty/whitespace env var as absent. Without this, a `.env` line like
+ * `TRACKED_ROLE_ID=` (common for optional keys) sets `''`, which `??` does NOT
+ * skip — so the empty string overrides the file/default and fails validation.
+ */
+function blank(v: string | undefined): string | undefined {
+  return v && v.trim() !== '' ? v : undefined;
+}
+
+/**
  * Build the storage block from env, falling back to the file's block. Env
  * `STORAGE_BACKEND` selects the variant; per-backend fields overlay.
  */
 function resolveStorage(env: NodeJS.ProcessEnv, fileStorage: unknown): unknown {
-  const backend = env.STORAGE_BACKEND ?? (fileStorage as { backend?: string })?.backend;
+  const backend = blank(env.STORAGE_BACKEND) ?? (fileStorage as { backend?: string })?.backend;
   if (backend === 'dynamodb') {
     return defined({
       backend: 'dynamodb',
-      table: env.DDB_TABLE,
-      region: env.AWS_REGION,
+      table: blank(env.DDB_TABLE),
+      region: blank(env.AWS_REGION),
       ...(fileStorage as object),
     });
   }
   // default: sqlite
   return defined({
     backend: 'sqlite',
-    path: env.SQLITE_PATH,
+    path: blank(env.SQLITE_PATH),
     ...(fileStorage as object),
   });
 }
@@ -105,23 +118,26 @@ export function loadConfig(cwd = process.cwd(), env: NodeJS.ProcessEnv = process
   const file = readConfigFile(cwd);
 
   const merged = {
-    token: env.DISCORD_TOKEN,
-    guildId: env.GUILD_ID ?? file.guildId,
+    token: blank(env.DISCORD_TOKEN),
+    guildId: blank(env.GUILD_ID) ?? file.guildId,
     channels: {
       ...(file.channels as object),
       ...defined({
-        goals: env.GOALS_CHANNEL_ID,
-        summary: env.SUMMARY_CHANNEL_ID,
-        ci: env.CI_CHANNEL_ID,
+        goals: blank(env.GOALS_CHANNEL_ID),
+        summary: blank(env.SUMMARY_CHANNEL_ID),
+        ci: blank(env.CI_CHANNEL_ID),
       }),
     },
     voiceChannelIds: parseIdList(env.VOICE_CHANNEL_IDS) ?? file.voiceChannelIds,
-    adminRoleId: env.ADMIN_ROLE_ID ?? file.adminRoleId,
-    reportChannelId: env.REPORT_CHANNEL_ID ?? file.reportChannelId,
-    trackedRoleId: env.TRACKED_ROLE_ID ?? file.trackedRoleId,
-    timezone: env.TIMEZONE ?? file.timezone,
-    weekStartsOn: env.WEEK_STARTS_ON ?? file.weekStartsOn,
-    schedule: { ...(file.schedule as object), ...defined({ dailyAt: env.SCHEDULE_DAILY_AT }) },
+    adminRoleId: blank(env.ADMIN_ROLE_ID) ?? file.adminRoleId,
+    reportChannelId: blank(env.REPORT_CHANNEL_ID) ?? file.reportChannelId,
+    trackedRoleId: blank(env.TRACKED_ROLE_ID) ?? file.trackedRoleId,
+    timezone: blank(env.TIMEZONE) ?? file.timezone,
+    weekStartsOn: blank(env.WEEK_STARTS_ON) ?? file.weekStartsOn,
+    schedule: {
+      ...(file.schedule as object),
+      ...defined({ dailyAt: blank(env.SCHEDULE_DAILY_AT) }),
+    },
     capture: file.capture,
     storage: resolveStorage(env, file.storage),
   };

@@ -23,7 +23,7 @@ Bun · TypeScript · discord.js v14 · [`@ecruz165/cli-kit`](../../packages/cli-
 
 ```bash
 pnpm install                 # from the monorepo root
-cp .env.example .env         # fill in token, guild, channel IDs
+cp .env.bak.example .env.bak         # fill in token, guild, channel IDs
 pnpm --filter @ecruz165/discord-timetracker dev -- --help
 ```
 
@@ -40,7 +40,7 @@ CLI verbs:
 ## Running the bot
 
 ```bash
-discord-timetracker setup     # or hand-edit .env + timetracker.config.json
+discord-timetracker setup     # or hand-edit .env.bak + timetracker.config.json
 discord-timetracker start     # Ctrl-C for graceful shutdown
 ```
 

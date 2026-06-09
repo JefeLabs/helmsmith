@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ConfigError, loadConfig } from './load.js';
+import { ConfigError, loadConfig, loadDotEnv } from './load.js';
 
 const SF = '123456789012345678'; // a valid 18-digit snowflake shape
 
@@ -37,6 +37,34 @@ describe('loadConfig', () => {
     const other = '987654321098765432';
     const cfg = loadConfig(tmp(), validEnv({ VOICE_CHANNEL_IDS: `${SF}, ${other}` }));
     expect(cfg.voiceChannelIds).toEqual([SF, other]);
+  });
+
+  it('treats an empty env var as unset (does not override / fail validation)', () => {
+    // `.env` lines like `TRACKED_ROLE_ID=` must not set '' — that would fail the
+    // optional snowflake check instead of being ignored.
+    const cfg = loadConfig(tmp(), validEnv({ TRACKED_ROLE_ID: '', TIMEZONE: '  ' }));
+    expect(cfg.trackedRoleId).toBeUndefined();
+    expect(cfg.timezone).toBe('America/New_York'); // blank → default, not ''
+  });
+
+  it('loadDotEnv strips an inline comment from an unquoted value', () => {
+    const dir = tmp();
+    const key = 'TT_TEST_TZ'; // unique key, not already in process.env
+    delete process.env[key];
+    writeFileSync(join(dir, '.env'), `${key}=America/New_York    # the timezone\n`);
+    loadDotEnv(dir);
+    expect(process.env[key]).toBe('America/New_York');
+    delete process.env[key];
+  });
+
+  it('loadDotEnv keeps a # that is inside a quoted value', () => {
+    const dir = tmp();
+    const key = 'TT_TEST_Q';
+    delete process.env[key];
+    writeFileSync(join(dir, '.env'), `${key}="a#b"\n`);
+    loadDotEnv(dir);
+    expect(process.env[key]).toBe('a#b');
+    delete process.env[key];
   });
 
   it('rejects a missing token', () => {
