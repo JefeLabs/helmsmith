@@ -46,6 +46,7 @@ program
   .option('-p, --period <period>', 'daily | weekly', 'daily')
   .option('-d, --date <iso>', 'anchor date (YYYY-MM-DD); defaults to today')
   .option('--json', 'machine-readable JSON output')
+  .option('--post', 'post the summary to the Discord report channel instead of printing')
   .action((opts) => runReport(opts));
 
 program
