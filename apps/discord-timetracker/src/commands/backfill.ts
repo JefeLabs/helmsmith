@@ -148,7 +148,7 @@ export async function runBackfill(opts: BackfillOptions, cwd = process.cwd()): P
       console.log(`  ✓ replayed ${replayed} message(s) through the router`);
 
       // Show the recovered summary for the first backfilled day.
-      const reports = new ReportService(storage, config.weekStartsOn);
+      const reports = new ReportService(storage, config.weekStartsOn, config.trackedUserIds);
       console.log(`\n${renderDaily(await reports.daily(since), tz)}`);
     }
   } catch (err) {

@@ -5,6 +5,7 @@
  * "ignore bots" guard — the CI poster ("GitHub Monitor") is itself a bot, so
  * dropping bots before this branch would silently zero out every CI submission.
  */
+import { isTracked } from '../domain/tracked.js';
 import {
   type BotDeps,
   handleCiSubmission,
@@ -20,6 +21,8 @@ type Handler = (m: IncomingMessage, deps: BotDeps) => Promise<unknown>;
 function selectHandler(m: IncomingMessage, config: BotDeps['config']): Handler | null {
   if (m.channelId === config.channels.ci) return handleCiSubmission; // bot poster — before the bot guard
   if (m.authorIsBot) return null; // ignore bots (and our own messages) elsewhere
+  // Human-authored signals: only from tracked users (CI is filtered per-actor).
+  if (!isTracked(m.authorId, config.trackedUserIds)) return null;
   if (m.channelId === config.channels.goals) return handleStartOfDay;
   if (m.channelId === config.channels.summary) return handleEndOfDay;
   if (config.voiceChannelIds.includes(m.channelId)) return handleEngagementText;

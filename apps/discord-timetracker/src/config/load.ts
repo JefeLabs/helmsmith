@@ -73,6 +73,15 @@ function parseIdList(raw: string | undefined): string[] | undefined {
   return ids;
 }
 
+/** Parse a boolean env var (true/1/yes/on → true; false/0/no/off → false). */
+function parseBool(raw: string | undefined): boolean | undefined {
+  const v = blank(raw)?.toLowerCase();
+  if (v === undefined) return undefined;
+  if (['true', '1', 'yes', 'on'].includes(v)) return true;
+  if (['false', '0', 'no', 'off'].includes(v)) return false;
+  return undefined;
+}
+
 /** Drop keys whose value is `undefined` so env-overlay only sets real values. */
 function defined<T extends Record<string, unknown>>(obj: T): Partial<T> {
   return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as Partial<T>;
@@ -132,11 +141,22 @@ export function loadConfig(cwd = process.cwd(), env: NodeJS.ProcessEnv = process
     adminRoleId: blank(env.ADMIN_ROLE_ID) ?? file.adminRoleId,
     reportChannelId: blank(env.REPORT_CHANNEL_ID) ?? file.reportChannelId,
     trackedRoleId: blank(env.TRACKED_ROLE_ID) ?? file.trackedRoleId,
+    trackedUserIds: parseIdList(env.TRACKED_USER_IDS) ?? file.trackedUserIds,
     timezone: blank(env.TIMEZONE) ?? file.timezone,
     weekStartsOn: blank(env.WEEK_STARTS_ON) ?? file.weekStartsOn,
     schedule: {
       ...(file.schedule as object),
       ...defined({ dailyAt: blank(env.SCHEDULE_DAILY_AT) }),
+      endOfDay: {
+        ...((file.schedule as { endOfDay?: object })?.endOfDay ?? {}),
+        ...defined({
+          enabled: parseBool(env.SCHEDULE_EOD_ENABLED),
+          mode: blank(env.SCHEDULE_EOD_MODE),
+          at: blank(env.SCHEDULE_EOD_AT),
+          deadlineAt: blank(env.SCHEDULE_EOD_DEADLINE),
+          weekdaysOnly: parseBool(env.SCHEDULE_EOD_WEEKDAYS_ONLY),
+        }),
+      },
     },
     capture: file.capture,
     storage: resolveStorage(env, file.storage),

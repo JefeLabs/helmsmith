@@ -27,7 +27,7 @@ export async function runStart(cwd = process.cwd()): Promise<void> {
 
   const storage = await createStorage(config.storage);
   const deps = { storage, config };
-  const reports = new ReportService(storage, config.weekStartsOn);
+  const reports = new ReportService(storage, config.weekStartsOn, config.trackedUserIds);
   const client = wireBot(createClient(), deps);
   const stopPoller = attachPoller(client, deps);
   const stopScheduler = attachScheduler(client, deps, reports);

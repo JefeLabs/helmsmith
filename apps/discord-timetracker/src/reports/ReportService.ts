@@ -5,7 +5,8 @@
  */
 import { POLL_INTERVAL_MINUTES } from '../domain/constants.js';
 import { addDays, type WeekStart, weekWindow } from '../domain/dayKey.js';
-import type { DailyActivity, ISODate } from '../domain/types.js';
+import { isTracked } from '../domain/tracked.js';
+import type { DailyActivity, ISODate, UserId } from '../domain/types.js';
 import type { StorageAdapter } from '../storage/StorageAdapter.js';
 import type { DailySummary, UserDayRow, UserWeekRow, WeeklySummary } from './types.js';
 
@@ -15,6 +16,8 @@ export class ReportService {
   constructor(
     private readonly storage: StorageAdapter,
     private readonly weekStartsOn: WeekStart = 'monday',
+    /** When non-empty, reports include only these users. */
+    private readonly trackedUserIds: readonly UserId[] = [],
   ) {}
 
   /** `now` bounds the span when a user hasn't posted end-of-day yet; injectable for tests. */
@@ -23,7 +26,10 @@ export class ReportService {
       this.storage.listDay(date),
       this.storage.getUserNames(),
     ]);
-    const users = rows.map((a) => toUserDayRow(a, now)).sort(byActiveDesc);
+    const users = rows
+      .filter((a) => isTracked(a.userId, this.trackedUserIds))
+      .map((a) => toUserDayRow(a, now))
+      .sort(byActiveDesc);
     for (const u of users) u.displayName = names[u.userId];
     return { period: 'daily', date, users };
   }
@@ -34,7 +40,8 @@ export class ReportService {
       this.storage.listRange(from, to),
       this.storage.getUserNames(),
     ]);
-    const summary = aggregateWeekly(from, to, rows);
+    const tracked = rows.filter((a) => isTracked(a.userId, this.trackedUserIds));
+    const summary = aggregateWeekly(from, to, tracked);
     for (const u of summary.users) u.displayName = names[u.userId];
     return summary;
   }

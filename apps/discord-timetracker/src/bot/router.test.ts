@@ -9,6 +9,7 @@ const config = {
   guildId: 'g',
   channels: { goals: 'GOALS', summary: 'SUMMARY', ci: 'CI' },
   voiceChannelIds: [],
+  trackedUserIds: [],
   adminRoleId: 'A',
   reportChannelId: 'R',
   timezone: 'UTC',

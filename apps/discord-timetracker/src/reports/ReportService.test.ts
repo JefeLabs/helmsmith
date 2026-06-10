@@ -101,6 +101,14 @@ describe('ReportService', () => {
     expect(u1?.perDay.find((d) => d.date === '2026-06-09')?.onlineMinutes).toBe(0);
   });
 
+  it('daily: restricts to trackedUserIds when the allowlist is set', async () => {
+    await seedDay(storage, U1, '2026-06-10', { online: 6, start: '2026-06-10T09:00:00Z' });
+    await seedDay(storage, U2, '2026-06-10', { online: 6, start: '2026-06-10T09:00:00Z' });
+    const scoped = new ReportService(storage, 'monday', [U1]);
+    const s = await scoped.daily('2026-06-10', new Date('2026-06-10T18:00:00Z'));
+    expect(s.users.map((u) => u.userId)).toEqual([U1]); // U2 excluded
+  });
+
   it('daily: empty when no records', async () => {
     expect((await reports.daily('2026-01-01')).users).toEqual([]);
   });

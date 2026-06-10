@@ -39,6 +39,27 @@ describe('loadConfig', () => {
     expect(cfg.voiceChannelIds).toEqual([SF, other]);
   });
 
+  it('parses TRACKED_USER_IDS and the end-of-day schedule from env', () => {
+    const a = '111111111111111111';
+    const b = '222222222222222222';
+    const cfg = loadConfig(
+      tmp(),
+      validEnv({
+        TRACKED_USER_IDS: `${a}, ${b}`,
+        SCHEDULE_EOD_ENABLED: 'true',
+        SCHEDULE_EOD_MODE: 'completion',
+        SCHEDULE_EOD_DEADLINE: '22:00',
+      }),
+    );
+    expect(cfg.trackedUserIds).toEqual([a, b]);
+    expect(cfg.schedule.endOfDay).toMatchObject({
+      enabled: true,
+      mode: 'completion',
+      deadlineAt: '22:00',
+      weekdaysOnly: true, // default
+    });
+  });
+
   it('treats an empty env var as unset (does not override / fail validation)', () => {
     // `.env` lines like `TRACKED_ROLE_ID=` must not set '' — that would fail the
     // optional snowflake check instead of being ignored.

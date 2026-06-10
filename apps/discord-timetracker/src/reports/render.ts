@@ -7,6 +7,11 @@
  */
 import type { DailySummary, WeeklySummary } from './types.js';
 
+/** First whitespace token of a name: "Yelisson Ortiz - Skoolscout" → "Yelisson". */
+export function firstName(name: string): string {
+  return name.split(/\s+/)[0] || name;
+}
+
 /** Minutes → "2h 30m" / "45m" / "—". */
 export function formatDuration(minutes: number): string {
   if (minutes <= 0) return '—';
@@ -42,7 +47,7 @@ function table(headers: string[], rows: string[][]): string {
 export function renderDaily(s: DailySummary, tz: string): string {
   if (s.users.length === 0) return `Daily summary — ${s.date}\n(no activity recorded)`;
   const rows = s.users.map((u) => [
-    u.displayName ?? u.userId,
+    firstName(u.displayName ?? u.userId),
     formatDuration(u.activeMinutes),
     formatDuration(u.idleMinutes),
     formatDuration(u.spanMinutes),
@@ -61,7 +66,7 @@ export function renderDaily(s: DailySummary, tz: string): string {
 export function renderWeekly(s: WeeklySummary, _tz: string): string {
   if (s.users.length === 0) return `Weekly summary — ${s.from} → ${s.to}\n(no activity recorded)`;
   const rows = s.users.map((u) => [
-    u.displayName ?? u.userId,
+    firstName(u.displayName ?? u.userId),
     formatDuration(u.onlineMinutes),
     formatDuration(u.voiceMinutes),
     String(u.ciSubmissions),

@@ -14,6 +14,7 @@ function makeConfig(over: Partial<Config> = {}): Config {
     guildId: 'g',
     channels: { goals: 'GOALS', summary: 'SUMMARY', ci: 'CI' },
     voiceChannelIds: ['VOICE1', 'VOICE2'],
+  trackedUserIds: [],
     adminRoleId: 'A',
     reportChannelId: 'R',
     timezone: 'UTC',

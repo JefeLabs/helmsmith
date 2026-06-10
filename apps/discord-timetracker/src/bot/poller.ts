@@ -54,12 +54,17 @@ export async function applyPoll(
   return { presence, voice };
 }
 
-/** Read the guild's member cache into snapshots, honouring `trackedRoleId`. */
+/** Read the guild's member cache into snapshots, honouring the tracked set. */
 export function collectSnapshots(guild: Guild, deps: BotDeps): MemberSnapshot[] {
-  const { trackedRoleId } = deps.config;
+  const { trackedRoleId, trackedUserIds } = deps.config;
   const snapshots: MemberSnapshot[] = [];
   for (const member of guild.members.cache.values()) {
-    if (trackedRoleId && !member.roles.cache.has(trackedRoleId)) continue;
+    // Explicit allowlist wins; otherwise fall back to the optional role filter.
+    if (trackedUserIds.length > 0) {
+      if (!trackedUserIds.includes(member.id)) continue;
+    } else if (trackedRoleId && !member.roles.cache.has(trackedRoleId)) {
+      continue;
+    }
     const status = member.presence?.status; // 'online'|'idle'|'dnd'|'offline'|undefined
     const presence: PresenceState | 'offline' =
       status === 'online' || status === 'dnd' ? 'active' : status === 'idle' ? 'idle' : 'offline';

@@ -36,16 +36,33 @@ export const ChannelsSchema = z.object({
   ci: snowflake('CI_CHANNEL_ID'),
 });
 
+const hhmm = (label: string) =>
+  z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, `${label} must be HH:MM (24-hour)`);
+
+/**
+ * End-of-day publish: posts TODAY's summary (the current day, not yesterday).
+ * Two modes — `fixed` posts at `at`; `completion` posts as soon as every tracked
+ * user has logged end-of-day, falling back to `deadlineAt` (whichever is first).
+ */
+export const EndOfDaySchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    mode: z.enum(['fixed', 'completion']).default('completion'),
+    at: hhmm('endOfDay.at').default('18:00'), // used when mode = 'fixed'
+    deadlineAt: hhmm('endOfDay.deadlineAt').default('22:00'), // fallback for 'completion'
+    // Restrict to Monday–Friday (no weekend posts).
+    weekdaysOnly: z.boolean().default(true),
+  })
+  .default({});
+
 export const ScheduleSchema = z
   .object({
     // Push daily/weekly summaries to the report channel.
     enabled: z.boolean().default(true),
     // Local time-of-day (HH:MM, 24h) to post. Daily covers the previous day;
     // on the week-start day it also posts the previous week.
-    dailyAt: z
-      .string()
-      .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'dailyAt must be HH:MM (24-hour)')
-      .default('09:00'),
+    dailyAt: hhmm('dailyAt').default('09:00'),
+    endOfDay: EndOfDaySchema,
   })
   .default({});
 
@@ -73,6 +90,13 @@ export const ConfigSchema = z.object({
   reportChannelId: snowflake('REPORT_CHANNEL_ID'),
   /** Optional: only track members with this role. Unset → all non-bot members. */
   trackedRoleId: snowflake('TRACKED_ROLE_ID').optional(),
+  /**
+   * Optional explicit allowlist of user ids to track. When non-empty it is the
+   * authoritative tracked set — the poller, message capture, reports, and the
+   * end-of-day "all done" check all restrict to these users. Empty → fall back
+   * to trackedRoleId (or all non-bot members).
+   */
+  trackedUserIds: z.array(snowflakeBare).default([]),
   timezone: z
     .string()
     .default('America/New_York')

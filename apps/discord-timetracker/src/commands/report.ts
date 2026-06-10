@@ -73,7 +73,7 @@ export async function runReport(opts: ReportOptions, cwd = process.cwd()): Promi
   const date = opts.date ?? todayKey(config.timezone);
   const storage = await createStorage(config.storage);
   try {
-    const reports = new ReportService(storage, config.weekStartsOn);
+    const reports = new ReportService(storage, config.weekStartsOn, config.trackedUserIds);
     if (opts.post) {
       await postToReportChannel(config, reports, period, date);
       return;

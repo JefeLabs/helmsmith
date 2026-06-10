@@ -5,6 +5,7 @@
  */
 import type { Config } from '../config/schema.js';
 import { dayKeyFor } from '../domain/dayKey.js';
+import { isTracked } from '../domain/tracked.js';
 import type { StorageAdapter } from '../storage/StorageAdapter.js';
 import type { IncomingMessage } from './message.js';
 
@@ -87,6 +88,7 @@ export async function handleCiSubmission(
   for (const actor of actors) {
     const userId = await storage.resolveIdentity('github', actor);
     if (!userId) continue;
+    if (!isTracked(userId, config.trackedUserIds)) continue; // only tracked humans
     await storage.incrementCi(userId, date);
     counted++;
   }

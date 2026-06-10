@@ -31,7 +31,7 @@ export async function runView(opts: ViewOptions, cwd = process.cwd()): Promise<v
 
   const storage = await createStorage(config.storage);
   try {
-    const reports = new ReportService(storage, config.weekStartsOn);
+    const reports = new ReportService(storage, config.weekStartsOn, config.trackedUserIds);
     await runViewer({
       reports,
       timezone: config.timezone,
