@@ -1,0 +1,28 @@
+{
+  "name": "@ecruz165/harness-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@ecruz165/agent-adapter": "workspace:*",
+    "@ecruz165/agent-auth": "workspace:*",
+    "@ecruz165/harness-core": "workspace:*",
+    "@ecruz165/harness-pipeline": "workspace:*",
+    "@langchain/core": "^1.1.44",
+    "@langchain/langgraph": "^1.3.0",
+    "yaml": "^2.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "typescript": "^5.6.0"
+  }
+}

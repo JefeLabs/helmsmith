@@ -1,0 +1,189 @@
+package com.jefelabs.agentx.controlplane.job.api;
+
+import com.jefelabs.agentx.controlplane.core.tenancy.TenantContext;
+import com.jefelabs.agentx.controlplane.job.api.dto.JobDTO;
+import com.jefelabs.agentx.controlplane.job.api.dto.JobReflectionRequestDTO;
+import com.jefelabs.agentx.controlplane.job.api.dto.JobStatusEventDTO;
+import com.jefelabs.agentx.controlplane.job.api.dto.ScoreJobRequestDTO;
+import com.jefelabs.agentx.controlplane.job.api.dto.SubmitJobRequestDTO;
+import com.jefelabs.agentx.controlplane.job.api.mapper.JobMapper;
+import com.jefelabs.agentx.controlplane.job.engine.JobEngine;
+import com.jefelabs.agentx.controlplane.job.service.JobService;
+import com.jefelabs.agentx.controlplane.proposals.service.SkillProposalService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+/**
+ * Thin HTTP edge for jobs. Phase 3a: submit / get / list / cancel.
+ * Step events SSE stream + per-step queries arrive with the engine in 3b.
+ */
+@RestController
+@RequestMapping("/api/jobs")
+public class JobController {
+
+    private final JobService jobService;
+    private final JobMapper jobMapper;
+    private final JobEngine jobEngine;
+    private final SkillProposalService skillProposalService;
+
+    public JobController(
+        JobService jobService,
+        JobMapper jobMapper,
+        JobEngine jobEngine,
+        SkillProposalService skillProposalService
+    ) {
+        this.jobService = jobService;
+        this.jobMapper = jobMapper;
+        this.jobEngine = jobEngine;
+        this.skillProposalService = skillProposalService;
+    }
+
+    @PostMapping
+    public ResponseEntity<JobDTO> submit(@RequestBody SubmitJobRequestDTO body) {
+        var tenant = TenantContext.current();
+        var intent = jobMapper.toIntent(body);
+        var job = jobService.submit(tenant.orgId(), tenant.userId(), intent);
+        return ResponseEntity.status(HttpStatus.CREATED).body(jobMapper.toDTO(job));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<JobDTO> getById(@PathVariable String id) {
+        var tenant = TenantContext.current();
+        return jobService.findById(tenant.orgId(), id)
+            .map(jobMapper::toDTO)
+            .map(ResponseEntity::ok)
+            .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping
+    public List<JobDTO> list(
+        @RequestParam(defaultValue = "50") int limit,
+        @RequestParam(defaultValue = "0") int offset,
+        @RequestParam(name = "benchmarkRunId", required = false) String benchmarkRunId
+    ) {
+        var tenant = TenantContext.current();
+        var jobs = (benchmarkRunId != null && !benchmarkRunId.isBlank())
+            ? jobService.listByBenchmarkRun(tenant.orgId(), benchmarkRunId, limit, offset)
+            : jobService.listByOrg(tenant.orgId(), limit, offset);
+        return jobs.stream().map(jobMapper::toDTO).toList();
+    }
+
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<JobDTO> cancel(@PathVariable String id) {
+        var tenant = TenantContext.current();
+        return jobService.cancel(tenant.orgId(), id)
+            .map(jobMapper::toDTO)
+            .map(ResponseEntity::ok)
+            .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Quality-score sink (slice 4). External scorers — rubric runner,
+     * LLM-as-judge, manual review — POST a score in [0, 1] for a job's
+     * output. Aggregated by /api/benchmarks/compare.
+     */
+    @PostMapping("/{id}/score")
+    public ResponseEntity<JobDTO> score(@PathVariable String id, @RequestBody ScoreJobRequestDTO body) {
+        var tenant = TenantContext.current();
+        return jobService.recordEvalScore(
+                tenant.orgId(), id, body.score(), body.rationale(), body.judge()
+            )
+            .map(jobMapper::toDTO)
+            .map(ResponseEntity::ok)
+            .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Post-job reflection: actual story points + free-text retro +
+     * optional structured surprises. Surprises with
+     * {@code kind: 'missing-skill'} are auto-forwarded into the
+     * skill_proposals queue for admin review (no separate call).
+     */
+    @PostMapping("/{id}/reflection")
+    public ResponseEntity<JobDTO> reflect(
+        @PathVariable String id,
+        @RequestBody JobReflectionRequestDTO body
+    ) {
+        var tenant = TenantContext.current();
+        var updated = jobService.recordReflection(
+            tenant.orgId(), id, body.actualPoints(), body.reflection(), body.surprises()
+        );
+        if (updated.isPresent()) {
+            // Fan out missing-skill surprises into the proposals queue.
+            skillProposalService.createFromSurprises(tenant.orgId(), id, body.surprises());
+        }
+        return updated
+            .map(jobMapper::toDTO)
+            .map(ResponseEntity::ok)
+            .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Manual engine trigger. Phase 3b ships this as the only execution path
+     * so testing is deterministic; Phase 3.x adds a {@code @Scheduled} poller
+     * that picks up queued jobs automatically.
+     */
+    @PostMapping("/{id}/start")
+    public ResponseEntity<JobDTO> start(@PathVariable String id) {
+        var tenant = TenantContext.current();
+        return jobService.findById(tenant.orgId(), id)
+            .map(jobEngine::runJob)
+            .map(jobMapper::toDTO)
+            .map(ResponseEntity::ok)
+            .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /** Deliver an external event to a paused {@code wait-for-event} step. */
+    @PostMapping("/{id}/events/{eventName}")
+    public ResponseEntity<JobDTO> deliverEvent(
+        @PathVariable String id,
+        @PathVariable String eventName,
+        @RequestBody(required = false) tools.jackson.databind.JsonNode payload
+    ) {
+        var tenant = TenantContext.current();
+        try {
+            return jobService.deliverEvent(tenant.orgId(), id, eventName, payload)
+                .map(jobMapper::toDTO)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT).build();
+        }
+    }
+
+    /**
+     * Status push-back from the harness-server executing a WORK job (W1d).
+     * Best-effort sender; idempotent-ish receiver (never regresses out of
+     * a terminal state). No auth yet — trust-based on the deployment
+     * network for the MVP; H3/W1d-hardening adds a per-harness token.
+     */
+    @PostMapping("/{id}/status")
+    public ResponseEntity<JobDTO> updateStatus(@PathVariable String id, @RequestBody JobStatusEventDTO body) {
+        var tenant = TenantContext.current();
+        return jobService.applyHarnessStatus(tenant.orgId(), id, body.status(), body.failureReason())
+            .map(jobMapper::toDTO)
+            .map(ResponseEntity::ok)
+            .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /** Submit an approval verdict to a paused {@code approval} step. */
+    @PostMapping("/{id}/approvals/{nodeId}")
+    public ResponseEntity<JobDTO> submitApproval(
+        @PathVariable String id,
+        @PathVariable String nodeId,
+        @RequestBody tools.jackson.databind.JsonNode body
+    ) {
+        var tenant = TenantContext.current();
+        try {
+            return jobService.submitApproval(tenant.orgId(), id, nodeId, body)
+                .map(jobMapper::toDTO)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT).build();
+        }
+    }
+}

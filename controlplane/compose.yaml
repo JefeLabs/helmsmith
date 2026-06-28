@@ -1,0 +1,197 @@
+# Sibling services for local dev. `spring-boot-docker-compose` auto-starts these on
+# `mvn spring-boot:run` and auto-injects connection details into Spring config.
+#
+# Postgres is provided by zonky's embedded-postgres library (in-process Postgres binary)
+# rather than as a sibling container — see core/config/EmbeddedPostgresConfig.java.
+# To use compose-managed Postgres instead (real binary, persistent volume), uncomment
+# the postgres service block below and set SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/...
+# at runtime so embedded auto-config skips.
+#
+#   postgres:
+#     image: postgres:17
+#     environment:
+#       POSTGRES_DB: controlplane
+#       POSTGRES_USER: controlplane
+#       POSTGRES_PASSWORD: controlplane
+#     ports: ["5432:5432"]
+#     volumes: [postgres-data:/var/lib/postgresql/data]
+#     healthcheck:
+#       test: ["CMD-SHELL", "pg_isready -U controlplane -d controlplane"]
+#       interval: 5s
+#       timeout: 5s
+#       retries: 10
+#
+# In production, override SPRING_DATASOURCE_URL to a managed Postgres
+# (RDS/Aurora/Cloud SQL); embedded-postgres auto-config skips when an external
+# datasource is configured.
+
+services:
+  # central-data — Postgres 15 + Neo4j 5 in one container. Data is throwaway
+  # (Flyway re-bootstraps schema on each spring-boot run), so the operational
+  # risk of bundling is low. See central-data/Dockerfile + entrypoint.sh for
+  # the multi-process supervision details (tini + bash trap, no supervisord).
+  central-data:
+    build:
+      context: ./central-data
+      dockerfile: Dockerfile
+    image: agentx/central-data:dev
+    environment:
+      NEO4J_AUTH: neo4j/controlplane
+      NEO4J_server_memory_heap_initial__size: 512m
+      NEO4J_server_memory_heap_max__size: 1g
+      NEO4J_server_memory_pagecache_size: 512m
+      POSTGRES_DB: controlplane
+      POSTGRES_USER: controlplane
+      POSTGRES_PASSWORD: controlplane
+    ports:
+      - "5432:5432"   # Postgres
+      - "7474:7474"   # Neo4j HTTP browser
+      - "7687:7687"   # Neo4j Bolt
+    volumes:
+      - central-pg-data:/var/lib/postgresql/data
+      - central-neo4j-data:/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -h 127.0.0.1 -p 5432 -U controlplane && wget -q --spider http://127.0.0.1:7474
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  # Embedder configuration is moved to per-variant overlay files —
+  # compose.qwen-0.6b.yaml, compose.qwen-4b.yaml, compose.qwen-8b.yaml,
+  # compose.openai.yaml, compose.bedrock.yaml. Each adds either a Docker
+  # Model Runner attachment (local Qwen variants) or pure env-var
+  # configuration (OpenAI / Bedrock cloud APIs).
+  #
+  # The base compose.yaml leaves AGENTX_EMBEDDER_URL/MODEL/DIMENSION
+  # unset; the controlplane Spring app boots fine but its query path
+  # surfaces a 503 until an overlay provides the embedder config.
+  #
+  # `workspace start --embedder <variant>` chooses the overlay; default
+  # is `qwen-0.6b` (lightest, fastest dev iteration).
+
+  # controlplane — Spring Boot app + bundled web UI (built into Spring's
+  # static resources at image-build time). Build context is the repo root
+  # (../) so the UI builder stage can reach packages/controlplane-ui +
+  # the pnpm workspace lockfile. See controlplane/Dockerfile for the
+  # 3-stage build (ui-builder → jar-builder → runtime).
+  controlplane:
+    build:
+      context: ..
+      dockerfile: controlplane/Dockerfile
+    image: agentx/controlplane:dev
+    ports:
+      - "8080:8080"
+    environment:
+      # External Postgres in central-data. The explicit escape hatch is
+      # required (not just SPRING_DATASOURCE_URL) because zonky's
+      # @ConditionalOnMissingBean(DataSource.class) fires before Spring
+      # Boot's DataSourceAutoConfiguration has materialized the bean —
+      # the conditional sees no DataSource yet and starts embedded.
+      AGENTX_EMBEDDED_POSTGRES_ENABLED: "false"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://central-data:5432/controlplane
+      SPRING_DATASOURCE_USERNAME: controlplane
+      SPRING_DATASOURCE_PASSWORD: controlplane
+      # Neo4j in central-data (same container; reachable via compose DNS).
+      AGENTX_NEO4J_URI: bolt://central-data:7687
+      AGENTX_NEO4J_USER: neo4j
+      AGENTX_NEO4J_PASSWORD: controlplane
+      # AGENTX_EMBEDDER_URL / AGENTX_EMBEDDER_MODEL / AGENTX_EMBEDDER_DIMENSION
+      # land via per-variant overlay files (see comment above).
+      # Disable refresh-poller in container by default (no agentx-load
+      # binary baked into the image yet — that's a follow-up).
+      AGENTX_CONTEXT_LOADER_REFRESH_POLLER_ENABLED: "false"
+    depends_on:
+      central-data:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  # harness-server — RPC surface for in-flight job execution. Mounts the
+  # host docker socket (DooD) so it can spawn per-job pipeline-instance
+  # containers via the host's docker daemon. Reaches edge-context +
+  # edge-memory via the shared edge-sockets volume. Fetches its catalog
+  # from the controlplane on startup (HTTP /api/catalog/flows + /products).
+  harness-server:
+    build:
+      context: ..
+      dockerfile: controlplane/harness-server/Dockerfile
+    image: agentx/harness-server:dev
+    environment:
+      HARNESS_SOCKET: /run/harness/harness.sock
+      EDGE_SOCKETS_DIR: /run/edge
+      # Catalog source — the controlplane HTTP API. Default is compose
+      # service-name DNS for the local-everything case; override
+      # CONTROLPLANE_URL to point at a hosted controlplane (e.g.,
+      # https://controlplane.prod.example.com) for hybrid setups
+      # where the harness is local but the controlplane is deployed.
+      # AGENTX_ORG_ID picks which tenant's catalog to load. Phase 7
+      # swaps to a system-token-scoped endpoint.
+      CONTROLPLANE_URL: ${CONTROLPLANE_URL:-http://controlplane:8080}
+      AGENTX_ORG_ID: ${AGENTX_ORG_ID:-dev-org}
+      # Self-register with controlplane's HarnessRegistry on startup +
+      # heartbeat every HARNESS_HEARTBEAT_INTERVAL_MS. HARNESS_ID needs
+      # to be stable across restarts so the controlplane doesn't
+      # accumulate stale rows.
+      HARNESS_ID: ${HARNESS_ID:-harness-local-dev}
+      HARNESS_NAME: ${HARNESS_NAME:-harness-local-dev}
+      HARNESS_REGION: ${HARNESS_REGION:-local}
+      HARNESS_HEARTBEAT_INTERVAL_MS: "30000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock     # DooD
+      - edge-sockets:/run/edge:ro                     # reach edge-context + edge-memory
+      - harness-sockets:/run/harness                  # own UDS
+    depends_on:
+      edge-server:
+        condition: service_healthy
+      controlplane:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "test -S /run/harness/harness.sock"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # edge-server — per-workspace cache. Bundles a private Neo4j (not exposed
+  # to the host) + edge-context-server + edge-memory-server. The two TS
+  # servers expose UDS sockets in /run/edge, mounted as a shared volume so
+  # the harness-server container can reach them. See controlplane/edge-server/
+  # for the Dockerfile + bun launcher details.
+  edge-server:
+    build:
+      context: ..
+      dockerfile: controlplane/edge-server/Dockerfile
+    image: agentx/edge-server:dev
+    environment:
+      NEO4J_AUTH: neo4j/edgepassword
+      EDGE_NEO4J_URL: bolt://localhost:7687
+      EDGE_NEO4J_USER: neo4j
+      EDGE_NEO4J_PASSWORD: edgepassword
+      # Embedder URL + model are injected by the per-variant overlay
+      # (compose.qwen-*.yaml / compose.openai.yaml / compose.bedrock.yaml).
+      # Without an overlay, edge-context falls back to echo mode.
+    volumes:
+      - edge-neo4j-data:/data
+      - edge-sockets:/run/edge
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q --spider http://127.0.0.1:7474 && test -S /run/edge/memory.sock && test -S /run/edge/context.sock
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+
+volumes:
+  central-pg-data:
+  central-neo4j-data:
+  edge-neo4j-data:
+  edge-sockets:
+  harness-sockets:
