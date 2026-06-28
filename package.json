@@ -69,6 +69,11 @@
     "yaml": "^2.6.0"
   },
   "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild",
+      "bun"
+    ],
     "overrides": {
       "react": "19.2.6",
       "react-dom": "19.2.6",

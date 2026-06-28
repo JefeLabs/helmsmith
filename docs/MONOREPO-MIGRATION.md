@@ -77,9 +77,21 @@ A complete sweep was run after the merge. Honest results:
   `context-loader-core` 12 files pass. (A repo-wide sweep confirmed no other
   cross-group `../../` paths are broken — `harness-server`'s is correct because
   harness-server and harness-core stayed in the same group.) Test packages: **15 / 21.**
-- **Still failing (ordinary triage, likely pre-existing):** `taskmaster` (5/77
-  files), `harness-server` (1/17), `mech-pencil` (1/19), `skillzkit` (1/15),
-  `edge-memory-server` (3/12 — likely native sqlite-vec).
+- **`edge-memory-server` (3/12 files) — diagnosed: environment, not the merge.**
+  The 3 failing files all use `better-sqlite3`, whose native binding never built.
+  Two layers: (a) pnpm gates dependency build scripts, so `better-sqlite3`'s
+  prebuilt-binary fetch never ran — added `onlyBuiltDependencies` (better-sqlite3,
+  esbuild, bun) to package.json's `pnpm` field to allow it; (b) the dev machine
+  runs **Node 26**, which has no better-sqlite3 11.10 prebuilt and fails to
+  compile against Node 26's V8. **CI pins Node 22** (prebuilts exist) so CI is
+  unaffected. To run these tests locally, use Node 22 (`nvm use 22`).
+  - ⚠️ **pnpm settings location gotcha:** `overrides` / `onlyBuiltDependencies`
+    must live in `package.json`'s `pnpm` field for the pinned pnpm 9.15.9 — it
+    does NOT read them from `pnpm-workspace.yaml` (despite a deprecation warning
+    suggesting otherwise; that's pnpm-10 behavior). Move them when upgrading to
+    pnpm 10.
+- **Still failing, ordinary triage (likely pre-existing app code):** `taskmaster`
+  (5/77 files), `harness-server` (1/17), `mech-pencil` (1/19), `skillzkit` (1/15).
 - **Build:** partial — TS/tsup builds pass; `apps/mech-pencil`'s `bun build`
   sub-step needs the `bun` npm package's postinstall (an environment/approval
   step pnpm gates), unrelated to the merge.

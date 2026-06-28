@@ -8,3 +8,7 @@ packages:
   - 'apps/*'
   # NOTE: controlplane/ is a Java/Maven project and is intentionally NOT a pnpm
   # workspace member. examples/ and workspace-template/ are scripts/scaffold, not packages.
+  #
+  # pnpm settings (overrides, onlyBuiltDependencies) live in package.json's "pnpm"
+  # field, NOT here: the pinned pnpm 9.15.9 reads them from package.json. (pnpm 10+
+  # moves them here — do that as part of a deliberate pnpm-10 upgrade.)
