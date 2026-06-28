@@ -105,15 +105,11 @@ jobs:
 
       - name: Vitest — run package suites
         # `-r --if-present test` runs each package's `test` script when present.
-        # The --filter='!…' exclusions skip packages with KNOWN failures, each
-        # tracked in .issues/. Remove an exclusion when its issue closes.
-        #   - gitradar: db-watcher.test.ts is flaky under parallel load (HELM-T4)
-        # (edge-memory-server is NOT excluded — it passes once better-sqlite3's
-        #  native binding builds on Node 22, which CI does.)
-        run: >-
-          pnpm -r --if-present
-          --filter='!@ecruz165/gitradar'
-          test
+        # All workspace test suites run, no exclusions. (edge-memory-server needs
+        # better-sqlite3's native binding, which builds on the CI-pinned Node 22 via
+        # onlyBuiltDependencies.) Add a --filter='!pkg' exclusion only for a tracked
+        # .issues/ regression, and remove it when fixed.
+        run: pnpm -r --if-present test
 
   # ── Java stack — controlplane ─────────────────────────────────────────
   #

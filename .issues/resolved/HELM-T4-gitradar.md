@@ -1,10 +1,30 @@
 # HELM-T4: gitradar — db-watcher.test.ts flaky under parallel load
 
-**Labels:** `flaky-test` · `area:gitradar` · `ci-excluded`
-**Status:** Open
-**CI exclusion:** test (`.github/workflows/ci.yml`) — remove on close
-**Repro:** passes in isolation (`pnpm --filter @ecruz165/gitradar run test` → exit 0,
-38 vitest files + 37 bun tests). Fails only under the recursive parallel run.
+**Labels:** `flaky-test` · `area:gitradar`
+**Status:** ✅ RESOLVED
+**CI exclusion:** removed — and it was the **last** one, so the CI test step now runs
+all suites with no `--filter` exclusions (typecheck is already exclusion-free).
+**Verified (Node 22):** 0/8 failures under an 8-core CPU-saturation stress loop (was
+2/2); full `pnpm -r test` (gitradar included) exits 0.
+
+## Resolution
+
+Fixed in branch `fix/helm-t4-gitradar`. `vi.waitFor` alone wasn't enough — under
+saturation, `fs.watch` *event delivery itself* starves, so no timeout is reliable.
+Made the logic deterministic instead:
+- Extracted the fs.watch callback body into a public `DbWatcher.handleFsEvent()`
+  (a test seam; behavior unchanged in production).
+- Rewrote `db-watcher.test.ts`'s change-detection tests to drive `handleFsEvent()`
+  directly with **fake timers** (`vi.useFakeTimers()` + `advanceTimersByTime(150)`),
+  removing any dependency on real OS file-watch delivery or wall-clock sleeps. The
+  filter + debounce + abort logic is now tested deterministically; `start()`'s real
+  fs.watch wiring stays covered by the idempotency tests.
+
+---
+
+_Original report below._
+
+**Repro:** passes in isolation; previously failed only under the recursive parallel run.
 
 ## Summary
 
