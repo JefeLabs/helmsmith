@@ -9,7 +9,7 @@ describe('frame() normalization', () => {
   it('flattens a legacy nested stroke into a Fill + sibling stroke props', () => {
     const f = frame('f', { stroke: { thickness: 2, fill: '#000000', align: 'center' } } as never);
     expect(f).toMatchObject({ stroke: '#000000', strokeWidth: 2, strokeAlignment: 'center' });
-    expect((f as Record<string, unknown>).stroke).not.toHaveProperty('thickness');
+    expect((f as unknown as Record<string, unknown>).stroke).not.toHaveProperty('thickness');
   });
 
   it('maps stroke align inside/outside/center → inner/outer/center', () => {

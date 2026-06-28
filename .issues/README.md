@@ -22,7 +22,6 @@ the full record (and git history follows the move).
 
 | ID | Package | Kind | Status |
 |----|---------|------|--------|
-| [HELM-T3](./HELM-T3-mech-pencil.md) | mech-pencil | typecheck | open — typecheck excluded |
 | [HELM-T4](./HELM-T4-gitradar.md) | gitradar | flaky test | open — test excluded |
 | [HELM-T5](./HELM-T5-opentui-react-esm.md) | @opentui/react (tui) | upstream ESM bug | open — not CI-blocking |
 
@@ -32,6 +31,7 @@ the full record (and git history follows the move).
 |----|---------|------|------------|
 | [HELM-T1](./resolved/HELM-T1-taskmaster.md) | taskmaster | typecheck + tests | ✅ fixed; CI exclusions removed (`401116f`) |
 | [HELM-T2](./resolved/HELM-T2-gittyup.md) | gittyup | typecheck | ✅ fixed; typecheck exclusion removed |
+| [HELM-T3](./resolved/HELM-T3-mech-pencil.md) | mech-pencil | typecheck | ✅ fixed; last typecheck exclusion removed |
 
 ## Fixed during the merge (no issue needed)
 
