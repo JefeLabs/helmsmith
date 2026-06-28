@@ -30,7 +30,7 @@ function mockEmbedder(dim = 8): EmbedderClient {
 
 describe('ingest() — code-full (smoke)', () => {
   it('ingests harness-core source and emits File + Function/Class nodes with vectors', async () => {
-    const harnessCorePath = resolve(__dirname, '../../../harness-core');
+    const harnessCorePath = resolve(__dirname, '../../../../harness/harness-core');
     const backend = new InMemoryGraphBackend();
     const events: IngestionEvent[] = [];
 

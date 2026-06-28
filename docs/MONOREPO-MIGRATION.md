@@ -67,11 +67,19 @@ A complete sweep was run after the merge. Honest results:
   `web/controlplane-ui`). **Fixed** by adding a `vite: ^6` pnpm override (keeps
   `vitest@4`, what the tests target). `controlplane-ui` rebuilt clean on vite 6
   (plugin-react 4.7 + tailwindcss/vite 4 both support it).
-  After the fix: **13 / 21 packages fully pass.** The remaining 8 have residual
-  *individual* test-file failures (e.g. `taskmaster` 72/77 files pass,
-  `harness-server` 16/17, `mech-pencil` 18/19) — now ordinary test triage, not a
-  blocker. `context/context-loader-cli` (2/2) and parts of `edge-memory-server`
-  (3/12) warrant a closer look (possibly native-module / pre-existing).
+  After the vite fix: **13 / 21 packages fully pass.**
+- **Merge-induced test breakage found + fixed:** `context-loader-cli` and
+  `context-loader-core` had hard-coded `../../harness-core` relative paths that
+  assumed the old flat `packages/*` sibling layout. Domain grouping split them
+  (`context/` vs `harness/`), so those paths pointed at a nonexistent dir and
+  ingestion found 0 files. Repointed to `../../../harness/harness-core` (and one
+  `../../../../harness/harness-core`). Now: `context-loader-cli` 14/14,
+  `context-loader-core` 12 files pass. (A repo-wide sweep confirmed no other
+  cross-group `../../` paths are broken — `harness-server`'s is correct because
+  harness-server and harness-core stayed in the same group.) Test packages: **15 / 21.**
+- **Still failing (ordinary triage, likely pre-existing):** `taskmaster` (5/77
+  files), `harness-server` (1/17), `mech-pencil` (1/19), `skillzkit` (1/15),
+  `edge-memory-server` (3/12 — likely native sqlite-vec).
 - **Build:** partial — TS/tsup builds pass; `apps/mech-pencil`'s `bun build`
   sub-step needs the `bun` npm package's postinstall (an environment/approval
   step pnpm gates), unrelated to the merge.

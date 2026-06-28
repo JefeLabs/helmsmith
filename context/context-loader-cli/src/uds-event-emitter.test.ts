@@ -17,7 +17,7 @@ import { describe, expect, it } from 'vitest';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BIN = resolve(__dirname, 'bin.ts');
-const HARNESS_CORE = resolve(__dirname, '../../harness-core');
+const HARNESS_CORE = resolve(__dirname, '../../../harness/harness-core');
 
 interface UdsCollector {
   server: Server;
