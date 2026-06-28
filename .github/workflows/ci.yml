@@ -87,12 +87,10 @@ jobs:
 
       - name: TypeScript typecheck
         # Recursive across packages — each package owns its own tsconfig.
-        # The --filter='!…' exclusions skip packages with KNOWN type errors, each
-        # tracked in .issues/ (gittyup HELM-T2, mech-pencil HELM-T3). Remove an
-        # exclusion when its issue closes.
+        # The --filter='!…' exclusion skips packages with KNOWN type errors,
+        # tracked in .issues/ (mech-pencil HELM-T3). Remove when its issue closes.
         run: >-
           pnpm -r
-          --filter='!@ecruz165/gittyup'
           --filter='!@ecruz165/mech-pencil'
           typecheck
 
