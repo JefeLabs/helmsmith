@@ -58,7 +58,7 @@ if ! docker info >/dev/null 2>&1; then
 fi
 
 log "submitting job: product=$PRODUCT change=\"$CHANGE\""
-SUBMIT_OUT="$(cd "$WS_ROOT" && pnpm --silent --filter @ecruz165/harness exec tsx packages/harness-cli/src/index.ts submit "$CHANGE" --product "$PRODUCT" 2>&1)"
+SUBMIT_OUT="$(cd "$WS_ROOT" && pnpm --silent --filter @ecruz165/harness exec tsx src/index.ts submit "$CHANGE" --product "$PRODUCT" 2>&1)"
 echo "$SUBMIT_OUT"
 
 # Extract jobId — `handleSubmit` logs it as the first token on
@@ -106,5 +106,5 @@ ok "Gate 1 smoke complete (jobId=$JOB_ID container=$CONTAINER_ID)"
 
 if (( DO_CLEANUP )); then
   log "reaping…"
-  (cd "$WS_ROOT" && pnpm --silent --filter @ecruz165/harness exec tsx packages/harness-cli/src/index.ts reap --job "$JOB_ID" --force)
+  (cd "$WS_ROOT" && pnpm --silent --filter @ecruz165/harness exec tsx src/index.ts reap --job "$JOB_ID" --force)
 fi

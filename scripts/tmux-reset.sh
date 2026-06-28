@@ -18,7 +18,7 @@ echo "→ killing tmux session '$SESSION' (if any)"
 tmux kill-session -t "$SESSION" 2>/dev/null && echo "  killed" || echo "  (none)"
 
 echo "→ reaping orphan trio processes"
-pkill -f "tsx packages/[^/]*/src/main\.ts" 2>/dev/null && echo "  killed main.ts processes" || echo "  (no main.ts procs)"
+pkill -f "tsx src/main\.ts" 2>/dev/null && echo "  killed main.ts processes" || echo "  (no main.ts procs)"
 pkill -f "tsx examples/04-server-trio\.ts" 2>/dev/null && echo "  killed dev:servers process" || echo "  (no dev:servers proc)"
 
 sleep 0.5

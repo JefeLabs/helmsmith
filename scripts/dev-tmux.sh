@@ -36,7 +36,7 @@ if tmux has-session -t "$SESSION" 2>/dev/null; then
   # inside might have been killed externally, leaving shell prompts but no
   # working servers). Heuristic: if no trio processes are alive on the host,
   # the session is stale; kill it and rebuild.
-  if pgrep -f "tsx packages/[^/]*/src/main\.ts" >/dev/null 2>&1 \
+  if pgrep -f "tsx src/main\.ts" >/dev/null 2>&1 \
      || pgrep -f "tsx examples/04-server-trio\.ts" >/dev/null 2>&1; then
     echo "Session '$SESSION' already running — attaching."
     exec tmux attach -t "$SESSION"
@@ -50,7 +50,7 @@ fi
 # pkill -9 (SIGKILL is uncatchable, so SIGHUP cleanup didn't fire). Makes
 # 'pnpm tmux' always idempotent — new panes' servers can bind without
 # colliding with zombies.
-pkill -f "tsx packages/[^/]*/src/main\.ts" 2>/dev/null || true
+pkill -f "tsx src/main\.ts" 2>/dev/null || true
 pkill -f "tsx examples/04-server-trio\.ts" 2>/dev/null || true
 sleep 0.3
 
@@ -63,17 +63,17 @@ tmux send-keys -t "${SESSION}:dash.0" "pnpm --silent harness tui" C-m
 # Pane 1 (right column, top) — harness-server
 tmux split-window -h -t "${SESSION}:dash.0" -c "$WS_ROOT"
 tmux send-keys -t "${SESSION}:dash.1" \
-  "HARNESS_SOCKET_PATH='$RUN_DIR/harness.sock' pnpm --silent --filter @agentx/harness-server exec tsx src/main.ts" C-m
+  "HARNESS_SOCKET_PATH='$RUN_DIR/harness.sock' pnpm --silent --filter @ecruz165/harness-server exec tsx src/main.ts" C-m
 
 # Pane 2 (right column, middle) — edge-memory-server
 tmux split-window -v -t "${SESSION}:dash.1" -c "$WS_ROOT"
 tmux send-keys -t "${SESSION}:dash.2" \
-  "MEMORY_SOCKET_PATH='$RUN_DIR/memory.sock' pnpm --silent --filter @agentx/edge-memory-server exec tsx src/main.ts" C-m
+  "MEMORY_SOCKET_PATH='$RUN_DIR/memory.sock' pnpm --silent --filter @ecruz165/edge-memory-server exec tsx src/main.ts" C-m
 
 # Pane 3 (right column, bottom) — edge-context-server
 tmux split-window -v -t "${SESSION}:dash.2" -c "$WS_ROOT"
 tmux send-keys -t "${SESSION}:dash.3" \
-  "CONTEXT_SOCKET_PATH='$RUN_DIR/context.sock' pnpm --silent --filter @agentx/edge-context-server exec tsx src/main.ts" C-m
+  "CONTEXT_SOCKET_PATH='$RUN_DIR/context.sock' pnpm --silent --filter @ecruz165/edge-context-server exec tsx src/main.ts" C-m
 
 # main-vertical: pane 0 takes the full left column, the others stack on the right.
 tmux select-layout -t "${SESSION}:dash" main-vertical
