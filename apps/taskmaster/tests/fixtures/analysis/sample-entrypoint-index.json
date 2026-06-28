@@ -1,0 +1,109 @@
+{
+  "version": 1,
+  "repoRoot": "/home/user/ecommerce",
+  "generatedAt": "2026-02-17T00:00:00Z",
+  "entryPoints": [
+    {
+      "id": "ep:api-gateway:post-login",
+      "name": "POST /api/auth/login",
+      "category": "http-api",
+      "componentId": "api-gateway",
+      "filePath": "src/routes/auth.ts",
+      "symbolName": "handleLogin",
+      "metadata": { "method": "POST", "path": "/api/auth/login" },
+      "detectedBy": "static",
+      "confidence": 0.95,
+      "tags": ["auth", "public"]
+    },
+    {
+      "id": "ep:api-gateway:get-products",
+      "name": "GET /api/products",
+      "category": "http-api",
+      "componentId": "api-gateway",
+      "filePath": "src/routes/products.ts",
+      "symbolName": "listProducts",
+      "metadata": { "method": "GET", "path": "/api/products" },
+      "detectedBy": "static",
+      "confidence": 0.9,
+      "tags": ["products"]
+    },
+    {
+      "id": "ep:cli-tool:generate",
+      "name": "generate command",
+      "category": "cli-command",
+      "componentId": "cli-tool",
+      "filePath": "bin/cli.ts",
+      "symbolName": "generateCommand",
+      "metadata": { "commandName": "generate" },
+      "detectedBy": "manifest",
+      "confidence": 1.0,
+      "tags": ["cli"]
+    },
+    {
+      "id": "ep:order-service:order-created",
+      "name": "order.created listener",
+      "category": "event",
+      "componentId": "order-service",
+      "filePath": "src/events/order-handler.ts",
+      "symbolName": "onOrderCreated",
+      "metadata": { "eventName": "order.created" },
+      "detectedBy": "ai",
+      "confidence": 0.7,
+      "tags": ["events", "orders"]
+    }
+  ],
+  "traces": [
+    {
+      "entryPointId": "ep:api-gateway:post-login",
+      "componentChain": ["api-gateway", "auth-service", "user-db"],
+      "sideEffects": [
+        {
+          "type": "database-read",
+          "target": "users-db.users",
+          "description": "Look up user by email",
+          "componentId": "auth-service",
+          "detectedBy": "ai"
+        },
+        {
+          "type": "database-write",
+          "target": "users-db.sessions",
+          "description": "Create session record",
+          "componentId": "auth-service",
+          "detectedBy": "ai"
+        }
+      ],
+      "externalSystems": [],
+      "dataSourcesAccessed": ["users-db"],
+      "description": "Login flow: validates credentials, creates session"
+    },
+    {
+      "entryPointId": "ep:api-gateway:get-products",
+      "componentChain": ["api-gateway", "product-service", "product-db"],
+      "sideEffects": [
+        {
+          "type": "database-read",
+          "target": "products-db.products",
+          "description": "Query product catalog",
+          "componentId": "product-service",
+          "detectedBy": "ai"
+        },
+        {
+          "type": "external-api-call",
+          "target": "pricing-service",
+          "description": "Fetch live pricing",
+          "componentId": "product-service",
+          "detectedBy": "ai"
+        }
+      ],
+      "externalSystems": ["pricing-service"],
+      "dataSourcesAccessed": ["products-db"],
+      "description": "Product listing: queries catalog with live pricing"
+    }
+  ],
+  "validation": {
+    "orphanComponents": ["email-templates"],
+    "unreachableComponents": ["legacy-utils"],
+    "entryPointsWithoutTraces": ["ep:order-service:order-created"],
+    "coveragePercentage": 80
+  }
+}

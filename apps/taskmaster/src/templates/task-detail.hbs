@@ -1,0 +1,19 @@
+# {{task.id}}: {{task.title}}
+
+**Type:** {{task.type}} | **Priority:** {{task.priority}} | **Status:** {{status-badge task.status}}
+
+**Complexity:** {{complexity-color task.complexity}} | **Readiness:** {{task.readiness}}
+
+## Description
+
+{{task.description}}
+
+{{> skill-badges requiredSkills=task.requiredSkills}}
+
+{{> dependency-list dependencies=task.dependencies}}
+
+{{> subtask-tree children=task.children}}
+
+## Metadata
+
+{{> metadata-block metadata=task.metadata}}

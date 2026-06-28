@@ -1,0 +1,50 @@
+# QA Report
+
+> Generated: {{generatedAt}}
+
+## Summary
+
+| Metric | Count |
+|--------|-------|
+| Total Failures | {{stats.totalFailures}} |
+| Critical | {{stats.bySeverity.critical}} |
+| Major | {{stats.bySeverity.major}} |
+| Minor | {{stats.bySeverity.minor}} |
+
+{{#if stats.byTestType.length}}
+## Failures by Test Type
+
+| Test Type | Count |
+|-----------|-------|
+{{#each stats.byTestType}}
+| `{{testType}}` | {{count}} |
+{{/each}}
+{{/if}}
+
+{{#if failures.length}}
+## QA Failed Tasks
+
+{{#each failures}}
+### {{id}} — {{title}}
+
+- **Severity:** {{severity}}
+- **Test Type:** {{testType}}
+- **Description:** {{description}}
+{{#if cause}}- **Cause:** {{cause}}{{/if}}
+- **Reporter:** {{reporter}}
+- **Timestamp:** {{timestamp}}
+
+{{/each}}
+{{else}}
+No QA failures recorded.
+{{/if}}
+
+{{#if reviewNeeded.length}}
+## Tasks Needing QA Review
+
+{{#each reviewNeeded}}
+- **{{id}}** — {{title}}
+{{/each}}
+{{else}}
+No tasks pending QA review.
+{{/if}}

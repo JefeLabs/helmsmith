@@ -1,0 +1,1559 @@
+{
+  "version": "2.11",
+  "imports": {
+    "tokens": "../design-tokens.lib.pen"
+  },
+  "children": [
+    {
+      "id": "design-system-atoms",
+      "type": "frame",
+      "name": "Design System · atoms",
+      "x": 0,
+      "y": 0,
+      "layout": "vertical",
+      "gap": 48,
+      "padding": 48,
+      "fill": "$tokens:color.background",
+      "children": [
+        {
+          "id": "ds-atoms-h",
+          "type": "text",
+          "content": "Design System · atoms (27)",
+          "fill": "$tokens:color.foreground",
+          "fontFamily": "$tokens:font.family",
+          "fontSize": 24,
+          "fontWeight": "700"
+        },
+        {
+          "id": "ds-atoms-buttons",
+          "type": "frame",
+          "name": "Buttons",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "ds-atoms-buttons-h",
+              "type": "text",
+              "content": "Buttons",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "ds-atoms-buttons-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "button",
+                  "type": "frame",
+                  "name": "Button",
+                  "height": 40,
+                  "fill": "$tokens:color.accent",
+                  "cornerRadius": "$tokens:radius.md",
+                  "layout": "horizontal",
+                  "gap": "$tokens:space.unit",
+                  "padding": [
+                    16,
+                    10
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "id": "button-label",
+                      "type": "text",
+                      "content": "Button",
+                      "fill": "$tokens:color.accent-foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md",
+                      "fontWeight": "600"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Button",
+                    "package": "@heroui/react",
+                    "slug": "button",
+                    "category": "Buttons",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/buttons.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "close-button",
+                  "type": "frame",
+                  "name": "CloseButton",
+                  "width": 32,
+                  "height": 32,
+                  "layout": "horizontal",
+                  "alignItems": "center",
+                  "justifyContent": "center",
+                  "cornerRadius": 9999,
+                  "fill": "$tokens:color.accent-soft",
+                  "children": [
+                    {
+                      "id": "close-button-icon",
+                      "type": "text",
+                      "content": "✕",
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "CloseButton",
+                    "package": "@heroui/react",
+                    "slug": "close-button",
+                    "category": "Buttons",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/buttons.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "toggle-button",
+                  "type": "frame",
+                  "name": "ToggleButton",
+                  "layout": "horizontal",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "alignItems": "center",
+                  "justifyContent": "center",
+                  "padding": [
+                    16,
+                    10
+                  ],
+                  "cornerRadius": "$tokens:radius.md",
+                  "fill": "$tokens:color.accent-soft",
+                  "stroke": {
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.accent"
+                  },
+                  "children": [
+                    {
+                      "id": "toggle-button-label",
+                      "type": "text",
+                      "content": "Toggle",
+                      "fill": "$tokens:color.accent",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md",
+                      "fontWeight": "600"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "ToggleButton",
+                    "package": "@heroui/react",
+                    "slug": "toggle-button",
+                    "category": "Buttons",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/buttons.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ds-atoms-colors",
+          "type": "frame",
+          "name": "Colors",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "ds-atoms-colors-h",
+              "type": "text",
+              "content": "Colors",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "ds-atoms-colors-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "color-swatch",
+                  "type": "frame",
+                  "name": "ColorSwatch",
+                  "width": 40,
+                  "height": 40,
+                  "cornerRadius": "$tokens:radius.md",
+                  "fill": "$tokens:color.accent",
+                  "stroke": {
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
+                  },
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "ColorSwatch",
+                    "package": "@heroui/react",
+                    "slug": "color-swatch",
+                    "category": "Colors",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/colors.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ds-atoms-controls",
+          "type": "frame",
+          "name": "Controls",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "ds-atoms-controls-h",
+              "type": "text",
+              "content": "Controls",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "ds-atoms-controls-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "switch",
+                  "type": "frame",
+                  "name": "Switch",
+                  "width": 44,
+                  "height": 24,
+                  "layout": "horizontal",
+                  "alignItems": "center",
+                  "justifyContent": "end",
+                  "padding": [
+                    2,
+                    2
+                  ],
+                  "fill": "$tokens:color.accent",
+                  "cornerRadius": 9999,
+                  "children": [
+                    {
+                      "id": "switch-knob",
+                      "type": "frame",
+                      "name": "Knob",
+                      "width": 20,
+                      "height": 20,
+                      "fill": "$tokens:color.surface",
+                      "cornerRadius": 9999
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Switch",
+                    "package": "@heroui/react",
+                    "slug": "switch",
+                    "category": "Controls",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/controls.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "slider",
+                  "type": "frame",
+                  "name": "Slider",
+                  "width": 240,
+                  "height": 20,
+                  "layout": "none",
+                  "children": [
+                    {
+                      "id": "slider-track",
+                      "type": "frame",
+                      "name": "Track",
+                      "x": 0,
+                      "y": 7,
+                      "width": 240,
+                      "height": 6,
+                      "cornerRadius": 9999,
+                      "fill": "$tokens:color.border"
+                    },
+                    {
+                      "id": "slider-fill",
+                      "type": "frame",
+                      "name": "Fill",
+                      "x": 0,
+                      "y": 7,
+                      "width": 108,
+                      "height": 6,
+                      "cornerRadius": 9999,
+                      "fill": "$tokens:color.accent"
+                    },
+                    {
+                      "id": "slider-thumb",
+                      "type": "frame",
+                      "name": "Thumb",
+                      "x": 100,
+                      "y": 1,
+                      "width": 18,
+                      "height": 18,
+                      "cornerRadius": 9999,
+                      "fill": "$tokens:color.surface",
+                      "stroke": {
+                        "thickness": 2,
+                        "fill": "$tokens:color.accent"
+                      }
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Slider",
+                    "package": "@heroui/react",
+                    "slug": "slider",
+                    "category": "Controls",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/controls.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ds-atoms-data-display",
+          "type": "frame",
+          "name": "Data Display",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "ds-atoms-data-display-h",
+              "type": "text",
+              "content": "Data Display",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "ds-atoms-data-display-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "badge",
+                  "type": "frame",
+                  "name": "Badge",
+                  "layout": "horizontal",
+                  "width": "fit_content",
+                  "alignItems": "center",
+                  "justifyContent": "center",
+                  "padding": [
+                    8,
+                    3
+                  ],
+                  "fill": "$tokens:color.accent",
+                  "cornerRadius": 9999,
+                  "children": [
+                    {
+                      "id": "badge-label",
+                      "type": "text",
+                      "content": "New",
+                      "fill": "$tokens:color.accent-foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": 12,
+                      "fontWeight": "600"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Badge",
+                    "package": "@heroui/react",
+                    "slug": "badge",
+                    "category": "Data Display",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/data-display.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "chip",
+                  "type": "frame",
+                  "name": "Chip",
+                  "layout": "horizontal",
+                  "width": "fit_content",
+                  "alignItems": "center",
+                  "gap": "$tokens:space.unit",
+                  "padding": [
+                    12,
+                    6
+                  ],
+                  "fill": "$tokens:color.accent-soft",
+                  "cornerRadius": 9999,
+                  "children": [
+                    {
+                      "id": "chip-label",
+                      "type": "text",
+                      "content": "Chip",
+                      "fill": "$tokens:color.accent",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm",
+                      "fontWeight": "500"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Chip",
+                    "package": "@heroui/react",
+                    "slug": "chip",
+                    "category": "Data Display",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/data-display.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ds-atoms-feedback",
+          "type": "frame",
+          "name": "Feedback",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "ds-atoms-feedback-h",
+              "type": "text",
+              "content": "Feedback",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "ds-atoms-feedback-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "spinner",
+                  "type": "frame",
+                  "name": "Spinner",
+                  "width": 32,
+                  "height": 32,
+                  "layout": "none",
+                  "children": [
+                    {
+                      "id": "spinner-track",
+                      "type": "ellipse",
+                      "width": 32,
+                      "height": 32,
+                      "fill": "$tokens:color.border",
+                      "innerRadius": 0.8,
+                      "startAngle": 0,
+                      "sweepAngle": 360
+                    },
+                    {
+                      "id": "spinner-arc",
+                      "type": "ellipse",
+                      "width": 32,
+                      "height": 32,
+                      "fill": "$tokens:color.accent",
+                      "innerRadius": 0.8,
+                      "startAngle": 90,
+                      "sweepAngle": 280
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Spinner",
+                    "package": "@heroui/react",
+                    "slug": "spinner",
+                    "category": "Feedback",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/feedback.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "skeleton",
+                  "type": "frame",
+                  "name": "Skeleton",
+                  "width": 240,
+                  "layout": "vertical",
+                  "gap": 10,
+                  "children": [
+                    {
+                      "id": "skeleton-a",
+                      "type": "frame",
+                      "width": 240,
+                      "height": 16,
+                      "cornerRadius": "$tokens:radius.sm",
+                      "fill": "$tokens:color.border"
+                    },
+                    {
+                      "id": "skeleton-b",
+                      "type": "frame",
+                      "width": 180,
+                      "height": 16,
+                      "cornerRadius": "$tokens:radius.sm",
+                      "fill": "$tokens:color.border"
+                    },
+                    {
+                      "id": "skeleton-c",
+                      "type": "frame",
+                      "width": 210,
+                      "height": 16,
+                      "cornerRadius": "$tokens:radius.sm",
+                      "fill": "$tokens:color.border"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Skeleton",
+                    "package": "@heroui/react",
+                    "slug": "skeleton",
+                    "category": "Feedback",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/feedback.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "meter",
+                  "type": "frame",
+                  "name": "Meter",
+                  "width": 240,
+                  "layout": "vertical",
+                  "gap": 6,
+                  "children": [
+                    {
+                      "id": "meter-track",
+                      "type": "frame",
+                      "name": "Track",
+                      "width": 240,
+                      "height": 8,
+                      "cornerRadius": 9999,
+                      "fill": "$tokens:color.border",
+                      "layout": "none",
+                      "children": [
+                        {
+                          "id": "meter-track-fill",
+                          "type": "frame",
+                          "x": 0,
+                          "y": 0,
+                          "width": 168,
+                          "height": 8,
+                          "cornerRadius": 9999,
+                          "fill": "$tokens:color.accent"
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Meter",
+                    "package": "@heroui/react",
+                    "slug": "meter",
+                    "category": "Feedback",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/feedback.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "progress-bar",
+                  "type": "frame",
+                  "name": "ProgressBar",
+                  "width": 240,
+                  "layout": "vertical",
+                  "gap": 6,
+                  "children": [
+                    {
+                      "id": "progress-bar-row",
+                      "type": "frame",
+                      "layout": "horizontal",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "children": [
+                        {
+                          "id": "progress-bar-label",
+                          "type": "text",
+                          "content": "Uploading",
+                          "fill": "$tokens:color.foreground",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm",
+                          "fontWeight": "600"
+                        },
+                        {
+                          "id": "progress-bar-pct",
+                          "type": "text",
+                          "content": "60%",
+                          "fill": "$tokens:color.muted",
+                          "fontFamily": "$tokens:font.family",
+                          "fontSize": "$tokens:font.size-sm"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "progress-bar-track",
+                      "type": "frame",
+                      "name": "Track",
+                      "width": 240,
+                      "height": 8,
+                      "cornerRadius": 9999,
+                      "fill": "$tokens:color.border",
+                      "layout": "none",
+                      "children": [
+                        {
+                          "id": "progress-bar-track-fill",
+                          "type": "frame",
+                          "x": 0,
+                          "y": 0,
+                          "width": 144,
+                          "height": 8,
+                          "cornerRadius": 9999,
+                          "fill": "$tokens:color.accent"
+                        }
+                      ]
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "ProgressBar",
+                    "package": "@heroui/react",
+                    "slug": "progress-bar",
+                    "category": "Feedback",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/feedback.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "progress-circle",
+                  "type": "frame",
+                  "name": "ProgressCircle",
+                  "width": 64,
+                  "height": 64,
+                  "layout": "none",
+                  "children": [
+                    {
+                      "id": "progress-circle-track",
+                      "type": "ellipse",
+                      "width": 64,
+                      "height": 64,
+                      "fill": "$tokens:color.border",
+                      "innerRadius": 0.8,
+                      "startAngle": 0,
+                      "sweepAngle": 360
+                    },
+                    {
+                      "id": "progress-circle-arc",
+                      "type": "ellipse",
+                      "width": 64,
+                      "height": 64,
+                      "fill": "$tokens:color.accent",
+                      "innerRadius": 0.8,
+                      "startAngle": 90,
+                      "sweepAngle": 252
+                    },
+                    {
+                      "id": "progress-circle-text",
+                      "type": "text",
+                      "content": "70%",
+                      "x": 18,
+                      "y": 24,
+                      "fill": "$tokens:color.foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm",
+                      "fontWeight": "600"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "ProgressCircle",
+                    "package": "@heroui/react",
+                    "slug": "progress-circle",
+                    "category": "Feedback",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/feedback.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ds-atoms-forms",
+          "type": "frame",
+          "name": "Forms",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "ds-atoms-forms-h",
+              "type": "text",
+              "content": "Forms",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "ds-atoms-forms-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "label",
+                  "type": "frame",
+                  "name": "Label",
+                  "layout": "horizontal",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "children": [
+                    {
+                      "id": "label-text",
+                      "type": "text",
+                      "content": "Email address",
+                      "fill": "$tokens:color.foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm",
+                      "fontWeight": "600"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Label",
+                    "package": "@heroui/react",
+                    "slug": "label",
+                    "category": "Forms",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/forms.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "description",
+                  "type": "frame",
+                  "name": "Description",
+                  "layout": "horizontal",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "children": [
+                    {
+                      "id": "description-text",
+                      "type": "text",
+                      "content": "We never share your email.",
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Description",
+                    "package": "@heroui/react",
+                    "slug": "description",
+                    "category": "Forms",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/forms.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "checkbox",
+                  "type": "frame",
+                  "name": "Checkbox",
+                  "width": 20,
+                  "height": 20,
+                  "layout": "horizontal",
+                  "alignItems": "center",
+                  "justifyContent": "center",
+                  "fill": "$tokens:color.accent",
+                  "cornerRadius": "$tokens:radius.sm",
+                  "children": [
+                    {
+                      "id": "checkbox-check",
+                      "type": "text",
+                      "content": "✓",
+                      "fill": "$tokens:color.accent-foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": 14,
+                      "fontWeight": "700"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Checkbox",
+                    "package": "@heroui/react",
+                    "slug": "checkbox",
+                    "category": "Forms",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/forms.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "error-message",
+                  "type": "frame",
+                  "name": "ErrorMessage",
+                  "layout": "horizontal",
+                  "width": "fit_content",
+                  "children": [
+                    {
+                      "id": "error-message-text",
+                      "type": "text",
+                      "content": "Something went wrong.",
+                      "fill": "$tokens:color.danger",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "ErrorMessage",
+                    "package": "@heroui/react",
+                    "slug": "error-message",
+                    "category": "Forms",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/forms.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "field-error",
+                  "type": "frame",
+                  "name": "FieldError",
+                  "layout": "horizontal",
+                  "width": "fit_content",
+                  "alignItems": "center",
+                  "gap": 6,
+                  "children": [
+                    {
+                      "id": "field-error-icon",
+                      "type": "text",
+                      "content": "⚠",
+                      "fill": "$tokens:color.danger",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm"
+                    },
+                    {
+                      "id": "field-error-text",
+                      "type": "text",
+                      "content": "This field is required",
+                      "fill": "$tokens:color.danger",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "FieldError",
+                    "package": "@heroui/react",
+                    "slug": "field-error",
+                    "category": "Forms",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/forms.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "input",
+                  "type": "frame",
+                  "name": "Input",
+                  "width": 280,
+                  "height": 40,
+                  "layout": "horizontal",
+                  "alignItems": "center",
+                  "padding": [
+                    12,
+                    0
+                  ],
+                  "fill": "$tokens:color.field-background",
+                  "cornerRadius": "$tokens:radius.md",
+                  "stroke": {
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
+                  },
+                  "children": [
+                    {
+                      "id": "input-text",
+                      "type": "text",
+                      "content": "Placeholder",
+                      "fill": "$tokens:color.field-placeholder",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Input",
+                    "package": "@heroui/react",
+                    "slug": "input",
+                    "category": "Forms",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/forms.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "text-area",
+                  "type": "frame",
+                  "name": "TextArea",
+                  "width": 300,
+                  "height": 110,
+                  "layout": "vertical",
+                  "padding": 12,
+                  "cornerRadius": "$tokens:radius.md",
+                  "fill": "$tokens:color.field-background",
+                  "stroke": {
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
+                  },
+                  "children": [
+                    {
+                      "id": "text-area-text",
+                      "type": "text",
+                      "content": "Write something…",
+                      "fill": "$tokens:color.field-placeholder",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "TextArea",
+                    "package": "@heroui/react",
+                    "slug": "text-area",
+                    "category": "Forms",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/forms.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ds-atoms-layout",
+          "type": "frame",
+          "name": "Layout",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "ds-atoms-layout-h",
+              "type": "text",
+              "content": "Layout",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "ds-atoms-layout-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "separator",
+                  "type": "frame",
+                  "name": "Separator",
+                  "width": 240,
+                  "height": 1,
+                  "fill": "$tokens:color.border",
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Separator",
+                    "package": "@heroui/react",
+                    "slug": "separator",
+                    "category": "Layout",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/layout.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "surface",
+                  "type": "frame",
+                  "name": "Surface",
+                  "width": 240,
+                  "height": 120,
+                  "layout": "horizontal",
+                  "alignItems": "center",
+                  "justifyContent": "center",
+                  "fill": "$tokens:color.surface",
+                  "cornerRadius": "$tokens:radius.lg",
+                  "stroke": {
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
+                  },
+                  "effect": {
+                    "type": "shadow",
+                    "shadowType": "outer",
+                    "offset": {
+                      "x": 0,
+                      "y": 2
+                    },
+                    "blur": 10,
+                    "spread": 0,
+                    "color": "#0000001f"
+                  },
+                  "children": [
+                    {
+                      "id": "surface-label",
+                      "type": "text",
+                      "content": "Surface",
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Surface",
+                    "package": "@heroui/react",
+                    "slug": "surface",
+                    "category": "Layout",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/layout.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ds-atoms-media",
+          "type": "frame",
+          "name": "Media",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "ds-atoms-media-h",
+              "type": "text",
+              "content": "Media",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "ds-atoms-media-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "avatar",
+                  "type": "frame",
+                  "name": "Avatar",
+                  "width": 40,
+                  "height": 40,
+                  "layout": "horizontal",
+                  "alignItems": "center",
+                  "justifyContent": "center",
+                  "fill": "$tokens:color.accent",
+                  "cornerRadius": 9999,
+                  "children": [
+                    {
+                      "id": "avatar-initials",
+                      "type": "text",
+                      "content": "AB",
+                      "fill": "$tokens:color.accent-foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Avatar",
+                    "package": "@heroui/react",
+                    "slug": "avatar",
+                    "category": "Media",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/media.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ds-atoms-navigation",
+          "type": "frame",
+          "name": "Navigation",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "ds-atoms-navigation-h",
+              "type": "text",
+              "content": "Navigation",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "ds-atoms-navigation-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "link",
+                  "type": "frame",
+                  "name": "Link",
+                  "layout": "horizontal",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "children": [
+                    {
+                      "id": "link-label",
+                      "type": "text",
+                      "content": "Learn more",
+                      "fill": "$tokens:color.accent",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md",
+                      "fontWeight": "500",
+                      "underline": true
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Link",
+                    "package": "@heroui/react",
+                    "slug": "link",
+                    "category": "Navigation",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/navigation.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ds-atoms-typography",
+          "type": "frame",
+          "name": "Typography",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "ds-atoms-typography-h",
+              "type": "text",
+              "content": "Typography",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "ds-atoms-typography-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "kbd",
+                  "type": "frame",
+                  "name": "Kbd",
+                  "layout": "horizontal",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "alignItems": "center",
+                  "justifyContent": "center",
+                  "padding": [
+                    8,
+                    4
+                  ],
+                  "cornerRadius": "$tokens:radius.sm",
+                  "fill": "$tokens:color.surface",
+                  "stroke": {
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
+                  },
+                  "children": [
+                    {
+                      "id": "kbd-label",
+                      "type": "text",
+                      "content": "⌘ K",
+                      "fill": "$tokens:color.foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": 12,
+                      "fontWeight": "600"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Kbd",
+                    "package": "@heroui/react",
+                    "slug": "kbd",
+                    "category": "Typography",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/typography.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "typography",
+                  "type": "frame",
+                  "name": "Typography",
+                  "layout": "vertical",
+                  "width": "fit_content",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "id": "typography-h",
+                      "type": "text",
+                      "content": "Heading",
+                      "fill": "$tokens:color.foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": 28,
+                      "fontWeight": "800"
+                    },
+                    {
+                      "id": "typography-b",
+                      "type": "text",
+                      "content": "Body text that explains the heading above.",
+                      "fill": "$tokens:color.foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md"
+                    },
+                    {
+                      "id": "typography-c",
+                      "type": "text",
+                      "content": "CAPTION",
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": 12,
+                      "fontWeight": "600"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Typography",
+                    "package": "@heroui/react",
+                    "slug": "typography",
+                    "category": "Typography",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/typography.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ds-atoms-utilities",
+          "type": "frame",
+          "name": "Utilities",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "ds-atoms-utilities-h",
+              "type": "text",
+              "content": "Utilities",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "ds-atoms-utilities-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "scroll-shadow",
+                  "type": "frame",
+                  "name": "ScrollShadow",
+                  "width": 240,
+                  "height": 120,
+                  "fill": "$tokens:color.surface",
+                  "cornerRadius": "$tokens:radius.md",
+                  "stroke": {
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
+                  },
+                  "clip": true,
+                  "layout": "none",
+                  "children": [
+                    {
+                      "id": "scroll-shadow-text",
+                      "type": "text",
+                      "content": "scrollable…",
+                      "x": 16,
+                      "y": 16,
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-sm"
+                    },
+                    {
+                      "id": "scroll-shadow-fade",
+                      "type": "frame",
+                      "x": 0,
+                      "y": 84,
+                      "width": 240,
+                      "height": 36,
+                      "fill": {
+                        "type": "gradient",
+                        "gradientType": "linear",
+                        "rotation": 180,
+                        "colors": [
+                          {
+                            "color": "#00000000",
+                            "position": 0
+                          },
+                          {
+                            "color": "#00000022",
+                            "position": 1
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "ScrollShadow",
+                    "package": "@heroui/react",
+                    "slug": "scroll-shadow",
+                    "category": "Utilities",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/utilities.lib.pen",
+                      "design-system/atoms.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

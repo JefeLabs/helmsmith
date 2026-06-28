@@ -1,0 +1,15 @@
+export { registerAuth } from './auth.js';
+export { registerCache } from './cache.js';
+export { registerCompare } from './compare.js';
+export { registerConfig } from './config.js';
+export { registerConnect } from './connect.js';
+export { registerFetch } from './fetch.js';
+export { registerFind } from './find.js';
+export { registerGroup } from './group.js';
+export { registerInit } from './init.js';
+export { registerMerge } from './merge.js';
+export { registerPick } from './pick.js';
+export { registerPrs } from './prs.js';
+export { registerRebrand } from './rebrand.js';
+export { registerRepo } from './repo.js';
+export { registerStatus } from './status.js';

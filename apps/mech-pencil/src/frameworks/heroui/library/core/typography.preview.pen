@@ -1,0 +1,156 @@
+{
+  "version": "2.11",
+  "imports": {
+    "tokens": "../design-tokens.lib.pen"
+  },
+  "children": [
+    {
+      "id": "group-typography",
+      "type": "frame",
+      "name": "Typography",
+      "x": 0,
+      "y": 0,
+      "layout": "vertical",
+      "gap": 40,
+      "padding": 40,
+      "fill": "$tokens:color.background",
+      "children": [
+        {
+          "id": "group-typography-title",
+          "type": "text",
+          "content": "Typography · HeroUI v3",
+          "fill": "$tokens:color.foreground",
+          "fontFamily": "$tokens:font.family",
+          "fontSize": 24,
+          "fontWeight": "700"
+        },
+        {
+          "id": "g-typography-atom",
+          "type": "frame",
+          "name": "atoms",
+          "layout": "vertical",
+          "width": "fit_content",
+          "gap": 16,
+          "children": [
+            {
+              "id": "g-typography-atom-h",
+              "type": "text",
+              "content": "ATOMS",
+              "fill": "$tokens:color.muted",
+              "fontFamily": "$tokens:font.family",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "id": "g-typography-atom-items",
+              "type": "frame",
+              "name": "Items",
+              "layout": "vertical",
+              "width": "fit_content",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "kbd",
+                  "type": "frame",
+                  "name": "Kbd",
+                  "layout": "horizontal",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "alignItems": "center",
+                  "justifyContent": "center",
+                  "padding": [
+                    8,
+                    4
+                  ],
+                  "cornerRadius": "$tokens:radius.sm",
+                  "fill": "$tokens:color.surface",
+                  "stroke": {
+                    "thickness": "$tokens:border.width",
+                    "fill": "$tokens:color.border"
+                  },
+                  "children": [
+                    {
+                      "id": "kbd-label",
+                      "type": "text",
+                      "content": "⌘ K",
+                      "fill": "$tokens:color.foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": 12,
+                      "fontWeight": "600"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Kbd",
+                    "package": "@heroui/react",
+                    "slug": "kbd",
+                    "category": "Typography",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/typography.lib.pen"
+                    ]
+                  }
+                },
+                {
+                  "id": "typography",
+                  "type": "frame",
+                  "name": "Typography",
+                  "layout": "vertical",
+                  "width": "fit_content",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "id": "typography-h",
+                      "type": "text",
+                      "content": "Heading",
+                      "fill": "$tokens:color.foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": 28,
+                      "fontWeight": "800"
+                    },
+                    {
+                      "id": "typography-b",
+                      "type": "text",
+                      "content": "Body text that explains the heading above.",
+                      "fill": "$tokens:color.foreground",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": "$tokens:font.size-md"
+                    },
+                    {
+                      "id": "typography-c",
+                      "type": "text",
+                      "content": "CAPTION",
+                      "fill": "$tokens:color.muted",
+                      "fontFamily": "$tokens:font.family",
+                      "fontSize": 12,
+                      "fontWeight": "600"
+                    }
+                  ],
+                  "reusable": true,
+                  "metadata": {
+                    "type": "component",
+                    "framework": "heroui",
+                    "atomic": "atom",
+                    "fidelity": "full",
+                    "react": "Typography",
+                    "package": "@heroui/react",
+                    "slug": "typography",
+                    "category": "Typography",
+                    "source": [
+                      "design-tokens.lib.pen",
+                      "core/typography.lib.pen"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

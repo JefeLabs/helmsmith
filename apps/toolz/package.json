@@ -1,0 +1,60 @@
+{
+  "name": "@ecruz165/toolz",
+  "version": "0.0.1",
+  "description": "ToolZ — cross-platform tool manager for the AgentX ecosystem. Detects, installs, and registers CLI dependencies.",
+  "type": "module",
+  "bin": {
+    "toolz": "./bin/toolz.mjs"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "bin",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "vitest run tests/e2e",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ecruz165/cli-kit": "workspace:*",
+    "@ecruz165/tui-view-components": "workspace:*",
+    "bun": "^1.3.13",
+    "chalk": "^5.6.2",
+    "commander": "^14.0.3",
+    "semver": "^7.6.0",
+    "yaml": "^2.8.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/semver": "^7.5.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.5"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ecruz165/agentx-toolbox.git",
+    "directory": "apps/toolz"
+  },
+  "license": "UNLICENSED"
+}

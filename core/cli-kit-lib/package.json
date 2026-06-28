@@ -1,0 +1,50 @@
+{
+  "name": "@ecruz165/cli-kit",
+  "version": "0.0.1",
+  "description": "Shared CLI bootstrap for the AgentX ecosystem — commander + inquirer + pluggable auth. Runtime-agnostic (Node or Bun).",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "commander": "^14.0.0",
+    "inquirer": "^12.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "commander": "^14.0.3",
+    "inquirer": "^12.6.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.5"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ecruz165/agentx-toolbox.git",
+    "directory": "packages/cli-kit-lib"
+  },
+  "license": "UNLICENSED"
+}

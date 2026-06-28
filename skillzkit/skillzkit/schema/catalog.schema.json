@@ -1,0 +1,286 @@
+{
+  "$ref": "#/definitions/Catalog",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "Catalog": {
+      "additionalProperties": false,
+      "description": "The full catalog produced by `skillzkit catalog`. The JSON Schema generated from this type is the cross-language contract — TS consumers import these types directly; Java consumers read the generated schema and produce POJOs.",
+      "properties": {
+        "commands": {
+          "items": {
+            "$ref": "#/definitions/Command"
+          },
+          "type": "array"
+        },
+        "generatedAt": {
+          "description": "ISO-8601 timestamp of catalog generation.",
+          "format": "date-time",
+          "type": "string"
+        },
+        "packageVersion": {
+          "description": "Semver of the skillzkit package that produced this catalog.",
+          "type": "string"
+        },
+        "skills": {
+          "items": {
+            "$ref": "#/definitions/Skill"
+          },
+          "type": "array"
+        },
+        "version": {
+          "description": "Catalog format version. Incremented on breaking shape changes.",
+          "minimum": 1,
+          "type": "number"
+        },
+        "workflows": {
+          "items": {
+            "$ref": "#/definitions/Workflow"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "version",
+        "generatedAt",
+        "packageVersion",
+        "commands",
+        "skills",
+        "workflows"
+      ],
+      "type": "object"
+    },
+    "Command": {
+      "additionalProperties": false,
+      "properties": {
+        "allowedTools": {
+          "description": "Tool names the command is allowed to invoke, e.g. `[\"Bash\", \"Read\", \"Edit\"]`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "argumentHint": {
+          "description": "Free-form hint shown in CLI help, e.g. `\"<package-name>\"`.",
+          "type": "string"
+        },
+        "body": {
+          "description": "Full markdown body of the source `.md` file (no frontmatter).",
+          "type": "string"
+        },
+        "dependents": {
+          "description": "Inverse of `dependsOn`. Computed at catalog-build time.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "dependsOn": {
+          "description": "Command slugs that must run first — those whose `produces` satisfy this command's `requires`. Computed at catalog-build time; a topological sort over this edge set yields build order.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "description": {
+          "type": "string"
+        },
+        "frontmatter": {
+          "$ref": "#/definitions/Frontmatter"
+        },
+        "kind": {
+          "$ref": "#/definitions/ItemKind"
+        },
+        "outcome": {
+          "description": "Imperative action-phrase describing what this command produces. UI prefers this over slug; falls back to slug when absent.",
+          "type": "string"
+        },
+        "path": {
+          "description": "Filesystem path relative to `.claude/commands/`, e.g. `\"core/tools/npm.md\"`.",
+          "type": "string"
+        },
+        "produces": {
+          "description": "Artifact paths/globs this command creates, declared in frontmatter (e.g. `[\"design/foundations/*.pen\"]`). A command B `dependsOn` A when one of A's `produces` satisfies one of B's `requires`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "referencedBy": {
+          "description": "Inverse of `references`. Computed at catalog-build time.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "references": {
+          "description": "Slash-command slugs referenced in this item's body. Computed at catalog-build time.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "requires": {
+          "description": "Artifact paths/globs this command needs to exist before it runs, declared in frontmatter (e.g. `[\"product/.pencil-brand.json\"]`). Drives the build-order graph — distinct from `references` (which is \"mentions /slug in prose\"); `requires` is \"needs this artifact\".",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "slug": {
+          "description": "Slash-command form, e.g. `\"core:tools:npm\"`. Each colon-separated segment is lowercase kebab-case.",
+          "pattern": "^[a-z][a-z0-9-]*(:[a-z][a-z0-9-]*)+$",
+          "type": "string"
+        },
+        "tags": {
+          "description": "Orthogonal discovery metadata. Two-tier: curated `core` tags (TAGS.md) plus free-form `extension` tags.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "slug",
+        "path",
+        "kind",
+        "description",
+        "references",
+        "referencedBy",
+        "dependsOn",
+        "dependents",
+        "body",
+        "frontmatter"
+      ],
+      "type": "object"
+    },
+    "Frontmatter": {
+      "additionalProperties": {},
+      "description": "Arbitrary YAML frontmatter from the source `.md` file. The schema intentionally does not lock this down without forking per-kind frontmatter contracts; treat unknown keys as forward-compatible.",
+      "type": "object"
+    },
+    "ItemKind": {
+      "description": "Distinguishes runnable commands, multi-phase workflows, and context-only artifacts.",
+      "enum": [
+        "command",
+        "workflow",
+        "context"
+      ],
+      "type": "string"
+    },
+    "Skill": {
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "frontmatter": {
+          "$ref": "#/definitions/Frontmatter"
+        },
+        "name": {
+          "description": "Skill name from frontmatter, e.g. `\"skillzkit-product-router\"`.",
+          "type": "string"
+        },
+        "path": {
+          "description": "Filesystem path relative to `.claude/skills/`.",
+          "type": "string"
+        },
+        "references": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "path",
+        "description",
+        "references",
+        "body",
+        "frontmatter"
+      ],
+      "type": "object"
+    },
+    "Workflow": {
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "commandSlug": {
+          "description": "Underlying command slug for direct invocation.",
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "domain": {
+          "description": "Domain prefix, e.g. `\"product\"`, `\"engineer\"`, `\"market\"`.",
+          "type": "string"
+        },
+        "estimatedDuration": {
+          "description": "Free-form duration estimate, e.g. `\"2-4 hours\"` or `\"1 week\"`.",
+          "type": "string"
+        },
+        "frontmatter": {
+          "$ref": "#/definitions/Frontmatter"
+        },
+        "outcome": {
+          "description": "Imperative action-phrase describing the workflow's outcome.",
+          "type": "string"
+        },
+        "phases": {
+          "minimum": 1,
+          "type": "number"
+        },
+        "prerequisites": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "qualifiedName": {
+          "description": "Qualified name used by `/core:workflows:manage`, e.g. `\"product:greenfield\"`.",
+          "type": "string"
+        },
+        "references": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "slug": {
+          "description": "Workflow slug within its domain, e.g. `\"greenfield\"`.",
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "qualifiedName",
+        "domain",
+        "slug",
+        "commandSlug",
+        "description",
+        "references",
+        "body",
+        "frontmatter"
+      ],
+      "type": "object"
+    }
+  }
+}
+

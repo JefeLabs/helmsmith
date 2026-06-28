@@ -1,0 +1,14 @@
+# Blueprint Coverage: {{blueprint.name}}
+
+| Concern | Urgency | Status |
+|---------|---------|--------|
+{{#each concerns}}
+| {{title}} | {{urgency}} | {{status}} |
+{{/each}}
+
+---
+**Coverage:** {{coveredCount}}/{{totalCount}} concerns addressed
+{{#if missingUpfront.length}}
+
+**Missing upfront concerns:** {{join missingUpfront ", "}}
+{{/if}}

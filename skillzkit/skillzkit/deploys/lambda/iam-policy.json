@@ -1,0 +1,29 @@
+{
+  "_comment_": "Minimum IAM policy for the skillzkit Lambda function. Replace <BUCKET> and <PREFIX> with your bucket name and key prefix (default prefix: v1/). The SAM template at template.yaml sets these automatically; this file is for teams deploying via CDK / Terraform / hand-rolled CloudFormation.",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CatalogReadWrite",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::<BUCKET>/<PREFIX>*"
+    },
+    {
+      "Sid": "CatalogList",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::<BUCKET>",
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": ["<PREFIX>*"]
+        }
+      }
+    },
+    {
+      "Sid": "CloudWatchLogs",
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+      "Resource": "arn:aws:logs:*:*:*"
+    }
+  ]
+}

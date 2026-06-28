@@ -1,0 +1,117 @@
+/**
+ * Ticket detection + optional validation. Reads a regex pattern from
+ * config and extracts the first match from the branch name. The AI
+ * prompts get enriched with the ticket reference (and link, when a
+ * template is configured) so generated commits and PRs include it.
+ *
+ * Validation is opt-in via `ticket.validate: true`. When set, the
+ * command fast-fails if no ticket is detected on the current branch
+ * — no interactive prompt, no override flag, just a clear exit
+ * message. Teams that need the gate enable it; everyone else gets
+ * silent enrichment when the pattern matches and a no-op when it
+ * doesn't.
+ */
+
+export interface TicketConfig {
+  /** Regex source — e.g. `PROJ-\\d+` or `[A-Z]{2,}-\\d+`. */
+  pattern: string;
+  /** Optional URL template; `{ticket}` is replaced with the match. */
+  linkTemplate?: string;
+  /** When true, fast-fail if no ticket is detected on the branch. */
+  validate?: boolean;
+  /**
+   * When true, fall back to scanning recent commits for a ticket
+   * reference if the branch name has none. Within `freshWindowHours`
+   * the inferred ticket is reused silently; outside that window
+   * pritty asks (default N) before reusing.
+   */
+  inferFromCommits?: boolean;
+  /**
+   * Hours-since-now window in which a ticket from a previous commit
+   * is reused without prompting. Beyond it, pritty prompts. Default
+   * 24 — covers "yesterday's work", under "last week's work".
+   */
+  freshWindowHours?: number;
+}
+
+/**
+ * Find the first ticket-shaped substring in a branch name. Returns
+ * null on no match, malformed regex, or empty input. Case-insensitive
+ * for typical patterns (Jira keys are uppercase by convention but
+ * branch names sometimes downcase them).
+ */
+export function detectTicket(branch: string, pattern: string): string | null {
+  if (!branch) return null;
+  try {
+    const re = new RegExp(pattern, 'i');
+    const match = branch.match(re);
+    if (!match) return null;
+    // Preserve original casing from the branch — uppercase tickets
+    // stay uppercase; lowercase get normalized to upper for display.
+    return match[0].toUpperCase();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Format a ticket as a URL using the configured template. Returns
+ * undefined when no template is set or the ticket is empty. The
+ * template uses `{ticket}` as the substitution token.
+ */
+export function ticketLink(ticket: string | null, template?: string): string | undefined {
+  if (!ticket || !template) return undefined;
+  return template.replace(/\{ticket\}/g, ticket);
+}
+
+/**
+ * Recent-commit ticket inference. Walks the supplied commits in
+ * order, returns the first ticket-bearing commit's reference and how
+ * old (in hours) it is. Caller decides what to do with the result —
+ * silent reuse if `ageHours` is within their fresh window, otherwise
+ * prompt.
+ *
+ * Pure function — takes commit list as input rather than calling git
+ * directly, so tests can feed synthetic commits without filesystem
+ * setup.
+ */
+export interface RecentTicketResult {
+  ticket: string;
+  ageHours: number;
+  /** Subject of the commit the ticket was found in (for the prompt). */
+  fromSubject: string;
+}
+
+export function findRecentTicket(
+  commits: ReadonlyArray<{ subject: string; dateISO: string }>,
+  pattern: string,
+  now: Date = new Date(),
+): RecentTicketResult | null {
+  for (const c of commits) {
+    const ticket = detectTicket(c.subject, pattern);
+    if (!ticket) continue;
+    const date = new Date(c.dateISO);
+    if (Number.isNaN(date.getTime())) continue;
+    const ageMs = now.getTime() - date.getTime();
+    const ageHours = ageMs / (1000 * 60 * 60);
+    return { ticket, ageHours, fromSubject: c.subject };
+  }
+  return null;
+}
+
+/**
+ * Build the AI-prompt enrichment text for a detected ticket. Returns
+ * empty string when no ticket — caller can concat unconditionally.
+ * When `title` is provided (from a live adapter), embeds it so the
+ * AI can write more contextual commit messages and PR bodies.
+ */
+export function ticketPromptGuidance(
+  ticket: string | null,
+  link: string | undefined,
+  title?: string | undefined,
+): string {
+  if (!ticket) return '';
+  const titleText = title ? ` — "${title}"` : '';
+  const linkText = link ? ` (${link})` : '';
+  return `\nReference ticket: ${ticket}${titleText}${linkText}. Include "Refs: ${ticket}" as a commit footer line, and mention the ticket in any PR body you generate.`;
+}

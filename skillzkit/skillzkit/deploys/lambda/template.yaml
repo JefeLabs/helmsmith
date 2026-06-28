@@ -1,0 +1,135 @@
+# skillzkit API - AWS SAM template
+#
+# Provisions:
+#   - Lambda function (Node.js 20, ESM, arm64 for cost efficiency)
+#   - API Gateway HTTP API in front
+#   - S3 bucket for catalog persistence
+#   - IAM role with least-privilege S3 access
+#
+# Deploy:
+#   cd apps/skillzkit
+#   npm run build:lambda
+#   sam build
+#   sam deploy --guided           # first time
+#   sam deploy                    # subsequent updates
+#
+# After deploy, the API Gateway URL prints in the outputs. Use it as
+# `--api-url` in `skillzkit init --mode team`.
+
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: skillzkit API on AWS Lambda
+
+Parameters:
+  CatalogBucketName:
+    Type: String
+    Description: S3 bucket for catalog persistence (must be globally unique)
+    AllowedPattern: "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
+  S3Prefix:
+    Type: String
+    Default: "v1/"
+    Description: Key prefix in the bucket (e.g. "v1/" for namespacing)
+
+Resources:
+  # ─── S3 bucket for catalog data ──────────────────────────────────
+  CatalogBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain    # never auto-delete user contributions
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Ref CatalogBucketName
+      VersioningConfiguration:
+        Status: Enabled       # one bad write rolls back via S3 versioning
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireOldNoncurrentVersions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90    # tune to your retention needs
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # ─── Lambda function ─────────────────────────────────────────────
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../../dist/lambda/      # populated by `npm run build:lambda`
+      Handler: index.handler
+      Runtime: nodejs20.x
+      Architectures:
+        - arm64                        # ~20% cheaper than x86_64
+      MemorySize: 512                  # tune for cold-start vs cost
+      Timeout: 15                      # seconds; layer-3 review can be slow
+      Environment:
+        Variables:
+          SKILLZKIT_STORAGE: !Sub "s3:${CatalogBucketName}"
+          SKILLZKIT_S3_PREFIX: !Ref S3Prefix
+          # Provider auth for layer-3 review is opt-in. Set via
+          # additional env vars or AWS Secrets Manager when enabling.
+          # SKILLZKIT_REVIEW_AGENT: "enabled"
+      Policies:
+        # Minimum IAM for catalog operations on the bucket prefix.
+        # Reads + writes are scoped to <bucket>/<prefix>* so the
+        # function can't touch unrelated objects in the bucket.
+        - Statement:
+            - Sid: CatalogReadWrite
+              Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+                - s3:DeleteObject       # only used by future doctor cleanups
+              Resource: !Sub "arn:aws:s3:::${CatalogBucketName}/${S3Prefix}*"
+            - Sid: CatalogList
+              Effect: Allow
+              Action:
+                - s3:ListBucket
+              Resource: !Sub "arn:aws:s3:::${CatalogBucketName}"
+              Condition:
+                StringLike:
+                  s3:prefix:
+                    - !Sub "${S3Prefix}*"
+      Events:
+        CatchAll:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /{proxy+}
+            Method: ANY
+
+  # ─── HTTP API in front of the Lambda ─────────────────────────────
+  Api:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      # CORS lets the TUI / browser-based controlplane call the API.
+      # Tighten Origins to your controlplane host in production.
+      CorsConfiguration:
+        AllowMethods: [GET, POST, OPTIONS]
+        AllowHeaders: [Authorization, Content-Type]
+        AllowOrigins: ["*"]
+      AccessLogSettings:
+        DestinationArn: !GetAtt AccessLogGroup.Arn
+        Format: '{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","method":"$context.httpMethod","path":"$context.path","status":"$context.status","time":"$context.requestTime"}'
+
+  AccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/apigateway/${AWS::StackName}"
+      RetentionInDays: 30
+
+Outputs:
+  ApiUrl:
+    Description: HTTPS endpoint for the skillzkit API
+    Value: !GetAtt Api.ApiEndpoint
+  CatalogBucketName:
+    Description: Name of the catalog S3 bucket
+    Value: !Ref CatalogBucketName
+  FunctionArn:
+    Description: ARN of the API Lambda function
+    Value: !GetAtt ApiFunction.Arn

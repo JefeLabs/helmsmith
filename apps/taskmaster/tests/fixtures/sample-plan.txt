@@ -1,0 +1,44 @@
+PROJECT SETUP
+=============
+
+Initialize the project repository with TypeScript configuration,
+linting setup, and CI/CD pipeline.
+
+Install core dependencies and configure the build system.
+
+DATABASE LAYER
+==============
+
+1. Schema Design
+
+Design the database schema for users, posts, and comments.
+Use PostgreSQL with proper indexes and constraints.
+
+2. Migration System
+
+Build database migration tooling with Knex.js.
+Support up/down migrations and seed data.
+
+3. Connection Pool
+
+Configure connection pooling with proper timeout handling
+and health checks.
+
+API DESIGN
+==========
+
+1. REST Endpoints
+
+Define RESTful API endpoints following OpenAPI 3.0 specification.
+Include proper error codes and response schemas.
+
+2. Authentication
+
+Implement JWT-based authentication with refresh tokens.
+Support API key authentication for service-to-service calls.
+
+DEPLOYMENT
+==========
+
+Configure Docker containers and Kubernetes manifests.
+Set up staging and production environments.
