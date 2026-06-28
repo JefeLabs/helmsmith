@@ -110,7 +110,7 @@ A complete sweep was run after the merge. Honest results:
 ## Known issues → tickets
 
 Remaining failures are the toolbox's own backlog (invisible until the merge put it
-under CI). Each has a fix-up ticket in [`docs/tickets/`](./tickets/) and a matching
+under CI). Each has a fix-up issue in [`.issues/`](../.issues/) and a matching
 `--filter='!…'` exclusion in `.github/workflows/ci.yml`:
 
 | Ticket | Package | Kind |
