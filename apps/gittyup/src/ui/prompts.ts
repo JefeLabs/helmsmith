@@ -66,7 +66,7 @@ const defaultSelectTheme = {
         .join(styleText('dim', ' • ')),
   },
   indexMode: 'hidden' as const,
-  keybindings: [] as string[],
+  keybindings: [],
 };
 
 function normalizeSelectChoices<V>(choices: ReadonlyArray<SelectChoice<V> | V>) {
@@ -250,7 +250,7 @@ const defaultCheckboxTheme = {
         .map(([key, action]) => `${styleText('bold', key)} ${styleText('dim', action)}`)
         .join(styleText('dim', ' • ')),
   },
-  keybindings: [] as string[],
+  keybindings: [],
 };
 
 function normalizeCheckboxChoices<V>(choices: ReadonlyArray<CheckboxChoice<V>>) {
@@ -409,7 +409,7 @@ export const checkboxWithBack = createPrompt<any, CheckboxConfig<any>>((config, 
   if (status === 'done') {
     if (isBack) return '';
     const selection = items.filter(isChecked);
-    const answer = theme.style.answer(theme.style.renderSelectedChoices(selection, items));
+    const answer = theme.style.answer(theme.style.renderSelectedChoices(selection));
     return [prefix, message, answer].filter(Boolean).join(' ');
   }
 
@@ -790,7 +790,7 @@ export const tagAssigner = createPrompt<TagAssignerResult, TagAssignerConfig>((c
       .map((t) => {
         const tIdx = tags.indexOf(t);
         const color = tIdx >= 0 ? TAG_COLORS[tIdx % TAG_COLORS.length] : 'dim';
-        return styleText(color as string, `[${t}]`);
+        return styleText(color, `[${t}]`);
       })
       .join(' ');
     const pathSuffix = repo.path ? styleText('dim', ` ${repo.path}`) : '';
