@@ -1,8 +1,36 @@
 # HELM-T5: @opentui/react@0.2.16 extensionless ESM import breaks under Node
 
-**Labels:** `bug` · `upstream` · `area:tui` · `low-priority`
-**Status:** Open
-**CI exclusion:** none (no test exercises an interactive TUI at runtime)
+**Labels:** `upstream` · `area:tui`
+**Status:** ✅ RESOLVED (made apps self-contained under Bun)
+**CI exclusion:** none
+
+## Resolution
+
+Investigation showed this isn't fixable for Node: `@opentui/react@0.4.2` (latest)
+still emits the extensionless `react-reconciler/constants` import, and patching
+react-reconciler's exports only uncovers a **deeper** blocker — `bun-ffi-structs`
+requires Bun's FFI. `@opentui` is a Bun-native lib; it cannot run under plain Node
+by design. So the fix is to make the apps reliably run under **Bun**, not to make
+them run under Node:
+
+1. **bun is a managed dependency** — already declared in the TUI/build apps + in
+   `pnpm.onlyBuiltDependencies`; also added to the root (`node_modules/.bin/bun`),
+   so installs vendor a pinned bun (no global Bun needed).
+2. **Self-contained bin launchers** — the app bins now start with
+   `#!/usr/bin/env node` and a bootstrap: if not already under Bun, re-exec the
+   bundle via the **vendored** bun (`require.resolve('bun/package.json')` →
+   `bin/bun.exe`), falling back to a system bun, else a clear "requires Bun" error.
+   Under Bun they fall through to the app entry. (gitradar already did this via a
+   shell wrapper.)
+
+Verified (Node 22, vendored bun): taskmaster/gittyup/mech-pencil/toolz/
+discord-timetracker/skillzkit all launch via `node <bin>` (re-exec → Bun → run);
+`bun <bin>` falls through directly. `pritty` re-execs fine but then hits a
+*separate* phantom-dep bug → **HELM-T6**.
+
+---
+
+_Original report below._
 
 ## Summary
 
