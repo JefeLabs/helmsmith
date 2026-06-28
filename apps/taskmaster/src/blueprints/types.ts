@@ -68,7 +68,7 @@ export const ApplicationBlueprintSchema = z.object({
   concerns: z.array(BlueprintConcernSchema).default([]),
   conditionalRules: z.array(ConditionalConcernRuleSchema).default([]),
   nonNegotiableBundle: z.array(z.string()).default([]),
-  detectionHints: DetectionHintSchema.default({}),
+  detectionHints: DetectionHintSchema.prefault({}),
 });
 
 export type ApplicationBlueprint = z.infer<typeof ApplicationBlueprintSchema>;

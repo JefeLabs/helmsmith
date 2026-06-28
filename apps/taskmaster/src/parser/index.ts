@@ -2,7 +2,13 @@ import { extname } from 'node:path';
 import { parseMarkdown } from './markdown.js';
 import { generateTasks } from './task-generator.js';
 import { parseText } from './text.js';
-import type { DependencyInferrer, ParseOptions, ParseResult, PlanFormat } from './types.js';
+import type {
+  DependencyInferrer,
+  ParsedSection,
+  ParseOptions,
+  ParseResult,
+  PlanFormat,
+} from './types.js';
 import { noopInferrer } from './types.js';
 import { parseYamlPlan } from './yaml-plan.js';
 

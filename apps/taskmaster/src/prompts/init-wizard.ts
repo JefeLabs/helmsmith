@@ -101,6 +101,10 @@ export interface InitWizardResult {
 
 export interface InitWizardContext {
   gitRoot: string | null;
+  /** Whether to offer interactive-only steps (the agent-instruction-files
+   *  install). Defaults to false so --no-interactive / fully-specified runs
+   *  never block on a prompt. */
+  interactive?: boolean;
 }
 
 /**
@@ -113,6 +117,9 @@ export async function runInitWizard(
   context?: InitWizardContext,
 ): Promise<InitWizardResult> {
   const gitRoot = context?.gitRoot ?? null;
+  // The agent-instruction-files step is the one prompt not keyed on an opt field;
+  // only offer it in true interactive mode.
+  const interactive = context?.interactive ?? false;
 
   // Step 0: Show existing projects and offer switch
   if (!opts?.switchTo && !opts?.name) {
@@ -367,7 +374,7 @@ export async function runInitWizard(
   if (opts?.aiTooling !== undefined) {
     aiTooling = opts.aiTooling;
     instructionIds = opts.instructionIds;
-  } else {
+  } else if (interactive) {
     const installInstructions = await confirmPrompt(
       'Install agent instruction files for your AI coding tool?',
       true,

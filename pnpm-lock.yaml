@@ -372,6 +372,12 @@ importers:
       '@inquirer/prompts':
         specifier: ^8.2.1
         version: 8.5.2(@types/node@25.9.4)
+      '@opentui/core':
+        specifier: ^0.2.2
+        version: 0.2.16(typescript@5.9.3)(web-tree-sitter@0.25.10)
+      '@opentui/react':
+        specifier: ^0.2.2
+        version: 0.2.16(react-devtools-core@7.0.1)(react@19.2.6)(typescript@5.9.3)(web-tree-sitter@0.25.10)(ws@8.21.0)
       bun:
         specifier: ^1.3.13
         version: 1.3.14
@@ -8684,6 +8690,25 @@ snapshots:
   '@opentui/core-win32-x64@0.2.16':
     optional: true
 
+  '@opentui/core@0.2.16(typescript@5.9.3)(web-tree-sitter@0.25.10)':
+    dependencies:
+      bun-ffi-structs: 0.2.2(typescript@5.9.3)
+      diff: 9.0.0
+      marked: 17.0.1
+      string-width: 7.2.0
+      strip-ansi: 7.1.2
+      web-tree-sitter: 0.25.10
+      yoga-layout: 3.2.1
+    optionalDependencies:
+      '@opentui/core-darwin-arm64': 0.2.16
+      '@opentui/core-darwin-x64': 0.2.16
+      '@opentui/core-linux-arm64': 0.2.16
+      '@opentui/core-linux-x64': 0.2.16
+      '@opentui/core-win32-arm64': 0.2.16
+      '@opentui/core-win32-x64': 0.2.16
+    transitivePeerDependencies:
+      - typescript
+
   '@opentui/core@0.2.16(typescript@5.9.3)(web-tree-sitter@0.26.9)':
     dependencies:
       bun-ffi-structs: 0.2.2(typescript@5.9.3)
@@ -8702,6 +8727,17 @@ snapshots:
       '@opentui/core-win32-x64': 0.2.16
     transitivePeerDependencies:
       - typescript
+
+  '@opentui/react@0.2.16(react-devtools-core@7.0.1)(react@19.2.6)(typescript@5.9.3)(web-tree-sitter@0.25.10)(ws@8.21.0)':
+    dependencies:
+      '@opentui/core': 0.2.16(typescript@5.9.3)(web-tree-sitter@0.25.10)
+      react: 19.2.6
+      react-devtools-core: 7.0.1
+      react-reconciler: 0.33.0(react@19.2.6)
+      ws: 8.21.0
+    transitivePeerDependencies:
+      - typescript
+      - web-tree-sitter
 
   '@opentui/react@0.2.16(react-devtools-core@7.0.1)(react@19.2.6)(typescript@5.9.3)(web-tree-sitter@0.26.9)(ws@8.21.0)':
     dependencies:

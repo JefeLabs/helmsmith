@@ -137,6 +137,7 @@ export async function executeAdd(
     assignee: null,
     outputs: [],
     tags: result.tags,
+    qaFeedback: [],
     children: [],
     metadata: {
       source: '',

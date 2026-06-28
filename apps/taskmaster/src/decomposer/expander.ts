@@ -304,6 +304,7 @@ export async function expandTask(
     assignee: null,
     outputs: [],
     tags: [...task.tags],
+    qaFeedback: [],
     children: [],
     metadata: {
       source: `expanded from ${task.id}`,

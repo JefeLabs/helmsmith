@@ -8,7 +8,11 @@ export default defineConfig({
   clean: true,
   sourcemap: true,
   dts: false,
-  splitting: false,
+  // Code-splitting on: keeps the dynamic import() of the TUI stack
+  // (@ecruz165/tui-view-components → @opentui/react) in a separate chunk so it
+  // loads only when the interactive `connect` command runs — non-interactive
+  // commands don't pull the React reconciler into the startup graph.
+  splitting: true,
   shims: false,
   // Inline @ecruz165/agent-* — consumed via npm link from
   // agentx-platform until those packages are published. Their

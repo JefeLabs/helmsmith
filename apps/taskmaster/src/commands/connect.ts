@@ -12,9 +12,13 @@
  * `apps/taskmaster/CLAUDE.md` (auth scope section).
  */
 
-import { noopConnection, runConnectView } from '@ecruz165/tui-view-components';
-
 export async function runConnect(): Promise<void> {
+  // Lazy-load the TUI stack (@ecruz165/tui-view-components → @opentui/react) so the
+  // CLI's startup import graph doesn't pull the React reconciler in for every
+  // command. Non-interactive commands (add/list/parse/…) must not depend on it —
+  // and @opentui/react@0.2.16 currently emits an extensionless ESM import of
+  // `react-reconciler/constants` that crashes at load (tracked separately).
+  const { noopConnection, runConnectView } = await import('@ecruz165/tui-view-components');
   await runConnectView({
     appName: 'agentx-taskmaster',
     optional: [

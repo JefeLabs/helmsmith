@@ -173,7 +173,7 @@ function applyDiffs(jsonTask: TaskNode, yamlData: Record<string, unknown>): void
     const jsonValue = jsonTask[field];
 
     if (!deepEqual(jsonValue, yamlValue)) {
-      (jsonTask as Record<string, unknown>)[field] = yamlValue;
+      (jsonTask as unknown as Record<string, unknown>)[field] = yamlValue;
     }
   }
 }

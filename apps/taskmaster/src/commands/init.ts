@@ -60,7 +60,7 @@ export async function executeInit(opts: InitOpts, gitRoot: string | null): Promi
           model: flagOverrides.model,
           location: flagOverrides.location,
         },
-    { gitRoot },
+    { gitRoot, interactive: opts.interactive !== false },
   );
 
   return {

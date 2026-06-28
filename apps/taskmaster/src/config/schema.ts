@@ -54,7 +54,7 @@ export const TaskNodeSchema: z.ZodType<TaskNode> = z.lazy(() =>
     tags: z.array(z.string()).default([]),
     qaFeedback: z.array(QAFeedbackEntrySchema).default([]),
     children: z.array(TaskNodeSchema).default([]),
-    metadata: TaskMetadataSchema.default({}),
+    metadata: TaskMetadataSchema.prefault({}),
   }),
 );
 
@@ -139,7 +139,7 @@ export const BlueprintProjectConfigSchema = z
       .record(z.string(), z.union([z.string(), z.boolean(), z.array(z.string())]))
       .default({}),
   })
-  .default({});
+  .prefault({});
 
 export type BlueprintProjectConfig = z.infer<typeof BlueprintProjectConfigSchema>;
 
@@ -147,10 +147,10 @@ export type BlueprintProjectConfig = z.infer<typeof BlueprintProjectConfigSchema
 
 export const ProjectConfigSchema = z.object({
   style: z.enum(['agile-full', 'story-driven', 'task-only', 'flat']).default('task-only'),
-  states: StatesConfigSchema.default({}),
-  skills: SkillsConfigSchema.default({}),
-  ai: AIConfigSchema.default({}),
-  thresholds: ThresholdsSchema.default({}),
+  states: StatesConfigSchema.prefault({}),
+  skills: SkillsConfigSchema.prefault({}),
+  ai: AIConfigSchema.prefault({}),
+  thresholds: ThresholdsSchema.prefault({}),
   blueprint: BlueprintProjectConfigSchema,
 });
 
