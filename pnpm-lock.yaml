@@ -195,6 +195,15 @@ importers:
       '@ecruz165/tui-view-components':
         specifier: workspace:*
         version: link:../../core/tui-view-components-lib
+      '@inquirer/ansi':
+        specifier: ^2.0.7
+        version: 2.0.7
+      '@inquirer/core':
+        specifier: ^11.2.1
+        version: 11.2.1(@types/node@25.9.4)
+      '@inquirer/figures':
+        specifier: ^2.0.7
+        version: 2.0.7
       '@inquirer/prompts':
         specifier: ^8.2.0
         version: 8.5.2(@types/node@25.9.4)

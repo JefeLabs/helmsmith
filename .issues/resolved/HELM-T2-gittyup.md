@@ -1,8 +1,27 @@
 # HELM-T2: gittyup — typecheck failures in src/ui/prompts.ts
 
-**Labels:** `bug` · `area:gittyup` · `ci-excluded` · `toolbox-backlog`
-**Status:** Open
-**CI exclusion:** typecheck (`.github/workflows/ci.yml`) — remove on close
+**Labels:** `bug` · `area:gittyup` · `toolbox-backlog`
+**Status:** ✅ RESOLVED
+**CI exclusion:** removed (gittyup runs in the typecheck step again)
+**Verified (Node 22):** `typecheck` 33 errors → 0; tests still 8/8; green under the parallel CI run.
+
+## Resolution
+
+Fixed in branch `fix/helm-t2-gittyup`. Two parts:
+1. **Declared the undeclared deps** `@inquirer/core`/`@inquirer/ansi`/`@inquirer/figures`
+   at the **8.x family** ranges (`^11.2.1` / `^2.0.7` / `^2.0.7`) to match
+   `@inquirer/prompts@8` (used across 7 files) — single core version, no duplicate.
+   This cleared 30 of 33 errors (the implicit-any / missing-property cascade from the
+   unresolved module types).
+2. **Migrated the custom `@inquirer/core` prompt to the core@11 API** (it was written
+   against core@10): `keybindings: [] as string[]` → `[]` (core@11 wants
+   `Keybinding[]`); `renderSelectedChoices(selection, items)` → 1-arg; dropped a bogus
+   `color as string` cast so `node:util` `styleText` gets a valid `InspectColor`.
+
+---
+
+_Original report below._
+
 **Repro (Node 22):** `pnpm --filter @ecruz165/gittyup run typecheck` (tests already pass)
 
 ## Summary
