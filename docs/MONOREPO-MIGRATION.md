@@ -62,11 +62,16 @@ A complete sweep was run after the merge. Honest results:
   - (`agent-adapter` + `edge-context-server` previously failed on a DOM-lib
     regression introduced by the unified `tsconfig.base.json`; fixed by adding
     `DOM`/`DOM.Iterable` to `lib`.)
-- **Test:** **0 / 21 suites run** — all blocked at the SAME startup error:
-  `vitest@4.1.9` requires `vite@^6`, but `vite@5.4.21` resolved (pulled by
-  `web/controlplane-ui`). No test bodies executed. Fix requires aligning the
-  vite/vitest versions (either downgrade vitest to a vite-5-compatible line, or
-  upgrade vite to 6 and migrate controlplane-ui). Decision pending.
+- **Test:** initially **0 / 21 suites ran** — all blocked at the same startup
+  error: `vitest@4.1.9` requires `vite@^6` but `vite@5.4.21` resolved (pulled by
+  `web/controlplane-ui`). **Fixed** by adding a `vite: ^6` pnpm override (keeps
+  `vitest@4`, what the tests target). `controlplane-ui` rebuilt clean on vite 6
+  (plugin-react 4.7 + tailwindcss/vite 4 both support it).
+  After the fix: **13 / 21 packages fully pass.** The remaining 8 have residual
+  *individual* test-file failures (e.g. `taskmaster` 72/77 files pass,
+  `harness-server` 16/17, `mech-pencil` 18/19) — now ordinary test triage, not a
+  blocker. `context/context-loader-cli` (2/2) and parts of `edge-memory-server`
+  (3/12) warrant a closer look (possibly native-module / pre-existing).
 - **Build:** partial — TS/tsup builds pass; `apps/mech-pencil`'s `bun build`
   sub-step needs the `bun` npm package's postinstall (an environment/approval
   step pnpm gates), unrelated to the merge.
