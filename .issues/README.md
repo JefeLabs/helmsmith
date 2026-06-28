@@ -3,8 +3,10 @@
 Markdown issues for the pre-existing toolbox failures surfaced (not caused) by the
 monorepo merge. They were invisible because `agentx-toolbox` shipped without CI.
 
-Each open issue is **excluded in `.github/workflows/ci.yml`** so CI reflects merge
-health. **Closing an issue → remove its CI `--filter='!…'` exclusion.**
+CI is currently **exclusion-free** — every package typechecks and every test suite
+runs in `.github/workflows/ci.yml`. The one remaining open issue (HELM-T5) is an
+upstream bug that doesn't block CI. **If a future issue needs a CI `--filter='!…'`
+exclusion, removing that exclusion is part of closing it.**
 
 These are flat-file issues (the authoring session's `gh` CLI was a different
 account with no access to `JefeLabs/helmsmith`). Each file maps 1:1 to a GitHub
@@ -22,7 +24,6 @@ the full record (and git history follows the move).
 
 | ID | Package | Kind | Status |
 |----|---------|------|--------|
-| [HELM-T4](./HELM-T4-gitradar.md) | gitradar | flaky test | open — test excluded |
 | [HELM-T5](./HELM-T5-opentui-react-esm.md) | @opentui/react (tui) | upstream ESM bug | open — not CI-blocking |
 
 ### Resolved
@@ -32,6 +33,7 @@ the full record (and git history follows the move).
 | [HELM-T1](./resolved/HELM-T1-taskmaster.md) | taskmaster | typecheck + tests | ✅ fixed; CI exclusions removed (`401116f`) |
 | [HELM-T2](./resolved/HELM-T2-gittyup.md) | gittyup | typecheck | ✅ fixed; typecheck exclusion removed |
 | [HELM-T3](./resolved/HELM-T3-mech-pencil.md) | mech-pencil | typecheck | ✅ fixed; last typecheck exclusion removed |
+| [HELM-T4](./resolved/HELM-T4-gitradar.md) | gitradar | flaky test | ✅ fixed (deterministic fake-timers); last CI exclusion removed |
 
 ## Fixed during the merge (no issue needed)
 

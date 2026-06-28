@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DbWatcher } from '../store/db-watcher.js';
 
 describe('DbWatcher', () => {
@@ -16,6 +16,7 @@ describe('DbWatcher', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     rmSync(tempDir, { recursive: true, force: true });
   });
 
@@ -54,83 +55,76 @@ describe('DbWatcher', () => {
     watcher.close();
   });
 
-  it('aborts signal when db file changes', async () => {
+  // Change-detection tests drive handleFsEvent() directly with fake timers rather
+  // than writing real files and waiting on OS fs.watch delivery — which is
+  // unreliable under parallel CPU load (the HELM-T4 flake). The behavior worth
+  // testing is the filename filter + debounce + abort, exercised deterministically
+  // here. start()'s real fs.watch wiring is covered by the idempotency tests above.
+
+  it('aborts signal when db file changes', () => {
+    vi.useFakeTimers();
     const watcher = new DbWatcher(dbPath);
-    watcher.start();
     const signal = watcher.createSignal();
 
-    // Write to the db file to trigger a change
-    writeFileSync(dbPath, 'updated');
-
-    // Wait for debounce (150ms) + some margin
-    await new Promise((r) => setTimeout(r, 300));
+    watcher.handleFsEvent('test.db');
+    vi.advanceTimersByTime(150); // debounce window
 
     expect(signal.aborted).toBe(true);
     watcher.close();
   });
 
-  it('aborts signal when WAL file changes', async () => {
+  it('aborts signal when WAL file changes', () => {
+    vi.useFakeTimers();
     const watcher = new DbWatcher(dbPath);
-    watcher.start();
     const signal = watcher.createSignal();
 
-    // Write a WAL file
-    writeFileSync(`${dbPath}-wal`, 'wal data');
-
-    await new Promise((r) => setTimeout(r, 300));
+    watcher.handleFsEvent('test.db-wal');
+    vi.advanceTimersByTime(150);
 
     expect(signal.aborted).toBe(true);
     watcher.close();
   });
 
-  it('does not abort signal for unrelated file changes', async () => {
+  it('does not abort signal for unrelated file changes', () => {
+    vi.useFakeTimers();
     const watcher = new DbWatcher(dbPath);
-    watcher.start();
-
-    // Wait for macOS to flush any stale events from the initial file creation
-    await new Promise((r) => setTimeout(r, 200));
-
-    // Now create a fresh signal after stale events have been consumed
     const signal = watcher.createSignal();
 
-    // Write an unrelated file in the same directory
-    writeFileSync(join(tempDir, 'unrelated.txt'), 'hello');
-
-    await new Promise((r) => setTimeout(r, 300));
+    watcher.handleFsEvent('unrelated.txt');
+    vi.advanceTimersByTime(300);
 
     expect(signal.aborted).toBe(false);
     watcher.close();
   });
 
-  it('debounces rapid changes into a single abort', async () => {
+  it('debounces rapid changes into a single abort', () => {
+    vi.useFakeTimers();
     const watcher = new DbWatcher(dbPath);
-    watcher.start();
     const signal = watcher.createSignal();
     let abortCount = 0;
     signal.addEventListener('abort', () => abortCount++);
 
-    // Rapid writes
-    writeFileSync(dbPath, 'a');
-    writeFileSync(dbPath, 'b');
-    writeFileSync(dbPath, 'c');
-
-    await new Promise((r) => setTimeout(r, 300));
+    // Rapid events within the debounce window collapse to one abort.
+    watcher.handleFsEvent('test.db');
+    watcher.handleFsEvent('test.db');
+    watcher.handleFsEvent('test.db');
+    vi.advanceTimersByTime(150);
 
     expect(signal.aborted).toBe(true);
     expect(abortCount).toBe(1);
     watcher.close();
   });
 
-  it('new signal after abort is not pre-aborted', async () => {
+  it('new signal after abort is not pre-aborted', () => {
+    vi.useFakeTimers();
     const watcher = new DbWatcher(dbPath);
-    watcher.start();
     const signal1 = watcher.createSignal();
 
-    writeFileSync(dbPath, 'trigger');
-    await new Promise((r) => setTimeout(r, 300));
+    watcher.handleFsEvent('test.db');
+    vi.advanceTimersByTime(150);
     expect(signal1.aborted).toBe(true);
 
-    // Create a fresh signal — it should start clean
+    // A fresh signal should start clean.
     const signal2 = watcher.createSignal();
     expect(signal2.aborted).toBe(false);
 
@@ -139,8 +133,7 @@ describe('DbWatcher', () => {
 
   it('gracefully handles non-existent directory', () => {
     const watcher = new DbWatcher('/tmp/nonexistent-dir-xyz/test.db');
-    // start() should not throw even if the directory doesn't exist
-    watcher.start();
+    watcher.start(); // should not throw even if the directory doesn't exist
     watcher.close();
   });
 });
