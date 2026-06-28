@@ -87,12 +87,9 @@ jobs:
 
       - name: TypeScript typecheck
         # Recursive across packages — each package owns its own tsconfig.
-        # The --filter='!…' exclusion skips packages with KNOWN type errors,
-        # tracked in .issues/ (mech-pencil HELM-T3). Remove when its issue closes.
-        run: >-
-          pnpm -r
-          --filter='!@ecruz165/mech-pencil'
-          typecheck
+        # All workspace packages typecheck clean. Add a --filter='!pkg' exclusion
+        # here only for a tracked .issues/ regression, and remove it when fixed.
+        run: pnpm -r typecheck
 
       - name: Harness skills in sync
         # workspace-template/.harness/skills/{context,context-briefs}.md are

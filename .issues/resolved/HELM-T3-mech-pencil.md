@@ -1,9 +1,24 @@
 # HELM-T3: mech-pencil — typecheck error (TS2352) + bun build postinstall
 
-**Labels:** `bug` · `area:mech-pencil` · `ci-excluded` · `toolbox-backlog`
-**Status:** Open
-**CI exclusion:** typecheck only (`.github/workflows/ci.yml`) — remove on close.
-Tests pass (19/19), so mech-pencil is NOT excluded from the test step.
+**Labels:** `bug` · `area:mech-pencil` · `toolbox-backlog`
+**Status:** ✅ RESOLVED
+**CI exclusion:** removed (mech-pencil runs in typecheck again — the typecheck step now has no exclusions at all).
+**Verified (Node 22):** `typecheck` 1 error → 0; tests 19/19; `build` exits 0.
+
+## Resolution
+
+Fixed in branch `fix/helm-t3-mech-pencil`.
+- **Typecheck:** `builder.test.ts:12` cast `f as Record<string, unknown>` →
+  `f as unknown as Record<string, unknown>` (the cast the TS2352 message itself
+  recommends; `Frame` has no string index signature).
+- **Build (`bun`):** now succeeds — `bun` is in `onlyBuiltDependencies`
+  (pnpm-workspace... package.json `pnpm` field), so a fresh install initializes the
+  bun binary and the `bun build` sub-step runs.
+
+---
+
+_Original report below._
+
 **Repro (Node 22):** `pnpm --filter @ecruz165/mech-pencil run typecheck`
 
 ## Summary
