@@ -1,0 +1,10 @@
+packages:
+  - 'core/*'
+  - 'harness/*'
+  - 'context/*'
+  - 'memory/*'
+  - 'skillzkit/*'
+  - 'web/*'
+  - 'apps/*'
+  # NOTE: controlplane/ is a Java/Maven project and is intentionally NOT a pnpm
+  # workspace member. examples/ and workspace-template/ are scripts/scaffold, not packages.
