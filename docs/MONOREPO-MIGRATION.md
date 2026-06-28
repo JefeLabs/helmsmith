@@ -45,4 +45,29 @@ Total history: **353 commits** (`git log` and `git blame` follow files across th
    `restricted` as the conservative default — decide the real target alongside #1.
 
 5. **Audit `scripts/sync-skills.mjs` and example scripts** for any hard-coded
-   `packages/*` paths now that packages moved into domain groups.
+   `packages/*` paths now that packages moved into domain groups. *(Done — see
+   the `ci:`/`fix(scripts):` commits.)*
+
+## Verification status (full build/typecheck/test sweep)
+
+A complete sweep was run after the merge. Honest results:
+
+- **Workspace resolution:** ✅ all 25 packages link, no duplicate names.
+- **Typecheck:** **22 / 25 pass.** The 3 failures are pre-existing app-code
+  issues in toolbox apps (which never had CI):
+  - `apps/taskmaster` — many type errors (zod overloads, missing props, a
+    `ParsedSection` not found, JSX consumed from `tui-view-components` source).
+  - `apps/gittyup` — missing `@inquirer/{core,ansi,figures}` deps + implicit-any.
+  - `apps/mech-pencil` — `TS2352` bad cast in `src/pen/builder.test.ts`.
+  - (`agent-adapter` + `edge-context-server` previously failed on a DOM-lib
+    regression introduced by the unified `tsconfig.base.json`; fixed by adding
+    `DOM`/`DOM.Iterable` to `lib`.)
+- **Test:** **0 / 21 suites run** — all blocked at the SAME startup error:
+  `vitest@4.1.9` requires `vite@^6`, but `vite@5.4.21` resolved (pulled by
+  `web/controlplane-ui`). No test bodies executed. Fix requires aligning the
+  vite/vitest versions (either downgrade vitest to a vite-5-compatible line, or
+  upgrade vite to 6 and migrate controlplane-ui). Decision pending.
+- **Build:** partial — TS/tsup builds pass; `apps/mech-pencil`'s `bun build`
+  sub-step needs the `bun` npm package's postinstall (an environment/approval
+  step pnpm gates), unrelated to the merge.
+- **Java controlplane:** not run here (`cd controlplane && ./mvnw test`).
