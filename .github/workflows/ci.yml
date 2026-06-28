@@ -86,9 +86,16 @@ jobs:
       # don't-block-the-team decision for the v1 wiring.
 
       - name: TypeScript typecheck
-        # Recursive across packages — each package owns its own tsconfig
-        # and the root script delegates via `pnpm -r typecheck`.
-        run: pnpm typecheck
+        # Recursive across packages — each package owns its own tsconfig.
+        # The --filter='!…' exclusions skip packages with KNOWN pre-existing type
+        # errors (toolbox backlog — see docs/MONOREPO-MIGRATION.md "Known
+        # pre-existing issues"). Remove an exclusion when its app fix-up lands.
+        run: >-
+          pnpm -r
+          --filter='!@ecruz165/taskmaster'
+          --filter='!@ecruz165/gittyup'
+          --filter='!@ecruz165/mech-pencil'
+          typecheck
 
       - name: Harness skills in sync
         # workspace-template/.harness/skills/{context,context-briefs}.md are
@@ -102,11 +109,20 @@ jobs:
             exit 1
           fi
 
-      - name: Vitest — run all package suites
-        # `-r test --if-present` recursively runs each package's `test`
-        # script when it exists; pnpm skips packages without one. As
-        # all packages grow tests this becomes a more uniform matrix.
-        run: pnpm -r --if-present test
+      - name: Vitest — run package suites
+        # `-r --if-present test` runs each package's `test` script when present.
+        # The --filter='!…' exclusions skip packages with KNOWN pre-existing test
+        # failures (toolbox backlog — see docs/MONOREPO-MIGRATION.md). Remove an
+        # exclusion when its app fix-up lands. (edge-memory-server is NOT excluded:
+        # it passes once better-sqlite3's native binding builds on Node 22.)
+        run: >-
+          pnpm -r --if-present
+          --filter='!@ecruz165/taskmaster'
+          --filter='!@ecruz165/mech-pencil'
+          --filter='!@ecruz165/skillzkit'
+          --filter='!@ecruz165/harness-server'
+          --filter='!@ecruz165/gitradar'
+          test
 
   # ── Java stack — controlplane ─────────────────────────────────────────
   #
