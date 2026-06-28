@@ -88,11 +88,10 @@ jobs:
       - name: TypeScript typecheck
         # Recursive across packages — each package owns its own tsconfig.
         # The --filter='!…' exclusions skip packages with KNOWN type errors, each
-        # tracked in .issues/ (taskmaster HELM-T1, gittyup HELM-T2,
-        # mech-pencil HELM-T3). Remove an exclusion when its issue closes.
+        # tracked in .issues/ (gittyup HELM-T2, mech-pencil HELM-T3). Remove an
+        # exclusion when its issue closes.
         run: >-
           pnpm -r
-          --filter='!@ecruz165/taskmaster'
           --filter='!@ecruz165/gittyup'
           --filter='!@ecruz165/mech-pencil'
           typecheck
@@ -113,13 +112,11 @@ jobs:
         # `-r --if-present test` runs each package's `test` script when present.
         # The --filter='!…' exclusions skip packages with KNOWN failures, each
         # tracked in .issues/. Remove an exclusion when its issue closes.
-        #   - taskmaster: deterministic e2e + unit failures (HELM-T1)
-        #   - gitradar:   db-watcher.test.ts is flaky under parallel load (HELM-T4)
+        #   - gitradar: db-watcher.test.ts is flaky under parallel load (HELM-T4)
         # (edge-memory-server is NOT excluded — it passes once better-sqlite3's
         #  native binding builds on Node 22, which CI does.)
         run: >-
           pnpm -r --if-present
-          --filter='!@ecruz165/taskmaster'
           --filter='!@ecruz165/gitradar'
           test
 
