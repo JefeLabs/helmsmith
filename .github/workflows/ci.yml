@@ -1,10 +1,13 @@
-# Continuous Integration — runs on every push to develop and on every
-# pull request targeting develop.
+# Continuous Integration — runs on every push to main and on every
+# pull request targeting main.
 #
 # Two parallel jobs split by toolchain:
 #
 #   - js: pnpm + Vitest + Biome + TypeScript
-#         Covers every package under packages/ and the controlplane-ui.
+#         Covers every workspace package — core/, harness/, context/,
+#         memory/, skillzkit/, web/ and apps/ — via recursive pnpm
+#         commands (which resolve packages from the workspace, so newly
+#         merged toolbox apps are covered automatically).
 #   - controlplane: Maven + JDK 21
 #         Covers the Spring Boot Modulith controlplane.
 #
@@ -14,15 +17,15 @@
 #
 # Concurrency: PR runs auto-cancel earlier in-progress runs from the
 # same PR to keep CI cheap during a typical edit-push-edit cycle.
-# Pushes to develop never cancel each other.
+# Pushes to main never cancel each other.
 
 name: CI
 
 on:
   push:
-    branches: [develop]
+    branches: [main]
   pull_request:
-    branches: [develop]
+    branches: [main]
 
 concurrency:
   # github.ref is GitHub-managed: refs/heads/<branch> on push and
@@ -89,7 +92,7 @@ jobs:
 
       - name: Harness skills in sync
         # workspace-template/.harness/skills/{context,context-briefs}.md are
-        # GENERATED from packages/edge-context-cli/skills/ via `pnpm sync:skills`.
+        # GENERATED from context/edge-context-cli/skills/ via `pnpm sync:skills`.
         # Regenerate here and fail if the committed copies drifted from source.
         run: |
           pnpm sync:skills
