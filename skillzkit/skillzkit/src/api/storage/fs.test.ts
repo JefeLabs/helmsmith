@@ -16,7 +16,7 @@ describe('FilesystemCatalogStorage', () => {
   const fs = new FilesystemCatalogStorage(packageRoot);
 
   it('findSkillzkitPackageRoot resolves the actual repo root', () => {
-    expect(packageRoot).toMatch(/apps\/skillzkit$/);
+    expect(packageRoot).toMatch(/skillzkit\/skillzkit$/);
   });
 
   it('getIndex returns the real catalog without bodies', async () => {
