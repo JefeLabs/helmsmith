@@ -36,15 +36,7 @@ export class DbWatcher {
 
     try {
       this.watcher = watch(this.dir, (_event, filename) => {
-        // filename can be null on some platforms; ignore those events
-        if (!filename) return;
-        if (
-          filename === this.basename ||
-          filename === `${this.basename}-wal` ||
-          filename === `${this.basename}-shm`
-        ) {
-          this.onDbChange();
-        }
+        this.handleFsEvent(filename);
       });
 
       // Gracefully ignore watcher errors (e.g. directory deleted)
@@ -53,6 +45,25 @@ export class DbWatcher {
       });
     } catch {
       // fs.watch may throw on unsupported platforms — fall back to polling
+    }
+  }
+
+  /**
+   * Handle a raw fs.watch event: ignore null filenames and anything that isn't
+   * the tracked db / `-wal` / `-shm` file, otherwise schedule a debounced abort.
+   *
+   * Public (rather than an inline closure) so tests can drive the filter +
+   * debounce + abort logic deterministically, without depending on OS file-watch
+   * event delivery — which is unreliable under heavy CPU load.
+   */
+  handleFsEvent(filename: string | null): void {
+    if (!filename) return;
+    if (
+      filename === this.basename ||
+      filename === `${this.basename}-wal` ||
+      filename === `${this.basename}-shm`
+    ) {
+      this.onDbChange();
     }
   }
 
