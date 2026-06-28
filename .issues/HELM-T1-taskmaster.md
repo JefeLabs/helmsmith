@@ -1,8 +1,36 @@
 # HELM-T1: taskmaster — restore typecheck + tests
 
-**Labels:** `bug` · `area:taskmaster` · `ci-excluded` · `toolbox-backlog`
-**Status:** Open
-**CI exclusion:** typecheck **and** test (`.github/workflows/ci.yml`) — remove both on close
+**Labels:** `bug` · `area:taskmaster` · `toolbox-backlog`
+**Status:** ✅ RESOLVED
+**CI exclusion:** removed (taskmaster runs in both CI steps again)
+**Verified (Node 22):** `typecheck` exit 0; `test` 77 files / 1199 tests pass; green under the parallel CI run.
+
+## Resolution
+
+Fixed in branch `fix/helm-t1-taskmaster`. The failures were a stack of independent
+pre-existing issues, fixed in order:
+1. **Phantom dep + JSX:** added `@opentui/core`/`@opentui/react` deps and
+   `jsx`/`jsxImportSource` to tsconfig → cleared 50 `TS6142`.
+2. **Zod v4:** `.default({})` → `.prefault({})` on object schemas (config/schema.ts,
+   blueprints/types.ts).
+3. **Missing required fields:** added `qaFeedback: []` (3 TaskNode constructions)
+   and `entryPointIds: []` (6 component constructions); `ParsedSection` import;
+   `string|null` username widened to `string|undefined`; cast-through-`unknown` in
+   sync.ts.
+4. **react-reconciler crash:** `@opentui/react@0.2.16` emits an extensionless ESM
+   import of `react-reconciler/constants` that crashes at load. Made the TUI
+   (`connect`) a lazy `import()` and turned on tsup `splitting` so non-interactive
+   commands never pull the reconciler into the startup graph. *(The upstream
+   @opentui/react ESM bug still affects the interactive `connect` TUI — see HELM-T5.)*
+5. **init hang / init-wizard unit test (same root cause):** `init --no-interactive`
+   blocked on the agent-instruction-files prompt. Gated that step behind a new
+   `interactive` wizard-context flag (default false); init passes
+   `interactive: opts.interactive !== false`.
+
+---
+
+_Original report below._
+
 **Repro (Node 22):** `pnpm --filter @ecruz165/taskmaster run typecheck` · `... run test`
 
 ## Summary

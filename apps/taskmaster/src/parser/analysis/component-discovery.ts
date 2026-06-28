@@ -285,6 +285,7 @@ async function buildNodeComponent(
     languageSet,
     ...commands,
     entrypoints,
+    entryPointIds: [],
     publicSurface,
     tags,
   };
@@ -332,6 +333,7 @@ async function buildGoComponent(dirPath: string): Promise<BuildComponent> {
     howToBuild: 'go build ./...',
     howToTest: 'go test ./...',
     entrypoints,
+    entryPointIds: [],
     publicSurface,
     tags,
   };
@@ -378,6 +380,7 @@ async function buildRustComponent(dirPath: string): Promise<BuildComponent> {
     howToBuild: 'cargo build',
     howToTest: 'cargo test',
     entrypoints,
+    entryPointIds: [],
     publicSurface,
     tags,
   };
@@ -415,6 +418,7 @@ async function buildJvmComponent(dirPath: string, manifestName: string): Promise
     howToBuild,
     howToTest,
     entrypoints,
+    entryPointIds: [],
     publicSurface,
     tags,
   };
@@ -449,6 +453,7 @@ async function buildDotnetComponent(
     howToBuild: 'dotnet build',
     howToTest: 'dotnet test',
     entrypoints,
+    entryPointIds: [],
     publicSurface,
     tags,
   };
@@ -493,6 +498,7 @@ async function buildScriptComponent(
     languageSet,
     howToBuild,
     entrypoints,
+    entryPointIds: [],
     publicSurface,
     tags,
   };

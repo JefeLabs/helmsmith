@@ -138,7 +138,7 @@ async function _fetchUsername(githubToken: string): Promise<string> {
  * exported in case any internal code relies on them — but the public
  * `login()` entry point no longer touches them.
  */
-export async function login(): Promise<{ username: string }> {
+export async function login(): Promise<{ username: string | undefined }> {
   console.log();
   console.log(chalk.bold('  Login with GitHub Copilot'));
   console.log();
@@ -152,7 +152,9 @@ export async function login(): Promise<{ username: string }> {
     },
   });
 
-  const username = await fetchGitHubUsername(result.apiKey);
+  // fetchGitHubUsername returns null if the API can't resolve a login; normalize
+  // to undefined so it flows through the optional `username` field cleanly.
+  const username = (await fetchGitHubUsername(result.apiKey)) ?? undefined;
 
   await writeAuthCredentials({
     github_token: result.apiKey,

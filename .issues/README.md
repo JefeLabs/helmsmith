@@ -10,12 +10,13 @@ These are flat-file issues (the authoring session's `gh` CLI was a different
 account with no access to `JefeLabs/helmsmith`). Each file maps 1:1 to a GitHub
 Issue / Jira ticket for import.
 
-| ID | Package | Kind | CI exclusion to remove on close |
-|----|---------|------|----------------------------------|
-| [HELM-T1](./HELM-T1-taskmaster.md) | taskmaster | typecheck + tests | typecheck **and** test |
-| [HELM-T2](./HELM-T2-gittyup.md) | gittyup | typecheck | typecheck |
-| [HELM-T3](./HELM-T3-mech-pencil.md) | mech-pencil | typecheck | typecheck |
-| [HELM-T4](./HELM-T4-gitradar.md) | gitradar | flaky test | test |
+| ID | Package | Kind | Status |
+|----|---------|------|--------|
+| [HELM-T1](./HELM-T1-taskmaster.md) | taskmaster | typecheck + tests | ✅ resolved (exclusions removed) |
+| [HELM-T2](./HELM-T2-gittyup.md) | gittyup | typecheck | open — typecheck excluded |
+| [HELM-T3](./HELM-T3-mech-pencil.md) | mech-pencil | typecheck | open — typecheck excluded |
+| [HELM-T4](./HELM-T4-gitradar.md) | gitradar | flaky test | open — test excluded |
+| [HELM-T5](./HELM-T5-opentui-react-esm.md) | @opentui/react (tui) | upstream ESM bug | open — not CI-blocking |
 
 ## Fixed during the merge (no issue needed)
 

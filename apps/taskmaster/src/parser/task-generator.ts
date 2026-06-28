@@ -58,6 +58,7 @@ function sectionToTask(
     assignee: null,
     outputs: [],
     tags: section.tags ?? [],
+    qaFeedback: [],
     children,
     metadata: {
       source: '',
