@@ -87,9 +87,9 @@ jobs:
 
       - name: TypeScript typecheck
         # Recursive across packages — each package owns its own tsconfig.
-        # The --filter='!…' exclusions skip packages with KNOWN pre-existing type
-        # errors (toolbox backlog — see docs/MONOREPO-MIGRATION.md "Known
-        # pre-existing issues"). Remove an exclusion when its app fix-up lands.
+        # The --filter='!…' exclusions skip packages with KNOWN type errors, each
+        # tracked in docs/tickets/ (taskmaster HELM-T1, gittyup HELM-T2,
+        # mech-pencil HELM-T3). Remove an exclusion when its ticket closes.
         run: >-
           pnpm -r
           --filter='!@ecruz165/taskmaster'
@@ -111,16 +111,15 @@ jobs:
 
       - name: Vitest — run package suites
         # `-r --if-present test` runs each package's `test` script when present.
-        # The --filter='!…' exclusions skip packages with KNOWN pre-existing test
-        # failures (toolbox backlog — see docs/MONOREPO-MIGRATION.md). Remove an
-        # exclusion when its app fix-up lands. (edge-memory-server is NOT excluded:
-        # it passes once better-sqlite3's native binding builds on Node 22.)
+        # The --filter='!…' exclusions skip packages with KNOWN failures, each
+        # tracked in docs/tickets/. Remove an exclusion when its ticket closes.
+        #   - taskmaster: deterministic e2e + unit failures (HELM-T1)
+        #   - gitradar:   db-watcher.test.ts is flaky under parallel load (HELM-T4)
+        # (edge-memory-server is NOT excluded — it passes once better-sqlite3's
+        #  native binding builds on Node 22, which CI does.)
         run: >-
           pnpm -r --if-present
           --filter='!@ecruz165/taskmaster'
-          --filter='!@ecruz165/mech-pencil'
-          --filter='!@ecruz165/skillzkit'
-          --filter='!@ecruz165/harness-server'
           --filter='!@ecruz165/gitradar'
           test
 
