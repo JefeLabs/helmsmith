@@ -41,7 +41,7 @@ _None — all filed issues resolved. 🎉_
 | [HELM-T7](./resolved/HELM-T7-context-loader-cli-sigterm-bun.md) | context-loader-cli · harness-server | SIGTERM cancel (bun) | ✅ CLI test asserts runtime-true contract; harness-server surfaces `cancelled` from the parent (reliable) |
 | [HELM-T8](./resolved/HELM-T8-ci-red-cli-kit-dist-types.md) | cli-kit (core) | CI red — typecheck | ✅ cli-kit made source-first; clean-checkout typecheck + tests green (CI was never actually verified before) |
 | [HELM-T9](./resolved/HELM-T9-gitradar-isoweek-timezone.md) | gitradar | CI red — TZ test | ✅ getISOWeek computes in UTC (was local-getter TZ-dependent); suite green under TZ=UTC |
-| [HELM-T10](./resolved/HELM-T10-gitradar-functional-hardcoded-paths.md) | gitradar | CI red — hardcoded paths | ✅ functional suite skips when its hardcoded local repos are absent (follow-up: self-contained fixtures) |
+| [HELM-T10](./resolved/HELM-T10-gitradar-functional-hardcoded-paths.md) | gitradar | CI red — hardcoded paths | ✅ functional suite rebuilt on self-contained git fixtures (generated in beforeAll) — runs in CI |
 
 ## Fixed during the merge (no issue needed)
 

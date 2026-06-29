@@ -1,7 +1,7 @@
 # HELM-T10: gitradar functional test scans hardcoded local repos — fails in CI
 
 **Labels:** `bug` · `area:apps` · `test` · `ci`
-**Status:** ✅ RESOLVED (skip when repos absent) · ⏩ follow-up: make self-contained
+**Status:** ✅ RESOLVED (self-contained git fixtures — runs everywhere, incl. CI)
 **CI exclusion:** none
 
 ## Discovery
@@ -28,25 +28,19 @@ test that was never runnable in CI.
 
 ## Fix
 
-Skip the suite when its repos aren't present, so it runs locally for the author and
-skips cleanly elsewhere:
+Made the suite **self-contained**: a `beforeAll` generates four throwaway git repos
+(`buildRepo`) under a temp dir, each with controlled commits — authors, dates, files,
+and line counts chosen to satisfy the pipeline assertions (4 repos, commits in the
+last 4 weeks, app/test/config files, >100 insertions, clean deletions via line-count
+shrink, a `git`-deletion path, and a mix of SkoolScout-mappable authors plus an
+unassignable one so org-filtered records are a strict subset). The hardcoded
+`/Users/...` paths and the interim `describe.skip` guard are gone; the suite now runs
+everywhere, including CI. Only this file had hardcoded paths; sibling
+`sqlite-store.test.ts` was already self-contained.
 
-```js
-const REPOS_PRESENT = TEST_REPOS.every((r) => existsSync(r.path));
-const describeIfRepos = REPOS_PRESENT ? describe : describe.skip;
-describeIfRepos('Functional: Full CLI Pipeline (Engine + SQLite)', () => { … });
-```
+(First shipped as a `describe.skip`-when-absent guard so CI could go green
+immediately; this change replaces that guard with real fixtures.)
 
-(`describe.skip` verified under bun:test — skips without running.) Only this file had
-hardcoded `/Users/...` paths (repo-wide grep); the sibling `sqlite-store.test.ts` is
-self-contained and still runs in CI.
-
-Verified Node 22 + bun 1.3.14: gitradar full `test` green locally (vitest 804/804 +
-`test:bun` 37 pass); the suite skips when the paths are absent.
-
-## Follow-up (open)
-
-Make the suite **self-contained** — generate throwaway git repos with known commits
-in `beforeAll` (temp dir) instead of scanning personal paths — so it provides CI value
-on every machine. Tracked by the `TODO(HELM-T10)` marker in the test. Until then this
-integration suite is local-only (skipped in CI).
+Verified Node 22 + bun 1.3.14: full gitradar `test` green (vitest 804/804 + `test:bun`
+37 pass) under both the local timezone and `TZ=UTC`; the functional suite is 19/19 on
+generated data (326 insertions, 42 deletions, 3 authors across 4 repos).

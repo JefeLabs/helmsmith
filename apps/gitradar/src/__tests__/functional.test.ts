@@ -1,9 +1,9 @@
 /**
  * Functional test suite — end-to-end CLI pipeline via GitRadarEngine + SQLite.
  *
- * Exercises the full workflow against real git repos using the production
- * data path: GitRadarEngine for scanning, sqlite-store for persistence,
- * and queryRollup for aggregation.
+ * Exercises the full workflow against generated throwaway git repos (built in
+ * beforeAll) using the production data path: GitRadarEngine for scanning,
+ * sqlite-store for persistence, and queryRollup for aggregation.
  *
  *   setup → scan (engine) → verify SQLite state → assign authors →
  *   queryRollup aggregation → contributions / leaderboard / repo-activity (SQL path)
@@ -13,37 +13,109 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it, mock, spyOn } from 'bun:test';
-import { existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
-// ── Real repos on disk ──────────────────────────────────────────────────────
+// ── Self-contained git fixtures ───────────────────────────────────────────────
+//
+// The suite generates throwaway git repos with known commits in beforeAll, so it
+// runs identically on every machine and in CI (it used to scan hardcoded local
+// paths — see HELM-T10). Authors / dates / files / line counts are chosen to
+// satisfy the pipeline assertions below: 4 repos with commits in the last 4 weeks,
+// app + test + config files, >100 insertions and some deletions, and a mix of
+// SkoolScout-mappable authors (email/name matches skoolscout|cruz|castillo) plus an
+// unassignable one (so org-filtered records are a strict subset of all records).
 
-const SKOOLSCOUT_ROOT = '/Users/edwincruz/Development/Workspaces/skoolscout';
+const EDWIN = { name: 'Edwin Cruz', email: 'edwin.cruz@skoolscout.com' }; // → SkoolScout
+const ANA = { name: 'Ana Castillo', email: 'ana.castillo@skoolscout.com' }; // → SkoolScout
+const PAT = { name: 'Pat Vendor', email: 'pat@contractor.dev' }; // stays unassigned
 
-const TEST_REPOS = [
-  { name: 'skoolscout-com', path: join(SKOOLSCOUT_ROOT, 'skoolscout-com'), group: 'SkoolScout' },
-  { name: 'jefelabs-com', path: join(SKOOLSCOUT_ROOT, 'jefelabs-com'), group: 'SkoolScout' },
+interface Commit {
+  author: { name: string; email: string };
+  daysAgo: number;
+  message: string;
+  files: Record<string, string>; // path → full contents (a modify = rewrite)
+}
+
+// `n` numbered lines; rewriting to fewer lines yields clean deletions (prefix kept).
+const lines = (n: number): string =>
+  `${Array.from({ length: n }, (_, i) => `export const v${i} = ${i};`).join('\n')}\n`;
+const PKG_JSON = `${JSON.stringify({ name: 'fixture', version: '1.0.0', private: true }, null, 2)}\n`;
+const TS_CONFIG = `${JSON.stringify({ compilerOptions: { strict: true, target: 'ES2022' } }, null, 2)}\n`;
+
+// All commits fall within the last 4 weeks (the scan's weeks_back), spread across
+// ~3 ISO weeks so multi-week aggregation has something to group.
+const REPO_PLANS: { name: string; group: string; commits: Commit[] }[] = [
+  {
+    name: 'skoolscout-com',
+    group: 'SkoolScout',
+    commits: [
+      { author: EDWIN, daysAgo: 18, message: 'init', files: { 'src/index.ts': lines(90), 'package.json': PKG_JSON } },
+      // index.ts 90 → 60 lines = 30 clean deletions; util.ts adds 40 insertions
+      { author: EDWIN, daysAgo: 11, message: 'refactor', files: { 'src/index.ts': lines(60), 'src/util.ts': lines(40) } },
+      { author: ANA, daysAgo: 11, message: 'add tests', files: { 'src/__tests__/index.test.ts': lines(25), 'tsconfig.json': TS_CONFIG } },
+      { author: PAT, daysAgo: 4, message: 'contrib', files: { 'src/contrib.ts': lines(20) } },
+    ],
+  },
+  {
+    name: 'jefelabs-com',
+    group: 'SkoolScout',
+    commits: [
+      { author: EDWIN, daysAgo: 11, message: 'init', files: { 'src/app.ts': lines(50), 'package.json': PKG_JSON } },
+      { author: ANA, daysAgo: 4, message: 'trim', files: { 'src/app.ts': lines(38) } }, // 50 → 38 = 12 deletions
+    ],
+  },
   {
     name: 'skoolscout-com-tenants',
-    path: join(SKOOLSCOUT_ROOT, 'skoolscout-com-tenants'),
     group: 'SkoolScout',
+    commits: [
+      { author: ANA, daysAgo: 18, message: 'tenants', files: { 'src/tenant.ts': lines(40), 'src/tenant.test.ts': lines(15) } },
+    ],
   },
   {
     name: 'jefelabs-clients',
-    path: join(SKOOLSCOUT_ROOT, 'jefelabs-clients'),
     group: 'SkoolScout',
+    commits: [{ author: PAT, daysAgo: 11, message: 'client', files: { 'src/client.ts': lines(30) } }],
   },
 ];
 
-// This is a LOCAL integration suite: it scans the author's real SkoolScout repos at
-// the hardcoded paths above, which exist only on that machine. Skip it when those
-// repos are absent (CI, other developers) rather than fail with empty-scan errors.
-// TODO(HELM-T10): make self-contained by generating temp git repos in beforeAll so
-// it provides CI value everywhere.
-const REPOS_PRESENT = TEST_REPOS.every((r) => existsSync(r.path));
-const describeIfRepos = REPOS_PRESENT ? describe : describe.skip;
+// Populated in beforeAll once the temp repos are generated.
+const TEST_REPOS: { name: string; path: string; group: string }[] = [];
+
+function git(cwd: string, args: string[], env: Record<string, string> = {}): void {
+  execFileSync('git', args, { cwd, env: { ...process.env, ...env }, stdio: 'pipe' });
+}
+
+async function buildRepo(root: string, plan: (typeof REPO_PLANS)[number]): Promise<string> {
+  const repoPath = join(root, plan.name);
+  await mkdir(repoPath, { recursive: true });
+  git(repoPath, ['init', '-q']);
+  git(repoPath, ['config', 'user.email', 'fixture@example.com']);
+  git(repoPath, ['config', 'user.name', 'Fixture']);
+  git(repoPath, ['config', 'commit.gpgsign', 'false']);
+  for (const c of plan.commits) {
+    for (const [rel, content] of Object.entries(c.files)) {
+      const fp = join(repoPath, rel);
+      await mkdir(dirname(fp), { recursive: true });
+      await writeFile(fp, content, 'utf-8');
+    }
+    git(repoPath, ['add', '-A']);
+    const date = new Date(Date.now() - c.daysAgo * 86_400_000);
+    date.setUTCHours(12, 0, 0, 0);
+    const iso = date.toISOString();
+    git(repoPath, ['commit', '-q', '-m', c.message], {
+      GIT_AUTHOR_NAME: c.author.name,
+      GIT_AUTHOR_EMAIL: c.author.email,
+      GIT_COMMITTER_NAME: c.author.name,
+      GIT_COMMITTER_EMAIL: c.author.email,
+      GIT_AUTHOR_DATE: iso,
+      GIT_COMMITTER_DATE: iso,
+    });
+  }
+  return repoPath;
+}
 
 // ── SQLite isolation: redirect getDataDir() to temp directory ────────────────
 
@@ -68,6 +140,13 @@ beforeAll(async () => {
   tempHome = await mkdtemp(join(tmpdir(), 'gitradar-functional-'));
   testDataDir = join(tempHome, 'data');
   await mkdir(testDataDir, { recursive: true });
+
+  // Generate the throwaway git repos this suite scans.
+  const reposRoot = join(tempHome, 'repos');
+  for (const plan of REPO_PLANS) {
+    const path = await buildRepo(reposRoot, plan);
+    TEST_REPOS.push({ name: plan.name, path, group: plan.group });
+  }
 });
 
 afterAll(async () => {
@@ -124,7 +203,7 @@ async function loadReposRegistryFromTemp() {
 
 // ── Test Suite ───────────────────────────────────────────────────────────────
 
-describeIfRepos('Functional: Full CLI Pipeline (Engine + SQLite)', () => {
+describe('Functional: Full CLI Pipeline (Engine + SQLite)', () => {
   beforeAll(async () => {
     await setupTempTree();
   });
