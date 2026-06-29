@@ -1,5 +1,5 @@
 {
-  "name": "@jefelabs/controlplane-ui",
+  "name": "@helmsmith/controlplane-ui",
   "version": "0.0.0",
   "private": true,
   "type": "module",

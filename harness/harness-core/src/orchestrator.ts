@@ -6,13 +6,13 @@ import {
   ClaudeSdkAdapter,
   OpenCodeCliAdapter,
   type OpenCodeCliAdapterOptions,
-} from '@jefelabs/agent-adapter';
+} from '@helmsmith/agent-adapter';
 import type {
   BindingResolver,
   CredentialBroker,
   GitHubCredentialResolver,
   ResolvedBinding,
-} from '@jefelabs/agent-auth';
+} from '@helmsmith/agent-auth';
 import { Command } from '@langchain/langgraph';
 import type { AdapterId, ToolResolver } from './catalog.ts';
 import { discoverChangedFiles } from './changed-files.ts';
@@ -123,7 +123,7 @@ export interface RunJobDeps {
    * returns a value, the orchestrator uses that adapter directly — bypasses
    * both the resolver path and the legacy adapterFactory path.
    *
-   * Used by `@jefelabs/harness-pipeline` (the per-job container runtime),
+   * Used by `@helmsmith/harness-pipeline` (the per-job container runtime),
    * which receives pre-resolved bindings via spec.json and constructs
    * adapters once at startup. The orchestrator inside the container then
    * looks them up by id rather than re-resolving — the auth boundary is
@@ -139,7 +139,7 @@ export interface RunJobDeps {
   adapters?: Map<string, AgentAdapter>;
   /**
    * Optional override for the resolver-path adapter constructor. Defaults
-   * to `bindingToAdapter` from `@jefelabs/agent-adapter`. Tests inject this
+   * to `bindingToAdapter` from `@helmsmith/agent-adapter`. Tests inject this
    * to substitute mock adapters per ResolvedBinding without spawning real
    * SDK clients — important for slice 13c fallback tests, where each
    * candidate must produce a controllable success/failure.
@@ -219,7 +219,7 @@ export interface RunJobDeps {
   /**
    * Credential resolver for `kind: 'publish'` nodes (`push-and-open-pr`,
    * `merge-pr`). A cascade — local `gh auth` first, controlplane-issued
-   * GitHub App token as fallback (see `@jefelabs/agent-auth`'s
+   * GitHub App token as fallback (see `@helmsmith/agent-auth`'s
    * `defaultGitHubResolver`). When absent, publish nodes fail with
    * `errorName: 'UnconfiguredGitHub'` so flows can route around them —
    * same pattern as `toolResolver` / `flowResolver`.

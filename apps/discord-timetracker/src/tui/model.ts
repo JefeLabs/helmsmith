@@ -3,7 +3,7 @@
  * The SummaryView component renders these column defs + helpers; this module
  * holds the logic worth testing (date paging, column shape, sparkline).
  */
-import type { TableColumn } from '@jefelabs/tui-view-components/organisms';
+import type { TableColumn } from '@helmsmith/tui-view-components/organisms';
 import { addDays } from '../domain/dayKey.js';
 import type { ISODate } from '../domain/types.js';
 import { formatDuration, formatTime } from '../reports/render.js';

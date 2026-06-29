@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Catalog, Command, Interface, ItemKind, Skill, Workflow } from './index.js';
 
-describe('@jefelabs/skillzkit-types', () => {
+describe('@helmsmith/skillzkit-types', () => {
   it('Catalog accepts a minimal-but-complete shape', () => {
     const catalog: Catalog = {
       version: 1,

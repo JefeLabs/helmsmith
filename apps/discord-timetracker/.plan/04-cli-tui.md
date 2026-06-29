@@ -2,16 +2,16 @@
 
 The user-facing surface is built entirely on the two workspace libs:
 
-- **`@jefelabs/cli-kit`** — `createCli()` owns the command tree, flag parsing,
+- **`@helmsmith/cli-kit`** — `createCli()` owns the command tree, flag parsing,
   and inquirer prompts.
-- **`@jefelabs/tui-view-components`** — `runTuiView()` + `AppShell` + organisms
+- **`@helmsmith/tui-view-components`** — `runTuiView()` + `AppShell` + organisms
   own the full-screen daily/weekly summary viewer.
 
 ## Command surface (commander, via cli-kit)
 
 ```ts
 // src/index.ts
-import { createCli } from '@jefelabs/cli-kit';
+import { createCli } from '@helmsmith/cli-kit';
 import { loadConfig } from './config/load';
 
 const { program } = createCli({
@@ -68,8 +68,8 @@ directly) and renders with the atomic-design organisms.
 
 ```ts
 // src/tui/runViewer.ts
-import { runTuiView } from '@jefelabs/tui-view-components/pages';
-import { AppShell } from '@jefelabs/tui-view-components/templates';
+import { runTuiView } from '@helmsmith/tui-view-components/pages';
+import { AppShell } from '@helmsmith/tui-view-components/templates';
 import { SummaryView } from './SummaryView';
 
 export async function runViewer(opts: { period: 'daily' | 'weekly'; date?: string }, deps: { reports: ReportService }) {
@@ -85,9 +85,9 @@ export async function runViewer(opts: { period: 'daily' | 'weekly'; date?: strin
 
 ```tsx
 // src/tui/SummaryView.tsx  (sketch)
-import { Table } from '@jefelabs/tui-view-components/organisms';
-import { Menu } from '@jefelabs/tui-view-components/organisms';
-import { useKeybinding } from '@jefelabs/tui-view-components/keyboard';
+import { Table } from '@helmsmith/tui-view-components/organisms';
+import { Menu } from '@helmsmith/tui-view-components/organisms';
+import { useKeybinding } from '@helmsmith/tui-view-components/keyboard';
 
 export function SummaryView({ period, date, reports }) {
   // load rows from reports.daily(date) / reports.weekly(date)

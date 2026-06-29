@@ -34,10 +34,10 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { createHarnessChatModel } from '@jefelabs/agent-adapter';
-import type { CredentialBroker, ResolvedBinding } from '@jefelabs/agent-auth';
-import type { Catalog } from '@jefelabs/harness-core';
-import { runEntryCoordinator } from '@jefelabs/harness-server';
+import { createHarnessChatModel } from '@helmsmith/agent-adapter';
+import type { CredentialBroker, ResolvedBinding } from '@helmsmith/agent-auth';
+import type { Catalog } from '@helmsmith/harness-core';
+import { runEntryCoordinator } from '@helmsmith/harness-server';
 
 const AUTH_PATH = join(homedir(), '.agentx', 'auth.json');
 

@@ -155,7 +155,7 @@ isn't the typical case (LinkedIn read goes direct).
 Connected social profiles (5):
 
   LinkedIn:
-    [abc123] @jefelabs (LinkedIn Page) — connected 2026-01-15
+    [abc123] @helmsmith (LinkedIn Page) — connected 2026-01-15
     [xyz789] Edwin (LinkedIn Personal) — connected 2026-01-15
 
   Instagram:
@@ -165,7 +165,7 @@ Connected social profiles (5):
     [ghi789] u/edwin-jefelabs — connected 2026-03-10
 
   X (Twitter):
-    [jkl012] @jefelabs — connected 2026-01-15
+    [jkl012] @helmsmith — connected 2026-01-15
     Status: ⚠ token expired (re-auth required at hootsuite.com)
 
 Last refreshed: 5m ago
@@ -178,7 +178,7 @@ Last refreshed: 5m ago
 Message ID:    msg_xyz789
 Scheduled:     2026-05-04 14:00 UTC
 Channels:      
-  - LinkedIn @jefelabs
+  - LinkedIn @helmsmith
   - Instagram TourneySeason
 
 Content preview:
@@ -195,7 +195,7 @@ View in Hootsuite: https://hootsuite.com/dashboard#/scheduled
 Scheduled (next 7 days, 8 posts):
 
 Tomorrow (2026-05-04):
-  09:00  LinkedIn @jefelabs
+  09:00  LinkedIn @helmsmith
          "New feature launch announcement..."
   14:00  Instagram TourneySeason
          "Sports community spotlight..."
@@ -203,7 +203,7 @@ Tomorrow (2026-05-04):
          "Lessons from building B2B SaaS..."
 
 Sunday (2026-05-05):
-  10:00  LinkedIn @jefelabs (cross-post: Reddit r/programming)
+  10:00  LinkedIn @helmsmith (cross-post: Reddit r/programming)
          "Weekly engineering update..."
 
 [5 more posts scheduled this week]
@@ -250,7 +250,7 @@ channels to platform integrations:
         {
           "platform": "linkedin",
           "channelId": "abc123",
-          "displayName": "LinkedIn — @jefelabs"
+          "displayName": "LinkedIn — @helmsmith"
         },
         {
           "platform": "linkedin",
@@ -271,7 +271,7 @@ channels to platform integrations:
 When LinkedIn integration delegates a write, it passes its
 configured channelId to Hootsuite. If LinkedIn's
 `writeDelegation.channelId` is "abc123", the post goes to
-@jefelabs on LinkedIn.
+@helmsmith on LinkedIn.
 
 For users with multiple accounts on the same platform (two
 LinkedIn pages, multiple Instagram accounts), each platform

@@ -115,7 +115,7 @@ import { createAuthClient } from '@your-org/agent-auth-lib';
 
 const auth = createAuthClient({
   appName: 'my-cli',                      // used in error messages
-  userAgent: '@jefelabs/my-cli/0.1.0',    // sent on outbound HTTP calls
+  userAgent: '@helmsmith/my-cli/0.1.0',    // sent on outbound HTTP calls
   authFilePath: undefined,                   // defaults to ~/.<your-org>/auth.json
   telemetrySink: undefined,                  // optional usage logging
 });

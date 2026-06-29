@@ -25,7 +25,7 @@
     "changeset:version": "changeset version",
     "changeset:publish": "changeset publish",
     "release": "pnpm -r run build && changeset publish",
-    "catalog": "pnpm --filter @jefelabs/skillzkit run catalog",
+    "catalog": "pnpm --filter @helmsmith/skillzkit run catalog",
     "harness": "bun harness/harness-cli/src/index.ts",
     "harness:run": "bun harness/harness-cli/src/in-process-run.tsx",
     "agentx-workspace": "bun harness/workspace-cli/src/bin.tsx",
@@ -49,14 +49,14 @@
     "tmux:reset": "scripts/tmux-reset.sh"
   },
   "dependencies": {
-    "@jefelabs/agent-adapter": "workspace:*",
-    "@jefelabs/agent-auth": "workspace:*",
-    "@jefelabs/edge-context-server": "workspace:*",
-    "@jefelabs/edge-memory-server": "workspace:*",
-    "@jefelabs/harness": "workspace:*",
-    "@jefelabs/harness-core": "workspace:*",
-    "@jefelabs/harness-pipeline": "workspace:*",
-    "@jefelabs/harness-server": "workspace:*"
+    "@helmsmith/agent-adapter": "workspace:*",
+    "@helmsmith/agent-auth": "workspace:*",
+    "@helmsmith/edge-context-server": "workspace:*",
+    "@helmsmith/edge-memory-server": "workspace:*",
+    "@helmsmith/harness": "workspace:*",
+    "@helmsmith/harness-core": "workspace:*",
+    "@helmsmith/harness-pipeline": "workspace:*",
+    "@helmsmith/harness-server": "workspace:*"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.15",

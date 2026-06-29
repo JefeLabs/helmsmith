@@ -151,7 +151,7 @@ that have CLI dependencies use these functions at startup.
 ### `ensureTool(name, options?)`
 
 ```typescript
-import { ensureTool } from "@jefelabs/toolz";
+import { ensureTool } from "@helmsmith/toolz";
 
 const status = await ensureTool("git", {
   minVersion: "2.40.0",
@@ -310,7 +310,7 @@ toolz ensure git --min-version 2.40 \
 ### Pre-flight check at the start of a script
 
 ```typescript
-import { ensureTools } from "@jefelabs/toolz";
+import { ensureTools } from "@helmsmith/toolz";
 
 const { jq, gh, fd } = await ensureTools({
   jq: { minVersion: "1.7", autoInstall: true },

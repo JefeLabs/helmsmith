@@ -2,7 +2,7 @@
  * Shared types for the workspace-cli procurement flow.
  *
  * Naming convention:
- *   - `RepoSpec` mirrors `SpawnRepoSpec` from @jefelabs/harness-server but is
+ *   - `RepoSpec` mirrors `SpawnRepoSpec` from @helmsmith/harness-server but is
  *     declared locally to avoid a tight coupling with the spawn primitive's
  *     evolution. The shape MUST stay structurally compatible with
  *     SpawnRepoSpec — validateRepoAccess + harness-workspace.yml substitution
@@ -35,7 +35,7 @@ export interface ProcureSpec {
    *  user wants to populate working trees themselves). */
   noClone?: boolean;
   /**
-   * Slugs from the @jefelabs/skillzkit catalog to install into the new
+   * Slugs from the @helmsmith/skillzkit catalog to install into the new
    * project's `.claude/` directory after procurement succeeds. Mixed
    * forms accepted: command slugs (`core:tools:npm`), workflow
    * qualifiedNames (`product:greenfield`), or router skill names
@@ -44,7 +44,7 @@ export interface ProcureSpec {
    */
   skills?: string[];
   /**
-   * Command used to invoke skillzkit. Default: `npx -y @jefelabs/skillzkit`
+   * Command used to invoke skillzkit. Default: `npx -y @helmsmith/skillzkit`
    * (installs from GitHub Packages — user must be authenticated). Override
    * for local-dev testing, e.g. `tsx /path/to/agentx-skillzkit/bin/cli.ts`
    * to run against an unpublished checkout.

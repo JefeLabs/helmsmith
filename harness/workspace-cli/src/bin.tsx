@@ -35,7 +35,7 @@ program
   .option('--no-tui', 'fail fast on missing/invalid input instead of launching the TUI')
   .option('--no-clone', 'skip the eager git clone step (advanced)')
   .option('--skills <slugs...>', 'skillzkit catalog items to install (e.g. core:tools:npm)')
-  .option('--skillzkit-bin <command>', 'override the skillzkit invocation', 'npx -y @jefelabs/skillzkit')
+  .option('--skillzkit-bin <command>', 'override the skillzkit invocation', 'npx -y @helmsmith/skillzkit')
   .action(async (positionalName: string | undefined, opts) => {
     await runSetup({
       ...opts,

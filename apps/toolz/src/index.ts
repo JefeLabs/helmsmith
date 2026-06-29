@@ -1,8 +1,8 @@
 /**
- * Public API for `@jefelabs/toolz`. Other AgentX packages import from
+ * Public API for `@helmsmith/toolz`. Other AgentX packages import from
  * here:
  *
- *   import { checkTool, detectPlatform } from "@jefelabs/toolz";
+ *   import { checkTool, detectPlatform } from "@helmsmith/toolz";
  *
  * Future additions (per the implementation plan): `ensureTool`,
  * `ensureTools`, registry CRUD.

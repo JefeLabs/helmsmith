@@ -19,7 +19,7 @@ agentx-platform packages plug in.
         │  (auth.ts)     │    │  (config.ts)   │    │ (categorizer.ts)│
         │                │    │                │    │                │
         │  delegates to  │    │  Zod schema +  │    │  glob-based    │
-        │  @jefelabs/    │    │  defaults +    │    │  first-match-  │
+        │  @helmsmith/    │    │  defaults +    │    │  first-match-  │
         │  agent-auth    │    │  cosmiconfig   │    │  wins bucketing│
         └───────┬────────┘    └────────────────┘    └────────────────┘
                 │
@@ -29,7 +29,7 @@ agentx-platform packages plug in.
         │  AI client (ai.ts)                     │
         │                                        │
         │  Multi-provider via                    │
-        │  @jefelabs/agent-adapter               │
+        │  @helmsmith/agent-adapter               │
         │                                        │
         │  ┌──────────┐  ┌──────────┐  ┌──────┐ │
         │  │ Copilot  │  │ Claude   │  │OpenAI│ │
@@ -58,7 +58,7 @@ users discover the surface area before features land.
 
 ### Auth (`src/auth.ts`)
 
-Thin wrapper around `@jefelabs/agent-auth`'s GitHub Device Flow
+Thin wrapper around `@helmsmith/agent-auth`'s GitHub Device Flow
 implementation. Three operations:
 
 - `pritty auth login` — runs Device Flow, persists token to
@@ -67,7 +67,7 @@ implementation. Three operations:
   per-provider info (no token values are ever printed).
 - `pritty auth logout` — removes the file.
 
-The same `@jefelabs/agent-auth` primitive backs the rest of the
+The same `@helmsmith/agent-auth` primitive backs the rest of the
 AgentX ecosystem (skillzkit, future tools). Auth improvements ship
 once and every consumer inherits them.
 
@@ -118,7 +118,7 @@ load time.
 ### AI client (`src/ai.ts`, in progress)
 
 Multi-provider LLM invocation routing through
-`@jefelabs/agent-adapter`. Provider selection logic:
+`@helmsmith/agent-adapter`. Provider selection logic:
 
 1. Try `config.provider` first
 2. If unavailable (no auth, no key, network error) → walk
@@ -320,7 +320,7 @@ apps/pritty/
 │   └── pritty.mjs              # Node shim that loads dist/index.js
 ├── src/
 │   ├── cli.ts                  # Commander entry; registers all subcommands
-│   ├── auth.ts                 # Auth wrappers (delegates to @jefelabs/agent-auth)
+│   ├── auth.ts                 # Auth wrappers (delegates to @helmsmith/agent-auth)
 │   ├── config.ts               # Zod schema + cosmiconfig loader
 │   ├── categorizer.ts          # First-match-wins glob bucketing
 │   ├── ai.ts                   # Multi-provider LLM invocation

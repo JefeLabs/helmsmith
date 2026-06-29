@@ -1,5 +1,5 @@
 {
-  "name": "@jefelabs/cli-kit",
+  "name": "@helmsmith/cli-kit",
   "version": "0.0.1",
   "description": "Shared CLI bootstrap for the AgentX ecosystem — commander + inquirer + pluggable auth. Runtime-agnostic (Node or Bun).",
   "type": "module",
@@ -34,8 +34,15 @@
     "node": ">=20"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com",
-    "access": "restricted"
+    "access": "public",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      }
+    }
   },
   "repository": {
     "type": "git",

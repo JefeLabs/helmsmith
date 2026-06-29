@@ -297,9 +297,9 @@ The persona grouping pattern enables:
   workflows simply don't apply
 
 Currently the suite ships as a monolith. Future packaging may
-split into per-persona npm packages (`@jefelabs/skillz-core`,
-`@jefelabs/skillz-product`, `@jefelabs/skillz-engineer`,
-`@jefelabs/skillz-market`, `@jefelabs/skillz-frameworks-heroui`).
+split into per-persona npm packages (`@helmsmith/skillz-core`,
+`@helmsmith/skillz-product`, `@helmsmith/skillz-engineer`,
+`@helmsmith/skillz-market`, `@helmsmith/skillz-frameworks-heroui`).
 The persona-grouped directory structure prepares for that
 without forcing it now.
 

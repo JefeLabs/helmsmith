@@ -1,5 +1,5 @@
 {
-  "name": "@jefelabs/taskmaster",
+  "name": "@helmsmith/taskmaster",
   "version": "0.1.0",
   "description": "CLI-based project task generator with complexity scoring and auto-decomposition. Part of the agentx-toolbox monorepo.",
   "type": "module",
@@ -35,10 +35,10 @@
   ],
   "license": "UNLICENSED",
   "dependencies": {
-    "@jefelabs/agent-adapter": "workspace:*",
-    "@jefelabs/agent-auth": "workspace:*",
-    "@jefelabs/cli-kit": "workspace:*",
-    "@jefelabs/tui-view-components": "workspace:*",
+    "@helmsmith/agent-adapter": "workspace:*",
+    "@helmsmith/agent-auth": "workspace:*",
+    "@helmsmith/cli-kit": "workspace:*",
+    "@helmsmith/tui-view-components": "workspace:*",
     "@inquirer/prompts": "^8.2.1",
     "@opentui/core": "^0.2.2",
     "@opentui/react": "^0.2.2",
@@ -65,8 +65,7 @@
     "vitest": "^4.0.18"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com",
-    "access": "restricted"
+    "access": "public"
   },
   "repository": {
     "type": "git",

@@ -1,5 +1,5 @@
 /**
- * @jefelabs/skillzkit-types
+ * @helmsmith/skillzkit-types
  *
  * **Source of truth** for the skillzkit catalog shape. JSDoc tags
  * (`@pattern`, `@format`, `@minimum`, etc.) are picked up by
@@ -17,7 +17,7 @@
  *   Java POJOs
  *
  * Zero runtime deps. Consumed by:
- *   - `@jefelabs/skillzkit` (this repo) — internally
+ *   - `@helmsmith/skillzkit` (this repo) — internally
  *   - `agentx-platform/packages/controlplane-ui` — for rendering catalog data
  */
 

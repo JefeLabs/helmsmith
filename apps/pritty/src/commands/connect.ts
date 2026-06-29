@@ -1,4 +1,4 @@
-import { runConnectView } from '@jefelabs/tui-view-components';
+import { runConnectView } from '@helmsmith/tui-view-components';
 import { githubCopilotConnection } from '../connections.js';
 
 export async function runConnect(): Promise<void> {

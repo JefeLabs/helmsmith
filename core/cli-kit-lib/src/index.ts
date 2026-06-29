@@ -1,5 +1,5 @@
 /**
- * @jefelabs/cli-kit — shared CLI bootstrap for the AgentX ecosystem.
+ * @helmsmith/cli-kit — shared CLI bootstrap for the AgentX ecosystem.
  *
  * Public surface:
  *   - createCli({ name, version, auth }) → { program, auth }

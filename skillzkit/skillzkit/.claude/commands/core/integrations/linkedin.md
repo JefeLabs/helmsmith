@@ -318,7 +318,7 @@ do_direct_read() {
 
 ```
 === LinkedIn Post Scheduled (via Hootsuite) ===
-Channel:       LinkedIn — @jefelabs
+Channel:       LinkedIn — @helmsmith
 Routing:       Hootsuite (delegated)
 Hootsuite ID:  msg_xyz789
 
@@ -336,7 +336,7 @@ View in Hootsuite: https://hootsuite.com/dashboard
 
 ```
 === LinkedIn Post Published (direct) ===
-Author:    @jefelabs
+Author:    @helmsmith
 Post URN:  urn:li:share:7234567890
 
 Content preview:

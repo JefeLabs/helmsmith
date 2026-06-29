@@ -5,8 +5,8 @@ have a working bot and can stop at any milestone with something useful.
 
 ## M0 — Project skeleton
 - `bun init`, TypeScript strict config, ESLint/Biome.
-- Add deps: `discord.js`, `@jefelabs/cli-kit` (+ `commander`, `inquirer` peers),
-  `@jefelabs/tui-view-components` (+ `@opentui/core`, `@opentui/react`,
+- Add deps: `discord.js`, `@helmsmith/cli-kit` (+ `commander`, `inquirer` peers),
+  `@helmsmith/tui-view-components` (+ `@opentui/core`, `@opentui/react`,
   `react` peers), `zod`, `@aws-sdk/client-dynamodb`, `@aws-sdk/lib-dynamodb`.
 - Link workspace libs (`workspace:*` or `bun link`).
 - `src/index.ts` with `createCli()` and a stub `start` command that just logs.

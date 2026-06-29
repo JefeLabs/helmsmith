@@ -1,5 +1,5 @@
 {
-  "name": "@jefelabs/harness-pipeline",
+  "name": "@helmsmith/harness-pipeline",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -16,9 +16,9 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@jefelabs/agent-adapter": "workspace:*",
-    "@jefelabs/agent-auth": "workspace:*",
-    "@jefelabs/harness-core": "workspace:*"
+    "@helmsmith/agent-adapter": "workspace:*",
+    "@helmsmith/agent-auth": "workspace:*",
+    "@helmsmith/harness-core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.7.0",

@@ -18,7 +18,7 @@
  * No server changes needed for F3a/F3b.
  */
 
-import type { MemoryScope } from '@jefelabs/edge-memory-server';
+import type { MemoryScope } from '@helmsmith/edge-memory-server';
 
 /** Read a single env var that the worker exports. Empty string is
  *  treated as unset (matches typical shell-env semantics). */

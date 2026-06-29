@@ -1,6 +1,6 @@
 import { homedir } from 'node:os';
 import path from 'node:path';
-import { createCli } from '@jefelabs/cli-kit';
+import { createCli } from '@helmsmith/cli-kit';
 import { runConnect } from './commands/connect.js';
 import { runMain } from './commands/run-main.js';
 import { detectGitRoot } from './config/git-root.js';

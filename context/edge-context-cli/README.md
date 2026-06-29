@@ -1,4 +1,4 @@
-# @jefelabs/edge-context-cli
+# @helmsmith/edge-context-cli
 
 The `edge-context` CLI — the agent + human client for `edge-context-server`'s
 GraphRAG knowledge graph. Talks to the server over its Unix domain socket; no
@@ -44,5 +44,5 @@ installed:
 
 ## Related
 
-- [`@jefelabs/edge-context-server`](../edge-context-server/README.md) — the daemon this CLI talks to
-- [`@jefelabs/edge-memory-cli`](../edge-memory-cli/README.md) — peer CLI for the agent-memory server
+- [`@helmsmith/edge-context-server`](../edge-context-server/README.md) — the daemon this CLI talks to
+- [`@helmsmith/edge-memory-cli`](../edge-memory-cli/README.md) — peer CLI for the agent-memory server

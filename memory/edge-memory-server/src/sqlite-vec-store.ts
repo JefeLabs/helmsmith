@@ -53,7 +53,7 @@ export interface SqliteVecMemoryStoreOptions {
    *  what the embedder produces. Changing it requires a fresh DB. */
   vectorDim: number;
   /** Embedder function. Tests inject a mock; production wires
-   *  createHttpEmbedderClient.embed from @jefelabs/context-loader-core. */
+   *  createHttpEmbedderClient.embed from @helmsmith/context-loader-core. */
   embed: EmbedFn;
 }
 

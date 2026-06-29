@@ -1,5 +1,5 @@
 {
-  "name": "@jefelabs/edge-context-server",
+  "name": "@helmsmith/edge-context-server",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@jefelabs/context-loader-core": "workspace:*",
+    "@helmsmith/context-loader-core": "workspace:*",
     "neo4j-driver": "^6.0.1",
     "ws": "^8.18.0"
   },

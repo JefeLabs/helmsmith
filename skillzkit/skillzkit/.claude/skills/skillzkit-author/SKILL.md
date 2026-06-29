@@ -40,7 +40,7 @@ via `gh`.
 This skill assumes:
 
 1. The user has a clone of `agentx-skillzkit` on disk. Detect it:
-   - If `pwd` contains `package.json` with `name: @jefelabs/skillzkit`,
+   - If `pwd` contains `package.json` with `name: @helmsmith/skillzkit`,
      you're already inside the clone.
    - Otherwise, ask the user for the path to their clone.
 2. `gh` (GitHub CLI) is installed and authenticated (only required at

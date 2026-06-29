@@ -1,5 +1,5 @@
 /**
- * harness-server launcher — runs @jefelabs/harness-server inside the
+ * harness-server launcher — runs @helmsmith/harness-server inside the
  * harness-server container.
  *
  * The harness exposes a UDS at HARNESS_SOCKET (default /run/harness/harness.sock)
@@ -33,7 +33,7 @@ import {
   type FlowDef,
   type ProductDef,
   startHarnessServer,
-} from '@jefelabs/harness-server';
+} from '@helmsmith/harness-server';
 
 interface DispatcherStatus {
   capacity: number;

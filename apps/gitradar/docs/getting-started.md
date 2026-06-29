@@ -19,7 +19,7 @@ about 10 minutes. Two paths:
 ## Path 1 — Demo mode (fastest)
 
 ```bash
-npm install -g @jefelabs/gitradar
+npm install -g @helmsmith/gitradar
 gitradar --demo
 ```
 

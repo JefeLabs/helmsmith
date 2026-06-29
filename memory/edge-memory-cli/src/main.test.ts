@@ -11,7 +11,7 @@ import { randomUUID } from 'node:crypto';
 import { rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { startMemoryServer } from '@jefelabs/edge-memory-server';
+import { startMemoryServer } from '@helmsmith/edge-memory-server';
 import { afterEach, describe, expect, it } from 'vitest';
 import { run } from './main.ts';
 

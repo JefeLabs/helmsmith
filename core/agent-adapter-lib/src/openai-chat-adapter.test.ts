@@ -4,7 +4,7 @@
  * extraction (slice 13a) and typed-error classification (slice 13b).
  */
 
-import type { CredentialBroker } from '@jefelabs/agent-auth';
+import type { CredentialBroker } from '@helmsmith/agent-auth';
 import { describe, expect, it, vi } from 'vitest';
 import { AuthError, BillingError, ConfigError, NetworkError, RateLimitError } from './errors.ts';
 import type { AdapterEvent } from './events.ts';

@@ -1,6 +1,6 @@
-# @jefelabs/edge-memory-cli
+# @helmsmith/edge-memory-cli
 
-Peer CLI for `@jefelabs/edge-memory-server`. The agent + human surface
+Peer CLI for `@helmsmith/edge-memory-server`. The agent + human surface
 to a workspace's memory daemon.
 
 ```sh
@@ -23,7 +23,7 @@ edge-memory health
 pnpm install
 
 # Standalone (when published)
-npm install -g @jefelabs/edge-memory-cli
+npm install -g @helmsmith/edge-memory-cli
 ```
 
 ## Subcommands
@@ -235,7 +235,7 @@ The testable `run({argv, env, stdout, stderr}) → exitCode` is exported
 for in-process testing:
 
 ```ts
-import { run } from '@jefelabs/edge-memory-cli';
+import { run } from '@helmsmith/edge-memory-cli';
 
 let stdout = '';
 const code = await run({
@@ -262,7 +262,7 @@ Targeted at <30ms for agent-loop usage. Achieved by:
 ## Tests
 
 ```sh
-pnpm --filter @jefelabs/edge-memory-cli test
+pnpm --filter @helmsmith/edge-memory-cli test
 ```
 
 12 in-process integration tests cover the full subcommand surface
@@ -271,6 +271,6 @@ spawn for the test loop.
 
 ## Related
 
-- [`@jefelabs/edge-memory-server`](../edge-memory-server/README.md) — the daemon this CLI talks to
-- [`@jefelabs/edge-context-cli`](../edge-context-cli) — peer CLI for the GraphRAG context server
+- [`@helmsmith/edge-memory-server`](../edge-memory-server/README.md) — the daemon this CLI talks to
+- [`@helmsmith/edge-context-cli`](../edge-context-cli) — peer CLI for the GraphRAG context server
 - `workspace-template/.harness/skills/memory.md` — agent-facing SKILL teaching this CLI's procedure

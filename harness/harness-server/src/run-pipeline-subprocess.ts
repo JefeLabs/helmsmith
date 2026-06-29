@@ -50,8 +50,8 @@ import { type ChildProcess, spawn } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { JobBus } from '@jefelabs/harness-core';
-import type { JobSpec } from '@jefelabs/harness-pipeline';
+import type { JobBus } from '@helmsmith/harness-core';
+import type { JobSpec } from '@helmsmith/harness-pipeline';
 import { consumeJsonlStream } from './pipeline-jsonl-stream.ts';
 
 export interface RunPipelineSubprocessOptions {

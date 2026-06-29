@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { createCli } from '@jefelabs/cli-kit';
+import { createCli } from '@helmsmith/cli-kit';
 import chalk from 'chalk';
 import Table from 'cli-table3';
 import yaml from 'js-yaml';

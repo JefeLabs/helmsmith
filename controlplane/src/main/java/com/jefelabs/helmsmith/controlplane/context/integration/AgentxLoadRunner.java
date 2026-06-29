@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Spawns the {@code @jefelabs/context-loader-cli} (agentx-load) as a
+ * Spawns the {@code @helmsmith/context-loader-cli} (agentx-load) as a
  * subprocess to ingest a context source into the central Neo4j graph.
  * Per prd-context-module.md F3, D1: one source of truth for chunkers
  * (the TS implementation), no Java reimplementation.

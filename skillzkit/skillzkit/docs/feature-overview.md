@@ -155,7 +155,7 @@ Format:
 ### Standalone
 
 ```bash
-npm install -g @jefelabs/skillzkit
+npm install -g @helmsmith/skillzkit
 skillzkit init                       # interactive setup; mode=standalone
 skillzkit ui                         # browse the bundled catalog
 ```
@@ -312,7 +312,7 @@ Review axes:
 - **Safety** — prompt injection patterns, harmful content, secrets
   the structural pass missed
 
-The review is provider-agnostic via `@jefelabs/agent-adapter`. You can
+The review is provider-agnostic via `@helmsmith/agent-adapter`. You can
 run it against Claude in production and a local Qwen for cost-sensitive
 deploys without changing skillzkit code.
 

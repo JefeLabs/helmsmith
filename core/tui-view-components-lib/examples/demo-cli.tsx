@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 
 /**
- * @jefelabs/tui-view-components — interactive component showcase.
+ * @helmsmith/tui-view-components — interactive component showcase.
  *
  * Run: `bun run examples/demo-cli.tsx`
- *  or: `npm run demo-cli --workspace=@jefelabs/tui-view-components`
+ *  or: `npm run demo-cli --workspace=@helmsmith/tui-view-components`
  *
  * Layout: top-level horizontal menu of sections; number + label
  * hotkeys jump to a section; Tab/Shift+Tab cycle scenarios within
@@ -292,7 +292,7 @@ function StatusListWithDetails() {
       id: 'github',
       label: 'GitHub Copilot',
       state: 'connected',
-      detail: 'logged in as @jefelabs (scope: read:user, repo)',
+      detail: 'logged in as @helmsmith (scope: read:user, repo)',
       badge: 'required',
     },
     {

@@ -1,5 +1,5 @@
 /**
- * @jefelabs/harness-pipeline — the per-job runtime that executes one pipeline
+ * @helmsmith/harness-pipeline — the per-job runtime that executes one pipeline
  * job inside a harness-pipeline devcontainer.
  *
  * Per memory `project_proxy_per_job_architecture`:
@@ -26,15 +26,15 @@ import {
   OpenCodeServer,
   type OpenCodeServerOptions,
   type OpencodeProviderEntry,
-} from '@jefelabs/agent-adapter';
-import type { ResolvedBinding } from '@jefelabs/agent-auth';
+} from '@helmsmith/agent-adapter';
+import type { ResolvedBinding } from '@helmsmith/agent-auth';
 import {
   type Envelope,
   JobBus,
   type JobRecord,
   type RegisteredAgent,
   runJob,
-} from '@jefelabs/harness-core';
+} from '@helmsmith/harness-core';
 import type { JobSpec, SpecAgent } from './spec.ts';
 import { SpecBroker } from './spec-broker.ts';
 

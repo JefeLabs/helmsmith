@@ -13,20 +13,20 @@ watches channels and presence, writes records, and reports.
 | Bun + TypeScript + discord.js v14 | Bun runtime (your call); discord.js is the most mature Discord lib with first-class typed gateway events (`messageCreate`, `presenceUpdate`). Bun gives a built-in SQLite driver and fast startup. |
 | Pluggable storage | You want SQLite now, DynamoDB later. A port/adapter boundary makes the swap a config change, not a rewrite. |
 | Local-first, AWS-ready | Run `bun run dev` on your laptop today. Same code runs on ECS Fargate / EC2 later — only the storage backend + secret source change. |
-| `@jefelabs/cli-kit` | Reuse the ecosystem's `createCli()` (commander + inquirer + pluggable auth) instead of re-wiring. Gives a clean subcommand CLI (`start`, `setup`, `report`, `view`…) and interactive prompts for first-run config. |
-| `@jefelabs/tui-view-components` | Reuse the ecosystem's openTUI/React kit for the **TUI summary viewer** — `AppShell`, `Table`, `StatusList`, `Menu`, launched via `runTuiView()` from a CLI handler. |
+| `@helmsmith/cli-kit` | Reuse the ecosystem's `createCli()` (commander + inquirer + pluggable auth) instead of re-wiring. Gives a clean subcommand CLI (`start`, `setup`, `report`, `view`…) and interactive prompts for first-run config. |
+| `@helmsmith/tui-view-components` | Reuse the ecosystem's openTUI/React kit for the **TUI summary viewer** — `AppShell`, `Table`, `StatusList`, `Menu`, launched via `runTuiView()` from a CLI handler. |
 
 ## High-level architecture
 
 ```
         ┌──────────────────────────────────────────────────────┐
-        │            CLI  —  @jefelabs/cli-kit createCli()       │
+        │            CLI  —  @helmsmith/cli-kit createCli()       │
         │   setup · start · view (TUI) · report --json · link    │
         └──────┬────────────────────────────────────┬───────────┘
         start  │                                view │
                ▼                                     ▼
    Discord Gateway ──►  Bot Runtime           TUI Viewer
-   (events pushed)      (discord.js Client)    @jefelabs/tui-view-components
+   (events pushed)      (discord.js Client)    @helmsmith/tui-view-components
         ├─ event router (by channel id)        runTuiView(<AppShell>
         │    ├─ #goals-for-the-day → StartOfDay   <SummaryView/>  ← daily
         │    ├─ #summary-of-the-day→ EndOfDay      </AppShell>)   ← weekly
@@ -131,7 +131,7 @@ discord-timetracker/
 │   ├── reports/
 │   │   ├── ReportService.ts    # daily/weekly read model (shared by bot + TUI)
 │   │   └── types.ts            # DailySummary, WeeklySummary, UserRow
-│   ├── tui/                    # @jefelabs/tui-view-components consumers
+│   ├── tui/                    # @helmsmith/tui-view-components consumers
 │   │   ├── SummaryView.tsx     # daily/weekly summary screen (Table + Menu)
 │   │   ├── UserDetailView.tsx  # master/detail drill-down for one user
 │   │   └── runViewer.ts        # runTuiView() launcher wired to ReportService
@@ -142,8 +142,8 @@ discord-timetracker/
 │       └── link.ts             # map discord user ↔ github/CI identity
 ├── data/                       # local sqlite file lives here (gitignored)
 ├── .env.example
-├── package.json                # deps: discord.js, @jefelabs/cli-kit,
-│                               #   @jefelabs/tui-view-components, zod, aws-sdk
+├── package.json                # deps: discord.js, @helmsmith/cli-kit,
+│                               #   @helmsmith/tui-view-components, zod, aws-sdk
 └── tsconfig.json
 ```
 

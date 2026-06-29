@@ -19,8 +19,8 @@
 import { chmod, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { type Envelope, JobBus } from '@jefelabs/harness-core';
-import type { JobSpec } from '@jefelabs/harness-pipeline';
+import { type Envelope, JobBus } from '@helmsmith/harness-core';
+import type { JobSpec } from '@helmsmith/harness-pipeline';
 import { afterEach, describe, expect, it } from 'vitest';
 import { runPipelineInContainer } from './run-pipeline-in-container.ts';
 

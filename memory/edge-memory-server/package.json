@@ -1,5 +1,5 @@
 {
-  "name": "@jefelabs/edge-memory-server",
+  "name": "@helmsmith/edge-memory-server",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@jefelabs/context-loader-core": "workspace:*",
+    "@helmsmith/context-loader-core": "workspace:*",
     "better-sqlite3": "^11.3.0",
     "sqlite-vec": "^0.1.6",
     "zod": "^3.25.32"

@@ -112,7 +112,7 @@ export async function runSetup(opts: SetupOptions): Promise<void> {
         console.log(`    └─ output (last 6 lines):`);
         for (const line of tail.split('\n')) console.log(`       ${line}`);
       }
-      const binHint = finalSpec?.skillzkitBin ?? 'npx -y @jefelabs/skillzkit';
+      const binHint = finalSpec?.skillzkitBin ?? 'npx -y @helmsmith/skillzkit';
       console.log(
         `    re-run manually: ${binHint} install ${s.requested.join(' ')} --target ${result.projectDir}`,
       );

@@ -1,12 +1,12 @@
 /**
- * @jefelabs/mech-pencil — programmatic API.
+ * @helmsmith/mech-pencil — programmatic API.
  *
  * The CLI (`src/cli.ts`) is the primary surface, but the .pen schema
  * engine and emitters are exported so other toolbox code can build
  * Pencil documents directly.
  *
- *   import { PenDocument, validateDocument } from '@jefelabs/mech-pencil';
- *   import { emitDocument, getFramework } from '@jefelabs/mech-pencil';
+ *   import { PenDocument, validateDocument } from '@helmsmith/mech-pencil';
+ *   import { emitDocument, getFramework } from '@helmsmith/mech-pencil';
  */
 
 // .pen schema engine

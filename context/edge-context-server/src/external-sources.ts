@@ -29,7 +29,7 @@ import {
   type GraphIngestionBackend,
   createHttpEmbedderClient,
   type EmbedderConfig,
-} from '@jefelabs/context-loader-core';
+} from '@helmsmith/context-loader-core';
 
 export interface GithubIssuesIngestRequest {
   /** Caller-meaningful name. */

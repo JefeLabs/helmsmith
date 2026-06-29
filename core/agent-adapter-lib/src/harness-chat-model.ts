@@ -30,7 +30,7 @@
  *     binding (one that supports tools natively).
  */
 
-import type { CredentialBroker, ResolvedBinding } from '@jefelabs/agent-auth';
+import type { CredentialBroker, ResolvedBinding } from '@helmsmith/agent-auth';
 import {
   type BaseChatModelParams,
   SimpleChatModel,

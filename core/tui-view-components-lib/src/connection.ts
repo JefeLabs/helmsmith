@@ -5,7 +5,7 @@
  * Connections are unit-testable in isolation: implement the four
  * methods and ConnectView/StatusList know how to render and drive
  * them. Apps construct Connection objects from their auth library
- * (e.g. `@jefelabs/agent-auth`) and pass an array to `runConnectView`.
+ * (e.g. `@helmsmith/agent-auth`) and pass an array to `runConnectView`.
  *
  * Design choices:
  * - **Status states**: 3 canonical (connected / expired / disconnected)

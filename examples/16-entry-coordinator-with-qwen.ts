@@ -28,10 +28,10 @@
  *   bun examples/16-entry-coordinator-with-qwen.ts
  */
 
-import { bindingToAdapter, createHarnessChatModel } from '@jefelabs/agent-adapter';
-import type { ResolvedBinding } from '@jefelabs/agent-auth';
-import type { Catalog } from '@jefelabs/harness-core';
-import { runEntryCoordinator } from '@jefelabs/harness-server';
+import { bindingToAdapter, createHarnessChatModel } from '@helmsmith/agent-adapter';
+import type { ResolvedBinding } from '@helmsmith/agent-auth';
+import type { Catalog } from '@helmsmith/harness-core';
+import { runEntryCoordinator } from '@helmsmith/harness-server';
 
 const DMR_CHAT_URL = 'http://localhost:12434/engines/llama.cpp/v1';
 

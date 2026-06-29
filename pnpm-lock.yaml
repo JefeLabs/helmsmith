@@ -17,28 +17,28 @@ importers:
 
   .:
     dependencies:
-      '@jefelabs/agent-adapter':
+      '@helmsmith/agent-adapter':
         specifier: workspace:*
         version: link:core/agent-adapter-lib
-      '@jefelabs/agent-auth':
+      '@helmsmith/agent-auth':
         specifier: workspace:*
         version: link:core/agent-auth-lib
-      '@jefelabs/edge-context-server':
+      '@helmsmith/edge-context-server':
         specifier: workspace:*
         version: link:context/edge-context-server
-      '@jefelabs/edge-memory-server':
+      '@helmsmith/edge-memory-server':
         specifier: workspace:*
         version: link:memory/edge-memory-server
-      '@jefelabs/harness':
+      '@helmsmith/harness':
         specifier: workspace:*
         version: link:harness/harness-cli
-      '@jefelabs/harness-core':
+      '@helmsmith/harness-core':
         specifier: workspace:*
         version: link:harness/harness-core
-      '@jefelabs/harness-pipeline':
+      '@helmsmith/harness-pipeline':
         specifier: workspace:*
         version: link:harness/harness-pipeline-cli
-      '@jefelabs/harness-server':
+      '@helmsmith/harness-server':
         specifier: workspace:*
         version: link:harness/harness-server
     devDependencies:
@@ -72,15 +72,15 @@ importers:
 
   apps/discord-timetracker:
     dependencies:
+      '@helmsmith/cli-kit':
+        specifier: workspace:*
+        version: link:../../core/cli-kit-lib
+      '@helmsmith/tui-view-components':
+        specifier: workspace:*
+        version: link:../../core/tui-view-components-lib
       '@inquirer/prompts':
         specifier: ^8.2.0
         version: 8.5.2(@types/node@22.20.0)
-      '@jefelabs/cli-kit':
-        specifier: workspace:*
-        version: link:../../core/cli-kit-lib
-      '@jefelabs/tui-view-components':
-        specifier: workspace:*
-        version: link:../../core/tui-view-components-lib
       '@opentui/core':
         specifier: ^0.2.2
         version: 0.2.16(typescript@5.9.3)(web-tree-sitter@0.26.9)
@@ -131,15 +131,15 @@ importers:
 
   apps/gitradar:
     dependencies:
+      '@helmsmith/cli-kit':
+        specifier: workspace:*
+        version: link:../../core/cli-kit-lib
+      '@helmsmith/tui-view-components':
+        specifier: workspace:*
+        version: link:../../core/tui-view-components-lib
       '@inquirer/prompts':
         specifier: ^8.2.0
         version: 8.5.2(@types/node@25.9.4)
-      '@jefelabs/cli-kit':
-        specifier: workspace:*
-        version: link:../../core/cli-kit-lib
-      '@jefelabs/tui-view-components':
-        specifier: workspace:*
-        version: link:../../core/tui-view-components-lib
       bun:
         specifier: ^1.3.13
         version: 1.3.14
@@ -192,6 +192,12 @@ importers:
 
   apps/gittyup:
     dependencies:
+      '@helmsmith/cli-kit':
+        specifier: workspace:*
+        version: link:../../core/cli-kit-lib
+      '@helmsmith/tui-view-components':
+        specifier: workspace:*
+        version: link:../../core/tui-view-components-lib
       '@inquirer/ansi':
         specifier: ^2.0.7
         version: 2.0.7
@@ -204,12 +210,6 @@ importers:
       '@inquirer/prompts':
         specifier: ^8.2.0
         version: 8.5.2(@types/node@25.9.4)
-      '@jefelabs/cli-kit':
-        specifier: workspace:*
-        version: link:../../core/cli-kit-lib
-      '@jefelabs/tui-view-components':
-        specifier: workspace:*
-        version: link:../../core/tui-view-components-lib
       bun:
         specifier: ^1.3.13
         version: 1.3.14
@@ -259,10 +259,10 @@ importers:
 
   apps/mech-pencil:
     dependencies:
-      '@jefelabs/cli-kit':
+      '@helmsmith/cli-kit':
         specifier: workspace:*
         version: link:../../core/cli-kit-lib
-      '@jefelabs/tui-view-components':
+      '@helmsmith/tui-view-components':
         specifier: workspace:*
         version: link:../../core/tui-view-components-lib
       '@opentui/core':
@@ -305,21 +305,21 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.30.1
         version: 0.30.1
+      '@helmsmith/agent-adapter':
+        specifier: workspace:*
+        version: link:../../core/agent-adapter-lib
+      '@helmsmith/agent-auth':
+        specifier: workspace:*
+        version: link:../../core/agent-auth-lib
+      '@helmsmith/cli-kit':
+        specifier: workspace:*
+        version: link:../../core/cli-kit-lib
+      '@helmsmith/tui-view-components':
+        specifier: workspace:*
+        version: link:../../core/tui-view-components-lib
       '@inquirer/prompts':
         specifier: ^8.2.0
         version: 8.5.2(@types/node@22.20.0)
-      '@jefelabs/agent-adapter':
-        specifier: workspace:*
-        version: link:../../core/agent-adapter-lib
-      '@jefelabs/agent-auth':
-        specifier: workspace:*
-        version: link:../../core/agent-auth-lib
-      '@jefelabs/cli-kit':
-        specifier: workspace:*
-        version: link:../../core/cli-kit-lib
-      '@jefelabs/tui-view-components':
-        specifier: workspace:*
-        version: link:../../core/tui-view-components-lib
       '@langchain/core':
         specifier: ^1.1.44
         version: 1.2.1(ws@8.21.0)
@@ -384,21 +384,21 @@ importers:
 
   apps/taskmaster:
     dependencies:
+      '@helmsmith/agent-adapter':
+        specifier: workspace:*
+        version: link:../../core/agent-adapter-lib
+      '@helmsmith/agent-auth':
+        specifier: workspace:*
+        version: link:../../core/agent-auth-lib
+      '@helmsmith/cli-kit':
+        specifier: workspace:*
+        version: link:../../core/cli-kit-lib
+      '@helmsmith/tui-view-components':
+        specifier: workspace:*
+        version: link:../../core/tui-view-components-lib
       '@inquirer/prompts':
         specifier: ^8.2.1
         version: 8.5.2(@types/node@25.9.4)
-      '@jefelabs/agent-adapter':
-        specifier: workspace:*
-        version: link:../../core/agent-adapter-lib
-      '@jefelabs/agent-auth':
-        specifier: workspace:*
-        version: link:../../core/agent-auth-lib
-      '@jefelabs/cli-kit':
-        specifier: workspace:*
-        version: link:../../core/cli-kit-lib
-      '@jefelabs/tui-view-components':
-        specifier: workspace:*
-        version: link:../../core/tui-view-components-lib
       '@opentui/core':
         specifier: ^0.2.2
         version: 0.2.16(typescript@5.9.3)(web-tree-sitter@0.25.10)
@@ -466,10 +466,10 @@ importers:
 
   apps/toolz:
     dependencies:
-      '@jefelabs/cli-kit':
+      '@helmsmith/cli-kit':
         specifier: workspace:*
         version: link:../../core/cli-kit-lib
-      '@jefelabs/tui-view-components':
+      '@helmsmith/tui-view-components':
         specifier: workspace:*
         version: link:../../core/tui-view-components-lib
       bun:
@@ -506,7 +506,7 @@ importers:
 
   context/context-loader-cli:
     dependencies:
-      '@jefelabs/context-loader-core':
+      '@helmsmith/context-loader-core':
         specifier: workspace:*
         version: link:../context-loader-core
     devDependencies:
@@ -519,10 +519,10 @@ importers:
 
   context/context-loader-core:
     dependencies:
-      '@jefelabs/agent-adapter':
+      '@helmsmith/agent-adapter':
         specifier: workspace:*
         version: link:../../core/agent-adapter-lib
-      '@jefelabs/agent-auth':
+      '@helmsmith/agent-auth':
         specifier: workspace:*
         version: link:../../core/agent-auth-lib
       '@vscode/tree-sitter-wasm':
@@ -544,7 +544,7 @@ importers:
 
   context/edge-context-cli:
     dependencies:
-      '@jefelabs/edge-context-server':
+      '@helmsmith/edge-context-server':
         specifier: workspace:*
         version: link:../edge-context-server
       ws:
@@ -563,7 +563,7 @@ importers:
 
   context/edge-context-server:
     dependencies:
-      '@jefelabs/context-loader-core':
+      '@helmsmith/context-loader-core':
         specifier: workspace:*
         version: link:../context-loader-core
       neo4j-driver:
@@ -588,7 +588,7 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.30.1
         version: 0.30.1
-      '@jefelabs/agent-auth':
+      '@helmsmith/agent-auth':
         specifier: workspace:*
         version: link:../agent-auth-lib
       '@langchain/core':
@@ -667,16 +667,16 @@ importers:
 
   harness/harness-cli:
     dependencies:
-      '@jefelabs/agent-adapter':
+      '@helmsmith/agent-adapter':
         specifier: workspace:*
         version: link:../../core/agent-adapter-lib
-      '@jefelabs/agent-auth':
+      '@helmsmith/agent-auth':
         specifier: workspace:*
         version: link:../../core/agent-auth-lib
-      '@jefelabs/harness-core':
+      '@helmsmith/harness-core':
         specifier: workspace:*
         version: link:../harness-core
-      '@jefelabs/harness-server':
+      '@helmsmith/harness-server':
         specifier: workspace:*
         version: link:../harness-server
       '@opentui/core':
@@ -713,10 +713,10 @@ importers:
 
   harness/harness-core:
     dependencies:
-      '@jefelabs/agent-adapter':
+      '@helmsmith/agent-adapter':
         specifier: workspace:*
         version: link:../../core/agent-adapter-lib
-      '@jefelabs/agent-auth':
+      '@helmsmith/agent-auth':
         specifier: workspace:*
         version: link:../../core/agent-auth-lib
       '@langchain/core':
@@ -735,13 +735,13 @@ importers:
 
   harness/harness-pipeline-cli:
     dependencies:
-      '@jefelabs/agent-adapter':
+      '@helmsmith/agent-adapter':
         specifier: workspace:*
         version: link:../../core/agent-adapter-lib
-      '@jefelabs/agent-auth':
+      '@helmsmith/agent-auth':
         specifier: workspace:*
         version: link:../../core/agent-auth-lib
-      '@jefelabs/harness-core':
+      '@helmsmith/harness-core':
         specifier: workspace:*
         version: link:../harness-core
     devDependencies:
@@ -754,16 +754,16 @@ importers:
 
   harness/harness-server:
     dependencies:
-      '@jefelabs/agent-adapter':
+      '@helmsmith/agent-adapter':
         specifier: workspace:*
         version: link:../../core/agent-adapter-lib
-      '@jefelabs/agent-auth':
+      '@helmsmith/agent-auth':
         specifier: workspace:*
         version: link:../../core/agent-auth-lib
-      '@jefelabs/harness-core':
+      '@helmsmith/harness-core':
         specifier: workspace:*
         version: link:../harness-core
-      '@jefelabs/harness-pipeline':
+      '@helmsmith/harness-pipeline':
         specifier: workspace:*
         version: link:../harness-pipeline-cli
       '@langchain/core':
@@ -795,7 +795,7 @@ importers:
         specifier: 19.2.6
         version: 19.2.6
     devDependencies:
-      '@jefelabs/harness-server':
+      '@helmsmith/harness-server':
         specifier: workspace:*
         version: link:../harness-server
       '@types/node':
@@ -819,7 +819,7 @@ importers:
 
   memory/edge-memory-cli:
     dependencies:
-      '@jefelabs/edge-memory-server':
+      '@helmsmith/edge-memory-server':
         specifier: workspace:*
         version: link:../edge-memory-server
     devDependencies:
@@ -832,7 +832,7 @@ importers:
 
   memory/edge-memory-server:
     dependencies:
-      '@jefelabs/context-loader-core':
+      '@helmsmith/context-loader-core':
         specifier: workspace:*
         version: link:../../context/context-loader-core
       better-sqlite3:
@@ -857,13 +857,13 @@ importers:
 
   skillzkit/skillzkit:
     dependencies:
-      '@jefelabs/cli-kit':
+      '@helmsmith/cli-kit':
         specifier: workspace:*
         version: link:../../core/cli-kit-lib
-      '@jefelabs/skillzkit-types':
+      '@helmsmith/skillzkit-types':
         specifier: workspace:*
         version: link:../skillzkit-types-lib
-      '@jefelabs/tui-view-components':
+      '@helmsmith/tui-view-components':
         specifier: workspace:*
         version: link:../../core/tui-view-components-lib
       '@opentui/core':

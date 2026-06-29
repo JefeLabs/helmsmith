@@ -1,7 +1,7 @@
 import { join } from 'node:path';
-import { ContextQueryService, startContextServer } from '@jefelabs/edge-context-server';
-import { startMemoryServer } from '@jefelabs/edge-memory-server';
-import { loadCatalogFromWorkspaceYaml, startHarnessServer } from '@jefelabs/harness-server';
+import { ContextQueryService, startContextServer } from '@helmsmith/edge-context-server';
+import { startMemoryServer } from '@helmsmith/edge-memory-server';
+import { loadCatalogFromWorkspaceYaml, startHarnessServer } from '@helmsmith/harness-server';
 
 const SOCKET_DIR = join(process.cwd(), '.harness', 'run');
 const harnessSocket = join(SOCKET_DIR, 'harness.sock');

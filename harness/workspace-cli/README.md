@@ -1,4 +1,4 @@
-# @jefelabs/workspace
+# @helmsmith/workspace
 
 The front door for setting up agentx project workspaces. Procure a fresh
 project from the canonical `workspace-template`, with optional repo
@@ -18,10 +18,10 @@ curl -fsSL https://bun.sh/install | bash
 
 ```sh
 # One-shot via bunx (no install)
-bunx @jefelabs/workspace setup my-project
+bunx @helmsmith/workspace setup my-project
 
 # Or install globally and invoke directly
-bun install -g @jefelabs/workspace
+bun install -g @helmsmith/workspace
 agentx-workspace setup my-project
 ```
 
@@ -31,10 +31,10 @@ From a parent directory where you want the new workspace folder to land:
 
 ```sh
 # Interactive — TUI walks you through the inputs
-npx @jefelabs/workspace
+npx @helmsmith/workspace
 
 # Scripted
-npx @jefelabs/workspace setup my-project \
+npx @helmsmith/workspace setup my-project \
   --repos git@github.com:my-org/web.git git@github.com:my-org/api.git
 ```
 

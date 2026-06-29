@@ -1,4 +1,4 @@
-# @jefelabs/tui-view-components
+# @helmsmith/tui-view-components
 
 Reusable TUI view components for the AgentX ecosystem. Built on
 [openTUI](https://github.com/sst/opentui) + React. Provides
@@ -45,12 +45,12 @@ Consumers can import from the root or from subpaths for tree-shaking:
 
 ```ts
 // Everything (largest bundle)
-import { ConnectView, Box, useTheme } from "@jefelabs/tui-view-components";
+import { ConnectView, Box, useTheme } from "@helmsmith/tui-view-components";
 
 // Subpath (smaller bundle, finer-grained)
-import { ConnectView } from "@jefelabs/tui-view-components/views";
-import { Box, Stack } from "@jefelabs/tui-view-components/primitives";
-import { useTheme } from "@jefelabs/tui-view-components/theme";
+import { ConnectView } from "@helmsmith/tui-view-components/views";
+import { Box, Stack } from "@helmsmith/tui-view-components/primitives";
+import { useTheme } from "@helmsmith/tui-view-components/theme";
 ```
 
 ## Peer dependencies
