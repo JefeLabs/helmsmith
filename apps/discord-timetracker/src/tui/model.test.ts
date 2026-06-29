@@ -56,8 +56,8 @@ describe('column definitions', () => {
       ),
     ).toBe('1h 30m');
   });
-  it('weekly has a trend sparkline column', () => {
-    const cols = weeklyColumns();
-    expect(cols.map((c) => c.key)).toContain('trend');
+  it('weekly is a Mon–Fri grid + WK Active + Avg/day', () => {
+    const cols = weeklyColumns().map((c) => c.key);
+    expect(cols).toEqual(['userId', 'wd0', 'wd1', 'wd2', 'wd3', 'wd4', 'wk', 'avg']);
   });
 });

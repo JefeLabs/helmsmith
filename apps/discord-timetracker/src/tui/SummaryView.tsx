@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import type { ReportService } from '../reports/ReportService.js';
 import { formatDuration, formatTime } from '../reports/render.js';
 import type { DailySummary, UserDayRow, UserWeekRow, WeeklySummary } from '../reports/types.js';
+import { weekGrid } from '../reports/weekGrid.js';
 import { dailyColumns, type Period, pageDate, sparkline, weeklyColumns } from './model.js';
 
 export interface SummaryViewProps {
@@ -101,16 +102,18 @@ function DayDetail({ row, tz }: { row: UserDayRow; tz: string }) {
 }
 
 function WeekDetail({ row }: { row: UserWeekRow }) {
+  const g = weekGrid(row);
+  const avg = g.avgActiveMinutes > 0 ? formatDuration(g.avgActiveMinutes) : '—';
   return (
     <Box style={{ flexDirection: 'column', padding: 1, gap: 1 }}>
       <Heading>{row.displayName ?? row.userId}</Heading>
-      <Text>{`Online:  ${formatDuration(row.onlineMinutes)}  ·  ${row.daysActive}/7 days`}</Text>
-      <Text>{`Voice:   ${formatDuration(row.voiceMinutes)}`}</Text>
-      <Text>{`CI:      ${row.ciSubmissions}    Msgs: ${row.engagementMessages}`}</Text>
-      <Text variant="muted">Online / day (Mon→Sun):</Text>
-      <Text>{sparkline(row.perDay.map((d) => d.onlineMinutes))}</Text>
+      <Text>{`WK Active: ${formatDuration(g.wkActiveMinutes)}  ·  Avg/day ${avg}  ·  ${row.daysActive}/7 days`}</Text>
+      <Text>{`Online:    ${formatDuration(row.onlineMinutes)}    Voice: ${formatDuration(row.voiceMinutes)}`}</Text>
+      <Text>{`CI:        ${row.ciSubmissions}    Msgs: ${row.engagementMessages}`}</Text>
+      <Text variant="muted">Active / day (Mon→Sun):</Text>
+      <Text>{sparkline(row.perDay.map((d) => d.activeMinutes))}</Text>
       {row.perDay.map((d) => (
-        <Text key={d.date} variant="muted">{`${d.date}  ${formatDuration(d.onlineMinutes)}`}</Text>
+        <Text key={d.date} variant="muted">{`${d.date}  active ${formatDuration(d.activeMinutes)}  ·  idle ${formatDuration(d.idleMinutes)}`}</Text>
       ))}
     </Box>
   );
