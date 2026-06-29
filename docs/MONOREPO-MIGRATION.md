@@ -23,13 +23,15 @@ Total history: **353 commits** (`git log` and `git blame` follow files across th
 
 ## Deferred follow-ups (intentionally NOT done in the merge)
 
-1. ✅ **DONE — scope/namespace rename to the JefeLabs + helmsmith identity.**
-   - **TS:** `@ecruz165/* → @jefelabs/*` across all 25 packages + every import,
-     `workspace:*` dep, `tsup` `noExternal` regex, and `pnpm --filter` arg.
+1. ✅ **DONE — scope/namespace rename.** Three identities, intentionally independent:
+   - **npm scope:** `@ecruz165/* → @helmsmith/*` across all 25 packages + every
+     import, `workspace:*` dep, `tsup` `noExternal` regex, and `pnpm --filter` arg.
+     Product-branded for public-npm publishing (see #4).
    - **Java:** `com.jefelabs.agentx → com.jefelabs.helmsmith` (package + Maven
-     `groupId`), dropping the old "agentx" project segment in favor of the repo name.
+     `groupId`).
+   - **GitHub org** stays `JefeLabs` (owns the repo).
    Verified: `pnpm -r typecheck` 0 + full suite 3324 / 0 failed; `./mvnw test` BUILD
-   SUCCESS (2/2). Publish-target reconciliation (#4) is the remaining piece.
+   SUCCESS (2/2).
 
 2. **Extract `createHttpEmbedderClient` into a tiny `core/` lib.**
    `memory/edge-memory-server` depends on `context/context-loader-core` solely for the
@@ -42,12 +44,19 @@ Total history: **353 commits** (`git log` and `git blame` follow files across th
    `core|harness|context|memory|skillzkit|web|apps/*` groups, and add the toolbox
    apps to the JS job (toolbox had no CI of its own).
 
-4. **Reconcile publish config.** Platform published `access: public` (npm); toolbox
-   published `access: restricted` (GitHub Packages). Changesets is currently set to
-   `restricted` as the conservative default — decide the real target alongside #1.
-   Note: libs are **source-first** (`exports` → `./src/*.ts`) for the run-from-source
-   dev model (HELM-T8 aligned `cli-kit` to this) — so publishing will need a uniform
-   build→`dist` + dist-pointing exports across all libs at that point.
+4. ✅ **DONE (target chosen + config reconciled) — `@helmsmith` on public npm.**
+   Was inconsistent (platform `public`/npm, toolbox `restricted`/GitHub Packages).
+   Reconciled: publishable packages → `publishConfig.access: "public"` (public npm),
+   vestigial publishConfig stripped from private packages, changesets `access:
+   public`. Source-first libs keep `exports` → `./src/*.ts` for in-repo dev but carry
+   a `publishConfig` **dist-override** (main/types/exports → `./dist`); `@helmsmith/
+   cli-kit` `npm publish --dry-run` ships the built `dist`.
+   **Remaining (own PR + external setup):** (a) the CLIs still declare their
+   `@helmsmith/*` libs as runtime deps — to publish each cleanly, either make it
+   self-contained (`tsup noExternal`; 5 of 9 already bundle) or publish the libs it
+   depends on (incl. `tui-view-components`, which needs a multi-entry `dist` build for
+   its 9 subpath exports); (b) actual `npm publish` needs the `helmsmith` npm org +
+   token created on your side.
 
 5. **Audit `scripts/sync-skills.mjs` and example scripts** for any hard-coded
    `packages/*` paths now that packages moved into domain groups. *(Done — see
