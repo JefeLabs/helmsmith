@@ -5,7 +5,7 @@ import com.jefelabs.agentx.controlplane.catalog.domain.Skill;
 import java.util.List;
 
 /**
- * Seam between the controlplane's Skill catalog and {@code @ecruz165/skillzkit}
+ * Seam between the controlplane's Skill catalog and {@code @jefelabs/skillzkit}
  * (the external skill catalog distributed via npm + git as markdown files +
  * metadata).
  *

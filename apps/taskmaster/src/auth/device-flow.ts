@@ -1,4 +1,4 @@
-import { fetchGitHubUsername, loginGitHubCopilot } from '@ecruz165/agent-auth';
+import { fetchGitHubUsername, loginGitHubCopilot } from '@jefelabs/agent-auth';
 import chalk from 'chalk';
 import { writeAuthCredentials } from './token-manager.js';
 import {
@@ -128,7 +128,7 @@ async function _fetchUsername(githubToken: string): Promise<string> {
  * taskmaster's auth.json.
  *
  * Migrated to delegate the OAuth Device Flow steps to
- * `@ecruz165/agent-auth`'s `loginGitHubCopilot` (the toolbox-shared
+ * `@jefelabs/agent-auth`'s `loginGitHubCopilot` (the toolbox-shared
  * implementation; same flow, same client id, fewer copies). Username
  * fetch and credential persistence stay in taskmaster because the
  * auth.json schema (with multi-provider `active_provider` etc.) is

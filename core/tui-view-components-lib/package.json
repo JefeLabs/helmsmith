@@ -1,5 +1,5 @@
 {
-  "name": "@ecruz165/tui-view-components",
+  "name": "@jefelabs/tui-view-components",
   "version": "0.0.1",
   "private": true,
   "description": "Reusable TUI view components for the AgentX ecosystem. Built on openTUI + React. Provides primitives, components, and pre-composed views (ConnectView, etc.) consumed by every toolbox CLI.",

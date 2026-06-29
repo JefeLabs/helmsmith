@@ -1,4 +1,4 @@
-# @ecruz165/mech-pencil
+# @jefelabs/mech-pencil
 
 Generate [Pencil](https://docs.pencil.dev) `.pen` design systems, themes,
 and mockups from a faithful **HeroUI v3** component catalog — all 71
@@ -17,7 +17,7 @@ A `.pen` / `.lib.pen` is plain pretty-printed JSON on disk (schema
 ## Install
 
 ```bash
-npm install -g @ecruz165/mech-pencil   # or: bun run src/cli.ts <cmd>
+npm install -g @jefelabs/mech-pencil   # or: bun run src/cli.ts <cmd>
 ```
 
 ## Quick start
@@ -148,7 +148,7 @@ src/
 │   └── heroui-pro/ index.ts — reuses heroui's tokens/components/mockups
 ├── emit/           document (init/theme) · brand · bundle
 ├── tui/            no-args wizard: WizardView.tsx (React/openTUI page,
-│                   composed from @ecruz165/tui-view-components) +
+│                   composed from @jefelabs/tui-view-components) +
 │                   wizard-config.ts (pure, testable step/validate logic)
 └── commands/       one file per CLI verb (incl. wizard.ts → runs the TUI)
 ```

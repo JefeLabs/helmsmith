@@ -9,7 +9,7 @@
  * navigating the toolbox should find verb logic in the same place
  * across every app.
  */
-import { createCli } from '@ecruz165/cli-kit';
+import { createCli } from '@jefelabs/cli-kit';
 import { runConfigCommand } from './commands/config.js';
 import { runConnect } from './commands/connect.js';
 import { runContributeCommand } from './commands/contribute.js';

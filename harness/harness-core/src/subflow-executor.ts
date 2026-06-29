@@ -331,7 +331,7 @@ function resolveJsonPath(path: string, state: unknown): unknown {
 export interface SubflowCompileDeps {
   flowResolver?: FlowResolver;
   toolResolver?: import('./catalog.ts').ToolResolver;
-  broker?: import('@ecruz165/agent-auth').CredentialBroker;
+  broker?: import('@jefelabs/agent-auth').CredentialBroker;
   fetchFn?: typeof fetch;
   mcpInvokeFn?: import('./tool-executor.ts').ToolExecutorDeps['mcpInvokeFn'];
 }

@@ -4,7 +4,7 @@
  * only async step in the contribute pipeline.
  *
  * The reviewer is integrated through the platform's
- * `@ecruz165/agent-adapter` rather than a direct provider SDK.
+ * `@jefelabs/agent-adapter` rather than a direct provider SDK.
  * `AgentAdapter.invoke({ system, user })` is provider-agnostic — the
  * host platform's binding/auth machinery decides whether the actual
  * call goes to Claude, OpenAI, local Qwen, etc. The skillzkit API
@@ -62,7 +62,7 @@ export class MockReviewer implements ContributionReviewer {
 /**
  * Subset of the platform's `AgentAdapter` interface we depend on.
  * Re-declared locally rather than imported so this module compiles
- * even when `@ecruz165/agent-adapter` isn't installed (it's a
+ * even when `@jefelabs/agent-adapter` isn't installed (it's a
  * workspace link from agentx-platform that may be absent in some
  * dev environments). At runtime, the caller passes a real
  * AgentAdapter instance — duck typing ensures compatibility.

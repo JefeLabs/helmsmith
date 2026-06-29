@@ -1,4 +1,4 @@
-# 🔧 @ecruz165/toolz
+# 🔧 @jefelabs/toolz
 
 Cross-platform tool manager for the AgentX ecosystem. Detects whether a
 CLI tool is installed, parses its version, installs missing tools via
@@ -25,10 +25,10 @@ toolz doctor                         # Reconcile registry vs reality
 
 ## Programmatic API
 
-The primary consumer of `@ecruz165/toolz` is **other AgentX packages**:
+The primary consumer of `@jefelabs/toolz` is **other AgentX packages**:
 
 ```typescript
-import { ensureTool, ensureTools } from "@ecruz165/toolz";
+import { ensureTool, ensureTools } from "@jefelabs/toolz";
 
 // One tool, fail if missing
 const status = await ensureTool("git", { minVersion: "2.40.0" });
@@ -129,8 +129,8 @@ The implementation plan walks through 7 phases:
 ```bash
 # From the toolbox root:
 npm install
-npm test --workspace=@ecruz165/toolz
-npm run build --workspace=@ecruz165/toolz
+npm test --workspace=@jefelabs/toolz
+npm run build --workspace=@jefelabs/toolz
 
 # From this directory:
 npm test

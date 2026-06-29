@@ -1,5 +1,5 @@
 {
-  "name": "@ecruz165/edge-memory-cli",
+  "name": "@jefelabs/edge-memory-cli",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -16,7 +16,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@ecruz165/edge-memory-server": "workspace:*"
+    "@jefelabs/edge-memory-server": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.7.0",

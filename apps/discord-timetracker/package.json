@@ -1,5 +1,5 @@
 {
-  "name": "@ecruz165/discord-timetracker",
+  "name": "@jefelabs/discord-timetracker",
   "version": "0.1.0",
   "description": "Admin-only Discord bot that tracks per-user daily activity (start/end of day, presence, CI submissions, channel engagement) with a TUI for daily/weekly summaries. Part of the agentx-toolbox monorepo.",
   "type": "module",
@@ -28,8 +28,8 @@
     "typecheck": "tsc --noEmit --allowImportingTsExtensions"
   },
   "dependencies": {
-    "@ecruz165/cli-kit": "workspace:*",
-    "@ecruz165/tui-view-components": "workspace:*",
+    "@jefelabs/cli-kit": "workspace:*",
+    "@jefelabs/tui-view-components": "workspace:*",
     "@inquirer/prompts": "^8.2.0",
     "@opentui/core": "^0.2.2",
     "@opentui/react": "^0.2.2",

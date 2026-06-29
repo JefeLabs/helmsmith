@@ -9,8 +9,8 @@ import {
   fetchGitHubUsername,
   loginGitHubCopilot,
   type Provider,
-} from '@ecruz165/agent-auth';
-import { type LoaderEvent, spawnLoaderJob } from '@ecruz165/harness-server';
+} from '@jefelabs/agent-auth';
+import { type LoaderEvent, spawnLoaderJob } from '@jefelabs/harness-server';
 import { udsRequest } from './uds-client.ts';
 import {
   findProduct,
@@ -665,7 +665,7 @@ async function handleSession(args: string[]) {
 
 /**
  * The `harness memory ...` subcommand was removed when memory moved to
- * its own peer CLI (`@ecruz165/edge-memory-cli`). harness-cli is now
+ * its own peer CLI (`@jefelabs/edge-memory-cli`). harness-cli is now
  * operator/orchestrator only — agent surfaces (memory, context,
  * steering check) live in their own packages so cold-start stays
  * tight on every agent invocation. See memory note
@@ -687,7 +687,7 @@ function memoryDeprecationNotice(): never {
       '  harness memory put <key> <value>    →  edge-memory put <key> --value "<value>"',
       '',
       'Install:',
-      '  npm install -g @ecruz165/edge-memory-cli   # or pnpm/yarn equivalent',
+      '  npm install -g @jefelabs/edge-memory-cli   # or pnpm/yarn equivalent',
       '',
       'See `edge-memory --help` for the full subcommand surface',
       '(query / put / forget / health) plus --scope, --json, etc.',
@@ -1193,7 +1193,7 @@ function usage(): void {
       '  harness steering <check|push|wait> [--job <id>] [--text "..."]',
       '',
       '  # Memory operations moved to a peer CLI:',
-      '  edge-memory <query|put|forget|health> ...   # @ecruz165/edge-memory-cli',
+      '  edge-memory <query|put|forget|health> ...   # @jefelabs/edge-memory-cli',
       '  harness context query <text>',
       '  harness context load <target> --type <id> --backend <url> --embedder-url <url>',
       "  harness context load --product <id>            # loads all of a product's declared contextSources",

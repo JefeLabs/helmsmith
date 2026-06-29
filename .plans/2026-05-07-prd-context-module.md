@@ -26,8 +26,8 @@ This module exists because some context is *organizationally shared*: OSS packag
 
 - **Org-wide ingestion API.** `POST /api/context/sources` to register a source for ingestion (OSS package, web crawl, internal docs).
 - **Org-wide query API.** `POST /api/context/query` returns ranked context chunks; harnesses call this from agents during their tool/RAG flows.
-- **Reuses TS chunker engine.** Spring shells out to the published `@ecruz165/context-loader` CLI (`agentx-load`) for actual ingestion. No reimplementation of chunkers in Java.
-- **Same Neo4j schema as edge.** Defined by `@ecruz165/context-loader-schema` package; both edge and central run the same Cypher migrations.
+- **Reuses TS chunker engine.** Spring shells out to the published `@jefelabs/context-loader` CLI (`agentx-load`) for actual ingestion. No reimplementation of chunkers in Java.
+- **Same Neo4j schema as edge.** Defined by `@jefelabs/context-loader-schema` package; both edge and central run the same Cypher migrations.
 - **Multi-tenant.** Orgs can have multiple knowledge sets with access policies; products can be granted read access to specific sets.
 - **Refresh scheduling.** Sources can declare a refresh cadence (`daily`, `weekly`); central server scheduled-refreshes them.
 - **Same query-result shape as edge.** Drop-in compatible with the edge query API so harness code can fan out to both transparently.
@@ -43,9 +43,9 @@ This module exists because some context is *organizationally shared*: OSS packag
 
 ## 4. Reference & Provenance
 
-- The chunker pipeline + graph schema are owned by `@ecruz165/context-loader-core` (TS). Central server *invokes* this code, doesn't reimplement.
-- Edge sibling: `@ecruz165/edge-context-server` (TS). Same query shape, different scope.
-- Cypher schema migrations: shared via `@ecruz165/context-loader-schema` (see companion PRD).
+- The chunker pipeline + graph schema are owned by `@jefelabs/context-loader-core` (TS). Central server *invokes* this code, doesn't reimplement.
+- Edge sibling: `@jefelabs/edge-context-server` (TS). Same query shape, different scope.
+- Cypher schema migrations: shared via `@jefelabs/context-loader-schema` (see companion PRD).
 - Neo4j as backing store; Bolt protocol; `neo4j-driver-java` for connections.
 - Embedder via OpenAI-compatible HTTP API (TEI, vLLM, LiteLLM).
 
@@ -67,7 +67,7 @@ This module exists because some context is *organizationally shared*: OSS packag
 | F1 | `POST /api/context/sources` accepts `{ kind, target, profile?, refreshSchedule?, accessPolicy? }`. Returns `{ sourceId, ingestionJobId }`. |
 | F2 | Ingestion is async: kicks off a background job; status visible via `GET /api/context/sources/{id}`. |
 | F3 | Ingestion implementation: shells out to `agentx-load <args>` as subprocess. CLI emits NDJSON events; Spring reads them and updates ingestion job state. |
-| F4 | Source kinds (v1): `oss-package` (npm, cargo, pypi later), `prose-markdown` (path or URL), `crawled-web`, `oss-docs`. Mirrors `@ecruz165/context-loader-core`'s SourceTypeId. |
+| F4 | Source kinds (v1): `oss-package` (npm, cargo, pypi later), `prose-markdown` (path or URL), `crawled-web`, `oss-docs`. Mirrors `@jefelabs/context-loader-core`'s SourceTypeId. |
 | F5 | Failure handling: ingestion errors logged + reported; partial ingest preserved (don't roll back chunks already inserted). |
 | F6 | `DELETE /api/context/sources/{id}` removes a source: its nodes/edges are deleted from Neo4j; metadata kept for audit. |
 
@@ -118,7 +118,7 @@ This module exists because some context is *organizationally shared*: OSS packag
 |---|---|
 | F21 | Postgres tables: `context_sources` (registry), `ingestion_jobs` (in-flight + history), `context_audit_log`. |
 | F22 | Neo4j connection via Bolt; central Neo4j instance as sibling container in docker-compose. |
-| F23 | Schema migrations on startup via `@ecruz165/context-loader-schema` Cypher files (idempotent). |
+| F23 | Schema migrations on startup via `@jefelabs/context-loader-schema` Cypher files (idempotent). |
 | F24 | Embedder URL configurable; same OpenAI-compatible API as edge. |
 
 ## 7. Architecture
@@ -178,7 +178,7 @@ This module exists because some context is *organizationally shared*: OSS packag
 
 | ID | Decision | Rationale | Date |
 |---|---|---|---|
-| D1 | Reuse `@ecruz165/context-loader` CLI for ingest | One source of truth for chunkers + graph schema; no Java reimplementation. | 2026-05-06 |
+| D1 | Reuse `@jefelabs/context-loader` CLI for ingest | One source of truth for chunkers + graph schema; no Java reimplementation. | 2026-05-06 |
 | D2 | Same Neo4j schema as edge | Cross-implementation parity; shared migrations package. | 2026-05-06 |
 | D3 | Query result shape matches edge API | Drop-in compat for harnesses; merge logic is symmetric. | 2026-05-06 |
 | D4 | Org-level multi-tenancy from day one | Future-proofs the module; cheap to add now. | 2026-05-06 |

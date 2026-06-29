@@ -4,9 +4,9 @@
  * d/w switch period, ←/→ page the date, ↑/↓ move (Table built-in), enter detail,
  * q quit. Rendering only — all testable logic lives in tui/model.ts.
  */
-import { Box, Heading, Text } from '@ecruz165/tui-view-components/atoms';
-import { useKeybinding } from '@ecruz165/tui-view-components/keyboard';
-import { Table } from '@ecruz165/tui-view-components/organisms';
+import { Box, Heading, Text } from '@jefelabs/tui-view-components/atoms';
+import { useKeybinding } from '@jefelabs/tui-view-components/keyboard';
+import { Table } from '@jefelabs/tui-view-components/organisms';
 import { useEffect, useState } from 'react';
 import type { ReportService } from '../reports/ReportService.js';
 import { formatDuration, formatTime } from '../reports/render.js';

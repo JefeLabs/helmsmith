@@ -1,5 +1,5 @@
 {
-  "name": "@ecruz165/agent-adapter",
+  "name": "@jefelabs/agent-adapter",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ecruz165/agent-auth": "workspace:*",
+    "@jefelabs/agent-auth": "workspace:*",
     "@anthropic-ai/sdk": "^0.30.1",
     "@langchain/core": "^1.1.44",
     "@langchain/langgraph": "^1.3.0",

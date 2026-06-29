@@ -30,10 +30,10 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { type CopilotChatAdapterOptions, createHarnessChatModel } from '@ecruz165/agent-adapter';
-import { type CredentialBroker, FileBroker, type ResolvedBinding } from '@ecruz165/agent-auth';
-import type { Catalog } from '@ecruz165/harness-core';
-import { runEntryCoordinator } from '@ecruz165/harness-server';
+import { type CopilotChatAdapterOptions, createHarnessChatModel } from '@jefelabs/agent-adapter';
+import { type CredentialBroker, FileBroker, type ResolvedBinding } from '@jefelabs/agent-auth';
+import type { Catalog } from '@jefelabs/harness-core';
+import { runEntryCoordinator } from '@jefelabs/harness-server';
 
 const AUTH_PATH = join(homedir(), '.agentx', 'auth.json');
 const PROVIDERS_RAW = process.env.AGENTX_AB_PROVIDERS ?? 'copilot,openai';

@@ -1,4 +1,4 @@
-# @ecruz165/cli-kit
+# @jefelabs/cli-kit
 
 Shared CLI bootstrap for the AgentX ecosystem. Consumed by every
 toolbox app (skillzkit, toolz, gitradar, pritty, taskmaster) and by
@@ -12,7 +12,7 @@ so it doesn't constrain consumers' runtime choice.
 ## Install
 
 ```bash
-npm install @ecruz165/cli-kit commander inquirer
+npm install @jefelabs/cli-kit commander inquirer
 ```
 
 `commander` and `inquirer` are peer dependencies — each consumer pins
@@ -21,7 +21,7 @@ its own version (or inherits from the toolbox root `overrides`).
 ## Usage
 
 ```ts
-import { createCli } from "@ecruz165/cli-kit";
+import { createCli } from "@jefelabs/cli-kit";
 import { input } from "@inquirer/prompts";
 import { agentAuthProvider } from "./auth.js"; // your auth wiring
 
@@ -47,7 +47,7 @@ program.parse();
 ## Why pluggable auth?
 
 cli-kit is consumed by both toolbox apps (which use
-`@ecruz165/agent-auth`) and platform CLIs (which may use different
+`@jefelabs/agent-auth`) and platform CLIs (which may use different
 auth flows). Hardcoding agent-auth would force every consumer onto it.
 
 The `AuthProvider` interface is intentionally minimal:
@@ -71,7 +71,7 @@ a token.
 - **Logging / colors**: use `chalk` directly. cli-kit doesn't wrap it.
 - **TUI**: use `@opentui/core` / `@opentui/react` directly inside the
   command's action handler. cli-kit doesn't try to abstract TUI.
-- **Login flows**: live in `@ecruz165/agent-auth` (or whichever auth
+- **Login flows**: live in `@jefelabs/agent-auth` (or whichever auth
   library you're wiring).
 
 ## Versioning

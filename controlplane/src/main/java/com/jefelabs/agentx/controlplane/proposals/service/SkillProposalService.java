@@ -109,7 +109,7 @@ public class SkillProposalService {
      * Approve a proposal. Seeds a draft {@code catalog_items} row
      * (type=skill, source='skillzkit') from the proposal fields so
      * users can immediately reference the skill from a flow; a future
-     * iteration syncs the draft back to the @ecruz165/skillzkit repo
+     * iteration syncs the draft back to the @jefelabs/skillzkit repo
      * as a real PR.
      */
     @Transactional

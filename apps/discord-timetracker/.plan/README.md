@@ -24,10 +24,10 @@ later) and externalized config.
   the shared libs require it; SQLite uses Bun's built-in driver.
 - **Discord:** discord.js v14 (Gateway intents: `Guilds`, `GuildMessages`,
   `MessageContent`, `GuildPresences`, `GuildMembers`)
-- **CLI:** [`@ecruz165/cli-kit`](../../agentx-toolbox/packages/cli-kit-lib)
+- **CLI:** [`@jefelabs/cli-kit`](../../agentx-toolbox/packages/cli-kit-lib)
   `createCli()` (commander + inquirer + pluggable auth) — peer deps
   `commander`, `inquirer`
-- **TUI:** [`@ecruz165/tui-view-components`](../../agentx-toolbox/packages/tui-view-components-lib)
+- **TUI:** [`@jefelabs/tui-view-components`](../../agentx-toolbox/packages/tui-view-components-lib)
   (`runTuiView`, `AppShell`, `StatusList`, `Table`, `Menu`) for the live admin
   dashboard — peer deps `@opentui/core`, `@opentui/react`, `react`
 - **Storage:** `StorageAdapter` interface → `SqliteAdapter` (default,
@@ -42,5 +42,5 @@ rather than re-wiring CLI/TUI from scratch:
 
 | Lib | Used for | Key API |
 |-----|----------|---------|
-| `@ecruz165/cli-kit` | the whole CLI bootstrap + interactive prompts + auth | `createCli({ name, version, auth })` → `{ program, auth }` |
-| `@ecruz165/tui-view-components` | live admin status dashboard (full-screen) | `runTuiView()`, `AppShell`, `StatusList`, `Table`, `Menu`, `useTheme` |
+| `@jefelabs/cli-kit` | the whole CLI bootstrap + interactive prompts + auth | `createCli({ name, version, auth })` → `{ program, auth }` |
+| `@jefelabs/tui-view-components` | live admin status dashboard (full-screen) | `runTuiView()`, `AppShell`, `StatusList`, `Table`, `Menu`, `useTheme` |

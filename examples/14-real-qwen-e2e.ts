@@ -38,8 +38,8 @@
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { bindingToAdapter } from '@ecruz165/agent-adapter';
-import { AuthStore, DefaultBindingResolver, FileBroker } from '@ecruz165/agent-auth';
+import { bindingToAdapter } from '@jefelabs/agent-adapter';
+import { AuthStore, DefaultBindingResolver, FileBroker } from '@jefelabs/agent-auth';
 
 const DMR_CHAT_URL = 'http://localhost:12434/engines/llama.cpp/v1';
 

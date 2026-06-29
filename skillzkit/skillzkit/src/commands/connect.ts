@@ -7,7 +7,7 @@
  * surfaces a stub so the connect view exists across the toolbox.
  */
 
-import { noopConnection, runConnectView } from '@ecruz165/tui-view-components';
+import { noopConnection, runConnectView } from '@jefelabs/tui-view-components';
 
 export async function runConnect(): Promise<void> {
   await runConnectView({

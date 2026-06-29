@@ -9,7 +9,7 @@
  * pritty), not a bespoke flow.
  */
 
-import { runConnectView } from '@ecruz165/tui-view-components';
+import { runConnectView } from '@jefelabs/tui-view-components';
 
 export async function runConnect(): Promise<void> {
   await runConnectView({ appName: 'mech-pencil' });

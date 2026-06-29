@@ -1,5 +1,5 @@
 {
-  "name": "@ecruz165/cli-kit",
+  "name": "@jefelabs/cli-kit",
   "version": "0.0.1",
   "description": "Shared CLI bootstrap for the AgentX ecosystem — commander + inquirer + pluggable auth. Runtime-agnostic (Node or Bun).",
   "type": "module",

@@ -1,5 +1,5 @@
 /**
- * @ecruz165/context-loader-core — public barrel.
+ * @jefelabs/context-loader-core — public barrel.
  *
  * Phase A: types + catalog stubs. Programmatic ingest() lands in Phase B.
  *

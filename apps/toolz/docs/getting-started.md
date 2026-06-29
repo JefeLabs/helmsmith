@@ -20,7 +20,7 @@ minutes, then walks two paths:
 ## 1. Install
 
 ```bash
-npm install -g @ecruz165/toolz
+npm install -g @jefelabs/toolz
 ```
 
 Verify:
@@ -165,7 +165,7 @@ needs CLI dependencies at runtime, integrate toolz programmatically.
 ### Install as a dependency
 
 ```bash
-npm install @ecruz165/toolz
+npm install @jefelabs/toolz
 ```
 
 ### Add a startup check
@@ -173,7 +173,7 @@ npm install @ecruz165/toolz
 In your tool's entry point:
 
 ```typescript
-import { ensureTool } from "@ecruz165/toolz";
+import { ensureTool } from "@jefelabs/toolz";
 
 async function main() {
   // Single tool, fail if missing
@@ -195,7 +195,7 @@ main();
 ### Multi-tool check with auto-install
 
 ```typescript
-import { ensureTools } from "@ecruz165/toolz";
+import { ensureTools } from "@jefelabs/toolz";
 
 const statuses = await ensureTools(
   ["git", "jq", "gh"],
@@ -275,7 +275,7 @@ If your project's README has a "Prerequisites" section, replace it
 with:
 
 ```bash
-npx @ecruz165/toolz ensure git jq gh fd ripgrep --min-version 2.40
+npx @jefelabs/toolz ensure git jq gh fd ripgrep --min-version 2.40
 ```
 
 One command across macOS, Linux, and Windows. (Pin specific versions
@@ -288,7 +288,7 @@ them on `PATH` (no install needed) and registers them:
 
 ```yaml
 # .github/workflows/test.yml
-- run: npx @ecruz165/toolz ensure git jq gh
+- run: npx @jefelabs/toolz ensure git jq gh
 ```
 
 If the runner is missing a tool, toolz installs it via the available

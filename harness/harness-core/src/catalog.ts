@@ -88,7 +88,7 @@ export interface AgentDef {
   fallbackOn?: readonly string[];
   /**
    * Skills this agent depends on. References items from the
-   * `@ecruz165/skillzkit` catalog — the procurement flow (workspace-cli)
+   * `@jefelabs/skillzkit` catalog — the procurement flow (workspace-cli)
    * resolves each entry to markdown files + transitive dependencies and
    * copies them into `<workspace>/.claude/{commands,skills}/` so the
    * agent can invoke them at runtime.
@@ -676,7 +676,7 @@ export function* walkAgents(flow: FlowDef): Generator<AgentDef> {
  * --product X` lands.
  */
 export interface ContextSourceDef {
-  /** Source-type id from @ecruz165/context-loader-core's catalog
+  /** Source-type id from @jefelabs/context-loader-core's catalog
    *  (`code-full`, `prose-markdown`, `oss-code`, …). */
   type: string;
   /** What to ingest: a path, an OSS package@version, or a URL. */
@@ -694,7 +694,7 @@ export interface ContextSourceDef {
  * (slice 9d) to pre-clone the repo as a bare and add a per-job
  * worktree before the devcontainer boots.
  *
- * Shape mirrors `SpawnRepoSpec` from `@ecruz165/harness-server` (which
+ * Shape mirrors `SpawnRepoSpec` from `@jefelabs/harness-server` (which
  * the spawn primitive owns) — declared here so the catalog can carry
  * the same shape without harness-core having to depend on
  * harness-server. Values cross the package boundary structurally.

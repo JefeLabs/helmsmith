@@ -1,5 +1,5 @@
 {
-  "name": "@ecruz165/pritty",
+  "name": "@jefelabs/pritty",
   "version": "0.0.1",
   "description": "Pretty PRs, zero effort. AI-powered CLI that categorizes staged files, generates conventional commits, and creates pull requests with human-in-the-loop approval.",
   "type": "module",
@@ -30,10 +30,10 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",
-    "@ecruz165/agent-adapter": "workspace:*",
-    "@ecruz165/agent-auth": "workspace:*",
-    "@ecruz165/cli-kit": "workspace:*",
-    "@ecruz165/tui-view-components": "workspace:*",
+    "@jefelabs/agent-adapter": "workspace:*",
+    "@jefelabs/agent-auth": "workspace:*",
+    "@jefelabs/cli-kit": "workspace:*",
+    "@jefelabs/tui-view-components": "workspace:*",
     "@inquirer/prompts": "^8.2.0",
     "@langchain/core": "^1.1.44",
     "@opentui/core": "^0.2.2",

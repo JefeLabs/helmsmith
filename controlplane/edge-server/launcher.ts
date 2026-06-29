@@ -23,8 +23,8 @@
 
 import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { ContextQueryService, startContextServer } from '@ecruz165/edge-context-server';
-import { startMemoryServer } from '@ecruz165/edge-memory-server';
+import { ContextQueryService, startContextServer } from '@jefelabs/edge-context-server';
+import { startMemoryServer } from '@jefelabs/edge-memory-server';
 
 const sockDir = process.env.EDGE_SOCKETS_DIR ?? '/run/edge';
 mkdirSync(sockDir, { recursive: true });

@@ -5,7 +5,7 @@ description: The parent product workflow for a new product from zero — UX (per
 estimatedDuration: 4-8 hours interactive
 phases: 8
 prerequisites:
-  - Pencil MCP server (for wireframes / pages) and/or @ecruz165/mech-pencil (for system generation)
+  - Pencil MCP server (for wireframes / pages) and/or @jefelabs/mech-pencil (for system generation)
   - LLM provider credentials configured
   - Empty or new project repo
 ---
@@ -151,7 +151,7 @@ atomically). Each step pauses for review.
 ## Phase 6 — Design-system generation  **(required)**
 
 Generate the entire system **deterministically (zero-LLM)** from the brand
-JSON with **`@ecruz165/mech-pencil`** — this **replaces** the kit's former
+JSON with **`@jefelabs/mech-pencil`** — this **replaces** the kit's former
 foundation-rendering, component, pattern, and template phases:
 
 ```bash

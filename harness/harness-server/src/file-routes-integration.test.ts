@@ -16,9 +16,9 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AdapterEventBus, type AgentAdapter, type InvocationSpec } from '@ecruz165/agent-adapter';
-import type { CredentialBroker } from '@ecruz165/agent-auth';
-import type { Edge, FlowCatalog, FlowDef, TaskStep } from '@ecruz165/harness-core';
+import { AdapterEventBus, type AgentAdapter, type InvocationSpec } from '@jefelabs/agent-adapter';
+import type { CredentialBroker } from '@jefelabs/agent-auth';
+import type { Edge, FlowCatalog, FlowDef, TaskStep } from '@jefelabs/harness-core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { startHarnessServer } from './index.ts';
 

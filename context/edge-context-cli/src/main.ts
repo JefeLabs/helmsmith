@@ -37,7 +37,7 @@ import type {
   RelatedResult,
   TraverseResult,
   UploadEntry,
-} from '@ecruz165/edge-context-server';
+} from '@jefelabs/edge-context-server';
 import { udsJson, UdsRequestError } from './uds-client.ts';
 
 export interface RunIO {

@@ -37,5 +37,5 @@ pnpm check              # biome lint + format check
 cd controlplane && ./mvnw verify
 ```
 
-> Packages are still published under the legacy `@ecruz165/*` scope; a rename to
+> Packages are still published under the legacy `@jefelabs/*` scope; a rename to
 > `@jefelabs/*` is a planned follow-up (see `docs/`).

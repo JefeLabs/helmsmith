@@ -23,7 +23,7 @@ export interface StatusListItem {
   id: string;
   label: string;
   state: StatusListItemState;
-  /** Subtle second line (e.g. "logged in as @ecruz165"). */
+  /** Subtle second line (e.g. "logged in as @jefelabs"). */
   detail?: string;
   /** Marker shown after the label (e.g. "required" / "optional"). */
   badge?: string;

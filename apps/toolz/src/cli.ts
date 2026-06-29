@@ -7,7 +7,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createCli } from '@ecruz165/cli-kit';
+import { createCli } from '@jefelabs/cli-kit';
 import { runCheck } from './commands/check.js';
 import { runConnect } from './commands/connect.js';
 import { runDeregister } from './commands/deregister.js';
@@ -28,7 +28,7 @@ function readVersion(): string {
   for (let dir = __dirname, i = 0; i < 4; i++, dir = dirname(dir)) {
     try {
       const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
-      if (pkg.name === '@ecruz165/toolz') return pkg.version as string;
+      if (pkg.name === '@jefelabs/toolz') return pkg.version as string;
     } catch {
       /* keep walking */
     }
@@ -39,7 +39,7 @@ function readVersion(): string {
 // No `auth` wired today — toolz's current commands (check, install,
 // ensure, register, etc.) don't make agent calls. When the planned
 // "add new tools via agent" feature lands, wire a toolzAuthProvider
-// here against @ecruz165/agent-auth — same pattern as pritty.
+// here against @jefelabs/agent-auth — same pattern as pritty.
 const { program } = createCli({
   name: 'toolz',
   version: readVersion(),

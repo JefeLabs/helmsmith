@@ -34,8 +34,8 @@ COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 # Workspace dep graph for the launcher:
 #   edge-context-server, edge-memory-server
 #     └ context-loader-core
-#         ├ agent-adapter-lib (npm: @ecruz165/agent-adapter)
-#         │   └ agent-auth-lib  (npm: @ecruz165/agent-auth)
+#         ├ agent-adapter-lib (npm: @jefelabs/agent-adapter)
+#         │   └ agent-auth-lib  (npm: @jefelabs/agent-auth)
 #         └ agent-auth-lib
 COPY packages/edge-context-server/package.json ./packages/edge-context-server/
 COPY packages/edge-memory-server/package.json  ./packages/edge-memory-server/
@@ -45,8 +45,8 @@ COPY packages/agent-auth-lib/package.json      ./packages/agent-auth-lib/
 
 # Filter-install the deps the launcher transitively needs.
 RUN pnpm install \
-    --filter @ecruz165/edge-context-server... \
-    --filter @ecruz165/edge-memory-server... \
+    --filter @jefelabs/edge-context-server... \
+    --filter @jefelabs/edge-memory-server... \
     --frozen-lockfile \
     --ignore-scripts
 

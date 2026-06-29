@@ -1,4 +1,4 @@
-# @ecruz165/skillzkit-types
+# @jefelabs/skillzkit-types
 
 **Source of truth** for the skillzkit catalog shape. The TypeScript
 definitions in `src/index.ts` are authoritative; the JSON Schema at
@@ -67,7 +67,7 @@ in the generated schema.
 ## Usage (TS consumers)
 
 ```ts
-import type { Catalog, Command, Skill, Workflow } from "@ecruz165/skillzkit-types";
+import type { Catalog, Command, Skill, Workflow } from "@jefelabs/skillzkit-types";
 
 function renderCommand(cmd: Command) {
   return `${cmd.slug}: ${cmd.outcome ?? cmd.description}`;

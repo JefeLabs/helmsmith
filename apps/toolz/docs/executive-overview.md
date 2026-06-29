@@ -45,7 +45,7 @@ missing, and registers everything for next time.
 The primary consumer is **other code**, not interactive humans.
 
 ```typescript
-import { ensureTool } from "@ecruz165/toolz";
+import { ensureTool } from "@jefelabs/toolz";
 
 const status = await ensureTool("jq", { minVersion: "1.7" });
 if (!status.installed) {
@@ -143,7 +143,7 @@ customize the install command for tools toolz already knows about
 ## Getting started
 
 ```bash
-npm install -g @ecruz165/toolz
+npm install -g @jefelabs/toolz
 toolz                                # banner + common commands
 toolz check git                      # is git installed?
 toolz install jq                     # install via auto-selected manager
@@ -152,7 +152,7 @@ toolz install jq                     # install via auto-selected manager
 For programmatic use:
 
 ```typescript
-import { ensureTool } from "@ecruz165/toolz";
+import { ensureTool } from "@jefelabs/toolz";
 const status = await ensureTool("git", { minVersion: "2.40.0" });
 ```
 
@@ -163,7 +163,7 @@ See [getting-started.md](getting-started.md) for the full setup.
 Teams adopting toolz report:
 
 - **README sections for "installation prerequisites" shrink from
-  pages to one line**: `npx @ecruz165/toolz ensure git jq gh`.
+  pages to one line**: `npx @jefelabs/toolz ensure git jq gh`.
 - **CI setup simplifies** — instead of conditional `apt-get install`
   blocks per OS, one `npx toolz ensure …` works on Linux runners,
   macOS runners, and Windows runners (when winget is available).

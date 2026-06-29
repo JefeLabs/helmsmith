@@ -1,4 +1,4 @@
-# @ecruz165/edge-memory-server
+# @jefelabs/edge-memory-server
 
 UDS-fronted memory store for agentx workers. Daemon process that holds
 the local agent-memory state — scope-aware, GDPR-compliant, vector-
@@ -6,7 +6,7 @@ similarity-capable. Co-located with the harness on each developer
 workstation / ECS task; persists across process restarts when configured
 with the SQLite + sqlite-vec backend.
 
-> Architecture peer to `@ecruz165/edge-context-server` (Neo4j-backed
+> Architecture peer to `@jefelabs/edge-context-server` (Neo4j-backed
 > graph-RAG). Distinct engines, distinct processes, independent
 > lifecycles — never a shared instance.
 
@@ -116,7 +116,7 @@ import {
   startMemoryServer,
   InMemoryMemoryStore,
   SqliteVecMemoryStore,
-} from '@ecruz165/edge-memory-server';
+} from '@jefelabs/edge-memory-server';
 
 // Tests / dev
 const handle = await startMemoryServer({
@@ -141,7 +141,7 @@ await handle.stop();
 
 ## Client surface
 
-Operators + agents talk to this daemon via `@ecruz165/edge-memory-cli`,
+Operators + agents talk to this daemon via `@jefelabs/edge-memory-cli`,
 which ships as a peer package with a `bin: edge-memory` entry. See
 [`packages/edge-memory-cli/README.md`](../edge-memory-cli/README.md).
 
@@ -175,7 +175,7 @@ Tracked in PRD; not yet implemented:
 ## Tests
 
 ```sh
-pnpm --filter @ecruz165/edge-memory-server test
+pnpm --filter @jefelabs/edge-memory-server test
 ```
 
 49 tests cover:

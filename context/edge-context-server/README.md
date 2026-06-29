@@ -153,18 +153,18 @@ The PRD describes four intake modes (§ 4.1.5). v1 implements two; the rest are 
 
 ```bash
 # Unit tests (no external deps — uses stub backends)
-pnpm --filter @ecruz165/edge-context-server test
+pnpm --filter @jefelabs/edge-context-server test
 
 # Real-Neo4j integration tests
 docker compose up -d neo4j-edge embedder
 RUN_NEO4J_INTEGRATION=1 \
   NEO4J_TEST_PASSWORD=devpassword \
-  pnpm --filter @ecruz165/edge-context-server test
+  pnpm --filter @jefelabs/edge-context-server test
 ```
 
 ## SKILL files
 
-The agent-facing SKILL files ship **with the CLI** — `@ecruz165/edge-context-cli/skills/` — not with the server. The CLI is what agents invoke, so its manual travels with it, keeping the server + CLI usable independently of the AgentX harness. (The harness, when it provisions a workspace, installs the equivalent into `~/.harness/skills/` / `~/.claude/skills/`.)
+The agent-facing SKILL files ship **with the CLI** — `@jefelabs/edge-context-cli/skills/` — not with the server. The CLI is what agents invoke, so its manual travels with it, keeping the server + CLI usable independently of the AgentX harness. (The harness, when it provisions a workspace, installs the equivalent into `~/.harness/skills/` / `~/.claude/skills/`.)
 
 - `edge-context-cli/skills/graphrag.md` — default agent SKILL covering reads + ingestion.
 - `edge-context-cli/skills/graphrag-briefs.md` — task-shaped retrieval: the `--mode` presets (code/plan/impact/debug/analysis) + the brief templates the agent synthesizes from the hits. The mode router is deterministic (server-side); the brief synthesis is the agent's job.
@@ -172,7 +172,7 @@ The agent-facing SKILL files ship **with the CLI** — `@ecruz165/edge-context-c
 
 ## Related packages
 
-- `@ecruz165/edge-context-cli` — the agent + human CLI (`edge-context` binary)
-- `@ecruz165/context-loader-core` — ingest pipeline (tree-sitter + chunkers + embedder + Neo4jBackend)
-- `@ecruz165/context-loader-cli` (`agentx-load`) — operator CLI that bypasses the server, writing direct to Neo4j
-- `@ecruz165/edge-memory-server` — peer edge server (SQLite-vec, agent memory)
+- `@jefelabs/edge-context-cli` — the agent + human CLI (`edge-context` binary)
+- `@jefelabs/context-loader-core` — ingest pipeline (tree-sitter + chunkers + embedder + Neo4jBackend)
+- `@jefelabs/context-loader-cli` (`agentx-load`) — operator CLI that bypasses the server, writing direct to Neo4j
+- `@jefelabs/edge-memory-server` — peer edge server (SQLite-vec, agent memory)

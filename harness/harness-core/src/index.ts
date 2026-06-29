@@ -1,9 +1,9 @@
 /**
- * @ecruz165/harness-core — orchestration primitives for running pipelines.
+ * @jefelabs/harness-core — orchestration primitives for running pipelines.
  *
  * Cutting principle: only what an in-process consumer (CLI, tests, future
  * IDE extensions) needs to execute a pipeline lives here. Transport (UDS/HTTP),
- * worker spawning, and the coordinator agent stay in @ecruz165/harness-server.
+ * worker spawning, and the coordinator agent stay in @jefelabs/harness-server.
  */
 
 export {

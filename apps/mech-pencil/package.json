@@ -1,5 +1,5 @@
 {
-  "name": "@ecruz165/mech-pencil",
+  "name": "@jefelabs/mech-pencil",
   "version": "0.0.1",
   "description": "mech-pencil — generates Pencil .pen design systems and base mockups from framework adapters (HeroUI v3). Part of the agentx-toolbox monorepo.",
   "type": "module",
@@ -40,8 +40,8 @@
     "atomic-design"
   ],
   "dependencies": {
-    "@ecruz165/cli-kit": "workspace:*",
-    "@ecruz165/tui-view-components": "workspace:*",
+    "@jefelabs/cli-kit": "workspace:*",
+    "@jefelabs/tui-view-components": "workspace:*",
     "@opentui/core": "^0.2.2",
     "@opentui/react": "^0.2.2",
     "bun": "^1.3.13",

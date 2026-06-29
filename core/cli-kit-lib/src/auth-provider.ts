@@ -3,7 +3,7 @@
  * their auth library into commands that need a token.
  *
  * Why pluggable: cli-kit is consumed by toolbox apps (which use
- * `@ecruz165/agent-auth`) AND by platform CLIs (which may use
+ * `@jefelabs/agent-auth`) AND by platform CLIs (which may use
  * different auth flows). Hardcoding agent-auth would force every
  * consumer onto it.
  *
