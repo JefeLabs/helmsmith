@@ -266,18 +266,18 @@ describe('getISOWeek', () => {
   });
 
   it('returns correct week at year boundary', () => {
-    // 2025-12-29 is a Monday → W52 of 2025
-    expect(getISOWeek('2025-12-29T00:00:00Z')).toBe('2025-W52');
+    // 2025-12-29 (Mon) is in the week whose Thursday is 2026-01-01 → W01 of 2026
+    expect(getISOWeek('2025-12-29T00:00:00Z')).toBe('2026-W01');
   });
 
   it('handles week 1 of new year', () => {
-    // 2026-01-05 is a Monday → W01 of 2026
-    expect(getISOWeek('2026-01-05T00:00:00Z')).toBe('2026-W01');
+    // 2026-01-02 (Fri) is in the week whose Thursday is 2026-01-01 → W01 of 2026
+    expect(getISOWeek('2026-01-02T00:00:00Z')).toBe('2026-W01');
   });
 
   it('handles mid-year dates', () => {
-    // 2026-06-15 is a Monday → W24
-    expect(getISOWeek('2026-06-15T00:00:00Z')).toBe('2026-W24');
+    // 2026-06-15 (Mon) → W25 of 2026
+    expect(getISOWeek('2026-06-15T00:00:00Z')).toBe('2026-W25');
   });
 });
 
