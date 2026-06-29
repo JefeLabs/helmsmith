@@ -17,6 +17,12 @@ AssertionError: expected [ +0, 143, 1 ] to include -1
   expect([0, 143, 1]).toContain(code);   // code was null → captured as -1
 ```
 
+A second manifestation of the same root cause: `harness/harness-server` →
+`loader-spawn.test.ts` → *"cancel() sends SIGTERM and surfaces a cancelled event"* —
+**flaky** (passed one full-suite run, failed the next). It spawns the loader and
+asserts the child's `cancelled` event arrives, which depends on bun delivering the
+signal mid-walk (`expected undefined to be defined`).
+
 ## Root cause (bun runtime limitation)
 
 The CLI ships on bun (`bin: src/bin.ts`, shebang `#!/usr/bin/env bun`), and the test
@@ -43,25 +49,39 @@ signal delivery. So a "yield more" CLI fix is not viable.
 
 ## Fix
 
-The test asserted a contract bun cannot deliver for a gap-free hot loop. Assert the
-**guaranteed** behavior instead, and verify the graceful path only when it ran:
+Two parts — the CLI test asserts the runtime-true contract, and the orchestrator is
+made to surface the event reliably (the real fix for consumers).
+
+### context-loader-cli (test asserts the achievable contract)
+
+The CLI alone can't deliver a graceful cancel under a bun hot loop, so the test
+asserts the **guaranteed** behavior and checks the graceful path only when it ran:
 
 - `spawnCli` now resolves `{ code, signal }` (was `code ?? -1`, which hid the signal).
-- The cancel test accepts **either** a graceful exit (`code ∈ {0,143,1}`) **or**
-  `signal === 'SIGTERM'` within the grace window — both mean "stopped promptly". The
+- The cancel test accepts a graceful exit (`code ∈ {0,143,1}`) **or** `signal ===
+  'SIGTERM'` within the grace window — both mean "stopped promptly". The
   `cancelled`-event assertions run only on the graceful branch.
 - `bin.ts` documents the bun signal-starvation caveat next to the handler.
 
-Verified (Node 22, bun 1.3.14): UDS test 3/3; `context-loader-cli` typecheck 0,
-tests 14/14; full workspace suite green.
+### harness-server (product fix — reliable `cancelled` event)
 
-## Known limitation / follow-up (product)
+`spawnLoaderJob().cancel()` previously just sent SIGTERM and **depended on the child
+loader to echo back a `cancelled` event** — exactly what bun can't guarantee. Now the
+parent (which *initiated* the cancel) **surfaces the `cancelled` event itself**, then
+sends SIGTERM. All events flow through a shared `dispatch()` that **de-dupes**
+`cancelled`, so if the child also emits one (when bun does run the handler) consumers
+still see exactly one. Applied to both direct and tmux spawn modes.
 
-Under bun, a worker in a **continuously-busy** walk (no embedder I/O to await) is
-signal-terminated before the handler runs, so **jobs-tui won't receive a `cancelled`
-event** in that case (the job still stops). With a real network embedder the loop has
-idle gaps and the graceful path runs. If the cancelled-on-cancel contract must hold
-even for hot loops, it needs a redesign independent of the starved in-loop handler
-(e.g. a watchdog/Worker thread, or polling a cancellation source the busy loop can't
-starve) — or upstream bun signal-delivery improvements. File a dedicated product
-issue if that guarantee is required.
+This closes the gap for the real consumer path: anything driving the loader through
+harness-server (jobs-tui, SSE, harness-cli) now gets a reliable `cancelled` signal on
+cancel, regardless of runtime — no longer dependent on the starved in-loop handler.
+
+Verified (Node 22, bun 1.3.14): context-loader-cli UDS test 3/3 + suite 14/14;
+harness-server loader-spawn 5/5 (was flaky) + typecheck 0; full workspace suite green.
+
+## Residual note
+
+Direct CLI invocation (no orchestrator) still can't emit a `cancelled` event when bun
+signal-terminates a continuously-busy worker — the job stops, but that event is
+best-effort at the CLI layer. The orchestrator path above is the one consumers use,
+and it is now reliable.
