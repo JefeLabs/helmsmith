@@ -69,6 +69,31 @@ describe('reduceStream', () => {
     });
   });
 
+  it('accumulates thinking-delta into a thinking ContentBlock', async () => {
+    const chunks: AgentChunk[] = [
+      { type: 'thinking-delta', text: 'Let me ' },
+      { type: 'thinking-delta', text: 'think...' },
+      { type: 'text-delta', text: 'Answer' },
+      { type: 'message-stop', finishReason: 'stop' },
+    ];
+    const result = await reduceStream(toAsyncIterable(chunks));
+    expect(result.content).toBe('Answer');
+    expect(result.contentBlocks).toHaveLength(2);
+    expect(result.contentBlocks![0]).toEqual({ type: 'thinking', thinking: 'Let me think...' });
+    expect(result.contentBlocks![1]).toEqual({ type: 'text', text: 'Answer' });
+  });
+
+  it('thinking block only (no text) produces only thinking ContentBlock', async () => {
+    const chunks: AgentChunk[] = [
+      { type: 'thinking-delta', text: 'deep thought' },
+      { type: 'message-stop', finishReason: 'stop' },
+    ];
+    const result = await reduceStream(toAsyncIterable(chunks));
+    expect(result.content).toBe('');
+    expect(result.contentBlocks).toHaveLength(1);
+    expect(result.contentBlocks![0]).toEqual({ type: 'thinking', thinking: 'deep thought' });
+  });
+
   it('omits contentBlocks when stream produces no content', async () => {
     const chunks: AgentChunk[] = [{ type: 'message-stop', finishReason: 'stop' }];
     const result = await reduceStream(toAsyncIterable(chunks));

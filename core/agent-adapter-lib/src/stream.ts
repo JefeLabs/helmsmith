@@ -64,6 +64,7 @@ export async function reduceStream(
 ): Promise<AgentInvocationResult> {
   const start = Date.now();
   let content = '';
+  let thinkingText = '';
   const contentBlocks: ContentBlock[] = [];
   let usage: TokenUsage | undefined;
   let finishReason: AgentInvocationResult['finishReason'];
@@ -77,7 +78,9 @@ export async function reduceStream(
         break;
 
       case 'thinking-delta':
-        // Tracked in the stream but not concatenated into text content.
+        // Accumulate thinking text — emitted as a 'thinking' ContentBlock
+        // so invoke/stream parity holds for extended-thinking responses.
+        thinkingText += chunk.text;
         break;
 
       case 'tool-call-start':
@@ -122,8 +125,13 @@ export async function reduceStream(
     }
   }
 
+  // Build contentBlocks in the canonical order: thinking → text → tool-use.
+  // unshift operations work from the front, so we apply them in reverse order.
   if (content) {
     contentBlocks.unshift({ type: 'text', text: content });
+  }
+  if (thinkingText) {
+    contentBlocks.unshift({ type: 'thinking', thinking: thinkingText });
   }
 
   return {
