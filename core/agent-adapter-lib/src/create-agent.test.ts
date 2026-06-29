@@ -128,9 +128,10 @@ describe('createAgent', () => {
       ).not.toThrow();
     });
 
-    it('succeeds when workdir is the repo root of the helmsmith monorepo', () => {
-      // The monorepo root is always a valid git working tree in this environment.
-      const repoRoot = '/Users/edwincruz/Development/Workspaces/jefelabs/helmsmith';
+    it('succeeds when workdir is the current working directory (a real git tree)', () => {
+      // process.cwd() is inside the monorepo's git working tree at test time —
+      // portable across machines/CI, unlike a hardcoded absolute path.
+      const repoRoot = process.cwd();
       registerAdapter(
         'claude-sdk',
         (_spec, deps) => makeAdapter('claude-sdk', deps.workdir),
