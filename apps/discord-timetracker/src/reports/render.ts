@@ -23,15 +23,29 @@ export function formatDuration(minutes: number): string {
   return `${h}h ${m}m`;
 }
 
+// Intl.DateTimeFormat construction is costly and formatTime runs ~2× per row across
+// the daily grid; cache one formatter per timezone (keyed by string, bounded by the
+// handful of tz values in play — a plain Map is fine, no WeakMap needed).
+const timeFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function timeFormatter(tz: string): Intl.DateTimeFormat {
+  let fmt = timeFormatters.get(tz);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat('en-GB', {
+      timeZone: tz,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    timeFormatters.set(tz, fmt);
+  }
+  return fmt;
+}
+
 /** ISO timestamp → "HH:MM" in the configured timezone, or "—". */
 export function formatTime(iso: string | undefined, tz: string): string {
   if (!iso) return '—';
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: tz,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(new Date(iso));
+  return timeFormatter(tz).format(new Date(iso));
 }
 
 function table(headers: string[], rows: string[][]): string {
