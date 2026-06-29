@@ -8,6 +8,7 @@ import { addDays } from '../domain/dayKey.js';
 import type { ISODate } from '../domain/types.js';
 import { formatDuration, formatTime } from '../reports/render.js';
 import type { UserDayRow, UserWeekRow } from '../reports/types.js';
+import { WEEKDAYS, weekGrid } from '../reports/weekGrid.js';
 
 export type Period = 'daily' | 'weekly';
 
@@ -42,25 +43,32 @@ export function dailyColumns(tz: string): TableColumn<UserDayRow>[] {
   ];
 }
 
+/** Per-user workweek grid: User · MON–FRI (active|idle) · WK Active · Avg/day. */
 export function weeklyColumns(): TableColumn<UserWeekRow>[] {
   return [
-    { key: 'userId', label: 'User', width: 20, render: (r) => r.displayName ?? r.userId },
-    { key: 'online', label: 'Online', width: 9, render: (r) => formatDuration(r.onlineMinutes) },
-    { key: 'voice', label: 'Voice', width: 9, render: (r) => formatDuration(r.voiceMinutes) },
-    { key: 'ci', label: 'CI', width: 4, align: 'right', render: (r) => String(r.ciSubmissions) },
+    { key: 'userId', label: 'User', width: 16, render: (r) => r.displayName ?? r.userId },
+    ...WEEKDAYS.map(
+      (wd, i): TableColumn<UserWeekRow> => ({
+        key: `wd${i}`,
+        label: wd,
+        width: 8,
+        render: (r) => weekGrid(r).cells[i] ?? '—',
+      }),
+    ),
     {
-      key: 'msgs',
-      label: 'Msgs',
-      width: 5,
-      align: 'right',
-      render: (r) => String(r.engagementMessages),
-    },
-    { key: 'days', label: 'Days', width: 5, render: (r) => `${r.daysActive}/7` },
-    {
-      key: 'trend',
-      label: 'Trend',
+      key: 'wk',
+      label: 'WK Active',
       width: 9,
-      render: (r) => sparkline(r.perDay.map((d) => d.onlineMinutes)),
+      render: (r) => formatDuration(weekGrid(r).wkActiveMinutes),
+    },
+    {
+      key: 'avg',
+      label: 'Avg/day',
+      width: 8,
+      render: (r) => {
+        const a = weekGrid(r).avgActiveMinutes;
+        return a > 0 ? formatDuration(a) : '—';
+      },
     },
   ];
 }
