@@ -24,13 +24,15 @@ Not affected: **skillzkit** re-declares agent-adapter's types locally (no import
 Verified (Node 22): both CLIs launch; full `pnpm -r typecheck` 0; tests pritty
 118/118, taskmaster 1199/1199.
 
-### Out of scope (separate, optional) — note for later
+### Correction: discord-timetracker DynamoDB backend is fine (no action)
 
-`discord-timetracker` bundles an optional **DynamoDB** backend importing
-`@aws-sdk/client-dynamodb` + `@aws-sdk/lib-dynamodb` without declaring them. It's
-lazy (default backend is sqlite via `bun:sqlite`; `--help` works), so it only affects
-users who select the dynamo backend — worth declaring as `optionalDependencies` if
-that backend is supported, but it's not this bug.
+An earlier draft flagged `discord-timetracker` for importing `@aws-sdk/*` without
+declaring it. **False positive** — the systematic scan only checked `dependencies`
++ `devDependencies` and missed `optionalDependencies`. In reality
+`@aws-sdk/client-dynamodb` + `@aws-sdk/lib-dynamodb` are correctly declared in
+`optionalDependencies`, `StorageSchema` is a discriminated union over `sqlite` +
+`dynamodb`, and `storage/factory.ts` lazy-`import()`s each backend. The deps
+resolve and the dynamo backend works — nothing to do.
 
 ---
 
