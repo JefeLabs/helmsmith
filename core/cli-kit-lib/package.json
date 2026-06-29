@@ -3,13 +3,9 @@
   "version": "0.0.1",
   "description": "Shared CLI bootstrap for the AgentX ecosystem — commander + inquirer + pluggable auth. Runtime-agnostic (Node or Bun).",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./src/index.ts",
   "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
+    ".": "./src/index.ts"
   },
   "files": [
     "dist",
