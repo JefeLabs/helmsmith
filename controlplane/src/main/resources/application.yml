@@ -80,5 +80,5 @@ agentx:
 logging:
   level:
     root: INFO
-    com.jefelabs.agentx.controlplane: DEBUG
+    com.jefelabs.helmsmith.controlplane: DEBUG
     org.springframework.modulith: INFO
