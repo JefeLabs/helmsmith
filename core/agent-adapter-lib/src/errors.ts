@@ -193,6 +193,78 @@ export function classifyNetworkError(err: unknown, context?: string): NetworkErr
   return new NetworkError(`${ctxPrefix}network error: ${message}`, { cause: err });
 }
 
+// ---------------------------------------------------------------------------
+// Phase A additions — new surface errors (additive; existing classes unchanged)
+// ---------------------------------------------------------------------------
+
+/**
+ * The provided workdir is not inside a git working tree.
+ *
+ * Thrown by createAgent() when `git -C <workdir> rev-parse
+ * --is-inside-work-tree` returns a non-zero exit code.
+ *
+ * Remediation: run `git init` in the target directory, or pass a path that
+ * is already a valid git working tree (bare repos and non-git directories
+ * are not accepted).
+ */
+export class WorkdirNotARepoError extends AdapterError {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = 'WorkdirNotARepoError';
+  }
+}
+
+/**
+ * A required CLI binary could not be found on PATH or at the given path.
+ *
+ * Thrown by resolveBinary() in child-process.ts when the binary is absent.
+ *
+ * Remediation: install the tool (e.g. `npm i -g @anthropic-ai/claude-code`)
+ * or pass an explicit `binaryPath` in the spec to override PATH resolution.
+ */
+export class BinaryNotFoundError extends AdapterError {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = 'BinaryNotFoundError';
+  }
+}
+
+/**
+ * A required credential could not be resolved for the given provider.
+ *
+ * Thrown at createAgent() time (not mid-stream) when a CLI adapter that
+ * sandboxes $HOME/TMPDIR cannot reach the tool's own credential store and
+ * the CredentialBroker returned nothing usable.
+ *
+ * Remediation: authenticate with the underlying tool first (e.g. `claude
+ * /login`, `gh auth login`), then ensure the CredentialBroker is wired up
+ * to propagate the resolved token to the adapter via containerEnv.
+ */
+export class MissingCredentialError extends AdapterError {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = 'MissingCredentialError';
+  }
+}
+
+/**
+ * The requested spec type does not support a capability that the call
+ * requires.
+ *
+ * Thrown at createAgent() time (PRD §13 D3: fail fast at construction).
+ * Hosts that want graceful degradation should check agent.capabilities
+ * before constructing; the lib never silently drops user input.
+ *
+ * Remediation: choose an adapter type that supports the required capability,
+ * or remove the capability requirement from your invocation.
+ */
+export class CapabilityMismatchError extends AdapterError {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = 'CapabilityMismatchError';
+  }
+}
+
 function parseRetryAfter(value: string | null | undefined): number | undefined {
   if (!value) return undefined;
   const trimmed = value.trim();
