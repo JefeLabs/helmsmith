@@ -7,7 +7,7 @@ import {
   type InvocationSpec,
   RateLimitError,
 } from '@helmsmith/agent-adapter';
-import type { CredentialBroker, ResolvedBinding } from '@helmsmith/agent-auth';
+import type { CredentialBroker, Provider, ResolvedBinding } from '@helmsmith/agent-auth';
 import { describe, expect, it } from 'vitest';
 import type { ApprovalRequest } from './flow-graph.ts';
 import type { JobRecord } from './job.ts';
@@ -16,7 +16,7 @@ import { type AdapterFactory, type CompiledFlowGraph, runJob } from './orchestra
 
 const dummyBroker: CredentialBroker = {
   async getCredential(provider) {
-    return { provider, apiKey: 'test', source: 'env' };
+    return { provider: provider as Provider, apiKey: 'test', source: 'env' };
   },
 };
 
