@@ -13,6 +13,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it, mock, spyOn } from 'bun:test';
+import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -35,6 +36,14 @@ const TEST_REPOS = [
     group: 'SkoolScout',
   },
 ];
+
+// This is a LOCAL integration suite: it scans the author's real SkoolScout repos at
+// the hardcoded paths above, which exist only on that machine. Skip it when those
+// repos are absent (CI, other developers) rather than fail with empty-scan errors.
+// TODO(HELM-T10): make self-contained by generating temp git repos in beforeAll so
+// it provides CI value everywhere.
+const REPOS_PRESENT = TEST_REPOS.every((r) => existsSync(r.path));
+const describeIfRepos = REPOS_PRESENT ? describe : describe.skip;
 
 // ── SQLite isolation: redirect getDataDir() to temp directory ────────────────
 
@@ -115,7 +124,7 @@ async function loadReposRegistryFromTemp() {
 
 // ── Test Suite ───────────────────────────────────────────────────────────────
 
-describe('Functional: Full CLI Pipeline (Engine + SQLite)', () => {
+describeIfRepos('Functional: Full CLI Pipeline (Engine + SQLite)', () => {
   beforeAll(async () => {
     await setupTempTree();
   });
