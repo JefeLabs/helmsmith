@@ -64,6 +64,36 @@ export interface OpenCodeCliSpec extends BaseSpec {
   binaryPath?: string;
   env?: Record<string, string>;
   apiKey?: string;
+  /**
+   * Provider whose credential is injected as an env var (anthropic →
+   * ANTHROPIC_API_KEY, openai → OPENAI_API_KEY, google → GOOGLE_API_KEY).
+   * Defaults to the `<provider>/` prefix of `model`. Ignored in local-endpoint
+   * mode (`endpoint` set).
+   */
+  provider?: string;
+  /**
+   * HTTP endpoint of an OpenAI-compatible inference server. When set, the
+   * adapter SKIPS broker credential lookup and writes a custom provider into a
+   * temp opencode.json pointing at this baseURL (self-hosted models). Ported
+   * from the old flat adapter's local-endpoint mode.
+   */
+  endpoint?: string;
+  /** Logical provider id for the local `endpoint`. Defaults to `'local'`. */
+  endpointProviderId?: string;
+  /** Static API key for the local `endpoint` (servers usually ignore it). */
+  staticApiKey?: string;
+  /**
+   * URL of a long-running `opencode serve` instance. When set, the adapter
+   * runs `opencode run --attach <serverUrl> ...` so a warm server is shared
+   * across invocations. Ported from the old flat adapter's serverUrl mode.
+   */
+  serverUrl?: string;
+  /**
+   * Auto-approve built-in tool permissions (`--dangerously-skip-permissions`)
+   * so the agent runs tools autonomously in headless mode. Off by default; the
+   * adapter sandboxes $HOME/$TMPDIR + cwd to the workdir, bounding blast radius.
+   */
+  dangerouslySkipPermissions?: boolean;
 }
 
 /** GitHub Copilot Chat HTTP API (OpenAI-compatible). */
