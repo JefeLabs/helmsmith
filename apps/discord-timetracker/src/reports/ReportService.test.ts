@@ -101,6 +101,33 @@ describe('ReportService', () => {
     expect(u1?.perDay.find((d) => d.date === '2026-06-09')?.onlineMinutes).toBe(0);
   });
 
+  it('weekly: per-day active|idle and summed active (span − idle)', async () => {
+    // Mon 06-08: present 09:00–10:00 (span 60m), 6 idle ticks (30m) → active 30m
+    await seedDay(storage, U1, '2026-06-08', {
+      online: 6,
+      idle: 6,
+      start: '2026-06-08T09:00:00Z',
+      end: '2026-06-08T10:00:00Z',
+    });
+    // Wed 06-10: present 09:00–11:00 (span 120m), no idle → active 120m
+    await seedDay(storage, U1, '2026-06-10', {
+      online: 24,
+      start: '2026-06-10T09:00:00Z',
+      end: '2026-06-10T11:00:00Z',
+    });
+    const s = await reports.weekly('2026-06-10');
+    const u1 = s.users.find((u) => u.userId === U1);
+    expect(u1?.activeMinutes).toBe(150); // 30 + 120
+    expect(u1?.perDay.find((d) => d.date === '2026-06-08')).toMatchObject({
+      activeMinutes: 30,
+      idleMinutes: 30,
+    });
+    expect(u1?.perDay.find((d) => d.date === '2026-06-10')).toMatchObject({
+      activeMinutes: 120,
+      idleMinutes: 0,
+    });
+  });
+
   it('daily: restricts to trackedUserIds when the allowlist is set', async () => {
     await seedDay(storage, U1, '2026-06-10', { online: 6, start: '2026-06-10T09:00:00Z' });
     await seedDay(storage, U2, '2026-06-10', { online: 6, start: '2026-06-10T09:00:00Z' });

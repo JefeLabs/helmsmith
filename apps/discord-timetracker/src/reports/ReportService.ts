@@ -34,14 +34,14 @@ export class ReportService {
     return { period: 'daily', date, users };
   }
 
-  async weekly(anchor: ISODate): Promise<WeeklySummary> {
+  async weekly(anchor: ISODate, now: Date = new Date()): Promise<WeeklySummary> {
     const { from, to } = weekWindow(anchor, this.weekStartsOn);
     const [rows, names] = await Promise.all([
       this.storage.listRange(from, to),
       this.storage.getUserNames(),
     ]);
     const tracked = rows.filter((a) => isTracked(a.userId, this.trackedUserIds));
-    const summary = aggregateWeekly(from, to, tracked);
+    const summary = aggregateWeekly(from, to, tracked, now);
     for (const u of summary.users) u.displayName = names[u.userId];
     return summary;
   }
@@ -58,6 +58,11 @@ function spanMinutesOf(a: DailyActivity, now: Date): number {
   const endIso = a.endOfDay?.at ?? a.presence.lastOnlineAt ?? now.toISOString();
   const ms = Date.parse(endIso) - Date.parse(startIso);
   return ms > 0 ? Math.round(ms / 60_000) : 0;
+}
+
+/** span − idle, floored at 0 — working time, lenient on Discord disconnects. */
+function activeMinutesOf(a: DailyActivity, now: Date): number {
+  return Math.max(0, spanMinutesOf(a, now) - toMinutes(a.presence.idle));
 }
 
 function toUserDayRow(a: DailyActivity, now: Date): UserDayRow {
@@ -80,10 +85,12 @@ function toUserDayRow(a: DailyActivity, now: Date): UserDayRow {
 const byActiveDesc = <T extends { activeMinutes: number; userId: string }>(a: T, b: T) =>
   b.activeMinutes - a.activeMinutes || a.userId.localeCompare(b.userId);
 
-const byOnlineDesc = <T extends { onlineMinutes: number; userId: string }>(a: T, b: T) =>
-  b.onlineMinutes - a.onlineMinutes || a.userId.localeCompare(b.userId);
-
-function aggregateWeekly(from: ISODate, to: ISODate, rows: DailyActivity[]): WeeklySummary {
+function aggregateWeekly(
+  from: ISODate,
+  to: ISODate,
+  rows: DailyActivity[],
+  now: Date,
+): WeeklySummary {
   // Every day in the inclusive window, so perDay is dense (0-filled) for sparklines.
   const days: ISODate[] = [];
   for (let d = from; d <= to; d = addDays(d, 1)) days.push(d);
@@ -98,19 +105,26 @@ function aggregateWeekly(from: ISODate, to: ISODate, rows: DailyActivity[]): Wee
   const users: UserWeekRow[] = [...byUser.entries()].map(([userId, recs]) => {
     const byDate = new Map(recs.map((r) => [r.date, r]));
     const sum = (pick: (a: DailyActivity) => number) => recs.reduce((n, r) => n + pick(r), 0);
+    const perDay = days.map((date) => {
+      const r = byDate.get(date);
+      return {
+        date,
+        onlineMinutes: toMinutes(r?.presence.online ?? 0),
+        activeMinutes: r ? activeMinutesOf(r, now) : 0,
+        idleMinutes: toMinutes(r?.presence.idle ?? 0),
+      };
+    });
     return {
       userId,
       onlineMinutes: toMinutes(sum((r) => r.presence.online)),
+      activeMinutes: perDay.reduce((n, d) => n + d.activeMinutes, 0),
       voiceMinutes: toMinutes(sum((r) => r.engagementVoiceSamples)),
       ciSubmissions: sum((r) => r.ciSubmissions),
       engagementMessages: sum((r) => r.engagementMessages),
       daysActive: recs.length, // listRange yields one record per user/day
-      perDay: days.map((date) => ({
-        date,
-        onlineMinutes: toMinutes(byDate.get(date)?.presence.online ?? 0),
-      })),
+      perDay,
     };
   });
-  users.sort(byOnlineDesc);
+  users.sort(byActiveDesc);
   return { period: 'weekly', from, to, users };
 }

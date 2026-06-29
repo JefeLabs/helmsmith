@@ -32,11 +32,13 @@ export interface UserWeekRow {
   userId: UserId;
   displayName?: string;
   onlineMinutes: number; // summed across the window
+  activeMinutes: number; // summed span−idle across the window
   voiceMinutes: number;
   ciSubmissions: number;
   engagementMessages: number;
   daysActive: number; // days with any tracked record
-  perDay: { date: ISODate; onlineMinutes: number }[]; // for the TUI detail pane
+  /** Dense per-day series (0-filled) — drives the workweek grid + TUI sparkline. */
+  perDay: { date: ISODate; onlineMinutes: number; activeMinutes: number; idleMinutes: number }[];
 }
 
 export interface WeeklySummary {

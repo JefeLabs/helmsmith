@@ -63,18 +63,53 @@ export function renderDaily(s: DailySummary, tz: string): string {
   )}`;
 }
 
+/** Compact duration for grid cells: 150 → "2h30", 30 → "30m", 0 → "0". */
+function durShort(minutes: number): string {
+  if (minutes <= 0) return '0';
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h${m}`;
+}
+
+/** UTC weekday index of an ISO date (1=Mon … 7=Sun); a date's weekday is TZ-stable. */
+function isoWeekday(date: string): number {
+  const dow = new Date(`${date}T12:00:00Z`).getUTCDay(); // 0=Sun..6=Sat
+  return dow === 0 ? 7 : dow;
+}
+
+const WEEKDAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI'] as const;
+
+/**
+ * Per-user workweek grid: one `active|idle` cell per weekday (Mon–Fri), then the
+ * week's active total and the average active time per day actually worked. Rows are
+ * ordered by weekly active time (descending). Weekend activity, if any, is tracked
+ * but not shown here — this is a workweek view.
+ */
 export function renderWeekly(s: WeeklySummary, _tz: string): string {
   if (s.users.length === 0) return `Weekly summary — ${s.from} → ${s.to}\n(no activity recorded)`;
-  const rows = s.users.map((u) => [
-    firstName(u.displayName ?? u.userId),
-    formatDuration(u.onlineMinutes),
-    formatDuration(u.voiceMinutes),
-    String(u.ciSubmissions),
-    String(u.engagementMessages),
-    `${u.daysActive}/7`,
-  ]);
-  return `Weekly summary — ${s.from} → ${s.to}\n\n${table(
-    ['User', 'Online', 'Voice', 'CI', 'Msgs', 'Days'],
+  const rows = s.users.map((u) => {
+    // Index the dense per-day series by weekday so columns line up Mon→Fri
+    // regardless of the configured week start.
+    const byWeekday = new Map(u.perDay.map((d) => [isoWeekday(d.date), d]));
+    let wkActive = 0;
+    let activeDays = 0;
+    const cells = [1, 2, 3, 4, 5].map((wd) => {
+      const d = byWeekday.get(wd);
+      const active = d?.activeMinutes ?? 0;
+      const idle = d?.idleMinutes ?? 0;
+      if (active > 0) {
+        wkActive += active;
+        activeDays += 1;
+      }
+      return active === 0 && idle === 0 ? '—' : `${durShort(active)}|${durShort(idle)}`;
+    });
+    const avg = activeDays > 0 ? formatDuration(Math.round(wkActive / activeDays)) : '—';
+    return [firstName(u.displayName ?? u.userId), ...cells, formatDuration(wkActive), avg];
+  });
+  return `Weekly summary (workweek · active|idle) — ${s.from} → ${s.to}\n\n${table(
+    ['User', ...WEEKDAYS, 'WK Active', 'Avg/day'],
     rows,
   )}`;
 }
