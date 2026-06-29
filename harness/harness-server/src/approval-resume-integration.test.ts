@@ -20,7 +20,7 @@ import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AdapterEventBus, type AgentAdapter, type InvocationSpec } from '@helmsmith/agent-adapter';
-import type { CredentialBroker } from '@helmsmith/agent-auth';
+import type { CredentialBroker, Provider } from '@helmsmith/agent-auth';
 import type { Edge, FlowCatalog, FlowDef, TaskStep } from '@helmsmith/harness-core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { startHarnessServer } from './index.ts';
@@ -29,7 +29,7 @@ const tmpSocket = () => join(tmpdir(), `ax-${randomUUID().slice(0, 8)}.sock`);
 
 const dummyBroker: CredentialBroker = {
   async getCredential(provider) {
-    return { provider, apiKey: 'test', source: 'env' };
+    return { provider: provider as Provider, apiKey: 'test', source: 'env' };
   },
 };
 

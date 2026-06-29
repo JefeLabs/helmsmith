@@ -21,7 +21,7 @@ import { spawn } from 'node:child_process';
 import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { BindingResolver, CredentialBroker, ResolvedBinding } from '@helmsmith/agent-auth';
+import type { BindingResolver, CredentialBroker, Provider, ResolvedBinding } from '@helmsmith/agent-auth';
 import { type Envelope, JobBus, type JobRecord } from '@helmsmith/harness-core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildJobSpec, runJobInContainer } from './run-job-in-container.ts';
@@ -41,7 +41,7 @@ async function tmpDir(prefix: string): Promise<string> {
 
 const dummyBroker: CredentialBroker = {
   async getCredential(provider) {
-    return { provider, apiKey: 'stub', source: 'host-file' };
+    return { provider: provider as Provider, apiKey: 'stub', source: 'host-file' };
   },
 };
 
