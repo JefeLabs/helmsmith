@@ -537,7 +537,11 @@ async function streamGitLog(
  */
 export function getISOWeek(dateStr: string): string {
   const d = new Date(dateStr);
-  const utc = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  // Use UTC getters so the ISO week is computed from the instant's UTC calendar
+  // date — TZ-independent. Mixing local getters here shifted dates by a day in
+  // negative-offset zones (e.g. a `…T00:00:00Z` commit rolled back to the prior
+  // day), making results differ between a dev machine and CI (UTC).
+  const utc = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
   const dayOfWeek = utc.getUTCDay() || 7; // Make Sunday = 7
   utc.setUTCDate(utc.getUTCDate() + 4 - dayOfWeek); // Set to nearest Thursday
 
