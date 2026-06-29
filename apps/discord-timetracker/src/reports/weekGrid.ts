@@ -35,8 +35,22 @@ export interface WeekGrid {
   avgActiveMinutes: number;
 }
 
-/** Fold a UserWeekRow's dense per-day series into the Mon–Fri grid. */
+// Memoize on row identity: the TUI's weeklyColumns calls weekGrid() once per column
+// (~7×) for the same UserWeekRow object each render. A WeakMap caches the fold without
+// pinning rows in memory — entries are collected once the row is unreferenced. Safe
+// because a UserWeekRow's perDay series is never mutated after aggregation.
+const gridCache = new WeakMap<UserWeekRow, WeekGrid>();
+
+/** Fold a UserWeekRow's dense per-day series into the Mon–Fri grid (memoized per row). */
 export function weekGrid(u: UserWeekRow): WeekGrid {
+  const cached = gridCache.get(u);
+  if (cached) return cached;
+  const grid = computeWeekGrid(u);
+  gridCache.set(u, grid);
+  return grid;
+}
+
+function computeWeekGrid(u: UserWeekRow): WeekGrid {
   const byWeekday = new Map(u.perDay.map((d) => [isoWeekday(d.date), d]));
   let wkActiveMinutes = 0;
   let activeDays = 0;
