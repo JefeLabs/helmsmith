@@ -1,5 +1,5 @@
 {
-  "name": "@ecruz165/edge-context-server",
+  "name": "@jefelabs/edge-context-server",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@ecruz165/context-loader-core": "workspace:*",
+    "@jefelabs/context-loader-core": "workspace:*",
     "neo4j-driver": "^6.0.1",
     "ws": "^8.18.0"
   },

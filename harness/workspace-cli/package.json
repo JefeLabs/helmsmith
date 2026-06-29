@@ -1,5 +1,5 @@
 {
-  "name": "@ecruz165/workspace",
+  "name": "@jefelabs/workspace",
   "version": "0.0.1",
   "description": "Procure a new agentx project workspace from the workspace-template — the front door for setting up agent flows on a new product.",
   "type": "module",
@@ -30,7 +30,7 @@
     "react": "^19.0.0"
   },
   "devDependencies": {
-    "@ecruz165/harness-server": "workspace:*",
+    "@jefelabs/harness-server": "workspace:*",
     "@types/node": "^22.7.0",
     "@types/react": "^19.0.0",
     "commander": "^12.1.0",

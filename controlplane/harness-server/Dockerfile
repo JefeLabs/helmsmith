@@ -1,4 +1,4 @@
-# harness-server — runs @ecruz165/harness-server with DooD access.
+# harness-server — runs @jefelabs/harness-server with DooD access.
 #
 # DooD ("Docker outside of Docker") = the container has access to the
 # host's docker daemon via a bind mount of /var/run/docker.sock, so it
@@ -42,7 +42,7 @@ COPY packages/agent-auth-lib/package.json       ./packages/agent-auth-lib/
 
 # Filter-install only what the launcher transitively needs.
 RUN pnpm install \
-    --filter @ecruz165/harness-server... \
+    --filter @jefelabs/harness-server... \
     --frozen-lockfile \
     --ignore-scripts
 

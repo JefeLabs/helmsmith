@@ -1,5 +1,5 @@
 {
-  "name": "@ecruz165/skillzkit-types",
+  "name": "@jefelabs/skillzkit-types",
   "version": "0.0.1",
   "private": true,
   "description": "TypeScript types for the skillzkit catalog. Source of truth for apps/skillzkit/schema/catalog.schema.json (generated via ts-json-schema-generator). Consumed by skillzkit itself and by agentx-platform's controlplane-ui.",

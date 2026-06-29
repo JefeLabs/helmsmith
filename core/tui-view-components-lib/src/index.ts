@@ -1,5 +1,5 @@
 /**
- * @ecruz165/tui-view-components — public API
+ * @jefelabs/tui-view-components — public API
  *
  * Components are organized via Brad Frost's Atomic Design
  * (https://atomicdesign.bradfrost.com/):
@@ -23,11 +23,11 @@
  *
  * Subpath imports for tree-shaking:
  *
- *   import { Box, Text } from '@ecruz165/tui-view-components/atoms';
- *   import { Panel } from '@ecruz165/tui-view-components/molecules';
- *   import { Table } from '@ecruz165/tui-view-components/organisms';
- *   import { AppShell } from '@ecruz165/tui-view-components/templates';
- *   import { runConnectView } from '@ecruz165/tui-view-components/pages';
+ *   import { Box, Text } from '@jefelabs/tui-view-components/atoms';
+ *   import { Panel } from '@jefelabs/tui-view-components/molecules';
+ *   import { Table } from '@jefelabs/tui-view-components/organisms';
+ *   import { AppShell } from '@jefelabs/tui-view-components/templates';
+ *   import { runConnectView } from '@jefelabs/tui-view-components/pages';
  */
 
 // Atomic layers

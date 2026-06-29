@@ -34,7 +34,7 @@ v0.0.1:
 
 | Capability | Status |
 |---|---|
-| GitHub Device Flow auth (via `@ecruz165/agent-auth`) | ✅ Shipped |
+| GitHub Device Flow auth (via `@jefelabs/agent-auth`) | ✅ Shipped |
 | Config (`.pritty.json` with Zod validation) | ✅ Shipped |
 | `pritty init` (starter config scaffolding) | ✅ Shipped |
 | File categorization (default + custom glob categories) | ✅ Shipped |
@@ -68,7 +68,7 @@ first and degrade gracefully.
 ```
 
 Switching providers is a config change, not a re-auth or a re-install.
-The shared `@ecruz165/agent-adapter` package handles the routing.
+The shared `@jefelabs/agent-adapter` package handles the routing.
 
 ### Human-in-the-loop, always
 
@@ -102,7 +102,7 @@ files).
 pritty's primitives are exported as a library:
 
 ```typescript
-import { categorize, loadConfig, login } from "@ecruz165/pritty";
+import { categorize, loadConfig, login } from "@jefelabs/pritty";
 ```
 
 Other AgentX tools (and your own scripts) can reuse the categorizer,
@@ -111,9 +111,9 @@ is core to the toolbox philosophy — every app is also a library.
 
 ### Built on shared agent infrastructure
 
-Auth comes from `@ecruz165/agent-auth` (the same OAuth/Device Flow
+Auth comes from `@jefelabs/agent-auth` (the same OAuth/Device Flow
 implementation other AgentX tools use). LLM provider routing comes
-from `@ecruz165/agent-adapter` (also shared). pritty doesn't reinvent
+from `@jefelabs/agent-adapter` (also shared). pritty doesn't reinvent
 either — it inherits improvements as the platform evolves.
 
 ## Who it's for
@@ -145,7 +145,7 @@ either — it inherits improvements as the platform evolves.
 The fastest path:
 
 ```bash
-npm install -g @ecruz165/pritty
+npm install -g @jefelabs/pritty
 pritty auth login                    # GitHub Device Flow
 pritty init                          # writes .pritty.json
 pritty categorize                    # try the file categorizer

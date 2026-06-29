@@ -31,7 +31,7 @@ import {
   type TraverseResult,
   type UploadEntry,
   type UploadIngestRequest,
-} from '@ecruz165/edge-context-server';
+} from '@jefelabs/edge-context-server';
 import { afterEach, describe, expect, it } from 'vitest';
 import { run } from './main.ts';
 

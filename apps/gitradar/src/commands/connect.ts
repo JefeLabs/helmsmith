@@ -10,7 +10,7 @@
  * file, but for now env-var-only matches gitradar's existing flow.
  */
 
-import { type Connection, runConnectView } from '@ecruz165/tui-view-components';
+import { type Connection, runConnectView } from '@jefelabs/tui-view-components';
 
 const githubPatConnection: Connection = {
   id: 'github-pat',

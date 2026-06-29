@@ -31,13 +31,13 @@ COPY packages/controlplane-ui/package.json ./packages/controlplane-ui/
 # Filter install: only the deps required for controlplane-ui transitively.
 # --frozen-lockfile fails fast if pnpm-lock.yaml is out of sync.
 RUN pnpm install \
-        --filter @ecruz165/controlplane-ui... \
+        --filter @jefelabs/controlplane-ui... \
         --frozen-lockfile \
         --ignore-scripts
 
 # Copy source + build vite bundle.
 COPY packages/controlplane-ui ./packages/controlplane-ui
-RUN pnpm --filter @ecruz165/controlplane-ui build
+RUN pnpm --filter @jefelabs/controlplane-ui build
 
 # ── Stage 2: build Spring fat jar with UI bundled ────────────────────
 FROM maven:3.9-eclipse-temurin-21 AS jar-builder

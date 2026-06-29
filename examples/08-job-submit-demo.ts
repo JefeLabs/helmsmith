@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
-import { startHarnessServer } from '@ecruz165/harness-server';
+import { startHarnessServer } from '@jefelabs/harness-server';
 
 /**
  * Job-submit demo: proves the registered-yaml + CLI submit chain.

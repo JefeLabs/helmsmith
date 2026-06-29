@@ -8,8 +8,8 @@
  * runTuiView's render callback requires) — @opentui's JSX yields the looser
  * `ReactNode`.
  */
-import { FocusManager } from '@ecruz165/tui-view-components/focus';
-import { runTuiView } from '@ecruz165/tui-view-components/pages';
+import { FocusManager } from '@jefelabs/tui-view-components/focus';
+import { runTuiView } from '@jefelabs/tui-view-components/pages';
 import { createElement } from 'react';
 import type { ReportService } from '../reports/ReportService.js';
 import type { Period } from './model.js';

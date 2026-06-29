@@ -54,8 +54,8 @@ Before running any pritty command, check:
 1. **Working in a git repo** — `.git/` exists. If not, suggest
    `git init` first.
 2. **pritty is installed** — `which pritty` succeeds. If not,
-   suggest `npm install -g @ecruz165/pritty` (or
-   `toolz install pritty` if the user has @ecruz165/toolz set up).
+   suggest `npm install -g @jefelabs/pritty` (or
+   `toolz install pritty` if the user has @jefelabs/toolz set up).
 3. **User has authenticated** — `pritty auth status` shows a
    provider. If not, suggest `pritty auth login` (Copilot) or
    setting an API key (`ANTHROPIC_API_KEY` / `OPENAI_API_KEY`).

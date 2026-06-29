@@ -1,6 +1,6 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { AuthStore, type Credential, callCopilot, FileBroker } from '@ecruz165/agent-auth';
+import { AuthStore, type Credential, callCopilot, FileBroker } from '@jefelabs/agent-auth';
 
 const authPath = join(homedir(), '.agentx', 'auth.json');
 const broker = new FileBroker(authPath);

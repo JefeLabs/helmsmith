@@ -14,7 +14,7 @@
  *   - reasoning field captures raw response for observability
  */
 
-import type { AgentDef, Catalog, Edge, FlowDef, TaskStep } from '@ecruz165/harness-core';
+import type { AgentDef, Catalog, Edge, FlowDef, TaskStep } from '@jefelabs/harness-core';
 import { SimpleChatModel } from '@langchain/core/language_models/chat_models';
 import type { BaseMessage } from '@langchain/core/messages';
 import { describe, expect, it } from 'vitest';

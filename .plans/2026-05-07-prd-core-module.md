@@ -3,7 +3,7 @@
 **Status:** Draft (2026-05-07)
 **Owner:** Edwin Cruz
 **Audience:** future implementer (human or agent) picking this up cold
-**Module package:** `com.jefelabs.agentx.controlplane.core`
+**Module package:** `com.jefelabs.helmsmith.controlplane.core`
 **Module type:** `@ApplicationModule(type = OPEN)` — public types reachable from every other module without explicit dependency declarations
 **Companion documents:**
 - `2026-05-07-prd-control-plane.md` — umbrella for the Spring Modulith app (this PRD owns the implementation requirements that umbrella references)
@@ -101,7 +101,7 @@ Core is *not* a domain module. It owns no business logic. It owns the things tha
 
 | ID | Requirement |
 |---|---|
-| F20 | A test class `com.jefelabs.agentx.controlplane.core.ModulithVerificationTest` runs `ApplicationModules.of(Application.class).verify()` on every CI run; module boundary violations fail the build. |
+| F20 | A test class `com.jefelabs.helmsmith.controlplane.core.ModulithVerificationTest` runs `ApplicationModules.of(Application.class).verify()` on every CI run; module boundary violations fail the build. |
 | F21 | Each domain module is `@ApplicationModule(type = CLOSED)` (default). `core` is `@ApplicationModule(type = OPEN)`. Allowed cross-module dependencies are declared via `package-info.java` in each module. |
 | F22 | The Modulith canvas (`ApplicationModules.toJson()`) is exported as a build artifact; the umbrella PRD's architecture diagram should match it. |
 | F23 | Documentation generation: `ApplicationModules.documenting()` produces module-level Asciidoc + PlantUML diagrams; published as part of the build artifacts directory. |
@@ -133,7 +133,7 @@ The following types are public from `core` and importable from every domain modu
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  com.jefelabs.agentx.controlplane                                         │
+│  com.jefelabs.helmsmith.controlplane                                         │
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐  │
 │  │  core/  @ApplicationModule(type = OPEN)                    │  │

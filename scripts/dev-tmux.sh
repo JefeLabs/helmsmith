@@ -63,17 +63,17 @@ tmux send-keys -t "${SESSION}:dash.0" "pnpm --silent harness tui" C-m
 # Pane 1 (right column, top) — harness-server
 tmux split-window -h -t "${SESSION}:dash.0" -c "$WS_ROOT"
 tmux send-keys -t "${SESSION}:dash.1" \
-  "HARNESS_SOCKET_PATH='$RUN_DIR/harness.sock' pnpm --silent --filter @ecruz165/harness-server exec tsx src/main.ts" C-m
+  "HARNESS_SOCKET_PATH='$RUN_DIR/harness.sock' pnpm --silent --filter @jefelabs/harness-server exec tsx src/main.ts" C-m
 
 # Pane 2 (right column, middle) — edge-memory-server
 tmux split-window -v -t "${SESSION}:dash.1" -c "$WS_ROOT"
 tmux send-keys -t "${SESSION}:dash.2" \
-  "MEMORY_SOCKET_PATH='$RUN_DIR/memory.sock' pnpm --silent --filter @ecruz165/edge-memory-server exec tsx src/main.ts" C-m
+  "MEMORY_SOCKET_PATH='$RUN_DIR/memory.sock' pnpm --silent --filter @jefelabs/edge-memory-server exec tsx src/main.ts" C-m
 
 # Pane 3 (right column, bottom) — edge-context-server
 tmux split-window -v -t "${SESSION}:dash.2" -c "$WS_ROOT"
 tmux send-keys -t "${SESSION}:dash.3" \
-  "CONTEXT_SOCKET_PATH='$RUN_DIR/context.sock' pnpm --silent --filter @ecruz165/edge-context-server exec tsx src/main.ts" C-m
+  "CONTEXT_SOCKET_PATH='$RUN_DIR/context.sock' pnpm --silent --filter @jefelabs/edge-context-server exec tsx src/main.ts" C-m
 
 # main-vertical: pane 0 takes the full left column, the others stack on the right.
 tmux select-layout -t "${SESSION}:dash" main-vertical

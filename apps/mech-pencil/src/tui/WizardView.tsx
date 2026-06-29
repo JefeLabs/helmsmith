@@ -6,7 +6,7 @@
  *                        <Input>, enum fields cycled with ←/→
  *   step 3  review        <Confirm> → emit the layered bundle
  *
- * Composed only from @ecruz165/tui-view-components (no raw openTUI
+ * Composed only from @jefelabs/tui-view-components (no raw openTUI
  * intrinsics). Hooks rule: every useKeybinding is called
  * unconditionally and gated via `enabled` (mirrors SelectList /
  * ConnectView in the lib).
@@ -16,11 +16,11 @@
  * (so chalk output lands in the normal terminal, not the TUI canvas).
  */
 
-import { Box, Heading, Input, Text } from '@ecruz165/tui-view-components/atoms';
-import { FocusManager } from '@ecruz165/tui-view-components/focus';
-import { useKeybinding } from '@ecruz165/tui-view-components/keyboard';
-import { KeybindingsBar } from '@ecruz165/tui-view-components/molecules';
-import { Confirm, SelectList } from '@ecruz165/tui-view-components/organisms';
+import { Box, Heading, Input, Text } from '@jefelabs/tui-view-components/atoms';
+import { FocusManager } from '@jefelabs/tui-view-components/focus';
+import { useKeybinding } from '@jefelabs/tui-view-components/keyboard';
+import { KeybindingsBar } from '@jefelabs/tui-view-components/molecules';
+import { Confirm, SelectList } from '@jefelabs/tui-view-components/organisms';
 import { useState } from 'react';
 import {
   cycle,

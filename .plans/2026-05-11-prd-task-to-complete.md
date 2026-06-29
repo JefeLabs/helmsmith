@@ -161,7 +161,7 @@
 
 - **D1. Build + push worker image** to ECR; apply the AWS-1 task definition revision.
 - **D2. Cloud smoke** — ECS `describe-tasks` form of the Gate 1 smoke test (local `docker ps` variant stays in Gate 1).
-- **D3. Publish `@ecruz165/workspace-cli` to npm** with `workspace setup` / `workspace start` — pulled from original 8a. `pnpm link` covers W5 during dev.
+- **D3. Publish `@jefelabs/workspace-cli` to npm** with `workspace setup` / `workspace start` — pulled from original 8a. `pnpm link` covers W5 during dev.
 - **D4. Fresh-corporate-laptop timing run**: `git clone` → `workspace setup` → `workspace start` → web UI → submitted job ≤ 10 min — pulled from original 8f. Verification on a clean machine.
 
 ---

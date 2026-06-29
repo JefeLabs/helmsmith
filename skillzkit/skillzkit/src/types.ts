@@ -1,6 +1,6 @@
 /**
  * Domain types for skillzkit's catalog. Re-exported from
- * `@ecruz165/skillzkit-types` (the cross-language source of truth that
+ * `@jefelabs/skillzkit-types` (the cross-language source of truth that
  * generates `apps/skillzkit/schema/catalog.schema.json` for Java
  * consumers on agentx-platform).
  *
@@ -15,7 +15,7 @@ export type {
   ItemKind,
   Skill,
   Workflow,
-} from '@ecruz165/skillzkit-types';
+} from '@jefelabs/skillzkit-types';
 
 /**
  * One suggested next-step for a completed slug. Returned by

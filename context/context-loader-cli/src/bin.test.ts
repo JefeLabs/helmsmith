@@ -6,7 +6,7 @@
  * since `agentx-load`'s shebang is `#!/usr/bin/env bun`.
  *
  * The end-to-end ingest path (chunker → backend → embedder) is covered
- * by `@ecruz165/context-loader-core`'s tests; this file is the CLI-shape
+ * by `@jefelabs/context-loader-core`'s tests; this file is the CLI-shape
  * contract: argv parsing, error messages, exit codes, output formats.
  */
 

@@ -25,7 +25,7 @@ import { existsSync } from 'node:fs';
 import { cp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validateRepoAccess } from '@ecruz165/harness-server';
+import { validateRepoAccess } from '@jefelabs/harness-server';
 import { generateCodeWorkspace } from './code-workspace.ts';
 import type { ProcureResult, ProcureSpec, RepoSpec } from './types.ts';
 import { generateWorkspaceYml } from './yml.ts';
@@ -164,7 +164,7 @@ export async function procure(spec: ProcureSpec): Promise<ProcureResult> {
 
     // ── 7. Optional: install skillzkit catalog items ────────────────────
     if (spec.skills && spec.skills.length > 0) {
-      const skillzkitBin = spec.skillzkitBin ?? 'npx -y @ecruz165/skillzkit';
+      const skillzkitBin = spec.skillzkitBin ?? 'npx -y @jefelabs/skillzkit';
       const installResult = await runSkillzkitInstall(skillzkitBin, spec.skills, projectDir);
       result.skillsInstalled = {
         requested: spec.skills,
@@ -188,7 +188,7 @@ export async function procure(spec: ProcureSpec): Promise<ProcureResult> {
  * Spawn skillzkit's install subcommand. The bin string is split on
  * whitespace so callers can pass either a single binary
  * (`agentx-skillzkit`) or a multi-word command
- * (`npx -y @ecruz165/skillzkit`, `tsx /path/to/cli.ts`). Captures combined
+ * (`npx -y @jefelabs/skillzkit`, `tsx /path/to/cli.ts`). Captures combined
  * output; truncates so ProcureResult.skillsInstalled.output stays small.
  */
 function runSkillzkitInstall(

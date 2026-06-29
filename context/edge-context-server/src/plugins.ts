@@ -23,8 +23,8 @@
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { EmbedderConfig } from '@ecruz165/context-loader-core';
-import { Neo4jBackend } from '@ecruz165/context-loader-core';
+import type { EmbedderConfig } from '@jefelabs/context-loader-core';
+import { Neo4jBackend } from '@jefelabs/context-loader-core';
 import neo4j, { type Driver } from 'neo4j-driver';
 
 export interface PluginRouteHandler {

@@ -42,7 +42,7 @@ import {
   mimeFromPath,
   parseGitDiffNameStatus,
   runGit,
-} from '@ecruz165/harness-core';
+} from '@jefelabs/harness-core';
 
 /** Cap any single file response. Tunable; current 50 MB matches what
  *  most browsers happily render. Larger files return 413. */

@@ -42,7 +42,7 @@ onto the same underlying code.
             │                                                         │
             │   Optional layer-3 reviewer:                            │
             │   ┌─────────────────────────────────────────────────┐   │
-            │   │ AgentAdapter (from @ecruz165/agent-adapter) →   │   │
+            │   │ AgentAdapter (from @jefelabs/agent-adapter) →   │   │
             │   │ Claude / OpenAI / Qwen (provider chosen by      │   │
             │   │ host's BindingResolver)                         │   │
             │   └─────────────────────────────────────────────────┘   │
@@ -142,14 +142,14 @@ Implementations:
 - **`MockReviewer`** — for tests. Returns no findings by default;
   configurable to return canned findings for failure-path coverage.
 - **`AgentAdapterReviewer`** — wraps an `AgentAdapter` from
-  `@ecruz165/agent-adapter`. Builds a system+user prompt, calls
+  `@jefelabs/agent-adapter`. Builds a system+user prompt, calls
   `adapter.invoke()`, parses JSON findings (tolerant of code-fenced
   output, embedded prose, malformed individual entries).
 
 The skillzkit API doesn't hold provider credentials directly. At
 startup, the host (controlplane Docker / Lambda runtime) constructs an
 `AgentAdapter` via `bindingToAdapter()` from the platform's
-`agent-adapter-lib`, which uses `@ecruz165/agent-auth`'s
+`agent-adapter-lib`, which uses `@jefelabs/agent-auth`'s
 `CredentialBroker` to fetch the configured provider's credentials.
 This means switching review providers (e.g., Claude → local Qwen) is a
 host-config change, not a skillzkit code change.

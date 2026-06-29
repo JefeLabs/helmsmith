@@ -75,11 +75,11 @@ who-contributed-what-when.
 When deployed in team mode, skillzkit integrates with the broader
 AgentX platform:
 
-- **Authentication** is handled by `@ecruz165/agent-auth` — the same
+- **Authentication** is handled by `@jefelabs/agent-auth` — the same
   credential broker the rest of the platform uses. skillzkit never
   manages user identity directly.
 - **Optional agent-driven contribution review** routes through
-  `@ecruz165/agent-adapter`. Quality, tag-fit, and safety checks are
+  `@jefelabs/agent-adapter`. Quality, tag-fit, and safety checks are
   performed by whichever LLM provider your controlplane is configured
   to use (Claude, OpenAI, local Qwen via Ollama). The skillzkit API
   doesn't hold provider keys directly — the platform's binding

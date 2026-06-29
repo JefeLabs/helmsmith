@@ -6,7 +6,7 @@ import {
   type Envelope,
   type HarnessServerHandle,
   startHarnessServer,
-} from '@ecruz165/harness-server';
+} from '@jefelabs/harness-server';
 import { afterEach, describe, expect, it } from 'vitest';
 import { connectSseStream } from './sse-client.ts';
 

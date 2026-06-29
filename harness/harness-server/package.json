@@ -1,5 +1,5 @@
 {
-  "name": "@ecruz165/harness-server",
+  "name": "@jefelabs/harness-server",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,10 +13,10 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@ecruz165/agent-adapter": "workspace:*",
-    "@ecruz165/agent-auth": "workspace:*",
-    "@ecruz165/harness-core": "workspace:*",
-    "@ecruz165/harness-pipeline": "workspace:*",
+    "@jefelabs/agent-adapter": "workspace:*",
+    "@jefelabs/agent-auth": "workspace:*",
+    "@jefelabs/harness-core": "workspace:*",
+    "@jefelabs/harness-pipeline": "workspace:*",
     "@langchain/core": "^1.1.44",
     "@langchain/langgraph": "^1.3.0",
     "yaml": "^2.6.0"

@@ -1,5 +1,5 @@
 {
-  "name": "@ecruz165/context-loader-core",
+  "name": "@jefelabs/context-loader-core",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,8 +13,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@ecruz165/agent-adapter": "workspace:*",
-    "@ecruz165/agent-auth": "workspace:*",
+    "@jefelabs/agent-adapter": "workspace:*",
+    "@jefelabs/agent-auth": "workspace:*",
     "@vscode/tree-sitter-wasm": "^0.3.1",
     "neo4j-driver": "^6.0.1",
     "web-tree-sitter": "^0.26.8"

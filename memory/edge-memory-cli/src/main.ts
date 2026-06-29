@@ -31,7 +31,7 @@ import type {
   MemoryForgetResult,
   MemoryQueryResult,
   MemoryScope,
-} from '@ecruz165/edge-memory-server';
+} from '@jefelabs/edge-memory-server';
 import { narrowestScope, readChain } from './precedence.ts';
 import { UdsRequestError, udsJson, udsRequest } from './uds-client.ts';
 

@@ -9,7 +9,7 @@
  * monorepo finds verb logic in a predictable place across every
  * app.
  */
-import { createCli } from '@ecruz165/cli-kit';
+import { createCli } from '@jefelabs/cli-kit';
 import chalk from 'chalk';
 import { prittyAuthProvider } from './auth-provider.js';
 import { runAuthLogin } from './commands/auth-login.js';

@@ -45,7 +45,7 @@ const audit: AuditLog = await pickAudit();
 const snapshots: SnapshotStore = await pickSnapshots();
 const idle: IdleThrottleOptions = pickIdleConfig();
 
-console.log(`Starting @ecruz165/edge-memory-server on ${socketPath}…`);
+console.log(`Starting @jefelabs/edge-memory-server on ${socketPath}…`);
 console.log(`  store:     ${store.constructor.name}`);
 console.log(`  audit:     ${audit.constructor.name}`);
 console.log(`  snapshots: ${snapshots.constructor.name}`);
@@ -81,7 +81,7 @@ async function pickStore(): Promise<MemoryStore> {
 
   // Lazy-import the embedder client to avoid pulling its deps when the
   // in-memory backend is in use.
-  const { createHttpEmbedderClient } = await import('@ecruz165/context-loader-core');
+  const { createHttpEmbedderClient } = await import('@jefelabs/context-loader-core');
   const embedder = createHttpEmbedderClient({
     config: { url: embedderUrl, model: embedderModel, dim: vectorDim },
   });

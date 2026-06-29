@@ -1,5 +1,5 @@
 {
-  "name": "@ecruz165/harness-core",
+  "name": "@jefelabs/harness-core",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,8 +11,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ecruz165/agent-adapter": "workspace:*",
-    "@ecruz165/agent-auth": "workspace:*",
+    "@jefelabs/agent-adapter": "workspace:*",
+    "@jefelabs/agent-auth": "workspace:*",
     "@langchain/core": "^1.1.44",
     "@langchain/langgraph": "^1.3.0"
   },

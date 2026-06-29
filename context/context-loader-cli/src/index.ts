@@ -1,5 +1,5 @@
 /**
- * @ecruz165/context-loader — public barrel (mostly empty).
+ * @jefelabs/context-loader — public barrel (mostly empty).
  *
  * The CLI package's primary surface is the `agentx-load` binary (see ./bin.ts).
  * This index file exists for consumers (e.g., harness-cli's workspace shim)
@@ -14,4 +14,4 @@ export type {
   IngestionEvent,
   SourceRef,
   SourceTypeId,
-} from '@ecruz165/context-loader-core';
+} from '@jefelabs/context-loader-core';

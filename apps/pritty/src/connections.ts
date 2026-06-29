@@ -2,12 +2,12 @@
  * Connection definitions for pritty's `connect` view.
  *
  * Pritty primarily uses GitHub Copilot for AI calls. This file
- * adapts pritty's auth.ts (which wraps `@ecruz165/agent-auth`'s
+ * adapts pritty's auth.ts (which wraps `@jefelabs/agent-auth`'s
  * AuthStore + loginGitHubCopilot) to the `Connection` contract
  * consumed by tui-view-components.
  */
 
-import type { Connection } from '@ecruz165/tui-view-components';
+import type { Connection } from '@jefelabs/tui-view-components';
 import { readAuth, login as runLogin, logout as runLogout } from './auth.js';
 
 export const githubCopilotConnection: Connection = {

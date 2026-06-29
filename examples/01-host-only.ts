@@ -1,7 +1,7 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { ClaudeSdkAdapter, FileEventSubscriber } from '@ecruz165/agent-adapter';
-import { FileBroker } from '@ecruz165/agent-auth';
+import { ClaudeSdkAdapter, FileEventSubscriber } from '@jefelabs/agent-adapter';
+import { FileBroker } from '@jefelabs/agent-auth';
 
 const authPath = join(homedir(), '.agentx', 'auth.json');
 const capturePath = join('.harness', 'captures', '01-host-only.jsonl');
