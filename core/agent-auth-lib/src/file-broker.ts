@@ -43,7 +43,7 @@ export class FileBroker implements CredentialBroker {
     this.fetchFn = options?.fetchFn ?? fetch;
   }
 
-  async getCredential(provider: string): Promise<Credential> {
+  async getCredential(provider: Provider): Promise<Credential> {
     await this.assertSecurePermissions();
     const raw = await readFile(this.path, 'utf8');
     const parsed = JSON.parse(raw) as AuthFile;
@@ -73,7 +73,7 @@ export class FileBroker implements CredentialBroker {
     }
 
     return {
-      provider: provider as Provider,
+      provider,
       apiKey: entry.apiKey,
       expiresAt: entry.expiresAt,
       tokenType: entry.tokenType,
