@@ -1,8 +1,41 @@
-# HELM-T6: bundled CLIs miss agent-adapter's third-party deps (phantom)
+# HELM-T6: bundled CLIs miss inlined-lib third-party deps (phantom)
 
-**Labels:** `bug` · `area:apps` · `area:agent-adapter` · `runtime`
-**Status:** Open
-**CI exclusion:** none (not exercised by current tests — surfaces at CLI runtime)
+**Labels:** `bug` · `area:apps` · `runtime`
+**Status:** ✅ RESOLVED
+**CI exclusion:** none
+
+## Resolution
+
+Fixed in branch `fix/helm-t6-agent-adapter-deps`. Scope was narrower than the report
+feared — only two apps reach undeclared externals from inlined workspace libs:
+
+- **pritty** (statically imports agent-adapter's adapters + the TUI stack): declared
+  `@anthropic-ai/sdk` + `@langchain/core` (agent-adapter's externals) and
+  `@opentui/core` + `@opentui/react` + `react` (tui-view-components' externals).
+  `node bin/pritty.mjs --help` now runs (was crashing on `@anthropic-ai/sdk`, then
+  `@opentui/react`).
+- **taskmaster**: declared `react` — a latent `@opentui/react` peer gap from HELM-T1
+  (which added `@opentui/*` but not its `react` peer). `import('react')` resolves now,
+  so the `connect` TUI no longer dies on missing react.
+
+Not affected: **skillzkit** re-declares agent-adapter's types locally (no import);
+**taskmaster** never imports agent-adapter's anthropic/langchain path.
+
+Verified (Node 22): both CLIs launch; full `pnpm -r typecheck` 0; tests pritty
+118/118, taskmaster 1199/1199.
+
+### Out of scope (separate, optional) — note for later
+
+`discord-timetracker` bundles an optional **DynamoDB** backend importing
+`@aws-sdk/client-dynamodb` + `@aws-sdk/lib-dynamodb` without declaring them. It's
+lazy (default backend is sqlite via `bun:sqlite`; `--help` works), so it only affects
+users who select the dynamo backend — worth declaring as `optionalDependencies` if
+that backend is supported, but it's not this bug.
+
+---
+
+_Original report below._
+
 **Repro:** `bun apps/pritty/bin/pritty.mjs --help` →
 `error: Cannot find module '@anthropic-ai/sdk' from .../pritty/dist/cli.js`
 
