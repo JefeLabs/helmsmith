@@ -5,10 +5,12 @@ monorepo merge. They were invisible because `agentx-toolbox` shipped without CI.
 
 CI (`.github/workflows/ci.yml`) is **exclusion-free** — every package typechecks and
 every test suite runs. **All filed issues are resolved** (see below). CI on `main` is
-green as of **HELM-T8**, which fixed a typecheck failure that had been red the whole
-time but unverified — the default `gh` account 404s on this private repo; check runs
-with the `ecruz165` account. **If a future issue needs a CI `--filter='!…'` exclusion,
-removing that exclusion is part of closing it.**
+**green and verified** (check runs with the `ecruz165` account — the default `gh`
+account 404s on this private repo). It had been red the whole time *and* unverified;
+**HELM-T8/T9/T10** cleared a cascade of pre-existing failures — dist-typed exports, a
+timezone-dependent test, and a machine-coupled integration suite — each of which only
+surfaced once the prior fix let CI reach the next stage. **If a future issue needs a
+CI `--filter='!…'` exclusion, removing that exclusion is part of closing it.**
 
 These are flat-file issues (the authoring session's `gh` CLI was a different
 account with no access to `JefeLabs/helmsmith`). Each file maps 1:1 to a GitHub
