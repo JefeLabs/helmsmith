@@ -4,8 +4,7 @@ Markdown issues for the pre-existing toolbox failures surfaced (not caused) by t
 monorepo merge. They were invisible because `agentx-toolbox` shipped without CI.
 
 CI is currently **exclusion-free** — every package typechecks and every test suite
-runs in `.github/workflows/ci.yml`. The remaining open issue (HELM-T6) is a
-runtime phantom-dep bug that current tests don't exercise, so it doesn't block CI.
+runs in `.github/workflows/ci.yml`. **All filed issues are resolved** (see below).
 **If a future issue needs a CI `--filter='!…'` exclusion, removing that exclusion
 is part of closing it.**
 
@@ -23,9 +22,7 @@ the full record (and git history follows the move).
 
 ### Open
 
-| ID | Package | Kind | Status |
-|----|---------|------|--------|
-| [HELM-T6](./HELM-T6-agent-adapter-phantom-deps.md) | apps / agent-adapter | phantom deps (runtime) | open — not CI-blocking |
+_None — all filed issues resolved. 🎉_
 
 ### Resolved
 
@@ -36,6 +33,7 @@ the full record (and git history follows the move).
 | [HELM-T3](./resolved/HELM-T3-mech-pencil.md) | mech-pencil | typecheck | ✅ fixed; last typecheck exclusion removed |
 | [HELM-T4](./resolved/HELM-T4-gitradar.md) | gitradar | flaky test | ✅ fixed (deterministic fake-timers); last CI exclusion removed |
 | [HELM-T5](./resolved/HELM-T5-opentui-react-esm.md) | @opentui/react (tui) | upstream / Bun | ✅ apps self-contained under Bun (vendored-bun bin bootstrap) |
+| [HELM-T6](./resolved/HELM-T6-agent-adapter-phantom-deps.md) | pritty / taskmaster | phantom deps | ✅ declared inlined-lib externals (anthropic/langchain/opentui/react) |
 
 ## Fixed during the merge (no issue needed)
 
