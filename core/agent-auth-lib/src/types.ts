@@ -28,6 +28,6 @@ export interface Credential {
 }
 
 export interface CredentialBroker {
-  getCredential(provider: Provider): Promise<Credential>;
-  refresh?(provider: Provider): Promise<Credential>;
+  getCredential(provider: string): Promise<Credential>;
+  refresh?(provider: string): Promise<Credential>;
 }

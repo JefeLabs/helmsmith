@@ -12,6 +12,7 @@ export {
   type ChatMessage,
   callCopilot,
   fetchGitHubUsername,
+  getCopilotCredential,
   getCopilotSessionToken,
 } from './copilot-api.ts';
 export { FileBroker } from './file-broker.ts';

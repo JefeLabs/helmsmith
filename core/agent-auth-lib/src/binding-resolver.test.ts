@@ -221,7 +221,7 @@ describe('DefaultBindingResolver', () => {
   });
 
   it('walks the broker once per cloud entry until one succeeds', async () => {
-    const calls: Provider[] = [];
+    const calls: string[] = [];
     const broker: CredentialBroker = {
       getCredential: async (p) => {
         calls.push(p);

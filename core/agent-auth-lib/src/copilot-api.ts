@@ -47,10 +47,14 @@ interface CopilotTokenResponse {
 /**
  * Exchange the stored GitHub OAuth token for a short-lived Copilot session
  * token. Caches in the AuthStore with proactive 5-minute refresh.
+ *
+ * @param fetchFn - Injectable fetch implementation (defaults to global fetch).
+ *   Pass a vi.fn() stub in tests to avoid real network calls.
  */
 export async function getCopilotSessionToken(
   store: AuthStore,
   githubToken: string,
+  fetchFn: typeof fetch = fetch,
 ): Promise<string> {
   const file = await store.read();
   const existing = file.providers['github-copilot'];
@@ -59,7 +63,7 @@ export async function getCopilotSessionToken(
     if (remaining > TOKEN_REFRESH_THRESHOLD_S) return existing.copilotToken;
   }
 
-  const res = await fetch(COPILOT_TOKEN_URL, {
+  const res = await fetchFn(COPILOT_TOKEN_URL, {
     headers: { Authorization: `token ${githubToken}`, Accept: 'application/json' },
   });
   if (!res.ok) {
@@ -80,13 +84,41 @@ export async function getCopilotSessionToken(
 }
 
 /**
+ * Broker entry point: exchange the GitHub OAuth token for a Copilot session
+ * token and return it as a `{ apiKey, expiresAt }` credential shape.
+ *
+ * This is what FileBroker calls for `github-copilot` so that downstream
+ * consumers receive the already-exchanged session token, not the raw GitHub
+ * OAuth token.
+ */
+export async function getCopilotCredential(
+  store: AuthStore,
+  githubToken: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<{ apiKey: string; expiresAt?: string }> {
+  await getCopilotSessionToken(store, githubToken, fetchFn);
+  const file = await store.read();
+  const entry = file.providers['github-copilot'];
+  return {
+    apiKey: entry?.copilotToken ?? '',
+    expiresAt: entry?.copilotTokenExpiresAt
+      ? new Date(entry.copilotTokenExpiresAt * 1000).toISOString()
+      : undefined,
+  };
+}
+
+/**
  * Call Copilot's chat completions API. Handles session-token caching,
  * 401 retry (revocation / clock skew), and surfaces server errors with body.
+ *
+ * @param fetchFn - Injectable fetch implementation (defaults to global fetch).
+ *   Pass a vi.fn() stub in tests to avoid real network calls.
  */
 export async function callCopilot(
   store: AuthStore,
   messages: ChatMessage[],
   model: string = 'gpt-4o',
+  fetchFn: typeof fetch = fetch,
 ): Promise<ChatCompletionResponse> {
   const file = await store.read();
   const cred = file.providers['github-copilot'];
@@ -96,8 +128,8 @@ export async function callCopilot(
     );
   }
 
-  let token = await getCopilotSessionToken(store, cred.apiKey);
-  let res = await postChat(token, messages, model);
+  let token = await getCopilotSessionToken(store, cred.apiKey, fetchFn);
+  let res = await postChat(token, messages, model, fetchFn);
 
   if (res.status === 401) {
     const fresh = await store.read();
@@ -107,8 +139,8 @@ export async function callCopilot(
       entry.copilotTokenExpiresAt = undefined;
       await store.write(fresh);
     }
-    token = await getCopilotSessionToken(store, cred.apiKey);
-    res = await postChat(token, messages, model);
+    token = await getCopilotSessionToken(store, cred.apiKey, fetchFn);
+    res = await postChat(token, messages, model, fetchFn);
   }
 
   if (!res.ok) {
@@ -118,8 +150,13 @@ export async function callCopilot(
   return (await res.json()) as ChatCompletionResponse;
 }
 
-async function postChat(token: string, messages: ChatMessage[], model: string): Promise<Response> {
-  return fetch(COPILOT_CHAT_URL, {
+async function postChat(
+  token: string,
+  messages: ChatMessage[],
+  model: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<Response> {
+  return fetchFn(COPILOT_CHAT_URL, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
