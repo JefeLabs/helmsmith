@@ -1,5 +1,9 @@
 # .issues
 
+> **Status: ✅ CLOSED (2026-06-29).** The entire backlog — **HELM-T1 … T10** — is
+> resolved, and CI on `main` is **green and verified**. This directory is now a
+> historical record; the resolution convention below applies if new issues are filed.
+
 Markdown issues for the pre-existing toolbox failures surfaced (not caused) by the
 monorepo merge. They were invisible because `agentx-toolbox` shipped without CI.
 
@@ -26,9 +30,9 @@ the full record (and git history follows the move).
 
 ### Open
 
-_None — all filed issues resolved. 🎉_
+_None — backlog closed; all filed issues resolved. 🎉_
 
-### Resolved
+### Resolved (10 of 10)
 
 | ID | Package | Kind | Resolution |
 |----|---------|------|------------|
