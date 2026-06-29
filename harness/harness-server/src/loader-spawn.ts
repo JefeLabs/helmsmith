@@ -168,6 +168,26 @@ export async function spawnLoaderJob(spec: LoaderSpawnSpec): Promise<LoaderJobHa
   // closed immediately.
   let writerConnected = false;
 
+  // Fan an event out to subscribers + the replay buffer. De-dupes `cancelled`:
+  // cancel() surfaces one from the parent immediately, and the child loader may
+  // also emit its own (when bun manages to run its handler) — consumers should
+  // see exactly one.
+  let cancelledSurfaced = false;
+  const dispatch = (event: LoaderEvent): void => {
+    if (event.kind === 'cancelled') {
+      if (cancelledSurfaced) return;
+      cancelledSurfaced = true;
+    }
+    events.push(event);
+    for (const handler of subscribers) {
+      try {
+        handler(event);
+      } catch {
+        // Isolated — one bad consumer can't break delivery to others.
+      }
+    }
+  };
+
   const server: Server = createServer((sock) => {
     if (writerConnected) {
       sock.destroy();
@@ -185,16 +205,7 @@ export async function spawnLoaderJob(spec: LoaderSpawnSpec): Promise<LoaderJobHa
         buf = buf.slice(idx + 1);
         if (!line) continue;
         try {
-          const event = JSON.parse(line) as LoaderEvent;
-          events.push(event);
-          for (const handler of subscribers) {
-            try {
-              handler(event);
-            } catch {
-              // Isolated — one bad consumer can't break delivery to others
-              // or block the producer.
-            }
-          }
+          dispatch(JSON.parse(line) as LoaderEvent);
         } catch (err) {
           lastError = err as Error;
         }
@@ -230,6 +241,7 @@ export async function spawnLoaderJob(spec: LoaderSpawnSpec): Promise<LoaderJobHa
       server,
       subscribers,
       events,
+      dispatch,
       lastError: () => lastError,
     });
   }
@@ -292,6 +304,11 @@ export async function spawnLoaderJob(spec: LoaderSpawnSpec): Promise<LoaderJobHa
     },
     whenComplete,
     cancel() {
+      // harness-server initiated the cancel, so surface a `cancelled` event from
+      // the parent immediately — the contract holds even when the child loader
+      // can't emit its own (bun starves the in-loop SIGTERM handler during a hot
+      // walk; see HELM-T7). De-duped against the child's own by dispatch().
+      dispatch({ jobId: spec.jobId, ts: Date.now(), kind: 'cancelled', reason: 'sigterm' });
       child.kill('SIGTERM');
     },
   };
@@ -312,9 +329,10 @@ function setupTmuxLoader(deps: {
   server: Server;
   subscribers: Set<(event: LoaderEvent) => void>;
   events: LoaderEvent[];
+  dispatch: (event: LoaderEvent) => void;
   lastError: () => Error | null;
 }): LoaderJobHandle {
-  const { spec, cmd, args, env, udsPath, server, subscribers, events, lastError } = deps;
+  const { spec, cmd, args, env, udsPath, server, subscribers, events, dispatch, lastError } = deps;
   const pane = spec.tmuxPane!;
   const idleTimeoutMs = spec.tmuxIdleTimeoutMs ?? 60_000;
   let paneId: string | null = null;
@@ -455,6 +473,9 @@ function setupTmuxLoader(deps: {
     },
     whenComplete,
     cancel() {
+      // Surface a `cancelled` event from the parent immediately (same contract as
+      // direct mode — see HELM-T7); de-duped against the child's own by dispatch().
+      dispatch({ jobId: spec.jobId, ts: Date.now(), kind: 'cancelled', reason: 'sigterm' });
       // Send SIGTERM to the pane's foreground process. tmux 3.0+ has
       // `send-keys -l` for literal text, but the simpler approach is
       // `kill-pane` — the loader's SIGTERM handler will fire on the

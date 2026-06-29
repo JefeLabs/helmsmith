@@ -34,6 +34,7 @@ _None — all filed issues resolved. 🎉_
 | [HELM-T4](./resolved/HELM-T4-gitradar.md) | gitradar | flaky test | ✅ fixed (deterministic fake-timers); last CI exclusion removed |
 | [HELM-T5](./resolved/HELM-T5-opentui-react-esm.md) | @opentui/react (tui) | upstream / Bun | ✅ apps self-contained under Bun (vendored-bun bin bootstrap) |
 | [HELM-T6](./resolved/HELM-T6-agent-adapter-phantom-deps.md) | pritty / taskmaster | phantom deps | ✅ declared inlined-lib externals (anthropic/langchain/opentui/react) |
+| [HELM-T7](./resolved/HELM-T7-context-loader-cli-sigterm-bun.md) | context-loader-cli · harness-server | SIGTERM cancel (bun) | ✅ CLI test asserts runtime-true contract; harness-server surfaces `cancelled` from the parent (reliable) |
 
 ## Fixed during the merge (no issue needed)
 
