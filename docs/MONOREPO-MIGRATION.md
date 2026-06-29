@@ -43,6 +43,9 @@ Total history: **353 commits** (`git log` and `git blame` follow files across th
 4. **Reconcile publish config.** Platform published `access: public` (npm); toolbox
    published `access: restricted` (GitHub Packages). Changesets is currently set to
    `restricted` as the conservative default — decide the real target alongside #1.
+   Note: libs are **source-first** (`exports` → `./src/*.ts`) for the run-from-source
+   dev model (HELM-T8 aligned `cli-kit` to this) — so publishing will need a uniform
+   build→`dist` + dist-pointing exports across all libs at that point.
 
 5. **Audit `scripts/sync-skills.mjs` and example scripts** for any hard-coded
    `packages/*` paths now that packages moved into domain groups. *(Done — see
@@ -98,27 +101,40 @@ A complete sweep was run after the merge. Honest results:
 
 ### Final suite tally (Node 22, the CI-pinned runtime)
 
-- **Typecheck:** 22 / 25 packages (fails: taskmaster, gittyup, mech-pencil).
-- **Test:** 19 / 21 packages deterministic green; `taskmaster` fails
-  deterministically and `gitradar` is flaky under parallel load.
+- **Typecheck:** 22 / 25 packages at merge time (fails: taskmaster, gittyup,
+  mech-pencil) — all since fixed; now **25 / 25**.
+- **Test:** 19 / 21 packages deterministic green at merge time; the rest fixed via
+  the tickets below. Current full sweep: **3324 passed / 0 failed / 23 skipped**.
 - **controlplane (Java):** `./mvnw -B -ntp test` → BUILD SUCCESS (2/2).
+
+> The numbers above are the immediate post-merge snapshot. They were later driven to
+> all-green and **CI was confirmed green** — see "CI: from unverified to verified
+> green" below.
 
 > Note: an initial parallel sweep over-counted test failures (5) due to
 > load-flakiness + two merge path bugs since fixed; per-package isolation +
 > CI-accurate re-runs give the numbers above.
 
-## Known issues → tickets
+## Backlog → tickets (all resolved)
 
-Remaining failures are the toolbox's own backlog (invisible until the merge put it
-under CI). Each has a fix-up issue in [`.issues/`](../.issues/) and a matching
-`--filter='!…'` exclusion in `.github/workflows/ci.yml`:
+The merge surfaced the toolbox's own backlog (invisible until it was put under CI),
+and — once CI could actually run each stage — several issues that were red in CI but
+green locally. **All are resolved**; full write-ups in
+[`.issues/resolved/`](../.issues/resolved/). CI is now **exclusion-free** — the early
+`--filter='!…'` scopes were removed as each ticket closed.
 
 | Ticket | Package | Kind |
 |--------|---------|------|
 | HELM-T1 | taskmaster | typecheck + tests (TUI deps / react-reconciler, zod-v4, init-wizard mock) |
 | HELM-T2 | gittyup | typecheck (undeclared `@inquirer/*` deps) |
-| HELM-T3 | mech-pencil | typecheck (`TS2352` cast); tests pass |
-| HELM-T4 | gitradar | flaky `db-watcher.test.ts` under parallel load; passes isolated |
+| HELM-T3 | mech-pencil | typecheck (`TS2352` cast) |
+| HELM-T4 | gitradar | flaky `db-watcher.test.ts` under load → deterministic fake-timers |
+| HELM-T5 | tui apps | `@opentui/react` is Bun-only → apps self-contained via a vendored-Bun launcher |
+| HELM-T6 | pritty / taskmaster | phantom deps → declared the inlined libs' third-party externals |
+| HELM-T7 | context-loader-cli / harness-server | bun starves in-loop SIGTERM → orchestrator surfaces `cancelled` |
+| HELM-T8 | cli-kit | **CI-red:** dist-typed exports unresolvable in a clean checkout → source-first |
+| HELM-T9 | gitradar | **CI-red:** `getISOWeek` was timezone-dependent → compute in UTC |
+| HELM-T10 | gitradar | **CI-red:** functional suite scanned hardcoded local repos → self-contained fixtures |
 
 **Two "failures" turned out to be merge-induced and were fixed (no ticket):**
 - `skillzkit/fs.test.ts` expected `apps/skillzkit` — stale after the move to
@@ -126,6 +142,39 @@ under CI). Each has a fix-up issue in [`.issues/`](../.issues/) and a matching
 - `harness-server/loader-spawn.ts` resolved `context-loader-cli` via a sibling
   path that broke when domain grouping split `harness/` from `context/`; repointed
   to `context/context-loader-cli`. Now 141/141.
+
+## CI: from unverified to verified green
+
+For most of this work the "both jobs green" claim was **unverified**: the session's
+default `gh` account (`edwin-skoolscout`) 404s on this private repo, so CI status
+couldn't be checked. Switching to the `ecruz165` account (which has access) revealed
+CI had in fact been **red on every push to `main`**. A claim no one can verify is
+"unknown," not "true" — checking it was the first real fix.
+
+The `js` job runs no build step (`install → typecheck → vitest`), so each failure
+masked the next and greening it was a serial cascade — three failures that were all
+**green locally but red in CI**:
+
+1. **HELM-T8 (typecheck).** `tsc` couldn't resolve `@ecruz165/cli-kit`'s types — it
+   pointed `types` at `dist/`, which a clean checkout never builds (a stale local
+   `dist/` had masked it). Made cli-kit source-first (`exports: "./src/index.ts"`),
+   matching the other 18 libs.
+2. **HELM-T9 (vitest).** With typecheck green, vitest ran and gitradar's `getISOWeek`
+   failed under UTC: it read a UTC instant with local date getters, so a `…T00:00:00Z`
+   date rolled back a day off-UTC. Switched to UTC getters.
+3. **HELM-T10 (vitest, bun).** Then gitradar's `test:bun` functional suite failed —
+   it scanned hardcoded `/Users/edwincruz/...` repos absent in CI. Rebuilt on
+   self-contained git fixtures generated in `beforeAll`.
+
+(HELM-T7 — bun starving an in-loop SIGTERM handler — was found in the same push-and-
+watch loop and fixed by having harness-server surface the `cancelled` event from the
+parent.)
+
+**Result: both jobs verified green** on the `ecruz165` account — js (Node 22) full
+sweep 3324 passed / 0 failed / 23 skipped, controlplane (JDK 21) Maven 2/2. The
+reusable lesson: *local green ≠ CI green*. Verifying meant reproducing CI's
+environment (clean checkout with no `dist/`, `TZ=UTC`) **and** watching the actual run
+rather than trusting the workflow file.
 
 ## Merge status: COMPLETE ✅
 
@@ -139,8 +188,11 @@ to the merge has been found and fixed:
 - domain-grouping path breakage repaired in `context-loader-{cli,core}`,
   `harness-server` (loader-spawn), and `skillzkit` (fs.test);
 - CI + dev scripts repointed to the new layout;
-- native-build allowlist added; CI JS job scoped past the ticketed backlog.
+- native-build allowlist added; CI JS job is **exclusion-free** (every package
+  typechecks and every suite runs);
+- the full HELM-T1…T10 backlog is resolved, including the CI-red cascade above.
 
-Both CI jobs verified green on their CI runtimes (js on Node 22, controlplane on
-JDK 21). Everything still red is the **ticketed toolbox backlog** above. See git
-log `5f3a85a..HEAD` for the full trail.
+Both CI jobs are **verified green** on their CI runtimes (js on Node 22, controlplane
+on JDK 21) — confirmed against the actual GitHub Actions run via the `ecruz165`
+account, not assumed (see the CI section above). See git log `5f3a85a..HEAD` for the
+full trail.
