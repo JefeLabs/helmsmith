@@ -90,6 +90,13 @@ export interface SpawnAgentProcessOptions {
   env?: NodeJS.ProcessEnv;
   signal?: AbortSignal;
   timeoutMs?: number;
+  /**
+   * Data to write to the child's stdin, then close it (EOF). Used by CLI
+   * adapters that feed the prompt/messages over stdin (e.g. claude-code-cli
+   * with `--input-format stream-json`). When provided (even an empty string),
+   * stdin is ended so the child sees EOF; when omitted, stdin is left as-is.
+   */
+  stdin?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -175,13 +182,23 @@ function createLineQueue(stream: NodeJS.EventEmitter, onClose?: () => void): Asy
  *   exit ≠0 → done rejects with ProviderError (last 4 KB of stderr).
  */
 export function spawnAgentProcess(opts: SpawnAgentProcessOptions): AgentProcessHandle {
-  const { binary, args, cwd, env, signal, timeoutMs } = opts;
+  const { binary, args, cwd, env, signal, timeoutMs, stdin } = opts;
 
   const child = spawn(binary, args, {
     cwd,
     env: env ?? process.env,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
+
+  // Feed stdin (if provided) then close it so the child sees EOF. Swallow
+  // EPIPE — the child may exit before consuming all input (e.g. on early
+  // error); that surfaces via the exit-code mapping below, not as an
+  // unhandled stream error.
+  if (stdin !== undefined && child.stdin) {
+    child.stdin.on('error', () => {});
+    if (stdin.length > 0) child.stdin.write(stdin);
+    child.stdin.end();
+  }
 
   // Stderr ring buffer (last 64 KB)
   const stderrChunks: string[] = [];

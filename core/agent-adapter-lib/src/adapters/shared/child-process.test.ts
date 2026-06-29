@@ -19,7 +19,11 @@ vi.mock('node:child_process', () => ({
 type FakeChild = EventEmitter & {
   stdout: EventEmitter;
   stderr: EventEmitter;
-  stdin: { end: ReturnType<typeof vi.fn>; write: ReturnType<typeof vi.fn> };
+  stdin: {
+    end: ReturnType<typeof vi.fn>;
+    write: ReturnType<typeof vi.fn>;
+    on: ReturnType<typeof vi.fn>;
+  };
   kill: ReturnType<typeof vi.fn>;
   killed: boolean;
 };
@@ -32,7 +36,7 @@ function fakeChild(
   const child = new EventEmitter() as FakeChild;
   child.stdout = new EventEmitter();
   child.stderr = new EventEmitter();
-  child.stdin = { end: vi.fn(), write: vi.fn() };
+  child.stdin = { end: vi.fn(), write: vi.fn(), on: vi.fn() };
   child.killed = false;
 
   child.kill = vi.fn((signal?: string) => {
@@ -61,7 +65,7 @@ function fakeChildWithStderr(stderrText: string, exitCode: number): FakeChild {
   const child = new EventEmitter() as FakeChild;
   child.stdout = new EventEmitter();
   child.stderr = new EventEmitter();
-  child.stdin = { end: vi.fn(), write: vi.fn() };
+  child.stdin = { end: vi.fn(), write: vi.fn(), on: vi.fn() };
   child.killed = false;
   child.kill = vi.fn(() => {
     child.killed = true;
@@ -310,11 +314,33 @@ describe('spawnAgentProcess', () => {
     expect(callArgs[2].env).toBe(process.env);
   });
 
+  it('writes the provided stdin and closes it (EOF)', async () => {
+    const child = fakeChild([], 0);
+    mockSpawn.mockImplementation(() => child);
+    const { spawnAgentProcess } = await import('./child-process.ts');
+
+    spawnAgentProcess({ binary: 'fake', args: [], cwd: '/tmp', stdin: 'hello stdin\n' });
+
+    expect(child.stdin.write).toHaveBeenCalledWith('hello stdin\n');
+    expect(child.stdin.end).toHaveBeenCalled();
+  });
+
+  it('does not write stdin when none is provided', async () => {
+    const child = fakeChild([], 0);
+    mockSpawn.mockImplementation(() => child);
+    const { spawnAgentProcess } = await import('./child-process.ts');
+
+    spawnAgentProcess({ binary: 'fake', args: [], cwd: '/tmp' });
+
+    expect(child.stdin.write).not.toHaveBeenCalled();
+    expect(child.stdin.end).not.toHaveBeenCalled();
+  });
+
   it('done rejects with BinaryNotFoundError on spawn error', async () => {
     const child = new EventEmitter() as FakeChild;
     child.stdout = new EventEmitter();
     child.stderr = new EventEmitter();
-    child.stdin = { end: vi.fn(), write: vi.fn() };
+    child.stdin = { end: vi.fn(), write: vi.fn(), on: vi.fn() };
     child.kill = vi.fn();
     child.killed = false;
     // Simulate spawn failure (ENOENT)
