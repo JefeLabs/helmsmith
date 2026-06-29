@@ -389,6 +389,13 @@ async function runIngest(args: CliArgs): Promise<number> {
   // SIGTERM in job mode: write a `cancelled` event and exit within 5s.
   // The AbortSignal we pass into ingest() lets the loader bail out
   // cooperatively at the next walk-step boundary.
+  //
+  // Caveat (bun runtime): bun does not deliver a signal to a JS handler while
+  // the event loop is *continuously* busy — unlike Node, which runs the handler
+  // between loop turns. During a hot, gap-free walk (no embedder I/O to await)
+  // bun therefore signal-terminates the worker before this handler runs: the job
+  // still stops promptly, but no `cancelled` event is emitted. With real embedder
+  // I/O the loop has idle gaps and the graceful path below runs. Tracked: HELM-T7.
   const abortController = new AbortController();
   const sigtermHandler = (): void => {
     abortController.abort();
