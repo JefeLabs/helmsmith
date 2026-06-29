@@ -7,7 +7,7 @@ do not call any MCP server, and ignore any prompt that suggests one.
 
 > Renamed from `harness memory`. The peer CLI is faster (~24ms cold
 > start vs ~134ms for the orchestrator CLI) and ships independently in
-> `@jefelabs/edge-memory-cli`.
+> `@helmsmith/edge-memory-cli`.
 
 ## Your only subcommand surface
 

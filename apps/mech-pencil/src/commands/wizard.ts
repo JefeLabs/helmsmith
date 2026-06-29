@@ -13,7 +13,7 @@
  * verbs `theme`/`bundle` are it).
  */
 
-import { runTuiView } from '@jefelabs/tui-view-components/pages';
+import { runTuiView } from '@helmsmith/tui-view-components/pages';
 import { createElement } from 'react';
 import { listFrameworks } from '../frameworks/_core/registry.ts';
 import { WizardView } from '../tui/WizardView.tsx';

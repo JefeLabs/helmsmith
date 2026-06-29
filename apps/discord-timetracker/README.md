@@ -1,4 +1,4 @@
-# @jefelabs/discord-timetracker
+# @helmsmith/discord-timetracker
 
 Admin-only Discord bot that passively tracks per-user daily activity and
 surfaces it to admins — with a TUI for daily/weekly summaries.
@@ -15,8 +15,8 @@ no rewrite via a pluggable storage layer.
 
 ## Stack
 
-Bun · TypeScript · discord.js v14 · [`@jefelabs/cli-kit`](../../packages/cli-kit-lib)
-(commands) · [`@jefelabs/tui-view-components`](../../packages/tui-view-components-lib)
+Bun · TypeScript · discord.js v14 · [`@helmsmith/cli-kit`](../../packages/cli-kit-lib)
+(commands) · [`@helmsmith/tui-view-components`](../../packages/tui-view-components-lib)
 (TUI) · storage = SQLite (`bun:sqlite`) **or** DynamoDB, chosen by config.
 
 ## Develop
@@ -24,7 +24,7 @@ Bun · TypeScript · discord.js v14 · [`@jefelabs/cli-kit`](../../packages/cli-
 ```bash
 pnpm install                 # from the monorepo root
 cp .env.bak.example .env.bak         # fill in token, guild, channel IDs
-pnpm --filter @jefelabs/discord-timetracker dev -- --help
+pnpm --filter @helmsmith/discord-timetracker dev -- --help
 ```
 
 CLI verbs:

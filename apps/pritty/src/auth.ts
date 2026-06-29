@@ -1,16 +1,16 @@
 /**
- * Pritty's auth surface — a thin layer over @jefelabs/agent-auth.
+ * Pritty's auth surface — a thin layer over @helmsmith/agent-auth.
  *
  * The implementation plan originally had pritty re-implement OAuth
  * Device Flow + token cascade + Copilot exchange from scratch. Now
- * those primitives live in @jefelabs/agent-auth (a toolbox-shared
+ * those primitives live in @helmsmith/agent-auth (a toolbox-shared
  * library); pritty consumes them and only owns:
  *
  *   - the path resolution to ~/.pritty/auth.json
  *   - thin command wrappers (login, logout, status) for CLI use
  *
  * If a future change wants to switch auth storage (e.g. system
- * keychain), it lands in @jefelabs/agent-auth and every consuming app
+ * keychain), it lands in @helmsmith/agent-auth and every consuming app
  * (pritty, gittyup, etc.) inherits the change.
  */
 
@@ -22,7 +22,7 @@ import {
   AuthStore,
   type DeviceFlowResult,
   loginGitHubCopilot,
-} from '@jefelabs/agent-auth';
+} from '@helmsmith/agent-auth';
 
 /** Resolve the pritty auth-store location. Override via PRITTY_HOME. */
 export function getAuthPath(): string {

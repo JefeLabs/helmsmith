@@ -1,6 +1,6 @@
 /** @jsxImportSource @opentui/react */
 
-import { validateRepoAccess } from '@jefelabs/harness-server';
+import { validateRepoAccess } from '@helmsmith/harness-server';
 import { createCliRenderer } from '@opentui/core';
 import { createRoot, useKeyboard } from '@opentui/react';
 import { useEffect, useMemo, useState } from 'react';

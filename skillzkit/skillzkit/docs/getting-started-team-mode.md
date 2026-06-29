@@ -126,8 +126,8 @@ SKILLZKIT_REVIEW_AGENT=enabled
 ```
 
 The skillzkit API doesn't hold provider credentials directly. It uses
-`@jefelabs/agent-adapter` to invoke whichever LLM the host's
-`BindingResolver` (from `@jefelabs/agent-auth`) is configured to use.
+`@helmsmith/agent-adapter` to invoke whichever LLM the host's
+`BindingResolver` (from `@helmsmith/agent-auth`) is configured to use.
 That means controlplane decides whether reviews go to Claude, OpenAI,
 local Qwen, etc. — and switching providers doesn't require a skillzkit
 deploy.
@@ -176,7 +176,7 @@ on the host.
 ### 2.1 Install the CLI
 
 ```bash
-npm install -g @jefelabs/skillzkit
+npm install -g @helmsmith/skillzkit
 ```
 
 (Same install as standalone mode.)

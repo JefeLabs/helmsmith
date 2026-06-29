@@ -1,4 +1,4 @@
-import { type AdapterEvent, AdapterEventBus } from '@jefelabs/agent-adapter';
+import { type AdapterEvent, AdapterEventBus } from '@helmsmith/agent-adapter';
 import { describe, expect, it } from 'vitest';
 import { bridgeAdapter, type Envelope, JobBus } from './job-bus.ts';
 

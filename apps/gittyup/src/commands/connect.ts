@@ -7,7 +7,7 @@
  * if richer integrations land (Linear, Jira, etc.).
  */
 
-import { type Connection, runConnectView } from '@jefelabs/tui-view-components';
+import { type Connection, runConnectView } from '@helmsmith/tui-view-components';
 import { Command } from 'commander';
 
 const githubConnection: Connection = {

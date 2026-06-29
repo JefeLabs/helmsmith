@@ -1,5 +1,5 @@
 {
-  "name": "@jefelabs/harness-server",
+  "name": "@helmsmith/harness-server",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,10 +13,10 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@jefelabs/agent-adapter": "workspace:*",
-    "@jefelabs/agent-auth": "workspace:*",
-    "@jefelabs/harness-core": "workspace:*",
-    "@jefelabs/harness-pipeline": "workspace:*",
+    "@helmsmith/agent-adapter": "workspace:*",
+    "@helmsmith/agent-auth": "workspace:*",
+    "@helmsmith/harness-core": "workspace:*",
+    "@helmsmith/harness-pipeline": "workspace:*",
     "@langchain/core": "^1.1.44",
     "@langchain/langgraph": "^1.3.0",
     "yaml": "^2.6.0"

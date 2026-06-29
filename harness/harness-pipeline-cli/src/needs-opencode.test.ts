@@ -14,7 +14,7 @@
  * the gated integration tests.
  */
 
-import type { ResolvedBinding } from '@jefelabs/agent-auth';
+import type { ResolvedBinding } from '@helmsmith/agent-auth';
 import { describe, expect, it } from 'vitest';
 import { type JobSpec, runHarnessPipeline, specNeedsOpenCode } from './index.ts';
 

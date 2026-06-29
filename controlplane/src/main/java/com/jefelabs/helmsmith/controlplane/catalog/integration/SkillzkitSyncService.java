@@ -5,7 +5,7 @@ import com.jefelabs.helmsmith.controlplane.catalog.domain.Skill;
 import java.util.List;
 
 /**
- * Seam between the controlplane's Skill catalog and {@code @jefelabs/skillzkit}
+ * Seam between the controlplane's Skill catalog and {@code @helmsmith/skillzkit}
  * (the external skill catalog distributed via npm + git as markdown files +
  * metadata).
  *

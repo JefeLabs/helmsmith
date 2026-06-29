@@ -7,14 +7,14 @@ import {
   AdapterEventBus,
   type AgentAdapter,
   type InvocationSpec,
-} from '@jefelabs/agent-adapter';
-import type { CredentialBroker } from '@jefelabs/agent-auth';
+} from '@helmsmith/agent-adapter';
+import type { CredentialBroker } from '@helmsmith/agent-auth';
 import {
   type AdapterFactory,
   type Envelope,
   type PipelineCatalog,
   startHarnessServer,
-} from '@jefelabs/harness-server';
+} from '@helmsmith/harness-server';
 
 /**
  * Phase 6 demo — full chain end-to-end without API keys:

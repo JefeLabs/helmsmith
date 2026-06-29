@@ -1,5 +1,5 @@
 {
-  "name": "@jefelabs/edge-context-cli",
+  "name": "@helmsmith/edge-context-cli",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -16,7 +16,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@jefelabs/edge-context-server": "workspace:*",
+    "@helmsmith/edge-context-server": "workspace:*",
     "ws": "^8.18.0"
   },
   "devDependencies": {

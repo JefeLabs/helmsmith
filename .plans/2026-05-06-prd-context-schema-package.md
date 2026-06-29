@@ -12,7 +12,7 @@
 
 ## 1. Purpose
 
-The Context Schema Package is a **standalone npm package** (likely `@jefelabs/context-loader-schema` or `@jefelabs/context-schema`) containing **versioned Cypher migration files** that define the Neo4j schema used by both the edge and central context servers. It exists because the same schema must be applied to *N+1 Neo4j instances* (one central + one per workspace edge) and drift between them would silently break cross-instance query parity.
+The Context Schema Package is a **standalone npm package** (likely `@helmsmith/context-loader-schema` or `@helmsmith/context-schema`) containing **versioned Cypher migration files** that define the Neo4j schema used by both the edge and central context servers. It exists because the same schema must be applied to *N+1 Neo4j instances* (one central + one per workspace edge) and drift between them would silently break cross-instance query parity.
 
 Migration files are plain text (`.cypher` files), runnable from any language: TypeScript code reads + executes them via the JS `neo4j-driver`; Java code reads + executes them via `neo4j-driver-java`. Both invoke the *same files*, ensuring identical schemas regardless of which language the runtime is.
 
@@ -23,8 +23,8 @@ This is the **cross-language schema contract** for the project — the boundary 
 - **Versioned, idempotent Cypher migrations.** Standard `V<N>__<description>.cypher` naming. Each migration runs at most once per database; re-running on an up-to-date DB is a no-op.
 - **Language-agnostic.** Files are plain Cypher; consumers pick how to apply them (TS via neo4j-driver, Java via Spring Boot's auto-migration framework or explicit code).
 - **Tracked migration state.** Standard `:_SchemaMigration` node tracks which migrations have run on each DB, with their hash for tamper detection.
-- **One package, two consumers.** Published once to npm; consumed by `@jefelabs/edge-context-server` (TS) and the Spring `central-context-server` module (Java reads the same files via subprocess `npm pack` extraction or a Maven mirror).
-- **Schema versioning aligned with `@jefelabs/context-loader-core`.** Both packages co-version: when the chunker changes the graph shape, the schema package gets a corresponding migration in the same release.
+- **One package, two consumers.** Published once to npm; consumed by `@helmsmith/edge-context-server` (TS) and the Spring `central-context-server` module (Java reads the same files via subprocess `npm pack` extraction or a Maven mirror).
+- **Schema versioning aligned with `@helmsmith/context-loader-core`.** Both packages co-version: when the chunker changes the graph shape, the schema package gets a corresponding migration in the same release.
 
 ## 3. Non-Goals (v1)
 
@@ -38,13 +38,13 @@ This is the **cross-language schema contract** for the project — the boundary 
 
 - Pattern: Flyway, Liquibase, Alembic, golang-migrate — versioned forward-only migrations with state tracking.
 - Cypher schema management is less mature than SQL (Neo4j doesn't ship a built-in migration tool). The community pattern is exactly what this package implements: numbered files + a tracking node.
-- Schema content (node labels, edge types, vector indexes) is defined by `@jefelabs/context-loader-core`'s `SourceTypeSchema` declarations; this package operationalizes those declarations as runnable migrations.
+- Schema content (node labels, edge types, vector indexes) is defined by `@helmsmith/context-loader-core`'s `SourceTypeSchema` declarations; this package operationalizes those declarations as runnable migrations.
 
 ## 5. Personas & user stories
 
 | Persona | Need |
 |---|---|
-| **`@jefelabs/edge-context-server` (TS)** | "On startup, ensure my workspace's Neo4j has all migrations applied." |
+| **`@helmsmith/edge-context-server` (TS)** | "On startup, ensure my workspace's Neo4j has all migrations applied." |
 | **Central ContextServer (Java)** | "On startup, ensure central Neo4j has all migrations applied." |
 | **Schema author (developer)** | "I'm changing the chunker output. I need to add a new migration that adds the new node label + vector index." |
 | **Operator** | "Show me which migrations are applied to which Neo4j instance; flag any drift." |
@@ -55,7 +55,7 @@ This is the **cross-language schema contract** for the project — the boundary 
 
 | ID | Requirement |
 |---|---|
-| F1 | Published as `@jefelabs/context-loader-schema` on npm. |
+| F1 | Published as `@helmsmith/context-loader-schema` on npm. |
 | F2 | Directory layout: `migrations/V001__init.cypher`, `migrations/V002__add_oss_labels.cypher`, etc. |
 | F3 | Filename format: `V<NNN>__<snake_case_description>.cypher`. NNN is monotonically increasing per package version. |
 | F4 | Each `.cypher` file is *idempotent* — uses `CREATE CONSTRAINT IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, etc. |
@@ -70,7 +70,7 @@ This is the **cross-language schema contract** for the project — the boundary 
 | F8 | First migration (`V001__init.cypher`) creates the foundational schema: `:File`, `:Function`, `:Class`, `:Doc`, `:Section` labels with their constraints + vector indexes. |
 | F9 | Subsequent migrations are additive — adding new labels (e.g., `OssFile`, `OssFunction`), edges (`Imports`, `Documents`), or indexes. |
 | F10 | Vector index dimensions match the embedder configuration (default 1024 for Qwen3 0.6B; configurable via env-var-substitution at apply time). |
-| F11 | Schema covers all source types declared in `@jefelabs/context-loader-core`'s `SourceTypeId` enum: `code-full`, `oss-code`, `prose-markdown`, `crawled-web`, `oss-docs`, `oss-issues`, `structured-schema`, `config`, `issue-tracker`, `image-described`, `pdf`, `learned`. |
+| F11 | Schema covers all source types declared in `@helmsmith/context-loader-core`'s `SourceTypeId` enum: `code-full`, `oss-code`, `prose-markdown`, `crawled-web`, `oss-docs`, `oss-issues`, `structured-schema`, `config`, `issue-tracker`, `image-described`, `pdf`, `learned`. |
 | F11a | **Per-source provenance properties on every chunked node (mandatory).** Every node emitted by chunkers carries `sourceId: string` (the logical source — e.g. `react@18.2.0`) + `sourceVersion: string` (the ingest's version stamp — e.g. ISO timestamp or content hash). These properties enable: (a) sub-graph export by sourceId on the central side; (b) selective re-import on edges via `MERGE` keyed on `sourceId`+stable-id; (c) staleness detection during refresh by comparing `sourceVersion`. Edges that lack these properties cannot participate in the priming/refresh protocol. |
 | F11b | First migration creates indexes on `(sourceId)` for all chunked node labels — sub-graph extraction queries depend on this for performance. |
 
@@ -88,7 +88,7 @@ This is the **cross-language schema contract** for the project — the boundary 
 
 | ID | Requirement |
 |---|---|
-| F17 | Package version follows `@jefelabs/context-loader-core` exactly — when context-loader-core ships v0.5.0, schema package ships v0.5.0 with any required migrations bundled. |
+| F17 | Package version follows `@helmsmith/context-loader-core` exactly — when context-loader-core ships v0.5.0, schema package ships v0.5.0 with any required migrations bundled. |
 | F18 | Coordinated release via changesets: changing the chunker = mandatory schema-package changeset. |
 | F19 | Migration files cannot be edited after release — only added. Hash mismatch triggers loud failure. |
 | F20 | Published changelog explicitly lists what each migration does (added labels, indexes, etc.). |
@@ -97,7 +97,7 @@ This is the **cross-language schema contract** for the project — the boundary 
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│  @jefelabs/context-loader-schema (npm package)             │
+│  @helmsmith/context-loader-schema (npm package)             │
 │                                                            │
 │  migrations/                                              │
 │    V001__init.cypher                                      │
@@ -145,7 +145,7 @@ This is the **cross-language schema contract** for the project — the boundary 
 | D1 | Plain `.cypher` files (not Liquibase/Flyway adapter) | Cross-language; Cypher-native tooling is immature. | 2026-05-06 |
 | D2 | Tracker node `:_SchemaMigration` with hash | Standard pattern; tamper detection. | 2026-05-06 |
 | D3 | npm package primary; Java reads via classpath | Single source of truth; v1 simplicity. | 2026-05-06 |
-| D4 | Co-versioned with `@jefelabs/context-loader-core` | Schema and chunker change together; one release cadence. | 2026-05-06 |
+| D4 | Co-versioned with `@helmsmith/context-loader-core` | Schema and chunker change together; one release cadence. | 2026-05-06 |
 | D5 | Forward-only migrations | Standard practice; rollback is "destroy + reingest". | 2026-05-06 |
 | D6 | Idempotent migrations using `IF NOT EXISTS` | Safe re-runs; no special-case logic. | 2026-05-06 |
 
@@ -154,7 +154,7 @@ This is the **cross-language schema contract** for the project — the boundary 
 | Phase | Scope |
 |---|---|
 | **Phase 1** | Initial migration `V001__init.cypher` covering current edge schema; TS apply API; tracker node convention |
-| **Phase 2** | Subsequent migrations as `@jefelabs/context-loader-core` evolves (additive labels for new source types) |
+| **Phase 2** | Subsequent migrations as `@helmsmith/context-loader-core` evolves (additive labels for new source types) |
 | **Phase 3** | Java consumption via classpath; Spring central-context-server uses on startup |
 | **Phase 4** | CI smoke tests against ephemeral Neo4j |
 | **Phase 5+** | Maven Central artifact (v1.x); selective subset application (v2+) |

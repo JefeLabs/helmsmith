@@ -7,7 +7,7 @@
  * view shows the empty-state ("no connections needed").
  */
 
-import { runConnectView } from '@jefelabs/tui-view-components';
+import { runConnectView } from '@helmsmith/tui-view-components';
 
 export async function runConnect(): Promise<void> {
   await runConnectView({

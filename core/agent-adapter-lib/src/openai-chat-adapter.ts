@@ -21,7 +21,7 @@
  * etc.) build on top. v1 supports plain chat completions only.
  */
 
-import type { CredentialBroker } from '@jefelabs/agent-auth';
+import type { CredentialBroker } from '@helmsmith/agent-auth';
 import { classifyHttpError, classifyNetworkError } from './errors.ts';
 import { AdapterEventBus, type TokenUsage } from './events.ts';
 import type { AgentAdapter, InvocationSpec } from './types.ts';

@@ -3,7 +3,7 @@
  * ("I needed a skill that didn't exist") and the unified catalog.
  * Proposals are reviewed by an admin; approving seeds a draft into
  * {@code catalog_items} (type=skill); a future iteration pushes the
- * draft back to @jefelabs/skillzkit as a real PR.
+ * draft back to @helmsmith/skillzkit as a real PR.
  *
  * <p>Closed module. Depends on catalog.service via the existing
  * {@code @NamedInterface("services")} so approval can write to the

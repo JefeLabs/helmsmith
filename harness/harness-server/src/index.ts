@@ -7,7 +7,7 @@ import {
   type CredentialBroker,
   defaultGitHubResolver,
   type GitHubCredentialResolver,
-} from '@jefelabs/agent-auth';
+} from '@helmsmith/agent-auth';
 import {
   type AdapterFactory,
   type AdapterId,
@@ -32,7 +32,7 @@ import {
   steerJob,
   TokenAccumulator,
   walkAgents,
-} from '@jefelabs/harness-core';
+} from '@helmsmith/harness-core';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { runEntryCoordinator } from './coordinator/entry-coordinator.ts';
 import {
@@ -59,8 +59,8 @@ import { runJobInContainer } from './run-job-in-container.ts';
 import type { SpawnRepoSpec } from './spawn-worker.ts';
 
 // Re-export the harness-core surface so existing consumers (harness-cli,
-// examples) that import from '@jefelabs/harness-server' keep working unchanged.
-// New consumers should prefer importing from '@jefelabs/harness-core' directly.
+// examples) that import from '@helmsmith/harness-server' keep working unchanged.
+// New consumers should prefer importing from '@helmsmith/harness-core' directly.
 export {
   type AdapterFactory,
   type AdapterId,
@@ -90,7 +90,7 @@ export {
   type SuspendRequest,
   steerJob,
   validateUnifiedCatalog,
-} from '@jefelabs/harness-core';
+} from '@helmsmith/harness-core';
 export {
   inlineCatalogLoader,
   loadCatalogFromWorkspaceYaml,
@@ -272,7 +272,7 @@ export interface HarnessServerHandle {
   stop(): Promise<void>;
 }
 
-export type { AgentStatus, JobRecord, RegisteredAgent } from '@jefelabs/harness-core';
+export type { AgentStatus, JobRecord, RegisteredAgent } from '@helmsmith/harness-core';
 export {
   buildCheckoutCoordinatorGraph,
   type RunCheckoutCoordinatorArgs,

@@ -273,7 +273,7 @@ that direct platform APIs provide.
         {
           "platform": "linkedin",
           "channelId": "abc123",
-          "displayName": "LinkedIn — @jefelabs"
+          "displayName": "LinkedIn — @helmsmith"
         },
         {
           "platform": "instagram",

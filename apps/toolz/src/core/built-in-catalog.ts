@@ -62,7 +62,7 @@ export const BUILT_IN_CATALOG: Record<string, CatalogEntry> = {
   },
   acli: {
     description:
-      "Atlassian CLI — Jira / Confluence / Bitbucket Cloud (used by @jefelabs/pritty's jira-cli adapter)",
+      "Atlassian CLI — Jira / Confluence / Bitbucket Cloud (used by @helmsmith/pritty's jira-cli adapter)",
     packages: {
       // Atlassian distributes via their own brew tap; brew auto-taps
       // when given the full <tap>/<formula> identifier.
@@ -76,13 +76,13 @@ export const BUILT_IN_CATALOG: Record<string, CatalogEntry> = {
     description:
       'AI-powered commit & PR CLI — categorize staged files, generate conventional commits, open PRs, all with human-in-the-loop. Part of agentx-toolbox.',
     packages: {
-      // Once @jefelabs/pritty is published to npm, all package
+      // Once @helmsmith/pritty is published to npm, all package
       // managers can install it via npm. Today this entry is a
       // forward-compatible declaration; before publish, users
       // workspace-link from agentx-toolbox.
-      brew: '@jefelabs/pritty',
-      apt: '@jefelabs/pritty',
-      winget: '@jefelabs/pritty',
+      brew: '@helmsmith/pritty',
+      apt: '@helmsmith/pritty',
+      winget: '@helmsmith/pritty',
     },
   },
 };

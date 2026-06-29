@@ -25,7 +25,7 @@ import {
   type ProductDef,
   type TaskStep,
   validateUnifiedCatalog,
-} from '@jefelabs/harness-core';
+} from '@helmsmith/harness-core';
 import YAML from 'yaml';
 
 /**

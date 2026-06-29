@@ -1,4 +1,4 @@
-import { createCli } from '@jefelabs/cli-kit';
+import { createCli } from '@helmsmith/cli-kit';
 import chalk from 'chalk';
 import {
   registerAuth,

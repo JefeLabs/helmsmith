@@ -1,9 +1,9 @@
 import { defineConfig } from 'tsup';
 
 /**
- * Build config for `@jefelabs/workspace`.
+ * Build config for `@helmsmith/workspace`.
  *
- * Strategy: fat-publish — bundle every workspace dep (`@jefelabs/*`) +
+ * Strategy: fat-publish — bundle every workspace dep (`@helmsmith/*`) +
  * small npm deps (commander, yaml) inline so the published artifact
  * has near-zero install-time dependencies. The only external deps are
  * `@opentui/core` and `@opentui/react` because they ship platform-
@@ -24,7 +24,7 @@ export default defineConfig({
   platform: 'node',
   // Bundle everything inline EXCEPT the OpenTUI native-binding packages.
   // Without `noExternal`, tsup defaults to externalizing every dependency.
-  noExternal: [/^@jefelabs\//, 'commander', 'yaml'],
+  noExternal: [/^@helmsmith\//, 'commander', 'yaml'],
   external: [
     '@opentui/core',
     '@opentui/react',

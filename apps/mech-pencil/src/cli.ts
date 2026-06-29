@@ -7,7 +7,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createCli } from '@jefelabs/cli-kit';
+import { createCli } from '@helmsmith/cli-kit';
 import { runBrand } from './commands/brand.ts';
 import { runBuildLibrary } from './commands/build-library.ts';
 import { runBundle } from './commands/bundle.ts';
@@ -29,7 +29,7 @@ function readVersion(): string {
   for (let dir = __dirname, i = 0; i < 4; i++, dir = dirname(dir)) {
     try {
       const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
-      if (pkg.name === '@jefelabs/mech-pencil') return pkg.version as string;
+      if (pkg.name === '@helmsmith/mech-pencil') return pkg.version as string;
     } catch {
       /* keep walking */
     }
@@ -41,7 +41,7 @@ const version = readVersion();
 
 // No `auth` wired: mech-pencil generates JSON locally and makes no
 // agent calls. If an agent-assisted generator is added later, wire an
-// AuthProvider here against @jefelabs/agent-auth (same pattern as pritty).
+// AuthProvider here against @helmsmith/agent-auth (same pattern as pritty).
 const { program } = createCli({
   name: 'mech-pencil',
   version,

@@ -13,7 +13,7 @@ import type {
   ModelDescriptor,
   Provider,
   ResolvedBinding,
-} from '@jefelabs/agent-auth';
+} from '@helmsmith/agent-auth';
 import { describe, expect, it } from 'vitest';
 import { bindingToAdapter, defaultLocalEndpointResolver } from './binding-to-adapter.ts';
 import { ClaudeSdkAdapter } from './claude-sdk-adapter.ts';

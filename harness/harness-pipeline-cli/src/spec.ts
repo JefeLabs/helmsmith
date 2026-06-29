@@ -18,8 +18,8 @@
  * with an actionable error rather than silently ignoring fields.
  */
 
-import type { ResolvedBinding } from '@jefelabs/agent-auth';
-import type { AdapterId } from '@jefelabs/harness-core';
+import type { ResolvedBinding } from '@helmsmith/agent-auth';
+import type { AdapterId } from '@helmsmith/harness-core';
 
 /**
  * One agent's pre-resolved description, ready for orchestration.

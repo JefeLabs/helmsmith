@@ -33,10 +33,10 @@ import {
   type IngestionSummary,
   Neo4jBackend,
   ingest,
-} from '@jefelabs/context-loader-core';
+} from '@helmsmith/context-loader-core';
 import neo4j, { type Driver } from 'neo4j-driver';
 import { Crawler, type CrawlRequest, type CrawlScope } from './crawl.ts';
-import { createHttpEmbedderClient } from '@jefelabs/context-loader-core';
+import { createHttpEmbedderClient } from '@helmsmith/context-loader-core';
 import {
   ConfluenceFetcher,
   type ConfluenceIngestRequest,

@@ -32,7 +32,7 @@
  * commit on the default branch are NOT reverted — pick a sandbox repo.
  *
  * Run:  GATE2_REPO_URL=git@github.com:you/sandbox.git \
- *       pnpm --filter @jefelabs/harness exec tsx examples/20-gate2-pr-merge-e2e.ts
+ *       pnpm --filter @helmsmith/harness exec tsx examples/20-gate2-pr-merge-e2e.ts
  */
 
 import { randomUUID } from 'node:crypto';
@@ -40,8 +40,8 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { defaultGitHubResolver } from '@jefelabs/agent-auth';
-import type { CredentialBroker } from '@jefelabs/agent-auth';
+import { defaultGitHubResolver } from '@helmsmith/agent-auth';
+import type { CredentialBroker } from '@helmsmith/agent-auth';
 import {
   type CompiledFlowGraph,
   type FlowDef,
@@ -49,8 +49,8 @@ import {
   JobBus,
   resumeJob,
   runJob,
-} from '@jefelabs/harness-core';
-import { spawnWorker } from '@jefelabs/harness-server';
+} from '@helmsmith/harness-core';
+import { spawnWorker } from '@helmsmith/harness-server';
 
 const REPO_URL = process.env.GATE2_REPO_URL ?? 'git@github.com:jefelabs/agentx-sandbox.git';
 const PRODUCT_ID = process.env.GATE2_PRODUCT_ID ?? 'agentx-sandbox';

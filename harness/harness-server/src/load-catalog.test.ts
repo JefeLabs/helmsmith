@@ -12,7 +12,7 @@
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { AgentDef, FlowDef } from '@jefelabs/harness-core';
+import type { AgentDef, FlowDef } from '@helmsmith/harness-core';
 import { describe, expect, it } from 'vitest';
 import { loadCatalogFromWorkspaceYaml } from './load-catalog.ts';
 

@@ -339,7 +339,7 @@ import {
   loadConfig,
   // Categorizer
   categorize, mergeCategories, DEFAULT_CATEGORIES,
-} from "@jefelabs/pritty";
+} from "@helmsmith/pritty";
 
 const config = loadConfig();
 const buckets = categorize(stagedFiles, config.categories);

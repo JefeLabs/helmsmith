@@ -1,5 +1,5 @@
 /**
- * @jefelabs/discord-timetracker — library surface.
+ * @helmsmith/discord-timetracker — library surface.
  *
  * Most consumers use the CLI (`src/cli.ts` / the `discord-timetracker`
  * bin). This module re-exports the pieces worth importing
@@ -8,5 +8,5 @@
  * the package metadata so `import`/`build` have a stable entry.
  */
 
-export const name = '@jefelabs/discord-timetracker';
+export const name = '@helmsmith/discord-timetracker';
 export const version = '0.1.0';

@@ -22,7 +22,7 @@
  */
 
 import { spawn } from 'node:child_process';
-import type { GitHubCredential, GitHubCredentialResolver } from '@jefelabs/agent-auth';
+import type { GitHubCredential, GitHubCredentialResolver } from '@helmsmith/agent-auth';
 import type { PublishConfig, TaskStep } from './catalog.ts';
 import type { FlowStateT, NodeExecutor } from './flow-graph.ts';
 import type { JobRecord } from './job.ts';

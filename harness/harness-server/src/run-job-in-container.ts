@@ -9,7 +9,7 @@
  *      these from spec.bindings and pre-builds adapters at boot;
  *      this is the "executor" side of the assembler/executor split.
  *   2. Build JobSpec — combine the registered agents + resolved
- *      bindings into the contract shape from `@jefelabs/harness-pipeline`.
+ *      bindings into the contract shape from `@helmsmith/harness-pipeline`.
  *   3. spawnWorker — generate worktrees + override-config artifacts
  *      (slice 9d-2 fix already runs `git fetch` on cached bare repos).
  *   4. runWorker — actually invoke `devcontainer up`; capture
@@ -41,9 +41,9 @@
  */
 
 import { spawn } from 'node:child_process';
-import type { BindingResolver, CredentialBroker, ResolvedBinding } from '@jefelabs/agent-auth';
-import type { JobBus, JobRecord, RegisteredAgent } from '@jefelabs/harness-core';
-import type { JobSpec, SpecAgent } from '@jefelabs/harness-pipeline';
+import type { BindingResolver, CredentialBroker, ResolvedBinding } from '@helmsmith/agent-auth';
+import type { JobBus, JobRecord, RegisteredAgent } from '@helmsmith/harness-core';
+import type { JobSpec, SpecAgent } from '@helmsmith/harness-pipeline';
 import { runPipelineInContainer } from './run-pipeline-in-container.ts';
 import { runWorker, type SpawnRepoSpec } from './spawn-worker.ts';
 

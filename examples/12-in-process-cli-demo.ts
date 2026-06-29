@@ -1,5 +1,5 @@
-import { AdapterEventBus, type AgentAdapter, type InvocationSpec } from '@jefelabs/agent-adapter';
-import type { CredentialBroker } from '@jefelabs/agent-auth';
+import { AdapterEventBus, type AgentAdapter, type InvocationSpec } from '@helmsmith/agent-adapter';
+import type { CredentialBroker } from '@helmsmith/agent-auth';
 import {
   type AdapterFactory,
   type Envelope,
@@ -8,10 +8,10 @@ import {
   type JobRecord,
   type PipelineCatalog,
   runJob,
-} from '@jefelabs/harness-core';
+} from '@helmsmith/harness-core';
 
 /**
- * Demo 12 — in-process CLI host using only `@jefelabs/harness-core`.
+ * Demo 12 — in-process CLI host using only `@helmsmith/harness-core`.
  *
  * Same outcome as demo 11 (orchestrator drives a 3-agent pipeline to
  * completion, events stream live), but with NO server in the picture:

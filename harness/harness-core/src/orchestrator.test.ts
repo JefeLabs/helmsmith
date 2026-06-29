@@ -6,8 +6,8 @@ import {
   BillingError,
   type InvocationSpec,
   RateLimitError,
-} from '@jefelabs/agent-adapter';
-import type { CredentialBroker, ResolvedBinding } from '@jefelabs/agent-auth';
+} from '@helmsmith/agent-adapter';
+import type { CredentialBroker, ResolvedBinding } from '@helmsmith/agent-auth';
 import { describe, expect, it } from 'vitest';
 import type { ApprovalRequest } from './flow-graph.ts';
 import type { JobRecord } from './job.ts';

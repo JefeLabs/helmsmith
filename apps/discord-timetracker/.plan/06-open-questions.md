@@ -10,8 +10,8 @@ can start building without blocking.
 | D1 | Language/framework | **TypeScript + discord.js v14** |
 | D2 | Runtime | **Bun** (run locally first) |
 | D3 | Storage v1 / alt | **SQLite (`bun:sqlite`) default; DynamoDB alternative**, chosen by config |
-| D4 | CLI/prompts | **`@jefelabs/cli-kit`** (`createCli` = commander + inquirer + auth) |
-| D5 | Summaries UI | **TUI viewer** via `@jefelabs/tui-view-components` (daily + weekly) |
+| D4 | CLI/prompts | **`@helmsmith/cli-kit`** (`createCli` = commander + inquirer + auth) |
+| D5 | Summaries UI | **TUI viewer** via `@helmsmith/tui-view-components` (daily + weekly) |
 | D6 | Hosting target | Local now; **AWS (ECS Fargate, us-east-1) later**, no rewrite |
 | D7 | CI attribution (was Q2) | Parse **every** `PR Actor:` line (bot "GitHub Monitor"); github→discord via `link`. Non-human actors (`Github System`) skipped — identity map is the filter |
 | D8 | CI counting granularity | **Per CI-run block** — each human-attributed `PR Actor:` block = `ciSubmissions++` |
@@ -67,7 +67,7 @@ Plain message count, or weight by reactions/thread replies/length?
   is a later enhancement.
 
 ### Q8 — Auth provider for cli-kit (affects M0, AWS)
-Local v1 uses `noopAuthProvider`. When hosted, do you want `@jefelabs/agent-auth`
+Local v1 uses `noopAuthProvider`. When hosted, do you want `@helmsmith/agent-auth`
 (ecosystem standard) or something else?
 - **Default assumed:** `noopAuthProvider` now; revisit at AWS time.
 

@@ -165,10 +165,10 @@ when published):
 npm install
 
 # Install dependency in specific workspace
-npm install lodash --workspace=@jefelabs/skillz-engineer
+npm install lodash --workspace=@helmsmith/skillz-engineer
 
 # Run script in specific workspace
-npm run build --workspace=@jefelabs/skillz-product
+npm run build --workspace=@helmsmith/skillz-product
 
 # Run across all workspaces
 npm run build --workspaces
@@ -293,7 +293,7 @@ npm is consumed by:
   packages; setup commands invoke `npm install`
 - **Build verification in upgrade routines** — after applying
   changes, `npm run build` to verify
-- **Publishing @jefelabs packages** — `npm publish --access public`
+- **Publishing @helmsmith packages** — `npm publish --access public`
   for the skillz-suite ecosystem
 - **Bumpr** — orchestrates npm across multiple repos
 

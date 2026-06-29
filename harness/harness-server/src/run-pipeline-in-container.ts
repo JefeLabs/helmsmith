@@ -39,8 +39,8 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { JobBus } from '@jefelabs/harness-core';
-import type { JobSpec } from '@jefelabs/harness-pipeline';
+import type { JobBus } from '@helmsmith/harness-core';
+import type { JobSpec } from '@helmsmith/harness-pipeline';
 import { consumeJsonlStream } from './pipeline-jsonl-stream.ts';
 import type { SubprocessLifecycleEvent } from './run-pipeline-subprocess.ts';
 

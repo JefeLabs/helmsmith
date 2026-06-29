@@ -22,7 +22,7 @@ import { rm } from 'node:fs/promises';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { AgentDef, Edge, FlowCatalog, FlowDef, TaskStep } from '@jefelabs/harness-core';
+import type { AgentDef, Edge, FlowCatalog, FlowDef, TaskStep } from '@helmsmith/harness-core';
 import { SimpleChatModel } from '@langchain/core/language_models/chat_models';
 import type { BaseMessage } from '@langchain/core/messages';
 import { afterEach, describe, expect, it } from 'vitest';

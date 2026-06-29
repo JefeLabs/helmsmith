@@ -26,7 +26,7 @@ import {
   InMemoryGraphBackend,
   ingest,
   Neo4jBackend,
-} from '@jefelabs/context-loader-core';
+} from '@helmsmith/context-loader-core';
 import { connectUdsEmitter, type UdsEmitter } from './uds-event-emitter.ts';
 
 // ─── Help / version / types (work without a backend) ──────────────────────

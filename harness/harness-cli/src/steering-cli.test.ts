@@ -17,10 +17,10 @@ import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AdapterEventBus, type AgentAdapter, type InvocationSpec } from '@jefelabs/agent-adapter';
-import type { CredentialBroker } from '@jefelabs/agent-auth';
-import type { Edge, FlowCatalog, FlowDef, TaskStep } from '@jefelabs/harness-core';
-import { startHarnessServer } from '@jefelabs/harness-server';
+import { AdapterEventBus, type AgentAdapter, type InvocationSpec } from '@helmsmith/agent-adapter';
+import type { CredentialBroker } from '@helmsmith/agent-auth';
+import type { Edge, FlowCatalog, FlowDef, TaskStep } from '@helmsmith/harness-core';
+import { startHarnessServer } from '@helmsmith/harness-server';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const tmpSocket = () => join(tmpdir(), `ax-${randomUUID().slice(0, 8)}.sock`);

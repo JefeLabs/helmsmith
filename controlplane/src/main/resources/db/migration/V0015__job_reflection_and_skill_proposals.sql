@@ -15,7 +15,7 @@
 --   proposed → approved (creates a draft catalog_items row) | rejected
 -- An admin reviews each one in /proposals before it lands in the
 -- catalog. Future iteration: PR-bot pushes approved proposals back
--- to the @jefelabs/skillzkit repo as actual PRs.
+-- to the @helmsmith/skillzkit repo as actual PRs.
 --
 -- Idempotent.
 

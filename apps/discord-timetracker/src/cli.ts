@@ -1,5 +1,5 @@
 /**
- * discord-timetracker CLI — thin commander wiring via @jefelabs/cli-kit.
+ * discord-timetracker CLI — thin commander wiring via @helmsmith/cli-kit.
  *
  * Each verb's logic lives in `src/commands/<verb>.ts`, matching the
  * pritty/gitradar layout so verb logic sits in a predictable place
@@ -7,7 +7,7 @@
  * "not implemented yet" — the command surface (and its flags) is the
  * deliverable here; behaviour lands in M1–M8 (see .plan/05-build-sequence.md).
  */
-import { createCli, noopAuthProvider } from '@jefelabs/cli-kit';
+import { createCli, noopAuthProvider } from '@helmsmith/cli-kit';
 import { runBackfill } from './commands/backfill.js';
 import { runLink } from './commands/link.js';
 import { runReport } from './commands/report.js';
@@ -19,7 +19,7 @@ const { program } = createCli({
   name: 'discord-timetracker',
   version: '0.1.0',
   description: 'Admin-only Discord activity time tracker',
-  // Local v1 runs without auth; swap for @jefelabs/agent-auth when hosted (see Q8).
+  // Local v1 runs without auth; swap for @helmsmith/agent-auth when hosted (see Q8).
   auth: noopAuthProvider,
 });
 

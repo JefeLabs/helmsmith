@@ -57,13 +57,13 @@ export function copyLibrary(dest: string): void {
 
 // ── WRITE path (maintainer / source-only) ────────────────────────────
 
-/** Walk up from this module to the @jefelabs/mech-pencil package root. */
+/** Walk up from this module to the @helmsmith/mech-pencil package root. */
 function packageRoot(): string {
   let dir = dirname(fileURLToPath(import.meta.url));
   for (let i = 0; i < 6; i++, dir = dirname(dir)) {
     try {
       const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
-      if (pkg.name === '@jefelabs/mech-pencil') return dir;
+      if (pkg.name === '@helmsmith/mech-pencil') return dir;
     } catch {
       /* keep walking */
     }

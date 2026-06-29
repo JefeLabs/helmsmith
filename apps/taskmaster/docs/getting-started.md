@@ -17,7 +17,7 @@ agent.
 ## 1. Install
 
 ```bash
-npm install -g @jefelabs/taskmaster
+npm install -g @helmsmith/taskmaster
 ```
 
 Verify:

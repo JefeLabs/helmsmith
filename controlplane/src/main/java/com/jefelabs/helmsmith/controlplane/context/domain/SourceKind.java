@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * Context-source content type. Mirrors prd-context-module.md F4 and the
- * TS-side {@code SourceTypeId} from {@code @jefelabs/context-loader-core}.
+ * TS-side {@code SourceTypeId} from {@code @helmsmith/context-loader-core}.
  */
 public enum SourceKind {
     @JsonProperty("oss-package")    OSS_PACKAGE,

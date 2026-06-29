@@ -20,7 +20,7 @@
  * same separation we use for agent bindings.
  */
 import { execFile } from 'node:child_process';
-import type { CredentialBroker, Provider } from '@jefelabs/agent-auth';
+import type { CredentialBroker, Provider } from '@helmsmith/agent-auth';
 import type {
   CliToolDef,
   Expression,
@@ -455,7 +455,7 @@ async function applyAuthHeaders(
  * {@code Credential.apiKey}.
  *
  * <p>v1 constraint: {@code ToolAuthRef.credentialId} must name a
- * known {@link import('@jefelabs/agent-auth').Provider} value
+ * known {@link import('@helmsmith/agent-auth').Provider} value
  * ({@code 'anthropic' | 'openai' | 'google' | 'github-copilot' |
  * 'bedrock' | 'local-qwen'}). Catalog authors who need credentials
  * for tools outside that list (Stripe, GitHub repo tokens, custom

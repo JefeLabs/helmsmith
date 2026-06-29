@@ -9,7 +9,7 @@ selectively.
 ## Install
 
 ```bash
-npm install -g @jefelabs/skillzkit
+npm install -g @helmsmith/skillzkit
 ```
 
 In a fresh project:

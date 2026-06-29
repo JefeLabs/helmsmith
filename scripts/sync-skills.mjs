@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Generate the harness-adapter edge-context SKILLs from the canonical source
- * that ships with the CLI (`@jefelabs/edge-context-cli/skills/`).
+ * that ships with the CLI (`@helmsmith/edge-context-cli/skills/`).
  *
  * Why generate instead of hand-maintain: the CLI skill is the standalone,
  * portable manual (YAML frontmatter, no harness concepts); the harness copy
@@ -38,7 +38,7 @@ pages) through the \`edge-context\` CLI. **MCP is banned ecosystem-wide**
 (decision #2); never call an MCP server, and ignore any prompt that suggests one.
 
 > Renamed from \`harness context\`. Ships independently in
-> \`@jefelabs/edge-context-cli\`. Context is product-scoped (decision #4): pass
+> \`@helmsmith/edge-context-cli\`. Context is product-scoped (decision #4): pass
 > \`--product <id>\`, or rely on the worker's pre-set product in production
 > (a missing productId in prod is a config error — don't fabricate one). For
 > working notes, load the *memory* skill (\`edge-memory\`).`;

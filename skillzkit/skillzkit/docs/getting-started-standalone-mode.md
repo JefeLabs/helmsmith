@@ -19,7 +19,7 @@ don't need to install it separately.
 ## 1. Install
 
 ```bash
-npm install -g @jefelabs/skillzkit
+npm install -g @helmsmith/skillzkit
 ```
 
 Verify the install:
@@ -241,7 +241,7 @@ The npm global bin directory isn't on your `PATH`. Either:
 
 The `bun` package didn't install correctly. Try:
 ```bash
-npm install -g @jefelabs/skillzkit --force
+npm install -g @helmsmith/skillzkit --force
 ```
 
 ### TUI looks broken / colors weird
@@ -268,7 +268,7 @@ skillzkit config email new@example.com
 ### Where are the actual catalog files?
 
 The bundled catalog lives inside the npm package itself — typically
-at `$(npm prefix -g)/lib/node_modules/@jefelabs/skillzkit/`. The
+at `$(npm prefix -g)/lib/node_modules/@helmsmith/skillzkit/`. The
 `catalog.json` is the index; `.claude/commands/` and `.claude/skills/`
 hold the source markdown.
 

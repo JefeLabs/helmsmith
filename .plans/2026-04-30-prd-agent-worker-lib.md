@@ -10,7 +10,7 @@
 ## 1. Purpose
 
 The Agent Worker Lib is a lightweight TypeScript library — folder
-`packages/agent-worker-lib/`, package name `@jefelabs/agent-worker` —
+`packages/agent-worker-lib/`, package name `@helmsmith/agent-worker` —
 that provides the logic and terminal orchestration for a worker
 process spawned by the `harness-server`.
 

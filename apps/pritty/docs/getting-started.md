@@ -15,7 +15,7 @@ table in [executive-overview.md](executive-overview.md).
 ## 1. Install
 
 ```bash
-npm install -g @jefelabs/pritty
+npm install -g @helmsmith/pritty
 ```
 
 Verify:
@@ -316,7 +316,7 @@ cosmiconfig discovers any of: `.pritty.json`, `.prittyrc`,
 The programmatic API is exported:
 
 ```typescript
-import { categorize, loadConfig } from "@jefelabs/pritty";
+import { categorize, loadConfig } from "@helmsmith/pritty";
 
 const config = loadConfig();
 const buckets = categorize(stagedFiles, config.categories);
@@ -380,7 +380,7 @@ pritty auth login
 - **[feature-overview.md](feature-overview.md)** — full categorized
   list of features (shipped + planned).
 - **[architecture.md](architecture.md)** — how pritty is organized
-  internally; how it integrates with `@jefelabs/agent-auth` and
-  `@jefelabs/agent-adapter`.
+  internally; how it integrates with `@helmsmith/agent-auth` and
+  `@helmsmith/agent-adapter`.
 - **[executive-overview.md](executive-overview.md)** — high-level
   framing for sharing with teammates considering adoption.

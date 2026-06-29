@@ -26,7 +26,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { spawnWorker } from '@jefelabs/harness-server';
+import { spawnWorker } from '@helmsmith/harness-server';
 
 // SSH URL — repo is INTERNAL (org-only). HTTPS clone via GCM would need
 // the credential helper to carry an org-scoped token; SSH agent (already

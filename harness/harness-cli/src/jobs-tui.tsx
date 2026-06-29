@@ -3,7 +3,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import type { AgentTokens, Envelope, RegisteredAgent } from '@jefelabs/harness-core';
+import type { AgentTokens, Envelope, RegisteredAgent } from '@helmsmith/harness-core';
 import { createCliRenderer } from '@opentui/core';
 import { createRoot, useKeyboard, useOnResize, useRenderer } from '@opentui/react';
 import { useEffect, useRef, useState } from 'react';
