@@ -3,7 +3,7 @@
 **Status:** Draft (2026-05-07)
 **Owner:** Edwin Cruz
 **Audience:** future implementer (human or agent) picking this up cold
-**Module package:** `com.jefelabs.agentx.controlplane.harness`
+**Module package:** `com.jefelabs.helmsmith.controlplane.harness`
 **Companion documents:**
 - `2026-05-07-prd-control-plane.md` — umbrella for the Spring Modulith app
 - `2026-05-07-prd-core-module.md` — scaffolding + shared kernel (open module)

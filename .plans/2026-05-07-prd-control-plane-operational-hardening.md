@@ -3,7 +3,7 @@
 **Status:** Draft (2026-05-07)
 **Owner:** Edwin Cruz
 **Audience:** future implementer (human or agent) picking this up cold; this PRD lands as Phase 7 of the control plane build
-**Module package(s) affected:** `com.jefelabs.agentx.controlplane.core` (most additions); minor touches in `com.jefelabs.agentx.controlplane.harness`
+**Module package(s) affected:** `com.jefelabs.helmsmith.controlplane.core` (most additions); minor touches in `com.jefelabs.helmsmith.controlplane.harness`
 **Companion documents:**
 - `2026-05-07-prd-control-plane.md` — umbrella; Phase 7 references this PRD
 - `2026-05-07-prd-core-module.md` — owns the cross-cutting types (`TenantContext`, `AuditPublisher`); this PRD adds the *populators* and *exporters*

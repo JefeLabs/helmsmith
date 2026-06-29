@@ -23,11 +23,13 @@ Total history: **353 commits** (`git log` and `git blame` follow files across th
 
 ## Deferred follow-ups (intentionally NOT done in the merge)
 
-1. **npm scope rename `@ecruz165/*` → `@jefelabs/*`.**
-   The org is JefeLabs and the Java `groupId` is already `com.jefelabs.agentx`, but
-   every TS package is still `@ecruz165/*`. Do this as its own focused PR: rename
-   `name` in every `package.json`, update all internal imports, and reconcile the
-   publish target (see #4). Kept separate so the merge diff stays reviewable.
+1. ✅ **DONE — scope/namespace rename to the JefeLabs + helmsmith identity.**
+   - **TS:** `@ecruz165/* → @jefelabs/*` across all 25 packages + every import,
+     `workspace:*` dep, `tsup` `noExternal` regex, and `pnpm --filter` arg.
+   - **Java:** `com.jefelabs.agentx → com.jefelabs.helmsmith` (package + Maven
+     `groupId`), dropping the old "agentx" project segment in favor of the repo name.
+   Verified: `pnpm -r typecheck` 0 + full suite 3324 / 0 failed; `./mvnw test` BUILD
+   SUCCESS (2/2). Publish-target reconciliation (#4) is the remaining piece.
 
 2. **Extract `createHttpEmbedderClient` into a tiny `core/` lib.**
    `memory/edge-memory-server` depends on `context/context-loader-core` solely for the

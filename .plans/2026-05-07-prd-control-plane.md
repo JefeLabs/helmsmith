@@ -60,9 +60,9 @@ The project is bootstrapped from `.plans/2026-05-07-prd-control-plane-spring-ini
 
 | Property | Value |
 |---|---|
-| Group | `com.jefelabs.agentx` |
+| Group | `com.jefelabs.helmsmith` |
 | Artifact | `controlplane` |
-| Java root package | `com.jefelabs.agentx.controlplane` |
+| Java root package | `com.jefelabs.helmsmith.controlplane` |
 | Application class | `ControlplaneApplication` |
 | Build tool | Maven (with Maven wrapper `mvnw`) |
 | Java version | 25 |
@@ -119,10 +119,10 @@ This single flag makes blocking JDBC / Neo4j / outbound HTTP calls park virtual 
 
 ## 5. Package layout
 
-The Spring Modulith app is organized into seven modules under the Java root package `com.jefelabs.agentx.controlplane`. Each direct sub-package IS a Spring Modulith module — boundary verification tests run at the package-leaf level.
+The Spring Modulith app is organized into seven modules under the Java root package `com.jefelabs.helmsmith.controlplane`. Each direct sub-package IS a Spring Modulith module — boundary verification tests run at the package-leaf level.
 
 ```
-com.jefelabs.agentx.controlplane
+com.jefelabs.helmsmith.controlplane
 ├── core/         (OPEN)    scaffolding + shared kernel
 ├── catalog/      (closed)  pipelines, agents, skills, products
 ├── context/      (closed)  org-wide graph-RAG (Neo4j)
@@ -259,7 +259,7 @@ Cross-module access is **read-only via shared interfaces** — e.g., dispatch re
 | D7 | Implementation requirements extracted from this umbrella into `prd-core-module.md` | Umbrella stays focused on index + architecture; cross-cutting build/persistence/auth/observability concerns live with the module that owns them. | 2026-05-07 |
 | D8 | Java 21 LTS + Spring Boot 4.0.6 + Spring Modulith 2.0.6 | Initializr selected Java 25, downgraded to **Java 21 LTS** for implementation: LTS support window, broader CI matrix, virtual threads matured here (finalized in 21). Boot 4 supports 17+; the loss of Java 22-25 features (pattern-matching refinements, scoped values, etc.) is acceptable for a starting baseline. Re-evaluate when Java 25 LTS-equivalent ships. | 2026-05-07 |
 | D9 | Maven (with wrapper) over Gradle | Per Initializr. Maven's stricter conventions reduce yak-shaving; wrapper means contributors don't need a system install. | 2026-05-07 |
-| D10 | Group `com.jefelabs.agentx`; root package `com.jefelabs.agentx.controlplane` | Per Initializr. `jefelabs` is the org domain; `agentx` is the platform; `controlplane` is the module. | 2026-05-07 |
+| D10 | Group `com.jefelabs.helmsmith`; root package `com.jefelabs.helmsmith.controlplane` | Per Initializr. `jefelabs` is the org domain; `agentx` is the platform; `controlplane` is the module. | 2026-05-07 |
 | D11 | OpenAPI via springdoc (annotation-driven) | Per Initializr (`springdoc-openapi-starter-webmvc-ui` wired). Generates spec from controllers; no separate hand-authored YAML to maintain. | 2026-05-07 |
 | D12 | `spring-boot-docker-compose` for local dev sibling services | Per Initializr. `mvn spring-boot:run` auto-starts containers declared in `compose.yaml` (postgres, neo4j, embedder); no separate `docker compose up` step. | 2026-05-07 |
 | D13 | GraalVM native-image build available (`native-maven-plugin` wired); JVM image is v1 default | Native gives ~50MB images + sub-second startup but adds reflection config burden. JVM until module surfaces stabilize, then optionally flip. | 2026-05-07 |
