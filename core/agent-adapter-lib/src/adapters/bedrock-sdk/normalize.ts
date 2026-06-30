@@ -27,7 +27,8 @@ import type { AgentInput, ChatMessage, ToolDefinition } from '../../agent.ts';
 /** A Bedrock Converse content block (request side; subset the adapter emits). */
 export type BedrockContentBlock =
   | { text: string }
-  | { toolUse: { toolUseId: string; name: string; input: unknown } };
+  | { toolUse: { toolUseId: string; name: string; input: unknown } }
+  | { toolResult: { toolUseId: string; content: { text: string }[] } };
 
 /** A Bedrock Converse message — role + ordered content blocks. */
 export interface BedrockMessage {
@@ -80,13 +81,15 @@ export const DEFAULT_MAX_TOKENS = 4096;
 /**
  * Convert the lib's ChatMessage array into Bedrock Converse `messages`.
  *
- * Role mapping: 'user' → 'user', 'assistant' → 'assistant' (Converse keeps the
- * system prompt in a separate `system` field — never as a message role).
+ * Role mapping: 'assistant' → 'assistant'; 'user' and 'tool' → 'user' (Converse
+ * keeps the system prompt in a separate `system` field — never as a message
+ * role — and tool results ride back in a user-role message).
  *
  * ContentBlock mapping:
- *   - text       → { text }
- *   - tool-use   → { toolUse: { toolUseId, name, input } }
- *   - thinking   → skipped (assistant-only output; never re-sent upstream)
+ *   - text        → { text }
+ *   - tool-use    → { toolUse: { toolUseId, name, input } }
+ *   - tool-result → { toolResult: { toolUseId, content: [{ text }] } }
+ *   - thinking    → skipped (assistant-only output; never re-sent upstream)
  *
  * A message that maps to zero blocks (e.g. only thinking) gets a single empty
  * text block so the Converse request stays valid (content must be non-empty).
@@ -106,6 +109,11 @@ export function normalizeMessages(messages: ChatMessage[]): BedrockMessage[] {
         case 'tool-use':
           content.push({
             toolUse: { toolUseId: block.id, name: block.name, input: block.input ?? {} },
+          });
+          break;
+        case 'tool-result':
+          content.push({
+            toolResult: { toolUseId: block.toolCallId, content: [{ text: block.output }] },
           });
           break;
         case 'thinking':

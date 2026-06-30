@@ -24,7 +24,6 @@ export type AgentSpecType =
   | 'opencode-cli'
   | 'copilot-sdk'
   | 'copilot-cli'
-  | 'copilot-agent-cli'
   | 'gemini-cli'
   | 'gemini-sdk'
   | 'openai-sdk'
@@ -137,21 +136,19 @@ export interface OpenAiSdkSpec extends BaseSpec {
   apiKey?: string;
 }
 
-/** `gh copilot suggest` CLI — single-turn shell-suggestion, limited capability. */
+/**
+ * Standalone GitHub Copilot CLI (`copilot`) — autonomous built-in tools,
+ * headless via `copilot -p <prompt> --allow-all-tools --add-dir <workdir>`.
+ *
+ * Auth (PRD §8.5 / §12): the standalone `copilot` reads its token from the env
+ * vars COPILOT_GITHUB_TOKEN → GH_TOKEN → GITHUB_TOKEN (in that precedence). The
+ * adapter sandboxes $HOME to the workdir, hiding `copilot login`'s stored
+ * credential store, so an env token is required for headless use.
+ */
 export interface CopilotCliSpec extends BaseSpec {
   type: 'copilot-cli';
   binaryPath?: string;
   env?: Record<string, string>;
-  /** Suggest target. Defaults to 'shell'. */
-  subcommand?: 'shell' | 'git' | 'gh';
-}
-
-/** Agentic Copilot CLI — autonomous tool use via gh extension. */
-export interface CopilotAgentCliSpec extends BaseSpec {
-  type: 'copilot-agent-cli';
-  binaryPath?: string;
-  env?: Record<string, string>;
-  apiKey?: string;
 }
 
 /**
@@ -237,7 +234,6 @@ export type AgentSpec =
   | OpenCodeCliSpec
   | CopilotSdkSpec
   | CopilotCliSpec
-  | CopilotAgentCliSpec
   | GeminiCliSpec
   | GeminiSdkSpec
   | OpenAiSdkSpec
@@ -248,15 +244,32 @@ export type AgentSpec =
 // I/O types (PRD §7)
 // ---------------------------------------------------------------------------
 
-/** Structured content block — text, tool-use invocation, or thinking. */
+/**
+ * Structured content block — text, tool-use invocation, thinking, or a
+ * tool-result fed back to the model.
+ *
+ * `tool-result` lets a host feed a tool's OUTPUT back through AgentInput so the
+ * host-loop SDK adapters (claude-sdk, openai-sdk, gemini-sdk, copilot-sdk,
+ * bedrock-sdk) can continue an in-progress tool-use turn. `toolCallId` matches
+ * the `id` of the originating `tool-use` block; `output` is the (string)
+ * result the tool produced.
+ */
 export type ContentBlock =
   | { type: 'text'; text: string }
   | { type: 'tool-use'; id: string; name: string; input: unknown }
+  | { type: 'tool-result'; toolCallId: string; output: string }
   | { type: 'thinking'; thinking: string };
 
-/** A single message in a conversation turn. */
+/**
+ * A single message in a conversation turn.
+ *
+ * The `tool` role carries tool-result content blocks back to the model (the
+ * counterpart to an assistant `tool-use` block). A tool-result block may also
+ * appear inside a `user` turn — both forms are accepted and serialized to each
+ * provider's tool-result shape by the host-loop adapters.
+ */
 export interface ChatMessage {
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'tool';
   content: string | ContentBlock[];
 }
 
@@ -321,6 +334,15 @@ export interface AdapterCapabilities {
   reportsUsage: boolean;
   supportsStreaming: boolean;
   supportsToolUse: boolean;
+  /**
+   * How the adapter executes tool calls:
+   *   - 'autonomous' — the backend runs tools itself (agentic CLIs, claude-agent-sdk);
+   *   - 'host-loop'  — the adapter surfaces tool-use events and the host re-invokes
+   *     with the tool result (the chat-mode SDK adapters);
+   *   - 'none'       — no tool use at all.
+   * `supportsToolUse` is the derived convenience flag (`toolUseMode !== 'none'`).
+   */
+  toolUseMode: 'autonomous' | 'host-loop' | 'none';
   supportsExtendedThinking: boolean;
   supportsCancellation: boolean;
   supportsCapture: boolean;

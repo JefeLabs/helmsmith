@@ -188,9 +188,12 @@ function toStreamJsonMessage(message: ChatMessage): {
   type: 'user' | 'assistant';
   message: { role: 'user' | 'assistant'; content: unknown };
 } {
+  // Claude Code stream-json has no 'tool' role; tool results ride back as a user
+  // message (mirrors the Anthropic API).
+  const role: 'user' | 'assistant' = message.role === 'assistant' ? 'assistant' : 'user';
   const content =
     typeof message.content === 'string' ? message.content : message.content.map(toAnthropicBlock);
-  return { type: message.role, message: { role: message.role, content } };
+  return { type: role, message: { role, content } };
 }
 
 function toAnthropicBlock(block: Exclude<ChatMessage['content'], string>[number]): unknown {
@@ -199,6 +202,8 @@ function toAnthropicBlock(block: Exclude<ChatMessage['content'], string>[number]
       return { type: 'text', text: block.text };
     case 'tool-use':
       return { type: 'tool_use', id: block.id, name: block.name, input: block.input };
+    case 'tool-result':
+      return { type: 'tool_result', tool_use_id: block.toolCallId, content: block.output };
     case 'thinking':
       return { type: 'thinking', thinking: block.thinking };
     default:

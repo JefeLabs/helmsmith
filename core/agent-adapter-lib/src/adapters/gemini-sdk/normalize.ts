@@ -18,10 +18,11 @@ import type { ChatMessage, ContentBlock, ToolDefinition } from '../../agent.ts';
 // Gemini (@google/genai) shape aliases (inline — no SDK dependency)
 // ---------------------------------------------------------------------------
 
-/** Gemini `Part` — text part or a predicted functionCall part. */
+/** Gemini `Part` — text, a predicted functionCall, or a functionResponse. */
 export interface GeminiPart {
   text?: string;
   functionCall?: { id?: string; name?: string; args?: Record<string, unknown> };
+  functionResponse?: { id?: string; name?: string; response: Record<string, unknown> };
 }
 
 /** Gemini `Content` — one message; role is 'user' or 'model'. */
@@ -50,11 +51,13 @@ export interface GeminiTool {
 /**
  * Convert the lib's ChatMessage array into Gemini `contents`.
  *
- * Role mapping: 'user' → 'user', 'assistant' → 'model'.
+ * Role mapping: 'assistant' → 'model'; 'user' and 'tool' → 'user' (Gemini sends
+ * functionResponse parts back in a user-role turn).
  * ContentBlock mapping:
- *   - text       → { text }
- *   - tool-use   → { functionCall: { id, name, args } }
- *   - thinking   → skipped (assistant-only output; never re-sent)
+ *   - text        → { text }
+ *   - tool-use    → { functionCall: { id, name, args } }
+ *   - tool-result → { functionResponse: { id, response: { output } } }
+ *   - thinking    → skipped (assistant-only output; never re-sent)
  *
  * String content becomes a single text part. A message that maps to zero parts
  * (e.g. only thinking) gets a single empty text part so the request stays valid.
@@ -85,6 +88,13 @@ function normalizeContentBlock(block: ContentBlock): GeminiPart | null {
           ...(block.id ? { id: block.id } : {}),
           name: block.name,
           args: (block.input as Record<string, unknown>) ?? {},
+        },
+      };
+    case 'tool-result':
+      return {
+        functionResponse: {
+          ...(block.toolCallId ? { id: block.toolCallId } : {}),
+          response: { output: block.output },
         },
       };
     case 'thinking':
@@ -151,6 +161,7 @@ export function mapFinishReason(
     case 'OTHER':
       return 'error';
     default:
-      return 'stop';
+      // Unknown/future finish reasons must not be masked as a clean stop.
+      return 'error';
   }
 }

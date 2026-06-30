@@ -17,6 +17,7 @@ function makeCaps(overrides: Partial<AdapterCapabilities> = {}): AdapterCapabili
     reportsUsage: true,
     supportsStreaming: true,
     supportsToolUse: true,
+    toolUseMode: 'host-loop',
     supportsExtendedThinking: false,
     supportsCancellation: true,
     supportsCapture: true,
@@ -249,7 +250,6 @@ describe('createAgent', () => {
         'opencode-cli',
         'copilot-sdk',
         'copilot-cli',
-        'copilot-agent-cli',
       ];
 
       for (const type of types) {

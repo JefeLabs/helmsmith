@@ -44,6 +44,15 @@ describe('normalizeContents', () => {
     ];
     expect(normalizeContents(msgs)).toEqual([{ role: 'model', parts: [{ text: '' }] }]);
   });
+
+  it('maps a tool-result turn to a user functionResponse part', () => {
+    const msgs: ChatMessage[] = [
+      { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'call_1', output: '42' }] },
+    ];
+    expect(normalizeContents(msgs)).toEqual([
+      { role: 'user', parts: [{ functionResponse: { id: 'call_1', response: { output: '42' } } }] },
+    ]);
+  });
 });
 
 describe('normalizeTools', () => {
@@ -87,5 +96,9 @@ describe('mapFinishReason', () => {
     expect(mapFinishReason('OTHER')).toBe('error');
     expect(mapFinishReason(undefined)).toBeUndefined();
     expect(mapFinishReason(null)).toBeUndefined();
+  });
+
+  it('maps an unknown/future finish reason to error (not a clean stop)', () => {
+    expect(mapFinishReason('SOME_NEW_REASON')).toBe('error');
   });
 });

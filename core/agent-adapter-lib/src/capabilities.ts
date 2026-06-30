@@ -20,8 +20,10 @@ export type { AdapterCapabilities } from './agent.ts';
 /**
  * Static capability matrix for all built-in adapter types.
  *
- * TBD cells (opencode-cli reportsUsage, supportsExtendedThinking) are set
- * conservatively (false) until verified against the live tool in Phase D.
+ * `toolUseMode` records how each adapter executes tools: 'autonomous' (the
+ * backend runs tools itself), 'host-loop' (the adapter surfaces tool-use events
+ * and the host re-invokes), or 'none'. `supportsToolUse` is the derived
+ * convenience flag (`toolUseMode !== 'none'`) and is kept consistent per row.
  *
  * copilot-sdk supportsJsonMode: false in the static matrix — at construction
  * the adapter resolves this from spec.model against a known-models allowlist
@@ -32,6 +34,7 @@ export const CAPABILITY_MATRIX: Record<AgentSpecType, AdapterCapabilities> = {
     reportsUsage: true,
     supportsStreaming: true,
     supportsToolUse: true, // host-loop: adapter surfaces tool-use events; host re-invokes
+    toolUseMode: 'host-loop',
     supportsExtendedThinking: true,
     supportsCancellation: true,
     supportsCapture: true,
@@ -43,6 +46,7 @@ export const CAPABILITY_MATRIX: Record<AgentSpecType, AdapterCapabilities> = {
     reportsUsage: true,
     supportsStreaming: true,
     supportsToolUse: true, // autonomous tool execution via the Agent SDK
+    toolUseMode: 'autonomous',
     supportsExtendedThinking: true,
     supportsCancellation: true,
     supportsCapture: true,
@@ -54,6 +58,7 @@ export const CAPABILITY_MATRIX: Record<AgentSpecType, AdapterCapabilities> = {
     reportsUsage: true,
     supportsStreaming: true,
     supportsToolUse: true, // built-in tools (Read, Edit, Bash…); host cannot inject
+    toolUseMode: 'autonomous',
     supportsExtendedThinking: true,
     supportsCancellation: true, // SIGTERM
     supportsCapture: true, // transcript file
@@ -62,10 +67,11 @@ export const CAPABILITY_MATRIX: Record<AgentSpecType, AdapterCapabilities> = {
   },
 
   'opencode-cli': {
-    reportsUsage: false, // TBD — verify opencode emits usage in JSON output (Phase D)
+    reportsUsage: true, // verified: opencode emits token usage in its JSON output
     supportsStreaming: true,
     supportsToolUse: true, // built-in tools; host cannot inject
-    supportsExtendedThinking: false, // TBD — verify against upstream
+    toolUseMode: 'autonomous',
+    supportsExtendedThinking: true, // verified: opencode surfaces reasoning/thinking
     supportsCancellation: true, // SIGTERM
     supportsCapture: true, // transcript file
     supportsJsonMode: false,
@@ -76,6 +82,7 @@ export const CAPABILITY_MATRIX: Record<AgentSpecType, AdapterCapabilities> = {
     reportsUsage: true, // OpenAI-style usage block
     supportsStreaming: true, // SSE
     supportsToolUse: true, // OpenAI-style function calling; host can inject custom tools
+    toolUseMode: 'host-loop',
     supportsExtendedThinking: false,
     supportsCancellation: true, // AbortSignal aborts the fetch
     supportsCapture: true,
@@ -83,24 +90,20 @@ export const CAPABILITY_MATRIX: Record<AgentSpecType, AdapterCapabilities> = {
     supportsSessionResume: false, // server-side invocation-scoped
   },
 
+  // Verified against the REAL standalone `copilot` (GitHub Copilot CLI v1.0.65):
+  // `copilot -p <prompt> --allow-all-tools --add-dir <workdir>` runs an
+  // autonomous agent with built-in tools (edit files, run shell, search). The
+  // adapter uses text print mode and buffers stdout into one synthetic block, so
+  // it does NOT surface incremental chunks (supportsStreaming:false) and text
+  // mode reports no token usage (reportsUsage:false).
   'copilot-cli': {
-    reportsUsage: false, // gh copilot does not report tokens
-    supportsStreaming: false, // single-block output
-    supportsToolUse: false, // gh copilot is shell-suggestion only
+    reportsUsage: false, // text print mode emits no token counts
+    supportsStreaming: false, // adapter buffers stdout into one synthetic block
+    supportsToolUse: true, // autonomous built-in tools (--allow-all-tools)
+    toolUseMode: 'autonomous',
     supportsExtendedThinking: false,
     supportsCancellation: true, // SIGTERM
     supportsCapture: true, // full stdout transcript
-    supportsJsonMode: false,
-    supportsSessionResume: false,
-  },
-
-  'copilot-agent-cli': {
-    reportsUsage: false,
-    supportsStreaming: true,
-    supportsToolUse: true,
-    supportsExtendedThinking: false,
-    supportsCancellation: true, // SIGTERM
-    supportsCapture: true,
     supportsJsonMode: false,
     supportsSessionResume: false,
   },
@@ -112,6 +115,7 @@ export const CAPABILITY_MATRIX: Record<AgentSpecType, AdapterCapabilities> = {
     reportsUsage: true, // result event carries stats { input_tokens, output_tokens }
     supportsStreaming: true, // -o stream-json (newline-delimited JSON events)
     supportsToolUse: true, // autonomous built-in tools; --approval-mode yolo
+    toolUseMode: 'autonomous',
     supportsExtendedThinking: false, // stream-json has no thinking/reasoning event type
     supportsCancellation: true, // SIGTERM
     supportsCapture: true, // full stream-json transcript
@@ -127,6 +131,7 @@ export const CAPABILITY_MATRIX: Record<AgentSpecType, AdapterCapabilities> = {
     reportsUsage: true, // usageMetadata { promptTokenCount, candidatesTokenCount }
     supportsStreaming: true, // generateContentStream
     supportsToolUse: true, // host-loop: functionCall parts surfaced as tool-call-*
+    toolUseMode: 'host-loop',
     supportsExtendedThinking: false, // thinking parts not surfaced as thinking-delta (v1.1)
     supportsCancellation: true, // config.abortSignal aborts the request
     supportsCapture: true,
@@ -142,6 +147,7 @@ export const CAPABILITY_MATRIX: Record<AgentSpecType, AdapterCapabilities> = {
     reportsUsage: true, // usage { prompt_tokens, completion_tokens }
     supportsStreaming: true, // chat.completions.create({ stream: true })
     supportsToolUse: true, // host-loop: tool_calls deltas surfaced as tool-call-*
+    toolUseMode: 'host-loop',
     supportsExtendedThinking: false, // reasoning models expose no delta in chat.completions
     supportsCancellation: true, // RequestOptions.signal aborts the request
     supportsCapture: true,
@@ -157,6 +163,7 @@ export const CAPABILITY_MATRIX: Record<AgentSpecType, AdapterCapabilities> = {
     reportsUsage: true, // turn.completed.usage { input_tokens, output_tokens, cached_input_tokens }
     supportsStreaming: true, // --json (JSONL thread events)
     supportsToolUse: true, // autonomous built-in tools (exec/patch/mcp/web_search)
+    toolUseMode: 'autonomous',
     supportsExtendedThinking: true, // emits reasoning ThreadItems → thinking-delta
     supportsCancellation: true, // SIGTERM
     supportsCapture: true, // full JSONL transcript
@@ -173,6 +180,7 @@ export const CAPABILITY_MATRIX: Record<AgentSpecType, AdapterCapabilities> = {
     reportsUsage: true, // metadata.usage { inputTokens, outputTokens }
     supportsStreaming: true, // ConverseStreamCommand
     supportsToolUse: true, // host-loop: contentBlock toolUse surfaced as tool-call-*
+    toolUseMode: 'host-loop',
     supportsExtendedThinking: true, // ContentBlockDelta.reasoningContent.text → thinking-delta
     supportsCancellation: true, // client.send(cmd, { abortSignal }) aborts the request
     supportsCapture: true,
@@ -190,9 +198,9 @@ export const CAPABILITY_MATRIX: Record<AgentSpecType, AdapterCapabilities> = {
  * in the filter. An empty (or absent) filter returns all types.
  *
  * Example:
- *   listAdapterTypes({ supportsToolUse: true })   // excludes copilot-cli
- *   listAdapterTypes({ supportsStreaming: true })  // excludes copilot-cli
- *   listAdapterTypes()                             // all 7 types
+ *   listAdapterTypes({ toolUseMode: 'autonomous' })  // the 6 agentic adapters
+ *   listAdapterTypes({ supportsStreaming: true })     // excludes copilot-cli
+ *   listAdapterTypes()                                // all 11 types
  */
 export function listAdapterTypes(filter?: Partial<AdapterCapabilities>): AgentSpecType[] {
   const entries = Object.entries(CAPABILITY_MATRIX) as [AgentSpecType, AdapterCapabilities][];
@@ -221,10 +229,14 @@ export function intersectCapabilities(
   a: AdapterCapabilities,
   b: AdapterCapabilities,
 ): AdapterCapabilities {
+  const supportsToolUse = a.supportsToolUse && b.supportsToolUse;
   return {
     reportsUsage: a.reportsUsage && b.reportsUsage,
     supportsStreaming: a.supportsStreaming && b.supportsStreaming,
-    supportsToolUse: a.supportsToolUse && b.supportsToolUse,
+    supportsToolUse,
+    // Tool use is only composable when both sides agree on the mode; differing
+    // modes (autonomous vs host-loop) have no shared execution model → 'none'.
+    toolUseMode: supportsToolUse && a.toolUseMode === b.toolUseMode ? a.toolUseMode : 'none',
     supportsExtendedThinking: a.supportsExtendedThinking && b.supportsExtendedThinking,
     supportsCancellation: a.supportsCancellation && b.supportsCancellation,
     supportsCapture: a.supportsCapture && b.supportsCapture,

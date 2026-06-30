@@ -71,17 +71,22 @@ export interface SdkTool {
 /**
  * Convert the lib's ChatMessage array into Anthropic SDK MessageParam format.
  *
+ * Role mapping: 'assistant' → 'assistant'; 'user' and 'tool' → 'user' (Anthropic
+ * has no dedicated tool role — tool results ride back in a user-role message).
+ *
  * ContentBlock mapping:
- *   - text       → { type: 'text', text }
- *   - tool-use   → { type: 'tool_use', id, name, input }
- *   - thinking   → skipped (thinking is assistant output; not re-sent to API)
+ *   - text        → { type: 'text', text }
+ *   - tool-use    → { type: 'tool_use', id, name, input }
+ *   - tool-result → { type: 'tool_result', tool_use_id, content }
+ *   - thinking    → skipped (thinking is assistant output; not re-sent to API)
  *
  * String content passes through unchanged (SDK accepts string directly).
  */
 export function normalizeMessages(messages: ChatMessage[]): SdkMessageParam[] {
   return messages.map((msg): SdkMessageParam => {
+    const role: SdkMessageParam['role'] = msg.role === 'assistant' ? 'assistant' : 'user';
     if (typeof msg.content === 'string') {
-      return { role: msg.role, content: msg.content };
+      return { role, content: msg.content };
     }
     const sdkBlocks: SdkContentBlock[] = [];
     for (const block of msg.content) {
@@ -91,9 +96,9 @@ export function normalizeMessages(messages: ChatMessage[]): SdkMessageParam[] {
     // If all blocks were filtered (e.g., only thinking blocks), fall back to empty text
     // so the SDK receives a valid message.
     if (sdkBlocks.length === 0) {
-      return { role: msg.role, content: '' };
+      return { role, content: '' };
     }
-    return { role: msg.role, content: sdkBlocks };
+    return { role, content: sdkBlocks };
   });
 }
 
@@ -103,6 +108,8 @@ function normalizeContentBlock(block: ContentBlock): SdkContentBlock | null {
       return { type: 'text', text: block.text };
     case 'tool-use':
       return { type: 'tool_use', id: block.id, name: block.name, input: block.input };
+    case 'tool-result':
+      return { type: 'tool_result', tool_use_id: block.toolCallId, content: block.output };
     case 'thinking':
       // Thinking blocks are assistant-output only; never sent back to the API.
       return null;

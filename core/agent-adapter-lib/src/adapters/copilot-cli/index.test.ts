@@ -1,12 +1,13 @@
 /**
  * CopilotCliAdapter unit tests.
  *
- * Mocks node:child_process.spawn (the repo fakeChild pattern) so no real `gh`
- * runs. Covers: spawn argv (real agentic `gh copilot -- -p …` shape) + cwd +
- * sandbox env ($HOME/$TMPDIR=workdir, injected GH_TOKEN/GITHUB_TOKEN); the
- * single synthetic text-delta + message-stop (no streaming); custom `tools` →
- * CapabilityMismatchError (mirrors the CLI capability guard); abort →
- * 'aborted'; broker-based GH token injection; MissingCredentialError.
+ * Mocks node:child_process.spawn (the repo fakeChild pattern) so no real
+ * `copilot` runs. Covers: spawn argv (standalone `copilot -p … --allow-all-tools
+ * --add-dir <workdir>` shape) + cwd + sandbox env ($HOME/$TMPDIR=workdir,
+ * injected COPILOT_GITHUB_TOKEN/GH_TOKEN/GITHUB_TOKEN); the single synthetic
+ * text-delta + message-stop (text print mode, no streaming); autonomous caps
+ * (supportsToolUse:true, toolUseMode:'autonomous'); abort → 'aborted';
+ * broker-based token injection; MissingCredentialError.
  */
 
 import { EventEmitter } from 'node:events';
@@ -66,16 +67,21 @@ function makeDeps(over?: Partial<AdapterDeps>): AdapterDeps {
   return { workdir: '/work/dir', repoRoot: '/work/dir', commit: 'abc', branch: 'main', ...over };
 }
 
+let savedCopilot: string | undefined;
 let savedGh: string | undefined;
 let savedGithub: string | undefined;
 beforeEach(() => {
   mockSpawn.mockReset();
+  savedCopilot = process.env.COPILOT_GITHUB_TOKEN;
   savedGh = process.env.GH_TOKEN;
   savedGithub = process.env.GITHUB_TOKEN;
+  delete process.env.COPILOT_GITHUB_TOKEN;
   delete process.env.GH_TOKEN;
   delete process.env.GITHUB_TOKEN;
 });
 afterEach(() => {
+  if (savedCopilot === undefined) delete process.env.COPILOT_GITHUB_TOKEN;
+  else process.env.COPILOT_GITHUB_TOKEN = savedCopilot;
   if (savedGh === undefined) delete process.env.GH_TOKEN;
   else process.env.GH_TOKEN = savedGh;
   if (savedGithub === undefined) delete process.env.GITHUB_TOKEN;
@@ -87,8 +93,8 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('CopilotCliAdapter — spawn contract', () => {
-  it('spawns `gh copilot -- -p …` with cwd=workdir and sandbox env', async () => {
-    mockSpawn.mockImplementation(() => fakeChild(['suggested answer']));
+  it('spawns `copilot -p … --allow-all-tools --add-dir <workdir>` with cwd + sandbox env', async () => {
+    mockSpawn.mockImplementation(() => fakeChild(['answer']));
     const { CopilotCliAdapter } = await import('./index.ts');
 
     const adapter = new CopilotCliAdapter(
@@ -109,27 +115,27 @@ describe('CopilotCliAdapter — spawn contract', () => {
     ];
     expect(binary).toBe(BIN);
     expect(args).toEqual([
-      'copilot',
-      '--',
       '-p',
       'list files',
       '--allow-all-tools',
+      '--add-dir',
+      '/work/dir',
       '--no-color',
-      '--log-level',
-      'none',
+      '--silent',
       '--model',
       'gpt-4o',
     ]);
     expect(options.cwd).toBe('/work/dir');
     expect(options.env.HOME).toBe('/work/dir');
     expect(options.env.TMPDIR).toBe('/work/dir');
+    expect(options.env.COPILOT_GITHUB_TOKEN).toBe('gho_test_token');
     expect(options.env.GH_TOKEN).toBe('gho_test_token');
     expect(options.env.GITHUB_TOKEN).toBe('gho_test_token');
   });
 });
 
 // ---------------------------------------------------------------------------
-// Single synthetic chunk (no streaming)
+// Single synthetic chunk (text print mode, no streaming)
 // ---------------------------------------------------------------------------
 
 describe('CopilotCliAdapter — single-block output', () => {
@@ -166,26 +172,27 @@ describe('CopilotCliAdapter — single-block output', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tool use rejected (limited adapter) + abort
+// Autonomous capability + abort
 // ---------------------------------------------------------------------------
 
-describe('CopilotCliAdapter — limited capability + abort', () => {
-  it('rejects a custom tools array with CapabilityMismatchError', async () => {
+describe('CopilotCliAdapter — autonomous capability + abort', () => {
+  it('reports autonomous tool use and accepts a custom tools array (no reject)', async () => {
     mockSpawn.mockImplementation(() => fakeChild(['x']));
     const { CopilotCliAdapter } = await import('./index.ts');
-    const { CapabilityMismatchError } = await import('../../errors.ts');
     const adapter = new CopilotCliAdapter(
       { type: 'copilot-cli', model: 'm', binaryPath: BIN },
       makeDeps(),
       'tok',
     );
-    await expect(
-      adapter.invoke({ messages: [{ role: 'user', content: 'q' }], tools: [{ name: 'f' }] }),
-    ).rejects.toBeInstanceOf(CapabilityMismatchError);
-    expect(mockSpawn).not.toHaveBeenCalled();
+    const result = await adapter.invoke({
+      messages: [{ role: 'user', content: 'q' }],
+      tools: [{ name: 'f' }],
+    });
+    expect(result.finishReason).toBe('stop');
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
   });
 
-  it('does not report streaming/tool-use capability', async () => {
+  it('reports autonomous tool use, no streaming, no usage', async () => {
     mockSpawn.mockImplementation(() => fakeChild(['x']));
     const { CopilotCliAdapter } = await import('./index.ts');
     const adapter = new CopilotCliAdapter(
@@ -194,7 +201,8 @@ describe('CopilotCliAdapter — limited capability + abort', () => {
       'tok',
     );
     expect(adapter.capabilities.supportsStreaming).toBe(false);
-    expect(adapter.capabilities.supportsToolUse).toBe(false);
+    expect(adapter.capabilities.supportsToolUse).toBe(true);
+    expect(adapter.capabilities.toolUseMode).toBe('autonomous');
     expect(adapter.capabilities.reportsUsage).toBe(false);
   });
 
@@ -225,11 +233,11 @@ describe('CopilotCliAdapter — limited capability + abort', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Auth (GH_TOKEN) via the registered factory
+// Auth (token) via the registered factory
 // ---------------------------------------------------------------------------
 
 describe('CopilotCliAdapter — auth', () => {
-  it('factory throws MissingCredentialError when no GH_TOKEN and no broker', async () => {
+  it('factory throws MissingCredentialError when no token and no broker', async () => {
     await import('./index.ts');
     const factory = getAdapterFactory('copilot-cli');
     expect(factory).toBeDefined();
@@ -238,7 +246,7 @@ describe('CopilotCliAdapter — auth', () => {
     );
   });
 
-  it('injects the broker-resolved github token as GH_TOKEN into the child env', async () => {
+  it('injects the broker-resolved github token into the child env', async () => {
     mockSpawn.mockImplementation(() => fakeChild(['ok']));
     await import('./index.ts');
     const factory = getAdapterFactory('copilot-cli');
@@ -252,21 +260,27 @@ describe('CopilotCliAdapter — auth', () => {
     }
     expect(broker.getCredential).toHaveBeenCalledWith('github');
     const options = mockSpawn.mock.calls[0][2] as { env: NodeJS.ProcessEnv };
+    expect(options.env.COPILOT_GITHUB_TOKEN).toBe('gho_from_broker');
     expect(options.env.GH_TOKEN).toBe('gho_from_broker');
   });
 
-  it('reads GH_TOKEN from spec.env when present', async () => {
+  it('reads COPILOT_GITHUB_TOKEN from spec.env when present', async () => {
     mockSpawn.mockImplementation(() => fakeChild(['ok']));
     await import('./index.ts');
     const factory = getAdapterFactory('copilot-cli');
     const adapter = factory?.factory(
-      { type: 'copilot-cli', model: 'm', binaryPath: BIN, env: { GH_TOKEN: 'gho_from_spec' } },
+      {
+        type: 'copilot-cli',
+        model: 'm',
+        binaryPath: BIN,
+        env: { COPILOT_GITHUB_TOKEN: 'tok_from_spec' },
+      },
       makeDeps(),
     );
     for await (const _ of adapter!.stream({ messages: [{ role: 'user', content: 'hi' }] })) {
       /* drain */
     }
     const options = mockSpawn.mock.calls[0][2] as { env: NodeJS.ProcessEnv };
-    expect(options.env.GH_TOKEN).toBe('gho_from_spec');
+    expect(options.env.COPILOT_GITHUB_TOKEN).toBe('tok_from_spec');
   });
 });

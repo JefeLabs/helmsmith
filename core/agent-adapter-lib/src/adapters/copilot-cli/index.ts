@@ -1,34 +1,35 @@
 /**
- * CopilotCliAdapter — `gh copilot` CLI subprocess adapter (PRD §8.5, Phase D′).
+ * CopilotCliAdapter — standalone `copilot` CLI subprocess adapter (PRD §8.5).
  *
  * Implements the NEW AgentAdapter interface from src/agent.ts.
  * NOT exported from index.ts until Phase F (coexistence rule).
  *
- * ⚠️ SHAPE DEVIATION (see flags.ts): the installed `gh copilot` v1.2.0 is the
- * agentic Copilot CLI launcher (no `suggest`/`--target`). This adapter wraps its
- * documented NON-INTERACTIVE PRINT MODE (`gh copilot -- -p "<prompt>"
- * --allow-all-tools …`) — single-shot, single-block output. Per the plan, the
- * surfaced contract stays "limited": no streaming, no host-injected tools.
+ * Targets the REAL standalone GitHub Copilot CLI v1.0.65 (`copilot`, NOT the old
+ * `gh copilot` launcher) in its documented NON-INTERACTIVE PRINT MODE:
+ *
+ *   copilot -p "<prompt>" --allow-all-tools --add-dir <workdir> --no-color --silent
+ *
+ * The standalone `copilot` is an AUTONOMOUS agent (edits files, runs shell,
+ * searches the codebase), so the adapter reports toolUseMode:'autonomous'
+ * (supportsToolUse:true). See flags.ts for the verified flag set.
  *
  * Behaviour:
- *   - stream(): spawns the launcher via shared/child-process.ts with cwd=workdir,
- *     buffers ALL stdout, then emits ONE synthetic text-delta + message-stop so
- *     the streaming contract holds without being incremental (PRD §8.5).
+ *   - stream(): spawns `copilot` via shared/child-process.ts with cwd=workdir,
+ *     buffers ALL stdout (text print mode), then emits ONE synthetic text-delta +
+ *     message-stop. The adapter does NOT parse the JSONL (`--output-format json`)
+ *     stream — text mode is the verified-robust path — so supportsStreaming:false.
  *   - invoke(): reduceStream(stream(...)) — invoke/stream parity (PRD §10).
- *   - Sandbox (PRD §8.5): $HOME + $TMPDIR redirect to workdir so `gh`/`copilot`
- *     state (~/.config/gh, ~/.copilot) is isolated and the agentic tools' blast
- *     radius is bounded to the workdir.
- *   - Auth (PRD §8.5 / §12): `gh` honours GH_TOKEN; injected into the child env.
- *     ⚠️ BROKER GAP (FLAGGED, not blocking): the broker's 'github-copilot'
- *     provider now returns the EXCHANGED Copilot session token (Phase 0), NOT the
- *     raw GitHub OAuth token that `gh` needs. There is no broker provider that
- *     surfaces the raw GitHub token for the CLI today, so this adapter reads
- *     GH_TOKEN/GITHUB_TOKEN from env/spec.env (best-effort broker.getCredential
- *     ('github') is attempted for forward-compat). MissingCredentialError at
+ *   - Sandbox (PRD §8.5): $HOME + $TMPDIR redirect to workdir so `copilot` state
+ *     (~/.copilot) is isolated and the agent's blast radius is bounded to the
+ *     workdir (mirrors opencode's sandbox).
+ *   - Auth (PRD §8.5 / §12): the standalone `copilot` reads its token from the
+ *     env in precedence order COPILOT_GITHUB_TOKEN → GH_TOKEN → GITHUB_TOKEN
+ *     (`copilot login --help`). The adapter injects the resolved token as all
+ *     three so headless auth works despite the $HOME sandbox hiding `copilot
+ *     login`'s stored credential store. Supported token types: fine-grained PATs
+ *     with "Copilot Requests", Copilot CLI OAuth tokens, and `gh` OAuth tokens
+ *     (classic ghp_ PATs are NOT supported). MissingCredentialError at
  *     construction when none resolves (fail-fast).
- *   - Tool use: NOT host-injectable. supportsToolUse:false — a custom `tools`
- *     array is rejected by the shared capability guard (mirrors claude-code-cli /
- *     opencode-cli; a later consolidated fix centralizes this).
  *   - AbortSignal → SIGTERM→SIGKILL (shared child-process) → finishReason:'aborted'.
  *   - Capabilities: CAPABILITY_MATRIX['copilot-cli'].
  */
@@ -68,15 +69,15 @@ export class CopilotCliAdapter implements AgentAdapter {
   readonly workdir: string;
 
   private readonly spec: CopilotCliSpec;
-  private readonly ghToken: string;
+  private readonly token: string;
   private readonly binary: string;
   private readonly logger?: Logger;
 
-  constructor(spec: CopilotCliSpec, deps: AdapterDeps, ghToken: string) {
+  constructor(spec: CopilotCliSpec, deps: AdapterDeps, token: string) {
     this.spec = spec;
     this.workdir = deps.workdir;
     this.capabilities = CAPABILITY_MATRIX['copilot-cli'];
-    this.ghToken = ghToken;
+    this.token = token;
     this.logger = deps.logger;
     // Resolve the binary at construction (fail-fast BinaryNotFoundError, PRD §9).
     this.binary = resolveBinary(COPILOT_CLI_BINARY, spec.binaryPath);
@@ -92,13 +93,13 @@ export class CopilotCliAdapter implements AgentAdapter {
   }
 
   // -------------------------------------------------------------------------
-  // stream — spawn `gh copilot`, buffer stdout, emit ONE synthetic text-delta
+  // stream — spawn `copilot`, buffer stdout, emit ONE synthetic text-delta
   // -------------------------------------------------------------------------
 
   async *stream(input: AgentInput, opts?: InvokeOptions): AsyncIterable<AgentChunk> {
     this._checkToolCapability(input);
 
-    const args = buildCopilotCliArgs(this.spec, input);
+    const args = buildCopilotCliArgs(this.spec, input, this.workdir);
     const env = this._buildSandboxEnv();
 
     this.logger?.debug?.('[copilot-cli] spawn', { binary: this.binary, args, cwd: this.workdir });
@@ -136,7 +137,7 @@ export class CopilotCliAdapter implements AgentAdapter {
       return;
     }
 
-    // Single-block output → ONE synthetic text-delta + message-stop (PRD §8.5).
+    // Text print mode → ONE synthetic text-delta + message-stop (PRD §8.5).
     const text = lines.join('\n').trim();
     if (text.length > 0) {
       yield { type: 'text-delta', text };
@@ -145,7 +146,7 @@ export class CopilotCliAdapter implements AgentAdapter {
   }
 
   // -------------------------------------------------------------------------
-  // Sandbox env (PRD §8.5): $HOME + $TMPDIR → workdir; inject GH_TOKEN
+  // Sandbox env (PRD §8.5): $HOME + $TMPDIR → workdir; inject the Copilot token
   // -------------------------------------------------------------------------
 
   private _buildSandboxEnv(): NodeJS.ProcessEnv {
@@ -155,8 +156,11 @@ export class CopilotCliAdapter implements AgentAdapter {
       // Sandbox + injected credential WIN over any spec.env / inherited values.
       HOME: this.workdir,
       TMPDIR: this.workdir,
-      GH_TOKEN: this.ghToken,
-      GITHUB_TOKEN: this.ghToken,
+      // The standalone `copilot` checks COPILOT_GITHUB_TOKEN → GH_TOKEN →
+      // GITHUB_TOKEN (in precedence order); inject all three.
+      COPILOT_GITHUB_TOKEN: this.token,
+      GH_TOKEN: this.token,
+      GITHUB_TOKEN: this.token,
     };
   }
 
@@ -181,23 +185,32 @@ function toAdapterError(err: unknown): AdapterError {
 }
 
 // ---------------------------------------------------------------------------
-// GH token resolution (async — broker may need network)
+// Token resolution (async — broker may need network)
 // ---------------------------------------------------------------------------
 
+/** Read a Copilot/GitHub token from the standard env precedence + spec.env. */
+function tokenFromEnv(spec: CopilotCliSpec): string | undefined {
+  return (
+    spec.env?.COPILOT_GITHUB_TOKEN ??
+    spec.env?.GH_TOKEN ??
+    spec.env?.GITHUB_TOKEN ??
+    process.env.COPILOT_GITHUB_TOKEN ??
+    process.env.GH_TOKEN ??
+    process.env.GITHUB_TOKEN
+  );
+}
+
 /**
- * Resolve the GitHub token `gh` needs. Priority: spec.env.GH_TOKEN →
- * process.env.GH_TOKEN → process.env.GITHUB_TOKEN → broker.getCredential('github')
- * (best-effort forward-compat) → MissingCredentialError.
- *
- * See the class doc + report: the broker does not currently surface the raw
- * GitHub token for the CLI (its 'github-copilot' provider returns the exchanged
- * Copilot session token, which `gh` cannot use).
+ * Resolve the token the standalone `copilot` needs. Priority: spec.env /
+ * process.env (COPILOT_GITHUB_TOKEN → GH_TOKEN → GITHUB_TOKEN) →
+ * broker.getCredential('github') (best-effort forward-compat) →
+ * MissingCredentialError.
  */
-export async function resolveGhToken(
+export async function resolveCopilotToken(
   spec: CopilotCliSpec,
   broker?: CredentialBroker,
 ): Promise<string> {
-  const fromEnv = spec.env?.GH_TOKEN ?? process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN;
+  const fromEnv = tokenFromEnv(spec);
   if (fromEnv) return fromEnv;
   if (broker) {
     try {
@@ -208,10 +221,11 @@ export async function resolveGhToken(
     }
   }
   throw new MissingCredentialError(
-    'No GitHub token found for copilot-cli adapter. `gh` needs the GitHub OAuth token (GH_TOKEN), ' +
-      'NOT the exchanged Copilot session token. Provide it via spec.env.GH_TOKEN, the GH_TOKEN / ' +
-      'GITHUB_TOKEN environment variable, or a broker that resolves the "github" provider. ' +
-      "The adapter sandboxes $HOME, so `gh`'s own ~/.config/gh auth is not reachable.",
+    'No GitHub token found for copilot-cli adapter. The standalone `copilot` needs a token via ' +
+      'COPILOT_GITHUB_TOKEN / GH_TOKEN / GITHUB_TOKEN (a fine-grained PAT with "Copilot Requests", ' +
+      'a Copilot CLI OAuth token, or a `gh` OAuth token — classic ghp_ PATs are not supported). ' +
+      'Provide it via spec.env, the environment, or a broker resolving the "github" provider. ' +
+      "The adapter sandboxes $HOME, so `copilot login`'s stored credential is not reachable.",
   );
 }
 
@@ -223,14 +237,14 @@ registerAdapter(
   'copilot-cli',
   (spec, deps) => {
     const cliSpec = spec as CopilotCliSpec;
-    const syncToken =
-      cliSpec.env?.GH_TOKEN ?? process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN ?? undefined;
+    const syncToken = tokenFromEnv(cliSpec);
 
     if (!syncToken && !deps.credentialBroker) {
       throw new MissingCredentialError(
-        'No GitHub token found for copilot-cli adapter. `gh` needs GH_TOKEN (the GitHub OAuth ' +
-          'token, NOT the exchanged Copilot session token). Provide it via spec.env.GH_TOKEN, ' +
-          'the GH_TOKEN / GITHUB_TOKEN environment variable, or a broker resolving "github".',
+        'No GitHub token found for copilot-cli adapter. The standalone `copilot` needs a token via ' +
+          'COPILOT_GITHUB_TOKEN / GH_TOKEN / GITHUB_TOKEN (a fine-grained PAT with "Copilot ' +
+          'Requests", a Copilot CLI OAuth token, or a `gh` OAuth token). Provide it via spec.env, ' +
+          'the environment, or a broker resolving the "github" provider.',
       );
     }
 
@@ -267,7 +281,7 @@ class LazyCopilotCliAdapter implements AgentAdapter {
   private async _resolve(): Promise<CopilotCliAdapter> {
     if (this._inner) return this._inner;
     if (!this._resolving) {
-      this._resolving = resolveGhToken(this.spec, this.broker).then((token) => {
+      this._resolving = resolveCopilotToken(this.spec, this.broker).then((token) => {
         this._inner = new CopilotCliAdapter(this.spec, this.deps, token);
         return this._inner;
       });

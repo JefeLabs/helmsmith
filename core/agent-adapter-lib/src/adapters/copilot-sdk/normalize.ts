@@ -25,9 +25,11 @@ interface OpenAiToolCall {
 }
 
 interface OpenAiMessage {
-  role: 'system' | 'user' | 'assistant';
+  role: 'system' | 'user' | 'assistant' | 'tool';
   content: string | null;
   tool_calls?: OpenAiToolCall[];
+  /** Present only on `role:'tool'` messages — the id of the originating tool call. */
+  tool_call_id?: string;
 }
 
 interface OpenAiTool {
@@ -59,9 +61,14 @@ export interface OpenAiRequestBody {
  * spec) is prepended as a `system` message.
  *
  * ContentBlock mapping:
- *   - text       → concatenated into the message `content` string
- *   - tool-use   → assistant `tool_calls` entry (OpenAI function-calling shape)
- *   - thinking   → skipped (assistant-only output; never re-sent)
+ *   - text        → concatenated into the message `content` string
+ *   - tool-use    → assistant `tool_calls` entry (OpenAI function-calling shape)
+ *   - tool-result → a separate `{ role:'tool', tool_call_id, content }` message
+ *   - thinking    → skipped (assistant-only output; never re-sent)
+ *
+ * A 'tool'-role message (or any message carrying tool-result blocks) expands to
+ * one `role:'tool'` message per tool result — the OpenAI-compatible endpoint
+ * requires a distinct tool message per tool_call_id.
  */
 export function normalizeMessages(messages: ChatMessage[], systemPrompt?: string): OpenAiMessage[] {
   const out: OpenAiMessage[] = [];
@@ -69,18 +76,20 @@ export function normalizeMessages(messages: ChatMessage[], systemPrompt?: string
     out.push({ role: 'system', content: systemPrompt });
   }
   for (const msg of messages) {
-    out.push(normalizeMessage(msg));
+    out.push(...normalizeMessage(msg));
   }
   return out;
 }
 
-function normalizeMessage(msg: ChatMessage): OpenAiMessage {
+function normalizeMessage(msg: ChatMessage): OpenAiMessage[] {
+  const role: 'user' | 'assistant' = msg.role === 'assistant' ? 'assistant' : 'user';
   if (typeof msg.content === 'string') {
-    return { role: msg.role, content: msg.content };
+    return [{ role, content: msg.content }];
   }
 
   let text = '';
   const toolCalls: OpenAiToolCall[] = [];
+  const toolMessages: OpenAiMessage[] = [];
   for (const block of msg.content) {
     switch (block.type) {
       case 'text':
@@ -93,18 +102,25 @@ function normalizeMessage(msg: ChatMessage): OpenAiMessage {
           function: { name: block.name, arguments: JSON.stringify(block.input ?? {}) },
         });
         break;
+      case 'tool-result':
+        toolMessages.push({ role: 'tool', tool_call_id: block.toolCallId, content: block.output });
+        break;
       case 'thinking':
         // Thinking blocks are assistant-output only; never sent back upstream.
         break;
     }
   }
 
-  const message: OpenAiMessage = {
-    role: msg.role,
-    content: text.length > 0 ? text : null,
-  };
-  if (toolCalls.length > 0) message.tool_calls = toolCalls;
-  return message;
+  const out: OpenAiMessage[] = [];
+  // Emit the assistant/user message only when it carries text or tool calls — a
+  // pure tool-result turn produces just the tool messages.
+  if (text.length > 0 || toolCalls.length > 0) {
+    const message: OpenAiMessage = { role, content: text.length > 0 ? text : null };
+    if (toolCalls.length > 0) message.tool_calls = toolCalls;
+    out.push(message);
+  }
+  out.push(...toolMessages);
+  return out;
 }
 
 // ---------------------------------------------------------------------------

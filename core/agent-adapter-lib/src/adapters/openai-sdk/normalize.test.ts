@@ -49,6 +49,13 @@ describe('normalizeMessages', () => {
     ]);
     expect(out[0]?.content).toBeNull();
   });
+
+  it('expands a tool-result turn into a role:tool message', () => {
+    const out = normalizeMessages([
+      { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'call_1', output: '42' }] },
+    ]);
+    expect(out).toEqual([{ role: 'tool', tool_call_id: 'call_1', content: '42' }]);
+  });
 });
 
 describe('normalizeTools', () => {
@@ -110,5 +117,9 @@ describe('mapFinishReason', () => {
     expect(mapFinishReason('function_call')).toBe('tool_use');
     expect(mapFinishReason('content_filter')).toBe('content_filter');
     expect(mapFinishReason(null)).toBeUndefined();
+  });
+
+  it('maps an unknown/future finish reason to error (not a clean stop)', () => {
+    expect(mapFinishReason('some_new_reason')).toBe('error');
   });
 });

@@ -16,6 +16,7 @@ function makeCaps(overrides: Partial<AdapterCapabilities> = {}): AdapterCapabili
     reportsUsage: false,
     supportsStreaming: false,
     supportsToolUse: false,
+    toolUseMode: 'none',
     supportsExtendedThinking: false,
     supportsCancellation: false,
     supportsCapture: false,

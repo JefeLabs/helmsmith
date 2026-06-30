@@ -1,17 +1,23 @@
 /**
- * LIVE integration test for CopilotCliAdapter.
+ * LIVE integration test for CopilotCliAdapter (standalone `copilot`).
  *
  * Triple-gated and SKIPPED by default:
- *   1. the `gh` binary is resolvable,
- *   2. a GitHub token is present (GH_TOKEN or GITHUB_TOKEN), AND
+ *   1. the `copilot` binary is resolvable,
+ *   2. a token is present (COPILOT_GITHUB_TOKEN / GH_TOKEN / GITHUB_TOKEN), AND
  *   3. COPILOT_CLI_LIVE=1 is set (explicit opt-in).
  *
- * The opt-in is deliberate: the installed `gh copilot` v1.2.0 is the AGENTIC
- * Copilot CLI (not the old `suggest` shell-helper), so a live run launches an
- * autonomous agent with --allow-all-tools. The adapter sandboxes $HOME/$TMPDIR
- * + cwd to a throwaway workdir to bound blast radius, but we still require the
- * explicit flag so CI / dev boxes never trigger it inadvertently. Skipping when
- * the gates are unmet is expected, not a failure.
+ * The opt-in is deliberate: the standalone `copilot` is an AUTONOMOUS agent run
+ * with --allow-all-tools. The adapter sandboxes $HOME/$TMPDIR + cwd to a
+ * throwaway workdir to bound blast radius, but we still require the explicit flag
+ * so CI / dev boxes never trigger it inadvertently. Skipping when the gates are
+ * unmet is expected, not a failure.
+ *
+ * NOTE (env limitation captured during the rework): on the dev box used to build
+ * this, the live model call was blocked by an org Copilot policy ("Access denied
+ * by policy settings" / "not authorized to use this Copilot feature"), so this
+ * test could not be exercised end-to-end. The argv/flags were verified against
+ * `copilot --help` (v1.0.65) and the JSONL envelope shape against a real
+ * `--output-format json` run (see fixtures/json-events.jsonl).
  */
 
 import { spawnSync } from 'node:child_process';
@@ -23,17 +29,17 @@ import type { AdapterDeps } from '../../registry.ts';
 import { resolveBinary } from '../shared/child-process.ts';
 import { CopilotCliAdapter } from './index.ts';
 
-function hasGh(): boolean {
+function hasCopilot(): boolean {
   try {
-    resolveBinary('gh');
+    resolveBinary('copilot');
     return true;
   } catch {
     return false;
   }
 }
 
-const TOKEN = process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN;
-const ENABLED = hasGh() && Boolean(TOKEN) && process.env.COPILOT_CLI_LIVE === '1';
+const TOKEN = process.env.COPILOT_GITHUB_TOKEN ?? process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN;
+const ENABLED = hasCopilot() && Boolean(TOKEN) && process.env.COPILOT_CLI_LIVE === '1';
 
 describe.skipIf(!ENABLED)('CopilotCliAdapter — live integration', () => {
   let workdir: string;
@@ -47,7 +53,7 @@ describe.skipIf(!ENABLED)('CopilotCliAdapter — live integration', () => {
     spawnSync('rm', ['-rf', workdir]);
   });
 
-  it('runs a real `gh copilot` round-trip and returns text', async () => {
+  it('runs a real `copilot` round-trip and returns text', async () => {
     const deps: AdapterDeps = { workdir, repoRoot: workdir, commit: 'live', branch: 'main' };
     const adapter = new CopilotCliAdapter(
       { type: 'copilot-cli', model: 'gpt-4o' },

@@ -41,6 +41,13 @@ describe('copilot-sdk normalize — messages', () => {
       },
     ]);
   });
+
+  it('expands a tool-result turn into a role:tool message', () => {
+    const msgs = normalizeMessages([
+      { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'call_1', output: 'sunny' }] },
+    ]);
+    expect(msgs).toEqual([{ role: 'tool', tool_call_id: 'call_1', content: 'sunny' }]);
+  });
 });
 
 describe('copilot-sdk normalize — request body', () => {

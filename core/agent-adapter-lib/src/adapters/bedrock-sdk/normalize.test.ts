@@ -51,6 +51,18 @@ describe('normalizeMessages', () => {
     ]);
     expect(out[0]).toEqual({ role: 'assistant', content: [{ text: '' }] });
   });
+
+  it('maps a tool-result turn to a user toolResult content block', () => {
+    const out = normalizeMessages([
+      { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'call_1', output: '42' }] },
+    ]);
+    expect(out).toEqual([
+      {
+        role: 'user',
+        content: [{ toolResult: { toolUseId: 'call_1', content: [{ text: '42' }] } }],
+      },
+    ]);
+  });
 });
 
 describe('normalizeSystem', () => {

@@ -9,7 +9,6 @@ const ALL_TYPES: AgentSpecType[] = [
   'opencode-cli',
   'copilot-sdk',
   'copilot-cli',
-  'copilot-agent-cli',
   'gemini-cli',
   'gemini-sdk',
   'openai-sdk',
@@ -19,6 +18,16 @@ const ALL_TYPES: AgentSpecType[] = [
 
 /** Adapter types that support JSON mode (structured output) in the static matrix. */
 const JSON_MODE_TYPES: AgentSpecType[] = ['gemini-sdk', 'openai-sdk'];
+
+/** Adapter types whose tool use is autonomous (the backend runs tools itself). */
+const AUTONOMOUS_TYPES: AgentSpecType[] = [
+  'claude-agent-sdk',
+  'claude-code-cli',
+  'opencode-cli',
+  'copilot-cli',
+  'gemini-cli',
+  'codex-cli',
+];
 
 describe('CAPABILITY_MATRIX', () => {
   it('has an entry for every AgentSpecType', () => {
@@ -49,12 +58,30 @@ describe('CAPABILITY_MATRIX', () => {
     }
   });
 
+  it('every entry has a valid toolUseMode consistent with supportsToolUse', () => {
+    for (const [type, caps] of Object.entries(CAPABILITY_MATRIX)) {
+      expect(['autonomous', 'host-loop', 'none'], `${type} toolUseMode`).toContain(
+        caps.toolUseMode,
+      );
+      // supportsToolUse is the derived convenience flag.
+      expect(caps.supportsToolUse, `${type} supportsToolUse vs toolUseMode`).toBe(
+        caps.toolUseMode !== 'none',
+      );
+    }
+  });
+
   it('copilot-cli does NOT support streaming', () => {
     expect(CAPABILITY_MATRIX['copilot-cli'].supportsStreaming).toBe(false);
   });
 
-  it('copilot-cli does NOT support tool use', () => {
-    expect(CAPABILITY_MATRIX['copilot-cli'].supportsToolUse).toBe(false);
+  it('copilot-cli supports autonomous tool use (standalone copilot agent)', () => {
+    expect(CAPABILITY_MATRIX['copilot-cli'].supportsToolUse).toBe(true);
+    expect(CAPABILITY_MATRIX['copilot-cli'].toolUseMode).toBe('autonomous');
+  });
+
+  it('opencode-cli reports usage + extended thinking (verified real)', () => {
+    expect(CAPABILITY_MATRIX['opencode-cli'].reportsUsage).toBe(true);
+    expect(CAPABILITY_MATRIX['opencode-cli'].supportsExtendedThinking).toBe(true);
   });
 
   it('claude-sdk supports tool use (host-loop)', () => {
@@ -114,28 +141,34 @@ describe('listAdapterTypes', () => {
     expect(result).toEqual(['copilot-cli']);
   });
 
-  it('filters by supportsToolUse:true — excludes copilot-cli', () => {
+  it('filters by supportsToolUse:true — now includes every adapter (copilot-cli is autonomous)', () => {
     const result = listAdapterTypes({ supportsToolUse: true });
-    expect(result).not.toContain('copilot-cli');
-    expect(result).toContain('claude-sdk');
-    expect(result).toContain('claude-agent-sdk');
-    expect(result).toContain('claude-code-cli');
-    expect(result).toContain('opencode-cli');
-    expect(result).toContain('copilot-sdk');
-    expect(result).toContain('copilot-agent-cli');
+    // Every remaining adapter supports tool use after the consolidated fix.
+    expect(result).toHaveLength(ALL_TYPES.length);
+    expect(result).toContain('copilot-cli');
   });
 
-  it('filters by supportsToolUse:false — returns only copilot-cli', () => {
+  it('filters by supportsToolUse:false — returns nothing (all adapters support tool use)', () => {
     const result = listAdapterTypes({ supportsToolUse: false });
-    expect(result).toEqual(['copilot-cli']);
+    expect(result).toEqual([]);
+  });
+
+  it('filters by toolUseMode:autonomous — returns exactly the agentic adapters', () => {
+    const result = listAdapterTypes({ toolUseMode: 'autonomous' });
+    expect(result.sort()).toEqual([...AUTONOMOUS_TYPES].sort());
+  });
+
+  it('filters by toolUseMode:host-loop — returns exactly the chat-mode SDK adapters', () => {
+    const result = listAdapterTypes({ toolUseMode: 'host-loop' });
+    expect(result.sort()).toEqual(
+      ['claude-sdk', 'openai-sdk', 'gemini-sdk', 'copilot-sdk', 'bedrock-sdk'].sort(),
+    );
   });
 
   it('filters by multiple keys — AND semantics', () => {
-    // streaming:true AND toolUse:false → empty (no adapter is non-streaming + has toolUse:false
-    //   except copilot-cli which is also non-streaming)
-    // Actually copilot-cli: streaming:false, toolUse:false
-    // streaming:false AND toolUse:false → ['copilot-cli']
-    const result = listAdapterTypes({ supportsStreaming: false, supportsToolUse: false });
+    // copilot-cli is the only non-streaming adapter, and it is autonomous.
+    // streaming:false AND toolUseMode:'autonomous' → ['copilot-cli'].
+    const result = listAdapterTypes({ supportsStreaming: false, toolUseMode: 'autonomous' });
     expect(result).toEqual(['copilot-cli']);
   });
 
@@ -144,11 +177,10 @@ describe('listAdapterTypes', () => {
     expect(result).toHaveLength(ALL_TYPES.length);
   });
 
-  it('filters by reportsUsage:true — excludes copilot-cli and opencode-cli', () => {
+  it('filters by reportsUsage:true — excludes only copilot-cli (opencode now reports usage)', () => {
     const result = listAdapterTypes({ reportsUsage: true });
-    expect(result).not.toContain('copilot-cli');
-    expect(result).not.toContain('opencode-cli'); // TBD → false
-    expect(result).not.toContain('copilot-agent-cli');
+    expect(result).not.toContain('copilot-cli'); // text print mode → no token counts
+    expect(result).toContain('opencode-cli'); // verified: opencode emits usage
     expect(result).toContain('claude-sdk');
     expect(result).toContain('claude-agent-sdk');
     expect(result).toContain('claude-code-cli');
@@ -157,18 +189,26 @@ describe('listAdapterTypes', () => {
 });
 
 describe('intersectCapabilities', () => {
-  it('AND-s all boolean flags', () => {
-    const a = CAPABILITY_MATRIX['claude-sdk'];
-    const b = CAPABILITY_MATRIX['copilot-cli'];
+  it('AND-s all boolean flags and resolves toolUseMode', () => {
+    const a = CAPABILITY_MATRIX['claude-sdk']; // host-loop, streaming
+    const b = CAPABILITY_MATRIX['copilot-cli']; // autonomous, non-streaming
     const result = intersectCapabilities(a, b);
     // copilot-cli streaming=false → intersection streaming=false
     expect(result.supportsStreaming).toBe(false);
-    // copilot-cli toolUse=false → intersection toolUse=false
-    expect(result.supportsToolUse).toBe(false);
+    // Both support tool use → intersection toolUse=true...
+    expect(result.supportsToolUse).toBe(true);
+    // ...but the modes differ (host-loop vs autonomous) → no shared mode.
+    expect(result.toolUseMode).toBe('none');
     // Both support cancellation
     expect(result.supportsCancellation).toBe(true);
     // Both support capture
     expect(result.supportsCapture).toBe(true);
+  });
+
+  it('keeps a shared toolUseMode when both sides agree', () => {
+    const a = CAPABILITY_MATRIX['claude-sdk']; // host-loop
+    const b = CAPABILITY_MATRIX['openai-sdk']; // host-loop
+    expect(intersectCapabilities(a, b).toolUseMode).toBe('host-loop');
   });
 
   it('is commutative', () => {
