@@ -1,27 +1,30 @@
 /**
- * LangGraphAdapter tests.
+ * LangGraphAdapter tests (companion package).
  *
- * Uses real `@langchain/langgraph` graphs (not mocks) — the surface is
- * thin enough that the unit-test boundary IS the graph's invoke()
- * behavior. Graphs are no-LLM so tests run offline. Each graph is a
- * pure data transformation: input goes in, deterministic output comes
- * out.
+ * Uses real `@langchain/langgraph` graphs (not mocks) — the surface is thin
+ * enough that the unit-test boundary IS the graph's invoke() behavior. Graphs
+ * are no-LLM so tests run offline. Each graph is a pure data transformation:
+ * input goes in, deterministic output comes out.
  *
- * Uses LangGraph 1.x `Annotation` API — the newer typed channels
- * pattern preferred over the legacy `{ value: null }` reducer shorthand.
- *
- * Coverage:
- *   - invoke() returns the responseKey field as string
- *   - emits request + response events with the expected shape
- *   - graphLabel surfaces in the request event's model field
- *   - error events fire on graph throw
- *   - buildInitialState override flows through
+ * Coverage (post-cut, NEW I/O shape — AgentInput → AgentInvocationResult):
+ *   - invoke() returns the responseKey field as result.content
+ *   - multi-node graphs thread to a final response
+ *   - custom responseKey + custom buildInitialState
+ *   - systemPrompt flows into the default initial state
+ *   - non-string responses coerce to JSON; missing field → empty content
  */
 
+import { type AgentInput } from '@helmsmith/agent-adapter';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph';
 import { describe, expect, it } from 'vitest';
-import type { AdapterEvent } from './events.ts';
 import { type CompiledGraph, LangGraphAdapter } from './langgraph-adapter.ts';
+
+/** Build an AgentInput from a bare user string (+ optional system prompt). */
+function userInput(user: string, system?: string): AgentInput {
+  const input: AgentInput = { messages: [{ role: 'user', content: user }] };
+  if (system !== undefined) input.systemPrompt = system;
+  return input;
+}
 
 /** Echo graph: { input: string } → { output: 'echo: <input>' }. */
 function echoGraph(): CompiledGraph {
@@ -36,8 +39,8 @@ function echoGraph(): CompiledGraph {
   return builder.compile() as unknown as CompiledGraph;
 }
 
-/** Two-step: capitalize then prefix. Multi-node flow visible to the
- *  adapter only as final state. */
+/** Two-step: capitalize then prefix. Multi-node flow visible to the adapter
+ *  only as final state. */
 function twoStepGraph(): CompiledGraph {
   const State = Annotation.Root({
     input: Annotation<string>,
@@ -53,7 +56,7 @@ function twoStepGraph(): CompiledGraph {
   return builder.compile() as unknown as CompiledGraph;
 }
 
-/** Graph that throws — exercises error path. */
+/** Graph that throws — exercises error propagation. */
 function throwingGraph(): CompiledGraph {
   const State = Annotation.Root({
     input: Annotation<string>,
@@ -69,46 +72,34 @@ function throwingGraph(): CompiledGraph {
 }
 
 describe('LangGraphAdapter', () => {
-  it('runs a simple graph end-to-end and returns the output field', async () => {
+  it('runs a simple graph end-to-end and returns the output field as content', async () => {
     const adapter = new LangGraphAdapter({ graph: echoGraph() });
-    const result = await adapter.invoke({ user: 'hello' });
-    expect(result).toBe('echo: hello');
+    const result = await adapter.invoke(userInput('hello'));
+    expect(result.content).toBe('echo: hello');
+    expect(typeof result.durationMs).toBe('number');
   });
 
-  it('emits request then response events around the graph invocation', async () => {
-    const events: AdapterEvent[] = [];
-    const adapter = new LangGraphAdapter({ graph: echoGraph() });
-    adapter.events.subscribe((e) => events.push(e));
-    await adapter.invoke({ system: 'be brief', user: 'hi' });
-
-    expect(events).toHaveLength(2);
-    expect(events[0]).toMatchObject({
-      kind: 'request',
-      system: 'be brief',
-      user: 'hi',
-      model: 'langgraph',
+  it('flows systemPrompt + last user message into the default initial state', async () => {
+    const State = Annotation.Root({
+      input: Annotation<string>,
+      system: Annotation<string>,
+      output: Annotation<string>,
     });
-    expect(events[1]).toMatchObject({
-      kind: 'response',
-      text: 'echo: hi',
-    });
-  });
-
-  it('surfaces graphLabel in the request event so observability can distinguish graphs', async () => {
-    const events: AdapterEvent[] = [];
+    const builder = new StateGraph(State)
+      .addNode('combine', (s) => ({ output: `${s.system ?? ''}|${s.input}` }))
+      .addEdge(START, 'combine')
+      .addEdge('combine', END);
     const adapter = new LangGraphAdapter({
-      graph: echoGraph(),
-      graphLabel: 'coordinator-routing',
+      graph: builder.compile() as unknown as CompiledGraph,
     });
-    adapter.events.subscribe((e) => events.push(e));
-    await adapter.invoke({ user: 'go' });
-    expect(events[0]).toMatchObject({ kind: 'request', model: 'coordinator-routing' });
+    const result = await adapter.invoke(userInput('hi', 'be brief'));
+    expect(result.content).toBe('be brief|hi');
   });
 
   it('threads multi-node graphs to a final response', async () => {
     const adapter = new LangGraphAdapter({ graph: twoStepGraph() });
-    const result = await adapter.invoke({ user: 'hello' });
-    expect(result).toBe('>> HELLO');
+    const result = await adapter.invoke(userInput('hello'));
+    expect(result.content).toBe('>> HELLO');
   });
 
   it('honors a custom responseKey when the graph names its output field differently', async () => {
@@ -124,11 +115,11 @@ describe('LangGraphAdapter', () => {
       graph: builder.compile() as unknown as CompiledGraph,
       responseKey: 'final',
     });
-    const result = await adapter.invoke({ user: 'X' });
-    expect(result).toBe('final-X');
+    const result = await adapter.invoke(userInput('X'));
+    expect(result.content).toBe('final-X');
   });
 
-  it('honors a custom buildInitialState that maps spec to a different channel structure', async () => {
+  it('honors a custom buildInitialState that maps input to a different channel structure', async () => {
     const State = Annotation.Root({
       question: Annotation<string>,
       output: Annotation<string>,
@@ -139,24 +130,17 @@ describe('LangGraphAdapter', () => {
       .addEdge('answer', END);
     const adapter = new LangGraphAdapter({
       graph: builder.compile() as unknown as CompiledGraph,
-      buildInitialState: (spec) => ({ question: spec.user }),
+      buildInitialState: (input) => ({
+        question: typeof input.messages[0]!.content === 'string' ? input.messages[0]!.content : '',
+      }),
     });
-    const result = await adapter.invoke({ user: 'are you ok?' });
-    expect(result).toBe('Q: are you ok?');
+    const result = await adapter.invoke(userInput('are you ok?'));
+    expect(result.content).toBe('Q: are you ok?');
   });
 
-  it('emits an error event and re-throws when the graph fails', async () => {
-    const events: AdapterEvent[] = [];
+  it('re-throws when the graph fails', async () => {
     const adapter = new LangGraphAdapter({ graph: throwingGraph() });
-    adapter.events.subscribe((e) => events.push(e));
-    await expect(adapter.invoke({ user: 'x' })).rejects.toThrow('intentional graph failure');
-
-    const errorEvent = events.find((e) => e.kind === 'error');
-    expect(errorEvent).toBeDefined();
-    expect(errorEvent).toMatchObject({
-      kind: 'error',
-      message: expect.stringContaining('intentional graph failure'),
-    });
+    await expect(adapter.invoke(userInput('x'))).rejects.toThrow('intentional graph failure');
   });
 
   it('coerces non-string responses to JSON when responseKey targets an object', async () => {
@@ -171,11 +155,11 @@ describe('LangGraphAdapter', () => {
     const adapter = new LangGraphAdapter({
       graph: builder.compile() as unknown as CompiledGraph,
     });
-    const result = await adapter.invoke({ user: 'ignored' });
-    expect(result).toBe('{"value":42}');
+    const result = await adapter.invoke(userInput('ignored'));
+    expect(result.content).toBe('{"value":42}');
   });
 
-  it('returns empty string when the responseKey field is missing', async () => {
+  it('returns empty content when the responseKey field is missing', async () => {
     const State = Annotation.Root({
       input: Annotation<string>,
       output: Annotation<string>,
@@ -187,7 +171,7 @@ describe('LangGraphAdapter', () => {
     const adapter = new LangGraphAdapter({
       graph: builder.compile() as unknown as CompiledGraph,
     });
-    const result = await adapter.invoke({ user: 'x' });
-    expect(result).toBe('');
+    const result = await adapter.invoke(userInput('x'));
+    expect(result.content).toBe('');
   });
 });
