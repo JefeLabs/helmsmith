@@ -1,20 +1,20 @@
 import {
   AdapterError,
   type AgentAdapter,
-  type BindingToAdapterOptions,
-  bindingToAdapter,
-  ClaudeSdkAdapter,
-  OpenCodeCliAdapter,
-  type OpenCodeCliAdapterOptions,
+  createAgent,
+  type OpenCodeCliSpec,
+  type TokenUsage,
 } from '@helmsmith/agent-adapter';
-import type {
-  BindingResolver,
-  CredentialBroker,
-  GitHubCredentialResolver,
-  ResolvedBinding,
+import {
+  type BindingResolver,
+  bridgeBroker,
+  type CredentialBroker,
+  type GitHubCredentialResolver,
+  type ResolvedBinding,
 } from '@helmsmith/agent-auth';
 import { Command } from '@langchain/langgraph';
-import type { AdapterId, ToolResolver } from './catalog.ts';
+import { type BindingToSpecOptions, bindingToSpec } from './binding-to-spec.ts';
+import type { AdapterId, FlowDef, McpToolDef, ToolResolver } from './catalog.ts';
 import { discoverChangedFiles } from './changed-files.ts';
 import {
   type ApprovalRequest,
@@ -25,17 +25,16 @@ import {
   type SuspendRequest,
 } from './flow-graph.ts';
 import type { JobRecord, RegisteredAgent } from './job.ts';
-import { bridgeAdapter, type JobBus } from './job-bus.ts';
-import { makeToolExecutor, type McpResult } from './tool-executor.ts';
-import { makeScriptExecutor } from './script-executor.ts';
+import type { EventTokenUsage, JobBus } from './job-bus.ts';
 import { makePublishExecutor } from './publish-executor.ts';
-import type { FlowDef, McpToolDef } from './catalog.ts';
+import { makeScriptExecutor } from './script-executor.ts';
 import {
   compileNonAgentFlow,
   type FlowResolver,
   makeSubflowExecutor,
   validateSubflowGraph,
 } from './subflow-executor.ts';
+import { type McpResult, makeToolExecutor } from './tool-executor.ts';
 
 /** Compiled-graph handle cached per-job for resume. Structural so this
  *  module doesn't pin a specific LangGraph type. Exported so callers
@@ -80,23 +79,78 @@ export type AdapterFactory = (
   adapterId: AdapterId,
   broker: CredentialBroker,
   config?: Record<string, unknown>,
+  workdir?: string,
 ) => AgentAdapter;
 
-export const defaultAdapterFactory: AdapterFactory = (id, broker, config) => {
-  if (id === 'claude-sdk') return new ClaudeSdkAdapter({ broker });
+export const defaultAdapterFactory: AdapterFactory = (id, broker, config, workdir) => {
+  const wd = workdir ?? process.cwd();
+  const credentialBroker = bridgeBroker(broker);
+  if (id === 'claude-sdk') {
+    const model = (config?.model as string | undefined) ?? 'claude-opus-4-7';
+    return createAgent({ spec: { type: 'claude-sdk', model }, workdir: wd, credentialBroker });
+  }
   if (id === 'opencode-cli') {
-    // Coerce: the catalog-side config is open-ended; the adapter accepts a
-    // typed subset. Unknown keys are ignored by the adapter constructor.
-    const cfg = (config ?? {}) as Partial<OpenCodeCliAdapterOptions>;
-    return new OpenCodeCliAdapter({ broker, ...cfg });
+    // Coerce: the catalog-side config is open-ended; the spec accepts a typed
+    // subset. Unknown keys land on the spec but are ignored by the adapter.
+    const cfg = (config ?? {}) as Partial<OpenCodeCliSpec>;
+    const spec: OpenCodeCliSpec = {
+      ...cfg,
+      type: 'opencode-cli',
+      model: cfg.model ?? 'anthropic/claude-opus-4-7',
+    };
+    return createAgent({ spec, workdir: wd, credentialBroker });
   }
   throw new Error(`unknown adapter id: ${id}`);
 };
+
+/**
+ * Options the resolver-path adapter constructor (`bindingToAdapterFn`)
+ * receives. Replaces the old lib `BindingToAdapterOptions`: the broker +
+ * workdir feed `createAgent`, the rest feed `bindingToSpec`.
+ */
+export interface BindingToAdapterOptions {
+  /** The agent-auth credential broker; bridged to the lib's structural form. */
+  broker: CredentialBroker;
+  /** Git working tree the constructed adapter is bound to. */
+  workdir: string;
+  /** Endpoint resolver for local providers (forwarded to `bindingToSpec`). */
+  localEndpoint?: BindingToSpecOptions['localEndpoint'];
+  /** Shared `opencode serve` URL (forwarded to `bindingToSpec`). */
+  opencodeServerUrl?: string;
+}
+
+/**
+ * Default resolver-path constructor: map a binding to its spec, then build the
+ * adapter via `createAgent`. The test seam (`deps.bindingToAdapterFn`)
+ * substitutes this with mock adapters.
+ */
+function defaultBindingToAdapter(
+  binding: ResolvedBinding,
+  options: BindingToAdapterOptions,
+): AgentAdapter {
+  const spec = bindingToSpec(binding, {
+    ...(options.localEndpoint ? { localEndpoint: options.localEndpoint } : {}),
+    ...(options.opencodeServerUrl ? { opencodeServerUrl: options.opencodeServerUrl } : {}),
+  });
+  return createAgent({
+    spec,
+    workdir: options.workdir,
+    credentialBroker: bridgeBroker(options.broker),
+  });
+}
 
 export interface RunJobDeps {
   jobs: Map<string, JobRecord>;
   bus: JobBus;
   broker: CredentialBroker;
+  /**
+   * Git working tree the constructed adapters are bound to (passed to
+   * `createAgent`, which validates it is inside a git repo). Defaults to
+   * `job.workdirRoot`, then `process.cwd()`. Only consulted on the
+   * resolver / legacy-factory construction paths — pre-built adapters
+   * (`deps.adapters`) and injected factories carry their own workdir.
+   */
+  workdir?: string;
   adapterFactory?: AdapterFactory;
   /**
    * Optional binding resolver. When supplied AND the agent declares a
@@ -795,9 +849,13 @@ function makeAgentExecutor(
     agent.status = 'running';
     deps.onStatusChange?.(jobId, agent.id, 'running');
 
+    // Workdir for adapter construction (resolver + legacy-factory paths).
+    // createAgent validates this is a git working tree.
+    const workdir = deps.workdir ?? job.workdirRoot ?? process.cwd();
+
     let candidates: AgentCandidate[];
     try {
-      candidates = await buildCandidates(agent, deps, factory);
+      candidates = await buildCandidates(agent, deps, factory, workdir);
     } catch (err) {
       failAgent(jobId, agent, job, deps, `adapter construction failed: ${(err as Error).message}`);
       return {
@@ -857,6 +915,15 @@ function makeAgentExecutor(
         kind: 'error',
         ts: new Date().toISOString(),
         message: `adapter construction failed: ${(outcome.error as Error).message}`,
+      });
+    } else {
+      // Terminal invoke-failure. The new adapter surface emits no events of
+      // its own, so the orchestrator publishes the single error event that a
+      // self-emitting adapter used to produce before throwing.
+      deps.bus.publish(jobId, agent.id, {
+        kind: 'error',
+        ts: new Date().toISOString(),
+        message: outcome.error instanceof Error ? outcome.error.message : String(outcome.error),
       });
     }
     agent.status = 'failed';
@@ -947,18 +1014,35 @@ async function runCandidates(
       return { kind: 'construction-failure', error: err };
     }
 
-    // Bridge events for THIS adapter. Each candidate gets its own bridge
-    // window so events appear chronologically in the bus.
-    const detach = bridgeAdapter(deps.bus, jobId, agent.id, adapter.events);
+    // Synthesize the request/response/error events for THIS candidate onto
+    // the bus. The new adapter surface has no event bus — the orchestrator
+    // is the producer, framing each invoke() with a request before and a
+    // response (or error) after, so consumers (TUI, SSE, TokenAccumulator)
+    // see the same per-job stream they always have.
+    deps.bus.publish(jobId, agent.id, {
+      kind: 'request',
+      ts: new Date().toISOString(),
+      ...(systemPrompt !== undefined ? { system: systemPrompt } : {}),
+      user: userInput,
+      model: adapter.type,
+    });
     try {
       const result = await adapter.invoke({
-        system: systemPrompt,
-        user: userInput,
+        messages: [{ role: 'user', content: userInput }],
+        ...(systemPrompt !== undefined ? { systemPrompt } : {}),
       });
-      detach();
-      return { kind: 'success', result };
+      deps.bus.publish(jobId, agent.id, {
+        kind: 'response',
+        ts: new Date().toISOString(),
+        text: result.content,
+        ...(result.usage ? { usage: toEventUsage(result.usage) } : {}),
+      });
+      return { kind: 'success', result: result.content };
     } catch (err) {
-      detach();
+      // Note: no generic error event is synthesized here. Fall-through
+      // failures get the orchestrator's "falling back" diagnostic below;
+      // terminal failures get a single error event from makeAgentExecutor.
+      // This preserves the historical one-error-per-failure bus contract.
       lastError = err;
       lastWasConstruction = false;
 
@@ -1019,6 +1103,7 @@ async function buildCandidates(
   agent: RegisteredAgent,
   deps: RunJobDeps,
   factory: AdapterFactory,
+  workdir: string,
 ): Promise<AgentCandidate[]> {
   // Path 1: pre-built (highest priority — executor pre-resolved at boot
   // and the auth boundary is sharp; we never re-resolve).
@@ -1048,14 +1133,15 @@ async function buildCandidates(
         // caller treats it as construction failure.
         throw new Error(`No satisfiable binding for accepts=[${accepts.join(', ')}]`);
       }
-      const ctor = deps.bindingToAdapterFn ?? bindingToAdapter;
+      const ctor = deps.bindingToAdapterFn ?? defaultBindingToAdapter;
       return bindings.map((binding) => ({
         label: bindingLabel(binding),
         fallbackEligible: bindings.length > 1,
         build: async () =>
           ctor(binding, {
             broker: deps.broker,
-            localEndpoint: deps.localEndpoint,
+            workdir,
+            ...(deps.localEndpoint ? { localEndpoint: deps.localEndpoint } : {}),
           }),
       }));
     }
@@ -1066,10 +1152,11 @@ async function buildCandidates(
         fallbackEligible: false,
         build: async () => {
           const binding = await deps.resolver!.resolveBinding(accepts);
-          const ctor = deps.bindingToAdapterFn ?? bindingToAdapter;
+          const ctor = deps.bindingToAdapterFn ?? defaultBindingToAdapter;
           return ctor(binding, {
             broker: deps.broker,
-            localEndpoint: deps.localEndpoint,
+            workdir,
+            ...(deps.localEndpoint ? { localEndpoint: deps.localEndpoint } : {}),
           });
         },
       },
@@ -1081,9 +1168,21 @@ async function buildCandidates(
     {
       label: `factory:${agent.adapter}`,
       fallbackEligible: false,
-      build: async () => factory(agent.adapter, deps.broker, agent.config),
+      build: async () => factory(agent.adapter, deps.broker, agent.config, workdir),
     },
   ];
+}
+
+/**
+ * Map an adapter-lib `TokenUsage` (input/output names) to the harness event
+ * vocabulary (`EventTokenUsage`, prompt/completion names) the bus carries.
+ */
+function toEventUsage(usage: TokenUsage): EventTokenUsage {
+  return {
+    promptTokens: usage.inputTokens,
+    completionTokens: usage.outputTokens,
+    totalTokens: usage.inputTokens + usage.outputTokens,
+  };
 }
 
 function bindingLabel(b: ResolvedBinding): string {

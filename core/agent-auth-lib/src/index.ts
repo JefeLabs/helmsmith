@@ -7,6 +7,7 @@ export {
   resolveAllBindingsFor,
   resolveBindingFor,
 } from './binding-resolver.ts';
+export { type AdapterCredentialBroker, bridgeBroker } from './broker-bridge.ts';
 export {
   type ChatCompletionResponse,
   type ChatMessage,

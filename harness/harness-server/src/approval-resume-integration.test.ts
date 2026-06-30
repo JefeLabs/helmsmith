@@ -19,7 +19,13 @@ import { rm } from 'node:fs/promises';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AdapterEventBus, type AgentAdapter, type InvocationSpec } from '@helmsmith/agent-adapter';
+import type {
+  AdapterCapabilities,
+  AgentAdapter,
+  AgentChunk,
+  AgentInput,
+  AgentInvocationResult,
+} from '@helmsmith/agent-adapter';
 import type { CredentialBroker, Provider } from '@helmsmith/agent-auth';
 import type { Edge, FlowCatalog, FlowDef, TaskStep } from '@helmsmith/harness-core';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -33,25 +39,31 @@ const dummyBroker: CredentialBroker = {
   },
 };
 
+const STUB_CAPS: AdapterCapabilities = {
+  reportsUsage: false,
+  supportsStreaming: false,
+  supportsToolUse: false,
+  toolUseMode: 'none',
+  supportsExtendedThinking: false,
+  supportsCancellation: false,
+  supportsCapture: false,
+  supportsJsonMode: false,
+  supportsSessionResume: false,
+};
+
 class TestAdapter implements AgentAdapter {
-  readonly events = new AdapterEventBus();
-  readonly invokeCalls: InvocationSpec[] = [];
+  readonly type = 'claude-sdk' as const;
+  readonly capabilities = STUB_CAPS;
+  readonly workdir = '/test/workdir';
+  readonly invokeCalls: AgentInput[] = [];
   constructor(private readonly reply: string) {}
-  async invoke(spec: InvocationSpec): Promise<string> {
-    this.invokeCalls.push(spec);
-    this.events.emit({
-      kind: 'request',
-      ts: new Date().toISOString(),
-      system: spec.system,
-      user: spec.user,
-      model: 'test-model',
-    });
-    this.events.emit({
-      kind: 'response',
-      ts: new Date().toISOString(),
-      text: this.reply,
-    });
-    return this.reply;
+  async invoke(input: AgentInput): Promise<AgentInvocationResult> {
+    this.invokeCalls.push(input);
+    return { content: this.reply, durationMs: 0 };
+  }
+  // biome-ignore lint/correctness/useYield: stub never emits chunks.
+  async *stream(): AsyncIterable<AgentChunk> {
+    throw new Error('TestAdapter.stream is not used by runJob');
   }
 }
 

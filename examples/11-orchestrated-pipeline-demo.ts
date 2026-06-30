@@ -2,11 +2,12 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import {
-  type AdapterEvent,
-  AdapterEventBus,
-  type AgentAdapter,
-  type InvocationSpec,
+import type {
+  AdapterCapabilities,
+  AgentAdapter,
+  AgentChunk,
+  AgentInput,
+  AgentInvocationResult,
 } from '@helmsmith/agent-adapter';
 import type { CredentialBroker } from '@helmsmith/agent-auth';
 import {
@@ -58,27 +59,48 @@ const catalog: PipelineCatalog = {
   ],
 };
 
+// The new adapter surface has no event bus — the orchestrator synthesizes the
+// request/response envelopes around each invoke(), so the SSE client still sees
+// the same per-agent stream. The mock just maps the incoming user message to a
+// canned reply.
+const MOCK_CAPABILITIES: AdapterCapabilities = {
+  reportsUsage: false,
+  supportsStreaming: true,
+  supportsToolUse: false,
+  toolUseMode: 'none',
+  supportsExtendedThinking: false,
+  supportsCancellation: false,
+  supportsCapture: false,
+  supportsJsonMode: false,
+  supportsSessionResume: false,
+};
+
+function lastUserText(input: AgentInput): string {
+  const last = input.messages[input.messages.length - 1];
+  if (!last) return '';
+  return typeof last.content === 'string'
+    ? last.content
+    : last.content.map((b) => ('text' in b ? b.text : '')).join('');
+}
+
 class MockAdapter implements AgentAdapter {
-  readonly events = new AdapterEventBus();
+  readonly type = 'claude-sdk' as const;
+  readonly capabilities = MOCK_CAPABILITIES;
+  readonly workdir = process.cwd();
   constructor(private readonly reply: (user: string) => string) {}
 
-  async invoke(spec: InvocationSpec): Promise<string> {
-    this.events.emit({
-      kind: 'request',
-      ts: new Date().toISOString(),
-      system: spec.system,
-      user: spec.user,
-      model: 'mock',
-    });
+  async invoke(input: AgentInput): Promise<AgentInvocationResult> {
+    const start = Date.now();
     // Simulate latency so events arrive at the SSE client one at a time.
     await new Promise((r) => setTimeout(r, 80));
-    const text = this.reply(spec.user);
-    this.events.emit({
-      kind: 'response',
-      ts: new Date().toISOString(),
-      text,
-    });
-    return text;
+    const content = this.reply(lastUserText(input));
+    return { content, durationMs: Date.now() - start };
+  }
+
+  async *stream(input: AgentInput): AsyncIterable<AgentChunk> {
+    const result = await this.invoke(input);
+    yield { type: 'text-delta', text: result.content };
+    yield { type: 'message-stop', finishReason: 'stop' };
   }
 }
 
@@ -259,6 +281,3 @@ async function waitFor(
 function truncate(s: string, n: number): string {
   return s.length <= n ? s : `${s.slice(0, n - 1)}…`;
 }
-
-// Silence unused-import warning if AdapterEvent gets pruned by tooling
-void (null as unknown as AdapterEvent);

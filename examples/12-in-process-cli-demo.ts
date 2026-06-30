@@ -1,4 +1,10 @@
-import { AdapterEventBus, type AgentAdapter, type InvocationSpec } from '@helmsmith/agent-adapter';
+import type {
+  AdapterCapabilities,
+  AgentAdapter,
+  AgentChunk,
+  AgentInput,
+  AgentInvocationResult,
+} from '@helmsmith/agent-adapter';
 import type { CredentialBroker } from '@helmsmith/agent-auth';
 import {
   type AdapterFactory,
@@ -88,26 +94,47 @@ if (!pipeline) {
 // ─── mock adapter + broker (no API keys needed for demo) ──────────────────
 // Identical pattern to demo 11 — what's interesting here is what's NOT
 // around it (no server, no UDS, no SSE), not the adapter mock itself.
+// The new adapter surface has no event bus — the orchestrator synthesizes the
+// request/response envelopes around each invoke(), so the JobBus subscriber
+// still sees the same per-agent stream. The mock just maps the incoming user
+// message to a canned reply.
+const MOCK_CAPABILITIES: AdapterCapabilities = {
+  reportsUsage: false,
+  supportsStreaming: true,
+  supportsToolUse: false,
+  toolUseMode: 'none',
+  supportsExtendedThinking: false,
+  supportsCancellation: false,
+  supportsCapture: false,
+  supportsJsonMode: false,
+  supportsSessionResume: false,
+};
+
+function lastUserText(input: AgentInput): string {
+  const last = input.messages[input.messages.length - 1];
+  if (!last) return '';
+  return typeof last.content === 'string'
+    ? last.content
+    : last.content.map((b) => ('text' in b ? b.text : '')).join('');
+}
+
 class MockAdapter implements AgentAdapter {
-  readonly events = new AdapterEventBus();
+  readonly type = 'claude-sdk' as const;
+  readonly capabilities = MOCK_CAPABILITIES;
+  readonly workdir = process.cwd();
   constructor(private readonly reply: (user: string) => string) {}
 
-  async invoke(spec: InvocationSpec): Promise<string> {
-    this.events.emit({
-      kind: 'request',
-      ts: new Date().toISOString(),
-      system: spec.system,
-      user: spec.user,
-      model: 'mock',
-    });
+  async invoke(input: AgentInput): Promise<AgentInvocationResult> {
+    const start = Date.now();
     await new Promise((r) => setTimeout(r, 80));
-    const text = this.reply(spec.user);
-    this.events.emit({
-      kind: 'response',
-      ts: new Date().toISOString(),
-      text,
-    });
-    return text;
+    const content = this.reply(lastUserText(input));
+    return { content, durationMs: Date.now() - start };
+  }
+
+  async *stream(input: AgentInput): AsyncIterable<AgentChunk> {
+    const result = await this.invoke(input);
+    yield { type: 'text-delta', text: result.content };
+    yield { type: 'message-stop', finishReason: 'stop' };
   }
 }
 

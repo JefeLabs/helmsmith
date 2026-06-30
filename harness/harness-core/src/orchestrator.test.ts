@@ -1,17 +1,18 @@
 import {
-  type AdapterEvent,
-  AdapterEventBus,
+  type AdapterCapabilities,
   type AgentAdapter,
+  type AgentChunk,
+  type AgentInput,
+  type AgentInvocationResult,
   AuthError,
   BillingError,
-  type InvocationSpec,
   RateLimitError,
 } from '@helmsmith/agent-adapter';
 import type { CredentialBroker, Provider, ResolvedBinding } from '@helmsmith/agent-auth';
 import { describe, expect, it } from 'vitest';
 import type { ApprovalRequest } from './flow-graph.ts';
 import type { JobRecord } from './job.ts';
-import { JobBus } from './job-bus.ts';
+import { type AdapterEvent, JobBus } from './job-bus.ts';
 import { type AdapterFactory, type CompiledFlowGraph, runJob } from './orchestrator.ts';
 
 const dummyBroker: CredentialBroker = {
@@ -20,38 +21,46 @@ const dummyBroker: CredentialBroker = {
   },
 };
 
-/** Test adapter that emits a request → response cycle and returns a fixed text. */
+/** Static capabilities for the in-test stub adapters (no real backend). */
+const STUB_CAPS: AdapterCapabilities = {
+  reportsUsage: false,
+  supportsStreaming: false,
+  supportsToolUse: false,
+  toolUseMode: 'none',
+  supportsExtendedThinking: false,
+  supportsCancellation: false,
+  supportsCapture: false,
+  supportsJsonMode: false,
+  supportsSessionResume: false,
+};
+
+/**
+ * Test adapter implementing the new AgentAdapter surface. The orchestrator
+ * synthesizes the request/response/error bus events around invoke(); this
+ * stub just records its input and returns (or throws). `stream` is unused by
+ * runJob but required by the interface.
+ */
 class TestAdapter implements AgentAdapter {
-  readonly events = new AdapterEventBus();
-  invokeCalls: InvocationSpec[] = [];
+  readonly type = 'claude-sdk' as const;
+  readonly capabilities = STUB_CAPS;
+  readonly workdir = '/test/workdir';
+  invokeCalls: AgentInput[] = [];
 
   constructor(
     private readonly behavior: { kind: 'ok'; reply: string } | { kind: 'throw'; message: string },
   ) {}
 
-  async invoke(spec: InvocationSpec): Promise<string> {
-    this.invokeCalls.push(spec);
-    this.events.emit({
-      kind: 'request',
-      ts: new Date().toISOString(),
-      system: spec.system,
-      user: spec.user,
-      model: 'test-model',
-    });
+  async invoke(input: AgentInput): Promise<AgentInvocationResult> {
+    this.invokeCalls.push(input);
     if (this.behavior.kind === 'throw') {
-      this.events.emit({
-        kind: 'error',
-        ts: new Date().toISOString(),
-        message: this.behavior.message,
-      });
       throw new Error(this.behavior.message);
     }
-    this.events.emit({
-      kind: 'response',
-      ts: new Date().toISOString(),
-      text: this.behavior.reply,
-    });
-    return this.behavior.reply;
+    return { content: this.behavior.reply, durationMs: 0 };
+  }
+
+  // biome-ignore lint/correctness/useYield: stub never emits chunks.
+  async *stream(): AsyncIterable<AgentChunk> {
+    throw new Error('TestAdapter.stream is not used by runJob');
   }
 }
 
@@ -102,10 +111,10 @@ describe('runJob (in-process)', () => {
 
     // Output of agent N becomes input of agent N+1.
     expect(adapters).toHaveLength(2);
-    expect(adapters[0]?.invokeCalls[0]?.user).toBe('Add a button');
-    expect(adapters[0]?.invokeCalls[0]?.system).toBe('plan it');
-    expect(adapters[1]?.invokeCalls[0]?.user).toBe('reply-1');
-    expect(adapters[1]?.invokeCalls[0]?.system).toBe('build it');
+    expect(adapters[0]?.invokeCalls[0]?.messages[0]?.content).toBe('Add a button');
+    expect(adapters[0]?.invokeCalls[0]?.systemPrompt).toBe('plan it');
+    expect(adapters[1]?.invokeCalls[0]?.messages[0]?.content).toBe('reply-1');
+    expect(adapters[1]?.invokeCalls[0]?.systemPrompt).toBe('build it');
   });
 
   it('publishes each adapter event onto the bus tagged with the agent id', async () => {
@@ -539,20 +548,20 @@ describe('runJob — slice 13c runtime fallback', () => {
   }
 
   /** Adapter that fails at invoke time with the given error, for fallback
-   *  tests. Distinct from TestAdapter because it doesn't emit its own
-   *  error event (we want to verify the orchestrator's fallback message
-   *  ends up on the bus, not double-counting the adapter's own error). */
+   *  tests. The orchestrator synthesizes the request event + the terminal /
+   *  fallback diagnostic; this stub only throws so we can verify exactly one
+   *  error event reaches the bus per failure (no double-counting). */
   class FailingAdapter implements AgentAdapter {
-    readonly events = new AdapterEventBus();
+    readonly type = 'claude-sdk' as const;
+    readonly capabilities = STUB_CAPS;
+    readonly workdir = '/test/workdir';
     constructor(private readonly err: Error) {}
-    async invoke(_spec: InvocationSpec): Promise<string> {
-      this.events.emit({
-        kind: 'request',
-        ts: new Date().toISOString(),
-        user: _spec.user,
-        model: 'fail-model',
-      });
+    async invoke(_input: AgentInput): Promise<AgentInvocationResult> {
       throw this.err;
+    }
+    // biome-ignore lint/correctness/useYield: stub never emits chunks.
+    async *stream(): AsyncIterable<AgentChunk> {
+      throw new Error('FailingAdapter.stream is not used by runJob');
     }
   }
 
@@ -1380,7 +1389,7 @@ describe('runJob + steerJob (operator steering reaches agent)', () => {
     await runJob('jSteer', deps);
     expect(job.status).toBe('awaiting-approval');
     // Planner saw its baseline systemPrompt only (no steering yet).
-    expect(adapters[0]?.invokeCalls[0]?.system).toBe('be a thoughtful planner');
+    expect(adapters[0]?.invokeCalls[0]?.systemPrompt).toBe('be a thoughtful planner');
 
     // Operator pushes steering while paused.
     await steerJob('jSteer', 'consider OAuth specifically', deps);
@@ -1390,7 +1399,7 @@ describe('runJob + steerJob (operator steering reaches agent)', () => {
     await resumeJob('jSteer', { decision: 'approve' }, deps);
     expect(job.status).toBe('completed');
 
-    expect(adapters[1]?.invokeCalls[0]?.system).toBe(
+    expect(adapters[1]?.invokeCalls[0]?.systemPrompt).toBe(
       'implement the plan\n\n[OPERATOR STEERING]\n— consider OAuth specifically',
     );
   });

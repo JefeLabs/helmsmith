@@ -20,6 +20,9 @@ importers:
       '@helmsmith/agent-adapter':
         specifier: workspace:*
         version: link:core/agent-adapter-lib
+      '@helmsmith/agent-adapter-langchain':
+        specifier: workspace:*
+        version: link:core/agent-adapter-langchain-lib
       '@helmsmith/agent-auth':
         specifier: workspace:*
         version: link:core/agent-auth-lib

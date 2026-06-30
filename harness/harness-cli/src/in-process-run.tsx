@@ -1,6 +1,12 @@
 /** @jsxImportSource @opentui/react */
 
-import { AdapterEventBus, type AgentAdapter, type InvocationSpec } from '@helmsmith/agent-adapter';
+import type {
+  AdapterCapabilities,
+  AgentAdapter,
+  AgentChunk,
+  AgentInput,
+  AgentInvocationResult,
+} from '@helmsmith/agent-adapter';
 import type { CredentialBroker } from '@helmsmith/agent-auth';
 import {
   type AdapterFactory,
@@ -106,22 +112,35 @@ if (!pipeline) {
 }
 
 // ─── mock adapter + broker (no API keys for demo) ─────────────────────────
+const MOCK_CAPS: AdapterCapabilities = {
+  reportsUsage: false,
+  supportsStreaming: false,
+  supportsToolUse: false,
+  toolUseMode: 'none',
+  supportsExtendedThinking: false,
+  supportsCancellation: false,
+  supportsCapture: false,
+  supportsJsonMode: false,
+  supportsSessionResume: false,
+};
+
 class MockAdapter implements AgentAdapter {
-  readonly events = new AdapterEventBus();
+  readonly type = 'claude-sdk' as const;
+  readonly capabilities = MOCK_CAPS;
+  readonly workdir = process.cwd();
   constructor(private readonly reply: (user: string) => string) {}
 
-  async invoke(spec: InvocationSpec): Promise<string> {
-    this.events.emit({
-      kind: 'request',
-      ts: new Date().toISOString(),
-      system: spec.system,
-      user: spec.user,
-      model: 'mock',
-    });
+  // The orchestrator synthesizes the request/response bus events around this
+  // call; the mock just returns canned text derived from the user message.
+  async invoke(input: AgentInput): Promise<AgentInvocationResult> {
+    const first = input.messages[0]?.content;
+    const user = typeof first === 'string' ? first : '';
     await new Promise((r) => setTimeout(r, 250));
-    const text = this.reply(spec.user);
-    this.events.emit({ kind: 'response', ts: new Date().toISOString(), text });
-    return text;
+    return { content: this.reply(user), durationMs: 250 };
+  }
+  // biome-ignore lint/correctness/useYield: mock never emits chunks.
+  async *stream(): AsyncIterable<AgentChunk> {
+    throw new Error('MockAdapter.stream is not used by runJob');
   }
 }
 

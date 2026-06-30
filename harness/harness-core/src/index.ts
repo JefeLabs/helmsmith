@@ -7,6 +7,12 @@
  */
 
 export {
+  type BindingToSpecOptions,
+  bindingNeedsOpenCode,
+  bindingToSpec,
+  defaultLocalEndpointResolver,
+} from './binding-to-spec.ts';
+export {
   type AdapterId,
   type AgentConfig,
   type AgentDef,
@@ -15,6 +21,8 @@ export {
   type BackoffPolicy,
   type Catalog,
   CatalogError,
+  type CliToolDef,
+  type CompareOp,
   type ConditionalEdge,
   type ContextSourceDef,
   type Duration,
@@ -28,9 +36,11 @@ export {
   findFlow,
   findProduct,
   type GateConfig,
+  type HttpToolDef,
   type JobIntent,
   type LoopTag,
   loadCatalog,
+  type McpToolDef,
   type MergePrConfig,
   type ProductDef,
   type ProductRepo,
@@ -48,10 +58,6 @@ export {
   type TaskStep,
   type TaskStepPolicy,
   type TaskStepTags,
-  type CliToolDef,
-  type CompareOp,
-  type HttpToolDef,
-  type McpToolDef,
   type ToolAuthRef,
   type ToolConfig,
   type ToolDef,
@@ -85,7 +91,15 @@ export {
   type SuspendRequest,
 } from './flow-graph.ts';
 export type { AgentStatus, AgentTokens, JobRecord, RegisteredAgent } from './job.ts';
-export { bridgeAdapter, type Envelope, JobBus } from './job-bus.ts';
+export {
+  type AdapterEvent,
+  AdapterEventBus,
+  type AdapterEventSource,
+  bridgeAdapter,
+  type Envelope,
+  type EventTokenUsage,
+  JobBus,
+} from './job-bus.ts';
 export {
   type AdapterFactory,
   type CompiledFlowGraph,
@@ -99,8 +113,8 @@ export {
   runJob,
   steerJob,
 } from './orchestrator.ts';
-export { makeScriptExecutor } from './script-executor.ts';
 export { makePublishExecutor } from './publish-executor.ts';
+export { makeScriptExecutor } from './script-executor.ts';
 export {
   compileNonAgentFlow,
   type FlowResolver,
@@ -108,9 +122,9 @@ export {
   type SubflowCompileDeps,
   validateSubflowGraph,
 } from './subflow-executor.ts';
+export { TokenAccumulator } from './token-accumulator.ts';
 export {
-  makeToolExecutor,
   type McpResult,
+  makeToolExecutor,
   type ToolExecutorDeps,
 } from './tool-executor.ts';
-export { TokenAccumulator } from './token-accumulator.ts';

@@ -58,19 +58,19 @@ describe('buildAdapter — provider resolution', () => {
     writeCopilotAuth(tmp);
     const adapter = await buildAdapter(defaultConfig());
     expect(adapter).toBeDefined();
-    expect(adapter.constructor.name).toBe('CopilotChatAdapter');
+    expect(adapter.type).toBe('copilot-sdk');
   });
 
   it('uses anthropic when explicitly chosen and key is set', async () => {
     process.env.ANTHROPIC_API_KEY = 'sk-ant-fake';
     const adapter = await buildAdapter(defaultConfig({ provider: 'anthropic' }));
-    expect(adapter.constructor.name).toBe('ClaudeSdkAdapter');
+    expect(adapter.type).toBe('claude-sdk');
   });
 
   it('uses openai when explicitly chosen and key is set', async () => {
     process.env.OPENAI_API_KEY = 'sk-fake';
     const adapter = await buildAdapter(defaultConfig({ provider: 'openai' }));
-    expect(adapter.constructor.name).toBe('OpenAiChatAdapter');
+    expect(adapter.type).toBe('openai-sdk');
   });
 
   it('falls back through the chain when primary unconfigured', async () => {
@@ -79,7 +79,7 @@ describe('buildAdapter — provider resolution', () => {
     const adapter = await buildAdapter(
       defaultConfig({ provider: 'copilot', fallback: ['anthropic'] }),
     );
-    expect(adapter.constructor.name).toBe('ClaudeSdkAdapter');
+    expect(adapter.type).toBe('claude-sdk');
   });
 
   it('walks fallback list in order, picks first available', async () => {
@@ -91,7 +91,7 @@ describe('buildAdapter — provider resolution', () => {
         fallback: ['anthropic', 'openai'],
       }),
     );
-    expect(adapter.constructor.name).toBe('OpenAiChatAdapter');
+    expect(adapter.type).toBe('openai-sdk');
   });
 
   it('throws a clear error when nothing is configured', async () => {
@@ -126,7 +126,7 @@ describe('buildAdapter — provider resolution', () => {
         anthropicKeyEnv: 'WORK_ANTHROPIC',
       }),
     );
-    expect(adapter.constructor.name).toBe('ClaudeSdkAdapter');
+    expect(adapter.type).toBe('claude-sdk');
     delete process.env.WORK_ANTHROPIC;
   });
 
@@ -137,6 +137,6 @@ describe('buildAdapter — provider resolution', () => {
     const adapter = await buildAdapter(
       defaultConfig({ provider: 'copilot', fallback: ['anthropic'] }),
     );
-    expect(adapter.constructor.name).toBe('CopilotChatAdapter');
+    expect(adapter.type).toBe('copilot-sdk');
   });
 });

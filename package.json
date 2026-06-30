@@ -50,6 +50,7 @@
   },
   "dependencies": {
     "@helmsmith/agent-adapter": "workspace:*",
+    "@helmsmith/agent-adapter-langchain": "workspace:*",
     "@helmsmith/agent-auth": "workspace:*",
     "@helmsmith/edge-context-server": "workspace:*",
     "@helmsmith/edge-memory-server": "workspace:*",

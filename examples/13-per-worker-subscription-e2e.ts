@@ -6,8 +6,8 @@
  *   catalog accepts:[]   →   BindingResolver
  *                         →  resolveBindingFor (walk + auth check)
  *                         →  ResolvedBinding (cloud OR local)
- *                         →  bindingToAdapter
- *                         →  AgentAdapter (ClaudeSdkAdapter / OpenCodeCliAdapter)
+ *                         →  bindingToSpec → createAgent
+ *                         →  AgentAdapter (type: claude-sdk / opencode-cli / openai-sdk)
  *
  * No live LLM calls — we stop at the point where the adapter object is
  * constructed and inspect its type. The actual SDK wire calls are an
@@ -16,11 +16,11 @@
  * provider selection deterministically against real auth state.
  *
  * Six scenarios cover the interesting branches:
- *   1. Anthropic configured + first in accepts        → ClaudeSdkAdapter
- *   2. Anthropic configured + Local first in accepts  → OpenCodeCliAdapter
+ *   1. Anthropic configured + first in accepts        → claude-sdk
+ *   2. Anthropic configured + Local first in accepts  → opencode-cli
  *      (priority wins over availability)
- *   3. No anthropic, fall through to OpenAI           → OpenCodeCliAdapter
- *   4. No cloud configured, fall through to local     → OpenCodeCliAdapter
+ *   3. No anthropic, fall through to OpenAI           → openai-sdk
+ *   4. No cloud configured, fall through to local     → opencode-cli
  *   5. Mixed pipeline — same job, different agents bind to different
  *      providers based on each agent's accept-list
  *   6. No satisfiable binding → BindingResolutionError, with full
@@ -30,14 +30,16 @@
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { bindingToAdapter, ClaudeSdkAdapter, OpenCodeCliAdapter } from '@helmsmith/agent-adapter';
+import { type AgentAdapter, createAgent } from '@helmsmith/agent-adapter';
 import {
   AuthStore,
   BindingResolutionError,
+  bridgeBroker,
   DefaultBindingResolver,
   FileBroker,
   type Provider,
 } from '@helmsmith/agent-auth';
+import { bindingToSpec } from '@helmsmith/harness-core';
 
 // ─── helpers ──────────────────────────────────────────────────────────────
 
@@ -77,10 +79,11 @@ async function makeAuthFixture(
   return { workspace, authPath, store, broker, resolver };
 }
 
-function adapterClassName(adapter: unknown): string {
-  if (adapter instanceof ClaudeSdkAdapter) return 'ClaudeSdkAdapter';
-  if (adapter instanceof OpenCodeCliAdapter) return 'OpenCodeCliAdapter';
-  return adapter?.constructor?.name ?? 'Unknown';
+// The new surface returns a uniform AgentAdapter — identity is its `.type`
+// discriminator ('claude-sdk' | 'opencode-cli' | 'openai-sdk' | …) rather than
+// a concrete class, so we report that instead of an `instanceof` check.
+function adapterTypeOf(adapter: AgentAdapter): string {
+  return adapter.type;
 }
 
 // Pretty banner for each scenario — keeps the output scannable.
@@ -92,7 +95,7 @@ function banner(n: number, title: string): void {
 // ─── scenarios ────────────────────────────────────────────────────────────
 
 async function scenario1AnthropicWins(): Promise<void> {
-  banner(1, 'Anthropic configured + first in accepts → ClaudeSdkAdapter');
+  banner(1, 'Anthropic configured + first in accepts → claude-sdk');
 
   const fix = await makeAuthFixture({
     anthropic: 'sk-ant-stub-redacted-12345',
@@ -107,18 +110,19 @@ async function scenario1AnthropicWins(): Promise<void> {
     if (binding.kind === 'cloud') {
       console.log(`  → credential.apiKey starts with "${binding.credential.apiKey.slice(0, 10)}…"`);
     }
-    const adapter = bindingToAdapter(binding, {
-      broker: fix.broker,
-      localEndpoint: () => 'http://test-llm:8080/v1',
+    const adapter = createAgent({
+      spec: bindingToSpec(binding, { localEndpoint: () => 'http://test-llm:8080/v1' }),
+      workdir: process.cwd(),
+      credentialBroker: bridgeBroker(fix.broker),
     });
-    console.log(`  → adapter class = ${adapterClassName(adapter)}`);
+    console.log(`  → adapter type = ${adapterTypeOf(adapter)}`);
   } finally {
     rmSync(fix.workspace, { recursive: true, force: true });
   }
 }
 
 async function scenario2LocalFirstBeatsAnthropic(): Promise<void> {
-  banner(2, 'Anthropic configured but Local first in accepts → OpenCodeCliAdapter (priority wins)');
+  banner(2, 'Anthropic configured but Local first in accepts → opencode-cli (priority wins)');
 
   const fix = await makeAuthFixture({
     anthropic: 'sk-ant-stub-redacted-12345',
@@ -130,11 +134,12 @@ async function scenario2LocalFirstBeatsAnthropic(): Promise<void> {
     console.log(
       `  → resolved kind=${binding.kind} provider=${binding.provider.id} model=${binding.model.id}`,
     );
-    const adapter = bindingToAdapter(binding, {
-      broker: fix.broker,
-      localEndpoint: () => 'http://test-llm:8080/v1',
+    const adapter = createAgent({
+      spec: bindingToSpec(binding, { localEndpoint: () => 'http://test-llm:8080/v1' }),
+      workdir: process.cwd(),
+      credentialBroker: bridgeBroker(fix.broker),
     });
-    console.log(`  → adapter class = ${adapterClassName(adapter)}`);
+    console.log(`  → adapter type = ${adapterTypeOf(adapter)}`);
     console.log(
       `  ← note: local won despite anthropic being available — accept-list ordering is policy`,
     );
@@ -144,7 +149,7 @@ async function scenario2LocalFirstBeatsAnthropic(): Promise<void> {
 }
 
 async function scenario3FallThroughToOpenAI(): Promise<void> {
-  banner(3, 'No anthropic, fall through to OpenAI → OpenCodeCliAdapter');
+  banner(3, 'No anthropic, fall through to OpenAI → openai-sdk');
 
   const fix = await makeAuthFixture({
     openai: 'sk-openai-stub-67890',
@@ -159,11 +164,12 @@ async function scenario3FallThroughToOpenAI(): Promise<void> {
     if (binding.kind === 'cloud') {
       console.log(`  → credential.apiKey starts with "${binding.credential.apiKey.slice(0, 10)}…"`);
     }
-    const adapter = bindingToAdapter(binding, {
-      broker: fix.broker,
-      localEndpoint: () => 'http://test-llm:8080/v1',
+    const adapter = createAgent({
+      spec: bindingToSpec(binding, { localEndpoint: () => 'http://test-llm:8080/v1' }),
+      workdir: process.cwd(),
+      credentialBroker: bridgeBroker(fix.broker),
     });
-    console.log(`  → adapter class = ${adapterClassName(adapter)}`);
+    console.log(`  → adapter type = ${adapterTypeOf(adapter)}`);
     console.log(`  ← anthropic skipped (not configured), openai matched`);
   } finally {
     rmSync(fix.workspace, { recursive: true, force: true });
@@ -171,7 +177,7 @@ async function scenario3FallThroughToOpenAI(): Promise<void> {
 }
 
 async function scenario4FallThroughToLocal(): Promise<void> {
-  banner(4, 'No cloud configured at all, fall through to local → OpenCodeCliAdapter');
+  banner(4, 'No cloud configured at all, fall through to local → opencode-cli');
 
   const fix = await makeAuthFixture({}); // empty
   try {
@@ -181,11 +187,12 @@ async function scenario4FallThroughToLocal(): Promise<void> {
     console.log(
       `  → resolved kind=${binding.kind} provider=${binding.provider.id} model=${binding.model.id}`,
     );
-    const adapter = bindingToAdapter(binding, {
-      broker: fix.broker,
-      localEndpoint: () => 'http://test-llm:8080/v1',
+    const adapter = createAgent({
+      spec: bindingToSpec(binding, { localEndpoint: () => 'http://test-llm:8080/v1' }),
+      workdir: process.cwd(),
+      credentialBroker: bridgeBroker(fix.broker),
     });
-    console.log(`  → adapter class = ${adapterClassName(adapter)}`);
+    console.log(`  → adapter type = ${adapterTypeOf(adapter)}`);
     console.log(`  ← all cloud entries skipped silently, local satisfied without auth`);
   } finally {
     rmSync(fix.workspace, { recursive: true, force: true });
@@ -209,16 +216,17 @@ async function scenario5MixedPipelineSameJob(): Promise<void> {
     console.log(`  pipeline has ${pipeline.length} agents, each with its own accept-list`);
     for (const agent of pipeline) {
       const binding = await fix.resolver.resolveBinding(agent.accepts);
-      const adapter = bindingToAdapter(binding, {
-        broker: fix.broker,
-        localEndpoint: () => 'http://test-llm:8080/v1',
+      const adapter = createAgent({
+        spec: bindingToSpec(binding, { localEndpoint: () => 'http://test-llm:8080/v1' }),
+        workdir: process.cwd(),
+        credentialBroker: bridgeBroker(fix.broker),
       });
       const summary =
         binding.kind === 'cloud'
           ? `cloud ${binding.provider.id}:${binding.model.id}`
           : `local ${binding.provider.id}:${binding.model.id}`;
       console.log(
-        `    [${agent.id.padEnd(11)}] accepts=${JSON.stringify(agent.accepts).padEnd(60)} → ${summary.padEnd(35)} (${adapterClassName(adapter)})`,
+        `    [${agent.id.padEnd(11)}] accepts=${JSON.stringify(agent.accepts).padEnd(60)} → ${summary.padEnd(35)} (${adapterTypeOf(adapter)})`,
       );
     }
     console.log(`  ← three different vendors bound for one pipeline run`);
@@ -258,7 +266,7 @@ async function scenario6NoSatisfiableBinding(): Promise<void> {
 async function main(): Promise<void> {
   console.log(`agentx · per-worker model subscription end-to-end proof`);
   console.log(`──────────────────────────────────────────────────────────`);
-  console.log(`exercises: catalog accepts → resolver → bindingToAdapter`);
+  console.log(`exercises: catalog accepts → resolver → bindingToSpec → createAgent`);
 
   await scenario1AnthropicWins();
   await scenario2LocalFirstBeatsAnthropic();
@@ -271,8 +279,8 @@ async function main(): Promise<void> {
   console.log(`══════ ✓ end-to-end proof complete ══════`);
   console.log(`  All scenarios ran the full chain: FileBroker reads auth.json,`);
   console.log(`  DefaultBindingResolver walks the accept-list against the`);
-  console.log(`  LLMProvider registry, bindingToAdapter constructs the right`);
-  console.log(`  adapter class for each ResolvedBinding.`);
+  console.log(`  LLMProvider registry, bindingToSpec + createAgent construct the`);
+  console.log(`  right adapter type for each ResolvedBinding.`);
 }
 
 main().catch((err) => {
