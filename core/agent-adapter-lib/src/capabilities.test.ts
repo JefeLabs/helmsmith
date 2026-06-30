@@ -10,6 +10,8 @@ const ALL_TYPES: AgentSpecType[] = [
   'copilot-sdk',
   'copilot-cli',
   'copilot-agent-cli',
+  'gemini-cli',
+  'codex-cli',
 ];
 
 describe('CAPABILITY_MATRIX', () => {

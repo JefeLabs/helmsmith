@@ -104,6 +104,35 @@ export const CAPABILITY_MATRIX: Record<AgentSpecType, AdapterCapabilities> = {
     supportsJsonMode: false,
     supportsSessionResume: false,
   },
+
+  // Verified against the REAL `gemini` CLI v0.43.0 stream-json output
+  // (@google/gemini-cli-core JsonStreamEventType: init/message/tool_use/
+  // tool_result/error/result).
+  'gemini-cli': {
+    reportsUsage: true, // result event carries stats { input_tokens, output_tokens }
+    supportsStreaming: true, // -o stream-json (newline-delimited JSON events)
+    supportsToolUse: true, // autonomous built-in tools; --approval-mode yolo
+    supportsExtendedThinking: false, // stream-json has no thinking/reasoning event type
+    supportsCancellation: true, // SIGTERM
+    supportsCapture: true, // full stream-json transcript
+    supportsJsonMode: false, // -o json is an OUTPUT format, not a model response_format
+    supportsSessionResume: false, // --resume exists but not wired (v1.1)
+  },
+
+  // Verified against the REAL `codex` CLI v0.133.0 `codex exec --json` events
+  // (thread.started/turn.started/turn.completed/turn.failed/item.completed/error;
+  // ThreadItem variants agent_message/reasoning/command_execution/file_change/
+  // mcp_tool_call/web_search).
+  'codex-cli': {
+    reportsUsage: true, // turn.completed.usage { input_tokens, output_tokens, cached_input_tokens }
+    supportsStreaming: true, // --json (JSONL thread events)
+    supportsToolUse: true, // autonomous built-in tools (exec/patch/mcp/web_search)
+    supportsExtendedThinking: true, // emits reasoning ThreadItems → thinking-delta
+    supportsCancellation: true, // SIGTERM
+    supportsCapture: true, // full JSONL transcript
+    supportsJsonMode: false, // codex exec has --output-schema, but the adapter doesn't wire it
+    supportsSessionResume: false, // codex exec resume exists but not wired (v1.1)
+  },
 };
 
 // ---------------------------------------------------------------------------

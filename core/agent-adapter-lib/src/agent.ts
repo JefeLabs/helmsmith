@@ -24,7 +24,9 @@ export type AgentSpecType =
   | 'opencode-cli'
   | 'copilot-sdk'
   | 'copilot-cli'
-  | 'copilot-agent-cli';
+  | 'copilot-agent-cli'
+  | 'gemini-cli'
+  | 'codex-cli';
 
 // ---------------------------------------------------------------------------
 // AgentSpec — discriminated union (each variant carries its own fields)
@@ -119,6 +121,52 @@ export interface CopilotAgentCliSpec extends BaseSpec {
   apiKey?: string;
 }
 
+/**
+ * Gemini CLI subprocess (`gemini`, provider: google). Autonomous built-in
+ * tools, headless via `-p <prompt> -o stream-json --approval-mode yolo`.
+ */
+export interface GeminiCliSpec extends BaseSpec {
+  type: 'gemini-cli';
+  binaryPath?: string;
+  env?: Record<string, string>;
+  /**
+   * Pre-resolved Google/Gemini API key. When unset, resolved via
+   * broker.getCredential('google') → injected as GEMINI_API_KEY (the var the
+   * gemini CLI reads for USE_GEMINI API-key auth; the $HOME sandbox hides its
+   * own OAuth state). Falls back to the GEMINI_API_KEY env var.
+   */
+  apiKey?: string;
+  /**
+   * Tool-approval mode passed to `--approval-mode`. Defaults to 'yolo'
+   * (auto-approve all tools) so the agent runs non-interactively.
+   */
+  approvalMode?: 'default' | 'auto_edit' | 'yolo' | 'plan';
+}
+
+/**
+ * Codex CLI subprocess (`codex`, provider: openai). Autonomous built-in tools,
+ * headless via the `codex exec <prompt> --json` non-interactive subcommand.
+ */
+export interface CodexCliSpec extends BaseSpec {
+  type: 'codex-cli';
+  binaryPath?: string;
+  env?: Record<string, string>;
+  /**
+   * Pre-resolved OpenAI API key. When unset, resolved via
+   * broker.getCredential('openai') → injected as OPENAI_API_KEY (the $HOME
+   * sandbox hides codex's own ~/.codex/auth.json ChatGPT OAuth). Falls back to
+   * the OPENAI_API_KEY env var.
+   */
+  apiKey?: string;
+  /**
+   * Sandbox policy for `codex exec --sandbox`. Defaults to 'workspace-write'
+   * (writes confined to the workspace + temp; network off) — the safe
+   * non-interactive choice. The adapter additionally sandboxes $HOME/$TMPDIR
+   * to the workdir.
+   */
+  sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
+}
+
 /** Discriminated union of all supported adapter specs. */
 export type AgentSpec =
   | ClaudeSdkSpec
@@ -127,7 +175,9 @@ export type AgentSpec =
   | OpenCodeCliSpec
   | CopilotSdkSpec
   | CopilotCliSpec
-  | CopilotAgentCliSpec;
+  | CopilotAgentCliSpec
+  | GeminiCliSpec
+  | CodexCliSpec;
 
 // ---------------------------------------------------------------------------
 // I/O types (PRD §7)
