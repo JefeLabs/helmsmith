@@ -19,8 +19,14 @@ import { rm } from 'node:fs/promises';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AdapterEventBus, type AgentAdapter, type InvocationSpec } from '@helmsmith/agent-adapter';
-import type { CredentialBroker } from '@helmsmith/agent-auth';
+import type {
+  AdapterCapabilities,
+  AgentAdapter,
+  AgentChunk,
+  AgentInput,
+  AgentInvocationResult,
+} from '@helmsmith/agent-adapter';
+import type { CredentialBroker, Provider } from '@helmsmith/agent-auth';
 import type { Edge, FlowCatalog, FlowDef, TaskStep } from '@helmsmith/harness-core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { startHarnessServer } from './index.ts';
@@ -29,7 +35,7 @@ const tmpSocket = () => join(tmpdir(), `ax-${randomUUID().slice(0, 8)}.sock`);
 
 const dummyBroker: CredentialBroker = {
   async getCredential(provider) {
-    return { provider, apiKey: 'test', source: 'env' };
+    return { provider: provider as Provider, apiKey: 'test', source: 'env' };
   },
 };
 
@@ -37,9 +43,23 @@ const dummyBroker: CredentialBroker = {
  * Test adapter that BLOCKS until externally released. Used to keep jobs
  * "in flight" so we can observe dispatcher state transitions.
  */
+const STUB_CAPS: AdapterCapabilities = {
+  reportsUsage: false,
+  supportsStreaming: false,
+  supportsToolUse: false,
+  toolUseMode: 'none',
+  supportsExtendedThinking: false,
+  supportsCancellation: false,
+  supportsCapture: false,
+  supportsJsonMode: false,
+  supportsSessionResume: false,
+};
+
 class BlockingAdapter implements AgentAdapter {
-  readonly events = new AdapterEventBus();
-  readonly invokeCalls: InvocationSpec[] = [];
+  readonly type = 'claude-sdk' as const;
+  readonly capabilities = STUB_CAPS;
+  readonly workdir = '/test/workdir';
+  readonly invokeCalls: AgentInput[] = [];
   private resolveBlock: (() => void) | null = null;
   private blockPromise: Promise<void>;
 
@@ -53,44 +73,30 @@ class BlockingAdapter implements AgentAdapter {
     this.resolveBlock?.();
   }
 
-  async invoke(spec: InvocationSpec): Promise<string> {
-    this.invokeCalls.push(spec);
-    this.events.emit({
-      kind: 'request',
-      ts: new Date().toISOString(),
-      system: spec.system,
-      user: spec.user,
-      model: 'test-model',
-    });
+  async invoke(input: AgentInput): Promise<AgentInvocationResult> {
+    this.invokeCalls.push(input);
     await this.blockPromise; // hold here until release()
-    this.events.emit({
-      kind: 'response',
-      ts: new Date().toISOString(),
-      text: this.reply,
-    });
-    return this.reply;
+    return { content: this.reply, durationMs: 0 };
+  }
+  // biome-ignore lint/correctness/useYield: stub never emits chunks.
+  async *stream(): AsyncIterable<AgentChunk> {
+    throw new Error('BlockingAdapter.stream is not used by runJob');
   }
 }
 
 class PassthroughAdapter implements AgentAdapter {
-  readonly events = new AdapterEventBus();
-  readonly invokeCalls: InvocationSpec[] = [];
+  readonly type = 'claude-sdk' as const;
+  readonly capabilities = STUB_CAPS;
+  readonly workdir = '/test/workdir';
+  readonly invokeCalls: AgentInput[] = [];
   constructor(private readonly reply: string) {}
-  async invoke(spec: InvocationSpec): Promise<string> {
-    this.invokeCalls.push(spec);
-    this.events.emit({
-      kind: 'request',
-      ts: new Date().toISOString(),
-      system: spec.system,
-      user: spec.user,
-      model: 'test-model',
-    });
-    this.events.emit({
-      kind: 'response',
-      ts: new Date().toISOString(),
-      text: this.reply,
-    });
-    return this.reply;
+  async invoke(input: AgentInput): Promise<AgentInvocationResult> {
+    this.invokeCalls.push(input);
+    return { content: this.reply, durationMs: 0 };
+  }
+  // biome-ignore lint/correctness/useYield: stub never emits chunks.
+  async *stream(): AsyncIterable<AgentChunk> {
+    throw new Error('PassthroughAdapter.stream is not used by runJob');
   }
 }
 

@@ -3,7 +3,7 @@
  * GitHub Copilot (device-token auth → live LLM call).
  *
  * Companion to examples/16 (which uses local-Qwen-via-DMR). Same chain
- * — accept-list → resolver → bindingToAdapter → adapter → model →
+ * — accept-list → resolver → bindingToSpec → createAgent → model →
  * coordinator graph — but with Copilot's hosted models (gpt-4o,
  * claude-3-5-sonnet, gemini-1.5-pro) instead of local Qwen. Unlike the
  * direct Anthropic / OpenAI paths, Copilot gives you frontier models
@@ -14,9 +14,9 @@
  *   ~/.agentx/auth.json (populated by `harness auth login github-copilot`)
  *     ↓ FileBroker / AuthStore
  *   github-copilot:gpt-4o binding
- *     ↓ bindingToAdapter (with copilotAuthPath)
- *   CopilotChatAdapter
- *     ↓ getCopilotSessionToken (cached → refresh → exchange OAuth)
+ *     ↓ bindingToSpec → createHarnessChatModel (FileBroker)
+ *   copilot-sdk adapter
+ *     ↓ FileBroker.getCredential('github-copilot') exchanges OAuth → session token
  *   POST api.githubcopilot.com/chat/completions
  *     ↓
  *   GPT-4o response
@@ -34,9 +34,9 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { createHarnessChatModel } from '@helmsmith/agent-adapter';
-import type { CredentialBroker, ResolvedBinding } from '@helmsmith/agent-auth';
-import type { Catalog } from '@helmsmith/harness-core';
+import { createHarnessChatModel } from '@helmsmith/agent-adapter-langchain';
+import { bridgeBroker, FileBroker, type ResolvedBinding } from '@helmsmith/agent-auth';
+import { bindingToSpec, type Catalog } from '@helmsmith/harness-core';
 import { runEntryCoordinator } from '@helmsmith/harness-server';
 
 const AUTH_PATH = join(homedir(), '.agentx', 'auth.json');
@@ -117,14 +117,6 @@ const intents = [
   },
 ];
 
-// Stub broker — Copilot's adapter reads auth.json directly via authPath,
-// so a broker stub that throws is fine (it never gets called).
-const stubBroker: CredentialBroker = {
-  getCredential: async () => {
-    throw new Error('stub: CopilotChatAdapter reads auth.json directly via copilotAuthPath');
-  },
-};
-
 function copilotBinding(model: string): ResolvedBinding {
   return {
     kind: 'cloud',
@@ -135,11 +127,12 @@ function copilotBinding(model: string): ResolvedBinding {
       models: [],
     },
     model: { id: model, type: 'text' },
-    // The credential is unused by CopilotChatAdapter (which reads
-    // auth.json directly via authPath) but the type requires one.
+    // bindingToSpec ignores the credential for github-copilot (the copilot-sdk
+    // adapter pulls the exchanged session token from the broker), but
+    // ResolvedBinding requires one.
     credential: {
       provider: 'github-copilot',
-      apiKey: '(unused; Copilot reads from authPath)',
+      apiKey: '(unused; broker supplies the Copilot session token)',
       source: 'host-file',
     },
   };
@@ -178,10 +171,14 @@ async function main(): Promise<void> {
 
   await preflight();
 
+  // FileBroker.getCredential('github-copilot') transparently exchanges the
+  // stored GitHub OAuth token for a short-lived Copilot session token — the
+  // exact credential the copilot-sdk adapter expects (the old copilotAuthPath
+  // option is gone; the broker owns the exchange now).
   const model = createHarnessChatModel({
-    binding: copilotBinding(COPILOT_MODEL),
-    broker: stubBroker,
-    copilotAuthPath: AUTH_PATH,
+    spec: bindingToSpec(copilotBinding(COPILOT_MODEL)),
+    workdir: process.cwd(),
+    credentialBroker: bridgeBroker(new FileBroker(AUTH_PATH)),
   });
 
   console.log('▶ Coordinator catalog:');

@@ -19,16 +19,17 @@
 
 import {
   type AgentAdapter,
-  type BindingToAdapterOptions,
-  bindingNeedsOpenCode,
-  bindingToAdapter,
-  defaultLocalEndpointResolver,
+  createAgent,
   OpenCodeServer,
   type OpenCodeServerOptions,
   type OpencodeProviderEntry,
 } from '@helmsmith/agent-adapter';
-import type { ResolvedBinding } from '@helmsmith/agent-auth';
+import { bridgeBroker, type ResolvedBinding } from '@helmsmith/agent-auth';
 import {
+  type BindingToSpecOptions,
+  bindingNeedsOpenCode,
+  bindingToSpec,
+  defaultLocalEndpointResolver,
   type Envelope,
   JobBus,
   type JobRecord,
@@ -53,7 +54,7 @@ export interface RunHarnessPipelineOptions {
    * endpoints; the spec doesn't carry them. Defaults to env-var lookup
    * inside `bindingToAdapter`.
    */
-  localEndpoint?: BindingToAdapterOptions['localEndpoint'];
+  localEndpoint?: BindingToSpecOptions['localEndpoint'];
   /**
    * URL of an externally-managed `opencode serve` instance. When provided,
    * runHarnessPipeline does NOT spawn its own opencode-server even if the
@@ -84,6 +85,12 @@ export interface RunHarnessPipelineOptions {
    * test paths and non-container production deployments stay unchanged.
    */
   tmuxSocket?: string;
+  /**
+   * Git working tree the constructed adapters are bound to. `createAgent`
+   * validates it is inside a git repo. In the per-job container this is the
+   * allocated worktree; defaults to `process.cwd()` for in-process/test use.
+   */
+  workdir?: string;
   /**
    * Optional bus override for tests / external observers. When omitted, a
    * fresh JobBus is created and exposed on the result.
@@ -193,10 +200,14 @@ export async function runHarnessPipeline(
             `but no such binding in spec.bindings (the spec parser should have caught this)`,
         );
       }
-      const adapter = bindingToAdapter(binding, {
-        broker,
-        localEndpoint: options.localEndpoint,
+      const agentSpec = bindingToSpec(binding, {
+        ...(options.localEndpoint ? { localEndpoint: options.localEndpoint } : {}),
         ...(opencodeServerUrl ? { opencodeServerUrl } : {}),
+      });
+      const adapter = createAgent({
+        spec: agentSpec,
+        workdir: options.workdir ?? process.cwd(),
+        credentialBroker: bridgeBroker(broker),
       });
       adapters.set(agent.id, adapter);
     }

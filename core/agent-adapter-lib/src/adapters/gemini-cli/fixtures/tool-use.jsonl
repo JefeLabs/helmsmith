@@ -1,0 +1,6 @@
+{"type":"init","timestamp":"2026-06-29T00:01:00.000Z","session_id":"a1b2c3d4-0000-43d9-b5d7-50ce7adb10df","model":"gemini-2.5-pro"}
+{"type":"message","timestamp":"2026-06-29T00:01:01.000Z","role":"user","content":"Run the bash command echo hi"}
+{"type":"tool_use","timestamp":"2026-06-29T00:01:02.000Z","tool_name":"run_shell_command","tool_id":"tool-1","parameters":{"command":"echo hi"}}
+{"type":"tool_result","timestamp":"2026-06-29T00:01:03.000Z","tool_id":"tool-1","status":"success","output":"hi"}
+{"type":"message","timestamp":"2026-06-29T00:01:04.000Z","role":"assistant","content":"`hi`","delta":true}
+{"type":"result","timestamp":"2026-06-29T00:01:05.000Z","status":"success","stats":{"total_tokens":30,"input_tokens":10,"output_tokens":20,"duration_ms":2000,"tool_calls":1}}

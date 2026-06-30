@@ -17,7 +17,13 @@ import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AdapterEventBus, type AgentAdapter, type InvocationSpec } from '@helmsmith/agent-adapter';
+import type {
+  AdapterCapabilities,
+  AgentAdapter,
+  AgentChunk,
+  AgentInput,
+  AgentInvocationResult,
+} from '@helmsmith/agent-adapter';
 import type { CredentialBroker } from '@helmsmith/agent-auth';
 import type { Edge, FlowCatalog, FlowDef, TaskStep } from '@helmsmith/harness-core';
 import { startHarnessServer } from '@helmsmith/harness-server';
@@ -31,8 +37,22 @@ const dummyBroker: CredentialBroker = {
   },
 };
 
+const STUB_CAPS: AdapterCapabilities = {
+  reportsUsage: false,
+  supportsStreaming: false,
+  supportsToolUse: false,
+  toolUseMode: 'none',
+  supportsExtendedThinking: false,
+  supportsCancellation: false,
+  supportsCapture: false,
+  supportsJsonMode: false,
+  supportsSessionResume: false,
+};
+
 class BlockingAdapter implements AgentAdapter {
-  readonly events = new AdapterEventBus();
+  readonly type = 'claude-sdk' as const;
+  readonly capabilities = STUB_CAPS;
+  readonly workdir = '/test/workdir';
   private resolve: (() => void) | null = null;
   private blocked: Promise<void>;
   constructor() {
@@ -43,17 +63,13 @@ class BlockingAdapter implements AgentAdapter {
   release(): void {
     this.resolve?.();
   }
-  async invoke(spec: InvocationSpec): Promise<string> {
-    this.events.emit({
-      kind: 'request',
-      ts: new Date().toISOString(),
-      system: spec.system,
-      user: spec.user,
-      model: 'test',
-    });
+  async invoke(_input: AgentInput): Promise<AgentInvocationResult> {
     await this.blocked;
-    this.events.emit({ kind: 'response', ts: new Date().toISOString(), text: 'done' });
-    return 'done';
+    return { content: 'done', durationMs: 0 };
+  }
+  // biome-ignore lint/correctness/useYield: stub never emits chunks.
+  async *stream(): AsyncIterable<AgentChunk> {
+    throw new Error('BlockingAdapter.stream is not used by runJob');
   }
 }
 

@@ -7,11 +7,13 @@ export {
   resolveAllBindingsFor,
   resolveBindingFor,
 } from './binding-resolver.ts';
+export { type AdapterCredentialBroker, bridgeBroker } from './broker-bridge.ts';
 export {
   type ChatCompletionResponse,
   type ChatMessage,
   callCopilot,
   fetchGitHubUsername,
+  getCopilotCredential,
   getCopilotSessionToken,
 } from './copilot-api.ts';
 export { FileBroker } from './file-broker.ts';

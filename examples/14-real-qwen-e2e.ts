@@ -9,8 +9,8 @@
  *   accept-list              ← DefaultBindingResolver picks first
  *                              satisfiable entry
  *   ResolvedBinding.local    ← matches local-qwen
- *   bindingToAdapter         ← constructs OpenCodeCliAdapter pointed at
- *                              DMR's chat-completions endpoint
+ *   bindingToSpec → createAgent ← constructs the opencode-cli adapter pointed
+ *                              at DMR's chat-completions endpoint
  *   adapter.invoke(...)      ← spawns `opencode run` which posts to DMR's
  *                              /v1/chat/completions with the model name
  *                              from registry.vendorModelId
@@ -26,8 +26,8 @@
  *   `opencode serve` and uses `opencode run --attach` for adapter calls
  *   — but the server's provider config (where DMR lives) hasn't been
  *   wired through spec.bindings yet (slice 9c-3 follow-up). For now this
- *   demo exercises the resolver → bindingToAdapter chain directly,
- *   letting OpenCodeCliAdapter run in standalone mode against DMR. That
+ *   demo exercises the resolver → bindingToSpec → createAgent chain directly,
+ *   letting the opencode-cli adapter run in standalone mode against DMR. That
  *   chain is the load-bearing architectural payoff; --attach is a perf
  *   optimization that lands separately.
  *
@@ -38,8 +38,9 @@
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { bindingToAdapter } from '@helmsmith/agent-adapter';
-import { AuthStore, DefaultBindingResolver, FileBroker } from '@helmsmith/agent-auth';
+import { createAgent } from '@helmsmith/agent-adapter';
+import { AuthStore, bridgeBroker, DefaultBindingResolver, FileBroker } from '@helmsmith/agent-auth';
+import { bindingToSpec } from '@helmsmith/harness-core';
 
 const DMR_CHAT_URL = 'http://localhost:12434/engines/llama.cpp/v1';
 
@@ -106,8 +107,8 @@ async function preflight(): Promise<void> {
 async function main(): Promise<void> {
   console.log('agentx · REAL end-to-end proof');
   console.log('────────────────────────────────────────────────');
-  console.log('catalog accepts → resolver → bindingToAdapter →');
-  console.log('OpenCodeCliAdapter → opencode run → DMR → live Qwen');
+  console.log('catalog accepts → resolver → bindingToSpec → createAgent →');
+  console.log('opencode-cli adapter → opencode run → DMR → live Qwen');
   console.log();
 
   await preflight();
@@ -128,30 +129,21 @@ async function main(): Promise<void> {
     console.log();
 
     // Step 2: build the adapter. localEndpoint points at DMR's
-    // OpenAI-compatible chat completions endpoint. OpenCodeCliAdapter
+    // OpenAI-compatible chat completions endpoint. The opencode-cli adapter
     // will write opencode.json with this provider, then spawn
     // `opencode run --model local-qwen/ai/qwen3:0.6B-Q4_K_M ...` against it.
-    console.log('▶ bindingToAdapter — constructing OpenCodeCliAdapter');
-    const adapter = bindingToAdapter(binding, {
-      broker: fix.broker,
-      localEndpoint: () => DMR_CHAT_URL,
+    console.log('▶ bindingToSpec + createAgent — constructing opencode-cli adapter');
+    const adapter = createAgent({
+      spec: bindingToSpec(binding, { localEndpoint: () => DMR_CHAT_URL }),
+      workdir: process.cwd(),
+      credentialBroker: bridgeBroker(fix.broker),
     });
-    console.log(`  → adapter class = ${adapter.constructor.name}`);
+    console.log(`  → adapter type = ${adapter.type}`);
     console.log();
 
-    // Subscribe to adapter events for diagnostic visibility into the
-    // request/response wire format. Useful to confirm what the adapter
-    // actually sees vs what shows up in the returned reply.
-    adapter.events.subscribe((evt) => {
-      if (evt.kind === 'response') {
-        console.log(`  [event] response.text length = ${(evt.text ?? '').length}`);
-        if ('raw' in evt && evt.raw) {
-          console.log(`  [event] response.raw = ${JSON.stringify(evt.raw).slice(0, 400)}`);
-        }
-      } else if (evt.kind === 'error') {
-        console.log(`  [event] error: ${evt.message}`);
-      }
-    });
+    // The new adapter surface has no event bus — invoke() returns the
+    // normalized result directly, so we read result.content (and report its
+    // length below) instead of subscribing to request/response events.
 
     // Step 3: actually invoke the LLM. `/no_think` is a Qwen3 control
     // token that asks the model to skip the reasoning phase and answer
@@ -159,14 +151,18 @@ async function main(): Promise<void> {
     // `reasoning_content` which opencode hides by default. (The 0.6B
     // model's reasoning is also slow + often empty.)
     const prompt = '/no_think Reply with exactly five words greeting an agentx developer.';
-    console.log(`▶ adapter.invoke({ user: ${JSON.stringify(prompt)} })`);
+    console.log(
+      `▶ adapter.invoke({ messages: [{ role: 'user', content: ${JSON.stringify(prompt)} }] })`,
+    );
     console.log('  (this spawns opencode, opencode posts to DMR, DMR runs Qwen…)');
     const t0 = Date.now();
-    const reply = await adapter.invoke({
-      user: prompt,
+    const result = await adapter.invoke({
+      messages: [{ role: 'user', content: prompt }],
     });
+    const reply = result.content;
     const ms = Date.now() - t0;
     console.log();
+    console.log(`  [diag] response length = ${reply.length} chars`);
     console.log(`▶ Qwen response (${ms}ms):`);
     console.log(`  ${reply.split('\n').join('\n  ')}`);
     console.log();

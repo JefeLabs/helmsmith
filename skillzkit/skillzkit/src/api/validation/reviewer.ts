@@ -5,10 +5,10 @@
  *
  * The reviewer is integrated through the platform's
  * `@helmsmith/agent-adapter` rather than a direct provider SDK.
- * `AgentAdapter.invoke({ system, user })` is provider-agnostic — the
- * host platform's binding/auth machinery decides whether the actual
- * call goes to Claude, OpenAI, local Qwen, etc. The skillzkit API
- * never holds a provider API key directly.
+ * `AgentAdapter.invoke(AgentInput)` is provider-agnostic — the host
+ * platform's binding/auth machinery decides whether the actual call
+ * goes to Claude, OpenAI, local Qwen, etc. The skillzkit API never
+ * holds a provider API key directly.
  *
  * Three reviewer flavors:
  *   - MockReviewer: returns no findings (or canned ones). For tests.
@@ -65,10 +65,15 @@ export class MockReviewer implements ContributionReviewer {
  * even when `@helmsmith/agent-adapter` isn't installed (it's a
  * workspace link from agentx-platform that may be absent in some
  * dev environments). At runtime, the caller passes a real
- * AgentAdapter instance — duck typing ensures compatibility.
+ * AgentAdapter instance — duck typing ensures compatibility. The shape
+ * mirrors the new surface: `invoke(AgentInput) → AgentInvocationResult`
+ * (a structural subset; a real AgentAdapter satisfies it).
  */
 export interface AdapterLike {
-  invoke(spec: { system?: string; user: string }): Promise<string>;
+  invoke(input: {
+    messages: Array<{ role: 'user' | 'assistant' | 'tool'; content: string }>;
+    systemPrompt?: string;
+  }): Promise<{ content: string }>;
 }
 
 export interface AgentAdapterReviewerOptions {
@@ -133,11 +138,11 @@ export class AgentAdapterReviewer implements ContributionReviewer {
       ];
     }
 
-    const raw = await this.adapter.invoke({
-      system: this.systemPrompt,
-      user: userPrompt,
+    const result = await this.adapter.invoke({
+      messages: [{ role: 'user', content: userPrompt }],
+      systemPrompt: this.systemPrompt,
     });
-    return parseFindings(raw);
+    return parseFindings(result.content);
   }
 
   /**

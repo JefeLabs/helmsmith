@@ -3,8 +3,14 @@ import { rm } from 'node:fs/promises';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AdapterEventBus, type AgentAdapter, type InvocationSpec } from '@helmsmith/agent-adapter';
-import type { CredentialBroker } from '@helmsmith/agent-auth';
+import type {
+  AdapterCapabilities,
+  AgentAdapter,
+  AgentChunk,
+  AgentInput,
+  AgentInvocationResult,
+} from '@helmsmith/agent-adapter';
+import type { CredentialBroker, Provider } from '@helmsmith/agent-auth';
 import type {
   AdapterId,
   AgentDef,
@@ -36,14 +42,34 @@ const tmpSocket = () => join(tmpdir(), `ax-${randomUUID().slice(0, 8)}.sock`);
 
 const dummyBroker: CredentialBroker = {
   async getCredential(provider) {
-    return { provider, apiKey: 'test', source: 'env' };
+    return { provider: provider as Provider, apiKey: 'test', source: 'env' };
   },
 };
 
-/** Test adapter that emits a request → response cycle and returns a fixed text. */
+const STUB_CAPS: AdapterCapabilities = {
+  reportsUsage: true,
+  supportsStreaming: false,
+  supportsToolUse: false,
+  toolUseMode: 'none',
+  supportsExtendedThinking: false,
+  supportsCancellation: false,
+  supportsCapture: false,
+  supportsJsonMode: false,
+  supportsSessionResume: false,
+};
+
+/**
+ * Test adapter returning a fixed result. The orchestrator synthesizes the
+ * request/response/error bus events; the per-call `usage` (here in the
+ * provider-style prompt/completion vocabulary the test thinks in) is returned
+ * in the lib's input/output vocabulary so the orchestrator maps it back to
+ * prompt/completion on the bus for the TokenAccumulator to read.
+ */
 class TestAdapter implements AgentAdapter {
-  readonly events = new AdapterEventBus();
-  invokeCalls: InvocationSpec[] = [];
+  readonly type = 'claude-sdk' as const;
+  readonly capabilities = STUB_CAPS;
+  readonly workdir = '/test/workdir';
+  invokeCalls: AgentInput[] = [];
 
   constructor(
     private readonly behavior:
@@ -51,30 +77,28 @@ class TestAdapter implements AgentAdapter {
       | { kind: 'throw'; message: string },
   ) {}
 
-  async invoke(spec: InvocationSpec): Promise<string> {
-    this.invokeCalls.push(spec);
-    this.events.emit({
-      kind: 'request',
-      ts: new Date().toISOString(),
-      system: spec.system,
-      user: spec.user,
-      model: 'test-model',
-    });
+  async invoke(input: AgentInput): Promise<AgentInvocationResult> {
+    this.invokeCalls.push(input);
     if (this.behavior.kind === 'throw') {
-      this.events.emit({
-        kind: 'error',
-        ts: new Date().toISOString(),
-        message: this.behavior.message,
-      });
       throw new Error(this.behavior.message);
     }
-    this.events.emit({
-      kind: 'response',
-      ts: new Date().toISOString(),
-      text: this.behavior.reply,
-      ...(this.behavior.usage ? { usage: this.behavior.usage } : {}),
-    });
-    return this.behavior.reply;
+    const usage = this.behavior.usage;
+    return {
+      content: this.behavior.reply,
+      durationMs: 0,
+      ...(usage
+        ? {
+            usage: {
+              inputTokens: usage.promptTokens ?? 0,
+              outputTokens: usage.completionTokens ?? 0,
+            },
+          }
+        : {}),
+    };
+  }
+  // biome-ignore lint/correctness/useYield: stub never emits chunks.
+  async *stream(): AsyncIterable<AgentChunk> {
+    throw new Error('TestAdapter.stream is not used by runJob');
   }
 }
 

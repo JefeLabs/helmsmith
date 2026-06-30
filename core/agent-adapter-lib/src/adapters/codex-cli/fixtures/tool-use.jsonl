@@ -1,0 +1,7 @@
+{"type":"thread.started","thread_id":"019f15e2-aaaa-7812-8623-fb476b8020e9"}
+{"type":"turn.started"}
+{"type":"item.started","item":{"id":"item_0","item_type":"reasoning"}}
+{"type":"item.completed","item":{"id":"item_0","item_type":"reasoning","text":"I should run echo hi."}}
+{"type":"item.completed","item":{"id":"item_1","item_type":"command_execution","command":"echo hi","status":"completed","exit_code":0,"aggregated_output":"hi\n"}}
+{"type":"item.completed","item":{"id":"item_2","item_type":"agent_message","text":"`hi`"}}
+{"type":"turn.completed","usage":{"input_tokens":20,"cached_input_tokens":0,"output_tokens":15}}

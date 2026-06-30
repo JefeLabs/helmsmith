@@ -133,8 +133,20 @@ describe('runHarnessPipeline opencode-server lifecycle', () => {
 
   it('does NOT start a server when caller provides opencodeServerUrl', async () => {
     // Even a binding that needs opencode (local) shouldn't trigger an
-    // internal spawn when the caller supplies a URL.
-    const spec = specWithBindings({ a: localBinding() });
+    // internal spawn when the caller supplies a URL. The spec carries the
+    // local binding (so specNeedsOpenCode is true), but its only agent is a
+    // coordinator with no bindingId — so no real opencode adapter is built or
+    // invoked, keeping this a pure server-lifecycle assertion.
+    const spec: JobSpec = {
+      version: 1,
+      jobId: 'test',
+      pipeline: 'p',
+      set: 'default',
+      input: 'go',
+      agents: [{ id: 'coordinator', role: 'C', adapter: 'opencode-cli' }],
+      bindings: { a: localBinding() },
+    };
+    expect(specNeedsOpenCode(spec)).toBe(true);
     const result = await runHarnessPipeline(spec, {
       opencodeServerUrl: 'http://test:9999',
       localEndpoint: () => 'http://test:8080/v1',

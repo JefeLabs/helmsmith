@@ -30,9 +30,9 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { type CopilotChatAdapterOptions, createHarnessChatModel } from '@helmsmith/agent-adapter';
-import { type CredentialBroker, FileBroker, type ResolvedBinding } from '@helmsmith/agent-auth';
-import type { Catalog } from '@helmsmith/harness-core';
+import { createHarnessChatModel } from '@helmsmith/agent-adapter-langchain';
+import { bridgeBroker, FileBroker, type ResolvedBinding } from '@helmsmith/agent-auth';
+import { bindingToSpec, type Catalog } from '@helmsmith/harness-core';
 import { runEntryCoordinator } from '@helmsmith/harness-server';
 
 const AUTH_PATH = join(homedir(), '.agentx', 'auth.json');
@@ -116,13 +116,6 @@ function openaiBinding(apiKey: string): ResolvedBinding {
   };
 }
 
-// Stub broker for the Copilot path (CopilotChatAdapter reads authPath).
-const stubBroker: CredentialBroker = {
-  getCredential: async () => {
-    throw new Error('stub: Copilot reads auth.json directly via authPath');
-  },
-};
-
 // ─── per-provider runner ──────────────────────────────────────────────────
 
 interface ProviderResult {
@@ -151,10 +144,13 @@ async function runProvider(name: string): Promise<ProviderResult | null> {
       return null;
     }
     modelLabel = 'github-copilot:gpt-4o (Copilot-routed)';
+    // FileBroker.getCredential('github-copilot') exchanges the stored GitHub
+    // OAuth token for a Copilot session token — the credential the copilot-sdk
+    // adapter expects (the old copilotAuthPath option is gone).
     model = createHarnessChatModel({
-      binding: copilotBinding(),
-      broker: stubBroker,
-      copilotAuthPath: AUTH_PATH,
+      spec: bindingToSpec(copilotBinding()),
+      workdir: process.cwd(),
+      credentialBroker: bridgeBroker(new FileBroker(AUTH_PATH)),
     });
   } else if (name === 'openai') {
     const apiKey = readApiKey('openai');
@@ -163,12 +159,12 @@ async function runProvider(name: string): Promise<ProviderResult | null> {
       return null;
     }
     modelLabel = 'openai:gpt-4o (direct OpenAI API)';
-    // Real FileBroker so OpenCodeCliAdapter (which the openai binding
+    // Real FileBroker so the openai-sdk adapter (which the openai binding
     // routes to) can pull the credential at invoke time.
-    const broker = new FileBroker(AUTH_PATH);
     model = createHarnessChatModel({
-      binding: openaiBinding(apiKey),
-      broker,
+      spec: bindingToSpec(openaiBinding(apiKey)),
+      workdir: process.cwd(),
+      credentialBroker: bridgeBroker(new FileBroker(AUTH_PATH)),
     });
   } else {
     console.log(`  ✗ unknown provider name: ${name}\n`);
@@ -229,8 +225,6 @@ function readApiKey(id: string): string | null {
 function truncate(s: string, max: number): string {
   return s.length > max ? `${s.slice(0, max - 1)}…` : s;
 }
-
-void {} as CopilotChatAdapterOptions; // type ref to keep import alive when checking
 
 // ─── main ─────────────────────────────────────────────────────────────────
 

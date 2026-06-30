@@ -6,7 +6,7 @@
  *
  *   resolved binding for local-qwen
  *     ↓
- *   bindingToAdapter → OpenCodeCliAdapter (DMR endpoint)
+ *   bindingToSpec → createAgent → opencode-cli adapter (DMR endpoint)
  *     ↓
  *   HarnessChatModel wraps the adapter as a LangChain BaseChatModel
  *     ↓
@@ -28,9 +28,10 @@
  *   bun examples/16-entry-coordinator-with-qwen.ts
  */
 
-import { bindingToAdapter, createHarnessChatModel } from '@helmsmith/agent-adapter';
-import type { ResolvedBinding } from '@helmsmith/agent-auth';
-import type { Catalog } from '@helmsmith/harness-core';
+import { createAgent } from '@helmsmith/agent-adapter';
+import { HarnessChatModel } from '@helmsmith/agent-adapter-langchain';
+import { bridgeBroker, type ResolvedBinding } from '@helmsmith/agent-auth';
+import { bindingToSpec, type Catalog } from '@helmsmith/harness-core';
 import { runEntryCoordinator } from '@helmsmith/harness-server';
 
 const DMR_CHAT_URL = 'http://localhost:12434/engines/llama.cpp/v1';
@@ -145,21 +146,17 @@ async function main(): Promise<void> {
 
   await preflight();
 
-  // Build the chat model once — wraps OpenCodeCliAdapter pointed at DMR.
+  // Build the chat model once — wraps the opencode-cli adapter pointed at DMR.
   // (We bypass runHarnessPipeline here because the coordinator runs in
   // harness-server's trust domain, not in a per-job container. Slice 10c
   // will wire harness-server's own opencode-server lifecycle for this.)
   const binding = localQwenBinding();
-  const adapter = bindingToAdapter(binding, {
-    broker: stubBroker,
-    localEndpoint: () => DMR_CHAT_URL,
+  const adapter = createAgent({
+    spec: bindingToSpec(binding, { localEndpoint: () => DMR_CHAT_URL }),
+    workdir: process.cwd(),
+    credentialBroker: bridgeBroker(stubBroker),
   });
-  const model = createHarnessChatModel({
-    binding,
-    broker: stubBroker,
-    localEndpoint: () => DMR_CHAT_URL,
-  });
-  void adapter;
+  const model = new HarnessChatModel({ adapter });
 
   console.log('▶ Coordinator catalog:');
   for (const p of sampleCatalog.pipelines) {

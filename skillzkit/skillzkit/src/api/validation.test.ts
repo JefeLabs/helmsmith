@@ -451,11 +451,13 @@ describe('AgentAdapterReviewer', () => {
     let captured: { system?: string; user: string } | undefined;
     const reviewer = new AgentAdapterReviewer({
       adapter: {
-        async invoke(spec) {
-          captured = spec;
-          return JSON.stringify({
-            findings: [{ severity: 'low', axis: 'quality', message: 'minor nit' }],
-          });
+        async invoke(input) {
+          captured = { system: input.systemPrompt, user: input.messages[0]?.content ?? '' };
+          return {
+            content: JSON.stringify({
+              findings: [{ severity: 'low', axis: 'quality', message: 'minor nit' }],
+            }),
+          };
         },
       },
     });
@@ -476,7 +478,7 @@ describe('AgentAdapterReviewer', () => {
     const reviewer = new AgentAdapterReviewer({
       adapter: {
         async invoke() {
-          return 'not JSON, just prose';
+          return { content: 'not JSON, just prose' };
         },
       },
     });
@@ -494,7 +496,10 @@ describe('AgentAdapterReviewer', () => {
     const reviewer = new AgentAdapterReviewer({
       adapter: {
         async invoke() {
-          return '```json\n{"findings":[{"severity":"high","axis":"safety","message":"oops"}]}\n```';
+          return {
+            content:
+              '```json\n{"findings":[{"severity":"high","axis":"safety","message":"oops"}]}\n```',
+          };
         },
       },
     });

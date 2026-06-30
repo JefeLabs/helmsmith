@@ -1,7 +1,6 @@
-import type { AdapterEvent } from '@helmsmith/agent-adapter';
 import { describe, expect, it } from 'vitest';
 import type { JobRecord } from './job.ts';
-import { JobBus } from './job-bus.ts';
+import { type AdapterEvent, JobBus } from './job-bus.ts';
 import { TokenAccumulator } from './token-accumulator.ts';
 
 function emptyJob(jobId: string, agentIds: string[]): JobRecord {

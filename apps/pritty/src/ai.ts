@@ -8,9 +8,15 @@
  * way (Copilot uses authPath; the others use API keys).
  */
 
-import { ClaudeSdkAdapter, CopilotChatAdapter, OpenAiChatAdapter } from '@helmsmith/agent-adapter';
-import type { Credential, CredentialBroker, Provider } from '@helmsmith/agent-auth';
-import { getAuthPath, readAuth } from './auth.js';
+import { type AgentAdapter, createAgent } from '@helmsmith/agent-adapter';
+import {
+  bridgeBroker,
+  type Credential,
+  type CredentialBroker,
+  getCopilotCredential,
+  type Provider,
+} from '@helmsmith/agent-auth';
+import { getAuthStore, readAuth } from './auth.js';
 import type { CategorizedFiles } from './categorizer.js';
 import type { Config } from './config.js';
 import { type PullRequestTemplate, templatePromptGuidance } from './pr-template.js';
@@ -29,8 +35,8 @@ class EnvBroker implements CredentialBroker {
   }
 }
 
-/** Common adapter interface — every provider implements .invoke(). */
-type ChatAdapter = CopilotChatAdapter | ClaudeSdkAdapter | OpenAiChatAdapter;
+/** Common adapter interface — every provider builds an AgentAdapter. */
+type ChatAdapter = AgentAdapter;
 
 export interface TicketContext {
   ticket: string | null;
@@ -59,24 +65,42 @@ async function tryBuildProvider(
   switch (name) {
     case 'copilot': {
       const auth = await readAuth();
-      if (!auth.providers['github-copilot']?.apiKey) return null;
-      return new CopilotChatAdapter({
-        authPath: getAuthPath(),
-        model: config.model,
+      const githubToken = auth.providers['github-copilot']?.apiKey;
+      if (!githubToken) return null;
+      // The copilot-sdk adapter resolves credentials via the broker, which
+      // exchanges the stored GitHub OAuth token for a short-lived Copilot
+      // session token (the same exchange the old CopilotChatAdapter did from
+      // authPath). Resolution is lazy — no network at construction.
+      const store = getAuthStore();
+      const credentialBroker = {
+        getCredential: async () => {
+          const cred = await getCopilotCredential(store, githubToken);
+          return {
+            apiKey: cred.apiKey,
+            ...(cred.expiresAt ? { expiresAt: new Date(cred.expiresAt) } : {}),
+          };
+        },
+      };
+      return createAgent({
+        spec: { type: 'copilot-sdk', model: config.model },
+        workdir: process.cwd(),
+        credentialBroker,
       });
     }
     case 'anthropic': {
       if (!process.env[config.anthropicKeyEnv]) return null;
-      return new ClaudeSdkAdapter({
-        broker: new EnvBroker(config.anthropicKeyEnv),
-        model: config.model,
+      return createAgent({
+        spec: { type: 'claude-sdk', model: config.model },
+        workdir: process.cwd(),
+        credentialBroker: bridgeBroker(new EnvBroker(config.anthropicKeyEnv)),
       });
     }
     case 'openai': {
       if (!process.env[config.openaiKeyEnv]) return null;
-      return new OpenAiChatAdapter({
-        broker: new EnvBroker(config.openaiKeyEnv),
-        model: config.model,
+      return createAgent({
+        spec: { type: 'openai-sdk', model: config.model },
+        workdir: process.cwd(),
+        credentialBroker: bridgeBroker(new EnvBroker(config.openaiKeyEnv)),
       });
     }
   }
@@ -186,7 +210,11 @@ export async function generateCommitMessages(
     '```',
   ].join('\n');
 
-  const raw = await adapter.invoke({ system, user });
+  const result = await adapter.invoke({
+    messages: [{ role: 'user', content: user }],
+    systemPrompt: system,
+  });
+  const raw = result.content;
   const cleaned = unwrapJson(raw);
 
   let parsed: unknown;
@@ -269,7 +297,11 @@ export async function generatePR(
     commitList,
   ].join('\n');
 
-  const raw = await adapter.invoke({ system, user });
+  const result = await adapter.invoke({
+    messages: [{ role: 'user', content: user }],
+    systemPrompt: system,
+  });
+  const raw = result.content;
   const cleaned = unwrapJson(raw);
 
   let parsed: unknown;
@@ -369,7 +401,11 @@ export async function generateRebasePlan(
 
   const user = [`Rebase plan needed for ${commits.length} commit(s):`, commitList].join('\n');
 
-  const raw = await adapter.invoke({ system, user });
+  const result = await adapter.invoke({
+    messages: [{ role: 'user', content: user }],
+    systemPrompt: system,
+  });
+  const raw = result.content;
   const cleaned = unwrapJson(raw);
 
   let parsed: unknown;

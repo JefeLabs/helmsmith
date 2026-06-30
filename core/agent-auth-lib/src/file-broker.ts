@@ -1,4 +1,6 @@
 import { readFile, stat } from 'node:fs/promises';
+import { AuthStore } from './auth-store.ts';
+import { getCopilotCredential } from './copilot-api.ts';
 import type { Credential, CredentialBroker, Provider } from './types.ts';
 
 interface ProviderEntry {
@@ -13,13 +15,33 @@ interface AuthFile {
   providers: Record<string, ProviderEntry>;
 }
 
+export interface FileBrokerOptions {
+  /**
+   * Injectable fetch implementation. Passed through to the Copilot session-token
+   * exchange in getCopilotCredential. Defaults to the global fetch.
+   * Useful for injecting a vi.fn() stub in tests.
+   */
+  fetchFn?: typeof fetch;
+}
+
 /**
  * v1 trust model (decision #5): file at `~/.<your-org>/auth.json`, mode 0600.
  * The file-perm check is the entire auth boundary — there is no app-level auth
  * in v1. Every other gate (UDS sockets, capture redaction) layers on top.
+ *
+ * For `github-copilot`, the broker transparently exchanges the stored GitHub
+ * OAuth token for a short-lived Copilot session token via getCopilotCredential.
+ * Downstream consumers always receive the exchanged session token.
  */
 export class FileBroker implements CredentialBroker {
-  constructor(private readonly path: string) {}
+  private readonly fetchFn: typeof fetch;
+
+  constructor(
+    private readonly path: string,
+    options?: FileBrokerOptions,
+  ) {
+    this.fetchFn = options?.fetchFn ?? fetch;
+  }
 
   async getCredential(provider: Provider): Promise<Credential> {
     await this.assertSecurePermissions();
@@ -37,6 +59,19 @@ export class FileBroker implements CredentialBroker {
             : `Edit ${this.path} and paste a real key.`),
       );
     }
+
+    if (provider === 'github-copilot') {
+      const store = new AuthStore(this.path);
+      const exchanged = await getCopilotCredential(store, entry.apiKey, this.fetchFn);
+      return {
+        provider,
+        apiKey: exchanged.apiKey,
+        expiresAt: exchanged.expiresAt,
+        source: 'host-file',
+        tokenType: 'copilot-session',
+      };
+    }
+
     return {
       provider,
       apiKey: entry.apiKey,
