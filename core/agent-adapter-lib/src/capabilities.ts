@@ -163,6 +163,22 @@ export const CAPABILITY_MATRIX: Record<AgentSpecType, AdapterCapabilities> = {
     supportsJsonMode: false, // codex exec has --output-schema, but the adapter doesn't wire it
     supportsSessionResume: false, // codex exec resume exists but not wired (v1.1)
   },
+
+  // Verified against the REAL `@aws-sdk/client-bedrock-runtime` v3.1076.0
+  // ConverseStream API (BedrockRuntimeClient.send(ConverseStreamCommand) →
+  // { stream: AsyncIterable<ConverseStreamOutput> }; the union carries
+  // messageStart / contentBlockStart / contentBlockDelta / contentBlockStop /
+  // messageStop / metadata). Chat-mode host-loop tool use via toolConfig.
+  'bedrock-sdk': {
+    reportsUsage: true, // metadata.usage { inputTokens, outputTokens }
+    supportsStreaming: true, // ConverseStreamCommand
+    supportsToolUse: true, // host-loop: contentBlock toolUse surfaced as tool-call-*
+    supportsExtendedThinking: true, // ContentBlockDelta.reasoningContent.text → thinking-delta
+    supportsCancellation: true, // client.send(cmd, { abortSignal }) aborts the request
+    supportsCapture: true,
+    supportsJsonMode: false, // Converse uses tool-use for structured output (no response_format)
+    supportsSessionResume: false,
+  },
 };
 
 // ---------------------------------------------------------------------------

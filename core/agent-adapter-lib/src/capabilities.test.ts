@@ -14,6 +14,7 @@ const ALL_TYPES: AgentSpecType[] = [
   'gemini-sdk',
   'openai-sdk',
   'codex-cli',
+  'bedrock-sdk',
 ];
 
 /** Adapter types that support JSON mode (structured output) in the static matrix. */
