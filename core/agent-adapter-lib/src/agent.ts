@@ -26,6 +26,8 @@ export type AgentSpecType =
   | 'copilot-cli'
   | 'copilot-agent-cli'
   | 'gemini-cli'
+  | 'gemini-sdk'
+  | 'openai-sdk'
   | 'codex-cli';
 
 // ---------------------------------------------------------------------------
@@ -104,6 +106,36 @@ export interface CopilotSdkSpec extends BaseSpec {
   apiKey?: string;
 }
 
+/**
+ * Google Gemini SDK — in-process `@google/genai`, chat-mode host-loop tool use
+ * (provider: google). Mirrors claude-sdk: stream()/invoke()=reduceStream,
+ * broker auth, API-level tool-use surfaced as tool-call-* chunks.
+ */
+export interface GeminiSdkSpec extends BaseSpec {
+  type: 'gemini-sdk';
+  /**
+   * Pre-resolved Google/Gemini API key (skips CredentialBroker when set). When
+   * unset, resolved via broker.getCredential('google'); falls back to the
+   * GEMINI_API_KEY / GOOGLE_API_KEY environment variables.
+   */
+  apiKey?: string;
+}
+
+/**
+ * OpenAI SDK — in-process `openai` Chat Completions, chat-mode host-loop tool
+ * use (provider: openai). Mirrors claude-sdk: stream()/invoke()=reduceStream,
+ * broker auth, API-level tool-use surfaced as tool-call-* chunks.
+ */
+export interface OpenAiSdkSpec extends BaseSpec {
+  type: 'openai-sdk';
+  /**
+   * Pre-resolved OpenAI API key (skips CredentialBroker when set). When unset,
+   * resolved via broker.getCredential('openai'); falls back to the
+   * OPENAI_API_KEY environment variable.
+   */
+  apiKey?: string;
+}
+
 /** `gh copilot suggest` CLI — single-turn shell-suggestion, limited capability. */
 export interface CopilotCliSpec extends BaseSpec {
   type: 'copilot-cli';
@@ -177,6 +209,8 @@ export type AgentSpec =
   | CopilotCliSpec
   | CopilotAgentCliSpec
   | GeminiCliSpec
+  | GeminiSdkSpec
+  | OpenAiSdkSpec
   | CodexCliSpec;
 
 // ---------------------------------------------------------------------------

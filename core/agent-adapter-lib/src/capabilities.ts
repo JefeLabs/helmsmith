@@ -119,6 +119,36 @@ export const CAPABILITY_MATRIX: Record<AgentSpecType, AdapterCapabilities> = {
     supportsSessionResume: false, // --resume exists but not wired (v1.1)
   },
 
+  // Verified against the REAL `@google/genai` v2.10.0 streaming API
+  // (ai.models.generateContentStream → AsyncGenerator<GenerateContentResponse>;
+  // candidates[].content.parts[] carry text + functionCall; usageMetadata +
+  // candidate.finishReason on the final chunk). Chat-mode host-loop tool use.
+  'gemini-sdk': {
+    reportsUsage: true, // usageMetadata { promptTokenCount, candidatesTokenCount }
+    supportsStreaming: true, // generateContentStream
+    supportsToolUse: true, // host-loop: functionCall parts surfaced as tool-call-*
+    supportsExtendedThinking: false, // thinking parts not surfaced as thinking-delta (v1.1)
+    supportsCancellation: true, // config.abortSignal aborts the request
+    supportsCapture: true,
+    supportsJsonMode: true, // structured output via responseMimeType + responseJsonSchema
+    supportsSessionResume: false,
+  },
+
+  // Verified against the REAL `openai` v6.45.0 Chat Completions streaming API
+  // (client.chat.completions.create({stream:true}) → Stream<ChatCompletionChunk>;
+  // choices[].delta.content + delta.tool_calls[] deltas; usage on the final
+  // chunk via stream_options.include_usage). Chat-mode host-loop tool use.
+  'openai-sdk': {
+    reportsUsage: true, // usage { prompt_tokens, completion_tokens }
+    supportsStreaming: true, // chat.completions.create({ stream: true })
+    supportsToolUse: true, // host-loop: tool_calls deltas surfaced as tool-call-*
+    supportsExtendedThinking: false, // reasoning models expose no delta in chat.completions
+    supportsCancellation: true, // RequestOptions.signal aborts the request
+    supportsCapture: true,
+    supportsJsonMode: true, // response_format (json_object / json_schema)
+    supportsSessionResume: false,
+  },
+
   // Verified against the REAL `codex` CLI v0.133.0 `codex exec --json` events
   // (thread.started/turn.started/turn.completed/turn.failed/item.completed/error;
   // ThreadItem variants agent_message/reasoning/command_execution/file_change/

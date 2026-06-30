@@ -11,8 +11,13 @@ const ALL_TYPES: AgentSpecType[] = [
   'copilot-cli',
   'copilot-agent-cli',
   'gemini-cli',
+  'gemini-sdk',
+  'openai-sdk',
   'codex-cli',
 ];
+
+/** Adapter types that support JSON mode (structured output) in the static matrix. */
+const JSON_MODE_TYPES: AgentSpecType[] = ['gemini-sdk', 'openai-sdk'];
 
 describe('CAPABILITY_MATRIX', () => {
   it('has an entry for every AgentSpecType', () => {
@@ -59,11 +64,14 @@ describe('CAPABILITY_MATRIX', () => {
     expect(CAPABILITY_MATRIX['claude-sdk'].reportsUsage).toBe(true);
   });
 
-  it('no adapter supports JSON mode on the static matrix (Anthropic-backed)', () => {
-    // Only copilot-sdk MIGHT support it at construction time (model-dependent).
-    // The static matrix defaults all to false — resolved at runtime for copilot-sdk.
+  it('only the gemini-sdk + openai-sdk adapters support JSON mode on the static matrix', () => {
+    // Anthropic-backed adapters use tool-use for structured output (false).
+    // copilot-sdk MIGHT support it at construction time (model-dependent) but the
+    // static matrix defaults it to false. The native OpenAI/Gemini SDK adapters
+    // expose response_format / responseJsonSchema, so they report true.
     for (const type of ALL_TYPES) {
-      expect(CAPABILITY_MATRIX[type].supportsJsonMode, `${type} supportsJsonMode`).toBe(false);
+      const expected = JSON_MODE_TYPES.includes(type);
+      expect(CAPABILITY_MATRIX[type].supportsJsonMode, `${type} supportsJsonMode`).toBe(expected);
     }
   });
 
