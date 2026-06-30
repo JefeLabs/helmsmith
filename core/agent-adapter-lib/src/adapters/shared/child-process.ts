@@ -1,8 +1,8 @@
 /**
  * CLI subprocess lifecycle utilities (PRD §9).
  *
- * Used by all CLI adapters (claude-code-cli, opencode-cli, copilot-cli,
- * copilot-agent-cli) in Phases C–D′. Phase A ships the utility + unit tests.
+ * Used by all CLI adapters (claude-code-cli, opencode-cli, copilot-cli) in
+ * Phases C–D′. Phase A ships the utility + unit tests.
  *
  * Responsibilities:
  *   - resolveBinary:    find the CLI binary on PATH or at an explicit path.

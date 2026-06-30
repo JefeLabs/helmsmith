@@ -252,12 +252,15 @@ export type AgentSpec =
  * host-loop SDK adapters (claude-sdk, openai-sdk, gemini-sdk, copilot-sdk,
  * bedrock-sdk) can continue an in-progress tool-use turn. `toolCallId` matches
  * the `id` of the originating `tool-use` block; `output` is the (string)
- * result the tool produced.
+ * result the tool produced. `toolName` is optional — a host that knows the
+ * invoked tool's name may set it so adapters that correlate a result by NAME
+ * (Gemini matches FunctionResponse.name to FunctionCall.name, not just an id)
+ * can populate it without re-deriving it from the originating tool-use block.
  */
 export type ContentBlock =
   | { type: 'text'; text: string }
   | { type: 'tool-use'; id: string; name: string; input: unknown }
-  | { type: 'tool-result'; toolCallId: string; output: string }
+  | { type: 'tool-result'; toolCallId: string; toolName?: string; output: string }
   | { type: 'thinking'; thinking: string };
 
 /**

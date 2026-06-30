@@ -64,13 +64,29 @@ export interface GeminiToolConfig {
  * ContentBlock mapping:
  *   - text        → { text }
  *   - tool-use    → { functionCall: { id, name, args } }
- *   - tool-result → { functionResponse: { id, response: { output } } }
+ *   - tool-result → { functionResponse: { id, name, response: { output } } }
  *   - thinking    → skipped (assistant-only output; never re-sent)
+ *
+ * Gemini correlates a functionResponse by the function NAME (it must match the
+ * originating FunctionCall.name / FunctionDeclaration.name), not just an id, so
+ * the `name` is REQUIRED on the response part. We source it from the
+ * tool-result's `toolName` when the host set it, else recover it from the
+ * originating tool-use block (indexed by toolCallId across the message array),
+ * else fall back to the toolCallId so the field is never empty.
  *
  * String content becomes a single text part. A message that maps to zero parts
  * (e.g. only thinking) gets a single empty text part so the request stays valid.
  */
 export function normalizeContents(messages: ChatMessage[]): GeminiContent[] {
+  // Index every tool-use block by its id so a later tool-result can recover the
+  // function NAME Gemini correlates on (the shared block carries only an id).
+  const toolNameById = new Map<string, string>();
+  for (const msg of messages) {
+    if (typeof msg.content === 'string') continue;
+    for (const block of msg.content) {
+      if (block.type === 'tool-use' && block.id) toolNameById.set(block.id, block.name);
+    }
+  }
   return messages.map((msg): GeminiContent => {
     const role: 'user' | 'model' = msg.role === 'assistant' ? 'model' : 'user';
     if (typeof msg.content === 'string') {
@@ -78,7 +94,7 @@ export function normalizeContents(messages: ChatMessage[]): GeminiContent[] {
     }
     const parts: GeminiPart[] = [];
     for (const block of msg.content) {
-      const mapped = normalizeContentBlock(block);
+      const mapped = normalizeContentBlock(block, toolNameById);
       if (mapped !== null) parts.push(mapped);
     }
     if (parts.length === 0) parts.push({ text: '' });
@@ -86,7 +102,10 @@ export function normalizeContents(messages: ChatMessage[]): GeminiContent[] {
   });
 }
 
-function normalizeContentBlock(block: ContentBlock): GeminiPart | null {
+function normalizeContentBlock(
+  block: ContentBlock,
+  toolNameById: Map<string, string>,
+): GeminiPart | null {
   switch (block.type) {
     case 'text':
       return { text: block.text };
@@ -99,9 +118,13 @@ function normalizeContentBlock(block: ContentBlock): GeminiPart | null {
         },
       };
     case 'tool-result':
+      // `name` is required: Gemini matches it to the originating FunctionCall's
+      // name. Prefer the host-supplied toolName, then the correlated tool-use's
+      // name, then the toolCallId as a last resort (better than an empty name).
       return {
         functionResponse: {
-          ...(block.toolCallId ? { id: block.toolCallId } : {}),
+          id: block.toolCallId,
+          name: block.toolName ?? toolNameById.get(block.toolCallId) ?? block.toolCallId,
           response: { output: block.output },
         },
       };

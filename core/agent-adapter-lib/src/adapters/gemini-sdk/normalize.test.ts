@@ -45,12 +45,57 @@ describe('normalizeContents', () => {
     expect(normalizeContents(msgs)).toEqual([{ role: 'model', parts: [{ text: '' }] }]);
   });
 
-  it('maps a tool-result turn to a user functionResponse part', () => {
+  it('maps a tool-result turn to a user functionResponse part, recovering the name from the preceding tool-use', () => {
+    const msgs: ChatMessage[] = [
+      {
+        role: 'assistant',
+        content: [{ type: 'tool-use', id: 'call_1', name: 'read', input: { path: 'a.ts' } }],
+      },
+      { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'call_1', output: '42' }] },
+    ];
+    expect(normalizeContents(msgs)).toEqual([
+      {
+        role: 'model',
+        parts: [{ functionCall: { id: 'call_1', name: 'read', args: { path: 'a.ts' } } }],
+      },
+      {
+        role: 'user',
+        // Gemini correlates by name — must be the originating function's name, not empty.
+        parts: [{ functionResponse: { id: 'call_1', name: 'read', response: { output: '42' } } }],
+      },
+    ]);
+  });
+
+  it('prefers an explicit toolName on the tool-result block over correlation', () => {
+    const msgs: ChatMessage[] = [
+      {
+        role: 'tool',
+        content: [
+          { type: 'tool-result', toolCallId: 'call_1', toolName: 'get_weather', output: 'sunny' },
+        ],
+      },
+    ];
+    expect(normalizeContents(msgs)).toEqual([
+      {
+        role: 'user',
+        parts: [
+          {
+            functionResponse: { id: 'call_1', name: 'get_weather', response: { output: 'sunny' } },
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('falls back to the toolCallId when no tool name can be sourced', () => {
     const msgs: ChatMessage[] = [
       { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'call_1', output: '42' }] },
     ];
     expect(normalizeContents(msgs)).toEqual([
-      { role: 'user', parts: [{ functionResponse: { id: 'call_1', response: { output: '42' } } }] },
+      {
+        role: 'user',
+        parts: [{ functionResponse: { id: 'call_1', name: 'call_1', response: { output: '42' } } }],
+      },
     ]);
   });
 });
