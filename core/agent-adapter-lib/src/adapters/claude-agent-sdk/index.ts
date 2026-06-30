@@ -46,20 +46,18 @@ import type {
   AgentSpecType,
   ClaudeAgentSdkSpec,
   InvokeOptions,
+  Logger,
   TokenUsage,
 } from '../../agent.ts';
 import type { AdapterCapabilities } from '../../capabilities.ts';
 import { CAPABILITY_MATRIX } from '../../capabilities.ts';
 import type { CredentialBroker } from '../../credentials/broker.ts';
-import {
-  CapabilityMismatchError,
-  classifyNetworkError,
-  MissingCredentialError,
-} from '../../errors.ts';
+import { ConfigError, classifyNetworkError, MissingCredentialError } from '../../errors.ts';
 import type { AdapterDeps } from '../../registry.ts';
 import { registerAdapter } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
 import { reduceStream } from '../../stream.ts';
+import { rejectCustomTools } from '../shared/reject-custom-tools.ts';
 
 // ---------------------------------------------------------------------------
 // SDK type shims
@@ -174,7 +172,9 @@ async function getQueryFn(): Promise<QueryFn> {
     _queryFn = mod.query as QueryFn;
     return _queryFn;
   } catch (err) {
-    throw new MissingCredentialError(
+    // A failed dynamic import means the optional peer package is missing/broken
+    // — a configuration problem, NOT a credential problem. (Phase B2 item 14.)
+    throw new ConfigError(
       '@anthropic-ai/claude-agent-sdk is not installed. ' +
         'Install it as a dependency to use the claude-agent-sdk adapter: ' +
         'npm install @anthropic-ai/claude-agent-sdk',
@@ -344,12 +344,9 @@ export class ClaudeAgentSdkAdapter implements AgentAdapter {
   // -------------------------------------------------------------------------
 
   private _checkToolCapability(input: AgentInput): void {
-    if (input.tools?.length && !this.capabilities.supportsToolUse) {
-      throw new CapabilityMismatchError(
-        `Adapter type '${this.type}' does not support tool use (supportsToolUse: false). ` +
-          `Remove the 'tools' array from AgentInput, or choose an adapter that supports it.`,
-      );
-    }
+    // Autonomous Agent SDK: built-in tools run inside the runtime; the host
+    // cannot inject custom tool definitions, so reject them (don't silently drop).
+    rejectCustomTools(this.type, input);
   }
 }
 
@@ -403,14 +400,23 @@ function mapAgentStopReason(
 // API key resolution (async — broker may need network)
 // ---------------------------------------------------------------------------
 
-async function resolveApiKey(spec: ClaudeAgentSdkSpec, broker?: CredentialBroker): Promise<string> {
+async function resolveApiKey(
+  spec: ClaudeAgentSdkSpec,
+  broker?: CredentialBroker,
+  logger?: Logger,
+): Promise<string> {
   if (spec.apiKey) return spec.apiKey;
   if (broker) {
     try {
       const cred = await broker.getCredential('anthropic');
       if (cred.apiKey) return cred.apiKey;
-    } catch {
-      // fall through to env var
+    } catch (err) {
+      // Don't swallow silently — log and fall back to env.
+      logger?.warn?.(
+        `[claude-agent-sdk] credential broker failed for 'anthropic'; falling back to env: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
     }
   }
   const envKey = process.env.ANTHROPIC_API_KEY;
@@ -429,20 +435,19 @@ registerAdapter(
   'claude-agent-sdk',
   (spec, deps) => {
     const agentSpec = spec as ClaudeAgentSdkSpec;
-    const syncKey = agentSpec.apiKey ?? process.env.ANTHROPIC_API_KEY;
-
-    if (!syncKey && !deps.credentialBroker) {
-      throw new MissingCredentialError(
-        'No Anthropic API key found for claude-agent-sdk adapter. Provide one via spec.apiKey, ' +
-          'CredentialBroker.getCredential("anthropic"), or the ANTHROPIC_API_KEY environment variable.',
-      );
-    }
-
-    if (!syncKey && deps.credentialBroker) {
+    // Precedence must match resolveApiKey: spec → broker → env. Only an explicit
+    // spec.apiKey short-circuits; when a broker is present we defer to lazy
+    // resolution so the broker is PREFERRED over env (token rotation).
+    if (agentSpec.apiKey) return new ClaudeAgentSdkAdapter(agentSpec, deps, agentSpec.apiKey);
+    if (deps.credentialBroker) {
       return new LazyClaudeAgentSdkAdapter(agentSpec, deps, deps.credentialBroker);
     }
-
-    return new ClaudeAgentSdkAdapter(agentSpec, deps, syncKey!);
+    const envKey = process.env.ANTHROPIC_API_KEY;
+    if (envKey) return new ClaudeAgentSdkAdapter(agentSpec, deps, envKey);
+    throw new MissingCredentialError(
+      'No Anthropic API key found for claude-agent-sdk adapter. Provide one via spec.apiKey, ' +
+        'CredentialBroker.getCredential("anthropic"), or the ANTHROPIC_API_KEY environment variable.',
+    );
   },
   CAPABILITY_MATRIX['claude-agent-sdk'],
 );
@@ -471,7 +476,7 @@ class LazyClaudeAgentSdkAdapter implements AgentAdapter {
   private async _resolve(): Promise<ClaudeAgentSdkAdapter> {
     if (this._inner) return this._inner;
     if (!this._resolving) {
-      this._resolving = resolveApiKey(this.spec, this.broker).then((apiKey) => {
+      this._resolving = resolveApiKey(this.spec, this.broker, this.deps.logger).then((apiKey) => {
         this._inner = new ClaudeAgentSdkAdapter(this.spec, this.deps, apiKey);
         return this._inner;
       });

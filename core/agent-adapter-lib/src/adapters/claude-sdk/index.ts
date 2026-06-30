@@ -25,6 +25,7 @@ import type {
   AgentSpecType,
   ClaudeSdkSpec,
   InvokeOptions,
+  Logger,
   TokenUsage,
 } from '../../agent.ts';
 import type { AdapterCapabilities } from '../../capabilities.ts';
@@ -110,9 +111,10 @@ export class ClaudeSdkAdapter implements AgentAdapter {
         signal !== undefined ? { signal } : undefined,
       );
 
-      // Track per-block state for tool-call accumulation
+      // Track per-block state for tool-call / thinking accumulation
       type BlockState =
         | { kind: 'text' }
+        | { kind: 'thinking' }
         | { kind: 'tool'; toolCallId: string; toolName: string; inputParts: string[] };
       const blockStates = new Map<number, BlockState>();
 
@@ -134,7 +136,13 @@ export class ClaudeSdkAdapter implements AgentAdapter {
 
           case 'content_block_start': {
             const block = event.content_block;
-            if (block.type === 'text') {
+            // Extended-thinking blocks are emitted at runtime by thinking-enabled
+            // models, but the SDK 0.30.1 ContentBlock union doesn't type them —
+            // detect via a structural cast (supportsExtendedThinking:true).
+            const blockType = (block as { type: string }).type;
+            if (blockType === 'thinking') {
+              blockStates.set(event.index, { kind: 'thinking' });
+            } else if (block.type === 'text') {
               blockStates.set(event.index, { kind: 'text' });
             } else if (block.type === 'tool_use') {
               const toolCallId = block.id;
@@ -150,7 +158,13 @@ export class ClaudeSdkAdapter implements AgentAdapter {
             if (!state) break;
 
             const delta = event.delta;
-            if (delta.type === 'text_delta' && state.kind === 'text') {
+            // thinking_delta (+ signature_delta) aren't in the SDK 0.30.1 delta
+            // union; detect thinking_delta structurally and surface its text.
+            const deltaType = (delta as { type: string }).type;
+            if (deltaType === 'thinking_delta' && state.kind === 'thinking') {
+              const text = (delta as { thinking?: string }).thinking ?? '';
+              if (text) yield { type: 'thinking-delta', text };
+            } else if (delta.type === 'text_delta' && state.kind === 'text') {
               yield { type: 'text-delta', text: delta.text };
             } else if (delta.type === 'input_json_delta' && state.kind === 'tool') {
               state.inputParts.push(delta.partial_json);
@@ -277,14 +291,23 @@ function classifyAnthropicError(err: unknown): import('../../errors.ts').Adapter
  *   3. ANTHROPIC_API_KEY env var
  *   4. MissingCredentialError (fail fast, never mid-stream)
  */
-async function resolveApiKey(spec: ClaudeSdkSpec, broker?: CredentialBroker): Promise<string> {
+async function resolveApiKey(
+  spec: ClaudeSdkSpec,
+  broker?: CredentialBroker,
+  logger?: Logger,
+): Promise<string> {
   if (spec.apiKey) return spec.apiKey;
   if (broker) {
     try {
       const cred = await broker.getCredential('anthropic');
       if (cred.apiKey) return cred.apiKey;
-    } catch {
-      // fall through to env var
+    } catch (err) {
+      // Don't swallow silently — log and fall back to env.
+      logger?.warn?.(
+        `[claude-sdk] credential broker failed for 'anthropic'; falling back to env: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
     }
   }
   const envKey = process.env.ANTHROPIC_API_KEY;
@@ -298,32 +321,22 @@ async function resolveApiKey(spec: ClaudeSdkSpec, broker?: CredentialBroker): Pr
 registerAdapter(
   'claude-sdk',
   (spec, deps) => {
-    // The factory is synchronous (createAgent contract). We resolve the API
-    // key synchronously from env/spec when possible; broker resolution is
-    // async and is deferred to the first invoke/stream call.
-    //
-    // For simplicity in Phase B, we resolve the key synchronously using
-    // spec.apiKey or ANTHROPIC_API_KEY. If only a broker is available,
-    // we use a sentinel and resolve lazily — but we still throw
-    // MissingCredentialError at registration time if neither is available.
+    // The factory is synchronous (createAgent contract). Precedence must match
+    // resolveApiKey: spec → broker → env. Only an explicit spec.apiKey
+    // short-circuits; when a broker is present we defer to lazy resolution so
+    // the broker is PREFERRED over env (token rotation), resolving on first
+    // invoke/stream. Env is the last-resort synchronous fallback.
     const claudeSpec = spec as ClaudeSdkSpec;
-    const syncKey = claudeSpec.apiKey ?? process.env.ANTHROPIC_API_KEY;
-
-    if (!syncKey && !deps.credentialBroker) {
-      throw new MissingCredentialError(
-        'No Anthropic API key found. Provide one via spec.apiKey, ' +
-          'CredentialBroker.getCredential("anthropic"), or the ANTHROPIC_API_KEY environment variable.',
-      );
-    }
-
-    // If we only have a broker, we build a lazy adapter that resolves
-    // the key on first invocation. For now, build with a placeholder
-    // and override via a lazy-resolution wrapper.
-    if (!syncKey && deps.credentialBroker) {
+    if (claudeSpec.apiKey) return new ClaudeSdkAdapter(claudeSpec, deps, claudeSpec.apiKey);
+    if (deps.credentialBroker) {
       return new LazyClaudeSdkAdapter(claudeSpec, deps, deps.credentialBroker);
     }
-
-    return new ClaudeSdkAdapter(claudeSpec, deps, syncKey!);
+    const envKey = process.env.ANTHROPIC_API_KEY;
+    if (envKey) return new ClaudeSdkAdapter(claudeSpec, deps, envKey);
+    throw new MissingCredentialError(
+      'No Anthropic API key found. Provide one via spec.apiKey, ' +
+        'CredentialBroker.getCredential("anthropic"), or the ANTHROPIC_API_KEY environment variable.',
+    );
   },
   CAPABILITY_MATRIX['claude-sdk'],
 );
@@ -357,7 +370,7 @@ class LazyClaudeSdkAdapter implements AgentAdapter {
   private async _resolve(): Promise<ClaudeSdkAdapter> {
     if (this._inner) return this._inner;
     if (!this._resolving) {
-      this._resolving = resolveApiKey(this.spec, this.broker).then((apiKey) => {
+      this._resolving = resolveApiKey(this.spec, this.broker, this.deps.logger).then((apiKey) => {
         this._inner = new ClaudeSdkAdapter(this.spec, this.deps, apiKey);
         return this._inner;
       });

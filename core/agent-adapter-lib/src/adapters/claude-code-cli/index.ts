@@ -36,17 +36,13 @@ import type {
 import type { AdapterCapabilities } from '../../capabilities.ts';
 import { CAPABILITY_MATRIX } from '../../capabilities.ts';
 import type { CredentialBroker } from '../../credentials/broker.ts';
-import {
-  AdapterError,
-  CapabilityMismatchError,
-  MissingCredentialError,
-  ProviderError,
-} from '../../errors.ts';
+import { AdapterError, MissingCredentialError, ProviderError } from '../../errors.ts';
 import type { AdapterDeps } from '../../registry.ts';
 import { registerAdapter } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
 import { reduceStream } from '../../stream.ts';
 import { resolveBinary, spawnAgentProcess } from '../shared/child-process.ts';
+import { rejectCustomTools } from '../shared/reject-custom-tools.ts';
 import { buildClaudeFlags, CLAUDE_BINARY } from './flags.ts';
 import { ClaudeStreamParser } from './stream-parser.ts';
 
@@ -160,12 +156,8 @@ export class ClaudeCodeCliAdapter implements AgentAdapter {
   }
 
   private _checkToolCapability(input: AgentInput): void {
-    if (input.tools?.length && !this.capabilities.supportsToolUse) {
-      throw new CapabilityMismatchError(
-        `Adapter type '${this.type}' does not support tool use (supportsToolUse: false). ` +
-          `Remove the 'tools' array from AgentInput, or choose an adapter that supports it.`,
-      );
-    }
+    // Autonomous CLI: built-in tools only; reject host-injected custom tools.
+    rejectCustomTools(this.type, input);
   }
 }
 
@@ -230,14 +222,20 @@ function toAdapterError(err: unknown): AdapterError {
 export async function resolveApiKey(
   spec: ClaudeCodeCliSpec,
   broker?: CredentialBroker,
+  logger?: Logger,
 ): Promise<string> {
   if (spec.apiKey) return spec.apiKey;
   if (broker) {
     try {
       const cred = await broker.getCredential('anthropic');
       if (cred.apiKey) return cred.apiKey;
-    } catch {
-      // fall through to env var
+    } catch (err) {
+      // Don't swallow silently — log and fall back to env.
+      logger?.warn?.(
+        `[claude-code-cli] credential broker failed for 'anthropic'; falling back to env: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
     }
   }
   const envKey = process.env.ANTHROPIC_API_KEY;
@@ -257,20 +255,19 @@ registerAdapter(
   'claude-code-cli',
   (spec, deps) => {
     const cliSpec = spec as ClaudeCodeCliSpec;
-    const syncKey = cliSpec.apiKey ?? process.env.ANTHROPIC_API_KEY;
-
-    if (!syncKey && !deps.credentialBroker) {
-      throw new MissingCredentialError(
-        'No Anthropic API key found for claude-code-cli adapter. Provide one via spec.apiKey, ' +
-          'CredentialBroker.getCredential("anthropic"), or the ANTHROPIC_API_KEY environment variable.',
-      );
-    }
-
-    if (!syncKey && deps.credentialBroker) {
+    // Precedence must match resolveApiKey: spec → broker → env. Only an explicit
+    // spec.apiKey short-circuits; when a broker is present we defer to lazy
+    // resolution so the broker is PREFERRED over env (token rotation).
+    if (cliSpec.apiKey) return new ClaudeCodeCliAdapter(cliSpec, deps, cliSpec.apiKey);
+    if (deps.credentialBroker) {
       return new LazyClaudeCodeCliAdapter(cliSpec, deps, deps.credentialBroker);
     }
-
-    return new ClaudeCodeCliAdapter(cliSpec, deps, syncKey as string);
+    const envKey = process.env.ANTHROPIC_API_KEY;
+    if (envKey) return new ClaudeCodeCliAdapter(cliSpec, deps, envKey);
+    throw new MissingCredentialError(
+      'No Anthropic API key found for claude-code-cli adapter. Provide one via spec.apiKey, ' +
+        'CredentialBroker.getCredential("anthropic"), or the ANTHROPIC_API_KEY environment variable.',
+    );
   },
   CAPABILITY_MATRIX['claude-code-cli'],
 );
@@ -299,7 +296,7 @@ class LazyClaudeCodeCliAdapter implements AgentAdapter {
   private async _resolve(): Promise<ClaudeCodeCliAdapter> {
     if (this._inner) return this._inner;
     if (!this._resolving) {
-      this._resolving = resolveApiKey(this.spec, this.broker).then((apiKey) => {
+      this._resolving = resolveApiKey(this.spec, this.broker, this.deps.logger).then((apiKey) => {
         this._inner = new ClaudeCodeCliAdapter(this.spec, this.deps, apiKey);
         return this._inner;
       });

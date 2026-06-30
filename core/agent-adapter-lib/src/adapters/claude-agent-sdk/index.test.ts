@@ -9,9 +9,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ClaudeAgentSdkSpec } from '../../agent.ts';
 import { CAPABILITY_MATRIX } from '../../capabilities.ts';
+import { CapabilityMismatchError, MissingCredentialError } from '../../errors.ts';
 import type { AdapterDeps } from '../../registry.ts';
+import { getAdapterFactory } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
-import { ClaudeAgentSdkAdapter } from './index.ts';
+import { ClaudeAgentSdkAdapter, resolveApiKey } from './index.ts';
 
 // ---------------------------------------------------------------------------
 // Fake SDKMessage builders
@@ -342,6 +344,89 @@ describe('ClaudeAgentSdkAdapter — abort', () => {
     expect(stopChunk).toEqual({ type: 'message-stop', finishReason: 'aborted' });
     // Should not have produced any text
     expect(chunks.filter((c) => c.type === 'text-delta')).toHaveLength(0);
+  });
+});
+
+describe('ClaudeAgentSdkAdapter — env spread', () => {
+  it('spreads process.env into query env + injects ANTHROPIC_API_KEY', async () => {
+    fakeQueryMessages = [makeAssistantMsg([{ type: 'text', text: 'ok' }]), makeResultSuccess('ok')];
+
+    const adapter = makeAdapter({ apiKey: 'sk-injected' });
+    await collectChunks(adapter);
+
+    expect(lastQueryOptions.env).toMatchObject({ ANTHROPIC_API_KEY: 'sk-injected' });
+    // A real process.env key (PATH) survives the spread (env REPLACES process.env).
+    expect((lastQueryOptions.env as Record<string, string | undefined>).PATH).toBe(
+      process.env.PATH,
+    );
+  });
+});
+
+describe('ClaudeAgentSdkAdapter — capability check', () => {
+  it('rejects host-injected custom tools (autonomous) with CapabilityMismatchError', async () => {
+    const adapter = makeAdapter();
+    await expect(
+      adapter.invoke({ messages: [{ role: 'user', content: 'hi' }], tools: [{ name: 'foo' }] }),
+    ).rejects.toBeInstanceOf(CapabilityMismatchError);
+  });
+
+  it('stream() also rejects custom tools', async () => {
+    const adapter = makeAdapter();
+    await expect(
+      (async () => {
+        for await (const _chunk of adapter.stream({
+          messages: [{ role: 'user', content: 'hi' }],
+          tools: [{ name: 'foo' }],
+        })) {
+          // drain
+        }
+      })(),
+    ).rejects.toBeInstanceOf(CapabilityMismatchError);
+  });
+});
+
+describe('ClaudeAgentSdkAdapter — auth + credential precedence', () => {
+  const SAVED = process.env.ANTHROPIC_API_KEY;
+  afterEach(() => {
+    if (SAVED === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = SAVED;
+  });
+
+  it('resolveApiKey follows spec → broker → env', async () => {
+    expect(await resolveApiKey(makeSpec({ apiKey: 'spec-key' }))).toBe('spec-key');
+
+    delete process.env.ANTHROPIC_API_KEY;
+    const broker = { getCredential: vi.fn(async () => ({ apiKey: 'broker-key' })) };
+    expect(await resolveApiKey(makeSpec({ apiKey: undefined }), broker)).toBe('broker-key');
+    expect(broker.getCredential).toHaveBeenCalledWith('anthropic');
+
+    process.env.ANTHROPIC_API_KEY = 'env-key';
+    expect(await resolveApiKey(makeSpec({ apiKey: undefined }))).toBe('env-key');
+  });
+
+  it('factory uses the broker-resolved key, preferred over env (broker-before-env)', async () => {
+    fakeQueryMessages = [makeAssistantMsg([{ type: 'text', text: 'ok' }]), makeResultSuccess('ok')];
+    process.env.ANTHROPIC_API_KEY = 'env-key';
+    const factory = getAdapterFactory('claude-agent-sdk');
+    const broker = { getCredential: vi.fn(async () => ({ apiKey: 'broker-key' })) };
+    const adapter = factory?.factory(
+      { type: 'claude-agent-sdk', model: 'claude-opus-4-7' },
+      makeDeps({ credentialBroker: broker }),
+    );
+    await adapter?.invoke({ messages: [{ role: 'user', content: 'hi' }] });
+    expect(broker.getCredential).toHaveBeenCalledWith('anthropic');
+    // The broker key — not env-key — was injected into the query env.
+    expect((lastQueryOptions.env as Record<string, string | undefined>).ANTHROPIC_API_KEY).toBe(
+      'broker-key',
+    );
+  });
+
+  it('factory throws MissingCredentialError when no key and no broker', () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    const factory = getAdapterFactory('claude-agent-sdk');
+    expect(() =>
+      factory?.factory({ type: 'claude-agent-sdk', model: 'claude-opus-4-7' }, makeDeps()),
+    ).toThrow(MissingCredentialError);
   });
 });
 

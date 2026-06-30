@@ -258,7 +258,9 @@ export class OpencodeStreamParser {
   private accumulateUsage(tokens: RawTokens): void {
     this.sawUsage = true;
     this.usageAcc.inputTokens += tokens.input ?? 0;
-    this.usageAcc.outputTokens += tokens.output ?? 0;
+    // Fold reasoning tokens into outputTokens — they are generated tokens that
+    // opencode reports separately; dropping them under-reports generation.
+    this.usageAcc.outputTokens += (tokens.output ?? 0) + (tokens.reasoning ?? 0);
     const cacheRead = tokens.cache?.read;
     if (cacheRead !== undefined) {
       this.usageAcc.cacheReadTokens = (this.usageAcc.cacheReadTokens ?? 0) + cacheRead;
@@ -319,7 +321,8 @@ export function mapTokens(t: RawTokens | undefined): TokenUsage | undefined {
   if (!t) return undefined;
   const usage: TokenUsage = {
     inputTokens: t.input ?? 0,
-    outputTokens: t.output ?? 0,
+    // Fold reasoning tokens into outputTokens (see accumulateUsage).
+    outputTokens: (t.output ?? 0) + (t.reasoning ?? 0),
   };
   if (t.cache?.read !== undefined) usage.cacheReadTokens = t.cache.read;
   if (t.cache?.write !== undefined) usage.cacheWriteTokens = t.cache.write;

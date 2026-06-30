@@ -186,14 +186,20 @@ function isAbort(err: unknown, signal?: AbortSignal): boolean {
 export async function resolveCopilotToken(
   spec: CopilotSdkSpec,
   broker?: CredentialBroker,
+  logger?: Logger,
 ): Promise<string> {
   if (spec.apiKey) return spec.apiKey;
   if (broker) {
     try {
       const cred = await broker.getCredential(COPILOT_PROVIDER);
       if (cred.apiKey) return cred.apiKey;
-    } catch {
-      // fall through to env var
+    } catch (err) {
+      // Don't swallow silently — log and fall back to env.
+      logger?.warn?.(
+        `[copilot-sdk] credential broker failed for '${COPILOT_PROVIDER}'; falling back to env: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
     }
   }
   const envToken = process.env.COPILOT_TOKEN;
@@ -213,20 +219,20 @@ registerAdapter(
   'copilot-sdk',
   (spec, deps) => {
     const sdkSpec = spec as CopilotSdkSpec;
-    const syncToken = sdkSpec.apiKey ?? process.env.COPILOT_TOKEN;
-
-    if (!syncToken && !deps.credentialBroker) {
-      throw new MissingCredentialError(
-        'No Copilot session token found for copilot-sdk adapter. Provide one via spec.apiKey, ' +
-          `CredentialBroker.getCredential("${COPILOT_PROVIDER}"), or the COPILOT_TOKEN env var.`,
-      );
-    }
-
-    if (!syncToken && deps.credentialBroker) {
+    // Precedence must match resolveCopilotToken: spec → broker → env. Only an
+    // explicit spec.apiKey short-circuits; when a broker is present we defer to
+    // lazy resolution so the broker is PREFERRED over env (token rotation —
+    // Copilot session tokens are short-lived and the broker refreshes them).
+    if (sdkSpec.apiKey) return new CopilotSdkAdapter(sdkSpec, deps, sdkSpec.apiKey);
+    if (deps.credentialBroker) {
       return new LazyCopilotSdkAdapter(sdkSpec, deps, deps.credentialBroker);
     }
-
-    return new CopilotSdkAdapter(sdkSpec, deps, syncToken as string);
+    const envToken = process.env.COPILOT_TOKEN;
+    if (envToken) return new CopilotSdkAdapter(sdkSpec, deps, envToken);
+    throw new MissingCredentialError(
+      'No Copilot session token found for copilot-sdk adapter. Provide one via spec.apiKey, ' +
+        `CredentialBroker.getCredential("${COPILOT_PROVIDER}"), or the COPILOT_TOKEN env var.`,
+    );
   },
   CAPABILITY_MATRIX['copilot-sdk'],
 );
@@ -255,10 +261,12 @@ class LazyCopilotSdkAdapter implements AgentAdapter {
   private async _resolve(): Promise<CopilotSdkAdapter> {
     if (this._inner) return this._inner;
     if (!this._resolving) {
-      this._resolving = resolveCopilotToken(this.spec, this.broker).then((token) => {
-        this._inner = new CopilotSdkAdapter(this.spec, this.deps, token);
-        return this._inner;
-      });
+      this._resolving = resolveCopilotToken(this.spec, this.broker, this.deps.logger).then(
+        (token) => {
+          this._inner = new CopilotSdkAdapter(this.spec, this.deps, token);
+          return this._inner;
+        },
+      );
     }
     return this._resolving;
   }

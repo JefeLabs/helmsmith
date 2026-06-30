@@ -41,17 +41,13 @@ import type {
 import type { AdapterCapabilities } from '../../capabilities.ts';
 import { CAPABILITY_MATRIX } from '../../capabilities.ts';
 import type { CredentialBroker } from '../../credentials/broker.ts';
-import {
-  AdapterError,
-  CapabilityMismatchError,
-  MissingCredentialError,
-  ProviderError,
-} from '../../errors.ts';
+import { AdapterError, MissingCredentialError, ProviderError } from '../../errors.ts';
 import type { AdapterDeps } from '../../registry.ts';
 import { registerAdapter } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
 import { reduceStream } from '../../stream.ts';
 import { resolveBinary, spawnAgentProcess } from '../shared/child-process.ts';
+import { rejectCustomTools } from '../shared/reject-custom-tools.ts';
 import { buildCodexFlags, CODEX_BINARY } from './flags.ts';
 import { CodexStreamParser } from './stream-parser.ts';
 
@@ -156,12 +152,8 @@ export class CodexCliAdapter implements AgentAdapter {
   }
 
   private _checkToolCapability(input: AgentInput): void {
-    if (input.tools?.length && !this.capabilities.supportsToolUse) {
-      throw new CapabilityMismatchError(
-        `Adapter type '${this.type}' does not support tool use (supportsToolUse: false). ` +
-          `Remove the 'tools' array from AgentInput, or choose an adapter that supports it.`,
-      );
-    }
+    // Autonomous CLI: built-in tools only; reject host-injected custom tools.
+    rejectCustomTools(this.type, input);
   }
 }
 
@@ -218,14 +210,20 @@ function toAdapterError(err: unknown): AdapterError {
 export async function resolveApiKey(
   spec: CodexCliSpec,
   broker?: CredentialBroker,
+  logger?: Logger,
 ): Promise<string> {
   if (spec.apiKey) return spec.apiKey;
   if (broker) {
     try {
       const cred = await broker.getCredential(CODEX_PROVIDER);
       if (cred.apiKey) return cred.apiKey;
-    } catch {
-      // fall through to env var
+    } catch (err) {
+      // Don't swallow silently — log and fall back to env.
+      logger?.warn?.(
+        `[codex-cli] credential broker failed for '${CODEX_PROVIDER}'; falling back to env: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
     }
   }
   const envKey = process.env[CODEX_API_KEY_ENV];
@@ -245,20 +243,19 @@ registerAdapter(
   'codex-cli',
   (spec, deps) => {
     const cliSpec = spec as CodexCliSpec;
-    const syncKey = cliSpec.apiKey ?? process.env[CODEX_API_KEY_ENV];
-
-    if (!syncKey && !deps.credentialBroker) {
-      throw new MissingCredentialError(
-        'No OpenAI API key found for codex-cli adapter. Provide one via spec.apiKey, ' +
-          'CredentialBroker.getCredential("openai"), or the OPENAI_API_KEY environment variable.',
-      );
-    }
-
-    if (!syncKey && deps.credentialBroker) {
+    // Precedence must match resolveApiKey: spec → broker → env. Only an explicit
+    // spec.apiKey short-circuits; when a broker is present we defer to lazy
+    // resolution so the broker is PREFERRED over env (token rotation).
+    if (cliSpec.apiKey) return new CodexCliAdapter(cliSpec, deps, cliSpec.apiKey);
+    if (deps.credentialBroker) {
       return new LazyCodexCliAdapter(cliSpec, deps, deps.credentialBroker);
     }
-
-    return new CodexCliAdapter(cliSpec, deps, syncKey as string);
+    const envKey = process.env[CODEX_API_KEY_ENV];
+    if (envKey) return new CodexCliAdapter(cliSpec, deps, envKey);
+    throw new MissingCredentialError(
+      'No OpenAI API key found for codex-cli adapter. Provide one via spec.apiKey, ' +
+        'CredentialBroker.getCredential("openai"), or the OPENAI_API_KEY environment variable.',
+    );
   },
   CAPABILITY_MATRIX['codex-cli'],
 );
@@ -287,7 +284,7 @@ class LazyCodexCliAdapter implements AgentAdapter {
   private async _resolve(): Promise<CodexCliAdapter> {
     if (this._inner) return this._inner;
     if (!this._resolving) {
-      this._resolving = resolveApiKey(this.spec, this.broker).then((apiKey) => {
+      this._resolving = resolveApiKey(this.spec, this.broker, this.deps.logger).then((apiKey) => {
         this._inner = new CodexCliAdapter(this.spec, this.deps, apiKey);
         return this._inner;
       });

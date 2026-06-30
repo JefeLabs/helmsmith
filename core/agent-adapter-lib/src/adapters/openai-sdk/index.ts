@@ -268,14 +268,20 @@ function classifyOpenAiError(err: unknown): AdapterError {
 export async function resolveApiKey(
   spec: OpenAiSdkSpec,
   broker?: CredentialBroker,
+  logger?: Logger,
 ): Promise<string> {
   if (spec.apiKey) return spec.apiKey;
   if (broker) {
     try {
       const cred = await broker.getCredential(OPENAI_PROVIDER);
       if (cred.apiKey) return cred.apiKey;
-    } catch {
-      // fall through to env var
+    } catch (err) {
+      // Don't swallow silently — log and fall back to env.
+      logger?.warn?.(
+        `[openai-sdk] credential broker failed for '${OPENAI_PROVIDER}'; falling back to env: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
     }
   }
   const envKey = process.env.OPENAI_API_KEY;
@@ -294,20 +300,19 @@ registerAdapter(
   'openai-sdk',
   (spec, deps) => {
     const sdkSpec = spec as OpenAiSdkSpec;
-    const syncKey = sdkSpec.apiKey ?? process.env.OPENAI_API_KEY;
-
-    if (!syncKey && !deps.credentialBroker) {
-      throw new MissingCredentialError(
-        'No OpenAI API key found for openai-sdk adapter. Provide one via spec.apiKey, ' +
-          'CredentialBroker.getCredential("openai"), or the OPENAI_API_KEY env var.',
-      );
-    }
-
-    if (!syncKey && deps.credentialBroker) {
+    // Precedence must match resolveApiKey: spec → broker → env. Only an explicit
+    // spec.apiKey short-circuits; when a broker is present we defer to lazy
+    // resolution so the broker is PREFERRED over env (token rotation).
+    if (sdkSpec.apiKey) return new OpenAiSdkAdapter(sdkSpec, deps, sdkSpec.apiKey);
+    if (deps.credentialBroker) {
       return new LazyOpenAiSdkAdapter(sdkSpec, deps, deps.credentialBroker);
     }
-
-    return new OpenAiSdkAdapter(sdkSpec, deps, syncKey as string);
+    const envKey = process.env.OPENAI_API_KEY;
+    if (envKey) return new OpenAiSdkAdapter(sdkSpec, deps, envKey);
+    throw new MissingCredentialError(
+      'No OpenAI API key found for openai-sdk adapter. Provide one via spec.apiKey, ' +
+        'CredentialBroker.getCredential("openai"), or the OPENAI_API_KEY env var.',
+    );
   },
   CAPABILITY_MATRIX['openai-sdk'],
 );
@@ -336,7 +341,7 @@ class LazyOpenAiSdkAdapter implements AgentAdapter {
   private async _resolve(): Promise<OpenAiSdkAdapter> {
     if (this._inner) return this._inner;
     if (!this._resolving) {
-      this._resolving = resolveApiKey(this.spec, this.broker).then((apiKey) => {
+      this._resolving = resolveApiKey(this.spec, this.broker, this.deps.logger).then((apiKey) => {
         this._inner = new OpenAiSdkAdapter(this.spec, this.deps, apiKey);
         return this._inner;
       });

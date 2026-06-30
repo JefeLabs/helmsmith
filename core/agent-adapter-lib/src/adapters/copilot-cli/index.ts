@@ -46,17 +46,13 @@ import type {
 import type { AdapterCapabilities } from '../../capabilities.ts';
 import { CAPABILITY_MATRIX } from '../../capabilities.ts';
 import type { CredentialBroker } from '../../credentials/broker.ts';
-import {
-  AdapterError,
-  CapabilityMismatchError,
-  MissingCredentialError,
-  ProviderError,
-} from '../../errors.ts';
+import { AdapterError, MissingCredentialError, ProviderError } from '../../errors.ts';
 import type { AdapterDeps } from '../../registry.ts';
 import { registerAdapter } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
 import { reduceStream } from '../../stream.ts';
 import { resolveBinary, spawnAgentProcess } from '../shared/child-process.ts';
+import { rejectCustomTools } from '../shared/reject-custom-tools.ts';
 import { buildCopilotCliArgs, COPILOT_CLI_BINARY } from './flags.ts';
 
 // ---------------------------------------------------------------------------
@@ -165,12 +161,8 @@ export class CopilotCliAdapter implements AgentAdapter {
   }
 
   private _checkToolCapability(input: AgentInput): void {
-    if (input.tools?.length && !this.capabilities.supportsToolUse) {
-      throw new CapabilityMismatchError(
-        `Adapter type '${this.type}' does not support tool use (supportsToolUse: false). ` +
-          `Remove the 'tools' array from AgentInput, or choose an adapter that supports it.`,
-      );
-    }
+    // Autonomous CLI: built-in tools only; reject host-injected custom tools.
+    rejectCustomTools(this.type, input);
   }
 }
 
@@ -209,6 +201,7 @@ function tokenFromEnv(spec: CopilotCliSpec): string | undefined {
 export async function resolveCopilotToken(
   spec: CopilotCliSpec,
   broker?: CredentialBroker,
+  logger?: Logger,
 ): Promise<string> {
   const fromEnv = tokenFromEnv(spec);
   if (fromEnv) return fromEnv;
@@ -216,8 +209,13 @@ export async function resolveCopilotToken(
     try {
       const cred = await broker.getCredential('github');
       if (cred.apiKey) return cred.apiKey;
-    } catch {
-      // No 'github' provider — fall through.
+    } catch (err) {
+      // No 'github' provider — log and fall through (don't swallow silently).
+      logger?.warn?.(
+        `[copilot-cli] credential broker failed for 'github': ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
     }
   }
   throw new MissingCredentialError(
@@ -281,10 +279,12 @@ class LazyCopilotCliAdapter implements AgentAdapter {
   private async _resolve(): Promise<CopilotCliAdapter> {
     if (this._inner) return this._inner;
     if (!this._resolving) {
-      this._resolving = resolveCopilotToken(this.spec, this.broker).then((token) => {
-        this._inner = new CopilotCliAdapter(this.spec, this.deps, token);
-        return this._inner;
-      });
+      this._resolving = resolveCopilotToken(this.spec, this.broker, this.deps.logger).then(
+        (token) => {
+          this._inner = new CopilotCliAdapter(this.spec, this.deps, token);
+          return this._inner;
+        },
+      );
     }
     return this._resolving;
   }

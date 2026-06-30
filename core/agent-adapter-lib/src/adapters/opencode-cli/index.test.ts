@@ -15,7 +15,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ConfigError } from '../../errors.ts';
+import { CapabilityMismatchError, ConfigError } from '../../errors.ts';
 import type { AdapterDeps } from '../../registry.ts';
 import { getAdapterFactory } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
@@ -178,8 +178,9 @@ describe('OpenCodeCliAdapter — invoke/stream parity', () => {
     expect(chunks).toEqual([
       { type: 'text-delta', text: 'pong' },
       {
+        // outputTokens folds output(7) + reasoning(10) = 17 (PRD §item 10).
         type: 'usage',
-        usage: { inputTokens: 6226, outputTokens: 7, cacheReadTokens: 0, cacheWriteTokens: 0 },
+        usage: { inputTokens: 6226, outputTokens: 17, cacheReadTokens: 0, cacheWriteTokens: 0 },
       },
       { type: 'message-stop', finishReason: 'stop' },
     ]);
@@ -196,7 +197,8 @@ describe('OpenCodeCliAdapter — invoke/stream parity', () => {
     const result = await adapter.invoke({ messages: [{ role: 'user', content: 'ping' }] });
     expect(result.content).toBe('pong');
     expect(result.finishReason).toBe('stop');
-    expect(result.usage?.outputTokens).toBe(7);
+    // output(7) + reasoning(10) folded into outputTokens.
+    expect(result.usage?.outputTokens).toBe(17);
   });
 });
 
@@ -350,5 +352,20 @@ describe('OpenCodeCliAdapter — capabilities', () => {
     expect(adapter.capabilities.supportsStreaming).toBe(true);
     expect(adapter.capabilities.supportsToolUse).toBe(true);
     expect(adapter.capabilities.supportsJsonMode).toBe(false);
+  });
+});
+
+describe('OpenCodeCliAdapter — custom tools reject', () => {
+  it('rejects host-injected custom tools with CapabilityMismatchError (autonomous CLI)', async () => {
+    const { OpenCodeCliAdapter } = await import('./index.ts');
+    const adapter = new OpenCodeCliAdapter(
+      { type: 'opencode-cli', model: 'anthropic/m', binaryPath: BIN },
+      makeDeps(),
+      'sk',
+    );
+    await expect(
+      adapter.invoke({ messages: [{ role: 'user', content: 'hi' }], tools: [{ name: 'f' }] }),
+    ).rejects.toBeInstanceOf(CapabilityMismatchError);
+    expect(mockSpawn).not.toHaveBeenCalled();
   });
 });

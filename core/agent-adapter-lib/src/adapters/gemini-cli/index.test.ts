@@ -13,6 +13,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { CapabilityMismatchError } from '../../errors.ts';
 import type { AdapterDeps } from '../../registry.ts';
 import { getAdapterFactory } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
@@ -276,5 +277,20 @@ describe('GeminiCliAdapter — capabilities', () => {
     expect(adapter.capabilities.supportsToolUse).toBe(true);
     expect(adapter.capabilities.supportsExtendedThinking).toBe(false);
     expect(adapter.capabilities.supportsJsonMode).toBe(false);
+  });
+});
+
+describe('GeminiCliAdapter — custom tools reject', () => {
+  it('rejects host-injected custom tools with CapabilityMismatchError (autonomous CLI)', async () => {
+    const { GeminiCliAdapter } = await import('./index.ts');
+    const adapter = new GeminiCliAdapter(
+      { type: 'gemini-cli', model: 'm', binaryPath: BIN },
+      makeDeps(),
+      'k',
+    );
+    await expect(
+      adapter.invoke({ messages: [{ role: 'user', content: 'hi' }], tools: [{ name: 'f' }] }),
+    ).rejects.toBeInstanceOf(CapabilityMismatchError);
+    expect(mockSpawn).not.toHaveBeenCalled();
   });
 });

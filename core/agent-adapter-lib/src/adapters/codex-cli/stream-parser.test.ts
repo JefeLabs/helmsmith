@@ -23,6 +23,7 @@ import {
   classifyCodexError,
   getItemType,
   getToolName,
+  isReconnectError,
   mapCodexUsage,
 } from './stream-parser.ts';
 
@@ -127,6 +128,49 @@ describe('CodexStreamParser — real 402 (deactivated_workspace) transcript', ()
   it('reduceStream rejects with the first BillingError', async () => {
     const chunks = parseLines(fixtureLines('error-402.jsonl'));
     await expect(reduceStream(fromArray(chunks))).rejects.toBeInstanceOf(BillingError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Reconnect error is non-terminal (only turn.failed is terminal)
+// ---------------------------------------------------------------------------
+
+describe('CodexStreamParser — reconnect error is non-terminal', () => {
+  it('skips a standalone reconnecting error and still completes the turn', () => {
+    const chunks = parseLines([
+      JSON.stringify({ type: 'thread.started', thread_id: 't1' }),
+      JSON.stringify({ type: 'turn.started' }),
+      JSON.stringify({ type: 'error', message: 'Reconnecting…' }),
+      JSON.stringify({
+        type: 'item.completed',
+        item: { id: 'i0', item_type: 'agent_message', text: 'recovered' },
+      }),
+      JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 3, output_tokens: 4 } }),
+    ]);
+    // The reconnect produced NO error chunk; the turn completed normally.
+    expect(chunks).toEqual([
+      { type: 'text-delta', text: 'recovered' },
+      { type: 'usage', usage: { inputTokens: 3, outputTokens: 4 } },
+      { type: 'message-stop', finishReason: 'stop' },
+    ]);
+    expect(chunks.some((c) => c.type === 'error')).toBe(false);
+  });
+
+  it('keeps turn.failed terminal even when its message mentions reconnect', () => {
+    const chunks = parseLines([
+      JSON.stringify({ type: 'turn.failed', error: { message: 'reconnect attempts exhausted' } }),
+    ]);
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]?.type).toBe('error');
+  });
+});
+
+describe('isReconnectError', () => {
+  it('matches reconnecting messages, not unrelated errors', () => {
+    expect(isReconnectError('Reconnecting…')).toBe(true);
+    expect(isReconnectError('stream disconnected, reconnecting')).toBe(true);
+    expect(isReconnectError('402 Payment Required')).toBe(false);
+    expect(isReconnectError('')).toBe(false);
   });
 });
 

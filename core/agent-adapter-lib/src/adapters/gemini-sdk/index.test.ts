@@ -240,6 +240,52 @@ describe('GeminiSdkAdapter — tool use', () => {
 });
 
 // ---------------------------------------------------------------------------
+// toolChoice → toolConfig.functionCallingConfig
+// ---------------------------------------------------------------------------
+
+describe('GeminiSdkAdapter — toolChoice', () => {
+  function toolConfigOf(): unknown {
+    return (lastParams?.config as { toolConfig?: unknown }).toolConfig;
+  }
+
+  it("maps 'auto' → functionCallingConfig mode AUTO", async () => {
+    fakeChunks = [textChunk('ok'), finalChunk()];
+    await collect(
+      makeAdapter().stream({ messages: [{ role: 'user', content: 'hi' }], toolChoice: 'auto' }),
+    );
+    expect(toolConfigOf()).toEqual({ functionCallingConfig: { mode: 'AUTO' } });
+  });
+
+  it("maps 'none' → functionCallingConfig mode NONE", async () => {
+    fakeChunks = [textChunk('ok'), finalChunk()];
+    await collect(
+      makeAdapter().stream({ messages: [{ role: 'user', content: 'hi' }], toolChoice: 'none' }),
+    );
+    expect(toolConfigOf()).toEqual({ functionCallingConfig: { mode: 'NONE' } });
+  });
+
+  it('maps a named toolChoice → mode ANY + allowedFunctionNames', async () => {
+    fakeChunks = [textChunk('ok'), finalChunk()];
+    await collect(
+      makeAdapter().stream({
+        messages: [{ role: 'user', content: 'hi' }],
+        tools: [{ name: 'read_file' }],
+        toolChoice: { name: 'read_file' },
+      }),
+    );
+    expect(toolConfigOf()).toEqual({
+      functionCallingConfig: { mode: 'ANY', allowedFunctionNames: ['read_file'] },
+    });
+  });
+
+  it('omits toolConfig when no toolChoice is given', async () => {
+    fakeChunks = [textChunk('ok'), finalChunk()];
+    await collect(makeAdapter().stream({ messages: [{ role: 'user', content: 'hi' }] }));
+    expect(toolConfigOf()).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Abort
 // ---------------------------------------------------------------------------
 

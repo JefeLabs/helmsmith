@@ -26,6 +26,7 @@ import type {
   AgentSpecType,
   GeminiSdkSpec,
   InvokeOptions,
+  Logger,
   TokenUsage,
 } from '../../agent.ts';
 import type { AdapterCapabilities } from '../../capabilities.ts';
@@ -45,8 +46,10 @@ import { reduceStream } from '../../stream.ts';
 import {
   type GeminiContent,
   type GeminiTool,
+  type GeminiToolConfig,
   mapFinishReason,
   normalizeContents,
+  normalizeToolChoice,
   normalizeTools,
 } from './normalize.ts';
 
@@ -81,6 +84,7 @@ interface GeminiGenerateConfig {
   systemInstruction?: string;
   maxOutputTokens?: number;
   tools?: GeminiTool[];
+  toolConfig?: GeminiToolConfig;
 }
 
 // ---------------------------------------------------------------------------
@@ -124,6 +128,7 @@ export class GeminiSdkAdapter implements AgentAdapter {
     const config: GeminiGenerateConfig = { maxOutputTokens: DEFAULT_MAX_TOKENS };
     if (systemPrompt !== undefined) config.systemInstruction = systemPrompt;
     if (input.tools?.length) config.tools = normalizeTools(input.tools);
+    if (input.toolChoice !== undefined) config.toolConfig = normalizeToolChoice(input.toolChoice);
     if (opts?.signal !== undefined) config.abortSignal = opts.signal;
 
     // Track usage + finish across chunks (Gemini emits them on the final chunk).
@@ -233,14 +238,20 @@ function classifyGeminiError(err: unknown): AdapterError {
 export async function resolveApiKey(
   spec: GeminiSdkSpec,
   broker?: CredentialBroker,
+  logger?: Logger,
 ): Promise<string> {
   if (spec.apiKey) return spec.apiKey;
   if (broker) {
     try {
       const cred = await broker.getCredential(GEMINI_PROVIDER);
       if (cred.apiKey) return cred.apiKey;
-    } catch {
-      // fall through to env var
+    } catch (err) {
+      // Don't swallow silently — log and fall back to env.
+      logger?.warn?.(
+        `[gemini-sdk] credential broker failed for '${GEMINI_PROVIDER}'; falling back to env: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
     }
   }
   const envKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
@@ -259,20 +270,19 @@ registerAdapter(
   'gemini-sdk',
   (spec, deps) => {
     const sdkSpec = spec as GeminiSdkSpec;
-    const syncKey = sdkSpec.apiKey ?? process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
-
-    if (!syncKey && !deps.credentialBroker) {
-      throw new MissingCredentialError(
-        'No Google/Gemini API key found for gemini-sdk adapter. Provide one via spec.apiKey, ' +
-          'CredentialBroker.getCredential("google"), or the GEMINI_API_KEY / GOOGLE_API_KEY env var.',
-      );
-    }
-
-    if (!syncKey && deps.credentialBroker) {
+    // Precedence must match resolveApiKey: spec → broker → env. Only an explicit
+    // spec.apiKey short-circuits; when a broker is present we defer to lazy
+    // resolution so the broker is PREFERRED over env (token rotation).
+    if (sdkSpec.apiKey) return new GeminiSdkAdapter(sdkSpec, deps, sdkSpec.apiKey);
+    if (deps.credentialBroker) {
       return new LazyGeminiSdkAdapter(sdkSpec, deps, deps.credentialBroker);
     }
-
-    return new GeminiSdkAdapter(sdkSpec, deps, syncKey as string);
+    const envKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
+    if (envKey) return new GeminiSdkAdapter(sdkSpec, deps, envKey);
+    throw new MissingCredentialError(
+      'No Google/Gemini API key found for gemini-sdk adapter. Provide one via spec.apiKey, ' +
+        'CredentialBroker.getCredential("google"), or the GEMINI_API_KEY / GOOGLE_API_KEY env var.',
+    );
   },
   CAPABILITY_MATRIX['gemini-sdk'],
 );
@@ -301,7 +311,7 @@ class LazyGeminiSdkAdapter implements AgentAdapter {
   private async _resolve(): Promise<GeminiSdkAdapter> {
     if (this._inner) return this._inner;
     if (!this._resolving) {
-      this._resolving = resolveApiKey(this.spec, this.broker).then((apiKey) => {
+      this._resolving = resolveApiKey(this.spec, this.broker, this.deps.logger).then((apiKey) => {
         this._inner = new GeminiSdkAdapter(this.spec, this.deps, apiKey);
         return this._inner;
       });

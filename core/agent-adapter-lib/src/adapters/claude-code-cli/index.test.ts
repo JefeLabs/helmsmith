@@ -13,6 +13,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { CapabilityMismatchError } from '../../errors.ts';
 import type { AdapterDeps } from '../../registry.ts';
 import { getAdapterFactory } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
@@ -305,5 +306,21 @@ describe('ClaudeCodeCliAdapter — capabilities', () => {
     expect(adapter.capabilities.supportsToolUse).toBe(true);
     expect(adapter.capabilities.supportsJsonMode).toBe(false);
     expect(adapter.capabilities.supportsSessionResume).toBe(false);
+  });
+});
+
+describe('ClaudeCodeCliAdapter — custom tools reject', () => {
+  it('rejects host-injected custom tools with CapabilityMismatchError (autonomous CLI)', async () => {
+    const { ClaudeCodeCliAdapter } = await import('./index.ts');
+    const adapter = new ClaudeCodeCliAdapter(
+      { type: 'claude-code-cli', model: 'm', binaryPath: BIN },
+      makeDeps(),
+      'sk',
+    );
+    await expect(
+      adapter.invoke({ messages: [{ role: 'user', content: 'hi' }], tools: [{ name: 'f' }] }),
+    ).rejects.toBeInstanceOf(CapabilityMismatchError);
+    // No subprocess should be spawned — the reject is fail-fast.
+    expect(mockSpawn).not.toHaveBeenCalled();
   });
 });

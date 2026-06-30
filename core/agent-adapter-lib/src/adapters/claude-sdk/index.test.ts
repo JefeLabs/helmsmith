@@ -11,8 +11,9 @@ import type { ClaudeSdkSpec } from '../../agent.ts';
 import { CAPABILITY_MATRIX } from '../../capabilities.ts';
 import { MissingCredentialError } from '../../errors.ts';
 import type { AdapterDeps } from '../../registry.ts';
+import { getAdapterFactory } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
-import { ClaudeSdkAdapter } from './index.ts';
+import { ClaudeSdkAdapter, resolveApiKey } from './index.ts';
 
 // ---------------------------------------------------------------------------
 // Mock @anthropic-ai/sdk
@@ -21,6 +22,8 @@ import { ClaudeSdkAdapter } from './index.ts';
 // We define the fake stream factory before vi.mock() so the hoisted mock
 // can access it via a shared let binding.
 let fakeStreamEvents: Array<Record<string, unknown>> = [];
+// Captures the request body passed to messages.stream() for assertions.
+let lastStreamBody: Record<string, unknown> | undefined;
 
 vi.mock('@anthropic-ai/sdk', () => {
   class APIUserAbortError extends Error {
@@ -37,9 +40,10 @@ vi.mock('@anthropic-ai/sdk', () => {
   }
 
   async function* makeFakeStream(
-    _body: unknown,
+    body: unknown,
     opts?: { signal?: AbortSignal },
   ): AsyncIterable<Record<string, unknown>> {
+    lastStreamBody = body as Record<string, unknown>;
     for (const event of fakeStreamEvents) {
       if (opts?.signal?.aborted) {
         throw new APIUserAbortError();
@@ -155,12 +159,29 @@ function messageDeltaEvent(stopReason: string, outputTokens = 5): Record<string,
   };
 }
 
+function thinkingBlockStart(index = 0): Record<string, unknown> {
+  return {
+    type: 'content_block_start',
+    index,
+    content_block: { type: 'thinking', thinking: '', signature: '' },
+  };
+}
+
+function thinkingDelta(thinking: string, index = 0): Record<string, unknown> {
+  return { type: 'content_block_delta', index, delta: { type: 'thinking_delta', thinking } };
+}
+
+function signatureDelta(signature: string, index = 0): Record<string, unknown> {
+  return { type: 'content_block_delta', index, delta: { type: 'signature_delta', signature } };
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
   fakeStreamEvents = [];
+  lastStreamBody = undefined;
 });
 
 afterEach(() => {
@@ -338,7 +359,7 @@ describe('ClaudeSdkAdapter — invoke (reduceStream parity)', () => {
     });
   });
 
-  it('invoke does NOT use max_tokens:256 (uses 8192)', async () => {
+  it('passes max_tokens:8192 (the real default, not the old 256 hardcode)', async () => {
     fakeStreamEvents = [
       messageStartEvent(),
       textBlockStart(0),
@@ -348,20 +369,65 @@ describe('ClaudeSdkAdapter — invoke (reduceStream parity)', () => {
       { type: 'message_stop' },
     ];
 
-    // Track what was passed to messages.stream by inspecting fakeStreamEvents flow
-    // The adapter should use 8192 not 256. We verify indirectly by ensuring
-    // the adapter actually streams (if it used wrong max_tokens, SDK would error).
     const adapter = makeAdapter();
     const result = await adapter.invoke({ messages: [{ role: 'user', content: 'hi' }] });
 
-    // If we got here without error and have content, the call succeeded
-    // max_tokens:256 was the OLD hardcode; 8192 is correct. The mock doesn't
-    // validate max_tokens, but we verify the adapter doesn't truncate by checking
-    // the result is valid.
     expect(result.content).toBe('ok');
-    expect(result.finishReason).toBe('stop');
-    // The DEFAULT_MAX_TOKENS constant is 8192 — asserted via the adapter source
-    // (no way to intercept the sdk call in this mock without extra plumbing).
+    // The streamMock captured the request body — assert the real default.
+    expect(lastStreamBody?.max_tokens).toBe(8192);
+    expect(lastStreamBody?.max_tokens).not.toBe(256);
+  });
+});
+
+describe('ClaudeSdkAdapter — thinking mapping', () => {
+  it('maps thinking_delta events → thinking-delta chunks (drops signature_delta)', async () => {
+    fakeStreamEvents = [
+      messageStartEvent(10),
+      thinkingBlockStart(0),
+      thinkingDelta('Let me reason', 0),
+      thinkingDelta(' step by step', 0),
+      signatureDelta('sig-abc', 0),
+      textBlockStop(0),
+      textBlockStart(1),
+      textDelta('The answer.', 1),
+      textBlockStop(1),
+      messageDeltaEvent('end_turn', 7),
+      { type: 'message_stop' },
+    ];
+
+    const adapter = makeAdapter();
+    const chunks = await collectChunks(adapter);
+
+    const thinkingChunks = chunks.filter((c) => c.type === 'thinking-delta');
+    expect(thinkingChunks).toEqual([
+      { type: 'thinking-delta', text: 'Let me reason' },
+      { type: 'thinking-delta', text: ' step by step' },
+    ]);
+    // text still flows after the thinking block
+    const textChunks = chunks.filter((c) => c.type === 'text-delta');
+    expect(textChunks).toEqual([{ type: 'text-delta', text: 'The answer.' }]);
+  });
+
+  it('invoke folds thinking into a thinking contentBlock', async () => {
+    fakeStreamEvents = [
+      messageStartEvent(10),
+      thinkingBlockStart(0),
+      thinkingDelta('hmm', 0),
+      textBlockStop(0),
+      textBlockStart(1),
+      textDelta('done', 1),
+      textBlockStop(1),
+      messageDeltaEvent('end_turn', 3),
+      { type: 'message_stop' },
+    ];
+
+    const adapter = makeAdapter();
+    const result = await adapter.invoke({ messages: [{ role: 'user', content: 'hi' }] });
+    expect(result.content).toBe('done');
+    expect(result.contentBlocks?.find((b) => b.type === 'thinking')).toEqual({
+      type: 'thinking',
+      thinking: 'hmm',
+    });
   });
 });
 
@@ -407,6 +473,80 @@ describe('ClaudeSdkAdapter — auth', () => {
     const err = new MissingCredentialError('no key');
     expect(err.name).toBe('MissingCredentialError');
     expect(err).toBeInstanceOf(MissingCredentialError);
+  });
+});
+
+describe('ClaudeSdkAdapter — credential precedence', () => {
+  const SAVED = process.env.ANTHROPIC_API_KEY;
+  afterEach(() => {
+    if (SAVED === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = SAVED;
+  });
+
+  it('resolveApiKey follows spec → broker → env', async () => {
+    expect(await resolveApiKey(makeSpec({ apiKey: 'spec-key' }))).toBe('spec-key');
+
+    delete process.env.ANTHROPIC_API_KEY;
+    const broker = { getCredential: vi.fn(async () => ({ apiKey: 'broker-key' })) };
+    expect(await resolveApiKey(makeSpec({ apiKey: undefined }), broker)).toBe('broker-key');
+    expect(broker.getCredential).toHaveBeenCalledWith('anthropic');
+
+    process.env.ANTHROPIC_API_KEY = 'env-key';
+    expect(await resolveApiKey(makeSpec({ apiKey: undefined }))).toBe('env-key');
+  });
+
+  it('resolveApiKey prefers the broker over env (token rotation)', async () => {
+    process.env.ANTHROPIC_API_KEY = 'env-key';
+    const broker = { getCredential: vi.fn(async () => ({ apiKey: 'broker-key' })) };
+    expect(await resolveApiKey(makeSpec({ apiKey: undefined }), broker)).toBe('broker-key');
+  });
+
+  it('factory prefers the broker over env (broker-before-env, lazy adapter)', async () => {
+    fakeStreamEvents = [
+      messageStartEvent(),
+      textBlockStart(0),
+      textDelta('ok', 0),
+      textBlockStop(0),
+      messageDeltaEvent('end_turn'),
+      { type: 'message_stop' },
+    ];
+    process.env.ANTHROPIC_API_KEY = 'env-key';
+    const factory = getAdapterFactory('claude-sdk');
+    const broker = { getCredential: vi.fn(async () => ({ apiKey: 'broker-key' })) };
+    const adapter = factory?.factory(
+      { type: 'claude-sdk', model: 'claude-opus-4-7' },
+      makeDeps({ credentialBroker: broker }),
+    );
+    const result = await adapter?.invoke({ messages: [{ role: 'user', content: 'hi' }] });
+    expect(broker.getCredential).toHaveBeenCalledWith('anthropic');
+    expect(result?.content).toBe('ok');
+  });
+
+  it('lazy adapter throws MissingCredentialError when broker returns empty and no env', async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    const factory = getAdapterFactory('claude-sdk');
+    const broker = { getCredential: vi.fn(async () => ({ apiKey: '' })) };
+    const adapter = factory?.factory(
+      { type: 'claude-sdk', model: 'claude-opus-4-7' },
+      makeDeps({ credentialBroker: broker }),
+    );
+    await expect(
+      adapter?.invoke({ messages: [{ role: 'user', content: 'hi' }] }),
+    ).rejects.toBeInstanceOf(MissingCredentialError);
+  });
+
+  it('resolveApiKey logs (does not swallow) a broker failure, then falls back to env', async () => {
+    process.env.ANTHROPIC_API_KEY = 'env-key';
+    const warn = vi.fn();
+    const broker = {
+      getCredential: vi.fn(async () => {
+        throw new Error('broker offline');
+      }),
+    };
+    const key = await resolveApiKey(makeSpec({ apiKey: undefined }), broker, { warn });
+    expect(key).toBe('env-key');
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]?.[0])).toContain('broker offline');
   });
 });
 

@@ -136,7 +136,7 @@ export class CodexStreamParser {
       case 'turn.failed':
         return [{ type: 'error', error: this.classifyEventError(evt) }];
       case 'error':
-        return [{ type: 'error', error: this.classifyEventError(evt) }];
+        return this.handleErrorEvent(evt);
       default:
         // thread.started, turn.started, item.started/updated, etc.
         return [];
@@ -182,6 +182,23 @@ export class CodexStreamParser {
     return out;
   }
 
+  /**
+   * Handle a standalone `error` event. A transient "Reconnecting…" notice is
+   * logged and skipped (non-terminal — only `turn.failed` ends the turn, like
+   * gemini's warning skip); any other error is surfaced as a terminal error.
+   */
+  private handleErrorEvent(evt: RawEvent): AgentChunk[] {
+    const message =
+      (typeof evt.message === 'string' && evt.message) ||
+      (evt.error && typeof evt.error.message === 'string' && evt.error.message) ||
+      '';
+    if (isReconnectError(message)) {
+      this.logger?.warn?.(`[codex-cli] non-terminal reconnect event: ${message}`);
+      return [];
+    }
+    return [{ type: 'error', error: this.classifyEventError(evt) }];
+  }
+
   private classifyEventError(evt: RawEvent): AdapterError {
     const message =
       (evt.error && typeof evt.error.message === 'string' && evt.error.message) ||
@@ -194,6 +211,15 @@ export class CodexStreamParser {
 // ---------------------------------------------------------------------------
 // Pure helpers (exported for unit tests)
 // ---------------------------------------------------------------------------
+
+/**
+ * A standalone `error` event whose message indicates a transient reconnect is
+ * non-terminal — codex retries the connection and the turn continues. Only a
+ * `turn.failed` event is terminal.
+ */
+export function isReconnectError(message: string): boolean {
+  return /reconnect/i.test(message);
+}
 
 /** Item discriminator: prefer `item_type` (legacy), fall back to `type`. */
 export function getItemType(item: RawItem): string | undefined {

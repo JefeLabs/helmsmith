@@ -14,6 +14,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { CapabilityMismatchError } from '../../errors.ts';
 import type { AdapterDeps } from '../../registry.ts';
 import { getAdapterFactory } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
@@ -272,5 +273,20 @@ describe('CodexCliAdapter — capabilities', () => {
     expect(adapter.capabilities.supportsToolUse).toBe(true);
     expect(adapter.capabilities.supportsExtendedThinking).toBe(true);
     expect(adapter.capabilities.supportsJsonMode).toBe(false);
+  });
+});
+
+describe('CodexCliAdapter — custom tools reject', () => {
+  it('rejects host-injected custom tools with CapabilityMismatchError (autonomous CLI)', async () => {
+    const { CodexCliAdapter } = await import('./index.ts');
+    const adapter = new CodexCliAdapter(
+      { type: 'codex-cli', model: 'm', binaryPath: BIN },
+      makeDeps(),
+      'k',
+    );
+    await expect(
+      adapter.invoke({ messages: [{ role: 'user', content: 'hi' }], tools: [{ name: 'f' }] }),
+    ).rejects.toBeInstanceOf(CapabilityMismatchError);
+    expect(mockSpawn).not.toHaveBeenCalled();
   });
 });

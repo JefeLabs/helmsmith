@@ -54,18 +54,13 @@ import type {
 import type { AdapterCapabilities } from '../../capabilities.ts';
 import { CAPABILITY_MATRIX } from '../../capabilities.ts';
 import type { CredentialBroker } from '../../credentials/broker.ts';
-import {
-  AdapterError,
-  CapabilityMismatchError,
-  ConfigError,
-  MissingCredentialError,
-  ProviderError,
-} from '../../errors.ts';
+import { AdapterError, ConfigError, MissingCredentialError, ProviderError } from '../../errors.ts';
 import type { AdapterDeps } from '../../registry.ts';
 import { registerAdapter } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
 import { reduceStream } from '../../stream.ts';
 import { resolveBinary, spawnAgentProcess } from '../shared/child-process.ts';
+import { rejectCustomTools } from '../shared/reject-custom-tools.ts';
 import { buildOpencodeFlags, OPENCODE_BINARY } from './flags.ts';
 import { OpencodeStreamParser } from './stream-parser.ts';
 
@@ -286,12 +281,8 @@ export class OpenCodeCliAdapter implements AgentAdapter {
   }
 
   private _checkToolCapability(input: AgentInput): void {
-    if (input.tools?.length && !this.capabilities.supportsToolUse) {
-      throw new CapabilityMismatchError(
-        `Adapter type '${this.type}' does not support tool use (supportsToolUse: false). ` +
-          `Remove the 'tools' array from AgentInput, or choose an adapter that supports it.`,
-      );
-    }
+    // Autonomous CLI: built-in tools only; reject host-injected custom tools.
+    rejectCustomTools(this.type, input);
   }
 }
 
@@ -349,6 +340,7 @@ function toAdapterError(err: unknown): AdapterError {
 export async function resolveApiKey(
   spec: OpenCodeCliSpec,
   broker?: CredentialBroker,
+  logger?: Logger,
 ): Promise<string> {
   const target = resolveOpencodeTarget(spec);
   // Local-endpoint mode authenticates via opencode.json staticApiKey, not env.
@@ -359,8 +351,13 @@ export async function resolveApiKey(
     try {
       const cred = await broker.getCredential(target.provider);
       if (cred.apiKey) return cred.apiKey;
-    } catch {
-      // fall through to env var
+    } catch (err) {
+      // Don't swallow silently — log and fall back to env.
+      logger?.warn?.(
+        `[opencode-cli] credential broker failed for '${target.provider}'; falling back to env: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
     }
   }
   const envVar = target.envVar;
@@ -388,22 +385,20 @@ registerAdapter(
       return new OpenCodeCliAdapter(cliSpec, deps, cliSpec.staticApiKey ?? 'no-auth-required');
     }
 
-    const syncKey =
-      cliSpec.apiKey ?? (target.envVar ? process.env[target.envVar] : undefined) ?? undefined;
-
-    if (!syncKey && !deps.credentialBroker) {
-      throw new MissingCredentialError(
-        `No API key found for opencode-cli adapter (provider '${target.provider}'). Provide one via ` +
-          `spec.apiKey, CredentialBroker.getCredential("${target.provider}"), or the ` +
-          `${target.envVar ?? 'provider'} environment variable.`,
-      );
-    }
-
-    if (!syncKey && deps.credentialBroker) {
+    // Precedence must match resolveApiKey: spec → broker → env. Only an explicit
+    // spec.apiKey short-circuits; when a broker is present we defer to lazy
+    // resolution so the broker is PREFERRED over env (token rotation).
+    if (cliSpec.apiKey) return new OpenCodeCliAdapter(cliSpec, deps, cliSpec.apiKey);
+    if (deps.credentialBroker) {
       return new LazyOpenCodeCliAdapter(cliSpec, deps, deps.credentialBroker);
     }
-
-    return new OpenCodeCliAdapter(cliSpec, deps, syncKey as string);
+    const envKey = target.envVar ? process.env[target.envVar] : undefined;
+    if (envKey) return new OpenCodeCliAdapter(cliSpec, deps, envKey);
+    throw new MissingCredentialError(
+      `No API key found for opencode-cli adapter (provider '${target.provider}'). Provide one via ` +
+        `spec.apiKey, CredentialBroker.getCredential("${target.provider}"), or the ` +
+        `${target.envVar ?? 'provider'} environment variable.`,
+    );
   },
   CAPABILITY_MATRIX['opencode-cli'],
 );
@@ -432,7 +427,7 @@ class LazyOpenCodeCliAdapter implements AgentAdapter {
   private async _resolve(): Promise<OpenCodeCliAdapter> {
     if (this._inner) return this._inner;
     if (!this._resolving) {
-      this._resolving = resolveApiKey(this.spec, this.broker).then((apiKey) => {
+      this._resolving = resolveApiKey(this.spec, this.broker, this.deps.logger).then((apiKey) => {
         this._inner = new OpenCodeCliAdapter(this.spec, this.deps, apiKey);
         return this._inner;
       });

@@ -53,8 +53,9 @@ describe('OpencodeStreamParser — real simple-text transcript', () => {
     expect(chunks).toEqual([
       { type: 'text-delta', text: 'pong' },
       {
+        // outputTokens folds output(7) + reasoning(10) = 17 (PRD §item 10).
         type: 'usage',
-        usage: { inputTokens: 6226, outputTokens: 7, cacheReadTokens: 0, cacheWriteTokens: 0 },
+        usage: { inputTokens: 6226, outputTokens: 17, cacheReadTokens: 0, cacheWriteTokens: 0 },
       },
       { type: 'message-stop', finishReason: 'stop' },
     ]);
@@ -66,7 +67,8 @@ describe('OpencodeStreamParser — real simple-text transcript', () => {
     expect(result.finishReason).toBe('stop');
     expect(result.usage).toEqual({
       inputTokens: 6226,
-      outputTokens: 7,
+      // output(7) + reasoning(10) folded into outputTokens.
+      outputTokens: 17,
       cacheReadTokens: 0,
       cacheWriteTokens: 0,
     });
@@ -100,12 +102,13 @@ describe('OpencodeStreamParser — real tool-use transcript', () => {
       },
       // The intermediate step_finish (reason 'tool-calls') emits nothing.
       { type: 'text-delta', text: 'The marker in `note.txt` is `secret-marker-42`.' },
-      // Cumulative usage = step1 (598/28/5632) + step2 (166/18/6144).
+      // Cumulative usage = step1 (598/28+33r/5632) + step2 (166/18+0r/6144).
+      // outputTokens folds output(28+18=46) + reasoning(33+0=33) = 79.
       {
         type: 'usage',
         usage: {
           inputTokens: 764,
-          outputTokens: 46,
+          outputTokens: 79,
           cacheReadTokens: 11776,
           cacheWriteTokens: 0,
         },
@@ -283,6 +286,33 @@ describe('mapTokens', () => {
     });
     expect(mapTokens({ input: 1, output: 2 })).toEqual({ inputTokens: 1, outputTokens: 2 });
     expect(mapTokens(undefined)).toBeUndefined();
+  });
+
+  it('folds reasoning tokens into outputTokens (not dropped)', () => {
+    expect(mapTokens({ input: 5, output: 20, reasoning: 8 })).toEqual({
+      inputTokens: 5,
+      outputTokens: 28,
+    });
+  });
+});
+
+describe('OpencodeStreamParser — reasoning tokens fold into outputTokens', () => {
+  it('accumulates output + reasoning into the emitted usage chunk', () => {
+    const parser = new OpencodeStreamParser();
+    const chunks = parser.pushLine(
+      JSON.stringify({
+        type: 'step_finish',
+        part: {
+          type: 'step-finish',
+          reason: 'stop',
+          tokens: { input: 100, output: 20, reasoning: 30 },
+        },
+      }),
+    );
+    expect(chunks).toEqual([
+      { type: 'usage', usage: { inputTokens: 100, outputTokens: 50 } },
+      { type: 'message-stop', finishReason: 'stop' },
+    ]);
   });
 });
 

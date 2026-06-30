@@ -12,6 +12,7 @@
 
 import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { CapabilityMismatchError } from '../../errors.ts';
 import type { AdapterDeps } from '../../registry.ts';
 import { getAdapterFactory } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
@@ -176,7 +177,7 @@ describe('CopilotCliAdapter — single-block output', () => {
 // ---------------------------------------------------------------------------
 
 describe('CopilotCliAdapter — autonomous capability + abort', () => {
-  it('reports autonomous tool use and accepts a custom tools array (no reject)', async () => {
+  it('rejects host-injected custom tools with CapabilityMismatchError (autonomous CLI)', async () => {
     mockSpawn.mockImplementation(() => fakeChild(['x']));
     const { CopilotCliAdapter } = await import('./index.ts');
     const adapter = new CopilotCliAdapter(
@@ -184,12 +185,11 @@ describe('CopilotCliAdapter — autonomous capability + abort', () => {
       makeDeps(),
       'tok',
     );
-    const result = await adapter.invoke({
-      messages: [{ role: 'user', content: 'q' }],
-      tools: [{ name: 'f' }],
-    });
-    expect(result.finishReason).toBe('stop');
-    expect(mockSpawn).toHaveBeenCalledTimes(1);
+    await expect(
+      adapter.invoke({ messages: [{ role: 'user', content: 'q' }], tools: [{ name: 'f' }] }),
+    ).rejects.toBeInstanceOf(CapabilityMismatchError);
+    // No subprocess should be spawned — the reject is fail-fast.
+    expect(mockSpawn).not.toHaveBeenCalled();
   });
 
   it('reports autonomous tool use, no streaming, no usage', async () => {

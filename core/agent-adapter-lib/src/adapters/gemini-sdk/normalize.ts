@@ -44,6 +44,14 @@ export interface GeminiTool {
   functionDeclarations: GeminiFunctionDeclaration[];
 }
 
+/** Gemini `ToolConfig` — controls how/whether the model calls functions. */
+export interface GeminiToolConfig {
+  functionCallingConfig: {
+    mode: 'AUTO' | 'ANY' | 'NONE';
+    allowedFunctionNames?: string[];
+  };
+}
+
 // ---------------------------------------------------------------------------
 // normalizeContents — ChatMessage[] → Gemini Content[]
 // ---------------------------------------------------------------------------
@@ -125,6 +133,22 @@ export function normalizeTools(tools: ToolDefinition[]): GeminiTool[] {
       }),
     },
   ];
+}
+
+// ---------------------------------------------------------------------------
+// normalizeToolChoice — AgentInput.toolChoice → Gemini toolConfig
+// ---------------------------------------------------------------------------
+
+/**
+ * Map the lib's `toolChoice` into Gemini's `toolConfig.functionCallingConfig`:
+ *   - 'auto'   → mode AUTO (the model decides whether to call a function);
+ *   - 'none'   → mode NONE (never call a function);
+ *   - { name } → mode ANY + allowedFunctionNames:[name] (force that function).
+ */
+export function normalizeToolChoice(choice: 'auto' | 'none' | { name: string }): GeminiToolConfig {
+  if (choice === 'auto') return { functionCallingConfig: { mode: 'AUTO' } };
+  if (choice === 'none') return { functionCallingConfig: { mode: 'NONE' } };
+  return { functionCallingConfig: { mode: 'ANY', allowedFunctionNames: [choice.name] } };
 }
 
 // ---------------------------------------------------------------------------
