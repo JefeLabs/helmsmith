@@ -1,4 +1,4 @@
-# @helmsmith/discord-timetracker
+# @helmsmith/timetracker
 
 Admin-only Discord bot that passively tracks per-user daily activity and
 surfaces it to admins — with a TUI for daily/weekly summaries.
@@ -24,7 +24,7 @@ Bun · TypeScript · discord.js v14 · [`@helmsmith/cli-kit`](../../packages/cli
 ```bash
 pnpm install                 # from the monorepo root
 cp .env.bak.example .env.bak         # fill in token, guild, channel IDs
-pnpm --filter @helmsmith/discord-timetracker dev -- --help
+pnpm --filter @helmsmith/timetracker dev -- --help
 ```
 
 CLI verbs:
@@ -40,8 +40,8 @@ CLI verbs:
 ## Running the bot
 
 ```bash
-discord-timetracker setup     # or hand-edit .env.bak + timetracker.config.json
-discord-timetracker start     # Ctrl-C for graceful shutdown
+timetracker setup     # or hand-edit .env.bak + timetracker.config.json
+timetracker start     # Ctrl-C for graceful shutdown
 ```
 
 > ⚠️ **Enable the three privileged intents** in the Discord Developer Portal

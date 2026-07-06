@@ -62,7 +62,7 @@ export async function runReport(opts: ReportOptions, cwd = process.cwd()): Promi
     config = loadConfig(cwd);
   } catch (err) {
     if (err instanceof ConfigError) {
-      console.error(`\n${err.message}\n\nRun \`discord-timetracker setup\` first.\n`);
+      console.error(`\n${err.message}\n\nRun \`timetracker setup\` first.\n`);
       process.exitCode = 1;
       return;
     }

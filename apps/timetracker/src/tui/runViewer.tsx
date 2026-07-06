@@ -23,7 +23,7 @@ export interface RunViewerOptions {
 }
 
 export async function runViewer(opts: RunViewerOptions): Promise<void> {
-  await runTuiView({ appName: 'discord-timetracker' }, (onQuit) =>
+  await runTuiView({ appName: 'timetracker' }, (onQuit) =>
     createElement(FocusManager, {
       initialFocus: 'table',
       // biome-ignore lint/correctness/noChildrenProp: createElement's typed overload requires `children` in props when the component declares it required (FocusManagerProps.children).

@@ -18,7 +18,7 @@ export async function runStart(cwd = process.cwd()): Promise<void> {
     config = loadConfig(cwd);
   } catch (err) {
     if (err instanceof ConfigError) {
-      console.error(`\n${err.message}\n\nRun \`discord-timetracker setup\` to create a config.\n`);
+      console.error(`\n${err.message}\n\nRun \`timetracker setup\` to create a config.\n`);
       process.exitCode = 1;
       return;
     }

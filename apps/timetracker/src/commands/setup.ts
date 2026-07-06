@@ -17,7 +17,7 @@ const snowflakeValidator = (v: string) =>
     : 'Enter a Discord ID (17–20 digits). Enable Developer Mode → right-click → Copy ID.';
 
 export async function runSetup(cwd = process.cwd()): Promise<void> {
-  console.log('\n  discord-timetracker setup\n  ─────────────────────────');
+  console.log('\n  timetracker setup\n  ─────────────────────────');
   console.log('  Tip: Discord → Settings → Advanced → Developer Mode, then');
   console.log('  right-click a server/channel/role → "Copy ID".\n');
 
@@ -149,7 +149,7 @@ export async function runSetup(cwd = process.cwd()): Promise<void> {
   }
 
   console.log('\n  Done. Next:');
-  console.log('    discord-timetracker start    # begins tracking (M3)\n');
+  console.log('    timetracker start    # begins tracking (M3)\n');
 }
 
 function writeConfigFile(path: string, config: PersistedConfig): void {

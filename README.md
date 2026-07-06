@@ -14,7 +14,7 @@ alongside the Java/Maven control plane.
 | `memory/` | Edge memory: `edge-memory-cli`, `edge-memory-server` | Depends on `core/` (and, narrowly, `context/context-loader-core` for the embedder client) |
 | `skillzkit/` | `skillzkit` app + `skillzkit-types` (source of truth for the Java catalog schema) | Depends on `core/` |
 | `web/` | `controlplane-ui` (React frontend for the control plane) | — |
-| `apps/` | Standalone CLI tools: `toolz`, `gitradar`, `pritty`, `taskmaster`, `gittyup`, `discord-timetracker`, `mech-pencil` | Depend on `core/` |
+| `apps/` | Standalone CLI tools: `toolz`, `gitradar`, `pritty`, `taskmaster`, `gittyup`, `timetracker`, `mech-pencil` | Depend on `core/` |
 | `controlplane/` | Java / Spring Boot (Maven). **Not** a pnpm workspace member. | — |
 | `examples/`, `workspace-template/` | Demo scripts and the cloneable artifact scaffold | — |
 
