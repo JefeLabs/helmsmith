@@ -130,8 +130,8 @@ A complete sweep was run after the merge. Honest results:
 
 The merge surfaced the toolbox's own backlog (invisible until it was put under CI),
 and — once CI could actually run each stage — several issues that were red in CI but
-green locally. **All are resolved**; full write-ups in
-[`.issues/resolved/`](../.issues/resolved/). CI is now **exclusion-free** — the early
+green locally. **All are resolved**; full write-ups live in `.issues/resolved/`
+(local working notes — untracked since 2026-07-07). CI is now **exclusion-free** — the early
 `--filter='!…'` scopes were removed as each ticket closed.
 
 | Ticket | Package | Kind |
