@@ -138,8 +138,24 @@ export function createFigmaServer(
   deps: FigmaDeps,
   trackers: Map<string, FilePresenceTracker>,
 ): Server {
+  // The sentinel plugin runs in Figma's sandboxed iframe, so its POST to
+  // /presence is a cross-origin request with a JSON content-type — that trips
+  // a CORS preflight (OPTIONS). Without these headers the preflight fails and
+  // the browser never sends the real POST ("Failed to fetch"). Figma's
+  // server-to-server webhooks don't need CORS, but sending it is harmless.
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  };
   return createServer((req, res) => {
     void (async () => {
+      // Answer the CORS preflight before any routing.
+      if (req.method === 'OPTIONS') {
+        res.writeHead(204, corsHeaders);
+        res.end();
+        return;
+      }
       let result: RouteResult;
       const route = `${req.method} ${req.url?.split('?')[0]}`;
       if (route === 'GET /healthz') {
@@ -156,11 +172,11 @@ export function createFigmaServer(
       } else {
         result = bad(404, 'not found');
       }
-      res.writeHead(result.status, { 'Content-Type': 'application/json' });
+      res.writeHead(result.status, { 'Content-Type': 'application/json', ...corsHeaders });
       res.end(JSON.stringify(result.body));
     })().catch((err) => {
       log.error('figma server: unhandled route error', err);
-      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.writeHead(500, { 'Content-Type': 'application/json', ...corsHeaders });
       res.end(JSON.stringify({ error: 'internal error' }));
     });
   });
