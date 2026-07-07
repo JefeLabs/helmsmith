@@ -9,6 +9,10 @@ Tracks:
 - **Online status** — sampled every 5 minutes
 - **CI submissions** — messages in `#ci-cd-notifications`, attributed per user
 - **Engagement** — messages in `#DevOffice`, counted per user
+- **Figma activity** (optional) — team file versions/comments/publishes ingested
+  into the same DB, clustered into estimated "work bursts", correlated against
+  Discord day-sessions, plus measured in-file presence for sentinel-monitored
+  files. See [`.plan/figma-tracker-prd.md`](./.plan/figma-tracker-prd.md).
 
 Runs locally first (Bun); designed to lift to AWS (ECS Fargate, us-east-1) with
 no rewrite via a pluggable storage layer.
@@ -33,9 +37,13 @@ CLI verbs:
 |------|------|
 | `setup` | interactive first-run config (token, guild, channels, storage) |
 | `start` | run the bot (gateway listener + 5-min poller + scheduler) |
-| `view` | daily/weekly summary **TUI** |
+| `view` | daily/weekly summary **TUI** (`f` toggles the Figma panel) |
 | `report` | non-interactive summary (`--period weekly`, `--json`) |
 | `link` | map a GitHub username → Discord user (CI attribution) |
+| `figma start` | run the Figma tracker (separate process: webhook receiver + poller + presence) |
+| `figma sync-files` | seed tracked files from the Figma team's projects |
+| `figma map-members` | pair Figma users ↔ Discord users (one-time manual) |
+| `figma status` | tracker heartbeats, event counts, unmapped members |
 
 ## Running the bot
 
@@ -53,6 +61,31 @@ The bot must run **continuously** to track (it samples presence/voice every 5
 min and reacts to messages live). Run it on an always-on host for real use; a
 laptop only tracks while awake. Scheduled summaries post to the report channel
 at `SCHEDULE_DAILY_AT` and survive restarts (last-run state is persisted).
+
+## Figma tracking (optional)
+
+Requires the **sqlite** backend (both processes share one DB file in WAL
+mode). Configure `FIGMA_TOKEN` + `FIGMA_TEAM_ID` in `.env` (see
+`.env.example`), then:
+
+```bash
+timetracker figma sync-files    # seed tracked files from team projects
+timetracker figma start         # separate always-on process, next to the bot
+timetracker figma map-members   # after the first poll: pair Figma ↔ Discord users
+```
+
+Two ingestion modes, gated by the team's Figma plan (PRD §2 decision gate):
+- **Professional+** → set `FIGMA_WEBHOOK_ENABLED=true`, `FIGMA_WEBHOOK_SECRET`,
+  and a public HTTPS route (`FIGMA_WEBHOOK_URL`) to the receiver port; webhooks
+  register idempotently at startup and polling drops to an hourly backfill.
+- **Starter/other** → leave webhooks off; polling every `FIGMA_POLL_INTERVAL_MIN`
+  is the sole (and sufficient) ingestion path. Same schema, same dedupe.
+
+Work sessions are **inferred** from event clustering (bursts) and always shown
+as `~… est.`; real-time in-file presence is only available for files monitored
+by the sentinel plugin (`figma-plugin/README.md`) and is shown as measured
+time. Transparency note: webhooks and token usage are visible to Figma team
+admins — tell the team what's tracked and why (PRD §8).
 
 ## Plan
 

@@ -75,6 +75,89 @@ export const CaptureSchema = z
   })
   .default({});
 
+/**
+ * Figma webhook receiver. Requires a Professional+ team plan and a public
+ * HTTPS route to `port` (reverse proxy / tunnel). When disabled, ingestion is
+ * polling-only (any paid plan) — same schema, same dedupe, slower latency.
+ */
+export const FigmaWebhookSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    port: z.number().int().min(1).max(65535).default(3846),
+    /** Delivery passcode — sourced from FIGMA_WEBHOOK_SECRET, never the file. */
+    passcode: z.string().optional(),
+    /**
+     * Public HTTPS URL Figma should deliver to (e.g. the reverse-proxy /
+     * tunnel route to `port`). When set, `figma start` registers the five
+     * team webhooks idempotently on startup; unset → register manually.
+     */
+    publicUrl: z.string().url().optional(),
+  })
+  .default({});
+
+/**
+ * Sentinel presence: a machine keeps monitored files open in Figma desktop and
+ * a private plugin POSTs `figma.activeUsers` snapshots to the tracker. Presence
+ * is measured (unlike bursts, which are estimates) but exists only for
+ * monitored files.
+ */
+export const FigmaPresenceSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    /** Plugin poll cadence, seconds. Interval accuracy is bounded by this. */
+    pollSec: z.number().int().min(5).default(45),
+    /** The sentinel's own Figma user id — filtered out of snapshots (§4.5). */
+    sentinelUserId: z.string().optional(),
+    /** Heartbeat age beyond which presence data is ⚠ STALE and intervals force-close. */
+    staleAfterSec: z.number().int().min(30).default(180),
+  })
+  .default({});
+
+/**
+ * Figma activity tracking (optional — absent block disables the whole feature).
+ * Runs as a separate `timetracker figma start` process writing to the same
+ * storage; see .plan/figma-tracker-prd.md.
+ */
+export const FigmaSchema = z
+  .object({
+    /** Personal access token — sourced from FIGMA_TOKEN, never the config file. */
+    token: z
+      .string({ required_error: 'FIGMA_TOKEN is required when figma tracking is configured' })
+      .min(1, 'FIGMA_TOKEN is required when figma tracking is configured'),
+    teamId: z
+      .string({ required_error: 'FIGMA_TEAM_ID is required when figma tracking is configured' })
+      .min(1, 'FIGMA_TEAM_ID is required when figma tracking is configured'),
+    /** Seed tracked file keys; `figma sync-files` discovers more, webhooks auto-add. */
+    fileKeys: z.array(z.string().min(1)).default([]),
+    /** Version/comment poll cadence (minutes) when webhooks are off. */
+    pollIntervalMin: z.number().int().min(1).default(10),
+    /** Backfill poll cadence (minutes) when webhooks are ON — catches missed deliveries. */
+    backfillIntervalMin: z.number().int().min(5).default(60),
+    /** Events by the same user ≤ this many minutes apart merge into one burst. */
+    burstGapMin: z.number().int().min(1).default(30),
+    /** Padding added to a burst's start — compensates webhook debounce lag (§4.4). */
+    burstPadMin: z.number().int().min(0).default(15),
+    webhook: FigmaWebhookSchema,
+    presence: FigmaPresenceSchema,
+  })
+  .superRefine((figma, ctx) => {
+    if (figma.webhook.enabled && !figma.webhook.passcode) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['webhook', 'passcode'],
+        message: 'FIGMA_WEBHOOK_SECRET is required when the webhook receiver is enabled',
+      });
+    }
+    if (figma.presence.enabled && !figma.presence.sentinelUserId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['presence', 'sentinelUserId'],
+        message:
+          'FIGMA_SENTINEL_USER_ID is required when presence is enabled (the sentinel must not count itself — PRD §4.5)',
+      });
+    }
+  });
+
 export const ConfigSchema = z.object({
   /** Bot token — sourced from DISCORD_TOKEN, never written to the config file. */
   token: z.string().min(1, 'DISCORD_TOKEN is required'),
@@ -106,6 +189,8 @@ export const ConfigSchema = z.object({
   schedule: ScheduleSchema,
   capture: CaptureSchema,
   storage: StorageSchema,
+  /** Optional Figma activity tracking — absent → feature disabled. */
+  figma: FigmaSchema.optional(),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
@@ -113,9 +198,12 @@ export type StorageConfig = z.infer<typeof StorageSchema>;
 export type SqliteStorageConfig = z.infer<typeof SqliteStorageSchema>;
 export type DynamoStorageConfig = z.infer<typeof DynamoStorageSchema>;
 export type Channels = z.infer<typeof ChannelsSchema>;
+export type FigmaConfig = z.infer<typeof FigmaSchema>;
 
 /**
  * The non-secret subset persisted to `timetracker.config.json` by `setup`.
- * Token is intentionally excluded — it lives in `.env` / the secret store.
+ * Tokens are intentionally excluded — they live in `.env` / the secret store.
+ * (The loader also *ignores* `figma.token` / `figma.webhook.passcode` if a
+ * hand-edited file contains them: those two are env-only.)
  */
 export type PersistedConfig = Omit<Config, 'token'>;

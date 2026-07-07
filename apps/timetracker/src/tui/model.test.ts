@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { dailyColumns, pageDate, sparkline, weeklyColumns } from './model.js';
+import {
+  dailyColumns,
+  figmaCorrelationLine,
+  figmaEventLine,
+  figmaMemberLine,
+  figmaPresenceLine,
+  pageDate,
+  sparkline,
+  weeklyColumns,
+} from './model.js';
 
 describe('pageDate', () => {
   it('pages ±1 day in daily mode', () => {
@@ -59,5 +68,71 @@ describe('column definitions', () => {
   it('weekly is a Mon–Fri grid + WK Active + Avg/day', () => {
     const cols = weeklyColumns().map((c) => c.key);
     expect(cols).toEqual(['userId', 'wd0', 'wd1', 'wd2', 'wd3', 'wd4', 'wk', 'avg']);
+  });
+});
+
+describe('figma panel lines', () => {
+  it('renders the live-log line in the PRD shape', () => {
+    const line = figmaEventLine(
+      { at: '2026-07-06T18:32:00Z', eventType: 'version', handle: 'ana', fileName: 'design-system' },
+      'UTC',
+    );
+    expect(line).toBe('[18:32] ana — version saved — design-system');
+  });
+
+  it('marks burst estimates with ~/est. but never in-file time', () => {
+    const line = figmaMemberLine({
+      figmaUserId: 'u1',
+      handle: 'ana',
+      discordName: 'Ana',
+      mapped: true,
+      eventCount: 47,
+      byType: { version: 40, comment: 7 },
+      estBurstMinutes: 125,
+      presenceMinutes: 118,
+    });
+    expect(line).toContain('~2h 5m est.');
+    expect(line).toContain('in-file 1h 58m');
+    expect(line).not.toContain('in-file ~'); // measured time carries no marker
+  });
+
+  it('flags unmapped members', () => {
+    const line = figmaMemberLine({
+      figmaUserId: 'u9',
+      handle: 'ghost',
+      mapped: false,
+      eventCount: 3,
+      byType: {},
+      estBurstMinutes: 15,
+      presenceMinutes: 0,
+    });
+    expect(line).toContain('⚠ unmapped');
+  });
+
+  it('renders presence-now with live dots', () => {
+    const line = figmaPresenceLine({
+      fileKey: 'f',
+      fileName: 'design-system',
+      users: [
+        { handle: 'ana', minutes: 12 },
+        { handle: 'marco', minutes: 3 },
+      ],
+    });
+    expect(line).toBe('design-system: ● ana (12m), ● marco (3m)');
+  });
+
+  it('builds the correlation row with session attribution counts', () => {
+    const line = figmaCorrelationLine({
+      eventCount: 47,
+      byType: {},
+      estBurstMinutes: 125,
+      burstsInSession: 2,
+      bursts: 3,
+      presenceMinutes: 118,
+      topFiles: ['design-system'],
+    });
+    expect(line).toBe(
+      '47 events  ·  ~2h 5m est. (2/3 bursts in session)  ·  in-file 1h 58m  ·  design-system',
+    );
   });
 });

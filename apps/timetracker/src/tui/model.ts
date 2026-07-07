@@ -6,8 +6,17 @@
 import type { TableColumn } from '@helmsmith/tui-view-components/organisms';
 import { addDays } from '../domain/dayKey.js';
 import type { ISODate } from '../domain/types.js';
+import type { FigmaEventType } from '../figma/types.js';
 import { formatDuration, formatTime } from '../reports/render.js';
-import type { UserDayRow, UserWeekRow } from '../reports/types.js';
+import type {
+  FigmaEventView,
+  FigmaFileHeat,
+  FigmaMemberDay,
+  FigmaPresenceNow,
+  UserDayFigma,
+  UserDayRow,
+  UserWeekRow,
+} from '../reports/types.js';
 import { WEEKDAYS, weekGrid } from '../reports/weekGrid.js';
 
 export type Period = 'daily' | 'weekly';
@@ -41,6 +50,54 @@ export function dailyColumns(tz: string): TableColumn<UserDayRow>[] {
     { key: 'start', label: 'Start', width: 6, render: (r) => formatTime(r.startedAt, tz) },
     { key: 'end', label: 'End', width: 6, render: (r) => formatTime(r.endedAt, tz) },
   ];
+}
+
+// ── Figma panel lines (PRD §5) — pure string builders, unit-testable ────
+// Hard display rule: burst times carry ~/est. (inferred); sentinel in-file
+// times are measured and never carry the marker.
+
+export const FIGMA_EVENT_LABEL: Record<FigmaEventType, string> = {
+  file_update: 'file updated',
+  version: 'version saved',
+  comment: 'comment',
+  library_publish: 'library publish',
+  file_delete: 'file deleted',
+};
+
+/** `[14:32] ana — version saved — design-system` (Figma Live Log, §5.1). */
+export function figmaEventLine(e: FigmaEventView, tz: string): string {
+  return `[${formatTime(e.at, tz)}] ${e.handle} — ${FIGMA_EVENT_LABEL[e.eventType]} — ${e.fileName}`;
+}
+
+/** Per-member daily activity row (§5.2), flagging unmapped members (§7). */
+export function figmaMemberLine(m: FigmaMemberDay): string {
+  const name = m.discordName ?? m.handle;
+  const est = m.estBurstMinutes > 0 ? `~${formatDuration(m.estBurstMinutes)} est.` : '—';
+  const inFile = m.presenceMinutes > 0 ? formatDuration(m.presenceMinutes) : '—';
+  const flag = m.mapped ? '' : '   ⚠ unmapped';
+  return `${name.padEnd(16)} ${String(m.eventCount).padStart(3)} ev   ${est.padEnd(14)} in-file ${inFile}${flag}`;
+}
+
+/** File heat row (§5.3): name, events today, last touch, last editor. */
+export function figmaFileLine(f: FigmaFileHeat, tz: string): string {
+  return `${f.name.padEnd(24)} ${String(f.events).padStart(3)} ev   last ${formatTime(f.lastTouchAt, tz)} by ${f.lastEditor}`;
+}
+
+/** `design-system: ● ana (12m), ● marco (3m)` (Presence Now, §5.5). */
+export function figmaPresenceLine(p: FigmaPresenceNow): string {
+  const users = p.users.map((u) => `● ${u.handle} (${formatDuration(u.minutes)})`).join(', ');
+  return `${p.fileName}: ${users}`;
+}
+
+/** The DayDetail correlation row (§5.4) — estimates and measures kept distinct. */
+export function figmaCorrelationLine(f: UserDayFigma): string {
+  const parts = [
+    `${f.eventCount} events`,
+    `~${formatDuration(f.estBurstMinutes)} est. (${f.burstsInSession}/${f.bursts} bursts in session)`,
+  ];
+  if (f.presenceMinutes > 0) parts.push(`in-file ${formatDuration(f.presenceMinutes)}`);
+  if (f.topFiles.length > 0) parts.push(f.topFiles.join(', '));
+  return parts.join('  ·  ');
 }
 
 /** Per-user workweek grid: User · MON–FRI (active|idle) · WK Active · Avg/day. */

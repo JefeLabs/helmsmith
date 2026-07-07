@@ -9,6 +9,12 @@
  */
 import { createCli, noopAuthProvider } from '@helmsmith/cli-kit';
 import { runBackfill } from './commands/backfill.js';
+import {
+  runFigmaMapMembers,
+  runFigmaStart,
+  runFigmaStatus,
+  runFigmaSyncFiles,
+} from './commands/figma.js';
 import { runLink } from './commands/link.js';
 import { runReport } from './commands/report.js';
 import { runSetup } from './commands/setup.js';
@@ -61,5 +67,25 @@ program
   .command('link')
   .description('Map a Discord user to a GitHub/CI identity (for CI attribution)')
   .action(() => runLink());
+
+const figma = program
+  .command('figma')
+  .description('Figma activity tracker (see .plan/figma-tracker-prd.md)');
+figma
+  .command('start')
+  .description('Run the Figma tracker: webhook receiver + poller + sentinel presence')
+  .action(() => runFigmaStart());
+figma
+  .command('sync-files')
+  .description('Seed tracked files from the Figma team’s projects')
+  .action(() => runFigmaSyncFiles());
+figma
+  .command('map-members')
+  .description('Pair Figma users with Discord users (one-time manual mapping)')
+  .action(() => runFigmaMapMembers());
+figma
+  .command('status')
+  .description('Tracker heartbeats, event counts, and unmapped members')
+  .action(() => runFigmaStatus());
 
 program.parse();

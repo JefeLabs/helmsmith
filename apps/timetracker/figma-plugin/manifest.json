@@ -1,0 +1,14 @@
+{
+  "name": "timetracker-sentinel",
+  "id": "REPLACE_WITH_ID_FROM_FIGMA_AFTER_IMPORT",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma"],
+  "permissions": ["activeusers"],
+  "enablePrivatePluginApi": true,
+  "networkAccess": {
+    "allowedDomains": ["http://localhost:3846"],
+    "reasoning": "POSTs figma.activeUsers snapshots to the team's timetracker presence endpoint (see apps/timetracker/.plan/figma-tracker-prd.md §4.5)"
+  }
+}

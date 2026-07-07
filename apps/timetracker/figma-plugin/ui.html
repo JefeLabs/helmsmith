@@ -1,0 +1,21 @@
+<!-- Minimal sentinel status view: last POST result + error streaks (PRD §4.1). -->
+<div style="font: 12px/1.5 ui-monospace, monospace; padding: 12px; color: #333">
+  <div style="font-weight: 600; margin-bottom: 8px">timetracker sentinel</div>
+  <div id="state" style="margin-bottom: 4px">waiting for first snapshot…</div>
+  <div id="time" style="color: #888"></div>
+  <div style="margin-top: 12px; color: #888">
+    Keep this tab open on the sentinel machine.<br />
+    Disable OS sleep + Figma tab discarding.
+  </div>
+</div>
+<script>
+  const state = document.getElementById('state');
+  const time = document.getElementById('time');
+  onmessage = (event) => {
+    const msg = event.data.pluginMessage;
+    if (!msg) return;
+    state.textContent = (msg.kind === 'ok' ? '● ' : '⚠ ') + msg.message;
+    state.style.color = msg.kind === 'ok' ? '#0a0' : '#c00';
+    time.textContent = 'last attempt: ' + msg.at;
+  };
+</script>

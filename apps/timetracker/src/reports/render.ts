@@ -72,10 +72,33 @@ export function renderDaily(s: DailySummary, tz: string): string {
     formatTime(u.startedAt, tz),
     formatTime(u.endedAt, tz),
   ]);
-  return `Daily summary — ${s.date} (${tz})\n\n${table(
+  const daily = `Daily summary — ${s.date} (${tz})\n\n${table(
     ['User', 'Active', 'Idle', 'Span', 'Voice', 'CI', 'Msgs', 'Start', 'End'],
     rows,
   )}`;
+  const figma = renderFigmaCorrelation(s);
+  return figma ? `${daily}\n\n${figma}` : daily;
+}
+
+/**
+ * Correlation rows (PRD §5.4): Discord voice vs Figma output per member.
+ * Burst time is an estimate (~/est.); sentinel in-file time is measured and
+ * rendered without the marker — the distinction is a hard display rule.
+ */
+function renderFigmaCorrelation(s: DailySummary): string | null {
+  const withFigma = s.users.filter((u) => u.figma);
+  if (withFigma.length === 0) return null;
+  const lines = withFigma.map((u) => {
+    const f = u.figma!;
+    const parts = [
+      `voice ${formatDuration(u.voiceMinutes)}`,
+      `figma ${f.eventCount} events, ~${formatDuration(f.estBurstMinutes)} est.`,
+    ];
+    if (f.presenceMinutes > 0) parts.push(`in-file ${formatDuration(f.presenceMinutes)}`);
+    if (f.topFiles.length > 0) parts.push(f.topFiles.join(', '));
+    return `  ${firstName(u.displayName ?? u.userId).padEnd(12)} ${parts.join('  |  ')}`;
+  });
+  return `Figma correlation (burst times are estimates)\n${lines.join('\n')}`;
 }
 
 /**
