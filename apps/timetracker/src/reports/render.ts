@@ -5,8 +5,16 @@
  * Note: rows show Discord user IDs — the bot doesn't yet store display names
  * (would require a guild lookup). Resolving names is a later enhancement.
  */
-import type { DailySummary, WeeklySummary } from './types.js';
+import type { DailySummary, FigmaDailySummary, WeeklySummary } from './types.js';
 import { WEEKDAYS, weekGrid } from './weekGrid.js';
+
+const FIGMA_EVENT_LABEL: Record<string, string> = {
+  file_update: 'file updated',
+  version: 'version saved',
+  comment: 'comment',
+  library_publish: 'library publish',
+  file_delete: 'file deleted',
+};
 
 /** First whitespace token of a name: "Yelisson Ortiz - Skoolscout" → "Yelisson". */
 export function firstName(name: string): string {
@@ -123,4 +131,66 @@ export function renderWeekly(s: WeeklySummary, _tz: string): string {
     ['User', ...WEEKDAYS, 'WK Active', 'Avg/day'],
     rows,
   )}`;
+}
+
+/**
+ * Figma activity report (the `figma report` CLI + Discord post). Renders the
+ * same `figmaDaily` feed the TUI `f` panel shows. The estimate/measured split
+ * is a hard display rule: burst time carries the `~`/`est.` marker; sentinel
+ * in-file time is measured and shown plain.
+ */
+export function renderFigmaDaily(f: FigmaDailySummary, tz: string): string {
+  if (!f.available) return `Figma activity — ${f.date}\n(figma tracking not available on this storage backend)`;
+
+  const out: string[] = [`Figma activity — ${f.date} (${tz})`];
+
+  // Presence now (measured) — ⚠ STALE when the sentinel heartbeat lapsed.
+  const staleFlag = f.stale ? '  ⚠ STALE (sentinel heartbeat lapsed)' : '';
+  out.push(`\nPresence now${staleFlag}`);
+  if (f.presenceNow.length === 0) {
+    out.push(f.heartbeatAt ? '  (nobody in monitored files)' : '  (no sentinel reporting)');
+  } else {
+    for (const p of f.presenceNow) {
+      const users = p.users.map((u) => `${u.handle} (${formatDuration(u.minutes)})`).join(', ');
+      out.push(`  ● ${p.fileName}: ${users}`);
+    }
+  }
+
+  // Per-member activity today (events → estimated bursts; measured in-file).
+  if (f.members.length > 0) {
+    out.push('\nMember activity today (burst times are estimates)');
+    const rows = f.members.map((m) => [
+      (m.discordName ?? m.handle) + (m.mapped ? '' : ' ⚠'),
+      String(m.eventCount),
+      m.estBurstMinutes > 0 ? `~${formatDuration(m.estBurstMinutes)}` : '—',
+      m.presenceMinutes > 0 ? formatDuration(m.presenceMinutes) : '—',
+    ]);
+    out.push(table(['Member', 'Events', 'Est. burst', 'In-file'], rows));
+    if (f.members.some((m) => !m.mapped)) out.push('  ⚠ = not mapped to a Discord user (run `figma map-members`)');
+  }
+
+  // File heat.
+  if (f.fileHeat.length > 0) {
+    out.push('\nFile heat');
+    const rows = f.fileHeat.map((h) => [
+      h.name,
+      String(h.events),
+      formatTime(h.lastTouchAt, tz),
+      h.lastEditor,
+    ]);
+    out.push(table(['File', 'Events', 'Last touch', 'Last editor'], rows));
+  }
+
+  // Recent events (most recent first, capped for readability).
+  if (f.events.length > 0) {
+    out.push('\nRecent events');
+    for (const e of f.events.slice(0, 15)) {
+      out.push(`  [${formatTime(e.at, tz)}] ${e.handle} — ${FIGMA_EVENT_LABEL[e.eventType] ?? e.eventType} — ${e.fileName}`);
+    }
+  }
+
+  if (f.presenceNow.length === 0 && f.members.length === 0 && f.events.length === 0) {
+    out.push('\n(no figma activity recorded for this day)');
+  }
+  return out.join('\n');
 }
