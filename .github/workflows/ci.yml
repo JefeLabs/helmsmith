@@ -53,7 +53,7 @@ jobs:
         # Pin to the project's packageManager field via corepack — keeps
         # the runner using the exact pnpm version listed in package.json
         # rather than whatever is bundled with setup-node.
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node
         uses: actions/setup-node@v6
