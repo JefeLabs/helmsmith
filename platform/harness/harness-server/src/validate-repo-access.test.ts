@@ -147,31 +147,43 @@ describe('validateRepoAccess — failure path', () => {
 });
 
 describe('validateRepoAccess — parallel vs sequential', () => {
-  it('parallel mode finishes faster than sequential for multiple repos', {
-    timeout: 15_000,
-  }, async () => {
-    // Two local bares — each ls-remote takes ~50-200ms. Parallel run
-    // should finish in close to the time of one; sequential takes
-    // close to the sum.
-    const bareA = await localRemote();
-    const bareB = await localRemote();
-    const repos = [
-      { name: 'a', cloneUrl: bareA },
-      { name: 'b', cloneUrl: bareB },
-    ];
+  // A checker that reports the peak number of checks in flight at once.
+  // `active++` runs synchronously at the top of each call before the first
+  // await, so under `Promise.all` (parallel) all N increment before any
+  // decrements → peak N; under an awaited loop (sequential) each call fully
+  // completes before the next starts → peak 1. This observes the actual
+  // dispatch behaviour deterministically, unlike the old wall-clock ratio,
+  // which was flaky AND couldn't catch a parallel-runs-sequentially
+  // regression (equal times trivially satisfy `parallel <= sequential*1.5`).
+  function makeConcurrencyProbe() {
+    let active = 0;
+    let peak = 0;
+    const check = async (repo: { name: string; cloneUrl: string }) => {
+      active++;
+      peak = Math.max(peak, active);
+      await new Promise((r) => setTimeout(r, 10)); // yield so parallel calls overlap
+      active--;
+      return { repo, ok: true, head: 'a'.repeat(40), durationMs: 0 };
+    };
+    return { check, peak: () => peak };
+  }
 
-    const tParStart = Date.now();
-    await validateRepoAccess({ repos, parallel: true });
-    const parallelMs = Date.now() - tParStart;
+  const repos = [
+    { name: 'a', cloneUrl: 'a-url' },
+    { name: 'b', cloneUrl: 'b-url' },
+    { name: 'c', cloneUrl: 'c-url' },
+  ];
 
-    const tSeqStart = Date.now();
-    await validateRepoAccess({ repos, parallel: false });
-    const sequentialMs = Date.now() - tSeqStart;
+  it('parallel mode dispatches all checks concurrently', async () => {
+    const probe = makeConcurrencyProbe();
+    await validateRepoAccess({ repos, parallel: true, _checkRepo: probe.check });
+    expect(probe.peak()).toBe(repos.length); // all in flight at once
+  });
 
-    // Parallel should be at least somewhat faster. Don't assert a
-    // tight ratio (CI variance) — just that it isn't catastrophically
-    // worse.
-    expect(parallelMs).toBeLessThanOrEqual(sequentialMs * 1.5);
+  it('sequential mode never has more than one check in flight', async () => {
+    const probe = makeConcurrencyProbe();
+    await validateRepoAccess({ repos, parallel: false, _checkRepo: probe.check });
+    expect(probe.peak()).toBe(1);
   });
 });
 

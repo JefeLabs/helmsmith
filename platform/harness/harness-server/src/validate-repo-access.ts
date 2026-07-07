@@ -62,6 +62,12 @@ export interface ValidateRepoAccessOptions {
    *  get killed at this point; the result has ok=false + a timeout
    *  reason. */
   timeoutMs?: number;
+  /**
+   * @internal Test seam — overrides the per-repo checker so a suite can
+   * observe dispatch concurrency deterministically (parallel vs sequential)
+   * without racing wall clocks. Never set in production.
+   */
+  _checkRepo?: (repo: SpawnRepoSpec) => Promise<RepoAccessCheck>;
 }
 
 export interface ValidateRepoAccessResult {
@@ -82,7 +88,7 @@ export async function validateRepoAccess(
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const parallel = options.parallel ?? true;
 
-  const checkOne = (repo: SpawnRepoSpec) => checkRepo(repo, env, timeoutMs);
+  const checkOne = options._checkRepo ?? ((repo: SpawnRepoSpec) => checkRepo(repo, env, timeoutMs));
 
   let all: RepoAccessCheck[];
   if (parallel) {
