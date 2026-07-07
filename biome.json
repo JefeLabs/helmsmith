@@ -13,8 +13,8 @@
       "!.plans",
       "!.screenshots",
       "!pnpm-lock.yaml",
-      "!skillzkit/skillzkit/catalog.json",
-      "!skillzkit/skillzkit/schema/catalog.schema.json"
+      "!platform/skillzkit/skillzkit/catalog.json",
+      "!platform/skillzkit/skillzkit/schema/catalog.schema.json"
     ]
   },
   "vcs": {
@@ -62,7 +62,7 @@
   },
   "overrides": [
     {
-      "includes": ["harness/workspace-cli/src/yml.ts"],
+      "includes": ["platform/harness/workspace-cli/src/yml.ts"],
       "linter": {
         "rules": {
           "suspicious": {

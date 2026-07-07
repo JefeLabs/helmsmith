@@ -19,8 +19,8 @@ no rewrite via a pluggable storage layer.
 
 ## Stack
 
-Bun · TypeScript · discord.js v14 · [`@helmsmith/cli-kit`](../../packages/cli-kit-lib)
-(commands) · [`@helmsmith/tui-view-components`](../../packages/tui-view-components-lib)
+Bun · TypeScript · discord.js v14 · [`@helmsmith/cli-kit`](../../platform/core/cli-kit-lib)
+(commands) · [`@helmsmith/tui-view-components`](../../platform/core/tui-view-components-lib)
 (TUI) · storage = SQLite (`bun:sqlite`) **or** DynamoDB, chosen by config.
 
 ## Develop

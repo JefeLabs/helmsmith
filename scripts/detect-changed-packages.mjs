@@ -22,6 +22,11 @@
  *       emit .changeset/weekly-<date>.md with a patch bump for each changed
  *       package not already covered by a pending human-written changeset
  *   --since "<git date>"                                     override window
+ *
+ * Commits whose message contains `[skip release]` are ignored entirely —
+ * the escape hatch for repo-wide mechanical churn (folder restructures,
+ * formatting sweeps) that would otherwise mark every package "changed"
+ * and trigger a pointless publish wave the following Sunday.
  */
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -39,10 +44,14 @@ const SINCE = opt('--since', '7 days ago');
 
 const git = (...a) => execFileSync('git', a, { cwd: ROOT, encoding: 'utf8' }).trim();
 
+// Commit-limiting flags shared by every history query: honour the
+// `[skip release]` marker (see header). --invert-grep drops matching commits.
+const SKIP_MARKER = ['--grep=\\[skip release\\]', '--invert-grep'];
+
 /**
  * Which changed files count toward "this package needs a release"?
  * Return false for churn that shouldn't trigger a publish on its own.
- * `file` is repo-relative, e.g. "core/cli-kit-lib/src/index.ts".
+ * `file` is repo-relative, e.g. "platform/core/cli-kit-lib/src/index.ts".
  *
  * TODO(edwin): this is release policy — tune it. Candidates to exclude:
  *   - docs-only churn:      file.endsWith('.md')
@@ -88,13 +97,23 @@ for (const pkg of packages.filter((p) => !p.private)) {
   }
 
   // All files touched in the window under this package's directory.
-  const files = git('log', `--since=${SINCE}`, '--name-only', '--format=', '--', dir)
+  const files = git(
+    'log',
+    `--since=${SINCE}`,
+    ...SKIP_MARKER,
+    '--name-only',
+    '--format=',
+    '--',
+    dir,
+  )
     .split('\n')
     .filter(Boolean);
   const releaseWorthy = [...new Set(files)].filter(isReleaseWorthy);
 
   if (releaseWorthy.length > 0) {
-    const commits = Number(git('rev-list', '--count', `--since=${SINCE}`, 'HEAD', '--', dir));
+    const commits = Number(
+      git('rev-list', '--count', `--since=${SINCE}`, ...SKIP_MARKER, 'HEAD', '--', dir),
+    );
     changed.push({ name: pkg.name, dir, version: pkg.version, commits, files: releaseWorthy });
   } else {
     unchanged.push(pkg.name);

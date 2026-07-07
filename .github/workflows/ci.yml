@@ -4,8 +4,7 @@
 # Two parallel jobs split by toolchain:
 #
 #   - js: pnpm + Vitest + Biome + TypeScript
-#         Covers every workspace package — core/, harness/, context/,
-#         memory/, skillzkit/, web/ and apps/ — via recursive pnpm
+#         Covers every workspace package — platform/ and apps/ — via recursive pnpm
 #         commands (which resolve packages from the workspace, so newly
 #         merged toolbox apps are covered automatically).
 #   - controlplane: Maven + JDK 21
@@ -93,7 +92,7 @@ jobs:
 
       - name: Harness skills in sync
         # workspace-template/.harness/skills/{context,context-briefs}.md are
-        # GENERATED from context/edge-context-cli/skills/ via `pnpm sync:skills`.
+        # GENERATED from platform/context/edge-context-cli/skills/ via `pnpm sync:skills`.
         # Regenerate here and fail if the committed copies drifted from source.
         run: |
           pnpm sync:skills
@@ -122,7 +121,7 @@ jobs:
     timeout-minutes: 25
     defaults:
       run:
-        working-directory: controlplane
+        working-directory: platform/controlplane/service
 
     steps:
       - name: Checkout
@@ -133,7 +132,7 @@ jobs:
       - name: Setup JDK 21
         # Temurin is the Adoptium OpenJDK distribution — same one most
         # production deployments target. Pinning to 21 matches the
-        # <java.version> in controlplane/pom.xml.
+        # <java.version> in platform/controlplane/service/pom.xml.
         uses: actions/setup-java@v4
         with:
           distribution: temurin
