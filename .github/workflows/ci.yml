@@ -132,8 +132,8 @@ jobs:
       - name: Setup JDK 21
         # Temurin is the Adoptium OpenJDK distribution — same one most
         # production deployments target. Pinning to 21 matches the
-        # <java.version> in platform/controlplane/service/pom.xml.
-        uses: actions/setup-java@v4
+        # <java.version> in controlplane/pom.xml.
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
