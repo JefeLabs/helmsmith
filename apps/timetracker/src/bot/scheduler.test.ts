@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { type DailyActivity, emptyDay } from '../domain/types.js';
 import { dueEndOfDay, dueReports, type EndOfDayConfig, type ScheduleConfig } from './scheduler.js';
 
-const CFG: ScheduleConfig = { timezone: 'UTC', weekStartsOn: 'monday', dailyAt: '09:00' };
+const CFG: ScheduleConfig = {
+  timezone: 'UTC',
+  weekStartsOn: 'monday',
+  dailyAt: '09:00',
+  figmaSummary: false,
+};
 // 2026-06-08 is a Monday (week start). 2026-06-10 is a Wednesday. 2026-06-13 is a Saturday.
 
 describe('dueReports', () => {
@@ -45,6 +50,33 @@ describe('dueReports', () => {
     const ny: ScheduleConfig = { ...CFG, timezone: 'America/New_York' };
     expect(dueReports(instant, ny, {}).daily).toBeUndefined(); // 08:00 NY < 09:00
     expect(dueReports(instant, CFG, {}).daily).toBe('2026-06-09'); // 12:00 UTC ≥ 09:00
+  });
+
+  describe('figma summary', () => {
+    const FIG: ScheduleConfig = { ...CFG, figmaSummary: true };
+
+    it('posts yesterday once, at/after dailyAt, when enabled', () => {
+      const r = dueReports(new Date('2026-06-10T09:00:00Z'), FIG, {});
+      expect(r.figma).toBe('2026-06-09');
+      expect(r.state.lastFigmaRunDay).toBe('2026-06-10');
+    });
+
+    it('is absent before the daily time and when disabled', () => {
+      expect(dueReports(new Date('2026-06-10T08:59:00Z'), FIG, {}).figma).toBeUndefined();
+      expect(dueReports(new Date('2026-06-10T09:00:00Z'), CFG, {}).figma).toBeUndefined();
+    });
+
+    it('does not repost the same day, and tracks its own last-run', () => {
+      const r = dueReports(new Date('2026-06-10T12:00:00Z'), FIG, { lastFigmaRunDay: '2026-06-10' });
+      expect(r.figma).toBeUndefined();
+    });
+
+    it('is independent of the daily last-run (a figma-only failure recovers)', () => {
+      // daily already went out today, but figma hasn't → figma still fires.
+      const r = dueReports(new Date('2026-06-10T10:00:00Z'), FIG, { lastDailyRunDay: '2026-06-10' });
+      expect(r.daily).toBeUndefined();
+      expect(r.figma).toBe('2026-06-09');
+    });
   });
 });
 
