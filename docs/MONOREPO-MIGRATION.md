@@ -207,3 +207,58 @@ Both CI jobs are **verified green** on their CI runtimes (js on Node 22, control
 on JDK 21) — confirmed against the actual GitHub Actions run via the `ecruz165`
 account, not assumed (see the CI section above). See git log `5f3a85a..HEAD` for the
 full trail.
+
+## Follow-up restructure (2026-07-07): everything platform under `platform/` — PR #6
+
+The domain groups from the merge (`core/ harness/ context/ memory/ skillzkit/ web/`)
+plus the Java `controlplane/` were nested under a single `platform/` directory, so the
+top level reads as architecture: **apps/ (products) vs platform/ (infrastructure) vs
+scaffolding**. The layout table above and in the root README describes the result:
+
+- `core|context|memory|skillzkit|harness/` → `platform/<same>/`
+- `web/controlplane-ui` → `platform/controlplane/ui`
+- `controlplane/` → `platform/controlplane/service`
+
+`ui` and `service` are co-located deliberately: one Docker image bundles both (the
+controlplane Dockerfile builds the vite dist into Spring's static resources).
+Workspace globs collapsed to a single `platform/*/*` (service has no `package.json`,
+so pnpm skips it). All 1,026 file moves are git renames — `git log --follow` and
+blame still cross the boundary.
+
+**Mechanical touchpoints rewired:** pnpm-workspace globs, root `package.json` bun
+scripts, biome paths, 17 package tsconfig `extends` (one `../` deeper),
+`sync-skills.mjs` source path (+ regenerated outputs), ci.yml maven
+`working-directory`, compose build contexts (`..` → `../../..`), workspace-cli
+`copy-template`, harness tsx-runtime resolution (root `node_modules/.bin/tsx` is one
+level further).
+
+**Rename debt from the original merge, found and paid down:** all three controlplane
+Dockerfiles still `COPY`'d from the pre-merge `packages/*` layout (broken since the
+merge — nobody had built the images from this repo); `skillzkit-types`' schema
+scripts targeted the defunct `apps/skillzkit`; five `repository.directory` fields
+still said `packages/*`. The recurring lesson from HELM-era path bugs holds:
+**every restructure must grep for the *previous* layout's paths, not just the
+current one.**
+
+**Release-wave guard:** the weekly npm publisher (`scripts/detect-changed-packages.mjs`,
+landed in the same PR) counts any commit touching a package dir as "changed" — a
+bulk rename would have patch-published every package the following Sunday. The
+detector now skips commits whose message contains `[skip release]`; the restructure
+commit carries it. Repo-wide mechanical churn (restructures, format sweeps) must use
+this marker.
+
+**Verification (baseline-driven):** full test suite compared against a worktree at
+the parent commit — post-move failure set identical to baseline; three genuine
+move-breakages fixed (tsx path depth, `better-sqlite3` rebuilt after a Node-26
+mis-rebuild, `copy-template`). Build green, typecheck 0, biome at its pre-existing
+count, release detector enumerates all 27 projects correctly. Docker image builds
+were **not** run (they were already broken pre-PR; paths are now at least correct) —
+first compose build after merge is the real test.
+
+**Bonus root-cause find:** root `pnpm test` was a bare `vitest run` with no root
+config, silently ignoring every package's vitest config (gitradar's `bun:sqlite`
+stub alias, bun-only exclusions, serial forks; etc.) — 13 files "failed locally"
+while CI was green, because CI runs `pnpm -r --if-present test`. The root script now
+matches CI, and the full recursive suite is green locally (exit 0, all 21 package
+suites). Same lesson as the CI section above, mirrored: *local red ≠ actually red* —
+verify with CI's exact command before believing a failure list.
