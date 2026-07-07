@@ -47,7 +47,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup pnpm
         # Pin to the project's packageManager field via corepack — keeps
@@ -127,7 +127,7 @@ jobs:
       - name: Checkout
         # Run-script working-directory above doesn't apply to actions;
         # checkout still drops everything into $GITHUB_WORKSPACE root.
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup JDK 21
         # Temurin is the Adoptium OpenJDK distribution — same one most
