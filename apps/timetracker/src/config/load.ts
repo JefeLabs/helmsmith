@@ -43,6 +43,12 @@ export function loadDotEnv(cwd = process.cwd()): void {
       (value.startsWith("'") && value.endsWith("'"))
     ) {
       value = value.slice(1, -1); // quoted: keep contents verbatim
+    } else if (value.startsWith('#')) {
+      // Comment-only value — an empty key left with its `.env.example`
+      // annotation, e.g. `FIGMA_WEBHOOK_URL=          # public HTTPS route`.
+      // Leading whitespace was already trimmed, so a value starting with `#`
+      // has no real content; treat it as unset (blank() then ignores it).
+      value = '';
     } else {
       // Unquoted: strip an inline ` #…` comment (e.g. `TIMEZONE=America/New_York # tz`).
       const comment = value.search(/\s#/);

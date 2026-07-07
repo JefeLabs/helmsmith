@@ -78,6 +78,19 @@ describe('loadConfig', () => {
     delete process.env[key];
   });
 
+  it('loadDotEnv treats a comment-only value as unset (copied .env.example line)', () => {
+    // `.env.example` uses `KEY=          # annotation` for keys left empty.
+    // After trimming, the value starts with `#` and must resolve to empty —
+    // not the annotation text (which would fail url/snowflake validation).
+    const dir = tmp();
+    const key = 'TT_TEST_EMPTY';
+    delete process.env[key];
+    writeFileSync(join(dir, '.env'), `${key}=          # public HTTPS route; set → auto-register\n`);
+    loadDotEnv(dir);
+    expect(process.env[key]).toBe('');
+    delete process.env[key];
+  });
+
   it('loadDotEnv keeps a # that is inside a quoted value', () => {
     const dir = tmp();
     const key = 'TT_TEST_Q';
