@@ -139,20 +139,27 @@ export function renderWeekly(s: WeeklySummary, _tz: string): string {
  * is a hard display rule: burst time carries the `~`/`est.` marker; sentinel
  * in-file time is measured and shown plain.
  */
-export function renderFigmaDaily(f: FigmaDailySummary, tz: string): string {
+export function renderFigmaDaily(
+  f: FigmaDailySummary,
+  tz: string,
+  opts: { includePresenceNow?: boolean } = {},
+): string {
   if (!f.available) return `Figma activity — ${f.date}\n(figma tracking not available on this storage backend)`;
 
   const out: string[] = [`Figma activity — ${f.date} (${tz})`];
 
   // Presence now (measured) — ⚠ STALE when the sentinel heartbeat lapsed.
-  const staleFlag = f.stale ? '  ⚠ STALE (sentinel heartbeat lapsed)' : '';
-  out.push(`\nPresence now${staleFlag}`);
-  if (f.presenceNow.length === 0) {
-    out.push(f.heartbeatAt ? '  (nobody in monitored files)' : '  (no sentinel reporting)');
-  } else {
-    for (const p of f.presenceNow) {
-      const users = p.users.map((u) => `${u.handle} (${formatDuration(u.minutes)})`).join(', ');
-      out.push(`  ● ${p.fileName}: ${users}`);
+  // "now" is a live concept: a scheduled recap of a past day omits it.
+  if (opts.includePresenceNow ?? true) {
+    const staleFlag = f.stale ? '  ⚠ STALE (sentinel heartbeat lapsed)' : '';
+    out.push(`\nPresence now${staleFlag}`);
+    if (f.presenceNow.length === 0) {
+      out.push(f.heartbeatAt ? '  (nobody in monitored files)' : '  (no sentinel reporting)');
+    } else {
+      for (const p of f.presenceNow) {
+        const users = p.users.map((u) => `${u.handle} (${formatDuration(u.minutes)})`).join(', ');
+        out.push(`  ● ${p.fileName}: ${users}`);
+      }
     }
   }
 

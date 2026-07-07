@@ -205,7 +205,10 @@ export function loadConfig(cwd = process.cwd(), env: NodeJS.ProcessEnv = process
     weekStartsOn: blank(env.WEEK_STARTS_ON) ?? file.weekStartsOn,
     schedule: {
       ...(file.schedule as object),
-      ...defined({ dailyAt: blank(env.SCHEDULE_DAILY_AT) }),
+      ...defined({
+        dailyAt: blank(env.SCHEDULE_DAILY_AT),
+        figmaSummary: parseBool(env.SCHEDULE_FIGMA_SUMMARY),
+      }),
       endOfDay: {
         ...((file.schedule as { endOfDay?: object })?.endOfDay ?? {}),
         ...defined({

@@ -7,8 +7,9 @@
 import { type Client, Events } from 'discord.js';
 import { addDays, dayKeyFor, type WeekStart, weekdayOf, weekWindow } from '../domain/dayKey.js';
 import type { DailyActivity, ISODate, UserId } from '../domain/types.js';
-import { dailyMessage, weeklyMessage } from '../reports/discord.js';
+import { dailyMessage, figmaMessages, weeklyMessage } from '../reports/discord.js';
 import type { ReportService } from '../reports/ReportService.js';
+import { supportsFigma } from '../storage/FigmaStorage.js';
 import type { StorageAdapter } from '../storage/StorageAdapter.js';
 import type { BotDeps } from './handlers.js';
 
@@ -18,6 +19,8 @@ export interface ScheduleConfig {
   timezone: string;
   weekStartsOn: WeekStart;
   dailyAt: string; // 'HH:MM' local
+  /** Post a daily Figma activity summary alongside the daily report. */
+  figmaSummary: boolean;
 }
 
 /** Config for the current-day end-of-day publish (distinct from `dailyAt`). */
@@ -34,11 +37,13 @@ export interface ScheduleState {
   lastDailyRunDay?: ISODate; // local day we last posted the daily report
   lastWeeklyRunWeek?: ISODate; // week-start day we last posted the weekly report
   lastEodPublishDay?: ISODate; // local day we last posted the end-of-day report
+  lastFigmaRunDay?: ISODate; // local day we last posted the figma summary
 }
 
 export interface DueResult {
   daily?: ISODate; // day-key to report (the previous day)
   weekly?: ISODate; // anchor day in the previous week
+  figma?: ISODate; // day-key for the figma summary (the previous day)
   state: ScheduleState;
 }
 
@@ -70,6 +75,13 @@ export function dueReports(now: Date, cfg: ScheduleConfig, state: ScheduleState)
   if (week.from === localDay && state.lastWeeklyRunWeek !== week.from) {
     result.weekly = addDays(localDay, -1); // yesterday sits in the previous week
     result.state.lastWeeklyRunWeek = week.from;
+  }
+
+  // Figma summary rides the same "at/after dailyAt, once per day" gate but
+  // tracks its own last-run, so a figma-post failure never blocks the daily.
+  if (cfg.figmaSummary && state.lastFigmaRunDay !== localDay) {
+    result.figma = addDays(localDay, -1); // yesterday's figma activity
+    result.state.lastFigmaRunDay = localDay;
   }
   return result;
 }
@@ -123,6 +135,12 @@ export function attachScheduler(client: Client, deps: BotDeps, reports: ReportSe
     timezone: deps.config.timezone,
     weekStartsOn: deps.config.weekStartsOn,
     dailyAt: deps.config.schedule.dailyAt,
+    // Only when figma is actually configured — otherwise the summary would be
+    // an empty/"not available" post. `supportsFigma` guards the backend too.
+    figmaSummary:
+      deps.config.schedule.figmaSummary &&
+      Boolean(deps.config.figma) &&
+      supportsFigma(deps.storage),
   };
   const eodCfg: EndOfDayConfig = {
     ...deps.config.schedule.endOfDay,
@@ -144,7 +162,7 @@ export function attachScheduler(client: Client, deps: BotDeps, reports: ReportSe
           due.state,
         )
       : { state: due.state };
-    if (!due.daily && !due.weekly && !eod.publish) return;
+    if (!due.daily && !due.weekly && !eod.publish && !due.figma) return;
 
     const channel = await client.channels.fetch(deps.config.reportChannelId).catch(() => null);
     if (!channel?.isTextBased() || !('send' in channel)) {
@@ -154,10 +172,19 @@ export function attachScheduler(client: Client, deps: BotDeps, reports: ReportSe
     if (due.daily) await channel.send(await dailyMessage(reports, due.daily, cfg.timezone));
     if (due.weekly) await channel.send(await weeklyMessage(reports, due.weekly, cfg.timezone));
     if (eod.publish) await channel.send(await dailyMessage(reports, eod.publish, cfg.timezone));
+    if (due.figma) {
+      // A past-day recap: omit live "presence now". Chunked, so events survive.
+      for (const msg of await figmaMessages(reports, due.figma, cfg.timezone, {
+        includePresenceNow: false,
+      })) {
+        await channel.send(msg);
+      }
+    }
     // Persist AFTER a successful post so a crash mid-post retries next minute.
+    // eod.state already carries due.state's fields (incl. lastFigmaRunDay).
     await deps.storage.setMeta(META_KEY, JSON.stringify(eod.state));
     console.log(
-      `  ✓ posted scheduled summary (daily=${due.daily ?? '–'} weekly=${due.weekly ?? '–'} eod=${eod.publish ?? '–'})`,
+      `  ✓ posted scheduled summary (daily=${due.daily ?? '–'} weekly=${due.weekly ?? '–'} eod=${eod.publish ?? '–'} figma=${due.figma ?? '–'})`,
     );
   };
 
@@ -168,7 +195,8 @@ export function attachScheduler(client: Client, deps: BotDeps, reports: ReportSe
     const eodNote = eodCfg.enabled
       ? ` · end-of-day ${eodCfg.mode === 'fixed' ? `at ${eodCfg.at}` : `on completion (deadline ${eodCfg.deadlineAt})`}`
       : '';
-    console.log(`  ✓ scheduled summaries at ${cfg.dailyAt} ${cfg.timezone}${eodNote}`);
+    const figmaNote = cfg.figmaSummary ? ' · figma summary' : '';
+    console.log(`  ✓ scheduled summaries at ${cfg.dailyAt} ${cfg.timezone}${eodNote}${figmaNote}`);
   });
 
   return () => {

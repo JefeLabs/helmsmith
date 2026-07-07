@@ -63,6 +63,9 @@ export const ScheduleSchema = z
     // on the week-start day it also posts the previous week.
     dailyAt: hhmm('dailyAt').default('09:00'),
     endOfDay: EndOfDaySchema,
+    // Also post a daily Figma activity summary at `dailyAt` (previous day).
+    // Only fires when the figma block is configured; a no-op otherwise.
+    figmaSummary: z.boolean().default(true),
   })
   .default({});
 
