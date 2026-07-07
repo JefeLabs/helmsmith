@@ -10,6 +10,8 @@
  * either can restart without touching the other; both share the SQLite file.
  */
 import { input, select } from '@inquirer/prompts';
+import { Events } from 'discord.js';
+import { createClient } from '../bot/client.js';
 import { ConfigError, loadConfig } from '../config/load.js';
 import type { Config } from '../config/schema.js';
 import { todayKey } from '../domain/dayKey.js';
@@ -17,6 +19,8 @@ import { FigmaApi } from '../figma/api.js';
 import { FIGMA_META } from '../figma/context.js';
 import { startFigmaTracker } from '../figma/tracker.js';
 import { log } from '../logger.js';
+import { reportServiceFor } from '../reports/ReportService.js';
+import { renderFigmaDaily } from '../reports/render.js';
 import { type FigmaStorage, supportsFigma } from '../storage/FigmaStorage.js';
 import { createStorage } from '../storage/factory.js';
 import type { StorageAdapter } from '../storage/StorageAdapter.js';
@@ -160,6 +164,82 @@ export async function runFigmaMapMembers(cwd = process.cwd()): Promise<void> {
   } finally {
     await storage.close();
   }
+}
+
+export interface FigmaReportOptions {
+  date?: string;
+  json?: boolean;
+  post?: boolean;
+}
+
+/**
+ * `figma report` — the Figma activity feed (presence now, per-member activity,
+ * file heat, recent events) as text, `--json`, or posted to the Discord report
+ * channel. Unlike `timetracker report`, this surfaces Figma users even when
+ * they aren't yet mapped to a Discord identity.
+ */
+export async function runFigmaReport(opts: FigmaReportOptions, cwd = process.cwd()): Promise<void> {
+  const opened = await open(cwd);
+  if (!opened) return;
+  const { config, storage } = opened;
+  try {
+    const reports = reportServiceFor(storage, config);
+    const date = opts.date ?? todayKey(config.timezone);
+    const summary = await reports.figmaDaily(date);
+    if (opts.json) {
+      console.log(JSON.stringify(summary, null, 2));
+      return;
+    }
+    const text = renderFigmaDaily(summary, config.timezone);
+    if (opts.post) {
+      await postFigmaReport(config, text);
+      return;
+    }
+    console.log(text);
+  } finally {
+    await storage.close();
+  }
+}
+
+/** Post the figma report to the Discord report channel, chunked to Discord's
+ *  2000-char message limit and fenced so the table columns stay aligned. */
+async function postFigmaReport(config: Config, text: string): Promise<void> {
+  const client = createClient();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      client.once(Events.ClientReady, (ready) => {
+        ready.channels
+          .fetch(config.reportChannelId)
+          .then(async (channel) => {
+            if (!channel?.isTextBased() || !('send' in channel)) {
+              throw new Error('report channel is not a sendable text channel');
+            }
+            for (const chunk of fenceChunks(text)) await channel.send(chunk);
+            const name = ('name' in channel && channel.name) || config.reportChannelId;
+            console.log(`✓ posted figma report to #${name}`);
+          })
+          .then(resolve, reject);
+      });
+      client.login(config.token).catch(reject);
+    });
+  } finally {
+    await client.destroy();
+  }
+}
+
+/** Split text into ```-fenced messages under Discord's 2000-char cap. */
+function fenceChunks(text: string, limit = 1900): string[] {
+  const chunks: string[] = [];
+  let buf = '';
+  for (const line of text.split('\n')) {
+    if (buf.length + line.length + 1 > limit) {
+      chunks.push('```\n' + buf + '\n```');
+      buf = '';
+    }
+    buf += (buf ? '\n' : '') + line;
+  }
+  if (buf) chunks.push('```\n' + buf + '\n```');
+  return chunks;
 }
 
 export async function runFigmaStatus(cwd = process.cwd()): Promise<void> {

@@ -11,6 +11,7 @@ import { createCli, noopAuthProvider } from '@helmsmith/cli-kit';
 import { runBackfill } from './commands/backfill.js';
 import {
   runFigmaMapMembers,
+  runFigmaReport,
   runFigmaStart,
   runFigmaStatus,
   runFigmaSyncFiles,
@@ -83,6 +84,13 @@ figma
   .command('map-members')
   .description('Pair Figma users with Discord users (one-time manual mapping)')
   .action(() => runFigmaMapMembers());
+figma
+  .command('report')
+  .description('Print/post a Figma activity report (presence, per-member activity, file heat, events)')
+  .option('-d, --date <iso>', 'anchor date (YYYY-MM-DD); defaults to today')
+  .option('--json', 'machine-readable JSON output')
+  .option('--post', 'post the report to the Discord report channel instead of printing')
+  .action((opts) => runFigmaReport(opts));
 figma
   .command('status')
   .description('Tracker heartbeats, event counts, and unmapped members')

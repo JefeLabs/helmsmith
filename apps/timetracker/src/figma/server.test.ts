@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import type { AddressInfo } from 'node:net';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FigmaSchema } from '../config/schema.js';
 import { SqliteAdapter } from '../storage/sqlite/SqliteAdapter.js';
 import { FIGMA_META, type FigmaDeps } from './context.js';
-import type { FilePresenceTracker } from './presence.js';
-import { handlePresence, handleWebhook } from './server.js';
+import { FilePresenceTracker } from './presence.js';
+import { createFigmaServer, handlePresence, handleWebhook } from './server.js';
 
 const TZ = 'America/New_York';
 
@@ -130,5 +131,55 @@ describe('handlePresence', () => {
   it('rejects a malformed body', async () => {
     const r = await handlePresence(deps, trackers, { passcode: 'pass' });
     expect(r.status).toBe(400);
+  });
+});
+
+describe('createFigmaServer — CORS (Figma plugin runs in a sandboxed iframe)', () => {
+  let storage: SqliteAdapter;
+  let server: ReturnType<typeof createFigmaServer>;
+  let base: string;
+
+  beforeEach(async () => {
+    storage = new SqliteAdapter({ backend: 'sqlite', path: ':memory:' });
+    await storage.init();
+    server = createFigmaServer(makeDeps(storage), new Map<string, FilePresenceTracker>());
+    await new Promise<void>((r) => server.listen(0, () => r()));
+    base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  });
+  afterEach(async () => {
+    await new Promise<void>((r) => server.close(() => r()));
+    await storage.close();
+  });
+
+  it('answers the preflight OPTIONS so the plugin POST is not blocked', async () => {
+    const res = await fetch(`${base}/presence`, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'null',
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'content-type',
+      },
+    });
+    expect(res.status).toBe(204);
+    expect(res.headers.get('access-control-allow-origin')).toBe('*');
+    expect(res.headers.get('access-control-allow-methods')).toContain('POST');
+    expect(res.headers.get('access-control-allow-headers')).toMatch(/content-type/i);
+  });
+
+  it('sends the CORS header on the actual presence POST', async () => {
+    const res = await fetch(`${base}/presence`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: 'null' },
+      body: JSON.stringify({
+        passcode: 'pass',
+        file_key: 'F',
+        file_name: 'x',
+        ts: '2026-07-07T14:00:00.000Z',
+        users: [{ id: 'u1', name: 'ana' }],
+      }),
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('access-control-allow-origin')).toBe('*');
+    expect(await res.json()).toMatchObject({ ok: true, open: 1 });
   });
 });
