@@ -25,6 +25,7 @@
     "changeset:version": "changeset version",
     "changeset:publish": "changeset publish",
     "release": "pnpm -r run build && changeset publish",
+    "release:plan": "node scripts/detect-changed-packages.mjs",
     "catalog": "pnpm --filter @helmsmith/skillzkit run catalog",
     "harness": "bun harness/harness-cli/src/index.ts",
     "harness:run": "bun harness/harness-cli/src/in-process-run.tsx",
