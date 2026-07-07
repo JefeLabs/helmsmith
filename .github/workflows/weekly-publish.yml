@@ -1,0 +1,167 @@
+# Weekly Publish — every Sunday evening, detect WHICH public workspace
+# packages changed in the last 7 days and release only those to npm.
+#
+# Per-package change detection lives in scripts/detect-changed-packages.mjs
+# (runnable locally as `pnpm release:plan`): a package qualifies when a
+# commit in the window touched its directory, and is refused ("blocked")
+# when it has private workspace runtime deps — publishing those would put
+# uninstallable tarballs on npm.
+#
+# Two jobs:
+#
+#   gate    → runs the detector, exposes `changed` + `packages` outputs.
+#             Keeping the decision in its own job means the publish job
+#             carries a single `if:` and a skipped week shows up clearly
+#             in the Actions UI as "publish (skipped)".
+#   publish → re-runs the detector to write a patch changeset for exactly
+#             the changed packages (human-written changesets win) →
+#             changeset version → build → changeset publish → push the
+#             version-bump commit and release tags back to main.
+#
+# GitHub scheduling caveats (all schedule-specific, none apply to CI):
+#   - Cron is UTC. 23:00 UTC Sunday = 7 PM EDT / 6 PM EST — "Sunday
+#     evening" US-Eastern year-round without DST gymnastics.
+#   - Scheduled workflows only run from the default branch (main).
+#   - Runs can start several minutes late under load; the schedule is
+#     best-effort, not exact.
+#   - GitHub auto-disables schedules after ~60 days without repo
+#     activity; a push re-enables it.
+#
+# Required repo secret:
+#   NPM_TOKEN — npm granular access token with read/write on the
+#   @helmsmith org packages and "bypass 2FA" (automation) enabled.
+#   Settings → Secrets and variables → Actions → New repository secret.
+
+name: Weekly Publish
+
+on:
+  schedule:
+    - cron: "0 23 * * 0" # Sunday 23:00 UTC = Sunday evening US-Eastern
+  # Manual off-cycle release from the Actions tab. The gate still runs,
+  # so a manual trigger with nothing to release is a visible no-op.
+  workflow_dispatch:
+
+concurrency:
+  # Never run two publishes at once, and never cancel one mid-publish —
+  # a cancelled `changeset publish` can leave npm and git tags disagreeing.
+  group: weekly-publish
+  cancel-in-progress: false
+
+jobs:
+  # ── Gate — which packages changed in the last 7 days? ─────────────────
+  gate:
+    name: gate — which packages changed this week?
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
+      packages: ${{ steps.check.outputs.packages }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history — the detector inspects the last 7 days of
+          # commits, not just HEAD.
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        # The detector shells out to `pnpm -r list` to enumerate workspace
+        # packages — that resolves from pnpm-workspace.yaml alone, so no
+        # `pnpm install` is needed here. Keeps the gate under a minute.
+        # Third-party action: SHA-pinned (supply chain) — bump via Dependabot.
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Detect changed packages
+        id: check
+        run: node scripts/detect-changed-packages.mjs --github-output
+
+  # ── Publish — version, build, publish, push ───────────────────────────
+  publish:
+    name: publish — changeset version + build + publish
+    needs: gate
+    if: needs.gate.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write # push the version-bump commit and release tags
+      id-token: write # lets npm attach provenance to published packages
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history so the final `git push` isn't a shallow push and
+          # changeset's changelog generation can see prior releases.
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        # Pins to the packageManager field via corepack — same as ci.yml.
+        # Third-party action: SHA-pinned (supply chain) — bump via Dependabot.
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          # Writes an .npmrc wired to NODE_AUTH_TOKEN — this is what lets
+          # `changeset publish` authenticate as the org automation token.
+          registry-url: https://registry.npmjs.org
+
+      - name: Setup Bun
+        # Some workspace build scripts compile via bun (same reason CI
+        # installs it); `pnpm -r run build` needs it on PATH.
+        # Third-party action: SHA-pinned (supply chain) — bump via Dependabot.
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Write changeset for this week's changed packages
+        # Re-runs the detector (cheap, and avoids passing file content
+        # between jobs) and emits .changeset/weekly-<date>.md with a patch
+        # bump for each changed package. Packages already covered by a
+        # pending human-written changeset are skipped — a hand-authored
+        # minor/major bump always wins over the automated patch.
+        run: node scripts/detect-changed-packages.mjs --write-changeset
+
+      - name: Version packages from pending changesets
+        # Consumes .changeset/*.md, bumps package versions, writes
+        # changelogs. Committed here but pushed only AFTER a successful
+        # publish — if publish fails, nothing lands on main and next
+        # Sunday's run starts clean.
+        run: |
+          if find .changeset -name '*.md' ! -name 'README.md' | grep -q .; then
+            pnpm changeset version
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "chore(release): version packages [skip ci]"
+          else
+            echo "No pending changesets — nothing new to version."
+          fi
+
+      - name: Build
+        run: pnpm -r run build
+
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        # Publishes every package whose version isn't on the registry yet
+        # and creates a git tag per published package. Private packages
+        # are skipped automatically.
+        run: pnpm changeset publish
+
+      - name: Push version bump + tags
+        # Rebase first in case main moved during the run — the bump
+        # commit is bot-generated version/changelog churn, so replaying
+        # it on top of new commits is safe.
+        run: |
+          git pull --rebase origin main
+          git push --follow-tags origin main
