@@ -1,0 +1,11 @@
+# Keeps GitHub Actions fresh while preserving commit-SHA pinning: Dependabot
+# opens PRs that bump the pinned SHA and update the trailing `# vX.Y.Z`
+# comment (see .github/workflows/*.yml). Scoped to actions only — workspace
+# npm deps are managed manually via pnpm.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
