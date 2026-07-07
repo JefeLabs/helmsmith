@@ -10,9 +10,29 @@ import { Table } from '@helmsmith/tui-view-components/organisms';
 import { useEffect, useState } from 'react';
 import type { ReportService } from '../reports/ReportService.js';
 import { formatDuration, formatTime } from '../reports/render.js';
-import type { DailySummary, UserDayRow, UserWeekRow, WeeklySummary } from '../reports/types.js';
+import type {
+  DailySummary,
+  FigmaDailySummary,
+  UserDayRow,
+  UserWeekRow,
+  WeeklySummary,
+} from '../reports/types.js';
 import { weekGrid } from '../reports/weekGrid.js';
-import { dailyColumns, type Period, pageDate, sparkline, weeklyColumns } from './model.js';
+import {
+  dailyColumns,
+  figmaCorrelationLine,
+  figmaEventLine,
+  figmaFileLine,
+  figmaMemberLine,
+  figmaPresenceLine,
+  type Period,
+  pageDate,
+  sparkline,
+  weeklyColumns,
+} from './model.js';
+
+/** Presence-now/live-log refresh cadence while the Figma panel is visible. */
+const FIGMA_REFRESH_MS = 30_000;
 
 export interface SummaryViewProps {
   reports: ReportService;
@@ -22,7 +42,8 @@ export interface SummaryViewProps {
   onQuit: () => void;
 }
 
-const HELP = '[d] daily  [w] weekly  [←/→] page  [↑/↓] move  [enter] detail  [q] quit';
+const HELP =
+  '[d] daily  [w] weekly  [f] figma  [←/→] page  [↑/↓] move  [enter] detail  [q] quit';
 
 export function SummaryView({
   reports,
@@ -34,6 +55,8 @@ export function SummaryView({
   const [period, setPeriod] = useState<Period>(initialPeriod);
   const [date, setDate] = useState(initialDate);
   const [summary, setSummary] = useState<DailySummary | WeeklySummary | null>(null);
+  const [showFigma, setShowFigma] = useState(false);
+  const [figma, setFigma] = useState<FigmaDailySummary | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -47,20 +70,50 @@ export function SummaryView({
     };
   }, [period, date, reports]);
 
-  useKeybinding('d', 'daily', () => setPeriod('daily'));
-  useKeybinding('w', 'weekly', () => setPeriod('weekly'));
+  // The Figma panel refreshes on a timer while visible: presence-now and the
+  // live log change without keyboard input (the tracker writes continuously).
+  useEffect(() => {
+    if (!showFigma) return;
+    let live = true;
+    const load = () =>
+      reports.figmaDaily(date).then((f) => {
+        if (live) setFigma(f);
+      });
+    setFigma(null);
+    void load();
+    const timer = setInterval(() => void load(), FIGMA_REFRESH_MS);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [showFigma, date, reports]);
+
+  useKeybinding('d', 'daily', () => {
+    setShowFigma(false);
+    setPeriod('daily');
+  });
+  useKeybinding('w', 'weekly', () => {
+    setShowFigma(false);
+    setPeriod('weekly');
+  });
+  useKeybinding('f', 'figma', () => setShowFigma((v) => !v));
   useKeybinding('left', 'prev', () => setDate((d) => pageDate(d, -1, period)));
   useKeybinding('right', 'next', () => setDate((d) => pageDate(d, 1, period)));
   useKeybinding('q', 'quit', () => onQuit());
 
-  const title =
-    summary?.period === 'weekly' ? `Weekly  ${summary.from} → ${summary.to}` : `Daily  ${date}`;
+  const title = showFigma
+    ? `Figma  ${date}`
+    : summary?.period === 'weekly'
+      ? `Weekly  ${summary.from} → ${summary.to}`
+      : `Daily  ${date}`;
 
   return (
     <Box style={{ flexDirection: 'column', padding: 1, gap: 1 }}>
       <Heading>{`⏱  Time Tracker — ${title}`}</Heading>
       <Text variant="muted">{HELP}</Text>
-      {summary === null ? (
+      {showFigma ? (
+        <FigmaPanel figma={figma} tz={timezone} />
+      ) : summary === null ? (
         <Text variant="muted">Loading…</Text>
       ) : summary.users.length === 0 ? (
         <Text variant="muted">No activity recorded for this period.</Text>
@@ -87,6 +140,63 @@ export function SummaryView({
   );
 }
 
+/**
+ * The Figma panel (PRD §5): Presence Now (measured, ⚠ STALE when the sentinel
+ * heartbeat lapses) · per-member daily activity · file heat · live event log.
+ */
+function FigmaPanel({ figma, tz }: { figma: FigmaDailySummary | null; tz: string }) {
+  if (figma === null) return <Text variant="muted">Loading…</Text>;
+  if (!figma.available) {
+    return (
+      <Text variant="muted">
+        Figma tracking is not available on this storage backend (sqlite only).
+      </Text>
+    );
+  }
+  const empty =
+    figma.events.length === 0 && figma.members.length === 0 && figma.presenceNow.length === 0;
+  return (
+    <Box style={{ flexDirection: 'column', gap: 1 }}>
+      <Box style={{ flexDirection: 'column' }}>
+        <Heading>{`Presence now${figma.stale ? '  ⚠ STALE (sentinel heartbeat lapsed)' : ''}`}</Heading>
+        {figma.presenceNow.length === 0 ? (
+          <Text variant="muted">
+            {figma.heartbeatAt ? 'Nobody in monitored files.' : 'No sentinel reporting.'}
+          </Text>
+        ) : (
+          figma.presenceNow.map((p) => <Text key={p.fileKey}>{figmaPresenceLine(p)}</Text>)
+        )}
+      </Box>
+      {empty ? (
+        <Text variant="muted">No Figma activity recorded for this day.</Text>
+      ) : (
+        <>
+          <Box style={{ flexDirection: 'column' }}>
+            <Heading>Member activity (bursts are estimates)</Heading>
+            {figma.members.map((m) => (
+              <Text key={m.figmaUserId}>{figmaMemberLine(m)}</Text>
+            ))}
+          </Box>
+          <Box style={{ flexDirection: 'column' }}>
+            <Heading>File heat</Heading>
+            {figma.fileHeat.map((f) => (
+              <Text key={f.fileKey}>{figmaFileLine(f, tz)}</Text>
+            ))}
+          </Box>
+          <Box style={{ flexDirection: 'column' }}>
+            <Heading>Live log</Heading>
+            {figma.events.slice(0, 15).map((e, i) => (
+              <Text key={`${e.at}-${i}`} variant="muted">
+                {figmaEventLine(e, tz)}
+              </Text>
+            ))}
+          </Box>
+        </>
+      )}
+    </Box>
+  );
+}
+
 function DayDetail({ row, tz }: { row: UserDayRow; tz: string }) {
   return (
     <Box style={{ flexDirection: 'column', padding: 1, gap: 1 }}>
@@ -97,6 +207,7 @@ function DayDetail({ row, tz }: { row: UserDayRow; tz: string }) {
       <Text>{`Msgs:    ${row.engagementMessages}`}</Text>
       <Text>{`Start:   ${formatTime(row.startedAt, tz)}`}</Text>
       <Text>{`End:     ${formatTime(row.endedAt, tz)}`}</Text>
+      {row.figma && <Text>{`Figma:   ${figmaCorrelationLine(row.figma)}`}</Text>}
     </Box>
   );
 }

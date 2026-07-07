@@ -10,7 +10,7 @@ import { ConfigError, loadConfig } from '../config/load.js';
 import type { Config } from '../config/schema.js';
 import { todayKey } from '../domain/dayKey.js';
 import { dailyMessage, weeklyMessage } from '../reports/discord.js';
-import { ReportService } from '../reports/ReportService.js';
+import { type ReportService, reportServiceFor } from '../reports/ReportService.js';
 import { renderDaily, renderWeekly } from '../reports/render.js';
 import { createStorage } from '../storage/factory.js';
 
@@ -73,7 +73,7 @@ export async function runReport(opts: ReportOptions, cwd = process.cwd()): Promi
   const date = opts.date ?? todayKey(config.timezone);
   const storage = await createStorage(config.storage);
   try {
-    const reports = new ReportService(storage, config.weekStartsOn, config.trackedUserIds);
+    const reports = reportServiceFor(storage, config);
     if (opts.post) {
       await postToReportChannel(config, reports, period, date);
       return;

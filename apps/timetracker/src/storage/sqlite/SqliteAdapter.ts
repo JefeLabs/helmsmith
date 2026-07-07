@@ -15,12 +15,21 @@ import {
   type StartOfDay,
   type UserId,
 } from '../../domain/types.js';
+import type {
+  FigmaEvent,
+  FigmaEventSource,
+  FigmaEventType,
+  FigmaFile,
+  FigmaMember,
+  FigmaPresenceInterval,
+} from '../../figma/types.js';
+import type { FigmaStorage } from '../FigmaStorage.js';
 import type { PresenceState, StorageAdapter } from '../StorageAdapter.js';
 import { openSqlite, type SqliteDb } from './driver.js';
 
 const nowIso = () => new Date().toISOString();
 
-export class SqliteAdapter implements StorageAdapter {
+export class SqliteAdapter implements StorageAdapter, FigmaStorage {
   private db!: SqliteDb;
   private txDepth = 0;
 
@@ -57,6 +66,12 @@ export class SqliteAdapter implements StorageAdapter {
       mkdirSync(dirname(this.opts.path), { recursive: true });
     }
     this.db = await openSqlite(this.opts.path);
+    // Two processes write this file (the Discord bot and the Figma tracker).
+    // WAL lets a reader/writer pair coexist; busy_timeout makes the rare
+    // writer/writer collision wait instead of throwing SQLITE_BUSY. No-op for
+    // :memory: databases.
+    this.db.exec('PRAGMA journal_mode=WAL');
+    this.db.exec('PRAGMA busy_timeout=5000');
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS daily_activity (
         user_id          TEXT NOT NULL,
@@ -94,6 +109,42 @@ export class SqliteAdapter implements StorageAdapter {
         message_id TEXT PRIMARY KEY,
         at         TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS figma_members (
+        figma_user_id TEXT PRIMARY KEY,
+        handle        TEXT NOT NULL,
+        updated_at    TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS figma_files (
+        file_key   TEXT PRIMARY KEY,
+        name       TEXT,
+        project    TEXT,
+        tracked    INTEGER NOT NULL DEFAULT 1,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS figma_events (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_type    TEXT NOT NULL,
+        file_key      TEXT NOT NULL,
+        figma_user_id TEXT,
+        external_id   TEXT NOT NULL,
+        at            TEXT NOT NULL,
+        date          TEXT NOT NULL,
+        source        TEXT NOT NULL,
+        payload       TEXT,
+        UNIQUE(event_type, file_key, external_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_figma_events_date ON figma_events(date);
+      CREATE TABLE IF NOT EXISTS figma_presence (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        figma_user_id TEXT NOT NULL,
+        file_key      TEXT NOT NULL,
+        date          TEXT NOT NULL,
+        start_at      TEXT NOT NULL,
+        end_at        TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_figma_presence_date ON figma_presence(date);
+      CREATE INDEX IF NOT EXISTS idx_figma_presence_open
+        ON figma_presence(figma_user_id, file_key) WHERE end_at IS NULL;
     `);
     // Migration: add presence_idle to DBs created before idle tracking. The
     // CREATE above covers fresh DBs; this ALTER covers existing ones (and is a
@@ -310,6 +361,152 @@ export class SqliteAdapter implements StorageAdapter {
       .run(key, value, value);
   }
 
+  // ── FigmaStorage ───────────────────────────────────────────────────────
+
+  async upsertFigmaMember(figmaUserId: string, handle: string): Promise<void> {
+    const now = nowIso();
+    this.db
+      .prepare(
+        `INSERT INTO figma_members (figma_user_id, handle, updated_at) VALUES (?, ?, ?)
+         ON CONFLICT(figma_user_id) DO UPDATE SET handle = ?, updated_at = ?`,
+      )
+      .run(figmaUserId, handle, now, handle, now);
+  }
+
+  async listFigmaMembers(): Promise<FigmaMember[]> {
+    // Discord mapping lives in identity_map (provider 'figma') — same
+    // mechanism as GitHub CI attribution, managed by `figma map-members`.
+    return this.db
+      .prepare(
+        `SELECT m.figma_user_id, m.handle, i.user_id
+           FROM figma_members m
+           LEFT JOIN identity_map i ON i.provider = 'figma' AND i.external_id = m.figma_user_id
+          ORDER BY m.handle`,
+      )
+      .all()
+      .map((r) => ({
+        figmaUserId: r.figma_user_id as string,
+        handle: r.handle as string,
+        discordUserId: (r.user_id as string) ?? null,
+      }));
+  }
+
+  async upsertFigmaFile(file: { fileKey: string; name?: string; project?: string }): Promise<void> {
+    const now = nowIso();
+    // COALESCE(excluded.…, existing) so a webhook event (key + name only)
+    // never wipes a project set by sync-files, and vice versa.
+    this.db
+      .prepare(
+        `INSERT INTO figma_files (file_key, name, project, updated_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(file_key) DO UPDATE SET
+           name = COALESCE(excluded.name, figma_files.name),
+           project = COALESCE(excluded.project, figma_files.project),
+           updated_at = excluded.updated_at`,
+      )
+      .run(file.fileKey, file.name ?? null, file.project ?? null, now);
+  }
+
+  async setFigmaFileTracked(fileKey: string, tracked: boolean): Promise<void> {
+    this.db
+      .prepare('UPDATE figma_files SET tracked = ?, updated_at = ? WHERE file_key = ?')
+      .run(tracked ? 1 : 0, nowIso(), fileKey);
+  }
+
+  async listFigmaFiles(opts?: { trackedOnly?: boolean }): Promise<FigmaFile[]> {
+    const rows = opts?.trackedOnly
+      ? this.db.prepare('SELECT * FROM figma_files WHERE tracked = 1 ORDER BY file_key').all()
+      : this.db.prepare('SELECT * FROM figma_files ORDER BY file_key').all();
+    return rows.map((r) => ({
+      fileKey: r.file_key as string,
+      name: (r.name as string) ?? undefined,
+      project: (r.project as string) ?? undefined,
+      tracked: Number(r.tracked) === 1,
+    }));
+  }
+
+  async insertFigmaEvent(e: FigmaEvent): Promise<boolean> {
+    // INSERT OR IGNORE + the UNIQUE(event_type, file_key, external_id) key is
+    // the whole webhook/poll dedupe story: same version from both paths → one row.
+    const before = this.db
+      .prepare('SELECT 1 FROM figma_events WHERE event_type = ? AND file_key = ? AND external_id = ?')
+      .get(e.eventType, e.fileKey, e.externalId);
+    if (before) return false;
+    this.db
+      .prepare(
+        `INSERT OR IGNORE INTO figma_events
+           (event_type, file_key, figma_user_id, external_id, at, date, source, payload)
+         VALUES (?,?,?,?,?,?,?,?)`,
+      )
+      .run(
+        e.eventType,
+        e.fileKey,
+        e.figmaUserId,
+        e.externalId,
+        e.at,
+        e.date,
+        e.source,
+        e.payload ?? null,
+      );
+    return true;
+  }
+
+  async listFigmaEventsRange(from: ISODate, to: ISODate): Promise<FigmaEvent[]> {
+    return this.db
+      .prepare('SELECT * FROM figma_events WHERE date >= ? AND date <= ? ORDER BY at, id')
+      .all(from, to)
+      .map(rowToFigmaEvent);
+  }
+
+  async openFigmaPresence(
+    figmaUserId: string,
+    fileKey: string,
+    date: ISODate,
+    startAt: string,
+  ): Promise<void> {
+    const open = this.db
+      .prepare(
+        'SELECT 1 FROM figma_presence WHERE figma_user_id = ? AND file_key = ? AND end_at IS NULL',
+      )
+      .get(figmaUserId, fileKey);
+    if (open) return; // already in the file — keep the original start
+    this.db
+      .prepare(
+        'INSERT INTO figma_presence (figma_user_id, file_key, date, start_at) VALUES (?,?,?,?)',
+      )
+      .run(figmaUserId, fileKey, date, startAt);
+  }
+
+  async closeFigmaPresence(figmaUserId: string, fileKey: string, endAt: string): Promise<void> {
+    this.db
+      .prepare(
+        `UPDATE figma_presence SET end_at = ?
+          WHERE figma_user_id = ? AND file_key = ? AND end_at IS NULL`,
+      )
+      .run(endAt, figmaUserId, fileKey);
+  }
+
+  async closeAllFigmaPresence(endAt: string): Promise<number> {
+    const open = this.db
+      .prepare('SELECT COUNT(*) AS n FROM figma_presence WHERE end_at IS NULL')
+      .get();
+    this.db.prepare('UPDATE figma_presence SET end_at = ? WHERE end_at IS NULL').run(endAt);
+    return Number(open?.n ?? 0);
+  }
+
+  async listOpenFigmaPresence(): Promise<FigmaPresenceInterval[]> {
+    return this.db
+      .prepare('SELECT * FROM figma_presence WHERE end_at IS NULL ORDER BY start_at, id')
+      .all()
+      .map(rowToPresence);
+  }
+
+  async listFigmaPresenceRange(from: ISODate, to: ISODate): Promise<FigmaPresenceInterval[]> {
+    return this.db
+      .prepare('SELECT * FROM figma_presence WHERE date >= ? AND date <= ? ORDER BY start_at, id')
+      .all(from, to)
+      .map(rowToPresence);
+  }
+
   async markProcessed(messageId: string): Promise<boolean> {
     // Single-process bun:sqlite is synchronous, so select-then-insert is safe.
     if (this.db.prepare('SELECT 1 FROM processed_messages WHERE message_id = ?').get(messageId)) {
@@ -320,6 +517,30 @@ export class SqliteAdapter implements StorageAdapter {
       .run(messageId, nowIso());
     return true;
   }
+}
+
+function rowToFigmaEvent(r: Record<string, unknown>): FigmaEvent {
+  return {
+    eventType: r.event_type as FigmaEventType,
+    fileKey: r.file_key as string,
+    figmaUserId: (r.figma_user_id as string) ?? null,
+    externalId: r.external_id as string,
+    at: r.at as string,
+    date: r.date as string,
+    source: r.source as FigmaEventSource,
+    payload: (r.payload as string) ?? undefined,
+  };
+}
+
+function rowToPresence(r: Record<string, unknown>): FigmaPresenceInterval {
+  return {
+    id: Number(r.id),
+    figmaUserId: r.figma_user_id as string,
+    fileKey: r.file_key as string,
+    date: r.date as string,
+    startAt: r.start_at as string,
+    endAt: (r.end_at as string) ?? null,
+  };
 }
 
 /** Map a flat DB row back into the nested DailyActivity shape. */

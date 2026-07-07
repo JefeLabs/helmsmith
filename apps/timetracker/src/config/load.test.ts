@@ -113,6 +113,76 @@ describe('loadConfig', () => {
     expect(() => loadConfig(tmp(), validEnv({ STORAGE_BACKEND: 'dynamodb' }))).toThrow(ConfigError);
   });
 
+  it('omits the figma block entirely when no figma signal exists', () => {
+    const cfg = loadConfig(tmp(), validEnv());
+    expect(cfg.figma).toBeUndefined();
+  });
+
+  it('parses a full figma env block with defaults', () => {
+    const cfg = loadConfig(
+      tmp(),
+      validEnv({ FIGMA_TOKEN: 'figd_x', FIGMA_TEAM_ID: '12345', FIGMA_FILE_KEYS: 'aaa, bbb' }),
+    );
+    expect(cfg.figma).toMatchObject({
+      token: 'figd_x',
+      teamId: '12345',
+      fileKeys: ['aaa', 'bbb'],
+      pollIntervalMin: 10,
+      burstGapMin: 30,
+      burstPadMin: 15,
+      webhook: { enabled: false, port: 3846 },
+      presence: { enabled: false, pollSec: 45, staleAfterSec: 180 },
+    });
+  });
+
+  it('requires FIGMA_TOKEN once any figma signal is present', () => {
+    expect(() => loadConfig(tmp(), validEnv({ FIGMA_TEAM_ID: '12345' }))).toThrow(ConfigError);
+  });
+
+  it('requires the webhook passcode when the webhook receiver is enabled', () => {
+    const base = { FIGMA_TOKEN: 'figd_x', FIGMA_TEAM_ID: '12345' };
+    expect(() =>
+      loadConfig(tmp(), validEnv({ ...base, FIGMA_WEBHOOK_ENABLED: 'true' })),
+    ).toThrow(/FIGMA_WEBHOOK_SECRET/);
+    const cfg = loadConfig(
+      tmp(),
+      validEnv({ ...base, FIGMA_WEBHOOK_ENABLED: 'true', FIGMA_WEBHOOK_SECRET: 'pass' }),
+    );
+    expect(cfg.figma?.webhook).toMatchObject({ enabled: true, passcode: 'pass' });
+  });
+
+  it('requires the sentinel user id when presence is enabled', () => {
+    const base = { FIGMA_TOKEN: 'figd_x', FIGMA_TEAM_ID: '12345' };
+    expect(() =>
+      loadConfig(tmp(), validEnv({ ...base, FIGMA_PRESENCE_ENABLED: 'true' })),
+    ).toThrow(/FIGMA_SENTINEL_USER_ID/);
+    const cfg = loadConfig(
+      tmp(),
+      validEnv({ ...base, FIGMA_PRESENCE_ENABLED: 'true', FIGMA_SENTINEL_USER_ID: 'u9' }),
+    );
+    expect(cfg.figma?.presence).toMatchObject({ enabled: true, sentinelUserId: 'u9' });
+  });
+
+  it('ignores figma secrets in the config file (env-only)', () => {
+    const cwd = tmp();
+    writeFileSync(
+      join(cwd, 'timetracker.config.json'),
+      JSON.stringify({
+        guildId: SF,
+        channels: { goals: SF, summary: SF, ci: SF },
+        adminRoleId: SF,
+        reportChannelId: SF,
+        figma: { token: 'leaked-in-file', teamId: '777', burstGapMin: 20 },
+      }),
+    );
+    // Non-secret figma fields come from the file; the token must NOT.
+    expect(() => loadConfig(cwd, { DISCORD_TOKEN: 'tok' })).toThrow(/FIGMA_TOKEN/);
+    const cfg = loadConfig(cwd, { DISCORD_TOKEN: 'tok', FIGMA_TOKEN: 'figd_env' });
+    expect(cfg.figma?.token).toBe('figd_env');
+    expect(cfg.figma?.teamId).toBe('777');
+    expect(cfg.figma?.burstGapMin).toBe(20);
+  });
+
   it('lets env override values from the config file', () => {
     const cwd = tmp();
     writeFileSync(

@@ -82,6 +82,14 @@ function parseBool(raw: string | undefined): boolean | undefined {
   return undefined;
 }
 
+/** Parse an integer env var; non-numeric values are treated as absent. */
+function parseNum(raw: string | undefined): number | undefined {
+  const v = blank(raw);
+  if (v === undefined) return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
+}
+
 /** Drop keys whose value is `undefined` so env-overlay only sets real values. */
 function defined<T extends Record<string, unknown>>(obj: T): Partial<T> {
   return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as Partial<T>;
@@ -116,6 +124,51 @@ function resolveStorage(env: NodeJS.ProcessEnv, fileStorage: unknown): unknown {
     path: blank(env.SQLITE_PATH),
     ...(fileStorage as object),
   });
+}
+
+/**
+ * Build the optional figma block. The feature is enabled by ANY figma signal
+ * (FIGMA_TOKEN / FIGMA_TEAM_ID in env, or a `figma` block in the file); with no
+ * signal it resolves to `undefined` and the schema's `.optional()` disables the
+ * feature. Secrets (token, webhook passcode) are env-only — a hand-edited file
+ * copy is deliberately ignored so it can't silently become the source of truth.
+ */
+function resolveFigma(env: NodeJS.ProcessEnv, fileFigma: unknown): unknown {
+  const file = (fileFigma ?? {}) as Record<string, unknown>;
+  const configured = fileFigma !== undefined || blank(env.FIGMA_TOKEN) || blank(env.FIGMA_TEAM_ID);
+  if (!configured) return undefined;
+  const fileWebhook = (file.webhook ?? {}) as Record<string, unknown>;
+  const filePresence = (file.presence ?? {}) as Record<string, unknown>;
+  return {
+    ...file,
+    ...defined({
+      teamId: blank(env.FIGMA_TEAM_ID),
+      fileKeys: parseIdList(env.FIGMA_FILE_KEYS),
+      pollIntervalMin: parseNum(env.FIGMA_POLL_INTERVAL_MIN),
+      backfillIntervalMin: parseNum(env.FIGMA_BACKFILL_INTERVAL_MIN),
+      burstGapMin: parseNum(env.FIGMA_BURST_GAP_MIN),
+      burstPadMin: parseNum(env.FIGMA_BURST_PAD_MIN),
+    }),
+    token: blank(env.FIGMA_TOKEN), // env-only; never read from the file
+    webhook: {
+      ...fileWebhook,
+      ...defined({
+        enabled: parseBool(env.FIGMA_WEBHOOK_ENABLED),
+        port: parseNum(env.FIGMA_WEBHOOK_PORT),
+        publicUrl: blank(env.FIGMA_WEBHOOK_URL),
+      }),
+      passcode: blank(env.FIGMA_WEBHOOK_SECRET), // env-only
+    },
+    presence: {
+      ...filePresence,
+      ...defined({
+        enabled: parseBool(env.FIGMA_PRESENCE_ENABLED),
+        pollSec: parseNum(env.FIGMA_PRESENCE_POLL_SEC),
+        sentinelUserId: blank(env.FIGMA_SENTINEL_USER_ID),
+        staleAfterSec: parseNum(env.FIGMA_PRESENCE_STALE_SEC),
+      }),
+    },
+  };
 }
 
 /**
@@ -160,6 +213,7 @@ export function loadConfig(cwd = process.cwd(), env: NodeJS.ProcessEnv = process
     },
     capture: file.capture,
     storage: resolveStorage(env, file.storage),
+    figma: resolveFigma(env, file.figma),
   };
 
   const result = ConfigSchema.safeParse(merged);

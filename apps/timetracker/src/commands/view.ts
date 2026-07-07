@@ -4,7 +4,7 @@
  */
 import { ConfigError, loadConfig } from '../config/load.js';
 import { todayKey } from '../domain/dayKey.js';
-import { ReportService } from '../reports/ReportService.js';
+import { reportServiceFor } from '../reports/ReportService.js';
 import { createStorage } from '../storage/factory.js';
 
 export interface ViewOptions {
@@ -31,7 +31,7 @@ export async function runView(opts: ViewOptions, cwd = process.cwd()): Promise<v
 
   const storage = await createStorage(config.storage);
   try {
-    const reports = new ReportService(storage, config.weekStartsOn, config.trackedUserIds);
+    const reports = reportServiceFor(storage, config);
     await runViewer({
       reports,
       timezone: config.timezone,
