@@ -1,4 +1,5 @@
 {
+  "_note": "Copy to ~/.agentx/auth.json on the HOST machine (decision #5: auth is per-user, host-only — never fill this in inside a workspace, never commit a real copy).",
   "version": 1,
   "providers": {
     "anthropic": {

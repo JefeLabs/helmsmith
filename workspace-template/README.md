@@ -37,7 +37,7 @@ workspace-template/
 | `<workspace>/.harness/run/<service>.sock` | edge servers + harness-cli | `→ ~/.harness/run/<service>.sock` in containers |
 | `<workspace>/.harness/wt/<jobId>/<subagentId>/<repoName>/` | worker worktrees | per-job override config injects mount |
 | `<workspace>/.harness/captures/` | capture sink | `→ ~/.harness/captures/` in harness-server |
-| `~/.agentx/auth.json` | agent-auth-lib FileBroker | host-only (per-user, never in workspace) |
+| `~/.agentx/auth.json` | agent-auth-lib FileBroker | host-only (per-user, never in workspace) — starter: [`auth.json.example`](./auth.json.example) |
 
 ## Why this lives in the monorepo
 

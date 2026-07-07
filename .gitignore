@@ -55,19 +55,20 @@ catalog.json
 .env.local
 .env.*.local
 
-# Per-user host-side files (auth.json lives at ~/.agentx/auth.json, never in repo)
-/host/auth.json
+# Per-user host-side files (auth.json lives at ~/.agentx/auth.json, never in
+# repo — guard against filling in the template's example in place)
+/workspace-template/auth.json
 
 # Repo-root workspace runtime state — purely test/dev artifacts produced when
 # running examples from the repo root. Default-deny: nothing under /.harness/.
 /.harness/
 
 # Spring Boot Modulith control plane (Java/Maven sub-project)
-/controlplane/target/
-/controlplane/.mvn/wrapper/maven-wrapper.jar
-/controlplane/HELP.md
-/controlplane/.idea/
-/controlplane/*.iml
+/platform/controlplane/service/target/
+/platform/controlplane/service/.mvn/wrapper/maven-wrapper.jar
+/platform/controlplane/service/HELP.md
+/platform/controlplane/service/.idea/
+/platform/controlplane/service/*.iml
 
 # Workspace-template runtime state (gitkeep'd structure preserved; runtime files ignored)
 /workspace-template/.harness/run/*
@@ -81,3 +82,18 @@ catalog.json
 
 /.playwright-mcp
 .claude/
+
+# Local working notes — tickets, plans, design scratch, agent context. Kept
+# out of the repo (any level): per-machine context, not deliverables.
+.issues/
+.plans/
+.superpowers/
+.design/
+
+# Integration-proof / dev-driver scripts — local-only by decision (some
+# reference client-specific targets). Root scripts (dev:servers, verify, …)
+# still point here and work where the files exist locally.
+/examples/
+
+# Product design sources (.pen/.png Pencil files) — local-only by decision.
+/product/
