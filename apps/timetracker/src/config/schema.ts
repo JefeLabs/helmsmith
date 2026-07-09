@@ -79,6 +79,19 @@ export const CaptureSchema = z
   .default({});
 
 /**
+ * Automatic catch-up on `start`: replay tracked-channel history through the
+ * router once the gateway is ready, recovering message-driven signals missed
+ * while the bot was down. Replay is idempotent (processed-message dedup), so
+ * overlapping the live session is safe. `maxDays` bounds history paging.
+ */
+export const StartupBackfillSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    maxDays: z.number().int().min(1).max(30).default(7),
+  })
+  .default({});
+
+/**
  * Figma webhook receiver. Requires a Professional+ team plan and a public
  * HTTPS route to `port` (reverse proxy / tunnel). When disabled, ingestion is
  * polling-only (any paid plan) — same schema, same dedupe, slower latency.
@@ -191,6 +204,7 @@ export const ConfigSchema = z.object({
   weekStartsOn: z.enum(['monday', 'sunday']).default('monday'),
   schedule: ScheduleSchema,
   capture: CaptureSchema,
+  startupBackfill: StartupBackfillSchema,
   storage: StorageSchema,
   /** Optional Figma activity tracking — absent → feature disabled. */
   figma: FigmaSchema.optional(),

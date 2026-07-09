@@ -36,9 +36,10 @@ CLI verbs:
 | Verb | Does |
 |------|------|
 | `setup` | interactive first-run config (token, guild, channels, storage) |
-| `start` | run the bot (gateway listener + 5-min poller + scheduler) |
+| `start` | run the bot (gateway listener + 5-min poller + scheduler + catch-up backfill) |
 | `view` | daily/weekly summary **TUI** (`f` toggles the Figma panel) |
 | `report` | non-interactive summary (`--period weekly`, `--json`) |
+| `backfill` | replay channel history to recover message-driven activity (`--since`, `--days`, `--dry-run`) |
 | `link` | map a GitHub username → Discord user (CI attribution) |
 | `figma start` | run the Figma tracker (separate process: webhook receiver + poller + presence) |
 | `figma sync-files` | seed tracked files from the Figma team's projects |
@@ -61,6 +62,12 @@ The bot must run **continuously** to track (it samples presence/voice every 5
 min and reacts to messages live). Run it on an always-on host for real use; a
 laptop only tracks while awake. Scheduled summaries post to the report channel
 at `SCHEDULE_DAILY_AT` and survive restarts (last-run state is persisted).
+
+Downtime is partially self-healing: on `start` the bot replays tracked-channel
+history it missed (start/end of day, CI, engagement — `BACKFILL_ON_START`,
+capped at `BACKFILL_MAX_DAYS`). Presence/voice minutes only exist as live
+5-minute samples and are gone for good; `timetracker backfill` does the same
+replay manually for arbitrary windows.
 
 ## Figma tracking (optional)
 

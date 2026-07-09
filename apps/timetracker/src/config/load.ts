@@ -221,6 +221,13 @@ export function loadConfig(cwd = process.cwd(), env: NodeJS.ProcessEnv = process
       },
     },
     capture: file.capture,
+    startupBackfill: {
+      ...((file.startupBackfill as object) ?? {}),
+      ...defined({
+        enabled: parseBool(env.BACKFILL_ON_START),
+        maxDays: parseNum(env.BACKFILL_MAX_DAYS),
+      }),
+    },
     storage: resolveStorage(env, file.storage),
     figma: resolveFigma(env, file.figma),
   };

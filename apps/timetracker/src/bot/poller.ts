@@ -5,7 +5,7 @@
  * without a live gateway.
  */
 import { type Client, Events, type Guild } from 'discord.js';
-import { POLL_INTERVAL_MS } from '../domain/constants.js';
+import { LAST_SEEN_META_KEY, POLL_INTERVAL_MS } from '../domain/constants.js';
 import { dayKeyFor } from '../domain/dayKey.js';
 import type { PresenceState } from '../storage/StorageAdapter.js';
 import type { BotDeps } from './handlers.js';
@@ -94,6 +94,9 @@ export function attachPoller(
     const guild = client.guilds.cache.get(deps.config.guildId);
     if (!guild) return;
     await applyPoll(collectSnapshots(guild, deps), deps, new Date());
+    // Heartbeat — "the bot was listening until here". The next `start` reads
+    // it to size the catch-up backfill window.
+    await deps.storage.setMeta(LAST_SEEN_META_KEY, new Date().toISOString());
   };
 
   client.once(Events.ClientReady, async () => {
