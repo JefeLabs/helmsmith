@@ -45,7 +45,7 @@ outlive invocations, making `agent-node` the first adapter type with
 | Deployment targets | In-process, Docker, remote machine — same client contract |
 | Profile storage | Broker profile registry (API + store); `ProfileStore` interface lets v1 run broker-less with a local file store |
 | Persona vs voice | Separate profile fields: persona = role/behavior, voice = communication style |
-| Adapter placement | Adapter type + capability row + protocol schemas in `agent-adapter-lib`; daemons in new packages |
+| Adapter placement | Adapter + protocol ship in the agent-node packages; `agent-adapter-lib` is **not touched** (prerequisite: provider-externalization refactor — see companion spec `2026-07-26-adapter-provider-externalization-design.md`) |
 | Transport | HTTP for control; newline-delimited JSONL over HTTP for chunk streaming (matches harness-server's pipeline-jsonl-stream precedent) |
 | Session workspace | Per-session git worktree allocated by the engine (worktree pattern per harness-workspace.yml) |
 
@@ -53,17 +53,18 @@ outlive invocations, making `agent-node` the first adapter type with
 
 | Piece | Location | Role |
 |---|---|---|
-| `'agent-node'` adapter, spec variant, capability row, protocol schemas (zod) | `platform/core/agent-adapter-lib` — `src/adapters/agent-node/` | Client. Implements `invoke()`/`stream()` over the `AgentNodeClient` interface. |
+| `'agent-node'` adapter, spec variant, capability descriptor, protocol schemas (zod) | `platform/harness/agent-node-server` — subpath entries `/adapter` and `/protocol` | Client. Implements `invoke()`/`stream()` over the `AgentNodeClient` interface. Hosts importing `/adapter` load no engine/daemon code. |
 | `AgentNodeEngine` | new pkg `platform/harness/agent-node-server` | Tmux session lifecycle, per-tool drivers, session-file tailers, workspace materializer. Importable in-process; no network required. |
 | Node daemon (`main.ts`) | same package | Wraps the engine with the HTTP API plus self-registration/heartbeat client. |
 | Broker | new pkg `platform/harness/agent-node-broker` | Fleet registry, launchers, remote enrollment endpoint, command routing, response relay, profile registry. |
 
-Dependency arrows all point at the lib: `agent-node-server` and
-`agent-node-broker` import `@helmsmith/agent-adapter` for protocol types
-(same direction harness-server already depends on it). The protocol contract
-lives beside the adapter because `AgentSpecType` is a closed union — the
-adapter cannot incubate outside the lib without casts, so the lib is touched
-regardless; only implementations live outside it.
+Dependency arrows all point at the lib **core**: `agent-node-server` and
+`agent-node-broker` import `@helmsmith/agent-adapter` for the `AgentAdapter`
+contract, chunk/stream types, and error taxonomy. After the
+provider-externalization refactor (companion spec), `AgentSpecRegistry` is
+open via declaration merging, so the agent-node package registers its
+`'agent-node'` type and augments the spec union **from outside** —
+agent-adapter-lib is not modified by this project.
 
 ## 4. Core interfaces
 
@@ -72,12 +73,13 @@ regardless; only implementations live outside it.
 One interface for talking to a node, two implementations:
 
 - `LocalNodeClient` — direct calls into an in-process `AgentNodeEngine`.
-  Lives in `agent-node-server` (it wraps the engine) and is **injected into
-  the adapter via the spec** (`spec.client`) by the caller — this is what
-  keeps the dependency arrows pointing at the lib in v1.
+  Lives with the engine (root entry of `agent-node-server`) and is
+  **injected into the adapter via the spec** (`spec.client`) by the caller —
+  this keeps the `/adapter` subpath free of engine code, so network-only
+  hosts never load tmux machinery.
 - `HttpNodeClient` — HTTP/JSONL to a broker or node daemon (Docker or
-  remote). Lives in the lib beside the adapter (it depends only on the
-  protocol schemas); selected when the spec carries `brokerUrl`/`nodeUrl`.
+  remote). Lives in the `/adapter` entry (depends only on `/protocol`);
+  selected when the spec carries `brokerUrl`/`nodeUrl`.
 
 The adapter and the broker both consume this interface. Deployment target is
 invisible above it.
@@ -208,9 +210,10 @@ env: { }                                             # tool env, MCP config, per
   a one-shot import when the broker lands.
 - The adapter spec references a profile (`profile: 'reviewer'` or
   `'reviewer@<hash>'`); tool and model are properties of the profile, not the
-  spec. `AgentNodeSpec` is therefore the first variant that does **not**
-  extend `BaseSpec` — it has no `model` field (shape:
-  `{ type: 'agent-node', profile, sessionId?, client? | brokerUrl? | nodeUrl? }`). Note this inverts the lib's usual flow: existing adapters push
+  spec. `AgentNodeSpec` has no `model` field (shape:
+  `{ type: 'agent-node', profile, sessionId?, client? | brokerUrl? | nodeUrl? }`)
+  and joins the spec union by augmenting `AgentSpecRegistry` from the
+  agent-node package — the first externally-registered adapter type. Note this inverts the lib's usual flow: existing adapters push
   configuration through the API call (`AgentInput.systemPrompt`, `tools`);
   agent-node pushes it through the filesystem before launch. Per-invocation
   `systemPrompt` on a warm session is therefore ignored with a logged
@@ -247,6 +250,9 @@ the caller's decision.
 
 ## 11. Phasing
 
+- **v0 — prerequisite:** the provider-externalization refactor of
+  `agent-adapter-lib` (companion spec) lands first; it opens
+  `AgentSpecRegistry` so agent-node can register externally.
 - **v1 — in-process, broker-less:** `AgentNodeEngine` + opencode driver +
   `'agent-node'` adapter with `LocalNodeClient` + `LocalProfileStore`.
   Delivers persistent resumable opencode sessions with profiles, usable from
