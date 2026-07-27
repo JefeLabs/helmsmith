@@ -3,7 +3,10 @@
 **Date:** 2026-07-26
 **Status:** Approved design (pre-implementation)
 **Owner:** Edwin Cruz
-**Relates to:** `2026-07-26-agent-node-design.md` (amends its §3 placement)
+**Relates to:** the agent-node design, re-scoped and moved to
+`smithagents/docs/superpowers/specs/2026-07-26-agent-node-swarm-hardening-design.md`
+(node behavior lives in the smithagents fleet; this refactor is what enables
+its future bridge adapter to register externally)
 
 ## 1. Problem
 
@@ -27,8 +30,9 @@ every provider:
 **Goals**
 
 1. A host imports (and installs SDKs for) only the providers it uses.
-2. Third-party adapters register first-class — no casts. The agent-node
-   adapter ships with the agent-node packages, not in this lib.
+2. External adapters register first-class — no casts. The first planned
+   consumer is the smithagents fleet-bridge adapter (`'agent-node'`), which
+   ships outside this lib entirely.
 3. Existing consumers migrate with one line per provider (or one compat
    import).
 
@@ -129,7 +133,8 @@ Construction-time refinement (copilot-sdk's `supportsJsonMode`) is untouched.
 
 ## 6. Sequencing
 
-This refactor lands **before** agent-node v1. Agent-node's adapter and
-protocol schemas then ship inside the agent-node packages (amended in the
-agent-node spec §3), augmenting `AgentSpecRegistry` from there — the lib is
-not touched by agent-node at all.
+This refactor stands alone and is worth landing on its own merits (it
+removes the forced-provider tax for every host). It is also the
+prerequisite for the smithagents fleet-bridge adapter (that spec's §6),
+which will augment `AgentSpecRegistry` from outside this lib when a
+helmsmith flow first needs a fleet worker.
