@@ -61,8 +61,8 @@ describe('evalExpression', () => {
 
   it('resolveExpressionValue returns raw values, booleans for compositions', () => {
     expect(resolveExpressionValue({ kind: 'jsonpath', path: '$.review.score' }, state)).toBe(0.9);
-    expect(resolveExpressionValue({ kind: 'not', expr: { kind: 'literal', value: false } }, state)).toBe(
-      true,
-    );
+    expect(
+      resolveExpressionValue({ kind: 'not', expr: { kind: 'literal', value: false } }, state),
+    ).toBe(true);
   });
 });

@@ -15,7 +15,39 @@ import {
   type FlowDef,
 } from './types.ts';
 
-export function validateFlowCatalog(value: unknown, path: string): asserts value is FlowCatalog {
+/**
+ * A spec feature that validates but that the current runtime does not
+ * execute. Reported through `ValidateOptions.onUnsupported` so loaders
+ * can warn (harness-core's loadCatalog does, via console.warn) and
+ * designer UIs can badge the node. Reporting never changes
+ * accept/reject behavior — a catalog with unsupported features is
+ * still a *valid* catalog; it just won't do everything it says.
+ *
+ * Current feature ids: `policy`, `joinStrategy`, `terminal-fail`,
+ * `trigger-<kind>` (any non-manual trigger), `expression-js`,
+ * `parallel-fan-out` (second+ sequence edge from one node). Remove an
+ * id from `reportUnsupportedFeatures` in the same change that makes
+ * the runtime execute it — the reporting list IS the honest coverage
+ * boundary.
+ */
+export interface UnsupportedFeature {
+  /** Path-prefixed location, same convention as CatalogError messages. */
+  where: string;
+  /** Stable feature id (see list above). */
+  feature: string;
+  /** One sentence of runtime truth — what actually happens instead. */
+  detail: string;
+}
+
+export interface ValidateOptions {
+  onUnsupported?: (feature: UnsupportedFeature) => void;
+}
+
+export function validateFlowCatalog(
+  value: unknown,
+  path: string,
+  opts?: ValidateOptions,
+): asserts value is FlowCatalog {
   if (!value || typeof value !== 'object') {
     throw new CatalogError(`${path}: top-level must be an object`);
   }
@@ -25,7 +57,7 @@ export function validateFlowCatalog(value: unknown, path: string): asserts value
   }
   const ids = new Set<string>();
   for (const [i, f] of obj.flows.entries()) {
-    validateFlow(f, `${path}: flows[${i}]`);
+    validateFlow(f, `${path}: flows[${i}]`, opts);
     const flow = f as unknown as Record<string, unknown>;
     if (ids.has(flow.id as string)) {
       throw new CatalogError(`${path}: duplicate flow id "${flow.id}"`);
@@ -39,7 +71,11 @@ export function validateFlowCatalog(value: unknown, path: string): asserts value
  * nodes (each TaskStep) + edges (referential integrity + cardinality
  * rules + acyclicity except along reject edges) + exactly-one-trigger.
  */
-function validateFlow(value: unknown, where: string): asserts value is FlowDef {
+function validateFlow(
+  value: unknown,
+  where: string,
+  opts?: ValidateOptions,
+): asserts value is FlowDef {
   if (!value || typeof value !== 'object') {
     throw new CatalogError(`${where} must be an object`);
   }
@@ -186,6 +222,111 @@ function validateFlow(value: unknown, where: string): asserts value is FlowDef {
     throw new CatalogError(
       `${where}: cycle detected on non-reject edges (only reject edges may form cycles for retry-with-context loops)`,
     );
+  }
+
+  if (opts?.onUnsupported) {
+    reportUnsupportedFeatures(flow, where, opts.onUnsupported);
+  }
+}
+
+/**
+ * Post-validation scan for spec features the runtime does not execute.
+ * Runs only when a callback is supplied, on a flow that already passed
+ * structural validation — so casts here are safe. Kept separate from
+ * the shape validators above so the moved-verbatim validation logic
+ * stays byte-comparable with its harness-core history.
+ */
+function reportUnsupportedFeatures(
+  flow: Record<string, unknown>,
+  where: string,
+  report: (f: UnsupportedFeature) => void,
+): void {
+  for (const [j, n] of (flow.nodes as unknown[]).entries()) {
+    const node = n as Record<string, unknown>;
+    const at = `${where}.nodes[${j}]`;
+    if (node.policy !== undefined) {
+      report({
+        where: at,
+        feature: 'policy',
+        detail:
+          'retry/timeout/onError are not enforced — the node runs once with executor-default timeouts and errors follow edges',
+      });
+    }
+    if (node.joinStrategy !== undefined) {
+      report({
+        where: at,
+        feature: 'joinStrategy',
+        detail: 'multiple incoming edges use LangGraph defaults; all/any/nOfM is not implemented',
+      });
+    }
+    if (node.terminal === 'fail') {
+      report({
+        where: at,
+        feature: 'terminal-fail',
+        detail: 'terminal nodes always end the flow as success',
+      });
+    }
+    if (node.kind === 'trigger') {
+      const kind = (node.config as Record<string, unknown>).kind;
+      if (kind !== 'manual') {
+        report({
+          where: `${at}.config`,
+          feature: `trigger-${String(kind)}`,
+          detail: 'no runtime fires this trigger; jobs start by manual submission',
+        });
+      }
+    }
+  }
+
+  // Second+ sequence edge from one source node is silently ignored by
+  // the runtime router (it follows the first). One report per source.
+  const sequenceSources = new Map<string, number>();
+  for (const e of flow.edges as Array<Record<string, unknown>>) {
+    if (e.type !== 'sequence') continue;
+    const from = e.from as string;
+    sequenceSources.set(from, (sequenceSources.get(from) ?? 0) + 1);
+  }
+  for (const [from, count] of sequenceSources) {
+    if (count > 1) {
+      report({
+        where: `${where}.edges (from "${from}")`,
+        feature: 'parallel-fan-out',
+        detail: `the router follows only the first sequence edge from a node; ${count - 1} of ${count} branches will never run`,
+      });
+    }
+  }
+
+  scanForJsExpressions(flow, where, report);
+}
+
+/**
+ * Recursive walk for `{ kind: 'js', expression: '...' }` anywhere in a
+ * flow — configs, tags, edge conditions, tool args. The evaluator
+ * throws on these at runtime, so surface them at load time instead.
+ */
+function scanForJsExpressions(
+  value: unknown,
+  path: string,
+  report: (f: UnsupportedFeature) => void,
+): void {
+  if (Array.isArray(value)) {
+    for (const [i, item] of value.entries()) {
+      scanForJsExpressions(item, `${path}[${i}]`, report);
+    }
+    return;
+  }
+  if (!value || typeof value !== 'object') return;
+  const obj = value as Record<string, unknown>;
+  if (obj.kind === 'js' && typeof obj.expression === 'string') {
+    report({
+      where: path,
+      feature: 'expression-js',
+      detail: 'the evaluator throws on js expressions; compose compare/all/any/not instead',
+    });
+    return;
+  }
+  for (const [key, sub] of Object.entries(obj)) {
+    scanForJsExpressions(sub, `${path}.${key}`, report);
   }
 }
 
@@ -822,7 +963,11 @@ function validateAcceptsList(list: unknown[], where: string): void {
  * sources surface bad-config locations without the validator needing
  * to know what kind of file it came from.
  */
-export function validateUnifiedCatalog(value: unknown, path: string): asserts value is Catalog {
+export function validateUnifiedCatalog(
+  value: unknown,
+  path: string,
+  opts?: ValidateOptions,
+): asserts value is Catalog {
   if (!value || typeof value !== 'object') {
     throw new CatalogError(`${path}: top-level must be an object`);
   }
@@ -833,7 +978,7 @@ export function validateUnifiedCatalog(value: unknown, path: string): asserts va
     throw new CatalogError(`${path}: missing "flows" array (use [] for none)`);
   }
   // Re-use the flows-only validator.
-  validateFlowCatalog({ flows: obj.flows }, path);
+  validateFlowCatalog({ flows: obj.flows }, path, opts);
 
   if (obj.products !== undefined) {
     if (!Array.isArray(obj.products)) {
