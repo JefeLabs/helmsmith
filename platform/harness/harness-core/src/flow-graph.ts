@@ -38,6 +38,7 @@
 
 import { readdir } from 'node:fs/promises';
 import { join as pathJoin } from 'node:path';
+import { evalExpression, resolveExpressionValue } from '@helmsmith/flow-spec';
 import {
   Annotation,
   type BaseCheckpointSaver,
@@ -59,6 +60,8 @@ import type {
   TaskStep,
 } from './catalog.ts';
 import type { ChangedFile } from './changed-files.ts';
+
+export { evalExpression };
 
 /**
  * Per-node exit signal. Drives error/fallback/reject routing in the
@@ -409,115 +412,6 @@ export function buildRouter(nodeId: string, out: readonly Edge[]): (state: FlowS
     if (fb) return fb.to;
     return END;
   };
-}
-
-/**
- * Predicate evaluator for conditional edge expressions.
- *
- *   - literal: value coerced to boolean (truthy check).
- *   - jsonpath: resolves `$.path.into.state`; truthy result counts as
- *     match. Minimal path syntax — `$.field` and `$.field.subfield`.
- *     No array indexing / filters / wildcards yet (add when the
- *     catalog calls for them).
- *   - compare: evaluates lhs and rhs to RAW values (via
- *     resolveExpressionValue) and applies op. ==/!= are strict
- *     (===/!==). Numeric ops (< <= > >=) coerce both sides via
- *     Number(); NaN on either side ⇒ false. `in` requires rhs to
- *     resolve to an array; predicate is true iff lhs ∈ rhs by
- *     strict equality.
- *   - all / any: short-circuit AND / OR over the expression list.
- *     Empty all([]) is true (identity for AND); empty any([]) is
- *     false (identity for OR).
- *   - not: inverts the inner predicate.
- *   - js: NOT supported. Throws with guidance to use compare /
- *     all / any / not instead. Catalog authors who hit a real wall
- *     should propose extending the language additively rather than
- *     reaching for a JS sandbox.
- */
-export function evalExpression(expr: Expression, state: FlowStateT): boolean {
-  switch (expr.kind) {
-    case 'literal':
-      return Boolean(expr.value);
-    case 'jsonpath':
-      return Boolean(resolveJsonPath(expr.path, state));
-    case 'compare':
-      return evalCompare(expr.lhs, expr.op, expr.rhs, state);
-    case 'all':
-      // Short-circuit AND. Empty list ⇒ true (vacuous truth: AND of
-      // no clauses holds).
-      for (const sub of expr.exprs) {
-        if (!evalExpression(sub, state)) return false;
-      }
-      return true;
-    case 'any':
-      // Short-circuit OR. Empty list ⇒ false (no clause is satisfied).
-      for (const sub of expr.exprs) {
-        if (evalExpression(sub, state)) return true;
-      }
-      return false;
-    case 'not':
-      return !evalExpression(expr.expr, state);
-    case 'js':
-      throw new Error(
-        '"js" expression kind is not yet supported — use compare / all / any / not / jsonpath / literal',
-      );
-  }
-}
-
-/**
- * Apply a compare op to two evaluated values. Pulled out so both
- * evalExpression and resolveExpressionValue can share the logic
- * without re-evaluating the subexpressions.
- */
-function evalCompare(
-  lhs: Expression,
-  op: import('./catalog.ts').CompareOp,
-  rhs: Expression,
-  state: FlowStateT,
-): boolean {
-  const lhsValue = resolveExpressionValue(lhs, state);
-  const rhsValue = resolveExpressionValue(rhs, state);
-  switch (op) {
-    case '==':
-      return lhsValue === rhsValue;
-    case '!=':
-      return lhsValue !== rhsValue;
-    case '<':
-    case '<=':
-    case '>':
-    case '>=': {
-      const a = Number(lhsValue);
-      const b = Number(rhsValue);
-      // NaN on either side ⇒ comparison is false. Avoids the
-      // surprising "NaN < 5" === false but "NaN >= 5" === false too;
-      // catalog authors who really want number-or-bust should pre-
-      // gate with a `compare lhs == null` check.
-      if (Number.isNaN(a) || Number.isNaN(b)) return false;
-      if (op === '<') return a < b;
-      if (op === '<=') return a <= b;
-      if (op === '>') return a > b;
-      return a >= b; // '>='
-    }
-    case 'in':
-      // rhs MUST resolve to an array. Anything else (string,
-      // object, primitive) returns false. This keeps the op
-      // specifically about collection membership; catalog authors
-      // who want substring containment should compose with a
-      // tool/transform step.
-      return Array.isArray(rhsValue) && rhsValue.includes(lhsValue);
-  }
-}
-
-function resolveJsonPath(path: string, state: unknown): unknown {
-  if (path === '$') return state;
-  if (!path.startsWith('$.')) return undefined;
-  const parts = path.slice(2).split('.');
-  let cur: unknown = state;
-  for (const p of parts) {
-    if (cur == null || typeof cur !== 'object') return undefined;
-    cur = (cur as Record<string, unknown>)[p];
-  }
-  return cur;
 }
 
 function groupEdgesBySource(edges: readonly Edge[]): Map<string, Edge[]> {
@@ -1046,9 +940,7 @@ async function runLoopParallel(
   // order halts subsequent chunks.
   for (let i = 0; i < items.length; i += concurrency) {
     const chunk = items.slice(i, i + concurrency);
-    const deltas = await Promise.all(
-      chunk.map((item) => inner(buildItemState(state, item))),
-    );
+    const deltas = await Promise.all(chunk.map((item) => inner(buildItemState(state, item))));
     for (const delta of deltas) {
       if (delta.lastExit?.kind === 'error' || delta.lastExit?.kind === 'reject') {
         return delta;
@@ -1068,36 +960,6 @@ async function runLoopParallel(
 function buildItemState(state: FlowStateT, item: unknown): FlowStateT {
   const itemInput = typeof item === 'string' ? item : JSON.stringify(item);
   return { ...state, output: itemInput };
-}
-
-/**
- * Resolve an Expression to its raw value (used for Loop iteration and
- * inside `compare` for lhs/rhs). Like evalExpression but returns the
- * raw value, not a boolean coercion. The boolean composition kinds
- * (compare / all / any / not) collapse to their boolean result here
- * — catalog authors using them as raw values get a `true` / `false`,
- * which matches the conditional-edge semantic and avoids surprising
- * polymorphism.
- *
- *   - literal → expr.value
- *   - jsonpath → resolved value or undefined
- *   - compare / all / any / not → the boolean result of evalExpression
- *   - js → throws (no sandbox; same as evalExpression)
- */
-function resolveExpressionValue(expr: Expression, state: FlowStateT): unknown {
-  switch (expr.kind) {
-    case 'literal':
-      return expr.value;
-    case 'jsonpath':
-      return resolveJsonPath(expr.path, state);
-    case 'compare':
-    case 'all':
-    case 'any':
-    case 'not':
-      return evalExpression(expr, state);
-    case 'js':
-      throw new Error('"js" expression kind is not yet supported');
-  }
 }
 
 /**

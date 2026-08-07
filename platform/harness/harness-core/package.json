@@ -13,6 +13,7 @@
   "dependencies": {
     "@helmsmith/agent-adapter": "workspace:*",
     "@helmsmith/agent-auth": "workspace:*",
+    "@helmsmith/flow-spec": "workspace:*",
     "@langchain/core": "^1.1.44",
     "@langchain/langgraph": "^1.3.0"
   },
