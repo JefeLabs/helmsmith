@@ -43,4 +43,4 @@ Reporting never changes accept/reject behavior. harness-core's `loadCatalog` wir
 
 ## Background
 
-Full design reference and critique: `docs/superpowers/specs/2026-08-07-flow-spec-design-review.md`. Extraction plan: `docs/superpowers/plans/2026-08-07-flow-spec-package.md`.
+Detailed specification + current critical notes: [`SPEC.md`](./SPEC.md). Pre-extraction design review of the whole flow runtime: `docs/superpowers/specs/2026-08-07-flow-spec-design-review.md`. Extraction plan: `docs/superpowers/plans/2026-08-07-flow-spec-package.md`.
