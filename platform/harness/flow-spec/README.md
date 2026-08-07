@@ -1,0 +1,46 @@
+# @helmsmith/flow-spec
+
+The flow wire contract: **types + validation + expression semantics + conformance fixtures**. This package is the spec — the shape stored in controlplane's catalog tables, edited by the (future) flow designer, and executed by harness-core.
+
+## Hard constraints
+
+- **Browser-safe:** zero runtime dependencies, no `node:*` imports. Anything that touches fs/network/process belongs in harness-core or harness-server.
+- **Dependency direction:** harness-core → flow-spec, never the reverse. harness-core re-exports this package from its `catalog.ts`, so downstream consumers (`harness-server`, CLIs) never import flow-spec directly.
+
+## What lives here
+
+| Module | Contents |
+|---|---|
+| `types.ts` | `FlowDef`, `TaskStep`, `Edge`, `Expression`, tags/policy/output contracts, `ToolDef`, `JobIntent`, product/catalog shapes, plus the small helpers (`walkAgents`, `resolveAccepts`, `findFlow`, `findProduct`) |
+| `validate.ts` | `validateFlowCatalog` / `validateUnifiedCatalog` — fail-loud structural validation with path-prefixed `CatalogError`s, and the unsupported-feature reporting seam |
+| `expression.ts` | `evalExpression` / `resolveExpressionValue` / `resolveJsonPath`, typed against structural `unknown` state so a designer preview and the runtime router share one evaluator |
+| `fixtures.ts` | `EXPRESSION_CASES` — executable spec data replayed by this package's tests and by harness-core's `flow-spec-conformance.test.ts` |
+
+## What deliberately stays out
+
+- `loadCatalog` (fs read) — harness-core's `catalog.ts`.
+- Graph compilation, routing, executors — harness-core's `flow-graph.ts` / `orchestrator.ts`.
+- Sharing with smithagents: the factory/fleet seam is work orders, not code. Hand external consumers a schema artifact, not this npm package.
+
+## The `onUnsupported` contract
+
+Both validators accept `{ onUnsupported?: (f: UnsupportedFeature) => void }`. The callback fires for spec features that **validate but are not executed** by the current runtime:
+
+| Feature id | Runtime truth |
+|---|---|
+| `policy` | retry/timeout/onError are not enforced |
+| `joinStrategy` | multiple incoming edges use LangGraph defaults |
+| `terminal-fail` | terminal nodes always end the flow as success |
+| `trigger-<kind>` | no runtime fires non-manual triggers |
+| `expression-js` | the evaluator throws on `js` expressions |
+| `parallel-fan-out` | only the first sequence edge from a node is followed |
+
+Reporting never changes accept/reject behavior. harness-core's `loadCatalog` wires this to one `console.warn` line per finding. **Rule:** when the runtime starts executing a feature, delete its report in the same change — this list is the honest coverage boundary.
+
+## Conformance
+
+`fixtures.ts` is data, not code. Any implementation claiming to support flow expressions (harness-core today; a designer UI or Java-side validator tomorrow — the planned home for generated JSON Schema is this package) must replay `EXPRESSION_CASES` and match `expected`. Change semantics by changing the fixture first; every conforming implementation then fails until it catches up.
+
+## Background
+
+Full design reference and critique: `docs/superpowers/specs/2026-08-07-flow-spec-design-review.md`. Extraction plan: `docs/superpowers/plans/2026-08-07-flow-spec-package.md`.
