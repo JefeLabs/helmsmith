@@ -41,6 +41,13 @@ Reporting never changes accept/reject behavior. harness-core's `loadCatalog` wir
 
 `fixtures.ts` is data, not code. Any implementation claiming to support flow expressions (harness-core today; a designer UI or Java-side validator tomorrow — the planned home for generated JSON Schema is this package) must replay `EXPRESSION_CASES` and match `expected`. Change semantics by changing the fixture first; every conforming implementation then fails until it catches up.
 
-## Background
+## Documentation
 
-Detailed specification + current critical notes: [`SPEC.md`](./SPEC.md). Pre-extraction design review of the whole flow runtime: `docs/superpowers/specs/2026-08-07-flow-spec-design-review.md`. Extraction plan: `docs/superpowers/plans/2026-08-07-flow-spec-package.md`.
+| Doc | Contents |
+|---|---|
+| [`SPEC.md`](./SPEC.md) | Detailed specification — boundary, modules, contract, validation, expressions, conformance |
+| [`docs/steps-and-edges.md`](./docs/steps-and-edges.md) | Authoring reference — every step kind, edge, and tag with config tables, JSON examples, and support status |
+| [`docs/critical-feedback.md`](./docs/critical-feedback.md) | Consolidated critical feedback with severity and status |
+| [`docs/next-steps.md`](./docs/next-steps.md) | Phased roadmap with effort estimates |
+
+Pre-extraction design review of the whole flow runtime: `docs/superpowers/specs/2026-08-07-flow-spec-design-review.md`. Extraction plan: `docs/superpowers/plans/2026-08-07-flow-spec-package.md`.
