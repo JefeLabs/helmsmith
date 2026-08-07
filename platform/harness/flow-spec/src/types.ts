@@ -559,13 +559,16 @@ export interface RejectionPayload {
 
 /** Comparison operator for `compare` expressions.
  *
- *   ==, != — strict equality / inequality (===, !==).
+ *   ==, != — strict equality / inequality (===, !==); objects compare
+ *            by REFERENCE, so structurally equal objects are never ==.
  *   <, <=, >, >= — numeric comparison; either side coerces via Number().
  *                  NaN on either side ⇒ predicate is false.
  *   in       — membership: rhs MUST resolve to an array; predicate is
- *              true iff lhs (raw value) is found via strict equality.
- *              For "string contains substring" use a `tool` or
- *              `transform` step; this op is collection-only. */
+ *              true iff lhs (raw value) is found via Array.includes
+ *              (SameValueZero — NaN self-matches, a runtime-state-only
+ *              case since JSON cannot encode NaN). For "string contains
+ *              substring" use a `tool` or `transform` step; this op is
+ *              collection-only. */
 export type CompareOp = '==' | '!=' | '<' | '<=' | '>' | '>=' | 'in';
 
 /** Generic expression evaluated by the runtime. Tagged-union over evaluators

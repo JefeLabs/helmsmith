@@ -65,4 +65,22 @@ describe('evalExpression', () => {
       resolveExpressionValue({ kind: 'not', expr: { kind: 'literal', value: false } }, state),
     ).toBe(true);
   });
+
+  // Lives here rather than in fixtures.ts because NaN is not
+  // JSON-serializable and the fixture set must stay replayable by
+  // schema/Java consumers. Only reachable via runtime state anyway —
+  // JSON catalogs cannot encode NaN.
+  it('in uses SameValueZero (Array.includes): NaN from state self-matches', () => {
+    expect(
+      evalExpression(
+        {
+          kind: 'compare',
+          lhs: { kind: 'jsonpath', path: '$.x' },
+          op: 'in',
+          rhs: { kind: 'jsonpath', path: '$.arr' },
+        },
+        { x: Number.NaN, arr: [Number.NaN] },
+      ),
+    ).toBe(true);
+  });
 });

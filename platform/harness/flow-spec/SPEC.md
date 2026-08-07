@@ -84,10 +84,10 @@ Tagged union: `literal`, `jsonpath`, `compare`, `all`, `any`, `not`, `js`. The e
 | Construct | Semantics |
 |---|---|
 | `literal` | `Boolean(value)` as predicate; raw value via `resolveExpressionValue` |
-| `jsonpath` | Dot-path only: `$`, `$.a.b`. Missing/non-object intermediate → `undefined`, never throws. **Undocumented:** `$.arr.0` works — JS string-indexing means dot-numeric array access succeeds, despite the doc comment claiming "no array indexing" |
-| `compare ==` / `!=` | Strict `===`/`!==`. No coercion: `"5" == 5` is false. Objects compare by **reference** — two structurally equal objects from jsonpath are never `==` |
+| `jsonpath` | Dot-path only: `$`, `$.a.b`. Missing/non-object intermediate → `undefined`, never throws. Dot-numeric array indexing (`$.arr.0`) is **supported and pinned by fixture**; out-of-bounds → `undefined`. No bracket syntax, wildcards, or filters |
+| `compare ==` / `!=` | Strict `===`/`!==`. No coercion: `"5" == 5` is false. Objects compare by **reference** — two structurally equal objects from jsonpath are never `==` (pinned by fixture) |
 | `compare <` `<=` `>` `>=` | Both sides through `Number()`; NaN on either side ⇒ false (both `NaN < 5` and `NaN >= 5` are false) |
-| `compare in` | rhs must resolve to an array, else false (no substring semantics). Membership via `Array.includes` — which is **SameValueZero, not strict equality**: `NaN` self-matches (reachable only from runtime state; JSON can't encode NaN) |
+| `compare in` | rhs must resolve to an array, else false (no substring semantics). Membership via `Array.includes` — **SameValueZero, not strict equality**: `NaN` self-matches (reachable only from runtime state; JSON can't encode NaN — pinned by code-level test, kept out of fixtures so they stay JSON-serializable) |
 | `all` / `any` | Short-circuit AND/OR; `all([])` ⇒ true, `any([])` ⇒ false (identity elements) |
 | `not` | Predicate inversion |
 | `js` | **Throws.** Deliberate: no sandbox dependency; compose the boolean primitives instead |
@@ -145,10 +145,12 @@ The canonical-spec dangling pointer is gone (this package is the spec; both stal
 
 ### 7.3 Semantic honesty gaps — found while writing this document, verified against the code
 
-- **Array indexing secretly works.** `resolveJsonPath('$.repos.0', …)` returns element 0 (JS string-indexing on arrays), while the doc comment and §3.3's own upstream sources claim "no array indexing." Undocumented + unfixtured = unstable: a future "real JSONPath" upgrade could silently break catalogs that discovered this. Either pin it with a fixture and document it, or reject dot-numeric segments in validation.
-- **`in` is SameValueZero, not strict equality.** `[NaN].includes(NaN)` is true while `NaN === NaN` is false; the docs say "strict equality." Unreachable through JSON literals, reachable through runtime state. One sentence of doc honesty or a `findIndex(=== )` makes docs and code agree.
-- **`==` on objects is reference equality.** Two jsonpath resolutions of structurally identical objects are never equal. Correct behavior, but catalog authors comparing `$.a == $.b` on non-primitives will be surprised; deserves a doc line and arguably an `onUnsupported`-style lint.
-- **`scanForJsExpressions` can false-positive on inert data.** A `literal` whose `value` happens to contain `{ kind: 'js', expression: '…' }` (or tool args carrying such a shape as data) is reported as a js *expression* even though the evaluator would never evaluate it. Harmless today (warning only), but it means the report's `where` paths can point at data, not expressions. Walking only known expression positions (edge conditions, gate assertions, transform/config expressions, loop paths, matchers) would be precise.
+> **Status update (2026-08-07, same PR):** the first three findings below are now **resolved by pinning** — dot-numeric array indexing, object reference-equality for `==`, and out-of-bounds behavior are fixture cases (replayed by harness-core's conformance suite); SameValueZero `in` is pinned by a code-level test (NaN can't live in JSON-serializable fixtures — a serializability guard test now enforces that property too); all doc comments in `expression.ts` and `types.ts` were corrected to match the code. The original findings are preserved below as the record of what documentation-as-audit caught.
+
+- **Array indexing secretly worked.** `resolveJsonPath('$.repos.0', …)` returns element 0 (JS string-indexing on arrays), while the doc comments claimed "no array indexing." Undocumented + unfixtured = unstable. *Resolution: pinned as supported — fixture + docs; a future JSONPath upgrade now breaks conformance instead of catalogs.*
+- **`in` is SameValueZero, not strict equality.** `[NaN].includes(NaN)` is true while `NaN === NaN` is false; the docs said "strict equality." *Resolution: documented as SameValueZero, pinned by code-level test.*
+- **`==` on objects is reference equality.** Two jsonpath resolutions of structurally identical objects are never equal. Correct but surprising for `$.a == $.b` on non-primitives. *Resolution: documented + pinned by fixture.*
+- **`scanForJsExpressions` can false-positive on inert data.** A `literal` whose `value` happens to contain `{ kind: 'js', expression: '…' }` (or tool args carrying such a shape as data) is reported as a js *expression* even though the evaluator would never evaluate it. Harmless today (warning only), but it means the report's `where` paths can point at data, not expressions. Walking only known expression positions (edge conditions, gate assertions, transform/config expressions, loop paths, matchers) would be precise. **Still open.**
 
 ### 7.4 Enforcement gaps — where the package still runs on convention
 
@@ -165,7 +167,7 @@ Still true, now *warned* rather than silent: `policy`/`joinStrategy`/`terminal-f
 ## 8. Recommendations, prioritized
 
 1. **Curate the export surface** — replace both `export *` layers with named exports; decide `ToolResolver`'s home while doing it. (Hours, prevents silent API growth forever.)
-2. **Pin or reject the discovered semantics** — fixture for dot-numeric array access (or validation error), doc lines for SameValueZero `in` and reference-equality `==`. The fixtures file exists precisely so these can't drift.
+2. **Pin or reject the discovered semantics** — fixture for dot-numeric array access (or validation error), doc lines for SameValueZero `in` and reference-equality `==`. The fixtures file exists precisely so these can't drift. — **✅ Done (2026-08-07): pinned.** 17 fixture cases (+ JSON-serializability guard), NaN case as a code-level test, all doc comments corrected.
 3. **Ship validation + unsupported-feature fixtures** — make conformance cover all three behaviors the package defines (validation verdicts, expression results, coverage warnings), and add the harness-core replay that turns the README's delete-the-report rule into a failing test.
 4. **Narrow `scanForJsExpressions` to known expression positions.**
 5. **Generate JSON Schema from the types** in this package's build — the controlplane Phase 2 dependency and the smithagents seam artifact both want it.

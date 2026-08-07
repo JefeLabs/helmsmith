@@ -18,15 +18,18 @@ import type { CompareOp, Expression } from './types.ts';
  *
  *   - literal: value coerced to boolean (truthy check).
  *   - jsonpath: resolves `$.path.into.state`; truthy result counts as
- *     match. Minimal path syntax — `$.field` and `$.field.subfield`.
- *     No array indexing / filters / wildcards yet (add when the
- *     catalog calls for them).
+ *     match. Minimal path syntax — `$.field` and `$.field.subfield`,
+ *     including dot-numeric array indexing (`$.repos.0`, pinned by
+ *     fixture). No bracket syntax / filters / wildcards.
  *   - compare: evaluates lhs and rhs to RAW values (via
  *     resolveExpressionValue) and applies op. ==/!= are strict
- *     (===/!==). Numeric ops (< <= > >=) coerce both sides via
- *     Number(); NaN on either side ⇒ false. `in` requires rhs to
- *     resolve to an array; predicate is true iff lhs ∈ rhs by
- *     strict equality.
+ *     (===/!==) — which for objects means REFERENCE equality; two
+ *     structurally equal objects are never ==. Numeric ops
+ *     (< <= > >=) coerce both sides via Number(); NaN on either
+ *     side ⇒ false. `in` requires rhs to resolve to an array;
+ *     membership is Array.includes — SameValueZero, so NaN
+ *     self-matches (reachable only via runtime state; JSON cannot
+ *     encode NaN).
  *   - all / any: short-circuit AND / OR over the expression list.
  *     Empty all([]) is true (identity for AND); empty any([]) is
  *     false (identity for OR).
@@ -100,14 +103,17 @@ function evalCompare(lhs: Expression, op: CompareOp, rhs: Expression, state: unk
       // object, primitive) returns false. This keeps the op
       // specifically about collection membership; catalog authors
       // who want substring containment should compose with a
-      // tool/transform step.
+      // tool/transform step. Note: includes() is SameValueZero, not
+      // strict equality — NaN self-matches (runtime-state-only case).
       return Array.isArray(rhsValue) && rhsValue.includes(lhsValue);
   }
 }
 
 /** Minimal dot-path resolver: `$` returns the whole state; `$.a.b`
- *  walks object properties. Non-object intermediates resolve to
- *  undefined rather than throwing. */
+ *  walks object properties. Arrays index via dot-numeric segments
+ *  (`$.repos.0` — JS string-indexing; pinned by fixture). Non-object
+ *  intermediates and out-of-bounds indexes resolve to undefined
+ *  rather than throwing. */
 export function resolveJsonPath(path: string, state: unknown): unknown {
   if (path === '$') return state;
   if (!path.startsWith('$.')) return undefined;

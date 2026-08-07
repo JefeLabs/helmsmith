@@ -57,12 +57,40 @@ export const EXPRESSION_CASES: readonly ExpressionCase[] = [
     expected: true,
   },
   {
+    name: 'jsonpath dot-numeric array indexing is supported: $.repos.0',
+    expr: {
+      kind: 'compare',
+      lhs: { kind: 'jsonpath', path: '$.repos.0' },
+      op: '==',
+      rhs: { kind: 'literal', value: 'api' },
+    },
+    state: STATE,
+    expected: true,
+  },
+  {
+    name: 'jsonpath out-of-bounds array index resolves undefined (falsy)',
+    expr: { kind: 'jsonpath', path: '$.repos.9' },
+    state: STATE,
+    expected: false,
+  },
+  {
     name: 'compare == is strict: string "5" never equals number 5',
     expr: {
       kind: 'compare',
       lhs: { kind: 'literal', value: '5' },
       op: '==',
       rhs: { kind: 'literal', value: 5 },
+    },
+    state: STATE,
+    expected: false,
+  },
+  {
+    name: 'compare == on objects is reference equality: structurally equal objects are not ==',
+    expr: {
+      kind: 'compare',
+      lhs: { kind: 'jsonpath', path: '$.review' },
+      op: '==',
+      rhs: { kind: 'literal', value: { score: 0.9, approved: true } },
     },
     state: STATE,
     expected: false,
