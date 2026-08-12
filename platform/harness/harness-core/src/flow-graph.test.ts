@@ -261,6 +261,75 @@ describe('node-addressable state', () => {
     ).toThrow(/unhandled error/);
   });
 
+  it('a looped node declaring json output aggregates a JSON array', async () => {
+    const flow: FlowDef = {
+      id: 'f',
+      nodes: [
+        trigger('t'),
+        {
+          id: 'each',
+          kind: 'transform',
+          output: { kind: 'json' },
+          config: {
+            expression: {
+              kind: 'object',
+              fields: { item: { kind: 'jsonpath', path: '$.output' } },
+            },
+          },
+          tags: {
+            loop: {
+              source: 'collection',
+              path: { kind: 'literal', value: ['x', 'y'] },
+              mode: 'sequential',
+            },
+          },
+        },
+      ],
+      edges: [{ from: 't', to: 'each', type: 'sequence' }],
+    };
+    const graph = compileFlow({ flow, executors: new Map() });
+    const result = await graph.invoke(initialState, { configurable: { thread_id: 'lj-1' } });
+    expect(result.nodes.each).toEqual([{ item: 'x' }, { item: 'y' }]);
+    expect(result.lastExit).toMatchObject({ kind: 'success' });
+  });
+
+  it('a looped json node with a non-JSON item output exits with OutputParseError', async () => {
+    const flow: FlowDef = {
+      id: 'f',
+      nodes: [
+        trigger('t'),
+        {
+          id: 'each',
+          kind: 'transform',
+          output: { kind: 'json' },
+          // Each iteration emits the raw item — 'not json' is not valid JSON,
+          // so the assembled array must fail the parse.
+          config: { expression: { kind: 'jsonpath', path: '$.output' } },
+          tags: {
+            loop: {
+              source: 'collection',
+              path: { kind: 'literal', value: ['not json'] },
+              mode: 'sequential',
+            },
+          },
+        },
+        {
+          id: 'handled',
+          kind: 'transform',
+          config: { expression: { kind: 'literal', value: 'recovered' } },
+        },
+      ],
+      edges: [
+        { from: 't', to: 'each', type: 'sequence' },
+        { from: 'each', to: 'handled', type: 'error', on: ['OutputParseError'] },
+      ],
+    };
+    const graph = compileFlow({ flow, executors: new Map() });
+    const result = await graph.invoke(initialState, { configurable: { thread_id: 'lj-2' } });
+    expect(result.nodes.each).toBeUndefined();
+    expect(result.output).toBe('recovered');
+  });
+
   it('a looped node records its aggregate output once', async () => {
     const flow: FlowDef = {
       id: 'f',

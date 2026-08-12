@@ -11,9 +11,11 @@
  *     discretion.
  *   - `state.output` (UTF-8 string) is piped to the child as stdin;
  *     stdout becomes the new `state.output` on success.
- *   - The full FlowState is JSON-serialized and exposed via
- *     `HARNESS_STATE_JSON` env var so scripts can pluck additional
- *     fields without parsing stdin twice.
+ *   - A curated view of FlowState (see `serializableStateView` — incl.
+ *     `input`, excl. `nodes`/`messages`/`changedFiles` for env-size
+ *     reasons) is JSON-serialized into the `HARNESS_STATE_JSON` env
+ *     var. Scripts that need a specific node's output should declare
+ *     an `input` mapping — the composed value arrives on stdin.
  *   - Hard timeout (default 30s); SIGTERM on expiry, SIGKILL after a
  *     short grace if the child ignores SIGTERM.
  *
@@ -37,7 +39,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { CredentialBroker } from '@helmsmith/agent-auth';
-import type { ScriptConfig, TaskStep } from './catalog.ts';
+import type { FlowRunState, ScriptConfig, TaskStep } from './catalog.ts';
 import type { FlowStateT, NodeExecutor } from './flow-graph.ts';
 import { fetchCredential } from './tool-executor.ts';
 
@@ -295,15 +297,21 @@ function invokeChild(
  *     in scripts.
  *   - changedFiles: file metadata; useful but verbose. Scripts
  *     that need it should use a `transform` to extract first.
+ *   - nodes: per-node outputs; unbounded (every node's output
+ *     accumulates here). Scripts that need a specific node's output
+ *     should declare an `input` mapping — the composed value arrives
+ *     on stdin with no size quota.
  *
- * What stays:
- *   - jobId, output, attempts, lastExit, rejectionPayload, steering,
- *     cancelRequested, cancelReason — the state most scripts care
- *     about.
+ * The return type ties this view to the spec's FlowRunState: when the
+ * wire contract grows a channel, this stops compiling until someone
+ * decides include-or-exclude explicitly.
  */
-function serializableStateView(state: FlowStateT): Record<string, unknown> {
+function serializableStateView(
+  state: FlowStateT,
+): Omit<FlowRunState, 'messages' | 'changedFiles' | 'nodes'> {
   return {
     jobId: state.jobId,
+    input: state.input,
     output: state.output,
     attempts: state.attempts,
     lastExit: state.lastExit,

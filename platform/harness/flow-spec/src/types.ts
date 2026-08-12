@@ -364,9 +364,12 @@ export type ToolResolver = (toolId: string) => ToolDef | undefined;
 /** Code execution. The script's source body is dropped to a temp file
  *  and run via the language's interpreter; state.output is piped to
  *  the script as stdin (UTF-8 string), and the script's stdout becomes
- *  the new state.output. The full FlowState is also exposed as JSON
- *  via the `HARNESS_STATE_JSON` environment variable. Non-zero exit
- *  routes to the node's error edge. */
+ *  the new state.output. A curated FlowRunState view (incl. `input`,
+ *  excl. `nodes`/`messages`/`changedFiles` for env-size reasons) is
+ *  exposed as JSON via the `HARNESS_STATE_JSON` environment variable —
+ *  scripts needing a node's output should declare an `input` mapping,
+ *  which arrives on stdin. Non-zero exit routes to the node's error
+ *  edge. */
 export interface ScriptConfig {
   language: 'bash' | 'node' | 'python';
   source: string;

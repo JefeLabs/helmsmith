@@ -709,6 +709,32 @@ and merge `...secretEnv` into the child env AFTER `config.env` (secrets win over
 - [ ] **Step 2:** Fix the now-true doc examples: `types.ts:585`'s `$.input.repos` jsonpath example is now real — note it; the `js`-kind example comment stays (still throws).
 - [ ] **Step 3: Commit** — `git add -A && git commit -m "docs(flow-spec): data-plane contract — state model, node I/O, error matchers, honest status updates"`
 
+## Phase 2 — hardening follow-up (post-merge review findings, branch `feat/flow-spec-hardening`)
+
+### Task 10: Loop + `output.kind: 'json'` aggregates a JSON array
+
+The `\n---\n` join is never valid JSON, so json-declaring looped nodes fail on >1 item. Fix: when the step declares json output, the loop aggregates `[item1,item2,…]` (each item must itself be JSON — a non-JSON item then fails the array parse, which is the correct semantic). `withNodeIO` parses the array normally → `$.nodes.<id>` = array of per-iteration values.
+
+- Modify `flow-graph.ts`: thread a `joinOutputs` fn from `wrapWithTags(step, …)` (which sees `step.output`) into `loopWrapper`/`runLoopSequential`/`runLoopParallel`: `wantsJson ? '[' + outputs.join(',') + ']' : outputs.join('\n---\n')`.
+- Tests (flow-graph.test.ts): looped transform with `output:{kind:'json'}` over 2 items → `result.nodes.each` deep-equals the 2-element array; non-JSON item → `OutputParseError`.
+- Docs: `NodeOutputContract` comment + steps-and-edges §5 row.
+
+### Task 11: Terminal flow-output enforcement (roadmap 2.5)
+
+New browser-safe module `flow-spec/src/output.ts`: `parseFlowOutput(contract, text)` → `{ok:true, value} | {ok:false, error}`; kinds: `agent-text` (pass-through), `job-intent` (JSON parse + shape: flowId/productId non-empty strings, `input` present), `job-intents` (array of shapes + min/max), `flow-spec` (JSON parse + `validateFlowCatalog({flows:[parsed]})`), `structured` (JSON parse only — schema NOT enforced, new load-time report `flow-output-schema`). Runtime: `finalizeOrPause` gains the flow's output contract; before promoting to 'completed', run `parseFlowOutput`; failure → status 'failed' + bus error `FlowOutputError`. Tests in both packages.
+
+### Task 12: Phase 1.1 — validation + unsupported fixtures as data
+
+`fixtures.ts` gains `VALIDATION_CASES` (`{name, catalog, valid, errorIncludes?}`) and `UNSUPPORTED_CASES` (`{name, flow, expectedFeatures}` — exact sorted-set match so both false-warns AND missing-warns fail). Replayed by `fixtures.test.ts` and harness-core's conformance test (via its re-exported validator). One case must exercise every current report id incl. `flow-output-schema`; one all-executed-features case must expect `[]`.
+
+### Task 13: Script state view honesty
+
+`serializableStateView` gains `input` (job payload — small); `nodes` stays excluded (env-size) but the return type becomes `Omit<FlowRunState, 'messages' | 'changedFiles' | 'nodes'>` so FlowRunState growth forces an explicit include/exclude decision here. Fix the "full state" doc claims (script-executor header, steps-and-edges §2.4): scripts reach node outputs via `input` mappings (stdin), not the env var.
+
+### Task 14: Docs
+
+Fold the post-merge review findings into `critical-feedback.md` (loop+json 🔴 → resolved here; script-view drift → resolved; tool-args-vs-input overlap, stringly delivery, `kind`-key wart, `nodes` growth → recorded open); update SPEC/steps-and-edges/README/next-steps for Tasks 10–13 (2.5 done, 1.1 done).
+
 ## Self-Review Notes
 
 - Spec coverage: Tier 1.1 → Tasks 2+4; 1.2 → Tasks 3+4; 1.3 → Tasks 3+5; Tier 2.4 → Task 6; 2.5 → Task 1; Tier 3.6 → Task 3 (declared + reported; enforcement is future); 3.7 → Task 2; 3.8 → Task 3 (identity + reported pin); 3.9 → Tasks 3+7; docs → Task 9. ✓

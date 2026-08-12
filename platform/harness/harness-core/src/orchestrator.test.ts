@@ -257,6 +257,70 @@ describe('runJob (in-process)', () => {
   });
 });
 
+describe('runJob — terminal output-contract enforcement', () => {
+  const intentText = JSON.stringify({ flowId: 'work-1', productId: 'p1', input: { x: 1 } });
+
+  function jobDefinitionJob(jobId: string, terminalLiteral: string): JobRecord {
+    return {
+      jobId,
+      status: 'received',
+      submittedAt: 'now',
+      input: 'go',
+      agents: [],
+      flow: {
+        id: 'intake',
+        kind: 'job-definition',
+        output: { kind: 'job-intent' },
+        nodes: [
+          { id: 't', kind: 'trigger', config: { kind: 'manual' } },
+          {
+            id: 'emit',
+            kind: 'transform',
+            config: { expression: { kind: 'literal', value: terminalLiteral } },
+          },
+        ],
+        edges: [{ from: 't', to: 'emit', type: 'sequence' }],
+      },
+    };
+  }
+
+  it('completes and records flowOutput when the terminal output satisfies the contract', async () => {
+    const jobs = new Map<string, JobRecord>();
+    const job = jobDefinitionJob('j-intent-ok', intentText);
+    jobs.set(job.jobId, job);
+
+    await runJob(job.jobId, {
+      jobs,
+      bus: new JobBus(),
+      broker: dummyBroker,
+      adapterFactory: () => new TestAdapter({ kind: 'ok', reply: 'unused' }),
+    });
+
+    expect(job.status).toBe('completed');
+    expect(job.flowOutput).toEqual({ flowId: 'work-1', productId: 'p1', input: { x: 1 } });
+  });
+
+  it('fails the job when the terminal output violates the contract', async () => {
+    const jobs = new Map<string, JobRecord>();
+    const job = jobDefinitionJob('j-intent-bad', 'not a job intent');
+    jobs.set(job.jobId, job);
+    const events: AdapterEvent[] = [];
+    const bus = new JobBus();
+    bus.subscribe(job.jobId, (envelope) => events.push(envelope.event));
+
+    await runJob(job.jobId, {
+      jobs,
+      bus,
+      broker: dummyBroker,
+      adapterFactory: () => new TestAdapter({ kind: 'ok', reply: 'unused' }),
+    });
+
+    expect(job.status).toBe('failed');
+    expect(job.flowOutput).toBeUndefined();
+    expect(events.some((e) => e.kind === 'error' && /job-intent/.test(e.message ?? ''))).toBe(true);
+  });
+});
+
 describe('runJob — accepts-aware adapter selection', () => {
   it('routes through the resolver when agent.accepts is set', async () => {
     const jobs = new Map<string, JobRecord>();

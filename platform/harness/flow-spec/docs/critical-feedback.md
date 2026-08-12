@@ -27,6 +27,10 @@ One document, every open criticism, with status. Sources: the pre-extraction des
 | 🟡 Scripts had no credential surface — tools got `ToolAuthRef`, scripts got plain-string env, inviting pasted secrets | `ScriptConfig.secrets` resolved through the CredentialBroker into child env (wins over static env); missing broker / bad id → `AuthError` exit |
 | 🔵 Flows had no version identity for durable checkpoints or subflow pins | `FlowDef.version` + `SubflowConfig.version` (pin recorded, not enforced — `subflow-version-pin` report) |
 | 🔵 No `test` script in package.json (`pnpm -r test` skipped the contract's own suite) | Added (`vitest run`) |
+| 🔴 `loop` + `output.kind: 'json'` was a guaranteed failure on 2+ items — the `\n---\n` join is never valid JSON, so every multi-item json loop exited OutputParseError (post-merge review of the data-plane slice itself) | json-declaring looped nodes aggregate a JSON **array**; `$.nodes.<id>` = per-iteration values; a non-JSON item fails the array parse (correct semantic), pinned by tests |
+| 🟡 Scripts couldn't see the data plane — `serializableStateView` predated the new channels, so `HARNESS_STATE_JSON` lacked `input`/`nodes` while docs claimed "full state"; no compile-time tie to `FlowRunState` | `input` included; `nodes` deliberately excluded (env-size — `input` mappings via stdin are the channel); return type is now `Omit<FlowRunState, 'messages'\|'changedFiles'\|'nodes'>` so contract growth forces an explicit decision; docs corrected |
+| 🔴 Flow-level output contracts had types and a static check, zero runtime parsing — the factory/fleet seam was toothless | `parseFlowOutput` in the spec (job-intent/job-intents shape checks + min/max, flow-spec re-validated through the catalog validator, structured parse-only); `finalizeOrPause` enforces before 'completed' and records `job.flowOutput`; schema stays honest via `flow-output-schema` report |
+| 🔴 The `onUnsupported` list ran on convention; conformance covered 1 of 3 behaviors | `VALIDATION_CASES` + `UNSUPPORTED_CASES` fixtures (JSON-serializable), replayed by spec + runtime with **exact-set** feature match — a stale report after implementing a feature, or a missing report on new dead config, now fails both suites until the fixture changes first |
 
 ## 2. Open — package-level (this package's debt)
 
@@ -42,11 +46,20 @@ One document, every open criticism, with status. Sources: the pre-extraction des
 ### 🟡 Runtime seams migrated with the types
 `ToolResolver` (`(toolId) => ToolDef | undefined`) is a dispatch signature, not a wire shape — it can't be stored or rendered. Softer versions of the same question: `walkAgents`, `resolveAccepts`. They rode along in the verbatim move; the export-surface curation (above) is the natural moment to decide their home.
 
-### 🔴 The `onUnsupported` list runs on convention
-Nothing ties the report list to what the runtime executes. The README rule ("delete the report in the change that implements the feature") is unenforced — implement `policy.retry` tomorrow and forget the deletion, and every catalog using it warns falsely forever (or worse: the inverse, a new dead field never gets a report). Fix: unsupported-feature fixtures `(flow, expectedFeatures)` replayed by harness-core, like the expression fixtures already are.
+### ~~🔴 The `onUnsupported` list runs on convention~~ — resolved 2026-08-12
+`UNSUPPORTED_CASES` fixtures with exact-set matching, replayed by spec + runtime (see §1).
 
-### 🟡 Conformance covers one of three behaviors
-Expressions have replayable fixtures; **validation verdicts** (valid/invalid catalogs + expected error substrings) and **warning expectations** do not — they're locked in `validate.test.ts` as code, which a Java validator or designer can't replay. The package defines three behaviors; it publishes conformance data for one.
+### ~~🟡 Conformance covers one of three behaviors~~ — resolved 2026-08-12
+All three behaviors now ship as replayable data: `EXPRESSION_CASES` (+`expectedValue`), `VALIDATION_CASES`, `UNSUPPORTED_CASES` (see §1).
+
+### 🟡 Tool nodes have two overlapping input mechanisms
+`ToolConfig.args` values were already expression-resolvable; `TaskStep.input` (2026-08-12) now exists on the same node. Both answer "how does state reach this tool?" with different semantics — args merge into the ToolDef template, input rewrites the node's effective `$.output`. The spec doesn't say which to prefer or define their composition. A designer UI will surface this ambiguity immediately; pick a rule (suggest: `input` composes the payload, `args` binds it to the tool's parameters) and document it.
+
+### 🔵 Input delivery is stringly
+`input` mappings resolve structured values, then serialize to one string through `state.output`. Right for agents (prompts) and scripts (stdin); wasteful for transform/gate consumers that re-parse what was just serialized. A structured hand-off (an `$.inputView` state slot or executor parameter) is the eventual fix; not urgent.
+
+### 🔵 Wire-format warts locked in 2026-08-12
+(a) Input-mapping keys must not be named `kind` — the single-Expression detection heuristic; `{ expr: … } | { map: … }` would have been unambiguous. (b) The write-once `input` reducer treats a legitimately-`null` job input as claimable by a later write; node writes to `input` are prevented by convention only. (c) `nodes` duplicates every output alongside `output` with no truncation policy — irrelevant in-memory, becomes checkpoint-size growth when the durable checkpointer (2.2) lands.
 
 ### 🟡 No schema artifact
 Controlplane still stores opaque JSONB; Phase 2 would hand-port these rules into Java, and the smithagents seam wants a language-neutral contract. Generated JSON Schema from these types is the agreed answer and doesn't exist yet.
@@ -66,8 +79,8 @@ These are inherited from the original review; the spec now *warns* about the fir
 | `policy` retry/timeout/onError, `joinStrategy`, `terminal:'fail'` | 🔴 | Warned at load, ignored at runtime — authors' reliability config does nothing |
 | Parallel fan-out/join | 🔴 | Router follows first sequence edge only; reducers and `joinStrategy` imply otherwise; second+ branches never run (warned) |
 | Non-manual triggers | 🟡 | Validated cron/webhook/event/message shapes with no ingress, scheduler, or subscription behind them (warned) |
-| Flow-level output contracts | 🔴 | `job-intent` — the factory/fleet seam — has types and a static check, zero runtime parsing/emission. `structured.schema` never validates anything. (Node-level `output.kind: 'json'` now parses — 2026-08-12 — and is the natural machinery for the terminal-node enforcement, still unbuilt) |
-| Node output schema / effect-aware replay | 🟡 | New 2026-08-12 spec surface, honestly reported: `output.schema` accepted but never validated (`node-output-schema`); `effect` recorded but not consulted (`effect`) — becomes 🔴 the day a durable checkpointer starts replaying side-effecting nodes (duplicate PRs) |
+| Flow-level output contracts | ✅→🟡 | **Enforced 2026-08-12:** `parseFlowOutput` shape-checks job-intent/job-intents (+min/max), re-validates flow-spec emissions, parses structured — and `finalizeOrPause` fails the job on violation, recording `job.flowOutput` on success. Remaining 🟡: schemas (`flow-output-schema`), and nothing *submits* the recorded JobIntent to a JobStateMachine yet — enforcement without emission |
+| Node/flow output schema, effect-aware replay | 🟡 | Honestly reported: `output.schema`/`structured.schema` accepted but never validated (`node-output-schema`/`flow-output-schema`); `effect` recorded but not consulted (`effect`) — becomes 🔴 the day a durable checkpointer starts replaying side-effecting nodes (duplicate PRs) |
 | Approval `slaMs` / `assigneeRole` | 🔴 | No auto-reject timer; resume route checks only job status — any caller with socket access can approve |
 | Durability | 🔴 | `MemorySaver` default checkpointer: restart loses every awaiting-approval/suspended job; durable savers supported but never wired |
 | Suspend wake-ups | 🟡 | No timer/event scheduler; resume is entirely the caller's job |
@@ -79,4 +92,4 @@ These are inherited from the original review; the spec now *warns* about the fir
 
 ## 4. The one-sentence summary
 
-The extraction fixed the *honesty* problem (2026-08-07) and the data-plane pass fixed the *capability ceiling* (2026-08-12 — run state, node I/O, typed errors, and a data-shaping expression language now exist and execute); what remains is the reliability tier (policy/join/triggers/fan-out still warn-only, schema and effect declared-not-enforced) and the mechanisms keeping spec and runtime aligned (the warning list, the fixture discipline), which are only as strong as the conventions §2 asks to turn into tests.
+The extraction fixed the *honesty* problem (2026-08-07), the data-plane pass fixed the *capability ceiling*, and the hardening pass turned the alignment mechanisms into enforced tests (three-behavior conformance fixtures) while giving the factory/fleet seam teeth (terminal output enforcement) — what remains is the reliability tier (policy/join/triggers/fan-out still warn-only), schema/effect enforcement, HITL trust (role check, SLA, durable checkpointer), and JobIntent *emission* on top of the now-enforced contract.

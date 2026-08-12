@@ -29,7 +29,9 @@ import {
  * `node-output-schema` (output.kind 'json' declares a schema — parse
  * happens, schema enforcement doesn't), `effect` (classification
  * recorded, not consulted on replay/retry), `subflow-version-pin`
- * (version recorded, resolution stays by flowId). Remove an id from
+ * (version recorded, resolution stays by flowId), `flow-output-schema`
+ * (flow-level structured output is parsed, its schema isn't validated).
+ * Remove an id from
  * `reportUnsupportedFeatures` in the same change that makes the
  * runtime execute it — the reporting list IS the honest coverage
  * boundary.
@@ -260,6 +262,18 @@ function reportUnsupportedFeatures(
   where: string,
   report: (f: UnsupportedFeature) => void,
 ): void {
+  const flowOutput = flow.output as Record<string, unknown> | undefined;
+  if (flowOutput?.kind === 'structured') {
+    // structured REQUIRES schema (enforced above), and parseFlowOutput
+    // only parses JSON — the schema itself is never validated against
+    // the terminal output.
+    report({
+      where: `${where}.output.schema`,
+      feature: 'flow-output-schema',
+      detail:
+        'terminal output is parsed as JSON, but the declared schema is not validated against it yet',
+    });
+  }
   for (const [j, n] of (flow.nodes as unknown[]).entries()) {
     const node = n as Record<string, unknown>;
     const at = `${where}.nodes[${j}]`;

@@ -530,7 +530,7 @@ export function makeTransformExecutor(node: TaskStep): NodeExecutor {
  */
 function wrapWithTags(step: TaskStep, exec: NodeExecutor): NodeExecutor {
   if (!step.tags?.loop) return exec;
-  return loopWrapper(step.id, step.tags.loop, exec);
+  return loopWrapper(step.id, step.tags.loop, exec, step.output?.kind === 'json');
 }
 
 /**
@@ -868,7 +868,20 @@ function makeSuspendExecutor(node: SyntheticSuspendNode): NodeExecutor {
  * channel reducers (changedFiles uses one) or use a `transform` step
  * after the loop to project state.
  */
-function loopWrapper(nodeId: string, tag: LoopTag, inner: NodeExecutor): NodeExecutor {
+function loopWrapper(
+  nodeId: string,
+  tag: LoopTag,
+  inner: NodeExecutor,
+  wantsJson: boolean,
+): NodeExecutor {
+  // json-declaring looped nodes aggregate a JSON ARRAY — each item's
+  // output must itself be valid JSON, and withNodeIO parses the whole
+  // aggregate into state.nodes[id] as an array of per-iteration values.
+  // (The `\n---\n` text join is never valid JSON, so without this a
+  // json loop over 2+ items could only ever exit OutputParseError.)
+  const joinOutputs = wantsJson
+    ? (outputs: string[]) => `[${outputs.join(',')}]`
+    : (outputs: string[]) => outputs.join('\n---\n');
   return async (state) => {
     const itemsOrError = await resolveLoopItems(tag, state, nodeId);
     if (!Array.isArray(itemsOrError)) {
@@ -878,9 +891,9 @@ function loopWrapper(nodeId: string, tag: LoopTag, inner: NodeExecutor): NodeExe
     const concurrency = Math.max(1, tag.concurrency ?? 4);
 
     if (tag.mode === 'parallel') {
-      return runLoopParallel(items, inner, state, nodeId, concurrency);
+      return runLoopParallel(items, inner, state, nodeId, concurrency, joinOutputs);
     }
-    return runLoopSequential(items, inner, state, nodeId);
+    return runLoopSequential(items, inner, state, nodeId, joinOutputs);
   };
 }
 
@@ -938,6 +951,7 @@ async function runLoopSequential(
   inner: NodeExecutor,
   state: FlowStateT,
   nodeId: string,
+  joinOutputs: (outputs: string[]) => string,
 ): Promise<Partial<FlowStateT>> {
   const outputs: string[] = [];
   let lastDelta: Partial<FlowStateT> = {};
@@ -953,7 +967,7 @@ async function runLoopSequential(
 
   return {
     ...lastDelta,
-    output: outputs.join('\n---\n'),
+    output: joinOutputs(outputs),
     lastExit: { nodeId, kind: 'success' },
   };
 }
@@ -964,6 +978,7 @@ async function runLoopParallel(
   state: FlowStateT,
   nodeId: string,
   concurrency: number,
+  joinOutputs: (outputs: string[]) => string,
 ): Promise<Partial<FlowStateT>> {
   const outputs: string[] = [];
   let lastDelta: Partial<FlowStateT> = {};
@@ -988,7 +1003,7 @@ async function runLoopParallel(
 
   return {
     ...lastDelta,
-    output: outputs.join('\n---\n'),
+    output: joinOutputs(outputs),
     lastExit: { nodeId, kind: 'success' },
   };
 }

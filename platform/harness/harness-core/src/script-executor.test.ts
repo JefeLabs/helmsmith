@@ -63,6 +63,21 @@ const STUB_BROKER = {
 const HAS_PYTHON =
   existsSync('/usr/bin/python3') || existsSync('/usr/local/bin/python3');
 
+// ─── state view ───────────────────────────────────────────────────────────
+
+describe('makeScriptExecutor: HARNESS_STATE_JSON view', () => {
+  it('exposes the job input; excludes nodes (input mappings are the channel for those)', async () => {
+    const exec = makeScriptExecutor(scriptStep('s', 'bash', 'printf "%s" "$HARNESS_STATE_JSON"'));
+    const delta = await exec(
+      freshState({ input: { task: 'fix-bug' }, nodes: { prior: { big: 'blob' } } }),
+    );
+    expect(delta.lastExit).toMatchObject({ kind: 'success' });
+    const view = JSON.parse(delta.output ?? '{}');
+    expect(view.input).toEqual({ task: 'fix-bug' });
+    expect('nodes' in view).toBe(false);
+  });
+});
+
 // ─── secrets ──────────────────────────────────────────────────────────────
 
 describe('makeScriptExecutor: secrets', () => {
