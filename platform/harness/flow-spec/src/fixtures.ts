@@ -303,3 +303,288 @@ export const EXPRESSION_CASES: readonly ExpressionCase[] = [
     expected: true,
   },
 ];
+
+// ─── Validation-verdict fixtures ─────────────────────────────────────────
+//
+// Same replay discipline as EXPRESSION_CASES, for the validator's
+// accept/reject behavior: any conforming validator (this package's,
+// harness-core's re-export, a future Java-side one) must agree on
+// which catalogs are valid and locate errors the same way.
+
+export interface ValidationCase {
+  name: string;
+  /** Passed verbatim to validateFlowCatalog(catalog, 'fixture'). */
+  catalog: unknown;
+  valid: boolean;
+  /** Substring the CatalogError message must contain when valid=false. */
+  errorIncludes?: string;
+}
+
+/** Shared minimal valid flow used as the base for invalid variations. */
+const VALID_FLOW = {
+  id: 'demo',
+  nodes: [
+    { id: 't', kind: 'trigger', config: { kind: 'manual' } },
+    { id: 'a', kind: 'transform', config: { expression: { kind: 'literal', value: 1 } } },
+  ],
+  edges: [{ from: 't', to: 'a', type: 'sequence' }],
+};
+
+export const VALIDATION_CASES: readonly ValidationCase[] = [
+  {
+    name: 'minimal valid catalog is accepted',
+    catalog: { flows: [VALID_FLOW] },
+    valid: true,
+  },
+  {
+    name: 'missing flows array is rejected',
+    catalog: {},
+    valid: false,
+    errorIncludes: 'missing "flows" array',
+  },
+  {
+    name: 'edge to an unknown node is rejected with the node named',
+    catalog: {
+      flows: [{ ...VALID_FLOW, edges: [{ from: 't', to: 'ghost', type: 'sequence' }] }],
+    },
+    valid: false,
+    errorIncludes: 'unknown node "ghost"',
+  },
+  {
+    name: 'cycles on non-reject edges are rejected',
+    catalog: {
+      flows: [
+        {
+          ...VALID_FLOW,
+          edges: [
+            { from: 't', to: 'a', type: 'sequence' },
+            { from: 'a', to: 'a', type: 'sequence' },
+          ],
+        },
+      ],
+    },
+    valid: false,
+    errorIncludes: 'cycle detected',
+  },
+  {
+    name: 'unknown compare op is rejected',
+    catalog: {
+      flows: [
+        {
+          ...VALID_FLOW,
+          nodes: [
+            VALID_FLOW.nodes[0],
+            {
+              id: 'a',
+              kind: 'transform',
+              config: {
+                expression: {
+                  kind: 'compare',
+                  lhs: { kind: 'literal', value: 1 },
+                  op: '~=',
+                  rhs: { kind: 'literal', value: 1 },
+                },
+              },
+            },
+          ],
+        },
+      ],
+    },
+    valid: false,
+    errorIncludes: 'op must be one of',
+  },
+  {
+    name: 'invalid literal regex for matches is rejected at load time',
+    catalog: {
+      flows: [
+        {
+          ...VALID_FLOW,
+          nodes: [
+            VALID_FLOW.nodes[0],
+            {
+              id: 'a',
+              kind: 'transform',
+              config: {
+                expression: {
+                  kind: 'compare',
+                  lhs: { kind: 'literal', value: 'x' },
+                  op: 'matches',
+                  rhs: { kind: 'literal', value: '(' },
+                },
+              },
+            },
+          ],
+        },
+      ],
+    },
+    valid: false,
+    errorIncludes: 'not a valid regular expression',
+  },
+  {
+    name: 'two catch-all error edges from one source are rejected',
+    catalog: {
+      flows: [
+        {
+          ...VALID_FLOW,
+          nodes: [
+            ...VALID_FLOW.nodes,
+            { id: 'b', kind: 'transform', config: { expression: { kind: 'literal', value: 1 } } },
+            { id: 'c', kind: 'transform', config: { expression: { kind: 'literal', value: 1 } } },
+          ],
+          edges: [
+            { from: 't', to: 'a', type: 'sequence' },
+            { from: 'a', to: 'b', type: 'error' },
+            { from: 'a', to: 'c', type: 'error' },
+          ],
+        },
+      ],
+    },
+    valid: false,
+    errorIncludes: "at most one catch-all 'error' edge",
+  },
+  {
+    name: 'job-definition flow without job-intent output is rejected',
+    catalog: { flows: [{ ...VALID_FLOW, kind: 'job-definition' }] },
+    valid: false,
+    errorIncludes: "requires output.kind 'job-intent'",
+  },
+  {
+    name: 'duplicate node ids are rejected',
+    catalog: {
+      flows: [{ ...VALID_FLOW, nodes: [...VALID_FLOW.nodes, VALID_FLOW.nodes[1]] }],
+    },
+    valid: false,
+    errorIncludes: 'duplicate node id',
+  },
+];
+
+// ─── Unsupported-feature fixtures ────────────────────────────────────────
+//
+// The teeth behind the README rule ("delete the report in the change
+// that implements the feature"): replayers compare the EXACT sorted
+// feature list, so a stale report (implemented but still warned) AND a
+// missing report (new dead config, no warning) both fail every
+// conforming validator until this fixture is updated FIRST.
+
+export interface UnsupportedCase {
+  name: string;
+  /** A single FlowDef; replayers wrap it as `{ flows: [flow] }`. */
+  flow: unknown;
+  /** Exact (sorted-compare) list of feature ids the validator must
+   *  report — no more, no fewer. */
+  expectedFeatures: readonly string[];
+}
+
+export const UNSUPPORTED_CASES: readonly UnsupportedCase[] = [
+  {
+    name: 'every currently-unexecuted feature reports exactly once',
+    flow: {
+      id: 'kitchen-sink',
+      output: { kind: 'structured', schema: { type: 'object' } },
+      nodes: [
+        { id: 't', kind: 'trigger', config: { kind: 'schedule', cron: '0 * * * *' } },
+        {
+          id: 'a',
+          kind: 'transform',
+          config: { expression: { kind: 'literal', value: 1 } },
+          policy: { retry: { maxAttempts: 2 } },
+          joinStrategy: 'any',
+          effect: 'pure',
+          output: { kind: 'json', schema: { type: 'object' } },
+        },
+        {
+          id: 'b',
+          kind: 'transform',
+          config: { expression: { kind: 'literal', value: 1 } },
+          terminal: 'fail',
+        },
+        {
+          id: 'c',
+          kind: 'gate',
+          config: {
+            assertions: [{ expression: { kind: 'js', expression: 'true' }, message: 'x' }],
+          },
+        },
+        { id: 's', kind: 'subflow', config: { flowId: 'inner', version: '1.0.0' } },
+      ],
+      edges: [
+        { from: 't', to: 'a', type: 'sequence' },
+        { from: 'a', to: 'b', type: 'sequence' },
+        { from: 'a', to: 'c', type: 'sequence' },
+        { from: 'b', to: 's', type: 'sequence' },
+      ],
+    },
+    expectedFeatures: [
+      'effect',
+      'expression-js',
+      'flow-output-schema',
+      'joinStrategy',
+      'node-output-schema',
+      'parallel-fan-out',
+      'policy',
+      'subflow-version-pin',
+      'terminal-fail',
+      'trigger-schedule',
+    ],
+  },
+  {
+    name: 'fully-executed features produce zero reports',
+    flow: {
+      id: 'all-executed',
+      version: '1.0.0',
+      nodes: [
+        { id: 't', kind: 'trigger', config: { kind: 'manual' } },
+        {
+          id: 'sh',
+          kind: 'script',
+          config: {
+            language: 'bash',
+            source: 'true',
+            secrets: { API_KEY: { credentialId: 'anthropic' } },
+          },
+        },
+        {
+          id: 'shape',
+          kind: 'transform',
+          input: { task: { kind: 'jsonpath', path: '$.input' } },
+          output: { kind: 'json' },
+          config: {
+            expression: {
+              kind: 'object',
+              fields: { ok: { kind: 'exists', expr: { kind: 'jsonpath', path: '$.output' } } },
+            },
+          },
+        },
+        {
+          id: 'check',
+          kind: 'gate',
+          config: {
+            assertions: [
+              {
+                expression: {
+                  kind: 'compare',
+                  lhs: { kind: 'jsonpath', path: '$.output' },
+                  op: 'contains',
+                  rhs: { kind: 'literal', value: 'ok' },
+                },
+                message: 'output mentions ok',
+              },
+            ],
+          },
+        },
+        {
+          id: 'handled',
+          kind: 'transform',
+          config: { expression: { kind: 'literal', value: 'recovered' } },
+        },
+      ],
+      edges: [
+        { from: 't', to: 'sh', type: 'sequence' },
+        { from: 'sh', to: 'shape', type: 'sequence' },
+        { from: 'sh', to: 'handled', type: 'error', on: ['Timeout', 'AuthError'] },
+        { from: 'shape', to: 'check', type: 'sequence' },
+      ],
+    },
+    expectedFeatures: [],
+  },
+];
