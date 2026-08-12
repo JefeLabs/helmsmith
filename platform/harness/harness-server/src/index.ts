@@ -775,7 +775,7 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: ServerCtx) {
     const resumeMatch = req.method === 'POST' ? url.match(/^\/v1\/jobs\/([^/]+)\/resume$/) : null;
     if (resumeMatch && parsed !== null) {
       const id = resumeMatch[1]!;
-      handleResumeJob(res, id, parsed, ctx).catch((err: Error) => {
+      handleResumeJob(req, res, id, parsed, ctx).catch((err: Error) => {
         if (!res.headersSent) {
           res.statusCode = 500;
           res.setHeader('Content-Type', 'application/json');
@@ -1278,6 +1278,7 @@ async function handleSubmitJob(
  * JobBus / GET /v1/jobs/:id; this endpoint just kicks the resume.
  */
 async function handleResumeJob(
+  req: IncomingMessage,
   res: ServerResponse,
   jobId: string,
   body: unknown,
@@ -1299,6 +1300,37 @@ async function handleResumeJob(
   if (!broker) {
     badRequest(res, 'cannot resume — no credential broker configured on this server');
     return;
+  }
+
+  // 2.1 — approval resumes are gated; suspend resumes are just a wake
+  // signal (no decision, no role on SuspendTag) and pass through.
+  const pending = ctx.pendingApprovals.get(jobId);
+  if (job.status === 'awaiting-approval') {
+    const decision = (body as { decision?: unknown } | null)?.decision;
+    if (decision !== 'approve' && decision !== 'reject') {
+      badRequest(
+        res,
+        `resume body for an approval must carry decision: 'approve' | 'reject' (got ${JSON.stringify(decision)})`,
+      );
+      return;
+    }
+    // Role check: the caller must assert the assignee role via the
+    // x-actor-role header. This is header-asserted identity over the
+    // already-0600-scoped UDS transport — an enforcement point, not
+    // authentication; real authn replaces the header source later.
+    // The SLA auto-reject timer bypasses this by construction (it
+    // calls executeResume directly — the server acting as itself).
+    if (pending) {
+      const role = req.headers['x-actor-role'];
+      if (typeof role !== 'string' || role !== pending.assigneeRole) {
+        forbidden(
+          res,
+          `role ${typeof role === 'string' ? `"${role}"` : '(none)'} is not authorized; ` +
+            `approval for job "${jobId}" requires role "${pending.assigneeRole}"`,
+        );
+        return;
+      }
+    }
   }
 
   const wasApproval = job.status === 'awaiting-approval';
@@ -2204,6 +2236,12 @@ function ok(res: ServerResponse, payload: Record<string, unknown>): void {
 function notFound(res: ServerResponse, error: string): void {
   res.writeHead(404, { 'content-type': 'application/json' });
   res.end(JSON.stringify({ ok: false, error }));
+}
+
+function forbidden(res: ServerResponse, error: string): void {
+  res.statusCode = 403;
+  res.setHeader('Content-Type', 'application/json');
+  res.end(JSON.stringify({ error }));
 }
 
 function badRequest(res: ServerResponse, error: string): void {

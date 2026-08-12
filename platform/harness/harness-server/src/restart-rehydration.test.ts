@@ -101,6 +101,7 @@ function udsJson(
   method: string,
   path: string,
   body?: unknown,
+  headers?: Record<string, string>,
   // biome-ignore lint/suspicious/noExplicitAny: test helper mirrors approval-resume-integration.test.ts
 ): Promise<{ status: number; body: any }> {
   return new Promise((resolve, reject) => {
@@ -113,6 +114,7 @@ function udsJson(
         headers: {
           'Content-Type': 'application/json',
           ...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : {}),
+          ...headers,
         },
       },
       (res) => {
@@ -207,9 +209,13 @@ describe('HITL restart survival (durable checkpointer + paused-job rehydration)'
 
     // Approve on the NEW server — the graph recompiles from the persisted
     // flow and picks the paused thread up from the SQLite checkpointer.
-    const resume = await udsJson(socketB, 'POST', '/v1/jobs/jRestart/resume', {
-      decision: 'approve',
-    });
+    const resume = await udsJson(
+      socketB,
+      'POST',
+      '/v1/jobs/jRestart/resume',
+      { decision: 'approve' },
+      { 'x-actor-role': 'tech-lead' },
+    );
     expect(resume.status).toBe(200);
 
     await waitFor(async () => {
@@ -289,7 +295,13 @@ describe('approval SLA auto-reject (2.1)', () => {
     });
 
     // A human approves the second attempt in time → completes.
-    await udsJson(socketPath, 'POST', '/v1/jobs/jSla/resume', { decision: 'approve' });
+    await udsJson(
+      socketPath,
+      'POST',
+      '/v1/jobs/jSla/resume',
+      { decision: 'approve' },
+      { 'x-actor-role': 'tech-lead' },
+    );
     await waitFor(async () => {
       const r = await udsJson(socketPath, 'GET', '/v1/jobs/jSla');
       return r.body.job?.status === 'completed';
@@ -310,7 +322,13 @@ describe('approval SLA auto-reject (2.1)', () => {
       return r.body.job?.status === 'awaiting-approval';
     });
 
-    await udsJson(socketPath, 'POST', '/v1/jobs/jTimely/resume', { decision: 'approve' });
+    await udsJson(
+      socketPath,
+      'POST',
+      '/v1/jobs/jTimely/resume',
+      { decision: 'approve' },
+      { 'x-actor-role': 'tech-lead' },
+    );
     await waitFor(async () => {
       const r = await udsJson(socketPath, 'GET', '/v1/jobs/jTimely');
       return r.body.job?.status === 'completed';
