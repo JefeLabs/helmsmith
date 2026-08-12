@@ -306,7 +306,7 @@ describe('unsupported-feature reporting', () => {
     expect(reported.map((f) => f.feature)).toContain('flow-output-schema');
   });
 
-  it('reports node-output-schema, effect, and subflow-version-pin', () => {
+  it('reports node-output-schema and subflow-version-pin; effect is executed and silent', () => {
     const reported: UnsupportedFeature[] = [];
     const catalog = {
       flows: [
@@ -337,7 +337,8 @@ describe('unsupported-feature reporting', () => {
     validateFlowCatalog(catalog, 'test', { onUnsupported: (f) => reported.push(f) });
     const features = reported.map((f) => f.feature);
     expect(features).toContain('node-output-schema');
-    expect(features).toContain('effect');
+    // effect is consulted by the runtime (replay guard) — no report.
+    expect(features).not.toContain('effect');
     expect(features).toContain('subflow-version-pin');
     // json output WITHOUT a schema is fully executed — no report.
     const reported2: UnsupportedFeature[] = [];
