@@ -161,6 +161,34 @@ export interface TaskStep {
     | SubflowConfig
     | TriggerConfig
     | PublishConfig;
+  /**
+   * Input mapping — how this node composes its effective input from
+   * run state, instead of implicitly consuming the previous node's
+   * `output` string. Two forms:
+   *
+   *   - A single Expression: resolves to the effective input. Strings
+   *     pass through raw; other values are JSON-serialized.
+   *   - A Record mapping name → Expression: each field resolves against
+   *     state and the whole object is JSON-serialized. This is how a
+   *     node consumes MORE than one upstream value: `$.input`,
+   *     `$.nodes.<id>`, `$.rejectionPayload`, …
+   *
+   * The single-Expression form is detected by a string `kind` field,
+   * so mapping keys must not be named `kind`.
+   *
+   * Omitted → legacy behavior: the node reads `state.output` as-is.
+   */
+  input?: Expression | Readonly<Record<string, Expression>>;
+  /** Per-node output contract. `json` → the runtime parses the node's
+   *  output into `state.nodes[id]` (parse failure exits with errorName
+   *  'OutputParseError', routable via an error edge). Omitted / `text`
+   *  → `state.nodes[id]` holds the raw output string. */
+  output?: NodeOutputContract;
+  /** Side-effect classification. Declarative for now (reported via
+   *  onUnsupported): the runtime does not yet consult it when deciding
+   *  whether a node is safe to re-run on replay/retry. Publish-family
+   *  nodes are inherently 'side-effecting'. */
+  effect?: 'pure' | 'idempotent' | 'side-effecting';
   /** Behavioral modifier tags. Multiple allowed; render order is
    *  Loop top-left, Approval/Suspend top-right. Approval and Suspend
    *  are mutually exclusive on the same node. */
@@ -172,6 +200,16 @@ export interface TaskStep {
   /** Set on nodes with no outgoing edges. Defaults to 'success'. */
   terminal?: 'success' | 'fail';
 }
+
+/**
+ * Per-node output contract (distinct from the flow-level
+ * FlowOutputContract, which governs the terminal node's emission).
+ * `json` makes the node's output addressable as structured data at
+ * `$.nodes.<id>` — the enabling contract for gates and conditional
+ * edges over agent results. `schema` is declared-but-not-enforced
+ * (reported via onUnsupported as 'node-output-schema').
+ */
+export type NodeOutputContract = { kind: 'text' } | { kind: 'json'; schema?: unknown };
 
 // ─── Per-kind configs ────────────────────────────────────────────────────
 
@@ -333,6 +371,12 @@ export interface ScriptConfig {
   language: 'bash' | 'node' | 'python';
   source: string;
   env?: Record<string, string>;
+  /** Credential references resolved through the CredentialBroker at
+   *  dispatch time and injected as environment variables — the same
+   *  auth surface tools use, so secrets never appear literally in
+   *  catalogs. Keys are env var names; resolved values win over any
+   *  same-named `env` entry. */
+  secrets?: Readonly<Record<string, { credentialId: string }>>;
   /** Hard timeout for the script run. Default 30s. SIGTERM on expiry,
    *  SIGKILL after a short grace period if the child ignores SIGTERM. */
   timeoutMs?: number;
@@ -360,6 +404,11 @@ export interface Assertion {
  *  sub-flow terminates; sub-flow output flows in as this node's output. */
 export interface SubflowConfig {
   flowId: string;
+  /** Optional version pin against the target flow's `version`.
+   *  Recorded but not enforced yet — subflows resolve by flowId in the
+   *  loaded catalog (reported via onUnsupported as
+   *  'subflow-version-pin'). */
+  version?: string;
   input?: Record<string, unknown>;
 }
 
@@ -666,6 +715,10 @@ export interface JobIntent {
 
 export interface FlowDef {
   id: string;
+  /** Optional version identity (free-form, semver recommended). Gives
+   *  durable checkpoints and subflow pins something stable to name;
+   *  uniqueness is still keyed on `id` alone within a catalog. */
+  version?: string;
   description?: string;
   /**
    * Flow kind discriminator. Default 'work'.

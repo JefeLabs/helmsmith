@@ -25,9 +25,13 @@ import {
  *
  * Current feature ids: `policy`, `joinStrategy`, `terminal-fail`,
  * `trigger-<kind>` (any non-manual trigger), `expression-js`,
- * `parallel-fan-out` (second+ sequence edge from one node). Remove an
- * id from `reportUnsupportedFeatures` in the same change that makes
- * the runtime execute it — the reporting list IS the honest coverage
+ * `parallel-fan-out` (second+ sequence edge from one node),
+ * `node-output-schema` (output.kind 'json' declares a schema — parse
+ * happens, schema enforcement doesn't), `effect` (classification
+ * recorded, not consulted on replay/retry), `subflow-version-pin`
+ * (version recorded, resolution stays by flowId). Remove an id from
+ * `reportUnsupportedFeatures` in the same change that makes the
+ * runtime execute it — the reporting list IS the honest coverage
  * boundary.
  */
 export interface UnsupportedFeature {
@@ -82,6 +86,9 @@ function validateFlow(
   const flow = value as Record<string, unknown>;
   if (typeof flow.id !== 'string' || !flow.id) {
     throw new CatalogError(`${where}.id must be a non-empty string`);
+  }
+  if (flow.version !== undefined && (typeof flow.version !== 'string' || !flow.version)) {
+    throw new CatalogError(`${where}.version must be a non-empty string when present`);
   }
 
   // kind discriminator (optional, default 'work')
@@ -276,6 +283,31 @@ function reportUnsupportedFeatures(
         });
       }
     }
+    const output = node.output as Record<string, unknown> | undefined;
+    if (output?.kind === 'json' && output.schema !== undefined) {
+      report({
+        where: `${at}.output.schema`,
+        feature: 'node-output-schema',
+        detail:
+          'JSON output is parsed into state.nodes, but the declared schema is not validated against it yet',
+      });
+    }
+    if (node.effect !== undefined) {
+      report({
+        where: at,
+        feature: 'effect',
+        detail:
+          'effect classification is recorded but the runtime does not yet consult it for replay/retry decisions',
+      });
+    }
+    if (node.kind === 'subflow' && (node.config as Record<string, unknown>).version !== undefined) {
+      report({
+        where: `${at}.config.version`,
+        feature: 'subflow-version-pin',
+        detail:
+          'subflows resolve by flowId in the loaded catalog; the version pin is recorded but not enforced',
+      });
+    }
   }
 
   // Second+ sequence edge from one source node is silently ignored by
@@ -436,6 +468,22 @@ function validateNode(value: unknown, where: string): void {
   }
   validateNodeConfig(node.kind, node.config, `${where}.config`);
 
+  if (node.input !== undefined) {
+    validateInputMapping(node.input, `${where}.input`);
+  }
+  if (node.output !== undefined) {
+    validateNodeOutputContract(node.output, `${where}.output`);
+  }
+  if (
+    node.effect !== undefined &&
+    node.effect !== 'pure' &&
+    node.effect !== 'idempotent' &&
+    node.effect !== 'side-effecting'
+  ) {
+    throw new CatalogError(
+      `${where}.effect must be 'pure', 'idempotent', or 'side-effecting' when present`,
+    );
+  }
   if (node.tags !== undefined) {
     validateTaskStepTags(node.tags, `${where}.tags`);
   }
@@ -447,6 +495,42 @@ function validateNode(value: unknown, where: string): void {
   }
   if (node.terminal !== undefined && node.terminal !== 'success' && node.terminal !== 'fail') {
     throw new CatalogError(`${where}.terminal must be 'success' or 'fail' when present`);
+  }
+}
+
+/**
+ * Validate `TaskStep.input` — either a single Expression (detected by a
+ * string `kind` field, which is why mapping keys must not be named
+ * "kind") or a non-empty Record of name → Expression.
+ */
+function validateInputMapping(value: unknown, where: string): void {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new CatalogError(`${where} must be an Expression or an object mapping name → Expression`);
+  }
+  const obj = value as Record<string, unknown>;
+  if (typeof obj.kind === 'string') {
+    validateExpression(obj, where);
+    return;
+  }
+  const keys = Object.keys(obj);
+  if (keys.length === 0) {
+    throw new CatalogError(`${where} must declare at least one entry`);
+  }
+  for (const key of keys) {
+    validateExpression(obj[key], `${where}.${key}`);
+  }
+}
+
+function validateNodeOutputContract(value: unknown, where: string): void {
+  if (!value || typeof value !== 'object') {
+    throw new CatalogError(`${where} must be an object`);
+  }
+  const o = value as Record<string, unknown>;
+  if (o.kind !== 'text' && o.kind !== 'json') {
+    throw new CatalogError(`${where}.kind must be 'text' or 'json' (got ${JSON.stringify(o.kind)})`);
+  }
+  if (o.kind === 'text' && o.schema !== undefined) {
+    throw new CatalogError(`${where}.schema is only allowed when kind is 'json'`);
   }
 }
 
@@ -475,6 +559,27 @@ function validateNodeConfig(kind: string, config: object, where: string): void {
       if (c.timeoutMs !== undefined && (typeof c.timeoutMs !== 'number' || c.timeoutMs <= 0)) {
         throw new CatalogError(`${where}.timeoutMs must be a positive number when present`);
       }
+      if (c.secrets !== undefined) {
+        if (!c.secrets || typeof c.secrets !== 'object' || Array.isArray(c.secrets)) {
+          throw new CatalogError(
+            `${where}.secrets must be an object mapping ENV_NAME → { credentialId }`,
+          );
+        }
+        for (const [envName, ref] of Object.entries(c.secrets as Record<string, unknown>)) {
+          if (!envName) {
+            throw new CatalogError(`${where}.secrets has an empty env var name`);
+          }
+          const credentialId =
+            ref && typeof ref === 'object'
+              ? (ref as Record<string, unknown>).credentialId
+              : undefined;
+          if (typeof credentialId !== 'string' || !credentialId) {
+            throw new CatalogError(
+              `${where}.secrets.${envName}.credentialId must be a non-empty string`,
+            );
+          }
+        }
+      }
       break;
     case 'transform':
       validateExpression(c.expression, `${where}.expression`);
@@ -497,6 +602,9 @@ function validateNodeConfig(kind: string, config: object, where: string): void {
     case 'subflow':
       if (typeof c.flowId !== 'string' || !c.flowId) {
         throw new CatalogError(`${where}.flowId must be a non-empty string`);
+      }
+      if (c.version !== undefined && (typeof c.version !== 'string' || !c.version)) {
+        throw new CatalogError(`${where}.version must be a non-empty string when present`);
       }
       break;
     case 'trigger':
