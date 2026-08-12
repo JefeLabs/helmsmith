@@ -4,9 +4,11 @@
  * Bridge between the static FlowDef catalog (nodes + edges + tags) and
  * an executable graph. Public surface:
  *
- *   - FlowState           — StateGraph schema (jobId, output, messages,
- *                           attempts, lastExit, rejectionPayload,
- *                           steering, cancelRequested, changedFiles).
+ *   - FlowState           — StateGraph schema (jobId, input, output,
+ *                           nodes, messages, attempts, lastExit,
+ *                           rejectionPayload, steering, cancelRequested,
+ *                           changedFiles). Compile-time-asserted against
+ *                           flow-spec's FlowRunState wire contract.
  *   - compileFlow         — FlowDef + per-node executor map → compiled
  *                           StateGraph with checkpointer attached.
  *   - buildRouter         — outgoing edges → ConditionalEdgeRouter

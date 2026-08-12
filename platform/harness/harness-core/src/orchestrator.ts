@@ -319,7 +319,8 @@ export interface RunJobDeps {
  *   ✅ subflow  — composable inner flows (subflow-executor.ts), v1-light:
  *                 inner CANNOT contain agent / approval / suspend
  *   ✅ script   — bash | node | python via execFile, stdin↔stdout
- *                 (script-executor.ts)
+ *                 (script-executor.ts); `secrets` resolved through the
+ *                 credential broker into child env
  *
  * Tags:
  *   ✅ approval — synthetic interrupt node + Command(resume) on parent
@@ -333,19 +334,45 @@ export interface RunJobDeps {
  *   ✅ sequence    — default forward
  *   ✅ conditional — Expression-driven; first match wins
  *   ✅ fallback    — catchall when no other edge fires
- *   ✅ error       — catches kind:'error' exits; unhandled → router throw
+ *   ✅ error       — catches kind:'error' exits; `on` matchers route by
+ *                    errorName (first declared match wins, catch-all
+ *                    last); unhandled → router throw
  *   ✅ reject      — cycles back with attempt counter; onMaxAttempts:
  *                    'fail' (default, throws) or 'escalate'
  *
+ * Node I/O (data plane):
+ *   ✅ input mapping     — TaskStep.input Expression / Record resolved
+ *                          against state into the node's effective
+ *                          input (withInputMapping, flow-graph.ts)
+ *   ✅ node outputs      — every node's output recorded under
+ *                          state.nodes[id] (withNodeIO, flow-graph.ts)
+ *   ✅ output.kind json  — output parsed into state.nodes[id];
+ *                          OutputParseError on bad JSON (error-edge
+ *                          eligible)
+ *   ❌ output schema     — declared schema not validated (reported:
+ *                          'node-output-schema')
+ *   ❌ effect            — classification recorded, not consulted on
+ *                          replay/retry (reported: 'effect')
+ *   ❌ subflow version   — pin recorded, resolution by flowId only
+ *                          (reported: 'subflow-version-pin')
+ *
  * Expressions (used by conditional edges, gates, transforms, loops, tool
- * args, subflow input):
+ * args, subflow input, node input mappings):
  *   ✅ literal       — value passthrough
- *   ✅ jsonpath      — $.path.into.state (no array indexing / wildcards)
- *   ✅ compare       — ==/!=/</<=/>/>=/in (strict equality; numeric
+ *   ✅ jsonpath      — $.path.into.state incl. dot-numeric array
+ *                      indexing ($.repos.0); no brackets / wildcards.
+ *                      Binding surface: FlowRunState ($.input, $.nodes,
+ *                      $.output, $.lastExit, …)
+ *   ✅ compare       — ==/!=/</<=/>/>=/in + contains/startsWith/
+ *                      endsWith/matches (strict equality; numeric
  *                      coercion via Number(); NaN ⇒ false; in is
- *                      collection-membership only)
+ *                      collection-membership; string ops are
+ *                      string-only, matches never throws)
  *   ✅ all / any     — short-circuit AND / OR; vacuous defaults
  *   ✅ not           — boolean inversion
+ *   ✅ exists        — presence check (undefined-only miss; null exists)
+ *   ✅ object/array  — constructors (resolveExpressionValue); truthy
+ *                      as predicates
  *   ❌ js            — throws; deliberately deferred (compose with
  *                      compare/all/any/not instead)
  *
@@ -356,6 +383,8 @@ export interface RunJobDeps {
  *   ✅ Checkpointer (MemorySaver default; PG/SQLite swappable)
  *   ✅ Changed-files state channel (merged from agent-tick + surfaced
  *      in Approval/Suspend payloads)
+ *   ✅ Run-state wire contract (FlowStateT compile-time-asserted
+ *      against flow-spec's FlowRunState)
  *
  * ─────────────────────────────────────────────────────────────────────
  *  EXPLICITLY DEFERRED
