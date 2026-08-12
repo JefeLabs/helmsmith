@@ -612,8 +612,10 @@ export const UNSUPPORTED_CASES: readonly UnsupportedCase[] = [
         { from: 'b', to: 's', type: 'sequence' },
       ],
     },
+    // 'effect' is deliberately absent: the kitchen-sink node still
+    // declares `effect: 'pure'`, pinning that the classification is
+    // executed (replay guard) and no longer reported.
     expectedFeatures: [
-      'effect',
       'expression-js',
       'flow-output-schema',
       'joinStrategy',
@@ -635,6 +637,7 @@ export const UNSUPPORTED_CASES: readonly UnsupportedCase[] = [
         {
           id: 'sh',
           kind: 'script',
+          effect: 'side-effecting',
           config: {
             language: 'bash',
             source: 'true',

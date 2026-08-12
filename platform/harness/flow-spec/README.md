@@ -41,7 +41,6 @@ Both validators accept `{ onUnsupported?: (f: UnsupportedFeature) => void }`. Th
 | `expression-js` | the evaluator throws on `js` expressions |
 | `parallel-fan-out` | only the first sequence edge from a node is followed |
 | `node-output-schema` | `output.kind: 'json'` is parsed into `state.nodes`, but the declared schema is not validated |
-| `effect` | classification recorded, not consulted on replay/retry |
 | `subflow-version-pin` | version recorded; subflows still resolve by flowId |
 | `flow-output-schema` | structured terminal output is parsed and enforced, but its schema is not validated |
 

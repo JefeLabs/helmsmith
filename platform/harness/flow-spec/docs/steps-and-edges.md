@@ -145,7 +145,7 @@ There is no parallel split/join. Multiple sequence edges from one node validate 
 
 | Tag | Fields | Status | Caveats |
 |---|---|---|---|
-| `approval` | `assigneeRole`, `slaMs`, `steeringInputs?`, `concurrency: "pessimistic"` | ⚠️ | Interrupt/resume works end-to-end (pause → `awaiting-approval` → approve/reject with steering). **Not enforced:** `slaMs` (no auto-reject timer), `assigneeRole` (no authz on the resume route), pessimistic locking (no lock exists). Mutually exclusive with `suspend`. |
+| `approval` | `assigneeRole`, `slaMs`, `steeringInputs?`, `concurrency: "pessimistic"` | ⚠️ | Interrupt/resume works end-to-end (pause → `awaiting-approval` → approve/reject with steering), and since the HITL trust slice (2026-08-12): `slaMs` arms a server-side auto-reject timer (re-armed across restarts from the original pause time), `assigneeRole` gates the resume route (`x-actor-role` header must match — header-asserted identity, real authn later), and paused jobs survive restarts (durable checkpointer + rehydration). **Still not enforced:** pessimistic locking (no lock exists). Mutually exclusive with `suspend`. |
 | `suspend` | `trigger: {kind:'timer',durationMs}` \| `{kind:'event',eventType,matcher?}` | ⚠️ | Pauses correctly; **nothing schedules the wake-up** — resume is the caller's job (cron/event listener not built). With the default in-memory checkpointer, a process restart loses the paused job. |
 | `loop` | `source: "collection"\|"directory"`, `path: Expression`, `mode: "sequential"\|"parallel"`, `concurrency?` (4) | ⚠️ | Iterates the node over items (item → `state.output`); outputs joined with `\n---\n`. **Caveats:** only the last iteration's non-output state delta survives; parallel mode is chunked (a slow item stalls its chunk) with no sibling cancellation; `directory` is non-recursive (compose with a `script` step + `collection` for trees); halts on first error/reject. |
 
@@ -161,7 +161,7 @@ Every node may declare three data-plane fields alongside `kind`/`config`:
 |---|---|---|---|
 | `input` | Expression **or** `{ name: Expression, … }` | ✅ | Composes the node's effective input from run state instead of implicitly consuming the previous node's `output`. A single Expression resolves to its value (strings raw, everything else JSON); a Record resolves each field and delivers the object as JSON. Agents receive it as the prompt, scripts as stdin, tools/transforms/gates see it as `$.output`. Mapping keys must not be named `kind` (that marks the single-Expression form). |
 | `output` | `{ "kind": "text" }` \| `{ "kind": "json", "schema"? }` | ✅ parse / ❌ schema | `json` → the node's output string is parsed and recorded at `$.nodes.<id>` as structured data; invalid JSON exits with `errorName: 'OutputParseError'` (error-edge routable, catch it with `on: ["OutputParseError"]`). Combined with `tags.loop`, iterations aggregate a JSON **array** — `$.nodes.<id>` = per-iteration values; each item must itself be valid JSON. `schema` validates shape-wise but is **not enforced** against the output (warned as `node-output-schema`). |
-| `effect` | `"pure"` \| `"idempotent"` \| `"side-effecting"` | ❌ | Declarative classification for replay/retry safety. Recorded, warned as `effect`, not yet consulted — declare it now (publish nodes are inherently side-effecting) so durable-checkpointer replays can respect it later. |
+| `effect` | `"pure"` \| `"idempotent"` \| `"side-effecting"` | ✅ | Replay/retry safety classification, consulted on node re-entry: a `side-effecting` node with completion evidence at `$.nodes.<id>` is **skipped** (at-most-once) and its recorded output restored — this covers reject-edge cycles and checkpointer replays after resume/restart. `idempotent`/`pure`/unset re-run freely; mark publish nodes `idempotent` if re-publishing after fixes is intended (the executor reuses an existing PR for the same branch). |
 
 **The run-state surface** (`FlowRunState` in types.ts) every Expression binds against:
 
@@ -202,7 +202,6 @@ Typical pattern — agent emits structured JSON, gate asserts on a field, a late
 | `joinStrategy: "all"\|"any"\|{nOfM}` | Fan-in coordination | Ignored (and fan-out doesn't exist anyway) | `joinStrategy` |
 | `terminal: "fail"` | Mark a failure endpoint | Every terminal node ends as success | `terminal-fail` |
 | `output.schema` | JSON-Schema enforcement of node output | Output parsed, schema ignored | `node-output-schema` |
-| `effect` | Replay/retry safety decisions | Recorded only | `effect` |
 | `config.version` (subflow) | Version-pinned resolution | Resolution by flowId only | `subflow-version-pin` |
 | `output.schema` (flow-level `structured`) | JSON-Schema enforcement of terminal output | Output parsed, schema ignored | `flow-output-schema` |
 

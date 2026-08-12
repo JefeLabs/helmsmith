@@ -980,8 +980,10 @@ export interface ApprovalRequest {
   nodeId: string;
   /** Org role authorized to approve (from the ApprovalTag). */
   assigneeRole: string;
-  /** Time-to-respond before the harness should auto-reject (caller's
-   *  responsibility to enforce; the runtime surfaces the value). */
+  /** Time-to-respond before the harness auto-rejects. harness-server
+   *  arms an auto-reject timer from this value when the job pauses,
+   *  re-armed across restarts from the original pause time (an SLA
+   *  that expired while the server was down fires immediately). */
   slaMs: number;
   /** Optional structured input schema the reviewer fills in. */
   steeringInputs?: ApprovalTag['steeringInputs'];

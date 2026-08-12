@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { chmod, mkdir, unlink } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import {
   type BindingResolver,
   type CredentialBroker,
@@ -34,7 +34,10 @@ import {
   walkAgents,
 } from '@helmsmith/harness-core';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import type { BaseCheckpointSaver } from '@langchain/langgraph';
+import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
 import { runEntryCoordinator } from './coordinator/entry-coordinator.ts';
+import { deletePausedJob, loadPausedJobs, savePausedJob } from './paused-jobs.ts';
 import {
   enqueue as dispatcherEnqueue,
   fireImmediate as dispatcherFireImmediate,
@@ -148,6 +151,10 @@ export {
 
 export interface HarnessServerOptions {
   socketPath: string;
+  /** Checkpointer override (2.2). Default: a SqliteSaver on
+   *  `<workspaceRoot>/.harness/state/checkpoints.sqlite`. Tests can
+   *  inject a MemorySaver to avoid disk. */
+  checkpointer?: BaseCheckpointSaver;
   /**
    * Optional TCP listener. When set, harness-server binds a second
    * `node:http` server on this port (same request handler as the UDS)
@@ -366,14 +373,24 @@ export async function startHarnessServer(opts: HarnessServerOptions): Promise<Ha
   // keepOnSuccess: true (PRD wording: "clean exit retains worktree
   // volume; cleanup only on explicit reaper pass").
   const worktreePolicy = await readWorkspaceYamlWorktreePolicy(workspaceRoot);
+  // 2.2 — durable graph state. One SQLite file per workspace holds every
+  // job's checkpointed thread; paused (awaiting-approval / suspended)
+  // jobs survive server restarts. Tests can inject their own saver.
+  const stateDir = join(workspaceRoot, '.harness', 'state');
+  await mkdir(stateDir, { recursive: true });
+  const checkpointer =
+    opts.checkpointer ?? SqliteSaver.fromConnString(join(stateDir, 'checkpoints.sqlite'));
   const ctx: ServerCtx = {
     bus,
     catalog,
     jobs,
     tokens,
     graphs: new Map(),
+    checkpointer,
+    stateDir,
     pendingApprovals: new Map(),
     pendingSuspends: new Map(),
+    approvalTimers: new Map(),
     inFlight: new Set(),
     queue: [],
     capacity: opts.maxConcurrentJobs ?? 5,
@@ -390,6 +407,23 @@ export async function startHarnessServer(opts: HarnessServerOptions): Promise<Ha
     resolver: opts.resolver,
     coordinatorModel: opts.coordinatorModel,
   };
+
+  // 2.2 — rehydrate paused jobs persisted by a previous process. The
+  // JobRecord (including its FlowDef) and the pending request surfaces
+  // come back here; the compiled graph itself recompiles lazily on the
+  // first resume (recompile-on-resume against the durable checkpointer).
+  for (const rec of await loadPausedJobs(stateDir)) {
+    if (ctx.jobs.has(rec.job.jobId)) continue;
+    ctx.jobs.set(rec.job.jobId, rec.job);
+    if (rec.kind === 'approval') {
+      ctx.pendingApprovals.set(rec.job.jobId, rec.request as ApprovalRequest);
+      // 2.1 — the SLA clock resumes from the ORIGINAL pause time; an
+      // SLA that expired while the server was down fires immediately.
+      armSlaTimer(ctx, rec.job.jobId, rec.request as ApprovalRequest, rec.pausedAt);
+    } else {
+      ctx.pendingSuspends.set(rec.job.jobId, rec.request as SuspendRequest);
+    }
+  }
 
   await mkdir(dirname(opts.socketPath), { recursive: true, mode: 0o700 });
   await unlink(opts.socketPath).catch(() => {});
@@ -424,6 +458,8 @@ export async function startHarnessServer(opts: HarnessServerOptions): Promise<Ha
     catalog,
     ...(tcpPort !== undefined ? { tcpPort } : {}),
     async stop() {
+      // Disarm SLA timers so a stopped server can't fire auto-rejects.
+      for (const jobId of [...ctx.approvalTimers.keys()]) clearSlaTimer(ctx, jobId);
       await new Promise<void>((resolve) => udsServer.close(() => resolve()));
       if (tcpServer) await new Promise<void>((resolve) => tcpServer.close(() => resolve()));
       await unlink(opts.socketPath).catch(() => {});
@@ -458,6 +494,14 @@ interface ServerCtx {
    * Map entirely and recompile on demand from the FlowDef.
    */
   graphs: Map<string, CompiledFlowGraph>;
+  /** Durable checkpointer shared by every graph compile — a SQLite file
+   *  at `<workspaceRoot>/.harness/state/checkpoints.sqlite` by default
+   *  (2.2). Paused thread state survives restarts; resumeJob recompiles
+   *  the graph from `job.flow` against it (recompile-on-resume). */
+  checkpointer: BaseCheckpointSaver;
+  /** State directory (`<workspaceRoot>/.harness/state`) — home of the
+   *  checkpointer DB and the paused-job JSON records. */
+  stateDir: string;
   /** Dispatcher: in-flight jobIds (those currently running runJob).
    *  Distinct from jobs (which holds ALL JobRecords including queued,
    *  paused, completed). */
@@ -483,6 +527,11 @@ interface ServerCtx {
    * resume manually via POST /v1/jobs/:id/resume.
    */
   pendingSuspends: Map<string, SuspendRequest>;
+  /** SLA auto-reject timers, one per pending approval (2.1). Armed when
+   *  a job pauses at an approval (or is rehydrated with one), cleared
+   *  on resume/terminal. Timers are unref'd — they never hold the
+   *  process open. */
+  approvalTimers: Map<string, NodeJS.Timeout>;
   /** Workspace root for the container path (slice 9d-4). Defaults to
    *  process.cwd() at server start. */
   workspaceRoot: string;
@@ -726,7 +775,7 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: ServerCtx) {
     const resumeMatch = req.method === 'POST' ? url.match(/^\/v1\/jobs\/([^/]+)\/resume$/) : null;
     if (resumeMatch && parsed !== null) {
       const id = resumeMatch[1]!;
-      handleResumeJob(res, id, parsed, ctx).catch((err: Error) => {
+      handleResumeJob(req, res, id, parsed, ctx).catch((err: Error) => {
         if (!res.headersSent) {
           res.statusCode = 500;
           res.setHeader('Content-Type', 'application/json');
@@ -1153,6 +1202,7 @@ async function handleSubmitJob(
         resolver,
         ...(githubResolver ? { githubResolver } : {}),
         graphs: ctx.graphs,
+        checkpointer: ctx.checkpointer,
         onStatusChange: (jid, agentId, status) => {
           onJobTerminal(agentId, status);
           // W1d — push job-level transitions up to the controlplane.
@@ -1166,6 +1216,11 @@ async function handleSubmitJob(
             (status === 'completed' || status === 'failed' || status === 'cancelled')
           ) {
             dispatcherOnJobTerminal(ctx, jid);
+            // 2.2 — a terminal job is no longer paused; drop its
+            // persisted pause record (no-op when none exists) and any
+            // still-armed SLA timer (2.1).
+            void deletePausedJob(ctx.stateDir, jid).catch(() => {});
+            clearSlaTimer(ctx, jid);
             // F19: best-effort cleanup of unconfirmed memory entries
             // scoped to this job. The endpoint, primitives, and CLI are
             // all already shipped; this is the missing auto-fire on
@@ -1181,6 +1236,8 @@ async function handleSubmitJob(
         },
         onAwaitingApproval: (jid, request) => {
           ctx.pendingApprovals.set(jid, request);
+          persistPause(ctx, jid, 'approval', request);
+          armSlaTimer(ctx, jid, request, new Date().toISOString());
           // Gate 2b — best-effort: surface the (PR-enriched) approval
           // request to the controlplane so the web HITL view can show
           // it. No-op when CONTROLPLANE_URL is unset (local-only setups
@@ -1191,6 +1248,7 @@ async function handleSubmitJob(
         },
         onSuspend: (jid, request) => {
           ctx.pendingSuspends.set(jid, request);
+          persistPause(ctx, jid, 'suspend', request);
         },
       });
     };
@@ -1220,6 +1278,7 @@ async function handleSubmitJob(
  * JobBus / GET /v1/jobs/:id; this endpoint just kicks the resume.
  */
 async function handleResumeJob(
+  req: IncomingMessage,
   res: ServerResponse,
   jobId: string,
   body: unknown,
@@ -1243,17 +1302,38 @@ async function handleResumeJob(
     return;
   }
 
-  const wasApproval = job.status === 'awaiting-approval';
-  // Clear the pending payload immediately — once we kick resumeJob, the
-  // graph leaves the awaiting state and the cached request is stale.
-  // resumeJob may surface a NEW request via the same hooks if the flow
-  // pauses again at a downstream interrupt.
-  ctx.pendingApprovals.delete(jobId);
-  ctx.pendingSuspends.delete(jobId);
+  // 2.1 — approval resumes are gated; suspend resumes are just a wake
+  // signal (no decision, no role on SuspendTag) and pass through.
+  const pending = ctx.pendingApprovals.get(jobId);
+  if (job.status === 'awaiting-approval') {
+    const decision = (body as { decision?: unknown } | null)?.decision;
+    if (decision !== 'approve' && decision !== 'reject') {
+      badRequest(
+        res,
+        `resume body for an approval must carry decision: 'approve' | 'reject' (got ${JSON.stringify(decision)})`,
+      );
+      return;
+    }
+    // Role check: the caller must assert the assignee role via the
+    // x-actor-role header. This is header-asserted identity over the
+    // already-0600-scoped UDS transport — an enforcement point, not
+    // authentication; real authn replaces the header source later.
+    // The SLA auto-reject timer bypasses this by construction (it
+    // calls executeResume directly — the server acting as itself).
+    if (pending) {
+      const role = req.headers['x-actor-role'];
+      if (typeof role !== 'string' || role !== pending.assigneeRole) {
+        forbidden(
+          res,
+          `role ${typeof role === 'string' ? `"${role}"` : '(none)'} is not authorized; ` +
+            `approval for job "${jobId}" requires role "${pending.assigneeRole}"`,
+        );
+        return;
+      }
+    }
+  }
 
-  // Re-attach the token accumulator before resuming. Detach happens via
-  // onStatusChange when the job hits a terminal state — same as runJob.
-  ctx.tokens.attach(ctx.bus, jobId);
+  const wasApproval = job.status === 'awaiting-approval';
 
   ok(res, {
     service: 'harness',
@@ -1265,14 +1345,45 @@ async function handleResumeJob(
     ts: new Date().toISOString(),
   });
 
+  executeResume(ctx, jobId, body);
+}
+
+/**
+ * The single resume-execution path (2.1) — shared by the HTTP route and
+ * the SLA auto-reject timer, so both clear the same state and fire the
+ * same hooks. Clears the pending request + SLA timer + persisted pause
+ * record, re-attaches the token accumulator, and kicks resumeJob on a
+ * microtask. resumeJob may surface a NEW request via the hooks if the
+ * flow pauses again downstream.
+ */
+function executeResume(ctx: ServerCtx, jobId: string, resumeValue: unknown): void {
+  const broker = ctx.broker;
+  if (!broker) {
+    // The HTTP route 400s before reaching here; this guards the timer path.
+    console.warn(`[harness] cannot resume job ${jobId} — no credential broker configured`);
+    return;
+  }
+  clearSlaTimer(ctx, jobId);
+  ctx.pendingApprovals.delete(jobId);
+  ctx.pendingSuspends.delete(jobId);
+  // 2.2 — the persisted pause record is stale once we kick resumeJob; a
+  // downstream pause writes a fresh one via the hooks below.
+  void deletePausedJob(ctx.stateDir, jobId).catch(() => {});
+
+  // Re-attach the token accumulator before resuming. Detach happens via
+  // onStatusChange when the job hits a terminal state — same as runJob.
+  ctx.tokens.attach(ctx.bus, jobId);
+
   const resolver = ctx.resolver;
   const adapterFactory = ctx.adapterFactory;
   const tokens = ctx.tokens;
   const onJobTerminal = (agentId: string | null, status: string) => {
     if (agentId === null && (status === 'completed' || status === 'failed')) {
       tokens.detach(jobId);
+      clearSlaTimer(ctx, jobId);
       ctx.pendingApprovals.delete(jobId);
       ctx.pendingSuspends.delete(jobId);
+      void deletePausedJob(ctx.stateDir, jobId).catch(() => {});
       // F19: same cleanup hook as the initial-submission paths. A
       // resumed job that ultimately completes from this path should
       // also clean up its unconfirmed memory.
@@ -1282,21 +1393,94 @@ async function handleResumeJob(
     }
   };
   queueMicrotask(() => {
-    void resumeJob(jobId, body, {
+    void resumeJob(jobId, resumeValue, {
       jobs: ctx.jobs,
       bus: ctx.bus,
       broker,
       adapterFactory,
       resolver,
       graphs: ctx.graphs,
+      // 2.2 — the shared durable checkpointer enables recompile-on-
+      // resume after a restart, and the GitHub resolver must ride along
+      // so a recompiled graph's publish executors are wired identically
+      // to the original runJob compile.
+      checkpointer: ctx.checkpointer,
+      githubResolver: ctx.githubResolver,
       onStatusChange: (_jid, agentId, status) => onJobTerminal(agentId, status),
       onAwaitingApproval: (jid, request) => {
         ctx.pendingApprovals.set(jid, request);
+        persistPause(ctx, jid, 'approval', request);
+        armSlaTimer(ctx, jid, request, new Date().toISOString());
       },
       onSuspend: (jid, request) => {
         ctx.pendingSuspends.set(jid, request);
+        persistPause(ctx, jid, 'suspend', request);
       },
     });
+  });
+}
+
+/**
+ * Arm the approval SLA auto-reject timer (2.1). `pausedAtIso` anchors
+ * the deadline so a rehydrated approval resumes its ORIGINAL clock (an
+ * already-expired SLA fires immediately). The timer bypasses the HTTP
+ * role gate by construction — auto-reject is the server acting as
+ * itself, not a caller asserting a role. Unref'd: never holds the
+ * process open.
+ */
+function armSlaTimer(
+  ctx: ServerCtx,
+  jobId: string,
+  request: ApprovalRequest,
+  pausedAtIso: string,
+): void {
+  clearSlaTimer(ctx, jobId);
+  const remaining = request.slaMs - (Date.now() - Date.parse(pausedAtIso));
+  const timer = setTimeout(() => {
+    ctx.approvalTimers.delete(jobId);
+    const job = ctx.jobs.get(jobId);
+    if (!job || job.status !== 'awaiting-approval' || !ctx.pendingApprovals.has(jobId)) return;
+    console.warn(
+      `[harness] approval SLA of ${request.slaMs}ms expired for job ${jobId} — auto-rejecting`,
+    );
+    executeResume(ctx, jobId, {
+      decision: 'reject',
+      steering: `auto-rejected: approval SLA of ${request.slaMs}ms expired with no reviewer decision`,
+    });
+  }, Math.max(0, remaining));
+  timer.unref?.();
+  ctx.approvalTimers.set(jobId, timer);
+}
+
+function clearSlaTimer(ctx: ServerCtx, jobId: string): void {
+  const timer = ctx.approvalTimers.get(jobId);
+  if (timer) {
+    clearTimeout(timer);
+    ctx.approvalTimers.delete(jobId);
+  }
+}
+
+/**
+ * Persist a paused job (2.2) — fire-and-forget: a failed write logs but
+ * never fails the pause itself. The record carries the full JobRecord
+ * (including the FlowDef) so a restarted server can rehydrate the job
+ * and recompile its graph on the first resume.
+ */
+function persistPause(
+  ctx: ServerCtx,
+  jobId: string,
+  kind: 'approval' | 'suspend',
+  request: ApprovalRequest | SuspendRequest,
+): void {
+  const job = ctx.jobs.get(jobId);
+  if (!job) return;
+  void savePausedJob(ctx.stateDir, {
+    job,
+    kind,
+    request,
+    pausedAt: new Date().toISOString(),
+  }).catch((err) => {
+    console.warn(`[harness] failed to persist paused job ${jobId}: ${(err as Error).message}`);
   });
 }
 
@@ -2052,6 +2236,12 @@ function ok(res: ServerResponse, payload: Record<string, unknown>): void {
 function notFound(res: ServerResponse, error: string): void {
   res.writeHead(404, { 'content-type': 'application/json' });
   res.end(JSON.stringify({ ok: false, error }));
+}
+
+function forbidden(res: ServerResponse, error: string): void {
+  res.statusCode = 403;
+  res.setHeader('Content-Type', 'application/json');
+  res.end(JSON.stringify({ error }));
 }
 
 function badRequest(res: ServerResponse, error: string): void {

@@ -27,8 +27,7 @@ import {
  * `trigger-<kind>` (any non-manual trigger), `expression-js`,
  * `parallel-fan-out` (second+ sequence edge from one node),
  * `node-output-schema` (output.kind 'json' declares a schema — parse
- * happens, schema enforcement doesn't), `effect` (classification
- * recorded, not consulted on replay/retry), `subflow-version-pin`
+ * happens, schema enforcement doesn't), `subflow-version-pin`
  * (version recorded, resolution stays by flowId), `flow-output-schema`
  * (flow-level structured output is parsed, its schema isn't validated).
  * Remove an id from
@@ -333,14 +332,6 @@ function reportUnsupportedFeatures(
         feature: 'node-output-schema',
         detail:
           'JSON output is parsed into state.nodes, but the declared schema is not validated against it yet',
-      });
-    }
-    if (node.effect !== undefined) {
-      report({
-        where: at,
-        feature: 'effect',
-        detail:
-          'effect classification is recorded but the runtime does not yet consult it for replay/retry decisions',
       });
     }
     if (node.kind === 'subflow' && (node.config as Record<string, unknown>).version !== undefined) {

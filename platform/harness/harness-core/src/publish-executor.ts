@@ -116,13 +116,13 @@ async function runPushAndOpenPr(
   const body = config.body ?? defaultPrBody(job, base, cred);
   const draft = config.draft ?? false;
 
-  const pr = await ghApi<{ html_url: string; number: number }>(
-    fetchFn,
-    cred,
-    'POST',
-    `/repos/${slug.owner}/${slug.name}/pulls`,
-    { title, head: branchName, base, body, draft },
-  );
+  const pr = await findOrCreatePr(fetchFn, cred, slug, {
+    title,
+    head: branchName,
+    base,
+    body,
+    draft,
+  });
 
   // Record on the JobRecord so the HITL surface + later merge-pr node
   // can find the PR. (Mirrors how the agent executor mutates `job`.)
@@ -133,6 +133,43 @@ async function runPushAndOpenPr(
     lastExit: { nodeId, kind: 'success' },
     output: JSON.stringify({ prUrl: pr.html_url, prNumber: pr.number, branchName }),
   };
+}
+
+/**
+ * Idempotent PR acquisition by natural key — the head branch. GitHub
+ * enforces one open PR per head→base pair (a second POST 422s), so the
+ * branch name IS the idempotency key: list open PRs for `owner:branch`
+ * and reuse the first hit; create only when none exists. This is what
+ * makes a replayed / re-entered `push-and-open-pr` node (reject cycle
+ * with `effect: 'idempotent'`, resume after restart) converge on the
+ * same PR instead of failing 422. Exported for unit tests — the git
+ * half of the executor is covered by the Gate 2d E2E instead.
+ */
+export async function findOrCreatePr(
+  fetchFn: typeof fetch,
+  cred: GitHubCredential,
+  slug: { owner: string; name: string },
+  params: { title: string; head: string; base: string; body: string; draft: boolean },
+): Promise<{ html_url: string; number: number; reused: boolean }> {
+  const head = encodeURIComponent(`${slug.owner}:${params.head}`);
+  const existing = await ghApi<Array<{ html_url: string; number: number }>>(
+    fetchFn,
+    cred,
+    'GET',
+    `/repos/${slug.owner}/${slug.name}/pulls?head=${head}&state=open`,
+    undefined,
+  );
+  if (existing.length > 0) {
+    return { html_url: existing[0]!.html_url, number: existing[0]!.number, reused: true };
+  }
+  const pr = await ghApi<{ html_url: string; number: number }>(
+    fetchFn,
+    cred,
+    'POST',
+    `/repos/${slug.owner}/${slug.name}/pulls`,
+    { title: params.title, head: params.head, base: params.base, body: params.body, draft: params.draft },
+  );
+  return { html_url: pr.html_url, number: pr.number, reused: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -152,6 +189,16 @@ async function runMergePr(
   const ref = parsePrUrl(job.prUrl);
   if (!ref) {
     return err(nodeId, 'UnparseablePrUrl', `merge-pr node "${nodeId}": could not parse owner/name/number from "${job.prUrl}"`);
+  }
+
+  // Idempotency short-circuit: a recorded mergeSha means this PR was
+  // already merged by a prior run of this node — replaying the merge
+  // would 405. Return the recorded result without touching the API.
+  if (job.mergeSha) {
+    return {
+      lastExit: { nodeId, kind: 'success' },
+      output: JSON.stringify({ mergeSha: job.mergeSha, prNumber: ref.number }),
+    };
   }
 
   const cred = await resolver.resolve({ owner: ref.owner, name: ref.name });

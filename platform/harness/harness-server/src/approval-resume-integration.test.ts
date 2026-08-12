@@ -167,9 +167,13 @@ describe('HITL Approval round-trip over HTTP', () => {
     expect(approval.body.request.attempt).toBe(1);
 
     // Approve.
-    const resume = await udsJson(socketPath, 'POST', '/v1/jobs/jApprove/resume', {
-      decision: 'approve',
-    });
+    const resume = await udsJson(
+      socketPath,
+      'POST',
+      '/v1/jobs/jApprove/resume',
+      { decision: 'approve' },
+      { 'x-actor-role': 'tech-lead' },
+    );
     expect(resume.status).toBe(200);
     expect(resume.body.accepted).toBe('approval');
 
@@ -185,6 +189,79 @@ describe('HITL Approval round-trip over HTTP', () => {
     // After completion, the pending-approval entry is cleared.
     const after = await udsJson(socketPath, 'GET', '/v1/jobs/jApprove/approval');
     expect(after.status).toBe(404);
+  });
+
+  it('enforces the assignee role and validates the decision on approval resumes (2.1)', async () => {
+    const socketPath = tmpSocket();
+    const adapters: TestAdapter[] = [];
+    const handle = await startHarnessServer({
+      socketPath,
+      catalog,
+      broker: dummyBroker,
+      adapterFactory: () => {
+        const a = new TestAdapter(`reply-${adapters.length + 1}`);
+        adapters.push(a);
+        return a;
+      },
+    });
+    cleanups.push(async () => {
+      await handle.stop();
+      await rm(socketPath, { force: true });
+    });
+
+    await udsJson(socketPath, 'POST', '/v1/jobs', {
+      jobId: 'jRole',
+      pipeline: 'plan-then-build',
+      input: 'work',
+    });
+    await waitFor(async () => {
+      const r = await udsJson(socketPath, 'GET', '/v1/jobs/jRole');
+      return r.body.job?.status === 'awaiting-approval';
+    });
+
+    // No role header → 403.
+    const noRole = await udsJson(socketPath, 'POST', '/v1/jobs/jRole/resume', {
+      decision: 'approve',
+    });
+    expect(noRole.status).toBe(403);
+
+    // Wrong role → 403.
+    const wrongRole = await udsJson(
+      socketPath,
+      'POST',
+      '/v1/jobs/jRole/resume',
+      { decision: 'approve' },
+      { 'x-actor-role': 'intern' },
+    );
+    expect(wrongRole.status).toBe(403);
+
+    // Right role but malformed decision → 400 (used to silently reject).
+    const badDecision = await udsJson(
+      socketPath,
+      'POST',
+      '/v1/jobs/jRole/resume',
+      { decision: 'banana' },
+      { 'x-actor-role': 'tech-lead' },
+    );
+    expect(badDecision.status).toBe(400);
+
+    // The job is still paused — none of the rejected calls consumed it.
+    const still = await udsJson(socketPath, 'GET', '/v1/jobs/jRole/approval');
+    expect(still.status).toBe(200);
+
+    // Correct role approves.
+    const okResume = await udsJson(
+      socketPath,
+      'POST',
+      '/v1/jobs/jRole/resume',
+      { decision: 'approve' },
+      { 'x-actor-role': 'tech-lead' },
+    );
+    expect(okResume.status).toBe(200);
+    await waitFor(async () => {
+      const r = await udsJson(socketPath, 'GET', '/v1/jobs/jRole');
+      return r.body.job?.status === 'completed';
+    });
   });
 
   it('routes via reject edge on resume with reject; re-runs planner; then approves', async () => {
@@ -217,10 +294,13 @@ describe('HITL Approval round-trip over HTTP', () => {
     expect(adapters).toHaveLength(1); // planner ran
 
     // Reject with steering — planner cycles back, runs again, pauses again.
-    const r1 = await udsJson(socketPath, 'POST', '/v1/jobs/jReject/resume', {
-      decision: 'reject',
-      steering: 'consider OAuth instead of JWT',
-    });
+    const r1 = await udsJson(
+      socketPath,
+      'POST',
+      '/v1/jobs/jReject/resume',
+      { decision: 'reject', steering: 'consider OAuth instead of JWT' },
+      { 'x-actor-role': 'tech-lead' },
+    );
     expect(r1.status).toBe(200);
 
     await waitFor(async () => {
@@ -242,9 +322,13 @@ describe('HITL Approval round-trip over HTTP', () => {
     expect(approval2.body.request.content).toBe('reply-2');
 
     // Approve the second draft.
-    await udsJson(socketPath, 'POST', '/v1/jobs/jReject/resume', {
-      decision: 'approve',
-    });
+    await udsJson(
+      socketPath,
+      'POST',
+      '/v1/jobs/jReject/resume',
+      { decision: 'approve' },
+      { 'x-actor-role': 'tech-lead' },
+    );
     await waitFor(async () => {
       const r = await udsJson(socketPath, 'GET', '/v1/jobs/jReject');
       return r.body.job?.status === 'completed';
@@ -335,10 +419,16 @@ function udsJson(
   method: string,
   path: string,
   body?: unknown,
+  headers?: Record<string, string>,
 ): Promise<UdsResponse> {
   return new Promise((resolve, reject) => {
     const req = request(
-      { socketPath, path, method, headers: body ? { 'content-type': 'application/json' } : {} },
+      {
+        socketPath,
+        path,
+        method,
+        headers: { ...(body ? { 'content-type': 'application/json' } : {}), ...headers },
+      },
       (res) => {
         let buf = '';
         res.on('data', (c) => (buf += c.toString()));

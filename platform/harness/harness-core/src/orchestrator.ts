@@ -12,7 +12,7 @@ import {
   type GitHubCredentialResolver,
   type ResolvedBinding,
 } from '@helmsmith/agent-auth';
-import { Command } from '@langchain/langgraph';
+import { type BaseCheckpointSaver, Command } from '@langchain/langgraph';
 import { type BindingToSpecOptions, bindingToSpec } from './binding-to-spec.ts';
 import { type AdapterId, type FlowDef, type McpToolDef, parseFlowOutput } from './catalog.ts';
 import { discoverChangedFiles } from './changed-files.ts';
@@ -214,6 +214,17 @@ export interface RunJobDeps {
    */
   graphs?: Map<string, CompiledFlowGraph>;
   /**
+   * Checkpointer for graph state persistence, passed through to
+   * compileFlow. When absent, each compile gets a private MemorySaver
+   * (single-process semantics, pre-2.2 behavior). Injecting a durable
+   * saver (SQLite/Postgres) — or any instance shared across compiles —
+   * additionally enables recompile-on-resume: resumeJob can rebuild
+   * the graph from job.flow after the in-process cache is gone (e.g.
+   * a server restart) because the paused thread state lives in the
+   * saver, not the graph object.
+   */
+  checkpointer?: BaseCheckpointSaver;
+  /**
    * Hook fired when the graph pauses at an Approval interrupt. Receives
    * the ApprovalRequest payload — assignee role, content under review,
    * etc. Caller is responsible for surfacing this to a reviewer (TUI
@@ -412,13 +423,54 @@ export async function runJob(jobId: string, deps: RunJobDeps): Promise<void> {
   const job = deps.jobs.get(jobId);
   if (!job) return;
 
-  const factory = deps.adapterFactory ?? defaultAdapterFactory;
   job.status = 'running';
   deps.onStatusChange?.(jobId, null, 'running');
 
   // Use the catalog-attached flow if present; else synthesize a linear
   // flow from the registered agents list (legacy JobRecord shape).
   const flow = job.flow ?? linearFlowFromAgents(`__legacy_${jobId}`, job.agents);
+
+  const graph = compileJobGraph(jobId, job, flow, deps);
+
+  // Cache the compiled graph for resume. Even flows without Approval /
+  // Suspend tags benefit minimally — the cache is only consulted by
+  // resumeJob, and runJob unconditionally clears it on terminal states.
+  deps.graphs?.set(jobId, graph);
+
+  // thread_id ties the graph invocation to its checkpointer entry; same
+  // thread_id on resume picks up the same paused state.
+  const config = { configurable: { thread_id: jobId } };
+  const initial = freshFlowState(jobId, job.input ?? '');
+
+  let result: Record<string, unknown>;
+  try {
+    result = await graph.invoke(initial, config);
+  } catch {
+    if (job.status !== 'failed' && job.status !== 'cancelled') {
+      job.status = 'failed';
+      deps.onStatusChange?.(jobId, null, 'failed');
+    }
+    deps.graphs?.delete(jobId);
+    return;
+  }
+
+  finalizeOrPause(jobId, job, result, deps);
+}
+
+/**
+ * Build the executor map for a job's flow and compile it into a
+ * runnable graph. Extracted from runJob so resumeJob can rebuild the
+ * graph after a restart (recompile-on-resume) with the exact same
+ * executor wiring. Compile errors (validateSubflowGraph CatalogError)
+ * propagate to the caller — they're config bugs, not runtime failures.
+ */
+function compileJobGraph(
+  jobId: string,
+  job: JobRecord,
+  flow: FlowDef,
+  deps: RunJobDeps,
+): CompiledFlowGraph {
+  const factory = deps.adapterFactory ?? defaultAdapterFactory;
 
   // Pre-validate + pre-compile inner subflow targets. Catalog
   // mistakes (missing flowId, cycles, banned-kind nodes) surface
@@ -531,31 +583,11 @@ export async function runJob(jobId: string, deps: RunJobDeps): Promise<void> {
     }
   }
 
-  const graph = compileFlow({ flow, executors }) as CompiledFlowGraph;
-
-  // Cache the compiled graph for resume. Even flows without Approval /
-  // Suspend tags benefit minimally — the cache is only consulted by
-  // resumeJob, and runJob unconditionally clears it on terminal states.
-  deps.graphs?.set(jobId, graph);
-
-  // thread_id ties the graph invocation to its checkpointer entry; same
-  // thread_id on resume picks up the same paused state.
-  const config = { configurable: { thread_id: jobId } };
-  const initial = freshFlowState(jobId, job.input ?? '');
-
-  let result: Record<string, unknown>;
-  try {
-    result = await graph.invoke(initial, config);
-  } catch {
-    if (job.status !== 'failed' && job.status !== 'cancelled') {
-      job.status = 'failed';
-      deps.onStatusChange?.(jobId, null, 'failed');
-    }
-    deps.graphs?.delete(jobId);
-    return;
-  }
-
-  finalizeOrPause(jobId, job, result, deps);
+  return compileFlow({
+    flow,
+    executors,
+    ...(deps.checkpointer ? { checkpointer: deps.checkpointer } : {}),
+  }) as CompiledFlowGraph;
 }
 
 /**
@@ -581,11 +613,25 @@ export async function resumeJob(
   const job = deps.jobs.get(jobId);
   if (!job) return;
 
-  const graph = deps.graphs?.get(jobId);
+  if (job.status !== 'awaiting-approval' && job.status !== 'suspended') {
+    throw new Error(`resumeJob: job "${jobId}" is not paused (status: ${job.status})`);
+  }
+
+  let graph = deps.graphs?.get(jobId);
   if (!graph) {
-    throw new Error(
-      `resumeJob: no cached graph for jobId "${jobId}" — runJob may not have run yet, or the graph was already cleared.`,
-    );
+    if (!deps.checkpointer) {
+      throw new Error(
+        `resumeJob: no cached graph for jobId "${jobId}" — runJob may not have run yet, or the graph was already cleared. ` +
+          `(Inject RunJobDeps.checkpointer to enable recompile-on-resume across restarts.)`,
+      );
+    }
+    // Restart path: the in-process cache is gone but the paused thread
+    // state lives in the injected checkpointer. Rebuild the graph from
+    // the job's flow with the same executor wiring and re-attach — the
+    // thread_id (jobId) picks the paused state back up.
+    const flow = job.flow ?? linearFlowFromAgents(`__legacy_${jobId}`, job.agents);
+    graph = compileJobGraph(jobId, job, flow, deps);
+    deps.graphs?.set(jobId, graph);
   }
 
   job.status = 'running';

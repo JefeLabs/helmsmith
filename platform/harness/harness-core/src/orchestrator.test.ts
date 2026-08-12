@@ -9,6 +9,7 @@ import {
   RateLimitError,
 } from '@helmsmith/agent-adapter';
 import type { CredentialBroker, Provider, ResolvedBinding } from '@helmsmith/agent-auth';
+import { MemorySaver } from '@langchain/langgraph';
 import { describe, expect, it } from 'vitest';
 import type { ApprovalRequest } from './flow-graph.ts';
 import type { JobRecord } from './job.ts';
@@ -1371,6 +1372,98 @@ describe('runJob + resumeJob (Approval tag)', () => {
     expect(factoryCalls).toBe(2); // 1 planner + 1 builder, no third call.
     // Graph cleared from cache after completion.
     expect(graphs.has('jA')).toBe(false);
+  });
+});
+
+describe('resumeJob — recompile-on-resume + paused-status guard (2.2)', () => {
+  function approvalJob(jobId: string): JobRecord {
+    return {
+      jobId,
+      pipeline: 'with-approval',
+      status: 'received',
+      submittedAt: 'now',
+      input: 'do the thing',
+      flow: {
+        id: 'with-approval',
+        nodes: [
+          { id: '__trigger', kind: 'trigger', config: { kind: 'manual' } },
+          {
+            id: 'planner',
+            kind: 'agent',
+            config: { agent: { id: 'planner' } as never },
+            tags: {
+              approval: { assigneeRole: 'tech-lead', slaMs: 60_000, concurrency: 'pessimistic' },
+            },
+          },
+          { id: 'builder', kind: 'agent', config: { agent: { id: 'builder' } as never } },
+        ],
+        edges: [
+          { from: '__trigger', to: 'planner', type: 'sequence' },
+          { from: 'planner', to: 'builder', type: 'sequence' },
+        ],
+      },
+      agents: [
+        { id: 'planner', role: 'Plan', adapter: 'claude-sdk', systemPrompt: 'plan', status: 'pending' },
+        { id: 'builder', role: 'Build', adapter: 'claude-sdk', systemPrompt: 'build', status: 'pending' },
+      ],
+    };
+  }
+
+  it('recompiles from job.flow when the cache is gone and a shared checkpointer holds the thread', async () => {
+    const { runJob, resumeJob } = await import('./orchestrator.ts');
+    const jobs = new Map<string, JobRecord>();
+    const bus = new JobBus();
+    const graphs = new Map<string, CompiledFlowGraph>();
+    const checkpointer = new MemorySaver();
+    const job = approvalJob('jR');
+    jobs.set('jR', job);
+    let factoryCalls = 0;
+    const factory: AdapterFactory = () => {
+      factoryCalls++;
+      return new TestAdapter({ kind: 'ok', reply: `reply-${factoryCalls}` });
+    };
+    const deps = { jobs, bus, broker: dummyBroker, adapterFactory: factory, graphs, checkpointer };
+
+    await runJob('jR', deps);
+    expect(job.status).toBe('awaiting-approval');
+
+    // Simulate a restart: the in-process graph cache is gone, the
+    // checkpointer (durable in production, shared instance here) survives.
+    graphs.delete('jR');
+
+    await resumeJob('jR', { decision: 'approve' }, deps);
+    expect(job.status).toBe('completed');
+    // Planner did not re-run — the thread state came from the checkpointer.
+    expect(factoryCalls).toBe(2);
+  });
+
+  it('still throws on a cache miss when no checkpointer was injected', async () => {
+    const { runJob, resumeJob } = await import('./orchestrator.ts');
+    const jobs = new Map<string, JobRecord>();
+    const bus = new JobBus();
+    const graphs = new Map<string, CompiledFlowGraph>();
+    const job = approvalJob('jN');
+    jobs.set('jN', job);
+    const factory: AdapterFactory = () => new TestAdapter({ kind: 'ok', reply: 'r' });
+    const deps = { jobs, bus, broker: dummyBroker, adapterFactory: factory, graphs };
+
+    await runJob('jN', deps);
+    graphs.delete('jN');
+
+    await expect(resumeJob('jN', { decision: 'approve' }, deps)).rejects.toThrow(
+      /no cached graph/,
+    );
+  });
+
+  it('rejects resuming a job that is not paused', async () => {
+    const { resumeJob } = await import('./orchestrator.ts');
+    const jobs = new Map<string, JobRecord>();
+    const job = approvalJob('jX');
+    job.status = 'completed';
+    jobs.set('jX', job);
+    await expect(
+      resumeJob('jX', { decision: 'approve' }, { jobs, bus: new JobBus(), broker: dummyBroker }),
+    ).rejects.toThrow(/not paused/);
   });
 });
 
