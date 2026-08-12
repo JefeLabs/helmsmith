@@ -1,6 +1,6 @@
 # @helmsmith/flow-spec — Specification & Critical Notes
 
-**Package:** `platform/harness/flow-spec` · **Version:** 0.0.0 (private, source-shipped) · **Date:** 2026-08-07 · **Landed via:** PR #13 (`feat/flow-spec-package`)
+**Package:** `platform/harness/flow-spec` · **Version:** 0.0.0 (private, source-shipped) · **Date:** 2026-08-07 · **Updated:** 2026-08-12 (data-plane contract: run state, node I/O, error matchers, expression additions) · **Landed via:** PR #13 (`feat/flow-spec-package`)
 
 This document is the detailed companion to the package `README.md`: the full contract the package defines and the exact semantics its code implements. Critique and roadmap live in dedicated docs (see §7 for the map). The pre-extraction critique of the whole flow *runtime* lives in `docs/superpowers/specs/2026-08-07-flow-spec-design-review.md`; runtime findings are only summarized here, not repeated.
 
@@ -32,10 +32,10 @@ Deliberately **not** here: graph compilation, routing, executors (harness-core);
 
 | Module | Exports | Role |
 |---|---|---|
-| `types.ts` (~790 lines) | `FlowDef`, `TaskStep`, `Edge`, `Expression`, tags, policy, `FlowOutputContract`, `JobIntent`, `ToolDef` family, `ProductDef`/`ProductRepo`/`ContextSourceDef`, `FlowCatalog`/`Catalog`, `CatalogError`, `walkAgents`, `resolveAccepts`, `findFlow`, `findProduct` | The wire shapes, moved verbatim from harness-core's `catalog.ts` |
+| `types.ts` (~1000 lines) | `FlowDef`, `TaskStep` (incl. `input`/`output`/`effect`), `NodeOutputContract`, `Edge` (incl. `ErrorEdge.on`), `Expression`, tags, policy, `FlowOutputContract`, `JobIntent`, `ToolDef` family, `ProductDef`/`ProductRepo`/`ContextSourceDef`, `FlowCatalog`/`Catalog`, `CatalogError`, run-side wire shapes (`FlowRunState`, `NodeExit`, `ChangedFile`, `ApprovalRequest`/`ApprovalResume`, `SuspendRequest`), `walkAgents`, `resolveAccepts`, `findFlow`, `findProduct` | The wire shapes — definition side AND run side |
 | `validate.ts` | `validateFlowCatalog`, `validateUnifiedCatalog`, `ValidateOptions`, `UnsupportedFeature` | Fail-loud structural validation + the unsupported-feature reporting seam |
 | `expression.ts` | `evalExpression`, `resolveExpressionValue`, `resolveJsonPath` | Expression semantics, shared verbatim by the runtime router and any future designer preview |
-| `fixtures.ts` | `ExpressionCase`, `EXPRESSION_CASES` (17 cases, JSON-serializability guarded) | Executable spec data; replayed by this package's tests and harness-core's `flow-spec-conformance.test.ts` |
+| `fixtures.ts` | `ExpressionCase`, `EXPRESSION_CASES` (28 cases, JSON-serializability guarded; `expectedValue` cases pin value semantics too) | Executable spec data; replayed by this package's tests and harness-core's `flow-spec-conformance.test.ts` |
 | `index.ts` | wildcard re-export of all four | Public surface (see `docs/critical-feedback.md` §2 for why "wildcard" is a critique) |
 
 ## 3. The contract in detail
@@ -49,7 +49,7 @@ A flow is a graph of `TaskStep` nodes — one polymorphic primitive discriminate
 | `trigger` | `manual` \| `webhook` \| `schedule` \| `event` \| `message` | Entry marker; exactly one per flow |
 | `agent` | `AgentDef` — adapter, prompt, `accepts` model bindings (flat or named sets), `fallbackOn`, `skillz` | LLM work; the dominant kind |
 | `tool` | `toolId` + expression-resolvable `args`, resolved to a `CliToolDef` \| `HttpToolDef` \| `McpToolDef` | Deterministic call |
-| `script` | `bash` \| `node` \| `python` + inline `source` | Batch subprocess, state via stdin + env |
+| `script` | `bash` \| `node` \| `python` + inline `source` + `secrets` (broker-resolved env credentials) | Batch subprocess, state via stdin + env |
 | `transform` | one `Expression` | Pure data shaping into `state.output` |
 | `gate` | `assertions[]` (expression + message) | All pass → success; any fail → reject with payload |
 | `subflow` | `flowId` + optional `input` | Composed inner flow (deterministic-only in v1) |
@@ -71,7 +71,19 @@ flowchart TD
     f -- none --> END
 ```
 
-Structural rules the validator enforces: exactly one trigger (no incoming, ≥1 outgoing); ≤1 each of error/fallback/reject edges per source; reject edges only from `gate` or approval-tagged nodes; reject-edge `onMaxAttempts.escalate` targets must exist; everything except reject edges must form a DAG.
+Structural rules the validator enforces: exactly one trigger (no incoming, ≥1 outgoing); ≤1 each of fallback/reject edges per source; error edges — any number carrying `on` matchers plus ≤1 catch-all (no/empty `on`), routed by `NodeExit.errorName` (first declared match wins, catch-all last); reject edges only from `gate` or approval-tagged nodes; reject-edge `onMaxAttempts.escalate` targets must exist; everything except reject edges must form a DAG.
+
+### 3.1.1 Node I/O — the data plane
+
+Every `TaskStep` may declare `input`, `output`, and `effect`:
+
+- **`input`** (executed): an Expression or a Record of name → Expression, resolved against `FlowRunState` into the node's *effective input* — the prompt for agents, stdin for scripts, `$.output` for everything else. This replaces the implicit "previous node's output string" contract when a node needs more than one upstream value. The single-Expression form is detected by a string `kind` field, so mapping keys must not be named `kind`. Runs inside the Loop wrapper (a looped node's mapping sees the per-item state).
+- **`output`** (`NodeOutputContract`, executed except schema): `{ kind: 'json' }` parses the node's output string into `state.nodes[id]`; invalid JSON → `errorName: 'OutputParseError'` (error-edge routable). `schema` is recorded but not enforced (§5). Omitted/`text` → the raw string is recorded.
+- **`effect`** (declared only, §5): `'pure' | 'idempotent' | 'side-effecting'` — replay/retry safety classification for the durable-checkpointer future.
+
+### 3.1.2 The run-state contract
+
+`FlowRunState` is the wire shape expressions bind against — the data plane made explicit: `input` (job payload, write-once), `nodes` (per-node outputs keyed by id, merge-reduced so parallel branches can't clobber), `output` (legacy latest-string channel), plus routing bookkeeping (`lastExit`, `rejectionPayload`, `attempts`) and operator surfaces (`steering`, `changedFiles`, `cancelRequested`). harness-core's `FlowStateT` is compile-time-asserted to satisfy it (`flow-graph.ts`), so a channel rename or type drift stops the build. The HITL payloads (`ApprovalRequest`/`ApprovalResume`, `SuspendRequest`) and `ChangedFile` live here too — a reviewer UI and the runtime must agree on them for the same reason a designer preview and the router must agree on expressions.
 
 ### 3.2 Tags and policy
 
@@ -87,11 +99,15 @@ Tagged union: `literal`, `jsonpath`, `compare`, `all`, `any`, `not`, `js`. The e
 | `jsonpath` | Dot-path only: `$`, `$.a.b`. Missing/non-object intermediate → `undefined`, never throws. Dot-numeric array indexing (`$.arr.0`) is **supported and pinned by fixture**; out-of-bounds → `undefined`. No bracket syntax, wildcards, or filters |
 | `compare ==` / `!=` | Strict `===`/`!==`. No coercion: `"5" == 5` is false. Objects compare by **reference** — two structurally equal objects from jsonpath are never `==` (pinned by fixture) |
 | `compare <` `<=` `>` `>=` | Both sides through `Number()`; NaN on either side ⇒ false (both `NaN < 5` and `NaN >= 5` are false) |
-| `compare in` | rhs must resolve to an array, else false (no substring semantics). Membership via `Array.includes` — **SameValueZero, not strict equality**: `NaN` self-matches (reachable only from runtime state; JSON can't encode NaN — pinned by code-level test, kept out of fixtures so they stay JSON-serializable) |
+| `compare in` | rhs must resolve to an array, else false (no substring semantics — that's `contains`). Membership via `Array.includes` — **SameValueZero, not strict equality**: `NaN` self-matches (reachable only from runtime state; JSON can't encode NaN — pinned by code-level test, kept out of fixtures so they stay JSON-serializable) |
+| `compare contains` / `startsWith` / `endsWith` | String-only: both sides must resolve to strings, else false — no coercion, mirroring `in`'s strictness (pinned by fixtures) |
+| `compare matches` | Both sides strings; `new RegExp(rhs).test(lhs)`, no flags. Invalid pattern from state ⇒ false (the evaluator never throws on data — pinned by code-level test); invalid **literal** patterns are rejected at load time by the validator |
 | `all` / `any` | Short-circuit AND/OR; `all([])` ⇒ true, `any([])` ⇒ false (identity elements) |
 | `not` | Predicate inversion |
+| `exists` | Presence, not truthiness: false only for `undefined` (missing path); `null`/`false`/`0`/`""` all exist (pinned by fixtures) — the escape hatch from the silent-`undefined` jsonpath semantics |
+| `object` / `array` | Constructors: fields/items resolved via `resolveExpressionValue`; always true as predicates (containers are truthy). The data-shaping half of the language — with these, `transform` + `output.kind: 'json'` builds structured `$.nodes.<id>` values |
 | `js` | **Throws.** Deliberate: no sandbox dependency; compose the boolean primitives instead |
-| composition as value | `compare`/`all`/`any`/`not` under `resolveExpressionValue` collapse to their boolean — no surprising polymorphism |
+| composition as value | `compare`/`all`/`any`/`not`/`exists` under `resolveExpressionValue` collapse to their boolean — no surprising polymorphism |
 
 ### 3.4 Flow kinds and output contracts
 
@@ -103,7 +119,7 @@ Tagged union: `literal`, `jsonpath`, `compare`, `all`, `any`, `not`, `js`. The e
 
 ## 4. Validation
 
-`validateFlowCatalog` / `validateUnifiedCatalog` are assert-style, throwing `CatalogError` with path-prefixed messages (`test: flows[0].nodes[2].config.toolId must be …`). Coverage: catalog shape, per-flow kind/output rules, per-node kind + per-kind config shape, tags (approval/suspend exclusivity, loop shape), policy/joinStrategy/terminal shapes, per-edge shape + referential integrity + cardinality + reject-source restrictions, trigger constraints, DAG check, duplicate ids (flows, nodes, agents, products, repos), `accepts` forms, `fallbackOn` against the closed AdapterError name set, `skillz` key set.
+`validateFlowCatalog` / `validateUnifiedCatalog` are assert-style, throwing `CatalogError` with path-prefixed messages (`test: flows[0].nodes[2].config.toolId must be …`). Coverage: catalog shape, per-flow kind/output rules + `version`, per-node kind + per-kind config shape (incl. script `secrets`, subflow `version`), node `input` mappings, `output` contracts, `effect` enum, tags (approval/suspend exclusivity, loop shape), policy/joinStrategy/terminal shapes, per-edge shape + referential integrity + cardinality (incl. error-edge `on` lists + the one-catch-all rule) + reject-source restrictions, trigger constraints, DAG check, duplicate ids (flows, nodes, agents, products, repos), `accepts` forms, `fallbackOn` against the closed AdapterError name set, `skillz` key set, load-time regex compilation for literal `matches` patterns.
 
 Validation is **structural only** — it answers "is this shaped like a flow?", never "will this flow do what it says?" The second question is exactly what §5 exists for.
 
@@ -120,13 +136,13 @@ sequenceDiagram
     L->>A: console.warn "[catalog] …: 'policy' is not executed by the runtime yet — …"
 ```
 
-`ValidateOptions.onUnsupported` fires for: `policy`, `joinStrategy`, `terminal-fail`, `trigger-<kind>` (non-manual), `expression-js` (recursive scan of the whole flow), `parallel-fan-out` (second+ sequence edge from one node — the runtime router silently follows only the first). Reporting never changes accept/reject behavior; no callback ≡ pre-extraction semantics.
+`ValidateOptions.onUnsupported` fires for: `policy`, `joinStrategy`, `terminal-fail`, `trigger-<kind>` (non-manual), `expression-js` (recursive scan of the whole flow), `parallel-fan-out` (second+ sequence edge from one node — the runtime router silently follows only the first), `node-output-schema` (output parsed, schema not enforced), `effect` (recorded, not consulted), `subflow-version-pin` (recorded, resolution by flowId). Reporting never changes accept/reject behavior; no callback ≡ pre-extraction semantics. Deliberately NOT reported because they execute: node `input` mappings, `output.kind: 'json'` parsing, error-edge `on` matchers, script `secrets`, the new expression kinds.
 
 **The governing rule** (from the README): when the runtime starts executing a feature, its report is deleted *in the same change*. The report list is the honest coverage boundary between spec and runtime.
 
 ## 6. Conformance
 
-`EXPRESSION_CASES` is plain data — `{ name, expr, state, expected }` — so conformance is a replay, not an import of behavior. Today two suites replay it: `fixtures.test.ts` (the spec testing itself) and harness-core's `flow-spec-conformance.test.ts` (the runtime proving its re-exported evaluator matches). A future designer preview or Java validator conforms the same way. Semantics change by changing the fixture first; every conforming implementation fails until it catches up.
+`EXPRESSION_CASES` is plain data — `{ name, expr, state, expected, expectedValue? }` — so conformance is a replay, not an import of behavior. `expected` pins the predicate coercion; when `expectedValue` is present, conforming implementations must also deep-equal `resolveExpressionValue(expr, state)` against it (constructor and raw-lookup value semantics). Today two suites replay it: `fixtures.test.ts` (the spec testing itself) and harness-core's `flow-spec-conformance.test.ts` (the runtime proving its re-exported evaluator matches). A future designer preview or Java validator conforms the same way. Semantics change by changing the fixture first; every conforming implementation fails until it catches up.
 
 ---
 
@@ -140,4 +156,4 @@ Each concern now has exactly one home (this section previously held both and is 
 | Critical feedback — consolidated, severity-rated, with resolved-item record | [`docs/critical-feedback.md`](./docs/critical-feedback.md) |
 | Suggested next steps — phased roadmap with effort estimates and sequencing | [`docs/next-steps.md`](./docs/next-steps.md) |
 
-Headline status as of 2026-08-07: the extraction fixed the *honesty* problem (dangling spec, silent dead config, unpinned semantics — all resolved, see critical-feedback §1); the *capability* gap remains (policy/joinStrategy/terminal/triggers/fan-out warn but don't execute), and two convention-only mechanisms — the `onUnsupported` list and the export surface — are the top candidates to turn into enforced tests and curated API (next-steps Phase 0–1).
+Headline status as of 2026-08-12: the extraction fixed the *honesty* problem (2026-08-07), and the data-plane pass fixed the *capability ceiling* the first critique missed — the spec now defines run state (`FlowRunState`), node-addressable outputs (`$.nodes.<id>`), node input mappings, per-node structured output, typed error routing, and a data-shaping expression language, all executed by the runtime and compile-time-asserted against the contract. Still open: policy/joinStrategy/terminal/triggers/fan-out (warn, don't execute), schema enforcement (`node-output-schema`), effect-aware replay (`effect`), and the two convention-only mechanisms — the `onUnsupported` list and the export surface (next-steps Phase 0–1).

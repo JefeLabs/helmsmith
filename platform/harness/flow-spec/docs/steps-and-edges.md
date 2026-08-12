@@ -1,6 +1,6 @@
 # Flow Authoring Reference — Steps, Edges, Tags, and What Actually Runs
 
-**Package:** `@helmsmith/flow-spec` · **Date:** 2026-08-07 · Companion docs: [`SPEC.md`](../SPEC.md) (contract detail) · [`critical-feedback.md`](./critical-feedback.md) · [`next-steps.md`](./next-steps.md)
+**Package:** `@helmsmith/flow-spec` · **Date:** 2026-08-07 · **Updated:** 2026-08-12 (data plane: node I/O, error matchers, expression additions) · Companion docs: [`SPEC.md`](../SPEC.md) (contract detail) · [`critical-feedback.md`](./critical-feedback.md) · [`next-steps.md`](./next-steps.md)
 
 This is the catalog author's reference: every node kind, edge type, and tag — with its config fields, a working JSON example, and an honest **support status**. Status comes from the runtime as it exists today; anything marked ❌ still *validates* but triggers a load-time warning via the `onUnsupported` seam and then does nothing.
 
@@ -82,7 +82,7 @@ Config is `{ "agent": AgentDef }`:
 | `fallbackOn` | string[] | no | AdapterError subclass names that trigger fall-through to the next binding. Default: Billing/RateLimit/Network/Provider (not Auth/Config — those page an operator) |
 | `skillz` | `{ routers?, tools?, integrations?, tasks?, workflows? }` | no | Skill dependencies procured into the agent's workspace |
 
-Runtime behavior: prior node's `output` becomes the prompt; operator steering is prepended to the system prompt; cooperative cancellation is checked at node-tick; staged file changes are discovered after each successful tick.
+Runtime behavior: prior node's `output` becomes the prompt — unless the node declares an `input` mapping (§5), which composes the prompt from any run-state fields (`$.input`, `$.nodes.<id>`, …); operator steering is prepended to the system prompt; cooperative cancellation is checked at node-tick; staged file changes are discovered after each successful tick.
 
 ### 2.3 `tool` — deterministic call ✅
 
@@ -98,11 +98,13 @@ Auth is always a reference (`credentialId` + scheme) resolved through the Creden
 
 ### 2.4 `script` — inline subprocess ✅
 
-Config: `{ "language": "bash"|"node"|"python", "source": string, "env"?, "timeoutMs"? }` (30s default). `state.output` arrives on stdin; full state as JSON in `HARNESS_STATE_JSON`; stdout (10MB cap) becomes the new `state.output`; non-zero exit → error edge. Batch only — no streaming. Scripts are trusted admin-curated content; state is passed as data, never interpolated into commands.
+Config: `{ "language": "bash"|"node"|"python", "source": string, "env"?, "secrets"?, "timeoutMs"? }` (30s default). `state.output` arrives on stdin; full state as JSON in `HARNESS_STATE_JSON`; stdout (10MB cap) becomes the new `state.output`; non-zero exit → error edge. Batch only — no streaming. Scripts are trusted admin-curated content; state is passed as data, never interpolated into commands.
+
+`secrets` maps env var names to credential references — `{ "API_KEY": { "credentialId": "anthropic" } }` — resolved through the same CredentialBroker tools use and injected into the child env at dispatch time (winning over same-named static `env` entries). Unresolvable credential or missing broker → `errorName: 'AuthError'`, routable via error edge. Secrets never appear literally in catalogs.
 
 ### 2.5 `transform` — pure data shaping ✅
 
-Config: `{ "expression": Expression }`. Writes the resolved value to `state.output` (strings pass through; everything else `JSON.stringify`d). Always succeeds. **Caveat:** an expression resolving to `undefined` writes the literal string `"undefined"` — guard with a gate first if absence matters.
+Config: `{ "expression": Expression }`. Writes the resolved value to `state.output` (strings pass through; everything else `JSON.stringify`d). Always succeeds. With the `object`/`array` constructor expressions this is real data shaping — build a structured value from several state fields, declare `"output": { "kind": "json" }` on the node, and the parsed result lands at `$.nodes.<id>` for downstream gates/edges. **Caveat:** an expression resolving to `undefined` writes the literal string `"undefined"` — guard with `exists` first if absence matters.
 
 ### 2.6 `gate` — quality gate ✅
 
@@ -110,7 +112,7 @@ Config: `{ "assertions": [{ "expression": Expression, "message": string }, …] 
 
 ### 2.7 `subflow` — composition ⚠️ (deterministic-only)
 
-Config: `{ "flowId": string, "input"?: Record<string, unknown> }` (input values are Expressions). Parent state passes through; inner output replaces parent `output`; `changedFiles`/`steering` merge back. **v1 bans, enforced at compile time:** no `agent` nodes and no `approval`/`suspend` tags inside a subflow (or any nested subflow). Cycles across subflow references are also rejected.
+Config: `{ "flowId": string, "version"?: string, "input"?: Record<string, unknown> }` (input values are Expressions). Parent state passes through; inner output replaces parent `output`; `changedFiles`/`steering` merge back. `version` pins the target flow's `version` — recorded but **not enforced** (resolution stays by flowId; warned as `subflow-version-pin`). **v1 bans, enforced at compile time:** no `agent` nodes and no `approval`/`suspend` tags inside a subflow (or any nested subflow). Cycles across subflow references are also rejected.
 
 ### 2.8 `publish` — delivery ✅
 
@@ -130,7 +132,7 @@ Credentials via the GitHub resolver cascade (local `gh` → controlplane App tok
 | `sequence` | — | unlimited, **but only the first is followed** | Default forward path | ✅ / ❌ fan-out (warned as `parallel-fan-out`) |
 | `conditional` | `condition: Expression` | unlimited | Tried in declaration order on success exit; first truthy predicate wins | ✅ |
 | `fallback` | — | ≤ 1 | Catchall when no conditional matched and no sequence edge exists | ✅ |
-| `error` | — | ≤ 1 | Catches `error` exits; without one, an error fails the whole flow | ✅ |
+| `error` | `on?: string[]` | any number with `on`; ≤ 1 catch-all (no/empty `on`) | Catches `error` exits. `on` matches `NodeExit.errorName` (`Timeout`, `RateLimitError`, `OutputParseError`, `UnknownTool`, `AuthError`, …) — first declared match wins, catch-all last; a name matched by no edge fails the flow | ✅ |
 | `reject` | `maxAttempts?` (3), `onMaxAttempts?` `{kind:'fail'}` \| `{kind:'escalate', to}` | ≤ 1; may only originate from `gate` or approval-tagged nodes | The only cycle-permitted edge; carries `RejectionPayload`; attempts exceeded → fail (default) or escalate | ✅ |
 
 Router precedence on every node exit: **reject → error → conditional (declaration order) → sequence (first) → fallback → END.**
@@ -151,7 +153,46 @@ Approval/Suspend are implemented by a compile-time topology rewrite — the tagg
 
 ---
 
-## 5. Node fields that validate but do nothing ❌
+## 5. Node I/O — the data plane (`input` / `output` / `effect`)
+
+Every node may declare three data-plane fields alongside `kind`/`config`:
+
+| Field | Shape | Status | Semantics |
+|---|---|---|---|
+| `input` | Expression **or** `{ name: Expression, … }` | ✅ | Composes the node's effective input from run state instead of implicitly consuming the previous node's `output`. A single Expression resolves to its value (strings raw, everything else JSON); a Record resolves each field and delivers the object as JSON. Agents receive it as the prompt, scripts as stdin, tools/transforms/gates see it as `$.output`. Mapping keys must not be named `kind` (that marks the single-Expression form). |
+| `output` | `{ "kind": "text" }` \| `{ "kind": "json", "schema"? }` | ✅ parse / ❌ schema | `json` → the node's output string is parsed and recorded at `$.nodes.<id>` as structured data; invalid JSON exits with `errorName: 'OutputParseError'` (error-edge routable, catch it with `on: ["OutputParseError"]`). `schema` validates shape-wise but is **not enforced** against the output (warned as `node-output-schema`). |
+| `effect` | `"pure"` \| `"idempotent"` \| `"side-effecting"` | ❌ | Declarative classification for replay/retry safety. Recorded, warned as `effect`, not yet consulted — declare it now (publish nodes are inherently side-effecting) so durable-checkpointer replays can respect it later. |
+
+**The run-state surface** (`FlowRunState` in types.ts) every Expression binds against:
+
+| Path | Contents |
+|---|---|
+| `$.input` | The job/trigger payload. Seeded once; nodes can never overwrite it |
+| `$.nodes.<id>` | Every prior node's output — parsed JSON when the node declared `output.kind: 'json'`, raw string otherwise |
+| `$.output` | Legacy single channel: the latest node's output string |
+| `$.lastExit` / `$.rejectionPayload` / `$.attempts` | Routing bookkeeping (errorName, reject context, retry counters) |
+| `$.steering` / `$.changedFiles` / `$.cancelRequested` | Operator + review surfaces |
+
+Typical pattern — agent emits structured JSON, gate asserts on a field, a later agent consumes both the original task and the review:
+
+```json
+{ "id": "review", "kind": "agent", "output": { "kind": "json" },
+  "config": { "agent": { "id": "review", "role": "Reviewer", "adapter": "claude-sdk",
+    "systemPrompt": "Respond ONLY with JSON: {\"score\": <0..1>, \"notes\": \"...\"}" } } },
+{ "id": "check", "kind": "gate", "config": { "assertions": [
+  { "expression": { "kind": "compare",
+      "lhs": { "kind": "jsonpath", "path": "$.nodes.review.score" },
+      "op": ">", "rhs": { "kind": "literal", "value": 0.8 } },
+    "message": "review score must exceed 0.8" } ] } },
+{ "id": "fix", "kind": "agent",
+  "input": { "task": { "kind": "jsonpath", "path": "$.input" },
+             "review": { "kind": "jsonpath", "path": "$.nodes.review" } },
+  "config": { "agent": { "id": "fix", "role": "Fixer", "adapter": "claude-sdk" } } }
+```
+
+---
+
+## 6. Node fields that validate but do nothing ❌
 
 | Field | What authors expect | What actually happens | Warning id |
 |---|---|---|---|
@@ -160,25 +201,31 @@ Approval/Suspend are implemented by a compile-time topology rewrite — the tagg
 | `policy.onError: "continue"\|"fallback"` | Soft error handling | Error edge or flow failure — nothing else | `policy` |
 | `joinStrategy: "all"\|"any"\|{nOfM}` | Fan-in coordination | Ignored (and fan-out doesn't exist anyway) | `joinStrategy` |
 | `terminal: "fail"` | Mark a failure endpoint | Every terminal node ends as success | `terminal-fail` |
+| `output.schema` | JSON-Schema enforcement of node output | Output parsed, schema ignored | `node-output-schema` |
+| `effect` | Replay/retry safety decisions | Recorded only | `effect` |
+| `config.version` (subflow) | Version-pinned resolution | Resolution by flowId only | `subflow-version-pin` |
 
 ---
 
-## 6. Expression quick reference
+## 7. Expression quick reference
 
-Used by: conditional edges, gate assertions, transforms, loop paths, tool args, subflow inputs, event matchers. All ✅ except `js` ❌ (throws; warned as `expression-js` at load). Semantics are pinned by 17 conformance fixtures replayed by both the spec and the runtime.
+Used by: conditional edges, gate assertions, transforms, loop paths, tool args, subflow inputs, event matchers, node `input` mappings. All ✅ except `js` ❌ (throws; warned as `expression-js` at load). Semantics are pinned by 28 conformance fixtures replayed by both the spec and the runtime (cases with `expectedValue` also pin value semantics).
 
 | Kind | Shape | Pinned semantics |
 |---|---|---|
 | `literal` | `{kind, value}` | Truthiness as predicate; raw value otherwise |
-| `jsonpath` | `{kind, path}` | `$`, `$.a.b`, dot-numeric array index `$.arr.0`; miss/out-of-bounds → `undefined`; no brackets/wildcards/filters |
-| `compare` | `{kind, lhs, op, rhs}` | `==`/`!=` strict (objects by reference); `<` `<=` `>` `>=` via `Number()`, NaN ⇒ false; `in` = array membership via SameValueZero |
+| `jsonpath` | `{kind, path}` | `$`, `$.a.b`, dot-numeric array index `$.arr.0`; miss/out-of-bounds → `undefined`; no brackets/wildcards/filters. Binds against `FlowRunState` (§5) |
+| `compare` | `{kind, lhs, op, rhs}` | `==`/`!=` strict (objects by reference); `<` `<=` `>` `>=` via `Number()`, NaN ⇒ false; `in` = array membership via SameValueZero; `contains`/`startsWith`/`endsWith` string-only (non-string ⇒ false); `matches` = `new RegExp(rhs).test(lhs)`, invalid pattern ⇒ false (literal patterns rejected at load) |
 | `all` / `any` | `{kind, exprs[]}` | Short-circuit AND/OR; `all([])`=true, `any([])`=false |
 | `not` | `{kind, expr}` | Inversion |
+| `exists` | `{kind, expr}` | Presence, not truthiness: only `undefined` (missing path) is false — `null`/`false`/`0`/`""` all exist |
+| `object` | `{kind, fields: {name: Expr}}` | Constructor — fields resolved against state; always true as predicate |
+| `array` | `{kind, items: Expr[]}` | Constructor — items resolved against state; always true as predicate |
 | `js` | `{kind, expression}` | **Throws** — compose the primitives instead |
 
 ---
 
-## 7. Flow kinds and output contracts
+## 8. Flow kinds and output contracts
 
 | `FlowDef.kind` | Purpose | Output rule |
 |---|---|---|

@@ -1,8 +1,8 @@
 # Flow Spec — Critical Feedback (Consolidated, Current)
 
-**Date:** 2026-08-07 · Companion docs: [`SPEC.md`](../SPEC.md) · [`steps-and-edges.md`](./steps-and-edges.md) · [`next-steps.md`](./next-steps.md)
+**Date:** 2026-08-07 · **Updated:** 2026-08-12 (data-plane critique + resolution) · Companion docs: [`SPEC.md`](../SPEC.md) · [`steps-and-edges.md`](./steps-and-edges.md) · [`next-steps.md`](./next-steps.md)
 
-One document, every open criticism, with status. Sources: the pre-extraction design review (`docs/superpowers/specs/2026-08-07-flow-spec-design-review.md`), the package-level critique from `SPEC.md` §7, and the semantic findings from documentation-as-audit. Items already fixed are listed once in §1 and not re-argued.
+One document, every open criticism, with status. Sources: the pre-extraction design review (`docs/superpowers/specs/2026-08-07-flow-spec-design-review.md`), the package-level critique from `SPEC.md` §7, the semantic findings from documentation-as-audit, and the 2026-08-12 data-plane review (plan: `docs/superpowers/plans/2026-08-12-flow-spec-data-plane.md`). Items already fixed are listed once in §1 and not re-argued.
 
 **Severity:** 🔴 can silently produce wrong behavior · 🟡 design debt that compounds · 🔵 polish / future-proofing
 
@@ -16,8 +16,17 @@ One document, every open criticism, with status. Sources: the pre-extraction des
 | Dead config accepted silently (`policy`, `joinStrategy`, `terminal:'fail'`, non-manual triggers, `js`, fan-out) | `onUnsupported` seam + one `console.warn` line per finding in `loadCatalog` |
 | `pipelines.json` / `flows.json` doc drift | Fixed in catalog.ts header |
 | Evaluator locked to LangGraph's `FlowStateT` | Retyped to structural `unknown`; browser consumers can share it |
-| Expression semantics undocumented/unpinned (dot-numeric array indexing, SameValueZero `in`, reference-equality `==`) | Documented + pinned: 17 fixtures (JSON-serializability guarded) + NaN code-level test; runtime replays fixtures in `flow-spec-conformance.test.ts` |
+| Expression semantics undocumented/unpinned (dot-numeric array indexing, SameValueZero `in`, reference-equality `==`) | Documented + pinned: fixtures (JSON-serializability guarded) + NaN code-level test; runtime replays fixtures in `flow-spec-conformance.test.ts` |
 | No compatibility proof for the extraction | Baseline 216 → 230 tests verified via stash comparison; 211 external-consumer tests untouched |
+| 🔴 **The data plane was one flat string** — `state.output` was the only inter-node channel, so the expression language routed over structured state the runtime could never produce: `$.input` didn't exist (despite appearing in types.ts doc examples), `$.nodes` didn't exist, `$.output.field` silently resolved `undefined` → false. The routing plane was spec'd; the data plane wasn't (2026-08-12 review, headline finding) | `FlowRunState` wire contract in the spec; runtime channels `input` (write-once) + `nodes` (merge-reduced, parallel-safe) with `FlowStateT extends FlowRunState` compile-time-asserted; fixtures pin `$.input` / `$.nodes.<id>` semantics |
+| 🔴 No per-node structured output — gates/edges could only see one opaque string; the runtime scraped JSON ad hoc (`extractPrUrlFromOutput`) | `NodeOutputContract` (`output.kind: 'json'`) — output parsed into `state.nodes[id]`; `OutputParseError` is error-edge routable. Schema enforcement still open (§2, `node-output-schema`) |
+| 🔴 No node input mapping — every node implicitly consumed the previous node's output string; multi-input nodes impossible | `TaskStep.input` (Expression or Record) resolved against run state into the effective prompt/stdin/input; runs inside Loop so mappings see per-item state |
+| 🟡 Error routing untyped — one catch-all error edge despite a rich AdapterError taxonomy; timeout ≠ rate-limit ≠ parse failure indistinguishable | `ErrorEdge.on` matchers against `NodeExit.errorName`; any number of named edges + ≤1 catch-all; first declared match wins |
+| 🟡 Expression language couldn't shape data or distinguish false-from-missing; string routing (\"did the agent say APPROVED\") needed a script hop | `exists` (presence ≠ truthiness), `object`/`array` constructors, `contains`/`startsWith`/`endsWith`/`matches` string ops; `matches` literal patterns validated at load; fixtures extended to 28 incl. `expectedValue` value-semantics pins |
+| 🟡 Run-side wire shapes were runtime-private — HITL request/resume payloads, `NodeExit`, `ChangedFile` lived in harness-core, so a reviewer UI had no contract to build against | Moved to flow-spec (`ApprovalRequest`/`ApprovalResume`, `SuspendRequest`, `NodeExit`, `ChangedFile`); harness-core re-exports for compatibility |
+| 🟡 Scripts had no credential surface — tools got `ToolAuthRef`, scripts got plain-string env, inviting pasted secrets | `ScriptConfig.secrets` resolved through the CredentialBroker into child env (wins over static env); missing broker / bad id → `AuthError` exit |
+| 🔵 Flows had no version identity for durable checkpoints or subflow pins | `FlowDef.version` + `SubflowConfig.version` (pin recorded, not enforced — `subflow-version-pin` report) |
+| 🔵 No `test` script in package.json (`pnpm -r test` skipped the contract's own suite) | Added (`vitest run`) |
 
 ## 2. Open — package-level (this package's debt)
 
@@ -46,7 +55,7 @@ Controlplane still stores opaque JSONB; Phase 2 would hand-port these rules into
 A `literal` whose `value` contains `{kind:'js', expression:'…'}` is reported as a js expression though it's never evaluated. Warning-only today; walking known expression positions (edge conditions, assertions, transform expressions, loop paths, matchers, tool args) would be precise.
 
 ### 🔵 Packaging hygiene
-No `test` script (`pnpm -r test` skips the contract's own tests); version 0.0.0/private with no changeset wiring despite semver being a stated extraction motive. Both fine today, both wrong the day the first out-of-repo consumer appears.
+~~No `test` script~~ (added 2026-08-12); version 0.0.0/private with no changeset wiring despite semver being a stated extraction motive. Fine today, wrong the day the first out-of-repo consumer appears.
 
 ## 3. Open — runtime-level (harness-core's debt, visible through the spec)
 
@@ -57,7 +66,8 @@ These are inherited from the original review; the spec now *warns* about the fir
 | `policy` retry/timeout/onError, `joinStrategy`, `terminal:'fail'` | 🔴 | Warned at load, ignored at runtime — authors' reliability config does nothing |
 | Parallel fan-out/join | 🔴 | Router follows first sequence edge only; reducers and `joinStrategy` imply otherwise; second+ branches never run (warned) |
 | Non-manual triggers | 🟡 | Validated cron/webhook/event/message shapes with no ingress, scheduler, or subscription behind them (warned) |
-| Output contracts | 🔴 | `job-intent` — the factory/fleet seam — has types and a static check, zero runtime parsing/emission. `structured.schema` never validates anything |
+| Flow-level output contracts | 🔴 | `job-intent` — the factory/fleet seam — has types and a static check, zero runtime parsing/emission. `structured.schema` never validates anything. (Node-level `output.kind: 'json'` now parses — 2026-08-12 — and is the natural machinery for the terminal-node enforcement, still unbuilt) |
+| Node output schema / effect-aware replay | 🟡 | New 2026-08-12 spec surface, honestly reported: `output.schema` accepted but never validated (`node-output-schema`); `effect` recorded but not consulted (`effect`) — becomes 🔴 the day a durable checkpointer starts replaying side-effecting nodes (duplicate PRs) |
 | Approval `slaMs` / `assigneeRole` | 🔴 | No auto-reject timer; resume route checks only job status — any caller with socket access can approve |
 | Durability | 🔴 | `MemorySaver` default checkpointer: restart loses every awaiting-approval/suspended job; durable savers supported but never wired |
 | Suspend wake-ups | 🟡 | No timer/event scheduler; resume is entirely the caller's job |
@@ -69,4 +79,4 @@ These are inherited from the original review; the spec now *warns* about the fir
 
 ## 4. The one-sentence summary
 
-The extraction fixed the *honesty* problem — the spec now tells you what it won't do — but the *capability* gap is unchanged: the runtime executes a clean, well-tested subset of a contract that still promises more, and the mechanisms keeping spec and runtime aligned (the warning list, the fixture discipline) are only as strong as the conventions §2 asks to turn into tests.
+The extraction fixed the *honesty* problem (2026-08-07) and the data-plane pass fixed the *capability ceiling* (2026-08-12 — run state, node I/O, typed errors, and a data-shaping expression language now exist and execute); what remains is the reliability tier (policy/join/triggers/fan-out still warn-only, schema and effect declared-not-enforced) and the mechanisms keeping spec and runtime aligned (the warning list, the fixture discipline), which are only as strong as the conventions §2 asks to turn into tests.
