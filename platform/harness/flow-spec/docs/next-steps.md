@@ -15,8 +15,8 @@ flowchart LR
 
 | # | Item | Effort | Why now |
 |---|---|---|---|
-| 0.1 | **Curate the export surface** — named exports in flow-spec's `index.ts` and harness-core's `catalog.ts` re-export; decide `ToolResolver`/`walkAgents`/`resolveAccepts` placement while at it | S | Every day of `export *` grows the accidental API; cheapest while the package is hours old |
-| 0.2 | **Narrow `scanForJsExpressions` to known expression positions** (edge conditions, gate assertions, transform expressions, loop paths, matchers, tool args) | S | Kills the false-positive class while the scan is fresh; keeps `where` paths pointing at real expressions |
+| 0.1 | ~~**Curate the export surface** — named exports in flow-spec's `index.ts` and harness-core's `catalog.ts` re-export; decide `ToolResolver`/`walkAgents`/`resolveAccepts` placement while at it~~ | S | ✅ Done 2026-08-12 (export-surface slice): named exports at both layers; `ToolResolver` moved to harness-core's `tool-executor.ts`; `walkAgents`/`resolveAccepts` stay as pure spec helpers; fixtures not re-exported by `catalog.ts` (see critical-feedback §1.5) |
+| 0.2 | ~~**Narrow `scanForJsExpressions` to known expression positions** (edge conditions, gate assertions, transform expressions, loop paths, matchers, tool args)~~ | S | ✅ Done 2026-08-12 (export-surface slice): position-aware walk mirroring the runtime's expression positions incl. top-level-only tool args / subflow inputs; inert-data false positives pinned dead by two new `UNSUPPORTED_CASES` fixtures |
 | 0.3 | ~~**Add the `test` script** to flow-spec's package.json~~ | S | ✅ Done 2026-08-12 (data-plane slice) |
 | 0.4 | ~~**Validator-consistency fixes** — load-time jsonpath path-syntax check, shadowed error-edge name rejection, `job-intents` min ≤ max cross-check, `vitest` in devDependencies~~ | S | ✅ Done 2026-08-12 (validator-consistency pass): all three validator rules pinned by new `VALIDATION_CASES` fixtures, replayed by both packages (see critical-feedback §1.4) |
 

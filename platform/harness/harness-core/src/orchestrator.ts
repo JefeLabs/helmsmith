@@ -14,7 +14,7 @@ import {
 } from '@helmsmith/agent-auth';
 import { Command } from '@langchain/langgraph';
 import { type BindingToSpecOptions, bindingToSpec } from './binding-to-spec.ts';
-import { type AdapterId, type FlowDef, type McpToolDef, parseFlowOutput, type ToolResolver } from './catalog.ts';
+import { type AdapterId, type FlowDef, type McpToolDef, parseFlowOutput } from './catalog.ts';
 import { discoverChangedFiles } from './changed-files.ts';
 import {
   type ApprovalRequest,
@@ -34,7 +34,7 @@ import {
   makeSubflowExecutor,
   validateSubflowGraph,
 } from './subflow-executor.ts';
-import { type McpResult, makeToolExecutor } from './tool-executor.ts';
+import { type McpResult, makeToolExecutor, type ToolResolver } from './tool-executor.ts';
 
 /** Compiled-graph handle cached per-job for resume. Structural so this
  *  module doesn't pin a specific LangGraph type. Exported so callers

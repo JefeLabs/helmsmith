@@ -349,18 +349,6 @@ export interface ToolAuthRef {
   name?: string;
 }
 
-/**
- * Lookup function the runtime calls to resolve a `ToolConfig.toolId`
- * to its `ToolDef`. Sync because the resolver is expected to be a
- * cached map populated at job-submission time — async lookups would
- * race against checkpointer state and complicate retry semantics.
- *
- * Returns undefined for unknown ids; the executor surfaces this as an
- * error-edge-eligible failure (errorName: 'UnknownTool') rather than a
- * graph-throw, so flows can route around missing tools.
- */
-export type ToolResolver = (toolId: string) => ToolDef | undefined;
-
 /** Code execution. The script's source body is dropped to a temp file
  *  and run via the language's interpreter; state.output is piped to
  *  the script as stdin (UTF-8 string), and the script's stdout becomes

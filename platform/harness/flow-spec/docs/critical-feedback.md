@@ -1,6 +1,6 @@
 # Flow Spec — Critical Feedback (Consolidated, Current)
 
-**Date:** 2026-08-07 · **Updated:** 2026-08-12 after the data-plane slice (PR #14), the hardening slice (PR #15), and a validator-consistency review · Companion docs: [`SPEC.md`](../SPEC.md) · [`steps-and-edges.md`](./steps-and-edges.md) · [`next-steps.md`](./next-steps.md)
+**Date:** 2026-08-07 · **Updated:** 2026-08-12 after the data-plane slice (PR #14), the hardening slice (PR #15), a validator-consistency review (PR #17), and the export-surface slice (next-steps 0.1 + 0.2) · Companion docs: [`SPEC.md`](../SPEC.md) · [`steps-and-edges.md`](./steps-and-edges.md) · [`next-steps.md`](./next-steps.md)
 
 One document, every open criticism, with status. Sources: the pre-extraction design review (`docs/superpowers/specs/2026-08-07-flow-spec-design-review.md`), the package-level critique from `SPEC.md` §7, the semantic findings from documentation-as-audit, the 2026-08-12 data-plane review + its post-merge self-review (plan: `docs/superpowers/plans/2026-08-12-flow-spec-data-plane.md`), and a 2026-08-12 validator-consistency review of the merged package. Items already fixed are listed once in §1 and not re-argued.
 
@@ -55,22 +55,24 @@ The unifying observation: once the validator crossed into statically-knowable-ru
 | 🔵 `job-intents` `min`/`max` were individually validated but never cross-checked — `{ min: 5, max: 2 }` validated yet was unsatisfiable; every terminal output failed `parseFlowOutput`, loudly but only after the flow ran to completion | Load-time `min ≤ max` cross-check in `validateFlowOutputContract` |
 | 🔵 `vitest` was missing from devDependencies — the `test` script resolved only via workspace hoisting, so the suite breaks the day the package is extracted (semver/extraction being a stated motive) | `vitest ^4.1.5` declared in the package's own devDependencies |
 
-## 2. Open — package-level (this package's debt)
+### 1.5 Export surface + scan precision (2026-08-12, next-steps 0.1 + 0.2)
 
-### 🟡 The export surface is unguarded — and growing
-`index.ts` wildcard-exports five modules, and harness-core's `catalog.ts` wildcard-exports the package again. Any new symbol becomes public API of two packages with no review point — and both 2026-08-12 slices pushed ~a dozen new symbols through it (`FlowRunState`, HITL shapes, `parseFlowOutput`, fixture types…). Still the cheapest high-leverage fix in the package (next-steps 0.1), and more urgent each slice: curated named exports at both layers.
+| Finding | Resolution |
+|---|---|
+| 🟡 The export surface was unguarded at two layers — `export *` in flow-spec's `index.ts` and again in harness-core's `catalog.ts` re-export meant any new symbol silently became public API of two packages, and both 2026-08-12 slices pushed ~a dozen symbols through it | Curated named exports at both layers; adding a symbol to either list is now the API-review point. The fixture sets stay exported by flow-spec (they ARE the conformance contract) but are deliberately not re-exported by `catalog.ts` — the runtime re-exports the contract, not the test data (the conformance suite imports fixtures from `@helmsmith/flow-spec` directly) |
+| 🟡 Runtime seams migrated with the types — `ToolResolver` is a dispatch signature, not a wire shape; it can't be stored or rendered | Moved to harness-core's `tool-executor.ts`, next to its consumer (harness-core's public surface unchanged — `index.ts` re-exports it from there). `walkAgents` / `resolveAccepts` / `findFlow` / `findProduct` stay in the spec deliberately: pure, browser-safe helpers over wire shapes that a designer UI needs as much as the runtime does |
+| 🔵 `scanForJsExpressions` false-positived on inert data — a `literal` whose `value` contained a js-shaped object was reported although it is never evaluated | Replaced by a position-aware walk over exactly the positions the runtime evaluates (edge conditions, gate assertions, transform expressions, loop paths, trigger/suspend matchers, input mappings, and top-level tool args / subflow inputs — mirroring the executors' three-kind `isExpression`); literal values are never descended into. Pinned by two new `UNSUPPORTED_CASES` fixtures: inert js-shaped data reports nothing, and js in every live position reports once per occurrence |
+
+## 2. Open — package-level (this package's debt)
 
 ### 🟡 `AdapterId` bakes two runtime implementations into the wire contract
 `'claude-sdk' | 'opencode-cli'` is a closed union in the *spec* package — adding an adapter is a spec change. Everything else in the contract references by id and resolves at runtime (`toolId`, `flowId`); adapters should work the same way (`string` + registry check).
 
 ### 🟡 The name undersells the scope — it's the platform wire-contract package now
-Originally: `ProductDef`/`ProductRepo`/`ContextSourceDef` (tenancy/git shapes) live here because `validateUnifiedCatalog` needs them. Since 2026-08-12 the run side (`FlowRunState`, HITL payloads, `NodeExit`, `ChangedFile`) lives here too — deliberately, for the shared-contract reasons in SPEC §3.1.2. Defensible, but a designer UI importing "flow types" now drags in clone-URL shapes and reviewer payloads. Rename, split entry points, or at least curate exports (0.1) when the designer becomes real.
+Originally: `ProductDef`/`ProductRepo`/`ContextSourceDef` (tenancy/git shapes) live here because `validateUnifiedCatalog` needs them. Since 2026-08-12 the run side (`FlowRunState`, HITL payloads, `NodeExit`, `ChangedFile`) lives here too — deliberately, for the shared-contract reasons in SPEC §3.1.2. Defensible, but a designer UI importing "flow types" now drags in clone-URL shapes and reviewer payloads. Exports are now curated (§1.5), which softens this but doesn't close it — rename or split entry points when the designer becomes real.
 
 ### 🟡 Tool nodes have two overlapping input mechanisms
 `ToolConfig.args` values were already expression-resolvable; `TaskStep.input` (2026-08-12) now exists on the same node. Both answer "how does state reach this tool?" with different semantics — args merge into the ToolDef template, input rewrites the node's effective `$.output`. The spec doesn't say which to prefer or define their composition. A designer UI will surface this ambiguity immediately; pick a rule (suggest: `input` composes the payload, `args` binds it to the tool's parameters) and document it.
-
-### 🟡 Runtime seams migrated with the types
-`ToolResolver` (`(toolId) => ToolDef | undefined`) is a dispatch signature, not a wire shape — it can't be stored or rendered. Softer versions of the same question: `walkAgents`, `resolveAccepts`. They rode along in the verbatim move; the export-surface curation (above) is the natural moment to decide their home.
 
 ### 🟡 No schema artifact
 Controlplane still stores opaque JSONB; Phase 2 would hand-port these rules into Java, and the smithagents seam wants a language-neutral contract. Generated JSON Schema from these types is the agreed answer and doesn't exist yet. The 2026-08-12 fixtures make this *safer* (a ported validator has three replayable behavior sets to conform to) but not less necessary.
@@ -80,9 +82,6 @@ Controlplane still stores opaque JSONB; Phase 2 would hand-port these rules into
 
 ### 🔵 Wire-format warts locked in 2026-08-12
 (a) Input-mapping keys must not be named `kind` — the single-Expression detection heuristic; `{ expr: … } | { map: … }` would have been unambiguous. (b) The write-once `input` reducer treats a legitimately-`null` job input as claimable by a later write; node writes to `input` are prevented by convention only. (c) `nodes` duplicates every output alongside `output` with no truncation policy — irrelevant in-memory, becomes checkpoint-size growth when the durable checkpointer (2.2) lands.
-
-### 🔵 `scanForJsExpressions` can false-positive on inert data
-A `literal` whose `value` contains `{kind:'js', expression:'…'}` is reported as a js expression though it's never evaluated. Warning-only today; walking known expression positions (edge conditions, assertions, transform expressions, loop paths, matchers, tool args, input mappings) would be precise.
 
 ### 🔵 Packaging hygiene
 Version 0.0.0/private with no changeset wiring despite semver being a stated extraction motive. Fine today, wrong the day the first out-of-repo consumer appears. (The missing `test` script and the hoisting-only `vitest` dependency were both fixed 2026-08-12.)
@@ -109,4 +108,4 @@ Inherited from the original review, minus what the 2026-08-12 slices closed (ter
 
 ## 4. The one-sentence summary
 
-The extraction fixed the *honesty* problem (2026-08-07), the data-plane pass fixed the *capability ceiling*, the hardening pass turned the alignment mechanisms into enforced tests (three-behavior conformance fixtures) while giving the factory/fleet seam teeth (terminal output enforcement), and the validator-consistency pass closed the statically-knowable-failure gaps (path syntax, shadowed error names, min ≤ max) — what remains is the reliability tier (policy/join/triggers/fan-out still warn-only, with 2.4's state-model excuse now gone), schema/effect enforcement, HITL trust (role check, SLA, durable checkpointer), and JobIntent *emission* on top of the now-enforced contract.
+The extraction fixed the *honesty* problem (2026-08-07), the data-plane pass fixed the *capability ceiling*, the hardening pass turned the alignment mechanisms into enforced tests (three-behavior conformance fixtures) while giving the factory/fleet seam teeth (terminal output enforcement), and the validator-consistency + export-surface passes closed the statically-knowable-failure gaps (path syntax, shadowed error names, min ≤ max) and made both export layers curated review points — what remains is the reliability tier (policy/join/triggers/fan-out still warn-only, with 2.4's state-model excuse now gone), schema/effect enforcement, HITL trust (role check, SLA, durable checkpointer), and JobIntent *emission* on top of the now-enforced contract.

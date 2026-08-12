@@ -371,37 +371,148 @@ function reportUnsupportedFeatures(
     }
   }
 
-  scanForJsExpressions(flow, where, report);
+  reportJsExpressions(flow, where, report);
 }
 
 /**
- * Recursive walk for `{ kind: 'js', expression: '...' }` anywhere in a
- * flow — configs, tags, edge conditions, tool args. The evaluator
- * throws on these at runtime, so surface them at load time instead.
+ * Report `{ kind: 'js' }` expressions in the positions the runtime
+ * actually evaluates — edge conditions, gate assertions, transform
+ * expressions, loop paths, event matchers (trigger + suspend), node
+ * input mappings, and top-level tool args / subflow inputs. A js-shaped
+ * object anywhere else (a literal's `value`, plain data in args) is
+ * inert and must NOT be reported: the evaluator never sees it.
  */
-function scanForJsExpressions(
+function reportJsExpressions(
+  flow: Record<string, unknown>,
+  where: string,
+  report: (f: UnsupportedFeature) => void,
+): void {
+  for (const [j, n] of (flow.nodes as unknown[]).entries()) {
+    const node = n as Record<string, unknown>;
+    const at = `${where}.nodes[${j}]`;
+    const config = node.config as Record<string, unknown>;
+    switch (node.kind) {
+      case 'transform':
+        scanExpressionTree(config.expression, `${at}.config.expression`, report);
+        break;
+      case 'gate':
+        for (const [k, a] of (config.assertions as unknown[]).entries()) {
+          scanExpressionTree(
+            (a as Record<string, unknown>).expression,
+            `${at}.config.assertions[${k}].expression`,
+            report,
+          );
+        }
+        break;
+      case 'tool':
+        scanResolvableRecord(config.args, `${at}.config.args`, report);
+        break;
+      case 'subflow':
+        scanResolvableRecord(config.input, `${at}.config.input`, report);
+        break;
+      case 'trigger':
+        if (config.kind === 'event' && config.matcher !== undefined) {
+          scanExpressionTree(config.matcher, `${at}.config.matcher`, report);
+        }
+        break;
+    }
+    if (node.input !== undefined) {
+      const input = node.input as Record<string, unknown>;
+      if (typeof input.kind === 'string') {
+        scanExpressionTree(input, `${at}.input`, report);
+      } else {
+        for (const [k, sub] of Object.entries(input)) {
+          scanExpressionTree(sub, `${at}.input.${k}`, report);
+        }
+      }
+    }
+    const tags = node.tags as Record<string, unknown> | undefined;
+    const loop = tags?.loop as Record<string, unknown> | undefined;
+    if (loop?.path !== undefined) {
+      scanExpressionTree(loop.path, `${at}.tags.loop.path`, report);
+    }
+    const suspendTrigger = (tags?.suspend as Record<string, unknown> | undefined)?.trigger as
+      | Record<string, unknown>
+      | undefined;
+    if (suspendTrigger?.matcher !== undefined) {
+      scanExpressionTree(suspendTrigger.matcher, `${at}.tags.suspend.trigger.matcher`, report);
+    }
+  }
+  for (const [j, e] of (flow.edges as unknown[]).entries()) {
+    const edge = e as Record<string, unknown>;
+    if (edge.type === 'conditional') {
+      scanExpressionTree(edge.condition, `${where}.edges[${j}].condition`, report);
+    }
+  }
+}
+
+/**
+ * Tool args and subflow inputs are unvalidated Records whose top-level
+ * values the runtime resolves ONLY when they are literal/jsonpath/js-
+ * shaped (mirrors `isExpression` in tool-executor.ts and
+ * subflow-executor.ts). Anything else — including a compare-shaped
+ * object with a js buried inside — passes through as plain data.
+ */
+function scanResolvableRecord(
   value: unknown,
   path: string,
   report: (f: UnsupportedFeature) => void,
 ): void {
-  if (Array.isArray(value)) {
-    for (const [i, item] of value.entries()) {
-      scanForJsExpressions(item, `${path}[${i}]`, report);
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return;
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    if (!v || typeof v !== 'object') continue;
+    const kind = (v as Record<string, unknown>).kind;
+    if (kind === 'literal' || kind === 'jsonpath' || kind === 'js') {
+      scanExpressionTree(v, `${path}.${k}`, report);
     }
-    return;
   }
+}
+
+/**
+ * Walk a validated Expression tree structurally — through the
+ * composition kinds' declared children only, never into a literal's
+ * `value` (inert data) — reporting each `js` node.
+ */
+function scanExpressionTree(
+  value: unknown,
+  path: string,
+  report: (f: UnsupportedFeature) => void,
+): void {
   if (!value || typeof value !== 'object') return;
-  const obj = value as Record<string, unknown>;
-  if (obj.kind === 'js' && typeof obj.expression === 'string') {
-    report({
-      where: path,
-      feature: 'expression-js',
-      detail: 'the evaluator throws on js expressions; compose compare/all/any/not instead',
-    });
-    return;
-  }
-  for (const [key, sub] of Object.entries(obj)) {
-    scanForJsExpressions(sub, `${path}.${key}`, report);
+  const e = value as Record<string, unknown>;
+  switch (e.kind) {
+    case 'js':
+      report({
+        where: path,
+        feature: 'expression-js',
+        detail: 'the evaluator throws on js expressions; compose compare/all/any/not instead',
+      });
+      return;
+    case 'compare':
+      scanExpressionTree(e.lhs, `${path}.lhs`, report);
+      scanExpressionTree(e.rhs, `${path}.rhs`, report);
+      return;
+    case 'all':
+    case 'any':
+      for (const [i, sub] of (e.exprs as unknown[]).entries()) {
+        scanExpressionTree(sub, `${path}.exprs[${i}]`, report);
+      }
+      return;
+    case 'not':
+    case 'exists':
+      scanExpressionTree(e.expr, `${path}.expr`, report);
+      return;
+    case 'object':
+      for (const [k, sub] of Object.entries(e.fields as Record<string, unknown>)) {
+        scanExpressionTree(sub, `${path}.fields.${k}`, report);
+      }
+      return;
+    case 'array':
+      for (const [i, sub] of (e.items as unknown[]).entries()) {
+        scanExpressionTree(sub, `${path}.items[${i}]`, report);
+      }
+      return;
+    // literal / jsonpath: leaves. A literal's value is opaque data.
   }
 }
 

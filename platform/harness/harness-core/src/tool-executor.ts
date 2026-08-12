@@ -30,9 +30,24 @@ import type {
   ToolAuthRef,
   ToolConfig,
   ToolDef,
-  ToolResolver,
 } from './catalog.ts';
 import { evalExpression, type FlowStateT, type NodeExecutor } from './flow-graph.ts';
+
+/**
+ * Lookup function the runtime calls to resolve a `ToolConfig.toolId`
+ * to its `ToolDef`. Sync because the resolver is expected to be a
+ * cached map populated at job-submission time — async lookups would
+ * race against checkpointer state and complicate retry semantics.
+ *
+ * Returns undefined for unknown ids; the executor surfaces this as an
+ * error-edge-eligible failure (errorName: 'UnknownTool') rather than a
+ * graph-throw, so flows can route around missing tools.
+ *
+ * Lives here (not in flow-spec) because it is a runtime dispatch seam,
+ * not a wire shape — it can't be stored in a catalog or rendered by a
+ * designer; the spec keeps only serializable contracts.
+ */
+export type ToolResolver = (toolId: string) => ToolDef | undefined;
 
 /** Default timeouts (ms). MCP gets longer because startup is real. */
 const DEFAULT_CLI_TIMEOUT = 30_000;
@@ -560,6 +575,7 @@ function errorExit(
 /**
  * Re-export wrapper so tests can build the executor without
  * round-tripping through the orchestrator. Kept thin — main entry is
- * `makeToolExecutor`.
+ * `makeToolExecutor`. (`ToolResolver` is defined and exported at the
+ * top of this module.)
  */
-export type { ToolDef, ToolResolver } from './catalog.ts';
+export type { ToolDef } from './catalog.ts';

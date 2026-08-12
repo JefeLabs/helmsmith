@@ -61,7 +61,6 @@ export {
   type ToolAuthRef,
   type ToolConfig,
   type ToolDef,
-  type ToolResolver,
   type TransformConfig,
   type TriggerConfig,
   validateUnifiedCatalog,
@@ -127,4 +126,5 @@ export {
   type McpResult,
   makeToolExecutor,
   type ToolExecutorDeps,
+  type ToolResolver,
 } from './tool-executor.ts';

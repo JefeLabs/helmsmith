@@ -1,6 +1,6 @@
 # @helmsmith/flow-spec — Specification & Critical Notes
 
-**Package:** `platform/harness/flow-spec` · **Version:** 0.0.0 (private, source-shipped) · **Date:** 2026-08-07 · **Updated:** 2026-08-12 (data-plane contract: run state, node I/O, error matchers, expression additions; validator-consistency pass: load-time path syntax, error-edge shadow rejection, min ≤ max) · **Landed via:** PR #13 (`feat/flow-spec-package`)
+**Package:** `platform/harness/flow-spec` · **Version:** 0.0.0 (private, source-shipped) · **Date:** 2026-08-07 · **Updated:** 2026-08-12 (data-plane contract: run state, node I/O, error matchers, expression additions; validator-consistency pass: load-time path syntax, error-edge shadow rejection, min ≤ max; export-surface slice: curated exports at both layers, position-aware js scan) · **Landed via:** PR #13 (`feat/flow-spec-package`)
 
 This document is the detailed companion to the package `README.md`: the full contract the package defines and the exact semantics its code implements. Critique and roadmap live in dedicated docs (see §7 for the map). The pre-extraction critique of the whole flow *runtime* lives in `docs/superpowers/specs/2026-08-07-flow-spec-design-review.md`; runtime findings are only summarized here, not repeated.
 
@@ -26,7 +26,7 @@ Two hard rules define the boundary:
 1. **Browser-safe:** zero runtime dependencies, no `node:*` imports. `loadCatalog` (fs) stayed behind in harness-core for exactly this reason.
 2. **Dependency direction:** harness-core → flow-spec, never back. The evaluator was retyped from LangGraph's `FlowStateT` to structural `unknown` before the split because this rule makes reaching back for runtime types impossible afterward.
 
-Deliberately **not** here: graph compilation, routing, executors (harness-core); catalog loading (harness-core); anything shared with smithagents — the factory/fleet seam is work orders, not code, so external consumers get a schema artifact, never this npm package.
+Deliberately **not** here: graph compilation, routing, executors (harness-core); catalog loading (harness-core); runtime dispatch seams — function types that can't be stored or rendered, e.g. `ToolResolver`, which lives in harness-core's `tool-executor.ts`; anything shared with smithagents — the factory/fleet seam is work orders, not code, so external consumers get a schema artifact, never this npm package.
 
 ## 2. Module map
 
@@ -37,7 +37,7 @@ Deliberately **not** here: graph compilation, routing, executors (harness-core);
 | `expression.ts` | `evalExpression`, `resolveExpressionValue`, `resolveJsonPath` | Expression semantics, shared verbatim by the runtime router and any future designer preview |
 | `output.ts` | `parseFlowOutput`, `FlowOutputParseResult` | Terminal output-contract enforcement (job-intent/job-intents shape + min/max, flow-spec re-validation, structured parse); the runtime's `finalizeOrPause` fails jobs through this |
 | `fixtures.ts` | `ExpressionCase`/`EXPRESSION_CASES` (28 cases, `expectedValue` pins value semantics), `ValidationCase`/`VALIDATION_CASES`, `UnsupportedCase`/`UNSUPPORTED_CASES` — all JSON-serializability guarded | Executable spec data for all three behaviors; replayed by this package's tests and harness-core's `flow-spec-conformance.test.ts` |
-| `index.ts` | wildcard re-export of all four | Public surface (see `docs/critical-feedback.md` §2 for why "wildcard" is a critique) |
+| `index.ts` | curated named exports of all five modules | Public surface — adding a symbol to the list IS the API-review point (harness-core's `catalog.ts` re-export is curated the same way, minus the fixture sets) |
 
 ## 3. The contract in detail
 
@@ -137,7 +137,7 @@ sequenceDiagram
     L->>A: console.warn "[catalog] …: 'policy' is not executed by the runtime yet — …"
 ```
 
-`ValidateOptions.onUnsupported` fires for: `policy`, `joinStrategy`, `terminal-fail`, `trigger-<kind>` (non-manual), `expression-js` (recursive scan of the whole flow), `parallel-fan-out` (second+ sequence edge from one node — the runtime router silently follows only the first), `node-output-schema` (output parsed, schema not enforced), `effect` (recorded, not consulted), `subflow-version-pin` (recorded, resolution by flowId), `flow-output-schema` (structured terminal output parsed, schema not enforced). Reporting never changes accept/reject behavior; no callback ≡ pre-extraction semantics. Deliberately NOT reported because they execute: node `input` mappings, `output.kind: 'json'` parsing, error-edge `on` matchers, script `secrets`, the new expression kinds, terminal output-contract parsing.
+`ValidateOptions.onUnsupported` fires for: `policy`, `joinStrategy`, `terminal-fail`, `trigger-<kind>` (non-manual), `expression-js` (position-aware scan of exactly the expression positions the runtime evaluates — js-shaped data in a literal's `value` or in non-resolved tool args is inert and not reported), `parallel-fan-out` (second+ sequence edge from one node — the runtime router silently follows only the first), `node-output-schema` (output parsed, schema not enforced), `effect` (recorded, not consulted), `subflow-version-pin` (recorded, resolution by flowId), `flow-output-schema` (structured terminal output parsed, schema not enforced). Reporting never changes accept/reject behavior; no callback ≡ pre-extraction semantics. Deliberately NOT reported because they execute: node `input` mappings, `output.kind: 'json'` parsing, error-edge `on` matchers, script `secrets`, the new expression kinds, terminal output-contract parsing.
 
 **The list is test-enforced, not convention-enforced** (2026-08-12): `UNSUPPORTED_CASES` fixtures pin the exact report set per flow, replayed by both this package and harness-core — implementing a feature without deleting its report (or adding dead config without a report) fails conformance until the fixture changes first.
 
