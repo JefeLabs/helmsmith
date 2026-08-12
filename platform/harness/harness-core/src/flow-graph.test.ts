@@ -681,6 +681,84 @@ describe('compileFlow — fallback edges', () => {
   });
 });
 
+// ─── effect-aware replay guard ────────────────────────────────────────────
+
+describe('effect-aware replay guard', () => {
+  // t → work → ship(effect?) → check(gate). The gate fails its assertion
+  // on the first attempt (attempts.check is unset → NaN compare → false),
+  // rejects back to work, and passes on the second (attempts.check = 1).
+  // The cycle re-enters ship — the guard decides whether it re-runs.
+  function effectFlow(effect?: TaskStep['effect']): FlowDef {
+    return {
+      id: 'fx',
+      nodes: [
+        trigger('t'),
+        agentNode('work'),
+        { ...agentNode('ship'), effect },
+        {
+          id: 'check',
+          kind: 'gate',
+          config: {
+            assertions: [
+              {
+                expression: {
+                  kind: 'compare',
+                  lhs: { kind: 'jsonpath', path: '$.attempts.check' },
+                  op: '>=',
+                  rhs: { kind: 'literal', value: 1 },
+                },
+                message: 'passes on the second attempt',
+              },
+            ],
+          },
+        },
+      ],
+      edges: [
+        { from: 't', to: 'work', type: 'sequence' },
+        { from: 'work', to: 'ship', type: 'sequence' },
+        { from: 'ship', to: 'check', type: 'sequence' },
+        { from: 'check', to: 'work', type: 'reject', maxAttempts: 3 },
+      ],
+    };
+  }
+
+  async function runEffectFlow(
+    effect?: TaskStep['effect'],
+  ): Promise<{ shipRuns: number; state: FlowStateT }> {
+    let shipRuns = 0;
+    const calls: string[] = [];
+    const executors = new Map<string, NodeExecutor>([
+      ['work', makeRecorder(calls, 'work')],
+      [
+        'ship',
+        async () => {
+          shipRuns++;
+          return { output: 'shipped', lastExit: { nodeId: 'ship', kind: 'success' } };
+        },
+      ],
+    ]);
+    const graph = compileFlow({ flow: effectFlow(effect), executors });
+    const state = (await graph.invoke(initialState, {
+      configurable: { thread_id: `fx-${effect ?? 'none'}` },
+    })) as FlowStateT;
+    return { shipRuns, state };
+  }
+
+  it('skips a side-effecting node on re-entry when completion evidence exists', async () => {
+    const { shipRuns, state } = await runEffectFlow('side-effecting');
+    expect(shipRuns).toBe(1);
+    // The skip restores the recorded output for downstream nodes and the
+    // evidence from the first run remains addressable.
+    expect(state.nodes.ship).toBe('shipped');
+    expect(state.output).toBe('shipped');
+  });
+
+  it('re-runs idempotent and unclassified nodes on re-entry', async () => {
+    expect((await runEffectFlow('idempotent')).shipRuns).toBe(2);
+    expect((await runEffectFlow(undefined)).shipRuns).toBe(2);
+  });
+});
+
 // ─── buildRouter (in isolation) ───────────────────────────────────────────
 
 describe('buildRouter', () => {

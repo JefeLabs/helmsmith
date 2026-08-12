@@ -277,7 +277,10 @@ export function compileFlow(opts: CompileFlowOptions) {
         : isSyntheticSuspendNode(node)
           ? makeSuspendExecutor(node)
           : (executors.get(node.id) ?? builtinExecutor(node) ?? defaultExecutor(node.id));
-    const wrapped = withNodeIO(node, wrapWithTags(node, withInputMapping(node, baseExec)));
+    const wrapped = withEffectGuard(
+      node,
+      withNodeIO(node, wrapWithTags(node, withInputMapping(node, baseExec))),
+    );
     builder.addNode(node.id, wrapped);
   }
 
@@ -571,7 +574,41 @@ function resolveInputMapping(
 }
 
 /**
- * Outermost node wrapper: records the node's output into the
+ * Outermost node wrapper — the runtime consult of `TaskStep.effect`:
+ * at-most-once execution for `side-effecting` nodes. When completion
+ * evidence exists in `state.nodes[id]` (written by withNodeIO on the
+ * node's first successful run), any re-entry — a reject-edge cycle, a
+ * checkpointer replay after resume or restart — returns the recorded
+ * output instead of re-running the effect. `idempotent` / `pure` /
+ * unclassified nodes re-run freely: authors who WANT re-publish
+ * semantics mark the node `idempotent` and rely on the executor's
+ * natural-key idempotency (publish-executor reuses an existing PR for
+ * the same head branch).
+ *
+ * Granularity notes: synthetic interrupt nodes never carry `effect`
+ * (the topology rewriter's synthetic node omits it), and a looped
+ * side-effecting node is skipped as a whole unit — at-most-once is per
+ * node, not per iteration. A side-effecting node that produced no
+ * output leaves no evidence and will re-run; publish nodes always
+ * produce output.
+ */
+function withEffectGuard(step: TaskStep, exec: NodeExecutor): NodeExecutor {
+  if (step.effect !== 'side-effecting') return exec;
+  const nodeId = step.id;
+  return async (state) => {
+    const prior = state.nodes?.[nodeId];
+    if (prior !== undefined) {
+      return {
+        output: typeof prior === 'string' ? prior : JSON.stringify(prior),
+        lastExit: { nodeId, kind: 'success' },
+      };
+    }
+    return exec(state);
+  };
+}
+
+/**
+ * Records the node's output into the
  * `state.nodes` map (after Loop aggregation, so a looped node records
  * its aggregate). When the step declares `output.kind: 'json'`, the
  * output string is parsed and the PARSED value is recorded — this is
