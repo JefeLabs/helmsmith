@@ -152,6 +152,7 @@ function validateFlow(
   const outgoingByType = new Map<string, Map<string, number>>(); // from → (type → count)
   const incomingCount = new Map<string, number>();
   const errorCatchAllBySource = new Map<string, number>();
+  const errorNamesBySource = new Map<string, Set<string>>();
   for (const [j, e] of (flow.edges as unknown[]).entries()) {
     const edgeWhere = `${where}.edges[${j}]`;
     validateEdge(e, edgeWhere);
@@ -180,6 +181,22 @@ function validateFlow(
             `${edgeWhere}: at most one catch-all 'error' edge (no "on" list) allowed per source node`,
           );
         }
+      } else {
+        // First-declared-match-wins makes a repeated error name dead
+        // config: a name already claimed by an earlier `on` entry from
+        // the same source (on a prior edge or earlier in this list)
+        // can never fire. Reject it — same statically-knowable-mistake
+        // rationale as the literal `matches` regex check.
+        const seen = errorNamesBySource.get(edge.from as string) ?? new Set<string>();
+        for (const [k, name] of (on as string[]).entries()) {
+          if (seen.has(name)) {
+            throw new CatalogError(
+              `${edgeWhere}.on[${k}]: "${name}" already appears in an earlier 'on' entry for source "${edge.from}" — the router picks the first declared match, so this entry can never fire`,
+            );
+          }
+          seen.add(name);
+        }
+        errorNamesBySource.set(edge.from as string, seen);
       }
     }
     if (edge.type === 'fallback' && (fromMap.get('fallback') ?? 0) > 1) {
@@ -869,6 +886,28 @@ function validateExpression(value: unknown, where: string): void {
       if (typeof e.path !== 'string' || !e.path) {
         throw new CatalogError(`${where}.path must be a non-empty string`);
       }
+      // Load-time path-syntax check. The evaluator resolves malformed
+      // paths to undefined (it never throws on data), so a typo like
+      // "output" or "$.a..b" would silently route false at runtime —
+      // reject statically knowable mistakes here, same rationale as
+      // the literal `matches` regex check below.
+      if (e.path !== '$') {
+        if (!e.path.startsWith('$.')) {
+          throw new CatalogError(
+            `${where}.path must be '$' or start with '$.' (got ${JSON.stringify(e.path)})`,
+          );
+        }
+        if (
+          e.path
+            .slice(2)
+            .split('.')
+            .some((segment) => !segment)
+        ) {
+          throw new CatalogError(
+            `${where}.path must not contain empty segments (got ${JSON.stringify(e.path)})`,
+          );
+        }
+      }
       break;
     case 'js':
       if (typeof e.expression !== 'string' || !e.expression) {
@@ -1022,6 +1061,11 @@ function validateFlowOutputContract(value: unknown, where: string): void {
       throw new CatalogError(`${where}.min must be a non-negative number`);
     if (o.max !== undefined && (typeof o.max !== 'number' || o.max < 0))
       throw new CatalogError(`${where}.max must be a non-negative number`);
+    if (typeof o.min === 'number' && typeof o.max === 'number' && o.min > o.max) {
+      throw new CatalogError(
+        `${where}.min (${o.min}) must not exceed .max (${o.max}) — no terminal output could ever satisfy the contract`,
+      );
+    }
   }
   if (o.kind === 'structured' && o.schema === undefined) {
     throw new CatalogError(`${where}.schema is required`);

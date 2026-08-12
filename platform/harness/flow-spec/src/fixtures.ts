@@ -456,6 +456,104 @@ export const VALIDATION_CASES: readonly ValidationCase[] = [
     valid: false,
     errorIncludes: 'duplicate node id',
   },
+  {
+    name: 'jsonpath root $, dot-numeric indexes, and nested dot-paths are accepted',
+    catalog: {
+      flows: [
+        {
+          ...VALID_FLOW,
+          nodes: [
+            VALID_FLOW.nodes[0],
+            {
+              id: 'a',
+              kind: 'transform',
+              config: {
+                expression: {
+                  kind: 'object',
+                  fields: {
+                    whole: { kind: 'jsonpath', path: '$' },
+                    first: { kind: 'jsonpath', path: '$.repos.0' },
+                    deep: { kind: 'jsonpath', path: '$.nodes.review.score' },
+                  },
+                },
+              },
+            },
+          ],
+        },
+      ],
+    },
+    valid: true,
+  },
+  {
+    name: 'jsonpath path without the $ prefix is rejected at load time',
+    catalog: {
+      flows: [
+        {
+          ...VALID_FLOW,
+          nodes: [
+            VALID_FLOW.nodes[0],
+            {
+              id: 'a',
+              kind: 'transform',
+              config: { expression: { kind: 'jsonpath', path: 'output' } },
+            },
+          ],
+        },
+      ],
+    },
+    valid: false,
+    errorIncludes: "must be '$' or start with '$.'",
+  },
+  {
+    name: 'jsonpath path with an empty segment is rejected at load time',
+    catalog: {
+      flows: [
+        {
+          ...VALID_FLOW,
+          nodes: [
+            VALID_FLOW.nodes[0],
+            {
+              id: 'a',
+              kind: 'transform',
+              config: { expression: { kind: 'jsonpath', path: '$.a..b' } },
+            },
+          ],
+        },
+      ],
+    },
+    valid: false,
+    errorIncludes: 'empty segment',
+  },
+  {
+    name: 'error name shadowed by an earlier error edge from the same source is rejected',
+    catalog: {
+      flows: [
+        {
+          ...VALID_FLOW,
+          nodes: [
+            ...VALID_FLOW.nodes,
+            { id: 'h1', kind: 'transform', config: { expression: { kind: 'literal', value: 1 } } },
+            { id: 'h2', kind: 'transform', config: { expression: { kind: 'literal', value: 1 } } },
+          ],
+          edges: [
+            { from: 't', to: 'a', type: 'sequence' },
+            { from: 'a', to: 'h1', type: 'error', on: ['Timeout'] },
+            { from: 'a', to: 'h2', type: 'error', on: ['Timeout', 'RateLimitError'] },
+          ],
+        },
+      ],
+    },
+    valid: false,
+    errorIncludes: 'can never fire',
+  },
+  {
+    name: 'job-intents contract with min greater than max is rejected',
+    catalog: {
+      flows: [{ ...VALID_FLOW, output: { kind: 'job-intents', min: 5, max: 2 } }],
+    },
+    valid: false,
+    errorIncludes: 'must not exceed',
+  },
 ];
 
 // ─── Unsupported-feature fixtures ────────────────────────────────────────
