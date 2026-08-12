@@ -38,7 +38,14 @@
 
 import { readdir } from 'node:fs/promises';
 import { join as pathJoin } from 'node:path';
-import { evalExpression, resolveExpressionValue } from '@helmsmith/flow-spec';
+import {
+  type ApprovalRequest,
+  type ApprovalResume,
+  evalExpression,
+  type NodeExit,
+  resolveExpressionValue,
+  type SuspendRequest,
+} from '@helmsmith/flow-spec';
 import {
   Annotation,
   type BaseCheckpointSaver,
@@ -63,18 +70,10 @@ import type { ChangedFile } from './changed-files.ts';
 
 export { evalExpression };
 
-/**
- * Per-node exit signal. Drives error/fallback/reject routing in the
- * conditional-edge router. Set by every node executor; the router reads it
- * to choose the next node id.
- */
-export interface NodeExit {
-  nodeId: string;
-  kind: 'success' | 'error' | 'reject';
-  /** Set when kind === 'error'. */
-  errorName?: string;
-  errorMessage?: string;
-}
+// Run-side wire shapes moved to @helmsmith/flow-spec (the spec owns the
+// run contract, not just the definition contract). Re-exported here so
+// existing harness-core consumers keep their import paths.
+export type { ApprovalRequest, ApprovalResume, NodeExit, SuspendRequest };
 
 /**
  * StateGraph state schema for compiled flows. Uses Annotation.Root to
@@ -203,73 +202,6 @@ export interface CompileFlowOptions {
    *  tag. Caller can pass a Postgres/SQLite saver to make awaiting-
    *  approval / suspended jobs survive process restarts. */
   checkpointer?: BaseCheckpointSaver;
-}
-
-/**
- * Payload surfaced via LangGraph's interrupt() when an Approval-tagged
- * node pauses for review. The reviewer (or harness-server's HITL UI)
- * inspects this, decides approve/reject, and resumes via
- * `Command({ resume: ApprovalResume })`.
- */
-export interface ApprovalRequest {
-  /** Discriminator — distinguishes approval from suspend interrupts. */
-  kind: 'approval';
-  /** The original (untagged) node id whose output is being reviewed.
-   *  The synthetic approval node has id `${nodeId}__approval`. */
-  nodeId: string;
-  /** Org role authorized to approve (from the ApprovalTag). */
-  assigneeRole: string;
-  /** Time-to-respond before the harness should auto-reject (caller's
-   *  responsibility to enforce; harness-core just surfaces the value). */
-  slaMs: number;
-  /** Optional structured input schema the reviewer fills in. */
-  steeringInputs?: ApprovalTag['steeringInputs'];
-  /** The output text the reviewer is approving — pulled from
-   *  `state.output` at interrupt time. */
-  content: string;
-  /** 1-indexed attempt counter — increments each time the gate runs. */
-  attempt: number;
-  /** Staged file changes the reviewer can inspect — pulled from
-   *  `state.changedFiles` at interrupt time. Empty when no agent has
-   *  staged changes (or no product repos are wired). UI uses this to
-   *  render a sidebar of files for diff/content fetch. */
-  changes: ChangedFile[];
-  /** Gate 2b — URL of the pull request opened by an upstream
-   *  `publish` node (`push-and-open-pr`), when one ran before this
-   *  gate. Lets the HITL surface link straight to the PR. Absent for
-   *  flows that don't open a PR before review. */
-  prUrl?: string;
-  /** Gate 2b — short human-readable summary of the staged diff
-   *  (e.g. "3 files, +42 −7"), derived from `changes` at interrupt
-   *  time. The full per-file detail is in `changes`; this is the
-   *  one-liner the UI shows next to the PR link. */
-  diffSummary?: string;
-}
-
-export interface ApprovalResume {
-  decision: 'approve' | 'reject';
-  /** Reviewer-provided steering text (free-form) or structured fields
-   *  matching `steeringInputs`. Becomes the rejectionPayload.steering
-   *  on reject; ignored on approve. */
-  steering?: unknown;
-}
-
-/**
- * Payload surfaced when a Suspend-tagged node pauses. Caller (harness-
- * server) is responsible for scheduling the resume — timer-based via
- * setTimeout/cron, or event-based via subscription to the matched
- * eventType. Resume value is unused (Suspend has no decision; resume
- * is the "wake up" signal itself).
- */
-export interface SuspendRequest {
-  kind: 'suspend';
-  nodeId: string;
-  trigger: SuspendTag['trigger'];
-  /** Staged file changes pending review while the job is suspended.
-   *  Same surface as ApprovalRequest.changes — operators inspecting a
-   *  long-running suspend (e.g., overnight timer) can preview what
-   *  the agent did before it paused. */
-  changes: ChangedFile[];
 }
 
 /**

@@ -823,3 +823,149 @@ export function findFlow(catalog: FlowCatalog, id: string): FlowDef | undefined 
 export function findProduct(catalog: Catalog, id: string): ProductDef | undefined {
   return catalog.products?.find((p) => p.id === id);
 }
+
+// ─── Run-side wire shapes ────────────────────────────────────────────────
+//
+// The DEFINITION shapes above describe what a flow is; the shapes below
+// describe what a flow RUN looks like on the wire — the state surface
+// expressions bind against, the per-node exit signal routing reads, and
+// the HITL request/resume payloads a reviewer UI exchanges with the
+// runtime. They live in the spec because every consumer that previews,
+// monitors, or approves a run must agree on them with the runtime —
+// exactly the same argument as the expression evaluator.
+
+/**
+ * Per-node exit signal. Drives error/fallback/reject routing in the
+ * conditional-edge router. Set by every node executor; the router reads
+ * it to choose the next node id. jsonpath surface: `$.lastExit`.
+ */
+export interface NodeExit {
+  nodeId: string;
+  kind: 'success' | 'error' | 'reject';
+  /** Set when kind === 'error'. Matched by `ErrorEdge.on`. */
+  errorName?: string;
+  errorMessage?: string;
+}
+
+/**
+ * One staged change in a product repo. Populated into `state.changedFiles`
+ * before HITL interrupts; surfaced to reviewers via ApprovalRequest +
+ * the harness-server file routes.
+ *
+ * The `id` is stable for the same `(repo, path)` within a job — UI
+ * components can use it as a React key, content-cache identifier, etc.
+ * Renames produce ONE entry with the new path + `previousPath` filled
+ * in (matches `git diff --name-status -z` rename rows).
+ */
+export interface ChangedFile {
+  /** Stable id: `${repo}::${path}`. Suitable for URL paths after
+   *  encodeURIComponent. */
+  id: string;
+  /** Repo name (matches an entry from `productRepos` on the JobRecord). */
+  repo: string;
+  /** Path within the repo (slash-separated, no leading slash). */
+  path: string;
+  /** Basename of `path` — for UI display. */
+  filename: string;
+  /** What kind of change this is. Mirrors git's name-status codes
+   *  collapsed to readable form. */
+  changeKind: 'added' | 'modified' | 'deleted' | 'renamed' | 'copied' | 'type-changed';
+  /** Raw git status code (e.g., 'M', 'A', 'D', 'R100'). Preserved for
+   *  clients that want git-native semantics. */
+  statusCode: string;
+  /** For renames/copies, the prior path. Undefined otherwise. */
+  previousPath?: string;
+  /** MIME type guessed from the file extension. Hint for UI rendering;
+   *  not authoritative — clients may sniff content if needed. */
+  mimeType: string;
+}
+
+/**
+ * The routable run-state surface — the shape jsonpath expressions bind
+ * against at runtime. This is the data-plane half of the contract: edge
+ * conditions, gate assertions, loop paths, tool args, and node input
+ * mappings all resolve against a value of this shape. harness-core's
+ * FlowState channels must remain structurally assignable to this
+ * (compile-time-asserted there).
+ */
+export interface FlowRunState {
+  jobId: string;
+  /** Job/trigger payload. Seeded once at start; never overwritten by
+   *  nodes. jsonpath surface: `$.input`. */
+  input: unknown;
+  /** Latest text output (legacy single channel; last-write-wins). Each
+   *  successful node writes here; the next node reads it as its default
+   *  input. jsonpath surface: `$.output`. */
+  output: string;
+  /** Per-node outputs, keyed by node id. Structured (parsed JSON) when
+   *  the node declares `output.kind: 'json'`; the raw output string
+   *  otherwise. jsonpath surface: `$.nodes.<id>`. */
+  nodes: Record<string, unknown>;
+  /** Append-only message log (reducer-merged; safe under parallelism). */
+  messages: unknown[];
+  /** Per-node attempt counter (reject-edge cycles increment). */
+  attempts: Record<string, number>;
+  lastExit: NodeExit | null;
+  rejectionPayload: RejectionPayload | null;
+  /** Operator steering — append-only. */
+  steering: string[];
+  cancelRequested: boolean;
+  cancelReason: string | null;
+  changedFiles: ChangedFile[];
+}
+
+/**
+ * Payload surfaced when an Approval-tagged node pauses for review. The
+ * reviewer (or harness-server's HITL UI) inspects this, decides
+ * approve/reject, and resumes with an `ApprovalResume`.
+ */
+export interface ApprovalRequest {
+  /** Discriminator — distinguishes approval from suspend interrupts. */
+  kind: 'approval';
+  /** The original (untagged) node id whose output is being reviewed. */
+  nodeId: string;
+  /** Org role authorized to approve (from the ApprovalTag). */
+  assigneeRole: string;
+  /** Time-to-respond before the harness should auto-reject (caller's
+   *  responsibility to enforce; the runtime surfaces the value). */
+  slaMs: number;
+  /** Optional structured input schema the reviewer fills in. */
+  steeringInputs?: ApprovalTag['steeringInputs'];
+  /** The output text the reviewer is approving — pulled from
+   *  `state.output` at interrupt time. */
+  content: string;
+  /** 1-indexed attempt counter — increments each time the gate runs. */
+  attempt: number;
+  /** Staged file changes the reviewer can inspect. Empty when no agent
+   *  has staged changes (or no product repos are wired). */
+  changes: ChangedFile[];
+  /** URL of the pull request opened by an upstream `publish` node
+   *  (`push-and-open-pr`), when one ran before this gate. */
+  prUrl?: string;
+  /** Short human-readable summary of the staged diff (e.g. "3 files,
+   *  +42 −7"), derived from `changes` at interrupt time. */
+  diffSummary?: string;
+}
+
+/** Reviewer's answer to an ApprovalRequest. */
+export interface ApprovalResume {
+  decision: 'approve' | 'reject';
+  /** Reviewer-provided steering text (free-form) or structured fields
+   *  matching `steeringInputs`. Becomes the rejectionPayload.steering
+   *  on reject; appended to `state.steering` on approve. */
+  steering?: unknown;
+}
+
+/**
+ * Payload surfaced when a Suspend-tagged node pauses. The caller is
+ * responsible for scheduling the resume — timer-based or event-based.
+ * The resume value is unused (suspend has no decision; resume is the
+ * "wake up" signal itself).
+ */
+export interface SuspendRequest {
+  kind: 'suspend';
+  nodeId: string;
+  trigger: SuspendTag['trigger'];
+  /** Staged file changes pending review while the job is suspended. */
+  changes: ChangedFile[];
+}

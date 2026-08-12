@@ -165,6 +165,28 @@ export const EXPRESSION_CASES: readonly ExpressionCase[] = [
     expected: true,
   },
   {
+    name: 'jsonpath reads the job input via $.input',
+    expr: {
+      kind: 'compare',
+      lhs: { kind: 'jsonpath', path: '$.input.task' },
+      op: '==',
+      rhs: { kind: 'literal', value: 'fix-bug' },
+    },
+    state: { input: { task: 'fix-bug' }, output: '', nodes: {} },
+    expected: true,
+  },
+  {
+    name: 'jsonpath reads structured node output via $.nodes.<id>',
+    expr: {
+      kind: 'compare',
+      lhs: { kind: 'jsonpath', path: '$.nodes.review.score' },
+      op: '>',
+      rhs: { kind: 'literal', value: 0.8 },
+    },
+    state: { input: null, output: '{"score":0.9}', nodes: { review: { score: 0.9 } } },
+    expected: true,
+  },
+  {
     name: 'contains matches substring on strings',
     expr: {
       kind: 'compare',

@@ -23,38 +23,12 @@
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 
-/**
- * One staged change in a product repo. Populated into `state.changedFiles`
- * before HITL interrupts; surfaced to reviewers via ApprovalRequest +
- * the harness-server file routes.
- *
- * The `id` is stable for the same `(repo, path)` within a job — UI
- * components can use it as a React key, content-cache identifier, etc.
- * Renames produce ONE entry with the new path + `previousPath` filled
- * in (matches `git diff --name-status -z` rename rows).
- */
-export interface ChangedFile {
-  /** Stable id: `${repo}::${path}`. Suitable for URL paths after
-   *  encodeURIComponent. */
-  id: string;
-  /** Repo name (matches an entry from `productRepos` on the JobRecord). */
-  repo: string;
-  /** Path within the repo (slash-separated, no leading slash). */
-  path: string;
-  /** Basename of `path` — for UI display. */
-  filename: string;
-  /** What kind of change this is. Mirrors git's name-status codes
-   *  collapsed to readable form. */
-  changeKind: 'added' | 'modified' | 'deleted' | 'renamed' | 'copied' | 'type-changed';
-  /** Raw git status code (e.g., 'M', 'A', 'D', 'R100'). Preserved for
-   *  clients that want git-native semantics. */
-  statusCode: string;
-  /** For renames/copies, the prior path. Undefined otherwise. */
-  previousPath?: string;
-  /** MIME type guessed from the file extension. Hint for UI rendering;
-   *  not authoritative — clients may sniff content if needed. */
-  mimeType: string;
-}
+// ChangedFile is a run-side wire shape and moved to @helmsmith/flow-spec
+// (reviewer UIs and the runtime must agree on it). Re-exported here so
+// existing harness-core consumers keep their import paths.
+import type { ChangedFile } from '@helmsmith/flow-spec';
+
+export type { ChangedFile };
 
 /**
  * Parse the output of `git diff --name-status -z --cached`. NUL-separated
