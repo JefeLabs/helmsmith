@@ -228,3 +228,98 @@ describe('HITL restart survival (durable checkpointer + paused-job rehydration)'
     expect(after.status).toBe(404);
   });
 });
+
+describe('approval SLA auto-reject (2.1)', () => {
+  const cleanups: Array<() => Promise<void>> = [];
+  afterEach(async () => {
+    for (const c of cleanups.splice(0)) await c();
+  });
+
+  /** Same planner→builder shape but with a short, test-controlled SLA. */
+  function slaCatalog(slaMs: number): FlowCatalog {
+    const flow = approvalFlow();
+    const planner = flow.nodes.find((n) => n.id === 'planner');
+    if (planner?.tags?.approval) planner.tags.approval.slaMs = slaMs;
+    return { flows: [flow] };
+  }
+
+  async function bootServer(slaMs: number) {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'sla-ws-'));
+    const socketPath = tmpSocket();
+    const adapters: TestAdapter[] = [];
+    const handle = await startHarnessServer({
+      socketPath,
+      catalog: slaCatalog(slaMs),
+      broker: dummyBroker,
+      adapterFactory: () => {
+        const a = new TestAdapter(`reply-${adapters.length + 1}`);
+        adapters.push(a);
+        return a;
+      },
+      workspaceRoot,
+    });
+    cleanups.push(async () => {
+      await handle.stop();
+      await rm(socketPath, { force: true });
+      await rm(workspaceRoot, { recursive: true, force: true });
+    });
+    return { socketPath, adapters };
+  }
+
+  it('auto-rejects on SLA expiry: the reject edge re-runs the planner, a second approval follows', async () => {
+    const { socketPath, adapters } = await bootServer(150);
+
+    await udsJson(socketPath, 'POST', '/v1/jobs', {
+      jobId: 'jSla',
+      pipeline: 'plan-then-build',
+      input: 'work',
+    });
+    await waitFor(async () => {
+      const r = await udsJson(socketPath, 'GET', '/v1/jobs/jSla');
+      return r.body.job?.status === 'awaiting-approval';
+    });
+    expect(adapters).toHaveLength(1);
+
+    // Do NOT resume. The SLA timer must fire the reject edge — the
+    // planner re-runs (adapter #2) and the flow pauses at attempt 2.
+    await waitFor(async () => adapters.length === 2);
+    await waitFor(async () => {
+      const r = await udsJson(socketPath, 'GET', '/v1/jobs/jSla/approval');
+      return r.status === 200 && r.body.request?.attempt === 2;
+    });
+
+    // A human approves the second attempt in time → completes.
+    await udsJson(socketPath, 'POST', '/v1/jobs/jSla/resume', { decision: 'approve' });
+    await waitFor(async () => {
+      const r = await udsJson(socketPath, 'GET', '/v1/jobs/jSla');
+      return r.body.job?.status === 'completed';
+    });
+    expect(adapters).toHaveLength(3); // planner, planner-rerun, builder
+  });
+
+  it('does not fire after a timely manual resume', async () => {
+    const { socketPath, adapters } = await bootServer(300);
+
+    await udsJson(socketPath, 'POST', '/v1/jobs', {
+      jobId: 'jTimely',
+      pipeline: 'plan-then-build',
+      input: 'work',
+    });
+    await waitFor(async () => {
+      const r = await udsJson(socketPath, 'GET', '/v1/jobs/jTimely');
+      return r.body.job?.status === 'awaiting-approval';
+    });
+
+    await udsJson(socketPath, 'POST', '/v1/jobs/jTimely/resume', { decision: 'approve' });
+    await waitFor(async () => {
+      const r = await udsJson(socketPath, 'GET', '/v1/jobs/jTimely');
+      return r.body.job?.status === 'completed';
+    });
+
+    // Wait past the SLA — the cancelled timer must not reject/re-run.
+    await new Promise((r) => setTimeout(r, 400));
+    const after = await udsJson(socketPath, 'GET', '/v1/jobs/jTimely');
+    expect(after.body.job?.status).toBe('completed');
+    expect(adapters).toHaveLength(2); // planner + builder only
+  });
+});
