@@ -62,6 +62,9 @@ catalog.json
 # Repo-root workspace runtime state — purely test/dev artifacts produced when
 # running examples from the repo root. Default-deny: nothing under /.harness/.
 /.harness/
+# harness-server tests that omit workspaceRoot default to the package dir and
+# create .harness/state (sqlite checkpointer + paused-job records) there.
+/platform/harness/harness-server/.harness/
 
 # Spring Boot Modulith control plane (Java/Maven sub-project)
 /platform/controlplane/service/target/

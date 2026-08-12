@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { chmod, mkdir, unlink } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import {
   type BindingResolver,
   type CredentialBroker,
@@ -34,7 +34,10 @@ import {
   walkAgents,
 } from '@helmsmith/harness-core';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import type { BaseCheckpointSaver } from '@langchain/langgraph';
+import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
 import { runEntryCoordinator } from './coordinator/entry-coordinator.ts';
+import { deletePausedJob, loadPausedJobs, savePausedJob } from './paused-jobs.ts';
 import {
   enqueue as dispatcherEnqueue,
   fireImmediate as dispatcherFireImmediate,
@@ -148,6 +151,10 @@ export {
 
 export interface HarnessServerOptions {
   socketPath: string;
+  /** Checkpointer override (2.2). Default: a SqliteSaver on
+   *  `<workspaceRoot>/.harness/state/checkpoints.sqlite`. Tests can
+   *  inject a MemorySaver to avoid disk. */
+  checkpointer?: BaseCheckpointSaver;
   /**
    * Optional TCP listener. When set, harness-server binds a second
    * `node:http` server on this port (same request handler as the UDS)
@@ -366,12 +373,21 @@ export async function startHarnessServer(opts: HarnessServerOptions): Promise<Ha
   // keepOnSuccess: true (PRD wording: "clean exit retains worktree
   // volume; cleanup only on explicit reaper pass").
   const worktreePolicy = await readWorkspaceYamlWorktreePolicy(workspaceRoot);
+  // 2.2 — durable graph state. One SQLite file per workspace holds every
+  // job's checkpointed thread; paused (awaiting-approval / suspended)
+  // jobs survive server restarts. Tests can inject their own saver.
+  const stateDir = join(workspaceRoot, '.harness', 'state');
+  await mkdir(stateDir, { recursive: true });
+  const checkpointer =
+    opts.checkpointer ?? SqliteSaver.fromConnString(join(stateDir, 'checkpoints.sqlite'));
   const ctx: ServerCtx = {
     bus,
     catalog,
     jobs,
     tokens,
     graphs: new Map(),
+    checkpointer,
+    stateDir,
     pendingApprovals: new Map(),
     pendingSuspends: new Map(),
     inFlight: new Set(),
@@ -390,6 +406,20 @@ export async function startHarnessServer(opts: HarnessServerOptions): Promise<Ha
     resolver: opts.resolver,
     coordinatorModel: opts.coordinatorModel,
   };
+
+  // 2.2 — rehydrate paused jobs persisted by a previous process. The
+  // JobRecord (including its FlowDef) and the pending request surfaces
+  // come back here; the compiled graph itself recompiles lazily on the
+  // first resume (recompile-on-resume against the durable checkpointer).
+  for (const rec of await loadPausedJobs(stateDir)) {
+    if (ctx.jobs.has(rec.job.jobId)) continue;
+    ctx.jobs.set(rec.job.jobId, rec.job);
+    if (rec.kind === 'approval') {
+      ctx.pendingApprovals.set(rec.job.jobId, rec.request as ApprovalRequest);
+    } else {
+      ctx.pendingSuspends.set(rec.job.jobId, rec.request as SuspendRequest);
+    }
+  }
 
   await mkdir(dirname(opts.socketPath), { recursive: true, mode: 0o700 });
   await unlink(opts.socketPath).catch(() => {});
@@ -458,6 +488,14 @@ interface ServerCtx {
    * Map entirely and recompile on demand from the FlowDef.
    */
   graphs: Map<string, CompiledFlowGraph>;
+  /** Durable checkpointer shared by every graph compile — a SQLite file
+   *  at `<workspaceRoot>/.harness/state/checkpoints.sqlite` by default
+   *  (2.2). Paused thread state survives restarts; resumeJob recompiles
+   *  the graph from `job.flow` against it (recompile-on-resume). */
+  checkpointer: BaseCheckpointSaver;
+  /** State directory (`<workspaceRoot>/.harness/state`) — home of the
+   *  checkpointer DB and the paused-job JSON records. */
+  stateDir: string;
   /** Dispatcher: in-flight jobIds (those currently running runJob).
    *  Distinct from jobs (which holds ALL JobRecords including queued,
    *  paused, completed). */
@@ -1153,6 +1191,7 @@ async function handleSubmitJob(
         resolver,
         ...(githubResolver ? { githubResolver } : {}),
         graphs: ctx.graphs,
+        checkpointer: ctx.checkpointer,
         onStatusChange: (jid, agentId, status) => {
           onJobTerminal(agentId, status);
           // W1d — push job-level transitions up to the controlplane.
@@ -1166,6 +1205,9 @@ async function handleSubmitJob(
             (status === 'completed' || status === 'failed' || status === 'cancelled')
           ) {
             dispatcherOnJobTerminal(ctx, jid);
+            // 2.2 — a terminal job is no longer paused; drop its
+            // persisted pause record (no-op when none exists).
+            void deletePausedJob(ctx.stateDir, jid).catch(() => {});
             // F19: best-effort cleanup of unconfirmed memory entries
             // scoped to this job. The endpoint, primitives, and CLI are
             // all already shipped; this is the missing auto-fire on
@@ -1181,6 +1223,7 @@ async function handleSubmitJob(
         },
         onAwaitingApproval: (jid, request) => {
           ctx.pendingApprovals.set(jid, request);
+          persistPause(ctx, jid, 'approval', request);
           // Gate 2b — best-effort: surface the (PR-enriched) approval
           // request to the controlplane so the web HITL view can show
           // it. No-op when CONTROLPLANE_URL is unset (local-only setups
@@ -1191,6 +1234,7 @@ async function handleSubmitJob(
         },
         onSuspend: (jid, request) => {
           ctx.pendingSuspends.set(jid, request);
+          persistPause(ctx, jid, 'suspend', request);
         },
       });
     };
@@ -1250,6 +1294,9 @@ async function handleResumeJob(
   // pauses again at a downstream interrupt.
   ctx.pendingApprovals.delete(jobId);
   ctx.pendingSuspends.delete(jobId);
+  // 2.2 — the persisted pause record is stale for the same reason; a
+  // downstream pause writes a fresh one via the hooks below.
+  void deletePausedJob(ctx.stateDir, jobId).catch(() => {});
 
   // Re-attach the token accumulator before resuming. Detach happens via
   // onStatusChange when the job hits a terminal state — same as runJob.
@@ -1273,6 +1320,7 @@ async function handleResumeJob(
       tokens.detach(jobId);
       ctx.pendingApprovals.delete(jobId);
       ctx.pendingSuspends.delete(jobId);
+      void deletePausedJob(ctx.stateDir, jobId).catch(() => {});
       // F19: same cleanup hook as the initial-submission paths. A
       // resumed job that ultimately completes from this path should
       // also clean up its unconfirmed memory.
@@ -1289,14 +1337,46 @@ async function handleResumeJob(
       adapterFactory,
       resolver,
       graphs: ctx.graphs,
+      // 2.2 — the shared durable checkpointer enables recompile-on-
+      // resume after a restart, and the GitHub resolver must ride along
+      // so a recompiled graph's publish executors are wired identically
+      // to the original runJob compile.
+      checkpointer: ctx.checkpointer,
+      githubResolver: ctx.githubResolver,
       onStatusChange: (_jid, agentId, status) => onJobTerminal(agentId, status),
       onAwaitingApproval: (jid, request) => {
         ctx.pendingApprovals.set(jid, request);
+        persistPause(ctx, jid, 'approval', request);
       },
       onSuspend: (jid, request) => {
         ctx.pendingSuspends.set(jid, request);
+        persistPause(ctx, jid, 'suspend', request);
       },
     });
+  });
+}
+
+/**
+ * Persist a paused job (2.2) — fire-and-forget: a failed write logs but
+ * never fails the pause itself. The record carries the full JobRecord
+ * (including the FlowDef) so a restarted server can rehydrate the job
+ * and recompile its graph on the first resume.
+ */
+function persistPause(
+  ctx: ServerCtx,
+  jobId: string,
+  kind: 'approval' | 'suspend',
+  request: ApprovalRequest | SuspendRequest,
+): void {
+  const job = ctx.jobs.get(jobId);
+  if (!job) return;
+  void savePausedJob(ctx.stateDir, {
+    job,
+    kind,
+    request,
+    pausedAt: new Date().toISOString(),
+  }).catch((err) => {
+    console.warn(`[harness] failed to persist paused job ${jobId}: ${(err as Error).message}`);
   });
 }
 

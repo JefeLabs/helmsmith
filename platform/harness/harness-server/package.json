@@ -19,6 +19,7 @@
     "@helmsmith/harness-pipeline": "workspace:*",
     "@langchain/core": "^1.1.44",
     "@langchain/langgraph": "^1.3.0",
+    "@langchain/langgraph-checkpoint-sqlite": "^1.0.3",
     "yaml": "^2.6.0"
   },
   "devDependencies": {
