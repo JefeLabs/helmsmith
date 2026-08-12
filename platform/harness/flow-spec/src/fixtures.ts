@@ -16,6 +16,11 @@ export interface ExpressionCase {
   expr: Expression;
   state: unknown;
   expected: boolean;
+  /** When present, conforming implementations must ALSO assert that
+   *  `resolveExpressionValue(expr, state)` deep-equals this value —
+   *  pins value semantics (constructors, raw lookups), not just the
+   *  predicate coercion. Must stay JSON-serializable. */
+  expectedValue?: unknown;
 }
 
 const STATE = {
@@ -23,6 +28,8 @@ const STATE = {
   review: { score: 0.9, approved: true },
   repos: ['api', 'web'],
   count: '10',
+  summary: 'APPROVED: ship it',
+  maybeNull: null,
 };
 
 export const EXPRESSION_CASES: readonly ExpressionCase[] = [
@@ -156,6 +163,99 @@ export const EXPRESSION_CASES: readonly ExpressionCase[] = [
     expr: { kind: 'not', expr: { kind: 'jsonpath', path: '$.missing' } },
     state: STATE,
     expected: true,
+  },
+  {
+    name: 'contains matches substring on strings',
+    expr: {
+      kind: 'compare',
+      lhs: { kind: 'jsonpath', path: '$.summary' },
+      op: 'contains',
+      rhs: { kind: 'literal', value: 'APPROVED' },
+    },
+    state: STATE,
+    expected: true,
+  },
+  {
+    name: 'contains with a non-string side is false (no coercion)',
+    expr: {
+      kind: 'compare',
+      lhs: { kind: 'jsonpath', path: '$.review' },
+      op: 'contains',
+      rhs: { kind: 'literal', value: 'x' },
+    },
+    state: STATE,
+    expected: false,
+  },
+  {
+    name: 'startsWith / endsWith are string prefix / suffix checks',
+    expr: {
+      kind: 'all',
+      exprs: [
+        {
+          kind: 'compare',
+          lhs: { kind: 'jsonpath', path: '$.summary' },
+          op: 'startsWith',
+          rhs: { kind: 'literal', value: 'APPROVED' },
+        },
+        {
+          kind: 'compare',
+          lhs: { kind: 'jsonpath', path: '$.summary' },
+          op: 'endsWith',
+          rhs: { kind: 'literal', value: 'it' },
+        },
+      ],
+    },
+    state: STATE,
+    expected: true,
+  },
+  {
+    name: 'matches applies rhs as a regular expression',
+    expr: {
+      kind: 'compare',
+      lhs: { kind: 'jsonpath', path: '$.summary' },
+      op: 'matches',
+      rhs: { kind: 'literal', value: '^APPROVED' },
+    },
+    state: STATE,
+    expected: true,
+  },
+  {
+    name: 'exists is true for present-but-null values',
+    expr: { kind: 'exists', expr: { kind: 'jsonpath', path: '$.maybeNull' } },
+    state: STATE,
+    expected: true,
+  },
+  {
+    name: 'exists is false for missing paths (unlike truthiness)',
+    expr: { kind: 'exists', expr: { kind: 'jsonpath', path: '$.nope' } },
+    state: STATE,
+    expected: false,
+  },
+  {
+    name: 'exists distinguishes false from missing',
+    expr: { kind: 'exists', expr: { kind: 'jsonpath', path: '$.flagOff' } },
+    state: { flagOff: false },
+    expected: true,
+  },
+  {
+    name: 'object constructor resolves fields against state',
+    expr: { kind: 'object', fields: { first: { kind: 'jsonpath', path: '$.repos.0' } } },
+    state: STATE,
+    expected: true,
+    expectedValue: { first: 'api' },
+  },
+  {
+    name: 'array constructor resolves items against state',
+    expr: {
+      kind: 'array',
+      items: [
+        { kind: 'jsonpath', path: '$.count' },
+        { kind: 'literal', value: 7 },
+      ],
+    },
+    state: STATE,
+    expected: true,
+    expectedValue: ['10', 7],
   },
   {
     name: 'nested composition: all(compare, not(any(...)))',

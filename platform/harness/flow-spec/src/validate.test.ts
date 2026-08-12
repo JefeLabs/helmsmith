@@ -27,6 +27,89 @@ describe('validateFlowCatalog', () => {
     expect(() => validateFlowCatalog(bad, 'test')).toThrow(/unknown node "ghost"/);
   });
 
+  it('accepts the new expression kinds (exists, object, array) and string compare ops', () => {
+    const flow = {
+      ...validFlow,
+      nodes: [
+        validFlow.nodes[0],
+        {
+          id: 'g',
+          kind: 'gate',
+          config: {
+            assertions: [
+              {
+                expression: { kind: 'exists', expr: { kind: 'jsonpath', path: '$.nodes.a' } },
+                message: 'a ran',
+              },
+              {
+                expression: {
+                  kind: 'compare',
+                  lhs: { kind: 'jsonpath', path: '$.output' },
+                  op: 'contains',
+                  rhs: { kind: 'literal', value: 'APPROVED' },
+                },
+                message: 'approved',
+              },
+              {
+                expression: {
+                  kind: 'object',
+                  fields: { xs: { kind: 'array', items: [{ kind: 'literal', value: 1 }] } },
+                },
+                message: 'constructor',
+              },
+            ],
+          },
+        },
+      ],
+    };
+    expect(() => validateFlowCatalog({ flows: [flow] }, 'test')).not.toThrow();
+  });
+
+  it('rejects an invalid literal regex for matches at load time', () => {
+    const flow = {
+      ...validFlow,
+      nodes: [
+        validFlow.nodes[0],
+        {
+          id: 'g',
+          kind: 'gate',
+          config: {
+            assertions: [
+              {
+                expression: {
+                  kind: 'compare',
+                  lhs: { kind: 'jsonpath', path: '$.output' },
+                  op: 'matches',
+                  rhs: { kind: 'literal', value: '(' },
+                },
+                message: 'x',
+              },
+            ],
+          },
+        },
+      ],
+    };
+    expect(() => validateFlowCatalog({ flows: [flow] }, 'test')).toThrow(
+      /not a valid regular expression/,
+    );
+  });
+
+  it('rejects malformed object/array constructors', () => {
+    const withExpr = (expression: unknown) => ({
+      ...validFlow,
+      nodes: [
+        validFlow.nodes[0],
+        { id: 'g', kind: 'transform', config: { expression } },
+      ],
+    });
+    expect(() =>
+      validateFlowCatalog({ flows: [withExpr({ kind: 'object', fields: [] })] }, 'test'),
+    ).toThrow(/fields must be an object/);
+    expect(() =>
+      validateFlowCatalog({ flows: [withExpr({ kind: 'array', items: {} })] }, 'test'),
+    ).toThrow(/items must be an array/);
+  });
+
   it('rejects cycles on non-reject edges', () => {
     const cyclic = {
       flows: [

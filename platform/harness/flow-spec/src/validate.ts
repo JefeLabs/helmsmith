@@ -711,7 +711,19 @@ function validateJoinStrategy(value: unknown, where: string): void {
   );
 }
 
-const VALID_COMPARE_OPS = new Set<CompareOp>(['==', '!=', '<', '<=', '>', '>=', 'in']);
+const VALID_COMPARE_OPS = new Set<CompareOp>([
+  '==',
+  '!=',
+  '<',
+  '<=',
+  '>',
+  '>=',
+  'in',
+  'contains',
+  'startsWith',
+  'endsWith',
+  'matches',
+]);
 
 function validateExpression(value: unknown, where: string): void {
   if (!value || typeof value !== 'object') {
@@ -740,6 +752,21 @@ function validateExpression(value: unknown, where: string): void {
       }
       validateExpression(e.lhs, `${where}.lhs`);
       validateExpression(e.rhs, `${where}.rhs`);
+      // Load-time regex check for `matches` with a literal pattern —
+      // the evaluator silently returns false on invalid patterns (it
+      // never throws on data), so reject statically knowable typos here.
+      if (e.op === 'matches') {
+        const rhs = e.rhs as Record<string, unknown> | undefined;
+        if (rhs && rhs.kind === 'literal' && typeof rhs.value === 'string') {
+          try {
+            new RegExp(rhs.value);
+          } catch (err) {
+            throw new CatalogError(
+              `${where}.rhs is not a valid regular expression: ${(err as Error).message}`,
+            );
+          }
+        }
+      }
       break;
     case 'all':
     case 'any':
@@ -755,11 +782,29 @@ function validateExpression(value: unknown, where: string): void {
       }
       break;
     case 'not':
+    case 'exists':
       validateExpression(e.expr, `${where}.expr`);
+      break;
+    case 'object': {
+      if (!e.fields || typeof e.fields !== 'object' || Array.isArray(e.fields)) {
+        throw new CatalogError(`${where}.fields must be an object of name → Expression`);
+      }
+      for (const [k, sub] of Object.entries(e.fields as Record<string, unknown>)) {
+        validateExpression(sub, `${where}.fields.${k}`);
+      }
+      break;
+    }
+    case 'array':
+      if (!Array.isArray(e.items)) {
+        throw new CatalogError(`${where}.items must be an array`);
+      }
+      for (const [i, sub] of (e.items as unknown[]).entries()) {
+        validateExpression(sub, `${where}.items[${i}]`);
+      }
       break;
     default:
       throw new CatalogError(
-        `${where}.kind must be one of: jsonpath, js, literal, compare, all, any, not (got ${JSON.stringify(e.kind)})`,
+        `${where}.kind must be one of: jsonpath, js, literal, compare, all, any, not, exists, object, array (got ${JSON.stringify(e.kind)})`,
       );
   }
 }

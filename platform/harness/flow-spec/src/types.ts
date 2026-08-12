@@ -566,10 +566,29 @@ export interface RejectionPayload {
  *   in       — membership: rhs MUST resolve to an array; predicate is
  *              true iff lhs (raw value) is found via Array.includes
  *              (SameValueZero — NaN self-matches, a runtime-state-only
- *              case since JSON cannot encode NaN). For "string contains
- *              substring" use a `tool` or `transform` step; this op is
- *              collection-only. */
-export type CompareOp = '==' | '!=' | '<' | '<=' | '>' | '>=' | 'in';
+ *              case since JSON cannot encode NaN). This op is
+ *              collection-only; string containment is `contains`.
+ *   contains / startsWith / endsWith — string ops: both sides must
+ *              resolve to strings, else false (no coercion, mirroring
+ *              `in`'s strictness).
+ *   matches  — regex test: both sides must resolve to strings; rhs is
+ *              compiled via `new RegExp(rhs)` (no flags) and tested
+ *              against lhs. An invalid pattern evaluates to false —
+ *              the evaluator never throws on bad data. When rhs is a
+ *              string literal, the validator additionally rejects
+ *              invalid patterns at load time. */
+export type CompareOp =
+  | '=='
+  | '!='
+  | '<'
+  | '<='
+  | '>'
+  | '>='
+  | 'in'
+  | 'contains'
+  | 'startsWith'
+  | 'endsWith'
+  | 'matches';
 
 /** Generic expression evaluated by the runtime. Tagged-union over evaluators
  *  so we can grow the language additively.
@@ -596,7 +615,20 @@ export type Expression =
   /** Logical OR over a list of expressions. Short-circuits. */
   | { kind: 'any'; exprs: readonly Expression[] }
   /** Logical NOT of a single expression. */
-  | { kind: 'not'; expr: Expression };
+  | { kind: 'not'; expr: Expression }
+  /** Presence check: true iff the inner expression resolves to a value
+   *  other than `undefined`. `null` EXISTS (it is a present JSON value);
+   *  only a missing path does not. This is the escape hatch from
+   *  truthiness — `false`, `0`, and `""` all exist. */
+  | { kind: 'exists'; expr: Expression }
+  /** Object constructor: each field resolved via resolveExpressionValue.
+   *  As a predicate it is always true (containers are truthy). This is
+   *  how `transform` steps and `input` mappings shape structured data
+   *  from multiple state fields. */
+  | { kind: 'object'; fields: Readonly<Record<string, Expression>> }
+  /** Array constructor: each item resolved via resolveExpressionValue.
+   *  As a predicate it is always true. */
+  | { kind: 'array'; items: readonly Expression[] };
 
 // ─── FlowOutputContract (drives JobIntent emission semantics) ────────────
 
