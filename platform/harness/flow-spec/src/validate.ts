@@ -149,6 +149,7 @@ function validateFlow(
   // Validate each edge + cardinality rules + referential integrity
   const outgoingByType = new Map<string, Map<string, number>>(); // from → (type → count)
   const incomingCount = new Map<string, number>();
+  const errorCatchAllBySource = new Map<string, number>();
   for (const [j, e] of (flow.edges as unknown[]).entries()) {
     const edgeWhere = `${where}.edges[${j}]`;
     validateEdge(e, edgeWhere);
@@ -164,9 +165,20 @@ function validateFlow(
     outgoingByType.set(edge.from as string, fromMap);
     incomingCount.set(edge.to as string, (incomingCount.get(edge.to as string) ?? 0) + 1);
 
-    // Edge-cardinality rules
-    if (edge.type === 'error' && (fromMap.get('error') ?? 0) > 1) {
-      throw new CatalogError(`${edgeWhere}: at most one 'error' edge allowed per source node`);
+    // Edge-cardinality rules. Error edges: any number of named ones
+    // (`on` matchers), at most one catch-all (no/empty `on`) — the
+    // router falls back to the catch-all when no matcher hits.
+    if (edge.type === 'error') {
+      const on = edge.on as unknown[] | undefined;
+      if (on === undefined || on.length === 0) {
+        const n = (errorCatchAllBySource.get(edge.from as string) ?? 0) + 1;
+        errorCatchAllBySource.set(edge.from as string, n);
+        if (n > 1) {
+          throw new CatalogError(
+            `${edgeWhere}: at most one catch-all 'error' edge (no "on" list) allowed per source node`,
+          );
+        }
+      }
     }
     if (edge.type === 'fallback' && (fromMap.get('fallback') ?? 0) > 1) {
       throw new CatalogError(`${edgeWhere}: at most one 'fallback' edge allowed per source node`);
@@ -936,6 +948,16 @@ function validateEdge(value: unknown, where: string): void {
   }
   if (edge.type === 'conditional') {
     validateExpression(edge.condition, `${where}.condition`);
+  }
+  if (edge.type === 'error' && edge.on !== undefined) {
+    if (!Array.isArray(edge.on)) {
+      throw new CatalogError(`${where}.on must be an array of error names when present`);
+    }
+    for (const [k, name] of (edge.on as unknown[]).entries()) {
+      if (typeof name !== 'string' || !name) {
+        throw new CatalogError(`${where}.on[${k}] must be a non-empty string`);
+      }
+    }
   }
   if (edge.type === 'reject') {
     if (

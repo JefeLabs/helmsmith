@@ -576,6 +576,16 @@ export interface ErrorEdge {
   from: string;
   to: string;
   type: 'error';
+  /** Optional list of `NodeExit.errorName` values this edge handles
+   *  (e.g. ['Timeout', 'RateLimitError', 'OutputParseError']). Omitted
+   *  (or empty) → catch-all. A source node may declare any number of
+   *  named error edges plus at most ONE catch-all; on an error exit the
+   *  router picks the first declared edge whose `on` contains the
+   *  errorName, falling back to the catch-all. Names are free-form —
+   *  they match whatever the executors emit (AdapterError subclass
+   *  names, 'UnknownTool', 'Timeout', …), which is runtime vocabulary
+   *  the spec cannot close over. */
+  on?: readonly string[];
 }
 
 /** Emitted only by Approval-tagged nodes and `kind: 'gate'` nodes when

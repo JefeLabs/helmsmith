@@ -194,7 +194,7 @@ describe('validateFlow — node + edge structure', () => {
         }),
         'test',
       ),
-    ).toThrow(/at most one 'error' edge allowed per source node/);
+    ).toThrow(/at most one catch-all 'error' edge \(no "on" list\) allowed per source node/);
   });
 
   it('rejects reject edges from non-gate, non-approval source', () => {

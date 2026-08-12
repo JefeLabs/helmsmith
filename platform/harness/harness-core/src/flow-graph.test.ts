@@ -236,6 +236,31 @@ describe('node-addressable state', () => {
     expect(seen[0]).toBe('raw text');
   });
 
+  it('routes errors by errorName via on-matchers, catch-all last', () => {
+    const edges: Edge[] = [
+      { from: 'n', to: 'onTimeout', type: 'error', on: ['Timeout'] },
+      { from: 'n', to: 'onAny', type: 'error' },
+    ];
+    const route = buildRouter('n', edges);
+    const exitState = (errorName: string): FlowStateT => ({
+      ...initialState,
+      lastExit: { nodeId: 'n', kind: 'error', errorName },
+    });
+    expect(route(exitState('Timeout'))).toBe('onTimeout');
+    expect(route(exitState('NetworkError'))).toBe('onAny');
+  });
+
+  it('throws on an error matched by no edge when only named matchers exist', () => {
+    const edges: Edge[] = [{ from: 'n', to: 'onTimeout', type: 'error', on: ['Timeout'] }];
+    const route = buildRouter('n', edges);
+    expect(() =>
+      route({
+        ...initialState,
+        lastExit: { nodeId: 'n', kind: 'error', errorName: 'NetworkError', errorMessage: 'x' },
+      }),
+    ).toThrow(/unhandled error/);
+  });
+
   it('a looped node records its aggregate output once', async () => {
     const flow: FlowDef = {
       id: 'f',

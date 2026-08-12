@@ -221,6 +221,48 @@ describe('validateFlowCatalog', () => {
     );
   });
 
+  it('allows multiple error edges when at most one is a catch-all', () => {
+    const nodes = [
+      validFlow.nodes[0],
+      { id: 'g', kind: 'transform', config: { expression: { kind: 'literal', value: 1 } } },
+      { id: 'h1', kind: 'transform', config: { expression: { kind: 'literal', value: 1 } } },
+      { id: 'h2', kind: 'transform', config: { expression: { kind: 'literal', value: 1 } } },
+    ];
+    const ok = {
+      ...validFlow,
+      nodes,
+      edges: [
+        { from: 't', to: 'g', type: 'sequence' },
+        { from: 'g', to: 'h1', type: 'error', on: ['Timeout'] },
+        { from: 'g', to: 'h2', type: 'error' },
+      ],
+    };
+    expect(() => validateFlowCatalog({ flows: [ok] }, 'test')).not.toThrow();
+    const twoCatchAlls = {
+      ...validFlow,
+      nodes,
+      edges: [
+        { from: 't', to: 'g', type: 'sequence' },
+        { from: 'g', to: 'h1', type: 'error' },
+        { from: 'g', to: 'h2', type: 'error' },
+      ],
+    };
+    expect(() => validateFlowCatalog({ flows: [twoCatchAlls] }, 'test')).toThrow(
+      /at most one catch-all 'error' edge/,
+    );
+    const badOn = {
+      ...validFlow,
+      nodes,
+      edges: [
+        { from: 't', to: 'g', type: 'sequence' },
+        { from: 'g', to: 'h1', type: 'error', on: [''] },
+      ],
+    };
+    expect(() => validateFlowCatalog({ flows: [badOn] }, 'test')).toThrow(
+      /on\[0\] must be a non-empty string/,
+    );
+  });
+
   it('rejects cycles on non-reject edges', () => {
     const cyclic = {
       flows: [

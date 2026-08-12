@@ -333,7 +333,7 @@ export function buildRouter(nodeId: string, out: readonly Edge[]): (state: FlowS
     (e): e is Extract<Edge, { type: 'conditional' }> => e.type === 'conditional',
   );
   const fb = out.find((e) => e.type === 'fallback');
-  const err = out.find((e) => e.type === 'error');
+  const errs = out.filter((e): e is Extract<Edge, { type: 'error' }> => e.type === 'error');
   const rej = out.find((e): e is Extract<Edge, { type: 'reject' }> => e.type === 'reject');
 
   return (state: FlowStateT): string => {
@@ -353,7 +353,14 @@ export function buildRouter(nodeId: string, out: readonly Edge[]): (state: FlowS
     }
 
     if (exit?.kind === 'error') {
-      if (err) return err.to;
+      // Named matchers first (first declared match wins), catch-all
+      // (no/empty `on`) as fallback. Validator guarantees ≤1 catch-all.
+      const name = exit.errorName;
+      const named = name
+        ? errs.find((e) => e.on !== undefined && e.on.length > 0 && e.on.includes(name))
+        : undefined;
+      const target = named ?? errs.find((e) => e.on === undefined || e.on.length === 0);
+      if (target) return target.to;
       throw new Error(
         `unhandled error at node "${nodeId}": ${exit.errorMessage ?? exit.errorName ?? 'unknown'}`,
       );
