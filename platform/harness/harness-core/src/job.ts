@@ -145,5 +145,14 @@ export interface JobRecord {
   branchName?: string;
   prUrl?: string;
   mergeSha?: string;
+  /**
+   * Parsed terminal output when the flow declares a non-default output
+   * contract — a `JobIntent` for `kind: 'job-definition'` flows (the
+   * factory/fleet seam reads work orders from here), an array of them
+   * for `job-intents`, a FlowDef for `flow-spec`, a JSON value for
+   * `structured`. Set by finalizeOrPause only after `parseFlowOutput`
+   * accepts the output; absent for `agent-text` flows and failed jobs.
+   */
+  flowOutput?: unknown;
   [key: string]: unknown;
 }

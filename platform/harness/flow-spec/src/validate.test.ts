@@ -280,6 +280,16 @@ describe('validateFlowCatalog', () => {
 });
 
 describe('unsupported-feature reporting', () => {
+  it('reports flow-output-schema for structured flow output', () => {
+    const reported: UnsupportedFeature[] = [];
+    validateFlowCatalog(
+      { flows: [{ ...validFlow, output: { kind: 'structured', schema: { type: 'object' } } }] },
+      'test',
+      { onUnsupported: (f) => reported.push(f) },
+    );
+    expect(reported.map((f) => f.feature)).toContain('flow-output-schema');
+  });
+
   it('reports node-output-schema, effect, and subflow-version-pin', () => {
     const reported: UnsupportedFeature[] = [];
     const catalog = {

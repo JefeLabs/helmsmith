@@ -14,7 +14,7 @@ import {
 } from '@helmsmith/agent-auth';
 import { Command } from '@langchain/langgraph';
 import { type BindingToSpecOptions, bindingToSpec } from './binding-to-spec.ts';
-import type { AdapterId, FlowDef, McpToolDef, ToolResolver } from './catalog.ts';
+import { type AdapterId, type FlowDef, type McpToolDef, parseFlowOutput, type ToolResolver } from './catalog.ts';
 import { discoverChangedFiles } from './changed-files.ts';
 import {
   type ApprovalRequest,
@@ -790,10 +790,31 @@ function finalizeOrPause(
   }
 
   // No interrupt — terminal state. Preserve cancelled / failed; only
-  // promote to 'completed' from 'running' (the normal happy path).
+  // promote to 'completed' from 'running' (the normal happy path) —
+  // and only after the flow's declared output contract holds. A
+  // job-definition flow that emits a malformed JobIntent fails HERE,
+  // not downstream when the fleet tries to consume the work order.
   if (job.status !== 'failed' && job.status !== 'cancelled') {
-    job.status = 'completed';
-    deps.onStatusChange?.(jobId, null, 'completed');
+    const contract = job.flow?.output;
+    const outputText = typeof result.output === 'string' ? result.output : '';
+    const parsed = parseFlowOutput(contract, outputText);
+    if (!parsed.ok) {
+      const lastExit = result.lastExit as { nodeId?: unknown } | null | undefined;
+      const nodeId = typeof lastExit?.nodeId === 'string' ? lastExit.nodeId : 'flow';
+      deps.bus.publish(jobId, nodeId, {
+        kind: 'error',
+        ts: new Date().toISOString(),
+        message: `flow output contract violated: ${parsed.error}`,
+      });
+      job.status = 'failed';
+      deps.onStatusChange?.(jobId, null, 'failed');
+    } else {
+      if (contract !== undefined && contract.kind !== 'agent-text') {
+        job.flowOutput = parsed.value;
+      }
+      job.status = 'completed';
+      deps.onStatusChange?.(jobId, null, 'completed');
+    }
   }
   deps.graphs?.delete(jobId);
 }
