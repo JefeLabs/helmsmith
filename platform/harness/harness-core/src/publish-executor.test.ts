@@ -7,8 +7,8 @@
  * by the Gate 2d E2E test against a live repo, not here.
  */
 
-import { describe, expect, it } from 'vitest';
 import type { GitHubCredential, GitHubCredentialResolver } from '@helmsmith/agent-auth';
+import { describe, expect, it } from 'vitest';
 import type { TaskStep } from './catalog.ts';
 import { FlowState, type FlowStateT } from './flow-graph.ts';
 import type { JobRecord } from './job.ts';
@@ -37,7 +37,11 @@ function freshState(jobId: string): FlowStateT {
 }
 
 function pushNode(config: Record<string, unknown>): TaskStep {
-  return { id: 'pub', kind: 'publish', config: { action: 'push-and-open-pr', ...config } } as TaskStep;
+  return {
+    id: 'pub',
+    kind: 'publish',
+    config: { action: 'push-and-open-pr', ...config },
+  } as TaskStep;
 }
 function mergeNode(config: Record<string, unknown> = {}): TaskStep {
   return { id: 'mrg', kind: 'publish', config: { action: 'merge-pr', ...config } } as TaskStep;

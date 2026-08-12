@@ -71,12 +71,11 @@ import type {
 } from './catalog.ts';
 import type { ChangedFile } from './changed-files.ts';
 
-export { evalExpression };
-
 // Run-side wire shapes moved to @helmsmith/flow-spec (the spec owns the
 // run contract, not just the definition contract). Re-exported here so
 // existing harness-core consumers keep their import paths.
 export type { ApprovalRequest, ApprovalResume, NodeExit, SuspendRequest };
+export { evalExpression };
 
 /**
  * StateGraph state schema for compiled flows. Uses Annotation.Root to

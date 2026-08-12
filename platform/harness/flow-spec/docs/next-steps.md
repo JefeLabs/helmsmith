@@ -34,15 +34,15 @@ Ordered by risk-reduction per effort. The rule from the README applies to every 
 
 | # | Item | Effort | Notes |
 |---|---|---|---|
-| 2.1 | **Approval hardening: `slaMs` auto-reject timer + role check on the resume route** | M | Smallest change with the largest governance payoff; currently any socket-access caller can approve anything, forever |
-| 2.2 | **Durable checkpointer by default** (SQLite file per workspace; PG in production) | M | Awaiting-approval/suspended jobs must survive restarts for HITL to be trustworthy |
+| 2.1 | ~~**Approval hardening: `slaMs` auto-reject timer + role check on the resume route**~~ | M | ✅ Done 2026-08-12 (HITL trust slice): per-approval SLA timer (re-armed across restarts from the original pause time) + `x-actor-role` gate + `decision` body validation. Pessimistic locking remains open (critical-feedback §3) |
+| 2.2 | ~~**Durable checkpointer by default** (SQLite file per workspace; PG in production)~~ | M | ✅ Done 2026-08-12 (HITL trust slice): SqliteSaver default + `RunJobDeps.checkpointer` seam + paused-job JSON rehydration + recompile-on-resume; PG is a config swap through the same seam |
 | 2.3 | **`policy.retry` (+ backoff), then `policy.timeout`, then `onError`** | M | The most-wanted reliability primitive; per-node timeout wraps executor calls; `onError:'continue'` last (it changes routing semantics) |
 | 2.4 | **Decide parallelism** — either implement fan-out/join (LangGraph supports multi-target routing; `joinStrategy` becomes real) or delete `joinStrategy` and validate ≤1 sequence edge | L / S | The half-state is the worst state. **2026-08-12 note: the state-model prerequisite now exists** — `nodes` is merge-reduced and `output` is documented as legacy, so branches can no longer clobber each other's addressable outputs; what remains is genuinely just the router/join work |
 | 2.5 | ~~**Enforce output contracts at the terminal node**~~ | M | ✅ Done 2026-08-12 (hardening slice): `parseFlowOutput` + `finalizeOrPause` enforcement + `job.flowOutput`. Remaining: `structured.schema` (see 2.7's schema decision) and JobIntent *emission* (submitting `job.flowOutput` to the JobStateMachine — new row 2.9) |
 | 2.9 | **JobIntent emission** — submit the enforced-and-recorded `job.flowOutput` intent(s) from `job-definition` flows to the JobStateMachine to launch the actual work flow | M | The other half of the factory/fleet seam: 2.5 guarantees the work order is well-formed; this makes it DO something |
 | 2.6 | **Suspend wake-up scheduling** (timer via job queue; event via bus subscription) | M | Makes `suspend` a real durability primitive instead of a pause-forever |
 | 2.7 | **Enforce `node-output-schema`** — validate declared schemas against parsed node output (needs a browser-safe JSON-Schema subset or a generated-validator approach; zero-dep constraint applies) | M | Deletes the `node-output-schema` report; turns agent output contracts from parse-only into shape-checked |
-| 2.8 | **Consult `effect` on replay/retry** — skip re-running `side-effecting` nodes on checkpointer replay; require idempotency keys for publish | M | Must land WITH or BEFORE 2.2 (durable checkpointer): replay + `push-and-open-pr` without it = duplicate PRs. Deletes the `effect` report |
+| 2.8 | ~~**Consult `effect` on replay/retry** — skip re-running `side-effecting` nodes on checkpointer replay; require idempotency keys for publish~~ | M | ✅ Done 2026-08-12 (HITL trust slice, landed BEFORE 2.2 per the constraint): `withEffectGuard` gives side-effecting nodes at-most-once semantics; publish executors idempotent by natural key (head branch / mergeSha); `effect` report deleted fixture-first |
 
 ## Phase 3 — Platform payoffs (the reasons the package exists)
 
