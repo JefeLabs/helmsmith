@@ -61,6 +61,7 @@ import {
 import type {
   AgentDef,
   ApprovalTag,
+  BackoffPolicy,
   Edge,
   Expression,
   FlowDef,
@@ -68,6 +69,7 @@ import type {
   RejectionPayload,
   SuspendTag,
   TaskStep,
+  TaskStepPolicy,
 } from './catalog.ts';
 import type { ChangedFile } from './changed-files.ts';
 
@@ -278,7 +280,7 @@ export function compileFlow(opts: CompileFlowOptions) {
           : (executors.get(node.id) ?? builtinExecutor(node) ?? defaultExecutor(node.id));
     const wrapped = withEffectGuard(
       node,
-      withNodeIO(node, wrapWithTags(node, withInputMapping(node, baseExec))),
+      withPolicy(node, withNodeIO(node, wrapWithTags(node, withInputMapping(node, baseExec)))),
     );
     builder.addNode(node.id, wrapped);
   }
@@ -292,7 +294,7 @@ export function compileFlow(opts: CompileFlowOptions) {
       builder.addEdge(node.id, END);
       continue;
     }
-    builder.addConditionalEdges(node.id, buildRouter(node.id, out));
+    builder.addConditionalEdges(node.id, buildRouter(node.id, out, node.policy?.onError));
   }
 
   // Step 5: attach checkpointer.
@@ -331,7 +333,11 @@ export function compileFlow(opts: CompileFlowOptions) {
  *   5. Fallback edge as catchall when nothing else fires.
  *   6. END.
  */
-export function buildRouter(nodeId: string, out: readonly Edge[]): (state: FlowStateT) => string {
+export function buildRouter(
+  nodeId: string,
+  out: readonly Edge[],
+  onError?: TaskStepPolicy['onError'],
+): (state: FlowStateT) => string {
   const seq = out.find((e) => e.type === 'sequence');
   const conds = out.filter(
     (e): e is Extract<Edge, { type: 'conditional' }> => e.type === 'conditional',
@@ -365,6 +371,11 @@ export function buildRouter(nodeId: string, out: readonly Edge[]): (state: FlowS
         : undefined;
       const target = named ?? errs.find((e) => e.on === undefined || e.on.length === 0);
       if (target) return target.to;
+      // policy.onError 'fallback' (2.3): an error no error edge handles
+      // routes to the node's fallback edge instead of failing the flow.
+      // ('continue' never reaches here — the policy wrapper converts the
+      // exit to success before the router runs.)
+      if (onError === 'fallback' && fb) return fb.to;
       throw new Error(
         `unhandled error at node "${nodeId}": ${exit.errorMessage ?? exit.errorName ?? 'unknown'}`,
       );
@@ -570,6 +581,112 @@ function resolveInputMapping(
     out[k] = resolveExpressionValue(sub, state);
   }
   return out;
+}
+
+/**
+ * Policy wrapper (roadmap 2.3) — the runtime consult of TaskStep.policy.
+ * Sits outside withNodeIO so retries also cover OutputParseError (an
+ * agent that emitted invalid JSON gets re-asked), and inside
+ * withEffectGuard so a side-effecting node that already completed is
+ * never re-entered at all.
+ *
+ *   - retry: re-runs the node while it produces an ERROR exit, up to
+ *     maxAttempts TOTAL attempts (1 ≡ no retry), sleeping per the
+ *     declared backoff between attempts (fixed, or exponential
+ *     baseMs·multiplier^(n-1) capped at maxMs; multiplier default 2).
+ *     Reject exits are authored flow control — never retried here.
+ *   - timeout: per-ATTEMPT deadline. A node that exceeds it exits with
+ *     errorName 'Timeout' (error-edge routable, retryable). The losing
+ *     executor keeps running detached — NodeExecutor has no AbortSignal
+ *     yet (same limitation as loop sibling cancellation); its late
+ *     result is discarded.
+ *   - onError 'continue': after retries exhaust, convert the error exit
+ *     to success (logged) so the flow proceeds past the node.
+ *     'fallback' is implemented in buildRouter (it's a routing
+ *     decision); 'propagate' is the default behavior unchanged.
+ *
+ * A GraphInterrupt thrown by a synthetic interrupt node passes through
+ * untouched — this wrapper only inspects RETURNED deltas, never
+ * catches. (Synthetic nodes carry no policy anyway.)
+ */
+function withPolicy(step: TaskStep, exec: NodeExecutor): NodeExecutor {
+  const policy = step.policy;
+  if (!policy) return exec;
+  const nodeId = step.id;
+  const maxAttempts = policy.retry?.maxAttempts ?? 1;
+  const backoff = policy.retry?.backoff;
+  const attemptOnce =
+    policy.timeout === undefined ? exec : withTimeout(nodeId, policy.timeout, exec);
+
+  return async (state) => {
+    let delta = await attemptOnce(state);
+    for (let attempt = 1; attempt < maxAttempts && isErrorExit(delta); attempt++) {
+      await sleep(backoffDelayMs(backoff, attempt));
+      delta = await attemptOnce(state);
+    }
+    if (isErrorExit(delta) && policy.onError === 'continue') {
+      console.warn(
+        `[flow] node "${nodeId}" failed (${delta.lastExit?.errorName ?? 'unknown'}) after ${maxAttempts} attempt(s); policy.onError='continue' — proceeding`,
+      );
+      return { ...delta, lastExit: { nodeId, kind: 'success' } };
+    }
+    return delta;
+  };
+}
+
+function isErrorExit(delta: Partial<FlowStateT>): boolean {
+  return delta.lastExit?.kind === 'error';
+}
+
+function backoffDelayMs(backoff: BackoffPolicy | undefined, attempt: number): number {
+  if (!backoff) return 0;
+  if (backoff.kind === 'fixed') return backoff.ms;
+  const raw = backoff.baseMs * (backoff.multiplier ?? 2) ** (attempt - 1);
+  return Math.min(raw, backoff.maxMs ?? Number.POSITIVE_INFINITY);
+}
+
+function sleep(ms: number): Promise<void> {
+  if (ms <= 0) return Promise.resolve();
+  return new Promise((resolve) => {
+    const t = setTimeout(resolve, ms);
+    (t as { unref?: () => void }).unref?.();
+  });
+}
+
+/**
+ * Per-attempt timeout: race the executor against a deadline. On expiry,
+ * return an error-edge-routable 'Timeout' exit; the loser's eventual
+ * result (or rejection) is discarded.
+ */
+function withTimeout(nodeId: string, timeoutMs: number, exec: NodeExecutor): NodeExecutor {
+  return async (state) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<Partial<FlowStateT>>((resolve) => {
+      timer = setTimeout(
+        () =>
+          resolve({
+            lastExit: {
+              nodeId,
+              kind: 'error',
+              errorName: 'Timeout',
+              errorMessage: `node "${nodeId}" exceeded policy.timeout of ${timeoutMs}ms`,
+            },
+          }),
+        timeoutMs,
+      );
+      (timer as { unref?: () => void }).unref?.();
+    });
+    const attempt = exec(state);
+    // A loser that rejects after the deadline won must not surface as an
+    // unhandled rejection; a rejection BEFORE the deadline (including
+    // GraphInterrupt) still propagates through the race.
+    attempt.catch(() => {});
+    try {
+      return await Promise.race([attempt, deadline]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  };
 }
 
 /**
