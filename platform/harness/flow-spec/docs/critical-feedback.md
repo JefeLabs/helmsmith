@@ -1,8 +1,8 @@
 # Flow Spec — Critical Feedback (Consolidated, Current)
 
-**Date:** 2026-08-07 · **Updated:** 2026-08-12 after the data-plane slice (PR #14) and the hardening slice (PR #15) · Companion docs: [`SPEC.md`](../SPEC.md) · [`steps-and-edges.md`](./steps-and-edges.md) · [`next-steps.md`](./next-steps.md)
+**Date:** 2026-08-07 · **Updated:** 2026-08-12 after the data-plane slice (PR #14), the hardening slice (PR #15), and a validator-consistency review · Companion docs: [`SPEC.md`](../SPEC.md) · [`steps-and-edges.md`](./steps-and-edges.md) · [`next-steps.md`](./next-steps.md)
 
-One document, every open criticism, with status. Sources: the pre-extraction design review (`docs/superpowers/specs/2026-08-07-flow-spec-design-review.md`), the package-level critique from `SPEC.md` §7, the semantic findings from documentation-as-audit, and the 2026-08-12 data-plane review + its post-merge self-review (plan: `docs/superpowers/plans/2026-08-12-flow-spec-data-plane.md`). Items already fixed are listed once in §1 and not re-argued.
+One document, every open criticism, with status. Sources: the pre-extraction design review (`docs/superpowers/specs/2026-08-07-flow-spec-design-review.md`), the package-level critique from `SPEC.md` §7, the semantic findings from documentation-as-audit, the 2026-08-12 data-plane review + its post-merge self-review (plan: `docs/superpowers/plans/2026-08-12-flow-spec-data-plane.md`), and a 2026-08-12 validator-consistency review of the merged package. Items already fixed are listed once in §1 and not re-argued.
 
 **Severity:** 🔴 can silently produce wrong behavior · 🟡 design debt that compounds · 🔵 polish / future-proofing
 
@@ -44,6 +44,17 @@ One document, every open criticism, with status. Sources: the pre-extraction des
 | 🔴 The `onUnsupported` list ran on convention; conformance covered 1 of 3 behaviors (validation verdicts + warning expectations were code-locked in `validate.test.ts`) | `VALIDATION_CASES` + `UNSUPPORTED_CASES` fixtures (JSON-serializable), replayed by spec + runtime with **exact-set** feature match — a stale report after implementing a feature, or a missing report on new dead config, now fails both suites until the fixture changes first |
 | 🟡 Scripts couldn't see the data plane — `serializableStateView` predated the new channels, so `HARNESS_STATE_JSON` lacked `input`/`nodes` while docs claimed "full state"; no compile-time tie to `FlowRunState` | `input` included; `nodes` deliberately excluded (env-size — `input` mappings via stdin are the channel); return type is now `Omit<FlowRunState, …>` so contract growth forces an explicit decision; docs corrected |
 
+### 1.4 Validator consistency (2026-08-12, validator-consistency review)
+
+The unifying observation: once the validator crossed into statically-knowable-runtime-failure checking (load-time regex compilation for literal `matches` patterns), unchecked siblings of the same class stopped being scope decisions and became inconsistencies. All four fixed same-day; the three validator rules are pinned by new `VALIDATION_CASES` fixtures replayed by both packages.
+
+| Finding | Resolution |
+|---|---|
+| 🟡 `jsonpath` path syntax was never checked at load time — a typo like `output` (missing `$.`) or `$.a..b` validated, then silently resolved `undefined` → false at runtime: the exact silent-miss class `exists` was added to escape | Load-time syntax check in `validateExpression`: a path must be `$` or `$.`-prefixed with non-empty segments. Evaluator semantics unchanged — it still resolves any runtime miss to `undefined`, never throws on data |
+| 🟡 Shadowed error-edge names validated silently — first-declared-match-wins made a repeated `on` name permanently dead config (the same dead-branch class `parallel-fan-out` warns about), neither rejected nor reported | An error name may appear at most once across a source node's error edges (including within a single `on` list); a duplicate is rejected with a located "can never fire" `CatalogError` |
+| 🔵 `job-intents` `min`/`max` were individually validated but never cross-checked — `{ min: 5, max: 2 }` validated yet was unsatisfiable; every terminal output failed `parseFlowOutput`, loudly but only after the flow ran to completion | Load-time `min ≤ max` cross-check in `validateFlowOutputContract` |
+| 🔵 `vitest` was missing from devDependencies — the `test` script resolved only via workspace hoisting, so the suite breaks the day the package is extracted (semver/extraction being a stated motive) | `vitest ^4.1.5` declared in the package's own devDependencies |
+
 ## 2. Open — package-level (this package's debt)
 
 ### 🟡 The export surface is unguarded — and growing
@@ -74,7 +85,7 @@ Controlplane still stores opaque JSONB; Phase 2 would hand-port these rules into
 A `literal` whose `value` contains `{kind:'js', expression:'…'}` is reported as a js expression though it's never evaluated. Warning-only today; walking known expression positions (edge conditions, assertions, transform expressions, loop paths, matchers, tool args, input mappings) would be precise.
 
 ### 🔵 Packaging hygiene
-Version 0.0.0/private with no changeset wiring despite semver being a stated extraction motive. Fine today, wrong the day the first out-of-repo consumer appears. (The missing `test` script was fixed 2026-08-12.)
+Version 0.0.0/private with no changeset wiring despite semver being a stated extraction motive. Fine today, wrong the day the first out-of-repo consumer appears. (The missing `test` script and the hoisting-only `vitest` dependency were both fixed 2026-08-12.)
 
 ## 3. Open — runtime-level (harness-core's debt, visible through the spec)
 
@@ -98,4 +109,4 @@ Inherited from the original review, minus what the 2026-08-12 slices closed (ter
 
 ## 4. The one-sentence summary
 
-The extraction fixed the *honesty* problem (2026-08-07), the data-plane pass fixed the *capability ceiling*, and the hardening pass turned the alignment mechanisms into enforced tests (three-behavior conformance fixtures) while giving the factory/fleet seam teeth (terminal output enforcement) — what remains is the reliability tier (policy/join/triggers/fan-out still warn-only, with 2.4's state-model excuse now gone), schema/effect enforcement, HITL trust (role check, SLA, durable checkpointer), and JobIntent *emission* on top of the now-enforced contract.
+The extraction fixed the *honesty* problem (2026-08-07), the data-plane pass fixed the *capability ceiling*, the hardening pass turned the alignment mechanisms into enforced tests (three-behavior conformance fixtures) while giving the factory/fleet seam teeth (terminal output enforcement), and the validator-consistency pass closed the statically-knowable-failure gaps (path syntax, shadowed error names, min ≤ max) — what remains is the reliability tier (policy/join/triggers/fan-out still warn-only, with 2.4's state-model excuse now gone), schema/effect enforcement, HITL trust (role check, SLA, durable checkpointer), and JobIntent *emission* on top of the now-enforced contract.

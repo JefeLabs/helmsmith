@@ -263,6 +263,22 @@ describe('validateFlowCatalog', () => {
     );
   });
 
+  it('rejects an error name shadowed within the same on list', () => {
+    const flow = {
+      ...validFlow,
+      nodes: [
+        validFlow.nodes[0],
+        { id: 'g', kind: 'transform', config: { expression: { kind: 'literal', value: 1 } } },
+        { id: 'h1', kind: 'transform', config: { expression: { kind: 'literal', value: 1 } } },
+      ],
+      edges: [
+        { from: 't', to: 'g', type: 'sequence' },
+        { from: 'g', to: 'h1', type: 'error', on: ['Timeout', 'Timeout'] },
+      ],
+    };
+    expect(() => validateFlowCatalog({ flows: [flow] }, 'test')).toThrow(/can never fire/);
+  });
+
   it('rejects cycles on non-reject edges', () => {
     const cyclic = {
       flows: [

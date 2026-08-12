@@ -1,6 +1,6 @@
 # Flow Authoring Reference — Steps, Edges, Tags, and What Actually Runs
 
-**Package:** `@helmsmith/flow-spec` · **Date:** 2026-08-07 · **Updated:** 2026-08-12 (data plane: node I/O, error matchers, expression additions) · Companion docs: [`SPEC.md`](../SPEC.md) (contract detail) · [`critical-feedback.md`](./critical-feedback.md) · [`next-steps.md`](./next-steps.md)
+**Package:** `@helmsmith/flow-spec` · **Date:** 2026-08-07 · **Updated:** 2026-08-12 (data plane: node I/O, error matchers, expression additions; validator-consistency pass: load-time path syntax, shadow rejection, min ≤ max) · Companion docs: [`SPEC.md`](../SPEC.md) (contract detail) · [`critical-feedback.md`](./critical-feedback.md) · [`next-steps.md`](./next-steps.md)
 
 This is the catalog author's reference: every node kind, edge type, and tag — with its config fields, a working JSON example, and an honest **support status**. Status comes from the runtime as it exists today; anything marked ❌ still *validates* but triggers a load-time warning via the `onUnsupported` seam and then does nothing.
 
@@ -132,7 +132,7 @@ Credentials via the GitHub resolver cascade (local `gh` → controlplane App tok
 | `sequence` | — | unlimited, **but only the first is followed** | Default forward path | ✅ / ❌ fan-out (warned as `parallel-fan-out`) |
 | `conditional` | `condition: Expression` | unlimited | Tried in declaration order on success exit; first truthy predicate wins | ✅ |
 | `fallback` | — | ≤ 1 | Catchall when no conditional matched and no sequence edge exists | ✅ |
-| `error` | `on?: string[]` | any number with `on`; ≤ 1 catch-all (no/empty `on`) | Catches `error` exits. `on` matches `NodeExit.errorName` (`Timeout`, `RateLimitError`, `OutputParseError`, `UnknownTool`, `AuthError`, …) — first declared match wins, catch-all last; a name matched by no edge fails the flow | ✅ |
+| `error` | `on?: string[]` | any number with `on`; ≤ 1 catch-all (no/empty `on`); each error name at most once per source (a shadowed name is rejected at load — it could never fire) | Catches `error` exits. `on` matches `NodeExit.errorName` (`Timeout`, `RateLimitError`, `OutputParseError`, `UnknownTool`, `AuthError`, …) — first declared match wins, catch-all last; a name matched by no edge fails the flow | ✅ |
 | `reject` | `maxAttempts?` (3), `onMaxAttempts?` `{kind:'fail'}` \| `{kind:'escalate', to}` | ≤ 1; may only originate from `gate` or approval-tagged nodes | The only cycle-permitted edge; carries `RejectionPayload`; attempts exceeded → fail (default) or escalate | ✅ |
 
 Router precedence on every node exit: **reject → error → conditional (declaration order) → sequence (first) → fallback → END.**
@@ -215,7 +215,7 @@ Used by: conditional edges, gate assertions, transforms, loop paths, tool args, 
 | Kind | Shape | Pinned semantics |
 |---|---|---|
 | `literal` | `{kind, value}` | Truthiness as predicate; raw value otherwise |
-| `jsonpath` | `{kind, path}` | `$`, `$.a.b`, dot-numeric array index `$.arr.0`; miss/out-of-bounds → `undefined`; no brackets/wildcards/filters. Binds against `FlowRunState` (§5) |
+| `jsonpath` | `{kind, path}` | `$`, `$.a.b`, dot-numeric array index `$.arr.0`; miss/out-of-bounds → `undefined`; no brackets/wildcards/filters. Malformed paths (no `$` prefix, empty segments) rejected at load time. Binds against `FlowRunState` (§5) |
 | `compare` | `{kind, lhs, op, rhs}` | `==`/`!=` strict (objects by reference); `<` `<=` `>` `>=` via `Number()`, NaN ⇒ false; `in` = array membership via SameValueZero; `contains`/`startsWith`/`endsWith` string-only (non-string ⇒ false); `matches` = `new RegExp(rhs).test(lhs)`, invalid pattern ⇒ false (literal patterns rejected at load) |
 | `all` / `any` | `{kind, exprs[]}` | Short-circuit AND/OR; `all([])`=true, `any([])`=false |
 | `not` | `{kind, expr}` | Inversion |
@@ -234,4 +234,4 @@ Used by: conditional edges, gate assertions, transforms, loop paths, tool args, 
 | `job-definition` | Intake conversation emitting a work order | **Must** declare `{kind:'job-intent'}` (statically enforced) |
 | `post-job` | Cleanup / notifications | — |
 
-`FlowOutputContract` kinds: `agent-text`, `job-intent`, `job-intents` (`min?`/`max?`), `flow-spec`, `structured` (`schema` required). **Enforced at the terminal** (`parseFlowOutput`): job-intent(s) shape-checked (flowId/productId/input, min/max), flow-spec emissions re-validated through the catalog validator, structured must parse as JSON; a violation fails the job, success records the parsed value on `JobRecord.flowOutput`. Only `structured.schema` remains unenforced (warned as `flow-output-schema`).
+`FlowOutputContract` kinds: `agent-text`, `job-intent`, `job-intents` (`min?`/`max?`, min ≤ max enforced at load), `flow-spec`, `structured` (`schema` required). **Enforced at the terminal** (`parseFlowOutput`): job-intent(s) shape-checked (flowId/productId/input, min/max), flow-spec emissions re-validated through the catalog validator, structured must parse as JSON; a violation fails the job, success records the parsed value on `JobRecord.flowOutput`. Only `structured.schema` remains unenforced (warned as `flow-output-schema`).

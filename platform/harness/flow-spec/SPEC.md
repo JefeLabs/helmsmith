@@ -1,6 +1,6 @@
 # @helmsmith/flow-spec — Specification & Critical Notes
 
-**Package:** `platform/harness/flow-spec` · **Version:** 0.0.0 (private, source-shipped) · **Date:** 2026-08-07 · **Updated:** 2026-08-12 (data-plane contract: run state, node I/O, error matchers, expression additions) · **Landed via:** PR #13 (`feat/flow-spec-package`)
+**Package:** `platform/harness/flow-spec` · **Version:** 0.0.0 (private, source-shipped) · **Date:** 2026-08-07 · **Updated:** 2026-08-12 (data-plane contract: run state, node I/O, error matchers, expression additions; validator-consistency pass: load-time path syntax, error-edge shadow rejection, min ≤ max) · **Landed via:** PR #13 (`feat/flow-spec-package`)
 
 This document is the detailed companion to the package `README.md`: the full contract the package defines and the exact semantics its code implements. Critique and roadmap live in dedicated docs (see §7 for the map). The pre-extraction critique of the whole flow *runtime* lives in `docs/superpowers/specs/2026-08-07-flow-spec-design-review.md`; runtime findings are only summarized here, not repeated.
 
@@ -72,7 +72,7 @@ flowchart TD
     f -- none --> END
 ```
 
-Structural rules the validator enforces: exactly one trigger (no incoming, ≥1 outgoing); ≤1 each of fallback/reject edges per source; error edges — any number carrying `on` matchers plus ≤1 catch-all (no/empty `on`), routed by `NodeExit.errorName` (first declared match wins, catch-all last); reject edges only from `gate` or approval-tagged nodes; reject-edge `onMaxAttempts.escalate` targets must exist; everything except reject edges must form a DAG.
+Structural rules the validator enforces: exactly one trigger (no incoming, ≥1 outgoing); ≤1 each of fallback/reject edges per source; error edges — any number carrying `on` matchers plus ≤1 catch-all (no/empty `on`), routed by `NodeExit.errorName` (first declared match wins, catch-all last), and each error name may appear at most once across a source's error edges (a shadowed name could never fire, so it is rejected); reject edges only from `gate` or approval-tagged nodes; reject-edge `onMaxAttempts.escalate` targets must exist; everything except reject edges must form a DAG.
 
 ### 3.1.1 Node I/O — the data plane
 
@@ -97,7 +97,7 @@ Tagged union: `literal`, `jsonpath`, `compare`, `all`, `any`, `not`, `js`. The e
 | Construct | Semantics |
 |---|---|
 | `literal` | `Boolean(value)` as predicate; raw value via `resolveExpressionValue` |
-| `jsonpath` | Dot-path only: `$`, `$.a.b`. Missing/non-object intermediate → `undefined`, never throws. Dot-numeric array indexing (`$.arr.0`) is **supported and pinned by fixture**; out-of-bounds → `undefined`. No bracket syntax, wildcards, or filters |
+| `jsonpath` | Dot-path only: `$`, `$.a.b`. Missing/non-object intermediate → `undefined`, never throws. Dot-numeric array indexing (`$.arr.0`) is **supported and pinned by fixture**; out-of-bounds → `undefined`. No bracket syntax, wildcards, or filters. Malformed paths (no `$` prefix, empty segments) are rejected by the validator at load time — the evaluator itself still resolves any runtime miss to `undefined` |
 | `compare ==` / `!=` | Strict `===`/`!==`. No coercion: `"5" == 5` is false. Objects compare by **reference** — two structurally equal objects from jsonpath are never `==` (pinned by fixture) |
 | `compare <` `<=` `>` `>=` | Both sides through `Number()`; NaN on either side ⇒ false (both `NaN < 5` and `NaN >= 5` are false) |
 | `compare in` | rhs must resolve to an array, else false (no substring semantics — that's `contains`). Membership via `Array.includes` — **SameValueZero, not strict equality**: `NaN` self-matches (reachable only from runtime state; JSON can't encode NaN — pinned by code-level test, kept out of fixtures so they stay JSON-serializable) |
@@ -120,7 +120,7 @@ Tagged union: `literal`, `jsonpath`, `compare`, `all`, `any`, `not`, `js`. The e
 
 ## 4. Validation
 
-`validateFlowCatalog` / `validateUnifiedCatalog` are assert-style, throwing `CatalogError` with path-prefixed messages (`test: flows[0].nodes[2].config.toolId must be …`). Coverage: catalog shape, per-flow kind/output rules + `version`, per-node kind + per-kind config shape (incl. script `secrets`, subflow `version`), node `input` mappings, `output` contracts, `effect` enum, tags (approval/suspend exclusivity, loop shape), policy/joinStrategy/terminal shapes, per-edge shape + referential integrity + cardinality (incl. error-edge `on` lists + the one-catch-all rule) + reject-source restrictions, trigger constraints, DAG check, duplicate ids (flows, nodes, agents, products, repos), `accepts` forms, `fallbackOn` against the closed AdapterError name set, `skillz` key set, load-time regex compilation for literal `matches` patterns.
+`validateFlowCatalog` / `validateUnifiedCatalog` are assert-style, throwing `CatalogError` with path-prefixed messages (`test: flows[0].nodes[2].config.toolId must be …`). Coverage: catalog shape, per-flow kind/output rules + `version` (incl. `job-intents` min ≤ max), per-node kind + per-kind config shape (incl. script `secrets`, subflow `version`), node `input` mappings, `output` contracts, `effect` enum, tags (approval/suspend exclusivity, loop shape), policy/joinStrategy/terminal shapes, per-edge shape + referential integrity + cardinality (incl. error-edge `on` lists, the one-catch-all rule, and shadowed-error-name rejection) + reject-source restrictions, trigger constraints, DAG check, duplicate ids (flows, nodes, agents, products, repos), `accepts` forms, `fallbackOn` against the closed AdapterError name set, `skillz` key set, load-time regex compilation for literal `matches` patterns, load-time jsonpath path-syntax checks.
 
 Validation is **structural only** — it answers "is this shaped like a flow?", never "will this flow do what it says?" The second question is exactly what §5 exists for.
 
