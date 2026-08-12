@@ -34,7 +34,6 @@ Both validators accept `{ onUnsupported?: (f: UnsupportedFeature) => void }`. Th
 
 | Feature id | Runtime truth |
 |---|---|
-| `policy` | retry/timeout/onError are not enforced |
 | `joinStrategy` | multiple incoming edges use LangGraph defaults |
 | `terminal-fail` | terminal nodes always end the flow as success |
 | `trigger-<kind>` | no runtime fires non-manual triggers |

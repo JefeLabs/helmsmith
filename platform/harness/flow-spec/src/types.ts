@@ -529,6 +529,8 @@ export interface TaskStepPolicy {
 }
 
 export interface RetryPolicy {
+  /** TOTAL attempts including the first (1 ≡ no retry). Retries fire
+   *  only on error exits — reject exits are authored flow control. */
   maxAttempts: number;
   backoff?: BackoffPolicy;
 }

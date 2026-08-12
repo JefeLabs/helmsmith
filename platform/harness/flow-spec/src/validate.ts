@@ -23,7 +23,7 @@ import {
  * accept/reject behavior — a catalog with unsupported features is
  * still a *valid* catalog; it just won't do everything it says.
  *
- * Current feature ids: `policy`, `joinStrategy`, `terminal-fail`,
+ * Current feature ids: `joinStrategy`, `terminal-fail`,
  * `trigger-<kind>` (any non-manual trigger), `expression-js`,
  * `parallel-fan-out` (second+ sequence edge from one node),
  * `node-output-schema` (output.kind 'json' declares a schema — parse
@@ -293,14 +293,6 @@ function reportUnsupportedFeatures(
   for (const [j, n] of (flow.nodes as unknown[]).entries()) {
     const node = n as Record<string, unknown>;
     const at = `${where}.nodes[${j}]`;
-    if (node.policy !== undefined) {
-      report({
-        where: at,
-        feature: 'policy',
-        detail:
-          'retry/timeout/onError are not enforced — the node runs once with executor-default timeouts and errors follow edges',
-      });
-    }
     if (node.joinStrategy !== undefined) {
       report({
         where: at,

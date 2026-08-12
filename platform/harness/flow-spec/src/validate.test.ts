@@ -363,7 +363,7 @@ describe('unsupported-feature reporting', () => {
     expect(reported2).toEqual([]);
   });
 
-  it('reports policy, joinStrategy, terminal, non-manual triggers, js expressions, and extra sequence edges', () => {
+  it('reports joinStrategy, terminal, non-manual triggers, js expressions, and extra sequence edges — policy is executed and silent', () => {
     const reported: UnsupportedFeature[] = [];
     const catalog = {
       flows: [
@@ -406,7 +406,6 @@ describe('unsupported-feature reporting', () => {
       'expression-js',
       'joinStrategy',
       'parallel-fan-out',
-      'policy',
       'terminal-fail',
       'trigger-schedule',
     ]);
