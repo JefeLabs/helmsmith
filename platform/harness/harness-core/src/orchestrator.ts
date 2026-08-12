@@ -702,7 +702,9 @@ async function callGetState(
 function freshFlowState(jobId: string, input: string) {
   return {
     jobId,
+    input,
     output: input,
+    nodes: {},
     messages: [],
     attempts: {},
     lastExit: null,

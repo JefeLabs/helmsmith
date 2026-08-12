@@ -42,6 +42,7 @@ import {
   type ApprovalRequest,
   type ApprovalResume,
   evalExpression,
+  type FlowRunState,
   type NodeExit,
   resolveExpressionValue,
   type SuspendRequest,
@@ -87,10 +88,26 @@ export const FlowState = Annotation.Root({
    *  executors via the deps map (not the state itself), but kept here
    *  for diagnostic prints + future per-event tagging. */
   jobId: Annotation<string>,
+  /** Job/trigger payload. Write-once: seeded by the initial invoke,
+   *  later writes are ignored so nodes can never clobber the flow's
+   *  input. jsonpath surface: `$.input`. */
+  input: Annotation<unknown>({
+    reducer: (current, incoming) => (current === null ? incoming : current),
+    default: () => null,
+  }),
   /** Accumulating text output. Each successful agent step writes here;
    *  the next step reads it as the user prompt. Equivalent to the old
    *  orchestrator's `priorOutput` local. */
   output: Annotation<string>,
+  /** Per-node outputs, keyed by node id — written by the withNodeIO
+   *  wrapper after every successful node that produced output. Merge-
+   *  reducer so parallel branches never clobber. jsonpath surface:
+   *  `$.nodes.<id>` (parsed JSON when the node declares output.kind
+   *  'json', the raw output string otherwise). */
+  nodes: Annotation<Record<string, unknown>>({
+    reducer: (acc, partial) => ({ ...acc, ...partial }),
+    default: () => ({}),
+  }),
   /** Append-only message log. Future use: structured chat history for
    *  agents that work better with full message turns vs raw text. The
    *  reducer concatenates so parallel branches don't clobber. */
@@ -179,6 +196,13 @@ export const FlowState = Annotation.Root({
 
 export type FlowStateT = typeof FlowState.State;
 
+// Compile-time proof that the runtime state satisfies the spec's
+// FlowRunState wire contract. If a channel drifts (name or type), this
+// stops compiling — the honest seam between spec and runtime.
+type _RunStateCheck = FlowStateT extends FlowRunState ? true : never;
+const _runStateCheck: _RunStateCheck = true;
+void _runStateCheck;
+
 /**
  * Per-node executor function. Receives the current flow state and returns
  * a partial-state delta. Should NEVER throw under normal flow conditions
@@ -251,7 +275,7 @@ export function compileFlow(opts: CompileFlowOptions) {
         : isSyntheticSuspendNode(node)
           ? makeSuspendExecutor(node)
           : (executors.get(node.id) ?? builtinExecutor(node) ?? defaultExecutor(node.id));
-    const wrapped = wrapWithTags(node, baseExec);
+    const wrapped = withNodeIO(node, wrapWithTags(node, baseExec));
     builder.addNode(node.id, wrapped);
   }
 
@@ -498,6 +522,40 @@ export function makeTransformExecutor(node: TaskStep): NodeExecutor {
 function wrapWithTags(step: TaskStep, exec: NodeExecutor): NodeExecutor {
   if (!step.tags?.loop) return exec;
   return loopWrapper(step.id, step.tags.loop, exec);
+}
+
+/**
+ * Outermost node wrapper: records the node's output into the
+ * `state.nodes` map (after Loop aggregation, so a looped node records
+ * its aggregate). When the step declares `output.kind: 'json'`, the
+ * output string is parsed and the PARSED value is recorded — this is
+ * what makes `$.nodes.<id>.<field>` routable in gates and conditional
+ * edges. Parse failure converts the exit to errorName
+ * 'OutputParseError' so the flow can route around it via an error edge
+ * (the raw output is kept on `state.output` for debugging).
+ */
+function withNodeIO(step: TaskStep, exec: NodeExecutor): NodeExecutor {
+  const nodeId = step.id;
+  const wantsJson = step.output?.kind === 'json';
+  return async (state) => {
+    const delta = await exec(state);
+    if (delta.output === undefined) return delta;
+    if (delta.lastExit && delta.lastExit.kind !== 'success') return delta;
+    if (!wantsJson) return { ...delta, nodes: { [nodeId]: delta.output } };
+    try {
+      return { ...delta, nodes: { [nodeId]: JSON.parse(delta.output) } };
+    } catch (err) {
+      return {
+        ...delta,
+        lastExit: {
+          nodeId,
+          kind: 'error',
+          errorName: 'OutputParseError',
+          errorMessage: `declared output.kind 'json' but output is not valid JSON: ${(err as Error).message}`,
+        },
+      };
+    }
+  };
 }
 
 // ─── Topology rewriter (Approval + Suspend tags) ──────────────────────────

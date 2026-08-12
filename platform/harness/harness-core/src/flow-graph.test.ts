@@ -79,7 +79,9 @@ function makeReject(calls: string[], id: string, attemptKey: string): NodeExecut
 
 const initialState: FlowStateT = {
   jobId: 'test',
+  input: null,
   output: '',
+  nodes: {},
   messages: [],
   attempts: {},
   lastExit: null,
@@ -89,6 +91,98 @@ const initialState: FlowStateT = {
   cancelReason: null,
   changedFiles: [],
 };
+
+// ─── node-addressable state (input + nodes channels) ─────────────────────
+
+describe('node-addressable state', () => {
+  it('records each node output under state.nodes[id] and preserves input', async () => {
+    const flow: FlowDef = {
+      id: 'f',
+      nodes: [
+        trigger('t'),
+        {
+          id: 'shape',
+          kind: 'transform',
+          config: { expression: { kind: 'literal', value: 'hello' } },
+        },
+      ],
+      edges: [{ from: 't', to: 'shape', type: 'sequence' }],
+    };
+    const graph = compileFlow({ flow, executors: new Map() });
+    const result = await graph.invoke(
+      { ...initialState, input: 'in', output: 'in' },
+      { configurable: { thread_id: 'nas-1' } },
+    );
+    expect(result.nodes.shape).toBe('hello');
+    expect(result.input).toBe('in');
+  });
+
+  it('parses declared json output into state.nodes and routes OutputParseError to error edge', async () => {
+    const flow: FlowDef = {
+      id: 'f',
+      nodes: [
+        trigger('t'),
+        {
+          id: 'j',
+          kind: 'transform',
+          output: { kind: 'json' },
+          config: {
+            expression: {
+              kind: 'object',
+              fields: { score: { kind: 'literal', value: 0.9 } },
+            },
+          },
+        },
+        {
+          id: 'bad',
+          kind: 'transform',
+          output: { kind: 'json' },
+          config: { expression: { kind: 'literal', value: 'not json' } },
+        },
+        {
+          id: 'handled',
+          kind: 'transform',
+          config: { expression: { kind: 'literal', value: 'recovered' } },
+        },
+      ],
+      edges: [
+        { from: 't', to: 'j', type: 'sequence' },
+        { from: 'j', to: 'bad', type: 'sequence' },
+        { from: 'bad', to: 'handled', type: 'error' },
+      ],
+    };
+    const graph = compileFlow({ flow, executors: new Map() });
+    const result = await graph.invoke(initialState, { configurable: { thread_id: 'nas-2' } });
+    expect(result.nodes.j).toEqual({ score: 0.9 });
+    expect(result.nodes.bad).toBeUndefined();
+    expect(result.output).toBe('recovered');
+  });
+
+  it('a looped node records its aggregate output once', async () => {
+    const flow: FlowDef = {
+      id: 'f',
+      nodes: [
+        trigger('t'),
+        {
+          id: 'each',
+          kind: 'transform',
+          config: { expression: { kind: 'jsonpath', path: '$.output' } },
+          tags: {
+            loop: {
+              source: 'collection',
+              path: { kind: 'literal', value: ['x', 'y'] },
+              mode: 'sequential',
+            },
+          },
+        },
+      ],
+      edges: [{ from: 't', to: 'each', type: 'sequence' }],
+    };
+    const graph = compileFlow({ flow, executors: new Map() });
+    const result = await graph.invoke(initialState, { configurable: { thread_id: 'nas-3' } });
+    expect(result.nodes.each).toBe('x\n---\ny');
+  });
+});
 
 // ─── compileFlow: topology ────────────────────────────────────────────────
 
@@ -530,7 +624,9 @@ describe('buildRouter', () => {
 describe('evalExpression', () => {
   const s: FlowStateT = {
     jobId: 'j',
+    input: null,
     output: 'has-value',
+    nodes: {},
     messages: [],
     attempts: { node1: 2 },
     lastExit: null,
