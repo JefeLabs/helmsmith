@@ -477,7 +477,7 @@ export async function runJob(jobId: string, deps: RunJobDeps): Promise<void> {
       }
       executors.set(node.id, makeSubflowExecutor(node, innerGraph));
     } else if (node.kind === 'script') {
-      executors.set(node.id, makeScriptExecutor(node));
+      executors.set(node.id, makeScriptExecutor(node, { broker: deps.broker }));
     } else if (node.kind === 'publish') {
       // publish-* nodes (push-and-open-pr, merge-pr) need the GitHub
       // credential resolver. Like tool/subflow nodes, an unset resolver

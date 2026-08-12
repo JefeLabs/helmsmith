@@ -36,8 +36,16 @@ import { execFile, type ChildProcess } from 'node:child_process';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { CredentialBroker } from '@helmsmith/agent-auth';
 import type { ScriptConfig, TaskStep } from './catalog.ts';
 import type { FlowStateT, NodeExecutor } from './flow-graph.ts';
+import { fetchCredential } from './tool-executor.ts';
+
+export interface ScriptExecutorDeps {
+  /** Required only for scripts that declare `secrets`. Same broker
+   *  (and audit trail) the tool executor uses for ToolAuthRef. */
+  broker?: CredentialBroker;
+}
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const SIGKILL_GRACE_MS = 5_000;
@@ -81,7 +89,7 @@ function pickInterpreter(language: ScriptConfig['language']): InterpreterPlan {
  * 'script' (programming error). Every other failure mode routes
  * through the error edge so flows can recover deterministically.
  */
-export function makeScriptExecutor(node: TaskStep): NodeExecutor {
+export function makeScriptExecutor(node: TaskStep, deps: ScriptExecutorDeps = {}): NodeExecutor {
   if (node.kind !== 'script') {
     throw new Error(
       `makeScriptExecutor: node "${node.id}" has kind "${node.kind}", expected "script"`,
@@ -93,6 +101,38 @@ export function makeScriptExecutor(node: TaskStep): NodeExecutor {
   const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
   return async (state) => {
+    // Resolve declared secrets through the credential broker BEFORE
+    // touching the filesystem — an unresolvable credential is an
+    // error-edge-eligible failure, not a script failure.
+    const secretEnv: Record<string, string> = {};
+    const secrets = config.secrets;
+    if (secrets && Object.keys(secrets).length > 0) {
+      if (!deps.broker) {
+        return {
+          lastExit: {
+            nodeId,
+            kind: 'error',
+            errorName: 'AuthError',
+            errorMessage: 'script declares secrets but no credential broker is configured',
+          },
+        };
+      }
+      for (const [envName, ref] of Object.entries(secrets)) {
+        try {
+          secretEnv[envName] = await fetchCredential(deps.broker, ref.credentialId);
+        } catch (err) {
+          return {
+            lastExit: {
+              nodeId,
+              kind: 'error',
+              errorName: 'AuthError',
+              errorMessage: `failed to resolve secret ${envName}: ${(err as Error).message}`,
+            },
+          };
+        }
+      }
+    }
+
     let workdir: string | undefined;
     try {
       workdir = await mkdtemp(join(tmpdir(), `agentx-script-${nodeId}-`));
@@ -102,6 +142,9 @@ export function makeScriptExecutor(node: TaskStep): NodeExecutor {
       const env: NodeJS.ProcessEnv = {
         ...process.env,
         ...(config.env ?? {}),
+        // Resolved credentials win over same-named static env entries —
+        // a catalog's static env must never shadow a live credential.
+        ...secretEnv,
         // Per-job context. JSON-serialize the whole state so authors
         // can pluck fields without negotiating multiple stdin
         // streams. Strip very large fields if they exceed env-var

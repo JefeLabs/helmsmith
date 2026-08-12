@@ -16,6 +16,7 @@
  * interpreter self-skip when the binary isn't installed.
  */
 import { existsSync } from 'node:fs';
+import type { CredentialBroker } from '@helmsmith/agent-auth';
 import { describe, expect, it } from 'vitest';
 import type { TaskStep } from './catalog.ts';
 import type { FlowStateT } from './flow-graph.ts';
@@ -41,7 +42,11 @@ function scriptStep(
   id: string,
   language: 'bash' | 'node' | 'python',
   source: string,
-  extra: { env?: Record<string, string>; timeoutMs?: number } = {},
+  extra: {
+    env?: Record<string, string>;
+    timeoutMs?: number;
+    secrets?: Record<string, { credentialId: string }>;
+  } = {},
 ): TaskStep {
   return {
     id,
@@ -50,8 +55,53 @@ function scriptStep(
   };
 }
 
+/** Broker stub: resolves every credential id to `sk-<id>`. */
+const STUB_BROKER = {
+  getCredential: async (id: string) => ({ apiKey: `sk-${id}` }),
+} as unknown as CredentialBroker;
+
 const HAS_PYTHON =
   existsSync('/usr/bin/python3') || existsSync('/usr/local/bin/python3');
+
+// ─── secrets ──────────────────────────────────────────────────────────────
+
+describe('makeScriptExecutor: secrets', () => {
+  it('resolves declared secrets into the child env, winning over static env', async () => {
+    const exec = makeScriptExecutor(
+      scriptStep('s', 'bash', 'printf "%s" "$API_KEY"', {
+        env: { API_KEY: 'static-should-lose' },
+        secrets: { API_KEY: { credentialId: 'anthropic' } },
+      }),
+      { broker: STUB_BROKER },
+    );
+    const delta = await exec(freshState());
+    expect(delta.lastExit).toMatchObject({ kind: 'success' });
+    expect(delta.output).toBe('sk-anthropic');
+  });
+
+  it('errors with AuthError when secrets are declared but no broker is wired', async () => {
+    const exec = makeScriptExecutor(
+      scriptStep('s', 'bash', 'true', { secrets: { API_KEY: { credentialId: 'anthropic' } } }),
+    );
+    const delta = await exec(freshState());
+    expect(delta.lastExit).toMatchObject({ kind: 'error', errorName: 'AuthError' });
+  });
+
+  it('errors with AuthError when the broker rejects a credential id', async () => {
+    const failing = {
+      getCredential: async () => {
+        throw new Error('unknown provider');
+      },
+    } as unknown as CredentialBroker;
+    const exec = makeScriptExecutor(
+      scriptStep('s', 'bash', 'true', { secrets: { API_KEY: { credentialId: 'nope' } } }),
+      { broker: failing },
+    );
+    const delta = await exec(freshState());
+    expect(delta.lastExit).toMatchObject({ kind: 'error', errorName: 'AuthError' });
+    expect(delta.lastExit?.errorMessage).toContain('API_KEY');
+  });
+});
 
 // ─── bash ─────────────────────────────────────────────────────────────────
 
