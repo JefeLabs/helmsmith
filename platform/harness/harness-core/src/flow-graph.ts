@@ -4,9 +4,11 @@
  * Bridge between the static FlowDef catalog (nodes + edges + tags) and
  * an executable graph. Public surface:
  *
- *   - FlowState           — StateGraph schema (jobId, output, messages,
- *                           attempts, lastExit, rejectionPayload,
- *                           steering, cancelRequested, changedFiles).
+ *   - FlowState           — StateGraph schema (jobId, input, output,
+ *                           nodes, messages, attempts, lastExit,
+ *                           rejectionPayload, steering, cancelRequested,
+ *                           changedFiles). Compile-time-asserted against
+ *                           flow-spec's FlowRunState wire contract.
  *   - compileFlow         — FlowDef + per-node executor map → compiled
  *                           StateGraph with checkpointer attached.
  *   - buildRouter         — outgoing edges → ConditionalEdgeRouter
@@ -38,7 +40,15 @@
 
 import { readdir } from 'node:fs/promises';
 import { join as pathJoin } from 'node:path';
-import { evalExpression, resolveExpressionValue } from '@helmsmith/flow-spec';
+import {
+  type ApprovalRequest,
+  type ApprovalResume,
+  evalExpression,
+  type FlowRunState,
+  type NodeExit,
+  resolveExpressionValue,
+  type SuspendRequest,
+} from '@helmsmith/flow-spec';
 import {
   Annotation,
   type BaseCheckpointSaver,
@@ -63,18 +73,10 @@ import type { ChangedFile } from './changed-files.ts';
 
 export { evalExpression };
 
-/**
- * Per-node exit signal. Drives error/fallback/reject routing in the
- * conditional-edge router. Set by every node executor; the router reads it
- * to choose the next node id.
- */
-export interface NodeExit {
-  nodeId: string;
-  kind: 'success' | 'error' | 'reject';
-  /** Set when kind === 'error'. */
-  errorName?: string;
-  errorMessage?: string;
-}
+// Run-side wire shapes moved to @helmsmith/flow-spec (the spec owns the
+// run contract, not just the definition contract). Re-exported here so
+// existing harness-core consumers keep their import paths.
+export type { ApprovalRequest, ApprovalResume, NodeExit, SuspendRequest };
 
 /**
  * StateGraph state schema for compiled flows. Uses Annotation.Root to
@@ -88,10 +90,26 @@ export const FlowState = Annotation.Root({
    *  executors via the deps map (not the state itself), but kept here
    *  for diagnostic prints + future per-event tagging. */
   jobId: Annotation<string>,
+  /** Job/trigger payload. Write-once: seeded by the initial invoke,
+   *  later writes are ignored so nodes can never clobber the flow's
+   *  input. jsonpath surface: `$.input`. */
+  input: Annotation<unknown>({
+    reducer: (current, incoming) => (current === null ? incoming : current),
+    default: () => null,
+  }),
   /** Accumulating text output. Each successful agent step writes here;
    *  the next step reads it as the user prompt. Equivalent to the old
    *  orchestrator's `priorOutput` local. */
   output: Annotation<string>,
+  /** Per-node outputs, keyed by node id — written by the withNodeIO
+   *  wrapper after every successful node that produced output. Merge-
+   *  reducer so parallel branches never clobber. jsonpath surface:
+   *  `$.nodes.<id>` (parsed JSON when the node declares output.kind
+   *  'json', the raw output string otherwise). */
+  nodes: Annotation<Record<string, unknown>>({
+    reducer: (acc, partial) => ({ ...acc, ...partial }),
+    default: () => ({}),
+  }),
   /** Append-only message log. Future use: structured chat history for
    *  agents that work better with full message turns vs raw text. The
    *  reducer concatenates so parallel branches don't clobber. */
@@ -180,6 +198,13 @@ export const FlowState = Annotation.Root({
 
 export type FlowStateT = typeof FlowState.State;
 
+// Compile-time proof that the runtime state satisfies the spec's
+// FlowRunState wire contract. If a channel drifts (name or type), this
+// stops compiling — the honest seam between spec and runtime.
+type _RunStateCheck = FlowStateT extends FlowRunState ? true : never;
+const _runStateCheck: _RunStateCheck = true;
+void _runStateCheck;
+
 /**
  * Per-node executor function. Receives the current flow state and returns
  * a partial-state delta. Should NEVER throw under normal flow conditions
@@ -203,73 +228,6 @@ export interface CompileFlowOptions {
    *  tag. Caller can pass a Postgres/SQLite saver to make awaiting-
    *  approval / suspended jobs survive process restarts. */
   checkpointer?: BaseCheckpointSaver;
-}
-
-/**
- * Payload surfaced via LangGraph's interrupt() when an Approval-tagged
- * node pauses for review. The reviewer (or harness-server's HITL UI)
- * inspects this, decides approve/reject, and resumes via
- * `Command({ resume: ApprovalResume })`.
- */
-export interface ApprovalRequest {
-  /** Discriminator — distinguishes approval from suspend interrupts. */
-  kind: 'approval';
-  /** The original (untagged) node id whose output is being reviewed.
-   *  The synthetic approval node has id `${nodeId}__approval`. */
-  nodeId: string;
-  /** Org role authorized to approve (from the ApprovalTag). */
-  assigneeRole: string;
-  /** Time-to-respond before the harness should auto-reject (caller's
-   *  responsibility to enforce; harness-core just surfaces the value). */
-  slaMs: number;
-  /** Optional structured input schema the reviewer fills in. */
-  steeringInputs?: ApprovalTag['steeringInputs'];
-  /** The output text the reviewer is approving — pulled from
-   *  `state.output` at interrupt time. */
-  content: string;
-  /** 1-indexed attempt counter — increments each time the gate runs. */
-  attempt: number;
-  /** Staged file changes the reviewer can inspect — pulled from
-   *  `state.changedFiles` at interrupt time. Empty when no agent has
-   *  staged changes (or no product repos are wired). UI uses this to
-   *  render a sidebar of files for diff/content fetch. */
-  changes: ChangedFile[];
-  /** Gate 2b — URL of the pull request opened by an upstream
-   *  `publish` node (`push-and-open-pr`), when one ran before this
-   *  gate. Lets the HITL surface link straight to the PR. Absent for
-   *  flows that don't open a PR before review. */
-  prUrl?: string;
-  /** Gate 2b — short human-readable summary of the staged diff
-   *  (e.g. "3 files, +42 −7"), derived from `changes` at interrupt
-   *  time. The full per-file detail is in `changes`; this is the
-   *  one-liner the UI shows next to the PR link. */
-  diffSummary?: string;
-}
-
-export interface ApprovalResume {
-  decision: 'approve' | 'reject';
-  /** Reviewer-provided steering text (free-form) or structured fields
-   *  matching `steeringInputs`. Becomes the rejectionPayload.steering
-   *  on reject; ignored on approve. */
-  steering?: unknown;
-}
-
-/**
- * Payload surfaced when a Suspend-tagged node pauses. Caller (harness-
- * server) is responsible for scheduling the resume — timer-based via
- * setTimeout/cron, or event-based via subscription to the matched
- * eventType. Resume value is unused (Suspend has no decision; resume
- * is the "wake up" signal itself).
- */
-export interface SuspendRequest {
-  kind: 'suspend';
-  nodeId: string;
-  trigger: SuspendTag['trigger'];
-  /** Staged file changes pending review while the job is suspended.
-   *  Same surface as ApprovalRequest.changes — operators inspecting a
-   *  long-running suspend (e.g., overnight timer) can preview what
-   *  the agent did before it paused. */
-  changes: ChangedFile[];
 }
 
 /**
@@ -319,7 +277,7 @@ export function compileFlow(opts: CompileFlowOptions) {
         : isSyntheticSuspendNode(node)
           ? makeSuspendExecutor(node)
           : (executors.get(node.id) ?? builtinExecutor(node) ?? defaultExecutor(node.id));
-    const wrapped = wrapWithTags(node, baseExec);
+    const wrapped = withNodeIO(node, wrapWithTags(node, withInputMapping(node, baseExec)));
     builder.addNode(node.id, wrapped);
   }
 
@@ -377,7 +335,7 @@ export function buildRouter(nodeId: string, out: readonly Edge[]): (state: FlowS
     (e): e is Extract<Edge, { type: 'conditional' }> => e.type === 'conditional',
   );
   const fb = out.find((e) => e.type === 'fallback');
-  const err = out.find((e) => e.type === 'error');
+  const errs = out.filter((e): e is Extract<Edge, { type: 'error' }> => e.type === 'error');
   const rej = out.find((e): e is Extract<Edge, { type: 'reject' }> => e.type === 'reject');
 
   return (state: FlowStateT): string => {
@@ -397,7 +355,14 @@ export function buildRouter(nodeId: string, out: readonly Edge[]): (state: FlowS
     }
 
     if (exit?.kind === 'error') {
-      if (err) return err.to;
+      // Named matchers first (first declared match wins), catch-all
+      // (no/empty `on`) as fallback. Validator guarantees ≤1 catch-all.
+      const name = exit.errorName;
+      const named = name
+        ? errs.find((e) => e.on !== undefined && e.on.length > 0 && e.on.includes(name))
+        : undefined;
+      const target = named ?? errs.find((e) => e.on === undefined || e.on.length === 0);
+      if (target) return target.to;
       throw new Error(
         `unhandled error at node "${nodeId}": ${exit.errorMessage ?? exit.errorName ?? 'unknown'}`,
       );
@@ -566,6 +531,77 @@ export function makeTransformExecutor(node: TaskStep): NodeExecutor {
 function wrapWithTags(step: TaskStep, exec: NodeExecutor): NodeExecutor {
   if (!step.tags?.loop) return exec;
   return loopWrapper(step.id, step.tags.loop, exec);
+}
+
+/**
+ * Innermost node wrapper: when the step declares `input`, resolve the
+ * mapping against current state and hand the node an effective
+ * `state.output` built from it — a single Expression resolves to its
+ * value (strings pass through raw; other values JSON-serialize), a
+ * Record resolves each field and serializes the object as JSON. This is
+ * how a node consumes MORE than the previous node's output: `$.input`,
+ * `$.nodes.<id>`, `$.rejectionPayload`, … Runs inside the Loop wrapper
+ * so a looped node's mapping sees the per-item state ($.output is the
+ * current item).
+ */
+function withInputMapping(step: TaskStep, exec: NodeExecutor): NodeExecutor {
+  const mapping = step.input;
+  if (mapping === undefined) return exec;
+  return async (state) => {
+    const resolved = resolveInputMapping(mapping, state);
+    const effective = typeof resolved === 'string' ? resolved : (JSON.stringify(resolved) ?? '');
+    return exec({ ...state, output: effective });
+  };
+}
+
+function resolveInputMapping(
+  mapping: Expression | Readonly<Record<string, Expression>>,
+  state: unknown,
+): unknown {
+  // A string `kind` field marks the single-Expression form (the
+  // validator rejects mapping keys named "kind" for this reason).
+  if (typeof (mapping as { kind?: unknown }).kind === 'string') {
+    return resolveExpressionValue(mapping as Expression, state);
+  }
+  const out: Record<string, unknown> = {};
+  for (const [k, sub] of Object.entries(mapping as Record<string, Expression>)) {
+    out[k] = resolveExpressionValue(sub, state);
+  }
+  return out;
+}
+
+/**
+ * Outermost node wrapper: records the node's output into the
+ * `state.nodes` map (after Loop aggregation, so a looped node records
+ * its aggregate). When the step declares `output.kind: 'json'`, the
+ * output string is parsed and the PARSED value is recorded — this is
+ * what makes `$.nodes.<id>.<field>` routable in gates and conditional
+ * edges. Parse failure converts the exit to errorName
+ * 'OutputParseError' so the flow can route around it via an error edge
+ * (the raw output is kept on `state.output` for debugging).
+ */
+function withNodeIO(step: TaskStep, exec: NodeExecutor): NodeExecutor {
+  const nodeId = step.id;
+  const wantsJson = step.output?.kind === 'json';
+  return async (state) => {
+    const delta = await exec(state);
+    if (delta.output === undefined) return delta;
+    if (delta.lastExit && delta.lastExit.kind !== 'success') return delta;
+    if (!wantsJson) return { ...delta, nodes: { [nodeId]: delta.output } };
+    try {
+      return { ...delta, nodes: { [nodeId]: JSON.parse(delta.output) } };
+    } catch (err) {
+      return {
+        ...delta,
+        lastExit: {
+          nodeId,
+          kind: 'error',
+          errorName: 'OutputParseError',
+          errorMessage: `declared output.kind 'json' but output is not valid JSON: ${(err as Error).message}`,
+        },
+      };
+    }
+  };
 }
 
 // ─── Topology rewriter (Approval + Suspend tags) ──────────────────────────

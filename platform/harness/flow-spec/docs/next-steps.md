@@ -1,8 +1,8 @@
 # Flow Spec — Suggested Next Steps
 
-**Date:** 2026-08-07 · Companion docs: [`SPEC.md`](../SPEC.md) · [`steps-and-edges.md`](./steps-and-edges.md) · [`critical-feedback.md`](./critical-feedback.md)
+**Date:** 2026-08-07 · **Updated:** 2026-08-12 · Companion docs: [`SPEC.md`](../SPEC.md) · [`steps-and-edges.md`](./steps-and-edges.md) · [`critical-feedback.md`](./critical-feedback.md)
 
-A sequenced roadmap merging the original review's recommendations with the package-level items, minus what's already done (honesty seam, semantics pinning, extraction itself). Effort: **S** ≤ half a day · **M** 1–3 days · **L** a real slice.
+A sequenced roadmap merging the original review's recommendations with the package-level items, minus what's already done (honesty seam, semantics pinning, extraction itself; **2026-08-12:** the data-plane slice — `FlowRunState` + `$.input`/`$.nodes` channels, node `input` mappings, `output.kind: 'json'` parsing, error-edge `on` matchers, expression additions (`exists`/`object`/`array`/string ops), script `secrets`, flow/subflow `version`, run-side wire shapes, and item 0.3 below). Effort: **S** ≤ half a day · **M** 1–3 days · **L** a real slice.
 
 ```mermaid
 flowchart LR
@@ -17,7 +17,7 @@ flowchart LR
 |---|---|---|---|
 | 0.1 | **Curate the export surface** — named exports in flow-spec's `index.ts` and harness-core's `catalog.ts` re-export; decide `ToolResolver`/`walkAgents`/`resolveAccepts` placement while at it | S | Every day of `export *` grows the accidental API; cheapest while the package is hours old |
 | 0.2 | **Narrow `scanForJsExpressions` to known expression positions** (edge conditions, gate assertions, transform expressions, loop paths, matchers, tool args) | S | Kills the false-positive class while the scan is fresh; keeps `where` paths pointing at real expressions |
-| 0.3 | **Add the `test` script** to flow-spec's package.json | S | One line; makes the contract's own suite unskippable by `pnpm -r test` |
+| 0.3 | ~~**Add the `test` script** to flow-spec's package.json~~ | S | ✅ Done 2026-08-12 (data-plane slice) |
 
 ## Phase 1 — Harden the contract (before any second consumer)
 
@@ -36,9 +36,11 @@ Ordered by risk-reduction per effort. The rule from the README applies to every 
 | 2.1 | **Approval hardening: `slaMs` auto-reject timer + role check on the resume route** | M | Smallest change with the largest governance payoff; currently any socket-access caller can approve anything, forever |
 | 2.2 | **Durable checkpointer by default** (SQLite file per workspace; PG in production) | M | Awaiting-approval/suspended jobs must survive restarts for HITL to be trustworthy |
 | 2.3 | **`policy.retry` (+ backoff), then `policy.timeout`, then `onError`** | M | The most-wanted reliability primitive; per-node timeout wraps executor calls; `onError:'continue'` last (it changes routing semantics) |
-| 2.4 | **Decide parallelism** — either implement fan-out/join (LangGraph supports multi-target routing; the state reducers already exist; `joinStrategy` becomes real) or delete `joinStrategy` and validate ≤1 sequence edge | L / S | The half-state is the worst state. Note: the S option (delete) is legitimate — it shrinks the spec to the truth |
-| 2.5 | **Enforce output contracts at the terminal node** — parse `job-intent`, validate `structured.schema` | M | The factory/fleet seam needs teeth before smithagents depends on it |
+| 2.4 | **Decide parallelism** — either implement fan-out/join (LangGraph supports multi-target routing; `joinStrategy` becomes real) or delete `joinStrategy` and validate ≤1 sequence edge | L / S | The half-state is the worst state. **2026-08-12 note: the state-model prerequisite now exists** — `nodes` is merge-reduced and `output` is documented as legacy, so branches can no longer clobber each other's addressable outputs; what remains is genuinely just the router/join work |
+| 2.5 | **Enforce output contracts at the terminal node** — parse `job-intent`, validate `structured.schema` | M | The factory/fleet seam needs teeth before smithagents depends on it. Node-level `output.kind: 'json'` parsing (done) is the machinery to reuse |
 | 2.6 | **Suspend wake-up scheduling** (timer via job queue; event via bus subscription) | M | Makes `suspend` a real durability primitive instead of a pause-forever |
+| 2.7 | **Enforce `node-output-schema`** — validate declared schemas against parsed node output (needs a browser-safe JSON-Schema subset or a generated-validator approach; zero-dep constraint applies) | M | Deletes the `node-output-schema` report; turns agent output contracts from parse-only into shape-checked |
+| 2.8 | **Consult `effect` on replay/retry** — skip re-running `side-effecting` nodes on checkpointer replay; require idempotency keys for publish | M | Must land WITH or BEFORE 2.2 (durable checkpointer): replay + `push-and-open-pr` without it = duplicate PRs. Deletes the `effect` report |
 
 ## Phase 3 — Platform payoffs (the reasons the package exists)
 

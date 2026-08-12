@@ -161,6 +161,34 @@ export interface TaskStep {
     | SubflowConfig
     | TriggerConfig
     | PublishConfig;
+  /**
+   * Input mapping — how this node composes its effective input from
+   * run state, instead of implicitly consuming the previous node's
+   * `output` string. Two forms:
+   *
+   *   - A single Expression: resolves to the effective input. Strings
+   *     pass through raw; other values are JSON-serialized.
+   *   - A Record mapping name → Expression: each field resolves against
+   *     state and the whole object is JSON-serialized. This is how a
+   *     node consumes MORE than one upstream value: `$.input`,
+   *     `$.nodes.<id>`, `$.rejectionPayload`, …
+   *
+   * The single-Expression form is detected by a string `kind` field,
+   * so mapping keys must not be named `kind`.
+   *
+   * Omitted → legacy behavior: the node reads `state.output` as-is.
+   */
+  input?: Expression | Readonly<Record<string, Expression>>;
+  /** Per-node output contract. `json` → the runtime parses the node's
+   *  output into `state.nodes[id]` (parse failure exits with errorName
+   *  'OutputParseError', routable via an error edge). Omitted / `text`
+   *  → `state.nodes[id]` holds the raw output string. */
+  output?: NodeOutputContract;
+  /** Side-effect classification. Declarative for now (reported via
+   *  onUnsupported): the runtime does not yet consult it when deciding
+   *  whether a node is safe to re-run on replay/retry. Publish-family
+   *  nodes are inherently 'side-effecting'. */
+  effect?: 'pure' | 'idempotent' | 'side-effecting';
   /** Behavioral modifier tags. Multiple allowed; render order is
    *  Loop top-left, Approval/Suspend top-right. Approval and Suspend
    *  are mutually exclusive on the same node. */
@@ -172,6 +200,16 @@ export interface TaskStep {
   /** Set on nodes with no outgoing edges. Defaults to 'success'. */
   terminal?: 'success' | 'fail';
 }
+
+/**
+ * Per-node output contract (distinct from the flow-level
+ * FlowOutputContract, which governs the terminal node's emission).
+ * `json` makes the node's output addressable as structured data at
+ * `$.nodes.<id>` — the enabling contract for gates and conditional
+ * edges over agent results. `schema` is declared-but-not-enforced
+ * (reported via onUnsupported as 'node-output-schema').
+ */
+export type NodeOutputContract = { kind: 'text' } | { kind: 'json'; schema?: unknown };
 
 // ─── Per-kind configs ────────────────────────────────────────────────────
 
@@ -333,6 +371,12 @@ export interface ScriptConfig {
   language: 'bash' | 'node' | 'python';
   source: string;
   env?: Record<string, string>;
+  /** Credential references resolved through the CredentialBroker at
+   *  dispatch time and injected as environment variables — the same
+   *  auth surface tools use, so secrets never appear literally in
+   *  catalogs. Keys are env var names; resolved values win over any
+   *  same-named `env` entry. */
+  secrets?: Readonly<Record<string, { credentialId: string }>>;
   /** Hard timeout for the script run. Default 30s. SIGTERM on expiry,
    *  SIGKILL after a short grace period if the child ignores SIGTERM. */
   timeoutMs?: number;
@@ -360,6 +404,11 @@ export interface Assertion {
  *  sub-flow terminates; sub-flow output flows in as this node's output. */
 export interface SubflowConfig {
   flowId: string;
+  /** Optional version pin against the target flow's `version`.
+   *  Recorded but not enforced yet — subflows resolve by flowId in the
+   *  loaded catalog (reported via onUnsupported as
+   *  'subflow-version-pin'). */
+  version?: string;
   input?: Record<string, unknown>;
 }
 
@@ -527,6 +576,16 @@ export interface ErrorEdge {
   from: string;
   to: string;
   type: 'error';
+  /** Optional list of `NodeExit.errorName` values this edge handles
+   *  (e.g. ['Timeout', 'RateLimitError', 'OutputParseError']). Omitted
+   *  (or empty) → catch-all. A source node may declare any number of
+   *  named error edges plus at most ONE catch-all; on an error exit the
+   *  router picks the first declared edge whose `on` contains the
+   *  errorName, falling back to the catch-all. Names are free-form —
+   *  they match whatever the executors emit (AdapterError subclass
+   *  names, 'UnknownTool', 'Timeout', …), which is runtime vocabulary
+   *  the spec cannot close over. */
+  on?: readonly string[];
 }
 
 /** Emitted only by Approval-tagged nodes and `kind: 'gate'` nodes when
@@ -566,10 +625,29 @@ export interface RejectionPayload {
  *   in       — membership: rhs MUST resolve to an array; predicate is
  *              true iff lhs (raw value) is found via Array.includes
  *              (SameValueZero — NaN self-matches, a runtime-state-only
- *              case since JSON cannot encode NaN). For "string contains
- *              substring" use a `tool` or `transform` step; this op is
- *              collection-only. */
-export type CompareOp = '==' | '!=' | '<' | '<=' | '>' | '>=' | 'in';
+ *              case since JSON cannot encode NaN). This op is
+ *              collection-only; string containment is `contains`.
+ *   contains / startsWith / endsWith — string ops: both sides must
+ *              resolve to strings, else false (no coercion, mirroring
+ *              `in`'s strictness).
+ *   matches  — regex test: both sides must resolve to strings; rhs is
+ *              compiled via `new RegExp(rhs)` (no flags) and tested
+ *              against lhs. An invalid pattern evaluates to false —
+ *              the evaluator never throws on bad data. When rhs is a
+ *              string literal, the validator additionally rejects
+ *              invalid patterns at load time. */
+export type CompareOp =
+  | '=='
+  | '!='
+  | '<'
+  | '<='
+  | '>'
+  | '>='
+  | 'in'
+  | 'contains'
+  | 'startsWith'
+  | 'endsWith'
+  | 'matches';
 
 /** Generic expression evaluated by the runtime. Tagged-union over evaluators
  *  so we can grow the language additively.
@@ -596,7 +674,20 @@ export type Expression =
   /** Logical OR over a list of expressions. Short-circuits. */
   | { kind: 'any'; exprs: readonly Expression[] }
   /** Logical NOT of a single expression. */
-  | { kind: 'not'; expr: Expression };
+  | { kind: 'not'; expr: Expression }
+  /** Presence check: true iff the inner expression resolves to a value
+   *  other than `undefined`. `null` EXISTS (it is a present JSON value);
+   *  only a missing path does not. This is the escape hatch from
+   *  truthiness — `false`, `0`, and `""` all exist. */
+  | { kind: 'exists'; expr: Expression }
+  /** Object constructor: each field resolved via resolveExpressionValue.
+   *  As a predicate it is always true (containers are truthy). This is
+   *  how `transform` steps and `input` mappings shape structured data
+   *  from multiple state fields. */
+  | { kind: 'object'; fields: Readonly<Record<string, Expression>> }
+  /** Array constructor: each item resolved via resolveExpressionValue.
+   *  As a predicate it is always true. */
+  | { kind: 'array'; items: readonly Expression[] };
 
 // ─── FlowOutputContract (drives JobIntent emission semantics) ────────────
 
@@ -634,6 +725,10 @@ export interface JobIntent {
 
 export interface FlowDef {
   id: string;
+  /** Optional version identity (free-form, semver recommended). Gives
+   *  durable checkpoints and subflow pins something stable to name;
+   *  uniqueness is still keyed on `id` alone within a catalog. */
+  version?: string;
   description?: string;
   /**
    * Flow kind discriminator. Default 'work'.
@@ -790,4 +885,150 @@ export function findFlow(catalog: FlowCatalog, id: string): FlowDef | undefined 
 
 export function findProduct(catalog: Catalog, id: string): ProductDef | undefined {
   return catalog.products?.find((p) => p.id === id);
+}
+
+// ─── Run-side wire shapes ────────────────────────────────────────────────
+//
+// The DEFINITION shapes above describe what a flow is; the shapes below
+// describe what a flow RUN looks like on the wire — the state surface
+// expressions bind against, the per-node exit signal routing reads, and
+// the HITL request/resume payloads a reviewer UI exchanges with the
+// runtime. They live in the spec because every consumer that previews,
+// monitors, or approves a run must agree on them with the runtime —
+// exactly the same argument as the expression evaluator.
+
+/**
+ * Per-node exit signal. Drives error/fallback/reject routing in the
+ * conditional-edge router. Set by every node executor; the router reads
+ * it to choose the next node id. jsonpath surface: `$.lastExit`.
+ */
+export interface NodeExit {
+  nodeId: string;
+  kind: 'success' | 'error' | 'reject';
+  /** Set when kind === 'error'. Matched by `ErrorEdge.on`. */
+  errorName?: string;
+  errorMessage?: string;
+}
+
+/**
+ * One staged change in a product repo. Populated into `state.changedFiles`
+ * before HITL interrupts; surfaced to reviewers via ApprovalRequest +
+ * the harness-server file routes.
+ *
+ * The `id` is stable for the same `(repo, path)` within a job — UI
+ * components can use it as a React key, content-cache identifier, etc.
+ * Renames produce ONE entry with the new path + `previousPath` filled
+ * in (matches `git diff --name-status -z` rename rows).
+ */
+export interface ChangedFile {
+  /** Stable id: `${repo}::${path}`. Suitable for URL paths after
+   *  encodeURIComponent. */
+  id: string;
+  /** Repo name (matches an entry from `productRepos` on the JobRecord). */
+  repo: string;
+  /** Path within the repo (slash-separated, no leading slash). */
+  path: string;
+  /** Basename of `path` — for UI display. */
+  filename: string;
+  /** What kind of change this is. Mirrors git's name-status codes
+   *  collapsed to readable form. */
+  changeKind: 'added' | 'modified' | 'deleted' | 'renamed' | 'copied' | 'type-changed';
+  /** Raw git status code (e.g., 'M', 'A', 'D', 'R100'). Preserved for
+   *  clients that want git-native semantics. */
+  statusCode: string;
+  /** For renames/copies, the prior path. Undefined otherwise. */
+  previousPath?: string;
+  /** MIME type guessed from the file extension. Hint for UI rendering;
+   *  not authoritative — clients may sniff content if needed. */
+  mimeType: string;
+}
+
+/**
+ * The routable run-state surface — the shape jsonpath expressions bind
+ * against at runtime. This is the data-plane half of the contract: edge
+ * conditions, gate assertions, loop paths, tool args, and node input
+ * mappings all resolve against a value of this shape. harness-core's
+ * FlowState channels must remain structurally assignable to this
+ * (compile-time-asserted there).
+ */
+export interface FlowRunState {
+  jobId: string;
+  /** Job/trigger payload. Seeded once at start; never overwritten by
+   *  nodes. jsonpath surface: `$.input`. */
+  input: unknown;
+  /** Latest text output (legacy single channel; last-write-wins). Each
+   *  successful node writes here; the next node reads it as its default
+   *  input. jsonpath surface: `$.output`. */
+  output: string;
+  /** Per-node outputs, keyed by node id. Structured (parsed JSON) when
+   *  the node declares `output.kind: 'json'`; the raw output string
+   *  otherwise. jsonpath surface: `$.nodes.<id>`. */
+  nodes: Record<string, unknown>;
+  /** Append-only message log (reducer-merged; safe under parallelism). */
+  messages: unknown[];
+  /** Per-node attempt counter (reject-edge cycles increment). */
+  attempts: Record<string, number>;
+  lastExit: NodeExit | null;
+  rejectionPayload: RejectionPayload | null;
+  /** Operator steering — append-only. */
+  steering: string[];
+  cancelRequested: boolean;
+  cancelReason: string | null;
+  changedFiles: ChangedFile[];
+}
+
+/**
+ * Payload surfaced when an Approval-tagged node pauses for review. The
+ * reviewer (or harness-server's HITL UI) inspects this, decides
+ * approve/reject, and resumes with an `ApprovalResume`.
+ */
+export interface ApprovalRequest {
+  /** Discriminator — distinguishes approval from suspend interrupts. */
+  kind: 'approval';
+  /** The original (untagged) node id whose output is being reviewed. */
+  nodeId: string;
+  /** Org role authorized to approve (from the ApprovalTag). */
+  assigneeRole: string;
+  /** Time-to-respond before the harness should auto-reject (caller's
+   *  responsibility to enforce; the runtime surfaces the value). */
+  slaMs: number;
+  /** Optional structured input schema the reviewer fills in. */
+  steeringInputs?: ApprovalTag['steeringInputs'];
+  /** The output text the reviewer is approving — pulled from
+   *  `state.output` at interrupt time. */
+  content: string;
+  /** 1-indexed attempt counter — increments each time the gate runs. */
+  attempt: number;
+  /** Staged file changes the reviewer can inspect. Empty when no agent
+   *  has staged changes (or no product repos are wired). */
+  changes: ChangedFile[];
+  /** URL of the pull request opened by an upstream `publish` node
+   *  (`push-and-open-pr`), when one ran before this gate. */
+  prUrl?: string;
+  /** Short human-readable summary of the staged diff (e.g. "3 files,
+   *  +42 −7"), derived from `changes` at interrupt time. */
+  diffSummary?: string;
+}
+
+/** Reviewer's answer to an ApprovalRequest. */
+export interface ApprovalResume {
+  decision: 'approve' | 'reject';
+  /** Reviewer-provided steering text (free-form) or structured fields
+   *  matching `steeringInputs`. Becomes the rejectionPayload.steering
+   *  on reject; appended to `state.steering` on approve. */
+  steering?: unknown;
+}
+
+/**
+ * Payload surfaced when a Suspend-tagged node pauses. The caller is
+ * responsible for scheduling the resume — timer-based or event-based.
+ * The resume value is unused (suspend has no decision; resume is the
+ * "wake up" signal itself).
+ */
+export interface SuspendRequest {
+  kind: 'suspend';
+  nodeId: string;
+  trigger: SuspendTag['trigger'];
+  /** Staged file changes pending review while the job is suspended. */
+  changes: ChangedFile[];
 }

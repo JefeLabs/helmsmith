@@ -25,9 +25,13 @@ import {
  *
  * Current feature ids: `policy`, `joinStrategy`, `terminal-fail`,
  * `trigger-<kind>` (any non-manual trigger), `expression-js`,
- * `parallel-fan-out` (second+ sequence edge from one node). Remove an
- * id from `reportUnsupportedFeatures` in the same change that makes
- * the runtime execute it — the reporting list IS the honest coverage
+ * `parallel-fan-out` (second+ sequence edge from one node),
+ * `node-output-schema` (output.kind 'json' declares a schema — parse
+ * happens, schema enforcement doesn't), `effect` (classification
+ * recorded, not consulted on replay/retry), `subflow-version-pin`
+ * (version recorded, resolution stays by flowId). Remove an id from
+ * `reportUnsupportedFeatures` in the same change that makes the
+ * runtime execute it — the reporting list IS the honest coverage
  * boundary.
  */
 export interface UnsupportedFeature {
@@ -82,6 +86,9 @@ function validateFlow(
   const flow = value as Record<string, unknown>;
   if (typeof flow.id !== 'string' || !flow.id) {
     throw new CatalogError(`${where}.id must be a non-empty string`);
+  }
+  if (flow.version !== undefined && (typeof flow.version !== 'string' || !flow.version)) {
+    throw new CatalogError(`${where}.version must be a non-empty string when present`);
   }
 
   // kind discriminator (optional, default 'work')
@@ -142,6 +149,7 @@ function validateFlow(
   // Validate each edge + cardinality rules + referential integrity
   const outgoingByType = new Map<string, Map<string, number>>(); // from → (type → count)
   const incomingCount = new Map<string, number>();
+  const errorCatchAllBySource = new Map<string, number>();
   for (const [j, e] of (flow.edges as unknown[]).entries()) {
     const edgeWhere = `${where}.edges[${j}]`;
     validateEdge(e, edgeWhere);
@@ -157,9 +165,20 @@ function validateFlow(
     outgoingByType.set(edge.from as string, fromMap);
     incomingCount.set(edge.to as string, (incomingCount.get(edge.to as string) ?? 0) + 1);
 
-    // Edge-cardinality rules
-    if (edge.type === 'error' && (fromMap.get('error') ?? 0) > 1) {
-      throw new CatalogError(`${edgeWhere}: at most one 'error' edge allowed per source node`);
+    // Edge-cardinality rules. Error edges: any number of named ones
+    // (`on` matchers), at most one catch-all (no/empty `on`) — the
+    // router falls back to the catch-all when no matcher hits.
+    if (edge.type === 'error') {
+      const on = edge.on as unknown[] | undefined;
+      if (on === undefined || on.length === 0) {
+        const n = (errorCatchAllBySource.get(edge.from as string) ?? 0) + 1;
+        errorCatchAllBySource.set(edge.from as string, n);
+        if (n > 1) {
+          throw new CatalogError(
+            `${edgeWhere}: at most one catch-all 'error' edge (no "on" list) allowed per source node`,
+          );
+        }
+      }
     }
     if (edge.type === 'fallback' && (fromMap.get('fallback') ?? 0) > 1) {
       throw new CatalogError(`${edgeWhere}: at most one 'fallback' edge allowed per source node`);
@@ -275,6 +294,31 @@ function reportUnsupportedFeatures(
           detail: 'no runtime fires this trigger; jobs start by manual submission',
         });
       }
+    }
+    const output = node.output as Record<string, unknown> | undefined;
+    if (output?.kind === 'json' && output.schema !== undefined) {
+      report({
+        where: `${at}.output.schema`,
+        feature: 'node-output-schema',
+        detail:
+          'JSON output is parsed into state.nodes, but the declared schema is not validated against it yet',
+      });
+    }
+    if (node.effect !== undefined) {
+      report({
+        where: at,
+        feature: 'effect',
+        detail:
+          'effect classification is recorded but the runtime does not yet consult it for replay/retry decisions',
+      });
+    }
+    if (node.kind === 'subflow' && (node.config as Record<string, unknown>).version !== undefined) {
+      report({
+        where: `${at}.config.version`,
+        feature: 'subflow-version-pin',
+        detail:
+          'subflows resolve by flowId in the loaded catalog; the version pin is recorded but not enforced',
+      });
     }
   }
 
@@ -436,6 +480,22 @@ function validateNode(value: unknown, where: string): void {
   }
   validateNodeConfig(node.kind, node.config, `${where}.config`);
 
+  if (node.input !== undefined) {
+    validateInputMapping(node.input, `${where}.input`);
+  }
+  if (node.output !== undefined) {
+    validateNodeOutputContract(node.output, `${where}.output`);
+  }
+  if (
+    node.effect !== undefined &&
+    node.effect !== 'pure' &&
+    node.effect !== 'idempotent' &&
+    node.effect !== 'side-effecting'
+  ) {
+    throw new CatalogError(
+      `${where}.effect must be 'pure', 'idempotent', or 'side-effecting' when present`,
+    );
+  }
   if (node.tags !== undefined) {
     validateTaskStepTags(node.tags, `${where}.tags`);
   }
@@ -447,6 +507,42 @@ function validateNode(value: unknown, where: string): void {
   }
   if (node.terminal !== undefined && node.terminal !== 'success' && node.terminal !== 'fail') {
     throw new CatalogError(`${where}.terminal must be 'success' or 'fail' when present`);
+  }
+}
+
+/**
+ * Validate `TaskStep.input` — either a single Expression (detected by a
+ * string `kind` field, which is why mapping keys must not be named
+ * "kind") or a non-empty Record of name → Expression.
+ */
+function validateInputMapping(value: unknown, where: string): void {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new CatalogError(`${where} must be an Expression or an object mapping name → Expression`);
+  }
+  const obj = value as Record<string, unknown>;
+  if (typeof obj.kind === 'string') {
+    validateExpression(obj, where);
+    return;
+  }
+  const keys = Object.keys(obj);
+  if (keys.length === 0) {
+    throw new CatalogError(`${where} must declare at least one entry`);
+  }
+  for (const key of keys) {
+    validateExpression(obj[key], `${where}.${key}`);
+  }
+}
+
+function validateNodeOutputContract(value: unknown, where: string): void {
+  if (!value || typeof value !== 'object') {
+    throw new CatalogError(`${where} must be an object`);
+  }
+  const o = value as Record<string, unknown>;
+  if (o.kind !== 'text' && o.kind !== 'json') {
+    throw new CatalogError(`${where}.kind must be 'text' or 'json' (got ${JSON.stringify(o.kind)})`);
+  }
+  if (o.kind === 'text' && o.schema !== undefined) {
+    throw new CatalogError(`${where}.schema is only allowed when kind is 'json'`);
   }
 }
 
@@ -475,6 +571,27 @@ function validateNodeConfig(kind: string, config: object, where: string): void {
       if (c.timeoutMs !== undefined && (typeof c.timeoutMs !== 'number' || c.timeoutMs <= 0)) {
         throw new CatalogError(`${where}.timeoutMs must be a positive number when present`);
       }
+      if (c.secrets !== undefined) {
+        if (!c.secrets || typeof c.secrets !== 'object' || Array.isArray(c.secrets)) {
+          throw new CatalogError(
+            `${where}.secrets must be an object mapping ENV_NAME → { credentialId }`,
+          );
+        }
+        for (const [envName, ref] of Object.entries(c.secrets as Record<string, unknown>)) {
+          if (!envName) {
+            throw new CatalogError(`${where}.secrets has an empty env var name`);
+          }
+          const credentialId =
+            ref && typeof ref === 'object'
+              ? (ref as Record<string, unknown>).credentialId
+              : undefined;
+          if (typeof credentialId !== 'string' || !credentialId) {
+            throw new CatalogError(
+              `${where}.secrets.${envName}.credentialId must be a non-empty string`,
+            );
+          }
+        }
+      }
       break;
     case 'transform':
       validateExpression(c.expression, `${where}.expression`);
@@ -497,6 +614,9 @@ function validateNodeConfig(kind: string, config: object, where: string): void {
     case 'subflow':
       if (typeof c.flowId !== 'string' || !c.flowId) {
         throw new CatalogError(`${where}.flowId must be a non-empty string`);
+      }
+      if (c.version !== undefined && (typeof c.version !== 'string' || !c.version)) {
+        throw new CatalogError(`${where}.version must be a non-empty string when present`);
       }
       break;
     case 'trigger':
@@ -711,7 +831,19 @@ function validateJoinStrategy(value: unknown, where: string): void {
   );
 }
 
-const VALID_COMPARE_OPS = new Set<CompareOp>(['==', '!=', '<', '<=', '>', '>=', 'in']);
+const VALID_COMPARE_OPS = new Set<CompareOp>([
+  '==',
+  '!=',
+  '<',
+  '<=',
+  '>',
+  '>=',
+  'in',
+  'contains',
+  'startsWith',
+  'endsWith',
+  'matches',
+]);
 
 function validateExpression(value: unknown, where: string): void {
   if (!value || typeof value !== 'object') {
@@ -740,6 +872,21 @@ function validateExpression(value: unknown, where: string): void {
       }
       validateExpression(e.lhs, `${where}.lhs`);
       validateExpression(e.rhs, `${where}.rhs`);
+      // Load-time regex check for `matches` with a literal pattern —
+      // the evaluator silently returns false on invalid patterns (it
+      // never throws on data), so reject statically knowable typos here.
+      if (e.op === 'matches') {
+        const rhs = e.rhs as Record<string, unknown> | undefined;
+        if (rhs && rhs.kind === 'literal' && typeof rhs.value === 'string') {
+          try {
+            new RegExp(rhs.value);
+          } catch (err) {
+            throw new CatalogError(
+              `${where}.rhs is not a valid regular expression: ${(err as Error).message}`,
+            );
+          }
+        }
+      }
       break;
     case 'all':
     case 'any':
@@ -755,11 +902,29 @@ function validateExpression(value: unknown, where: string): void {
       }
       break;
     case 'not':
+    case 'exists':
       validateExpression(e.expr, `${where}.expr`);
+      break;
+    case 'object': {
+      if (!e.fields || typeof e.fields !== 'object' || Array.isArray(e.fields)) {
+        throw new CatalogError(`${where}.fields must be an object of name → Expression`);
+      }
+      for (const [k, sub] of Object.entries(e.fields as Record<string, unknown>)) {
+        validateExpression(sub, `${where}.fields.${k}`);
+      }
+      break;
+    }
+    case 'array':
+      if (!Array.isArray(e.items)) {
+        throw new CatalogError(`${where}.items must be an array`);
+      }
+      for (const [i, sub] of (e.items as unknown[]).entries()) {
+        validateExpression(sub, `${where}.items[${i}]`);
+      }
       break;
     default:
       throw new CatalogError(
-        `${where}.kind must be one of: jsonpath, js, literal, compare, all, any, not (got ${JSON.stringify(e.kind)})`,
+        `${where}.kind must be one of: jsonpath, js, literal, compare, all, any, not, exists, object, array (got ${JSON.stringify(e.kind)})`,
       );
   }
 }
@@ -783,6 +948,16 @@ function validateEdge(value: unknown, where: string): void {
   }
   if (edge.type === 'conditional') {
     validateExpression(edge.condition, `${where}.condition`);
+  }
+  if (edge.type === 'error' && edge.on !== undefined) {
+    if (!Array.isArray(edge.on)) {
+      throw new CatalogError(`${where}.on must be an array of error names when present`);
+    }
+    for (const [k, name] of (edge.on as unknown[]).entries()) {
+      if (typeof name !== 'string' || !name) {
+        throw new CatalogError(`${where}.on[${k}] must be a non-empty string`);
+      }
+    }
   }
   if (edge.type === 'reject') {
     if (

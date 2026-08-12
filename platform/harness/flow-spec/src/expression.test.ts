@@ -84,3 +84,53 @@ describe('evalExpression', () => {
     ).toBe(true);
   });
 });
+
+describe('object / array constructors', () => {
+  it('object resolves each field against state', () => {
+    expect(
+      resolveExpressionValue(
+        {
+          kind: 'object',
+          fields: {
+            item: { kind: 'jsonpath', path: '$.repos.0' },
+            max: { kind: 'literal', value: 3 },
+          },
+        },
+        { repos: ['api'] },
+      ),
+    ).toEqual({ item: 'api', max: 3 });
+  });
+
+  it('array resolves each item against state', () => {
+    expect(
+      resolveExpressionValue(
+        {
+          kind: 'array',
+          items: [{ kind: 'jsonpath', path: '$.a' }, { kind: 'literal', value: 2 }],
+        },
+        { a: 1 },
+      ),
+    ).toEqual([1, 2]);
+  });
+
+  it('constructors are truthy as predicates', () => {
+    expect(evalExpression({ kind: 'object', fields: {} }, {})).toBe(true);
+    expect(evalExpression({ kind: 'array', items: [] }, {})).toBe(true);
+  });
+});
+
+describe('string compare ops', () => {
+  it('matches with an invalid pattern from state is false, never throws', () => {
+    expect(
+      evalExpression(
+        {
+          kind: 'compare',
+          lhs: { kind: 'literal', value: 'abc' },
+          op: 'matches',
+          rhs: { kind: 'jsonpath', path: '$.pat' },
+        },
+        { pat: '(' },
+      ),
+    ).toBe(false);
+  });
+});

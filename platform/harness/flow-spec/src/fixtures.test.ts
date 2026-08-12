@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EXPRESSION_CASES, evalExpression } from './index.ts';
+import { EXPRESSION_CASES, evalExpression, resolveExpressionValue } from './index.ts';
 
 describe('conformance fixtures', () => {
   it('ships at least 10 expression cases', () => {
@@ -13,6 +13,9 @@ describe('conformance fixtures', () => {
   for (const c of EXPRESSION_CASES) {
     it(`expression: ${c.name}`, () => {
       expect(evalExpression(c.expr, c.state)).toBe(c.expected);
+      if (c.expectedValue !== undefined) {
+        expect(resolveExpressionValue(c.expr, c.state)).toEqual(c.expectedValue);
+      }
     });
   }
 });

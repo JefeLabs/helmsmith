@@ -2,6 +2,8 @@
 
 The flow wire contract: **types + validation + expression semantics + conformance fixtures**. This package is the spec — the shape stored in controlplane's catalog tables, edited by the (future) flow designer, and executed by harness-core.
 
+The contract covers both halves of a flow: the **definition side** (nodes, edges, tags) and the **data plane** (`FlowRunState` — the run-state shape expressions bind against). Nodes address each other's outputs via `$.nodes.<id>` (structured when a node declares `output.kind: 'json'`), read the job payload via `$.input`, and compose multi-source inputs via `input` mappings; harness-core's state schema is compile-time-asserted against `FlowRunState`, so the two cannot silently drift.
+
 ## Hard constraints
 
 - **Browser-safe:** zero runtime dependencies, no `node:*` imports. Anything that touches fs/network/process belongs in harness-core or harness-server.
@@ -11,7 +13,7 @@ The flow wire contract: **types + validation + expression semantics + conformanc
 
 | Module | Contents |
 |---|---|
-| `types.ts` | `FlowDef`, `TaskStep`, `Edge`, `Expression`, tags/policy/output contracts, `ToolDef`, `JobIntent`, product/catalog shapes, plus the small helpers (`walkAgents`, `resolveAccepts`, `findFlow`, `findProduct`) |
+| `types.ts` | `FlowDef`, `TaskStep` (incl. `input`/`output`/`effect`), `Edge` (incl. `ErrorEdge.on`), `Expression`, tags/policy/output contracts, `ToolDef`, `JobIntent`, product/catalog shapes, run-side wire shapes (`FlowRunState`, `NodeExit`, `ChangedFile`, `ApprovalRequest`/`ApprovalResume`, `SuspendRequest`), plus the small helpers (`walkAgents`, `resolveAccepts`, `findFlow`, `findProduct`) |
 | `validate.ts` | `validateFlowCatalog` / `validateUnifiedCatalog` — fail-loud structural validation with path-prefixed `CatalogError`s, and the unsupported-feature reporting seam |
 | `expression.ts` | `evalExpression` / `resolveExpressionValue` / `resolveJsonPath`, typed against structural `unknown` state so a designer preview and the runtime router share one evaluator |
 | `fixtures.ts` | `EXPRESSION_CASES` — executable spec data replayed by this package's tests and by harness-core's `flow-spec-conformance.test.ts` |
@@ -34,6 +36,9 @@ Both validators accept `{ onUnsupported?: (f: UnsupportedFeature) => void }`. Th
 | `trigger-<kind>` | no runtime fires non-manual triggers |
 | `expression-js` | the evaluator throws on `js` expressions |
 | `parallel-fan-out` | only the first sequence edge from a node is followed |
+| `node-output-schema` | `output.kind: 'json'` is parsed into `state.nodes`, but the declared schema is not validated |
+| `effect` | classification recorded, not consulted on replay/retry |
+| `subflow-version-pin` | version recorded; subflows still resolve by flowId |
 
 Reporting never changes accept/reject behavior. harness-core's `loadCatalog` wires this to one `console.warn` line per finding. **Rule:** when the runtime starts executing a feature, delete its report in the same change — this list is the honest coverage boundary.
 

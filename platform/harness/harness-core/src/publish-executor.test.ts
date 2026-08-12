@@ -22,7 +22,9 @@ function freshState(jobId: string): FlowStateT {
   void FlowState;
   return {
     jobId,
+    input: null,
     output: '',
+    nodes: {},
     messages: [],
     attempts: {},
     lastExit: null,

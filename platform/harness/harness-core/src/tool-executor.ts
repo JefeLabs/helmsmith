@@ -472,7 +472,7 @@ async function applyAuthHeaders(
  * as the broker's own "unknown provider" error rather than an
  * opaque shim failure — clearer for the operator.
  */
-async function fetchCredential(
+export async function fetchCredential(
   broker: CredentialBroker,
   credentialId: string,
 ): Promise<string> {

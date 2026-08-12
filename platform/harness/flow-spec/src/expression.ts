@@ -62,6 +62,15 @@ export function evalExpression(expr: Expression, state: unknown): boolean {
       return false;
     case 'not':
       return !evalExpression(expr.expr, state);
+    case 'exists':
+      // Presence, not truthiness: false / 0 / "" / null all exist.
+      // Only a missing path (undefined) does not.
+      return resolveExpressionValue(expr.expr, state) !== undefined;
+    case 'object':
+    case 'array':
+      // Constructors always produce a container, and containers are
+      // truthy — a constructor used as a predicate is always true.
+      return true;
     case 'js':
       throw new Error(
         '"js" expression kind is not yet supported — use compare / all / any / not / jsonpath / literal',
@@ -101,11 +110,31 @@ function evalCompare(lhs: Expression, op: CompareOp, rhs: Expression, state: unk
     case 'in':
       // rhs MUST resolve to an array. Anything else (string,
       // object, primitive) returns false. This keeps the op
-      // specifically about collection membership; catalog authors
-      // who want substring containment should compose with a
-      // tool/transform step. Note: includes() is SameValueZero, not
+      // specifically about collection membership; string containment
+      // is the `contains` op. Note: includes() is SameValueZero, not
       // strict equality — NaN self-matches (runtime-state-only case).
       return Array.isArray(rhsValue) && rhsValue.includes(lhsValue);
+    case 'contains':
+    case 'startsWith':
+    case 'endsWith': {
+      // String-only, no coercion — a non-string on either side is
+      // false, mirroring `in`'s strictness about its rhs.
+      if (typeof lhsValue !== 'string' || typeof rhsValue !== 'string') return false;
+      if (op === 'contains') return lhsValue.includes(rhsValue);
+      if (op === 'startsWith') return lhsValue.startsWith(rhsValue);
+      return lhsValue.endsWith(rhsValue);
+    }
+    case 'matches': {
+      if (typeof lhsValue !== 'string' || typeof rhsValue !== 'string') return false;
+      try {
+        return new RegExp(rhsValue).test(lhsValue);
+      } catch {
+        // Invalid pattern from runtime state — the evaluator never
+        // throws on bad data. Literal patterns are additionally
+        // rejected at load time by the validator.
+        return false;
+      }
+    }
   }
 }
 
@@ -150,7 +179,17 @@ export function resolveExpressionValue(expr: Expression, state: unknown): unknow
     case 'all':
     case 'any':
     case 'not':
+    case 'exists':
       return evalExpression(expr, state);
+    case 'object': {
+      const out: Record<string, unknown> = {};
+      for (const [k, sub] of Object.entries(expr.fields)) {
+        out[k] = resolveExpressionValue(sub, state);
+      }
+      return out;
+    }
+    case 'array':
+      return expr.items.map((sub) => resolveExpressionValue(sub, state));
     case 'js':
       throw new Error('"js" expression kind is not yet supported');
   }
