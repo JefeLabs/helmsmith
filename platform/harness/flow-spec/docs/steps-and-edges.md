@@ -98,7 +98,7 @@ Auth is always a reference (`credentialId` + scheme) resolved through the Creden
 
 ### 2.4 `script` — inline subprocess ✅
 
-Config: `{ "language": "bash"|"node"|"python", "source": string, "env"?, "secrets"?, "timeoutMs"? }` (30s default). `state.output` arrives on stdin; full state as JSON in `HARNESS_STATE_JSON`; stdout (10MB cap) becomes the new `state.output`; non-zero exit → error edge. Batch only — no streaming. Scripts are trusted admin-curated content; state is passed as data, never interpolated into commands.
+Config: `{ "language": "bash"|"node"|"python", "source": string, "env"?, "secrets"?, "timeoutMs"? }` (30s default). `state.output` arrives on stdin; a curated state view (incl. `$.input`, excl. `nodes`/`messages`/`changedFiles` for env-size reasons) as JSON in `HARNESS_STATE_JSON` — scripts that need a specific node's output declare an `input` mapping, which arrives on stdin; stdout (10MB cap) becomes the new `state.output`; non-zero exit → error edge. Batch only — no streaming. Scripts are trusted admin-curated content; state is passed as data, never interpolated into commands.
 
 `secrets` maps env var names to credential references — `{ "API_KEY": { "credentialId": "anthropic" } }` — resolved through the same CredentialBroker tools use and injected into the child env at dispatch time (winning over same-named static `env` entries). Unresolvable credential or missing broker → `errorName: 'AuthError'`, routable via error edge. Secrets never appear literally in catalogs.
 
@@ -160,7 +160,7 @@ Every node may declare three data-plane fields alongside `kind`/`config`:
 | Field | Shape | Status | Semantics |
 |---|---|---|---|
 | `input` | Expression **or** `{ name: Expression, … }` | ✅ | Composes the node's effective input from run state instead of implicitly consuming the previous node's `output`. A single Expression resolves to its value (strings raw, everything else JSON); a Record resolves each field and delivers the object as JSON. Agents receive it as the prompt, scripts as stdin, tools/transforms/gates see it as `$.output`. Mapping keys must not be named `kind` (that marks the single-Expression form). |
-| `output` | `{ "kind": "text" }` \| `{ "kind": "json", "schema"? }` | ✅ parse / ❌ schema | `json` → the node's output string is parsed and recorded at `$.nodes.<id>` as structured data; invalid JSON exits with `errorName: 'OutputParseError'` (error-edge routable, catch it with `on: ["OutputParseError"]`). `schema` validates shape-wise but is **not enforced** against the output (warned as `node-output-schema`). |
+| `output` | `{ "kind": "text" }` \| `{ "kind": "json", "schema"? }` | ✅ parse / ❌ schema | `json` → the node's output string is parsed and recorded at `$.nodes.<id>` as structured data; invalid JSON exits with `errorName: 'OutputParseError'` (error-edge routable, catch it with `on: ["OutputParseError"]`). Combined with `tags.loop`, iterations aggregate a JSON **array** — `$.nodes.<id>` = per-iteration values; each item must itself be valid JSON. `schema` validates shape-wise but is **not enforced** against the output (warned as `node-output-schema`). |
 | `effect` | `"pure"` \| `"idempotent"` \| `"side-effecting"` | ❌ | Declarative classification for replay/retry safety. Recorded, warned as `effect`, not yet consulted — declare it now (publish nodes are inherently side-effecting) so durable-checkpointer replays can respect it later. |
 
 **The run-state surface** (`FlowRunState` in types.ts) every Expression binds against:
@@ -204,6 +204,7 @@ Typical pattern — agent emits structured JSON, gate asserts on a field, a late
 | `output.schema` | JSON-Schema enforcement of node output | Output parsed, schema ignored | `node-output-schema` |
 | `effect` | Replay/retry safety decisions | Recorded only | `effect` |
 | `config.version` (subflow) | Version-pinned resolution | Resolution by flowId only | `subflow-version-pin` |
+| `output.schema` (flow-level `structured`) | JSON-Schema enforcement of terminal output | Output parsed, schema ignored | `flow-output-schema` |
 
 ---
 
@@ -233,4 +234,4 @@ Used by: conditional edges, gate assertions, transforms, loop paths, tool args, 
 | `job-definition` | Intake conversation emitting a work order | **Must** declare `{kind:'job-intent'}` (statically enforced) |
 | `post-job` | Cleanup / notifications | — |
 
-`FlowOutputContract` kinds: `agent-text`, `job-intent`, `job-intents` (`min?`/`max?`), `flow-spec`, `structured` (`schema` required). **Caveat:** no runtime parses terminal output against the declared contract yet — the contract is validated shape, not enforced behavior.
+`FlowOutputContract` kinds: `agent-text`, `job-intent`, `job-intents` (`min?`/`max?`), `flow-spec`, `structured` (`schema` required). **Enforced at the terminal** (`parseFlowOutput`): job-intent(s) shape-checked (flowId/productId/input, min/max), flow-spec emissions re-validated through the catalog validator, structured must parse as JSON; a violation fails the job, success records the parsed value on `JobRecord.flowOutput`. Only `structured.schema` remains unenforced (warned as `flow-output-schema`).

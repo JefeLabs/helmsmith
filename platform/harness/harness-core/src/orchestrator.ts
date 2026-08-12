@@ -349,8 +349,16 @@ export interface RunJobDeps {
  *   ✅ output.kind json  — output parsed into state.nodes[id];
  *                          OutputParseError on bad JSON (error-edge
  *                          eligible)
- *   ❌ output schema     — declared schema not validated (reported:
- *                          'node-output-schema')
+ *   ✅ loop + json       — iterations aggregate a JSON array; each
+ *                          item must itself be valid JSON
+ *   ✅ flow output       — parseFlowOutput enforced at the terminal
+ *                          (finalizeOrPause): job-intent(s) shape +
+ *                          min/max, flow-spec re-validation, structured
+ *                          parse; violation fails the job, success
+ *                          records job.flowOutput
+ *   ❌ output schemas    — declared node/flow schemas not validated
+ *                          (reported: 'node-output-schema' /
+ *                          'flow-output-schema')
  *   ❌ effect            — classification recorded, not consulted on
  *                          replay/retry (reported: 'effect')
  *   ❌ subflow version   — pin recorded, resolution by flowId only

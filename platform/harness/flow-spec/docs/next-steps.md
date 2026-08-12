@@ -23,7 +23,7 @@ flowchart LR
 
 | # | Item | Effort | Why |
 |---|---|---|---|
-| 1.1 | **Validation-verdict + unsupported-feature fixtures** — `(catalog, valid, errorIncludes?)` and `(flow, expectedFeatures)` as replayable data; harness-core replays both like it replays expressions | M | Turns the README's "delete the report when you implement the feature" rule into a failing test; completes conformance coverage from 1 of 3 behaviors to 3 of 3 |
+| 1.1 | ~~**Validation-verdict + unsupported-feature fixtures**~~ | M | ✅ Done 2026-08-12 (hardening slice): `VALIDATION_CASES` + `UNSUPPORTED_CASES` replayed by both packages with exact-set feature matching |
 | 1.2 | **Generate JSON Schema from the types** as a build artifact of this package | M | The controlplane Phase 2 validator and the smithagents work-order seam both need a language-neutral contract; hand-porting rules to Java is the drift machine the review warned about |
 | 1.3 | **Wire changesets + drop `private` when the first out-of-repo consumer appears** | S | Semver discipline was a stated reason to extract; set it up before someone needs a version to pin |
 
@@ -37,7 +37,8 @@ Ordered by risk-reduction per effort. The rule from the README applies to every 
 | 2.2 | **Durable checkpointer by default** (SQLite file per workspace; PG in production) | M | Awaiting-approval/suspended jobs must survive restarts for HITL to be trustworthy |
 | 2.3 | **`policy.retry` (+ backoff), then `policy.timeout`, then `onError`** | M | The most-wanted reliability primitive; per-node timeout wraps executor calls; `onError:'continue'` last (it changes routing semantics) |
 | 2.4 | **Decide parallelism** — either implement fan-out/join (LangGraph supports multi-target routing; `joinStrategy` becomes real) or delete `joinStrategy` and validate ≤1 sequence edge | L / S | The half-state is the worst state. **2026-08-12 note: the state-model prerequisite now exists** — `nodes` is merge-reduced and `output` is documented as legacy, so branches can no longer clobber each other's addressable outputs; what remains is genuinely just the router/join work |
-| 2.5 | **Enforce output contracts at the terminal node** — parse `job-intent`, validate `structured.schema` | M | The factory/fleet seam needs teeth before smithagents depends on it. Node-level `output.kind: 'json'` parsing (done) is the machinery to reuse |
+| 2.5 | ~~**Enforce output contracts at the terminal node**~~ | M | ✅ Done 2026-08-12 (hardening slice): `parseFlowOutput` + `finalizeOrPause` enforcement + `job.flowOutput`. Remaining: `structured.schema` (see 2.7's schema decision) and JobIntent *emission* (submitting `job.flowOutput` to the JobStateMachine — new row 2.9) |
+| 2.9 | **JobIntent emission** — submit the enforced-and-recorded `job.flowOutput` intent(s) from `job-definition` flows to the JobStateMachine to launch the actual work flow | M | The other half of the factory/fleet seam: 2.5 guarantees the work order is well-formed; this makes it DO something |
 | 2.6 | **Suspend wake-up scheduling** (timer via job queue; event via bus subscription) | M | Makes `suspend` a real durability primitive instead of a pause-forever |
 | 2.7 | **Enforce `node-output-schema`** — validate declared schemas against parsed node output (needs a browser-safe JSON-Schema subset or a generated-validator approach; zero-dep constraint applies) | M | Deletes the `node-output-schema` report; turns agent output contracts from parse-only into shape-checked |
 | 2.8 | **Consult `effect` on replay/retry** — skip re-running `side-effecting` nodes on checkpointer replay; require idempotency keys for publish | M | Must land WITH or BEFORE 2.2 (durable checkpointer): replay + `push-and-open-pr` without it = duplicate PRs. Deletes the `effect` report |

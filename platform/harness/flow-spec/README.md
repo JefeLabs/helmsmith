@@ -16,7 +16,8 @@ The contract covers both halves of a flow: the **definition side** (nodes, edges
 | `types.ts` | `FlowDef`, `TaskStep` (incl. `input`/`output`/`effect`), `Edge` (incl. `ErrorEdge.on`), `Expression`, tags/policy/output contracts, `ToolDef`, `JobIntent`, product/catalog shapes, run-side wire shapes (`FlowRunState`, `NodeExit`, `ChangedFile`, `ApprovalRequest`/`ApprovalResume`, `SuspendRequest`), plus the small helpers (`walkAgents`, `resolveAccepts`, `findFlow`, `findProduct`) |
 | `validate.ts` | `validateFlowCatalog` / `validateUnifiedCatalog` — fail-loud structural validation with path-prefixed `CatalogError`s, and the unsupported-feature reporting seam |
 | `expression.ts` | `evalExpression` / `resolveExpressionValue` / `resolveJsonPath`, typed against structural `unknown` state so a designer preview and the runtime router share one evaluator |
-| `fixtures.ts` | `EXPRESSION_CASES` — executable spec data replayed by this package's tests and by harness-core's `flow-spec-conformance.test.ts` |
+| `output.ts` | `parseFlowOutput` — terminal output-contract enforcement (JobIntent shapes, flow-spec re-validation, structured parse); the runtime fails jobs through this |
+| `fixtures.ts` | `EXPRESSION_CASES` + `VALIDATION_CASES` + `UNSUPPORTED_CASES` — executable spec data for all three behaviors, replayed by this package's tests and by harness-core's `flow-spec-conformance.test.ts` |
 
 ## What deliberately stays out
 
@@ -39,12 +40,13 @@ Both validators accept `{ onUnsupported?: (f: UnsupportedFeature) => void }`. Th
 | `node-output-schema` | `output.kind: 'json'` is parsed into `state.nodes`, but the declared schema is not validated |
 | `effect` | classification recorded, not consulted on replay/retry |
 | `subflow-version-pin` | version recorded; subflows still resolve by flowId |
+| `flow-output-schema` | structured terminal output is parsed and enforced, but its schema is not validated |
 
-Reporting never changes accept/reject behavior. harness-core's `loadCatalog` wires this to one `console.warn` line per finding. **Rule:** when the runtime starts executing a feature, delete its report in the same change — this list is the honest coverage boundary.
+Reporting never changes accept/reject behavior. harness-core's `loadCatalog` wires this to one `console.warn` line per finding. **Rule:** when the runtime starts executing a feature, delete its report in the same change — this list is the honest coverage boundary. The rule is test-enforced: `UNSUPPORTED_CASES` pins the exact report set, so a stale or missing report fails conformance in both packages until the fixture changes first.
 
 ## Conformance
 
-`fixtures.ts` is data, not code. Any implementation claiming to support flow expressions (harness-core today; a designer UI or Java-side validator tomorrow — the planned home for generated JSON Schema is this package) must replay `EXPRESSION_CASES` and match `expected`. Change semantics by changing the fixture first; every conforming implementation then fails until it catches up.
+`fixtures.ts` is data, not code, and covers all three behaviors the package defines: `EXPRESSION_CASES` (predicate + value semantics via `expectedValue`), `VALIDATION_CASES` (accept/reject verdicts + error locations), and `UNSUPPORTED_CASES` (exact-set feature reports). Any implementation (harness-core today; a designer UI or Java-side validator tomorrow — the planned home for generated JSON Schema is this package) must replay all three. Change semantics by changing the fixture first; every conforming implementation then fails until it catches up.
 
 ## Documentation
 
