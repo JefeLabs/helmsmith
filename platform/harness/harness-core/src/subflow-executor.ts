@@ -330,7 +330,7 @@ function resolveJsonPath(path: string, state: unknown): unknown {
  */
 export interface SubflowCompileDeps {
   flowResolver?: FlowResolver;
-  toolResolver?: import('./catalog.ts').ToolResolver;
+  toolResolver?: import('./tool-executor.ts').ToolResolver;
   broker?: import('@helmsmith/agent-auth').CredentialBroker;
   fetchFn?: typeof fetch;
   mcpInvokeFn?: import('./tool-executor.ts').ToolExecutorDeps['mcpInvokeFn'];

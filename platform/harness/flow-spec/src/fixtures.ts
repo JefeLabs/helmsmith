@@ -685,4 +685,118 @@ export const UNSUPPORTED_CASES: readonly UnsupportedCase[] = [
     },
     expectedFeatures: [],
   },
+  {
+    // js-SHAPED data in positions the runtime never evaluates is inert:
+    // a literal's `value` is opaque data, and tool args are resolved
+    // only when the top-level value is literal/jsonpath/js-shaped — a
+    // compare-shaped arg (with a js inside) passes through as plain
+    // data. Neither may report expression-js.
+    name: 'inert js-shaped data (literal values, non-resolved tool args) reports nothing',
+    flow: {
+      id: 'inert-js',
+      nodes: [
+        { id: 't', kind: 'trigger', config: { kind: 'manual' } },
+        {
+          id: 'a',
+          kind: 'transform',
+          config: {
+            expression: {
+              kind: 'literal',
+              value: { kind: 'js', expression: 'ctx.score > 0.8' },
+            },
+          },
+        },
+        {
+          id: 'b',
+          kind: 'tool',
+          config: {
+            toolId: 'core:tools:jq',
+            args: {
+              plainData: {
+                kind: 'compare',
+                lhs: { kind: 'js', expression: '1' },
+                op: '==',
+                rhs: { kind: 'literal', value: 1 },
+              },
+            },
+          },
+        },
+      ],
+      edges: [
+        { from: 't', to: 'a', type: 'sequence' },
+        { from: 'a', to: 'b', type: 'sequence' },
+      ],
+    },
+    expectedFeatures: [],
+  },
+  {
+    // Every position the runtime DOES evaluate must still surface js:
+    // event-trigger matcher, node input mapping, conditional edge
+    // condition (nested), top-level tool arg, loop path, subflow input.
+    // One expression-js report per occurrence (plus the trigger-event
+    // report for the non-manual trigger).
+    name: 'js in every live expression position reports once per occurrence',
+    flow: {
+      id: 'live-js',
+      nodes: [
+        {
+          id: 't',
+          kind: 'trigger',
+          config: {
+            kind: 'event',
+            eventType: 'push',
+            matcher: { kind: 'js', expression: 'event.branch === "main"' },
+          },
+        },
+        {
+          id: 'm',
+          kind: 'transform',
+          input: { ctx: { kind: 'js', expression: 'state.output' } },
+          config: { expression: { kind: 'literal', value: 1 } },
+        },
+        {
+          id: 'w',
+          kind: 'tool',
+          config: {
+            toolId: 'core:tools:jq',
+            args: { q: { kind: 'js', expression: '".files"' } },
+          },
+          tags: {
+            loop: {
+              source: 'collection',
+              path: { kind: 'js', expression: 'state.repos' },
+              mode: 'sequential',
+            },
+          },
+        },
+        {
+          id: 'sf',
+          kind: 'subflow',
+          config: {
+            flowId: 'inner',
+            input: { seed: { kind: 'js', expression: 'state.count' } },
+          },
+        },
+      ],
+      edges: [
+        { from: 't', to: 'm', type: 'sequence' },
+        {
+          from: 'm',
+          to: 'w',
+          type: 'conditional',
+          condition: { kind: 'not', expr: { kind: 'js', expression: 'state.done' } },
+        },
+        { from: 'w', to: 'sf', type: 'sequence' },
+      ],
+    },
+    expectedFeatures: [
+      'expression-js',
+      'expression-js',
+      'expression-js',
+      'expression-js',
+      'expression-js',
+      'expression-js',
+      'trigger-event',
+    ],
+  },
 ];

@@ -23,7 +23,10 @@ The contract covers both halves of a flow: the **definition side** (nodes, edges
 
 - `loadCatalog` (fs read) — harness-core's `catalog.ts`.
 - Graph compilation, routing, executors — harness-core's `flow-graph.ts` / `orchestrator.ts`.
+- Runtime dispatch seams (`ToolResolver` and friends) — function types that can't be stored or rendered belong next to their executors in harness-core, not in the wire contract.
 - Sharing with smithagents: the factory/fleet seam is work orders, not code. Hand external consumers a schema artifact, not this npm package.
+
+The public surface is curated: `index.ts` names every exported symbol (no `export *`), and harness-core's `catalog.ts` re-export is curated the same way — adding a symbol to those lists is the API-review point.
 
 ## The `onUnsupported` contract
 
