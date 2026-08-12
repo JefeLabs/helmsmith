@@ -158,6 +158,84 @@ describe('node-addressable state', () => {
     expect(result.output).toBe('recovered');
   });
 
+  it('input mapping composes the effective input from state', async () => {
+    const seen: string[] = [];
+    const executors = new Map<string, NodeExecutor>([
+      [
+        'probe',
+        async (state) => {
+          seen.push(state.output);
+          return { lastExit: { nodeId: 'probe', kind: 'success' } };
+        },
+      ],
+    ]);
+    const flow: FlowDef = {
+      id: 'f',
+      nodes: [
+        trigger('t'),
+        {
+          id: 'shape',
+          kind: 'transform',
+          output: { kind: 'json' },
+          config: {
+            expression: { kind: 'object', fields: { score: { kind: 'literal', value: 1 } } },
+          },
+        },
+        {
+          id: 'probe',
+          kind: 'agent',
+          config: { agent: { id: 'probe' } as never },
+          input: {
+            task: { kind: 'jsonpath', path: '$.input' },
+            score: { kind: 'jsonpath', path: '$.nodes.shape.score' },
+          },
+        },
+      ],
+      edges: [
+        { from: 't', to: 'shape', type: 'sequence' },
+        { from: 'shape', to: 'probe', type: 'sequence' },
+      ],
+    };
+    const graph = compileFlow({ flow, executors });
+    await graph.invoke(
+      { ...initialState, input: 'fix the bug', output: 'fix the bug' },
+      { configurable: { thread_id: 'im-1' } },
+    );
+    expect(JSON.parse(seen[0] ?? '')).toEqual({ task: 'fix the bug', score: 1 });
+  });
+
+  it('single-expression input mapping passes strings through raw', async () => {
+    const seen: string[] = [];
+    const executors = new Map<string, NodeExecutor>([
+      [
+        'probe',
+        async (state) => {
+          seen.push(state.output);
+          return { lastExit: { nodeId: 'probe', kind: 'success' } };
+        },
+      ],
+    ]);
+    const flow: FlowDef = {
+      id: 'f',
+      nodes: [
+        trigger('t'),
+        {
+          id: 'probe',
+          kind: 'agent',
+          config: { agent: { id: 'probe' } as never },
+          input: { kind: 'jsonpath', path: '$.input' },
+        },
+      ],
+      edges: [{ from: 't', to: 'probe', type: 'sequence' }],
+    };
+    const graph = compileFlow({ flow, executors });
+    await graph.invoke(
+      { ...initialState, input: 'raw text', output: '' },
+      { configurable: { thread_id: 'im-2' } },
+    );
+    expect(seen[0]).toBe('raw text');
+  });
+
   it('a looped node records its aggregate output once', async () => {
     const flow: FlowDef = {
       id: 'f',

@@ -275,7 +275,7 @@ export function compileFlow(opts: CompileFlowOptions) {
         : isSyntheticSuspendNode(node)
           ? makeSuspendExecutor(node)
           : (executors.get(node.id) ?? builtinExecutor(node) ?? defaultExecutor(node.id));
-    const wrapped = withNodeIO(node, wrapWithTags(node, baseExec));
+    const wrapped = withNodeIO(node, wrapWithTags(node, withInputMapping(node, baseExec)));
     builder.addNode(node.id, wrapped);
   }
 
@@ -522,6 +522,43 @@ export function makeTransformExecutor(node: TaskStep): NodeExecutor {
 function wrapWithTags(step: TaskStep, exec: NodeExecutor): NodeExecutor {
   if (!step.tags?.loop) return exec;
   return loopWrapper(step.id, step.tags.loop, exec);
+}
+
+/**
+ * Innermost node wrapper: when the step declares `input`, resolve the
+ * mapping against current state and hand the node an effective
+ * `state.output` built from it — a single Expression resolves to its
+ * value (strings pass through raw; other values JSON-serialize), a
+ * Record resolves each field and serializes the object as JSON. This is
+ * how a node consumes MORE than the previous node's output: `$.input`,
+ * `$.nodes.<id>`, `$.rejectionPayload`, … Runs inside the Loop wrapper
+ * so a looped node's mapping sees the per-item state ($.output is the
+ * current item).
+ */
+function withInputMapping(step: TaskStep, exec: NodeExecutor): NodeExecutor {
+  const mapping = step.input;
+  if (mapping === undefined) return exec;
+  return async (state) => {
+    const resolved = resolveInputMapping(mapping, state);
+    const effective = typeof resolved === 'string' ? resolved : (JSON.stringify(resolved) ?? '');
+    return exec({ ...state, output: effective });
+  };
+}
+
+function resolveInputMapping(
+  mapping: Expression | Readonly<Record<string, Expression>>,
+  state: unknown,
+): unknown {
+  // A string `kind` field marks the single-Expression form (the
+  // validator rejects mapping keys named "kind" for this reason).
+  if (typeof (mapping as { kind?: unknown }).kind === 'string') {
+    return resolveExpressionValue(mapping as Expression, state);
+  }
+  const out: Record<string, unknown> = {};
+  for (const [k, sub] of Object.entries(mapping as Record<string, Expression>)) {
+    out[k] = resolveExpressionValue(sub, state);
+  }
+  return out;
 }
 
 /**
