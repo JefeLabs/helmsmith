@@ -12,7 +12,7 @@ import type { GitHubCredential, GitHubCredentialResolver } from '@helmsmith/agen
 import type { TaskStep } from './catalog.ts';
 import { FlowState, type FlowStateT } from './flow-graph.ts';
 import type { JobRecord } from './job.ts';
-import { makePublishExecutor } from './publish-executor.ts';
+import { findOrCreatePr, makePublishExecutor } from './publish-executor.ts';
 
 const STUB_RESOLVER: GitHubCredentialResolver = {
   resolve: async (): Promise<GitHubCredential | null> => ({ token: 'tok', source: 'local-gh-cli' }),
@@ -98,6 +98,66 @@ describe('makePublishExecutor', () => {
       });
       const delta = await run(freshState('job_test'));
       expect(delta.lastExit).toMatchObject({ kind: 'error', errorName: 'UnparseablePrUrl' });
+    });
+  });
+
+  describe('idempotency by natural key (2.8)', () => {
+    const cred: GitHubCredential = { token: 'tok', source: 'local-gh-cli' };
+    const prParams = { title: 't', head: 'feat-x', base: 'main', body: '', draft: false };
+
+    function jsonResponse(v: unknown): Response {
+      return new Response(JSON.stringify(v), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    it('findOrCreatePr reuses an existing open PR for the head branch without POSTing', async () => {
+      const calls: string[] = [];
+      const fetchFn = (async (url: RequestInfo | URL, init?: RequestInit) => {
+        calls.push(`${init?.method} ${String(url)}`);
+        if (init?.method === 'GET') {
+          return jsonResponse([{ html_url: 'https://github.com/o/r/pull/7', number: 7 }]);
+        }
+        throw new Error(`unexpected ${init?.method} call`);
+      }) as typeof fetch;
+      const pr = await findOrCreatePr(fetchFn, cred, { owner: 'o', name: 'r' }, prParams);
+      expect(pr).toMatchObject({
+        html_url: 'https://github.com/o/r/pull/7',
+        number: 7,
+        reused: true,
+      });
+      expect(calls.some((c) => c.startsWith('POST'))).toBe(false);
+      expect(calls[0]).toContain('head=o%3Afeat-x');
+    });
+
+    it('findOrCreatePr creates a PR when no open one exists for the branch', async () => {
+      const calls: string[] = [];
+      const fetchFn = (async (url: RequestInfo | URL, init?: RequestInit) => {
+        calls.push(`${init?.method} ${String(url)}`);
+        if (init?.method === 'GET') return jsonResponse([]);
+        return jsonResponse({ html_url: 'https://github.com/o/r/pull/8', number: 8 });
+      }) as typeof fetch;
+      const pr = await findOrCreatePr(fetchFn, cred, { owner: 'o', name: 'r' }, prParams);
+      expect(pr).toMatchObject({ number: 8, reused: false });
+      expect(calls.filter((c) => c.startsWith('POST')).length).toBe(1);
+    });
+
+    it('merge-pr short-circuits without any API call when job.mergeSha is set', async () => {
+      let fetchCalls = 0;
+      const fetchFn = (async () => {
+        fetchCalls++;
+        throw new Error('network must not be touched');
+      }) as unknown as typeof fetch;
+      const run = makePublishExecutor(mergeNode(), {
+        job: job({ prUrl: 'https://github.com/o/r/pull/7', mergeSha: 'abc123' }),
+        githubResolver: STUB_RESOLVER,
+        fetchFn,
+      });
+      const delta = await run(freshState('job_test'));
+      expect(delta.lastExit).toMatchObject({ kind: 'success' });
+      expect(JSON.parse(delta.output as string)).toMatchObject({ mergeSha: 'abc123' });
+      expect(fetchCalls).toBe(0);
     });
   });
 });
