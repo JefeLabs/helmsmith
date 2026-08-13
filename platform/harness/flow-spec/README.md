@@ -36,7 +36,7 @@ Both validators accept `{ onUnsupported?: (f: UnsupportedFeature) => void }`. Th
 
 | Feature id | Runtime truth |
 |---|---|
-| `trigger-<kind>` | no runtime fires non-manual triggers |
+| `trigger-message` | no message transport exists; schedule/webhook/event triggers are ingress-backed |
 | `expression-js` | the evaluator throws on `js` expressions |
 | `subflow-version-pin` | version recorded; subflows still resolve by flowId |
 

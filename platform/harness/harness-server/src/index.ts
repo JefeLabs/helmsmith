@@ -19,6 +19,7 @@ import {
   type Envelope,
   evalExpression,
   type FlowCatalog,
+  type FlowDef,
   findFlow,
   findProduct,
   getJobSteering,
@@ -32,6 +33,7 @@ import {
   runJob,
   type SuspendRequest,
   steerJob,
+  type TriggerConfig,
   TokenAccumulator,
   walkAgents,
 } from '@helmsmith/harness-core';
@@ -39,6 +41,7 @@ import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { BaseCheckpointSaver } from '@langchain/langgraph';
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
 import { runEntryCoordinator } from './coordinator/entry-coordinator.ts';
+import { nextCronFire } from './cron.ts';
 import { deletePausedJob, loadPausedJobs, savePausedJob } from './paused-jobs.ts';
 import {
   enqueue as dispatcherEnqueue,
@@ -394,6 +397,7 @@ export async function startHarnessServer(opts: HarnessServerOptions): Promise<Ha
     pendingSuspends: new Map(),
     approvalTimers: new Map(),
     suspendTimers: new Map(),
+    cronTimers: new Map(),
     inFlight: new Set(),
     queue: [],
     capacity: opts.maxConcurrentJobs ?? 5,
@@ -431,6 +435,9 @@ export async function startHarnessServer(opts: HarnessServerOptions): Promise<Ha
     }
   }
 
+  // 3.1 — arm cron timers for schedule-triggered catalog flows.
+  armScheduleTriggers(ctx);
+
   await mkdir(dirname(opts.socketPath), { recursive: true, mode: 0o700 });
   await unlink(opts.socketPath).catch(() => {});
 
@@ -467,6 +474,8 @@ export async function startHarnessServer(opts: HarnessServerOptions): Promise<Ha
       // Disarm timers so a stopped server can't fire auto-rejects/wakes.
       for (const jobId of [...ctx.approvalTimers.keys()]) clearSlaTimer(ctx, jobId);
       for (const jobId of [...ctx.suspendTimers.keys()]) clearSuspendTimer(ctx, jobId);
+      for (const t of ctx.cronTimers.values()) clearTimeout(t);
+      ctx.cronTimers.clear();
       await new Promise<void>((resolve) => udsServer.close(() => resolve()));
       if (tcpServer) await new Promise<void>((resolve) => tcpServer.close(() => resolve()));
       await unlink(opts.socketPath).catch(() => {});
@@ -545,6 +554,10 @@ interface ServerCtx {
    *  down fires immediately. Event-triggered suspends have no timer —
    *  they wake through POST /v1/events. */
   suspendTimers: Map<string, NodeJS.Timeout>;
+  /** Cron wake timers, one per schedule-triggered flow (3.1). Armed at
+   *  boot, re-armed after each fire (long gaps re-check every 24h),
+   *  cleared on stop. Unref'd. */
+  cronTimers: Map<string, NodeJS.Timeout>;
   /** Workspace root for the container path (slice 9d-4). Defaults to
    *  process.cwd() at server start. */
   workspaceRoot: string;
@@ -787,6 +800,21 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: ServerCtx) {
     // caller polls GET /v1/jobs/:id (or subscribes to /events) to observe
     // the next status — completed, failed, or paused-again at another
     // interrupt.
+    // GET /v1/triggers — ingress inventory (3.1): armed schedules with
+    // their next fire time, webhook paths, event subscriptions.
+    if (req.method === 'GET' && url === '/v1/triggers') {
+      handleListTriggers(res, ctx);
+      return;
+    }
+
+    // Webhook ingress (3.1): POST|GET /v1/hooks/<path> fires flows whose
+    // trigger declares that path (+ method, default POST).
+    const hookMatch = url.split('?')[0]?.match(/^\/v1\/hooks\/(.+)$/);
+    if (hookMatch && (req.method === 'POST' || req.method === 'GET')) {
+      handleWebhook(req, res, url, decodeURIComponent(hookMatch[1] ?? ''), parsed, ctx);
+      return;
+    }
+
     // POST /v1/events — event ingress for suspend wake-ups (2.6).
     if (req.method === 'POST' && url === '/v1/events' && parsed !== null) {
       handleIngestEvent(res, parsed, ctx);
@@ -1382,6 +1410,67 @@ function executeRun(ctx: ServerCtx, jobId: string): void {
 }
 
 /**
+ * Submit a catalog flow as a new job through the dispatcher (3.1 / 2.9)
+ * — the single spawn path shared by JobIntent emission, webhook / event
+ * / schedule trigger firing. Registers the flow's agents (accepts-set
+ * aware), records lineage/provenance fields when given, and fires via
+ * executeRun. Returns the jobId, or an error string when the spawn
+ * cannot happen (unresolvable accepts set, dispatcher overflow — the
+ * record then stays 'received' for operator visibility).
+ */
+function spawnFlowJob(
+  ctx: ServerCtx,
+  flow: FlowDef,
+  opts: {
+    input: string;
+    setName?: string;
+    productId?: string;
+    config?: Record<string, unknown>;
+    parentJobId?: string;
+    triggeredBy?: string;
+  },
+): { jobId: string } | { error: string } {
+  const setName = opts.setName ?? 'default';
+  let agents: RegisteredAgent[];
+  try {
+    agents = [
+      registeredFromDef(COORDINATOR_AGENT, setName),
+      ...[...walkAgents(flow)].map((d) => registeredFromDef(d, setName)),
+      registeredFromDef(CHECKOUT_COORDINATOR_AGENT, setName),
+    ];
+  } catch (err) {
+    return { error: (err as Error).message };
+  }
+  const jobId = `job_${randomUUID().slice(0, 8)}`;
+  const job: JobRecord = {
+    jobId,
+    pipeline: flow.id,
+    ...(opts.productId !== undefined ? { productId: opts.productId } : {}),
+    input: opts.input,
+    ...(opts.config ? { config: opts.config } : {}),
+    flow,
+    workdirRoot: ctx.workspaceRoot,
+    status: 'received',
+    submittedAt: new Date().toISOString(),
+    agents,
+    ...(opts.parentJobId ? { parentJobId: opts.parentJobId } : {}),
+    ...(opts.triggeredBy ? { triggeredBy: opts.triggeredBy } : {}),
+  };
+  ctx.jobs.set(jobId, job);
+  ctx.tokens.attach(ctx.bus, jobId);
+  const decision = evaluateSubmission(ctx);
+  const fire = () => executeRun(ctx, jobId);
+  if (decision.kind === 'fire-immediate') {
+    dispatcherFireImmediate(ctx, jobId, fire);
+  } else if (decision.kind === 'enqueue') {
+    dispatcherEnqueue(ctx, jobId, fire);
+  } else {
+    return { error: `dispatcher at capacity (${decision.reason}) — job ${jobId} left in 'received'` };
+  }
+  return { jobId };
+}
+
+/**
  * JobIntent emission (2.9) — the factory/fleet seam's second half.
  * Called when a job-definition flow completes with enforced intent(s):
  * each intent becomes a child job submitted through the same dispatcher
@@ -1401,46 +1490,17 @@ function spawnJobsFromIntents(ctx: ServerCtx, parentJobId: string, intents: JobI
       errors.push(`intent flowId "${intent.flowId}" is not in the catalog`);
       continue;
     }
-    const setName = intent.set ?? 'default';
-    let agents: RegisteredAgent[];
-    try {
-      agents = [
-        registeredFromDef(COORDINATOR_AGENT, setName),
-        ...[...walkAgents(flow)].map((d) => registeredFromDef(d, setName)),
-        registeredFromDef(CHECKOUT_COORDINATOR_AGENT, setName),
-      ];
-    } catch (err) {
-      errors.push(`intent for "${intent.flowId}": ${(err as Error).message}`);
-      continue;
-    }
-    const childId = `job_${randomUUID().slice(0, 8)}`;
-    const child: JobRecord = {
-      jobId: childId,
-      pipeline: flow.id,
-      productId: intent.productId,
+    const spawnResult = spawnFlowJob(ctx, flow, {
       input: typeof intent.input === 'string' ? intent.input : JSON.stringify(intent.input),
+      setName: intent.set ?? 'default',
+      productId: intent.productId,
       ...(intent.config ? { config: intent.config } : {}),
-      flow,
-      workdirRoot: ctx.workspaceRoot,
-      status: 'received',
-      submittedAt: new Date().toISOString(),
-      agents,
       parentJobId,
-    };
-    ctx.jobs.set(childId, child);
-    ctx.tokens.attach(ctx.bus, childId);
-    spawned.push(childId);
-    const decision = evaluateSubmission(ctx);
-    const fire = () => executeRun(ctx, childId);
-    if (decision.kind === 'fire-immediate') {
-      dispatcherFireImmediate(ctx, childId, fire);
-    } else if (decision.kind === 'enqueue') {
-      dispatcherEnqueue(ctx, childId, fire);
+    });
+    if ('jobId' in spawnResult) {
+      spawned.push(spawnResult.jobId);
     } else {
-      // Queue overflow: the child record stays 'received' for operator
-      // visibility rather than being silently dropped.
-      spawned.pop();
-      errors.push(`intent for "${intent.flowId}": dispatcher at capacity (${decision.reason})`);
+      errors.push(`intent for "${intent.flowId}": ${spawnResult.error}`);
     }
   }
   if (parent) {
@@ -1634,7 +1694,162 @@ function handleIngestEvent(res: ServerResponse, body: unknown, ctx: ServerCtx): 
     woke.push(jobId);
     executeResume(ctx, jobId, { wake: 'event', event: envelope });
   }
-  ok(res, { service: 'harness', method: 'POST', path: '/v1/events', woke, ts: new Date().toISOString() });
+  // 3.1 — the same event also STARTS flows whose trigger subscribes to
+  // this type (matcher evaluated against the identical envelope).
+  const started: string[] = [];
+  for (const flow of ctx.catalog.flows) {
+    const cfg = triggerConfigOf(flow);
+    if (!cfg || cfg.kind !== 'event' || cfg.eventType !== event.type) continue;
+    if (cfg.matcher && !evalExpression(cfg.matcher, envelope)) continue;
+    const spawnResult = spawnFlowJob(ctx, flow, {
+      input: JSON.stringify(envelope),
+      triggeredBy: `event:${event.type}`,
+    });
+    if ('jobId' in spawnResult) {
+      started.push(spawnResult.jobId);
+    } else {
+      console.warn(`[harness] event trigger for flow "${flow.id}" could not fire: ${spawnResult.error}`);
+    }
+  }
+  ok(res, {
+    service: 'harness',
+    method: 'POST',
+    path: '/v1/events',
+    woke,
+    started,
+    ts: new Date().toISOString(),
+  });
+}
+
+/** The trigger node's config, or null for flows without one (legacy). */
+function triggerConfigOf(flow: FlowDef): TriggerConfig | null {
+  const node = flow.nodes.find((n) => n.kind === 'trigger');
+  return node ? (node.config as TriggerConfig) : null;
+}
+
+/**
+ * Webhook ingress (3.1). Fires every flow whose webhook trigger matches
+ * the path + method (default POST); the job input is a JSON envelope
+ * `{ trigger: 'webhook', path, method, payload }` — POST payload is the
+ * request body, GET payload is the query parameters.
+ */
+function handleWebhook(
+  req: IncomingMessage,
+  res: ServerResponse,
+  url: string,
+  hookPath: string,
+  parsed: unknown,
+  ctx: ServerCtx,
+): void {
+  const method = req.method === 'GET' ? 'GET' : 'POST';
+  const flows = ctx.catalog.flows.filter((flow) => {
+    const cfg = triggerConfigOf(flow);
+    return cfg?.kind === 'webhook' && cfg.path === hookPath && (cfg.method ?? 'POST') === method;
+  });
+  if (flows.length === 0) {
+    notFound(res, `no flow declares a ${method} webhook trigger for path "${hookPath}"`);
+    return;
+  }
+  const payload =
+    method === 'GET'
+      ? Object.fromEntries(new URL(url, 'http://localhost').searchParams)
+      : (parsed ?? {});
+  const started: string[] = [];
+  const errors: string[] = [];
+  for (const flow of flows) {
+    const spawnResult = spawnFlowJob(ctx, flow, {
+      input: JSON.stringify({ trigger: 'webhook', path: hookPath, method, payload }),
+      triggeredBy: `webhook:${hookPath}`,
+    });
+    if ('jobId' in spawnResult) started.push(spawnResult.jobId);
+    else errors.push(`flow "${flow.id}": ${spawnResult.error}`);
+  }
+  ok(res, {
+    service: 'harness',
+    method,
+    path: `/v1/hooks/${hookPath}`,
+    started,
+    ...(errors.length > 0 ? { errors } : {}),
+    ts: new Date().toISOString(),
+  });
+}
+
+/** GET /v1/triggers — operator inventory of the armed ingress surface. */
+function handleListTriggers(res: ServerResponse, ctx: ServerCtx): void {
+  const schedules: Array<{ flowId: string; cron: string; nextFireAt: string | null }> = [];
+  const webhooks: Array<{ flowId: string; path: string; method: string }> = [];
+  const events: Array<{ flowId: string; eventType: string }> = [];
+  for (const flow of ctx.catalog.flows) {
+    const cfg = triggerConfigOf(flow);
+    if (!cfg) continue;
+    if (cfg.kind === 'schedule') {
+      let nextFireAt: string | null = null;
+      try {
+        nextFireAt = nextCronFire(cfg.cron, new Date()).toISOString();
+      } catch {
+        // unsatisfiable schedule — validator-permitted but never fires
+      }
+      schedules.push({ flowId: flow.id, cron: cfg.cron, nextFireAt });
+    } else if (cfg.kind === 'webhook') {
+      webhooks.push({ flowId: flow.id, path: cfg.path, method: cfg.method ?? 'POST' });
+    } else if (cfg.kind === 'event') {
+      events.push({ flowId: flow.id, eventType: cfg.eventType });
+    }
+  }
+  ok(res, {
+    service: 'harness',
+    method: 'GET',
+    path: '/v1/triggers',
+    schedules,
+    webhooks,
+    events,
+    ts: new Date().toISOString(),
+  });
+}
+
+/**
+ * Arm cron timers for every schedule-triggered flow (3.1). Schedules
+ * run in server-local time (the validator rejects tz). Fires spawn
+ * through the shared dispatcher path; each fire re-arms for the next
+ * occurrence. Gaps beyond 24h re-check daily (setTimeout's 32-bit cap).
+ */
+function armScheduleTriggers(ctx: ServerCtx): void {
+  for (const flow of ctx.catalog.flows) {
+    const cfg = triggerConfigOf(flow);
+    if (cfg?.kind === 'schedule') armCronTimer(ctx, flow, cfg.cron);
+  }
+}
+
+const CRON_TIMER_CHUNK_MS = 24 * 60 * 60 * 1000;
+
+function armCronTimer(ctx: ServerCtx, flow: FlowDef, cron: string): void {
+  let next: Date;
+  try {
+    next = nextCronFire(cron, new Date());
+  } catch (err) {
+    console.warn(`[harness] schedule for flow "${flow.id}" never fires: ${(err as Error).message}`);
+    return;
+  }
+  const delay = next.getTime() - Date.now();
+  const timer =
+    delay > CRON_TIMER_CHUNK_MS
+      ? setTimeout(() => {
+          ctx.cronTimers.delete(flow.id);
+          armCronTimer(ctx, flow, cron);
+        }, CRON_TIMER_CHUNK_MS)
+      : setTimeout(() => {
+          ctx.cronTimers.delete(flow.id);
+          const spawnResult = spawnFlowJob(ctx, flow, {
+            input: JSON.stringify({ trigger: 'schedule', cron, firedAt: new Date().toISOString() }),
+            triggeredBy: `schedule:${cron}`,
+          });
+          if ('error' in spawnResult) {
+            console.warn(`[harness] schedule for flow "${flow.id}" could not fire: ${spawnResult.error}`);
+          }
+          armCronTimer(ctx, flow, cron);
+        }, Math.max(0, delay));
+  timer.unref?.();
+  ctx.cronTimers.set(flow.id, timer);
 }
 
 /**

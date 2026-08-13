@@ -48,7 +48,7 @@ Ordered by risk-reduction per effort. The rule from the README applies to every 
 
 | # | Item | Effort | Depends on |
 |---|---|---|---|
-| 3.1 | **Trigger ingress** — scheduler (cron), webhook route, event-bus subscription; or formally demote triggers to manual-only and delete the other four kinds | L | 2.6's scheduler machinery overlaps |
+| 3.1 | ~~**Trigger ingress** — scheduler (cron), webhook route, event-bus subscription; or formally demote triggers to manual-only and delete the other four kinds~~ | L | ✅ Done 2026-08-13 (trigger-ingress slice — decided: IMPLEMENT for schedule/webhook/event, `message` stays warned pending a transport): zero-dep cron engine (validator-gated subset, server-local, tz rejected), `/v1/hooks/<path>`, `/v1/events` start-or-wake, `GET /v1/triggers` inventory, shared `spawnFlowJob` dispatcher path with `triggeredBy` provenance |
 | 3.2 | **Flow designer UI** consuming flow-spec directly in the browser (types + validation + expression preview against the same evaluator the router uses) | L | 0.1 (clean surface), 1.1 (fixtures to test the preview against) |
 | 3.3 | **Controlplane Phase 2 validation** via the generated schema — reject bad flows at write time instead of first-load time | M | 1.2 |
 | 3.4 | **Loosen `AdapterId` to a registry-checked string** | S | Do it in the same change that adds the third adapter — don't pay the spec-change tax twice |

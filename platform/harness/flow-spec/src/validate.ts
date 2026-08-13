@@ -24,9 +24,9 @@ import {
  * accept/reject behavior — a catalog with unsupported features is
  * still a *valid* catalog; it just won't do everything it says.
  *
- * Current feature ids: `trigger-<kind>` (any non-manual trigger),
- * `expression-js`, `subflow-version-pin` (version recorded, resolution
- * stays by flowId).
+ * Current feature ids: `trigger-message` (no message transport;
+ * schedule/webhook/event are ingress-backed), `expression-js`,
+ * `subflow-version-pin` (version recorded, resolution stays by flowId).
  * Remove an id from
  * `reportUnsupportedFeatures` in the same change that makes the
  * runtime execute it — the reporting list IS the honest coverage
@@ -309,11 +309,14 @@ function reportUnsupportedFeatures(
     const at = `${where}.nodes[${j}]`;
     if (node.kind === 'trigger') {
       const kind = (node.config as Record<string, unknown>).kind;
-      if (kind !== 'manual') {
+      // schedule/webhook/event triggers are ingress-backed (3.1);
+      // 'message' still has no transport to bind to.
+      if (kind === 'message') {
         report({
           where: `${at}.config`,
-          feature: `trigger-${String(kind)}`,
-          detail: 'no runtime fires this trigger; jobs start by manual submission',
+          feature: 'trigger-message',
+          detail:
+            'no message transport fires this trigger; jobs start by manual submission, schedule, webhook, or event ingress',
         });
       }
     }
@@ -785,6 +788,15 @@ function validateTriggerConfig(c: Record<string, unknown>, where: string): void 
       if (typeof c.cron !== 'string' || !c.cron) {
         throw new CatalogError(`${where}.cron must be a non-empty string`);
       }
+      validateCronExpression(c.cron, `${where}.cron`);
+      // Schedules run in server-local time (3.1). tz is rejected rather
+      // than silently ignored — fail-loud beats wrong-timezone-silently;
+      // accepting it later is additive.
+      if (c.tz !== undefined) {
+        throw new CatalogError(
+          `${where}.tz is not supported yet — schedules run in server-local time; omit tz`,
+        );
+      }
       break;
     case 'manual':
       // No additional fields.
@@ -1052,6 +1064,55 @@ function validateExpression(value: unknown, where: string): void {
         `${where}.kind must be one of: jsonpath, js, literal, compare, all, any, not, exists, object, array (got ${JSON.stringify(e.kind)})`,
       );
   }
+}
+
+/**
+ * Cron SUBSET syntax gate (3.1) — five whitespace-separated fields
+ * (minute, hour, day-of-month, month, day-of-week), each `*`, `*\/n`,
+ * or a comma list of numbers / a-b ranges within the field's bounds
+ * (dow accepts 0-7; 7 ≡ 0 ≡ Sunday). Names (JAN, MON) and range-steps
+ * (a-b/n) are NOT in the subset — the server's scheduler implements
+ * exactly this grammar, so anything it can't fire is rejected here.
+ */
+const CRON_FIELD_BOUNDS: ReadonlyArray<readonly [string, number, number]> = [
+  ['minute', 0, 59],
+  ['hour', 0, 23],
+  ['day-of-month', 1, 31],
+  ['month', 1, 12],
+  ['day-of-week', 0, 7],
+];
+
+function validateCronExpression(cron: string, where: string): void {
+  const fields = cron.trim().split(/\s+/);
+  if (fields.length !== 5) {
+    throw new CatalogError(
+      `${where} must have 5 fields (minute hour day-of-month month day-of-week) — got ${fields.length}`,
+    );
+  }
+  for (const [i, field] of fields.entries()) {
+    const bounds = CRON_FIELD_BOUNDS[i];
+    if (!bounds) continue;
+    const [name, lo, hi] = bounds;
+    if (!validCronField(field, lo, hi)) {
+      throw new CatalogError(
+        `${where} ${name} field "${field}" is not in the supported cron subset ` +
+          `(*, */n, or a comma list of ${lo}-${hi} numbers and ranges)`,
+      );
+    }
+  }
+}
+
+function validCronField(field: string, lo: number, hi: number): boolean {
+  if (field === '*') return true;
+  const step = field.match(/^\*\/(\d+)$/);
+  if (step) return Number(step[1]) >= 1;
+  return field.split(',').every((part) => {
+    const m = part.match(/^(\d+)(?:-(\d+))?$/);
+    if (!m) return false;
+    const a = Number(m[1]);
+    const b = m[2] !== undefined ? Number(m[2]) : a;
+    return a >= lo && b <= hi && a <= b;
+  });
 }
 
 function validateEdge(value: unknown, where: string): void {
