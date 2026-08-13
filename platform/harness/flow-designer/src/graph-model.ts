@@ -7,8 +7,9 @@
  *
  * Layout: FlowDef carries no positions (deliberately — layout is a
  * designer concern, not wire contract), so `flowToGraph` computes a
- * left-to-right layered layout via dagre on import/switch. Positions
- * live only in canvas state for the session.
+ * left-to-right layered layout via dagre on import/switch. Hand-arranged
+ * positions persist as a browser-local sidecar (layout-store.ts) that
+ * loads overlay on top of this computed baseline.
  */
 import dagre from '@dagrejs/dagre';
 import type { FlowDef, Edge as SpecEdge, TaskStep } from '@helmsmith/flow-spec';

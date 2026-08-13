@@ -11,6 +11,7 @@ import type { DesignerEdge, DesignerNode } from './graph-model.ts';
 import { flowToGraph, graphToFlow, newStep } from './graph-model.ts';
 import { emptyHistory, type History, recorded, redone, undone } from './history.ts';
 import { kindColor, STEP_KINDS } from './kinds.ts';
+import { appliedLayout, capturedLayout, readLayouts, writeLayout } from './layout-store.ts';
 import { SAMPLE_CATALOG } from './sample-catalog.ts';
 
 interface Selection {
@@ -18,10 +19,21 @@ interface Selection {
   id: string;
 }
 
+/** Map a flow to canvas shapes, overlaying any layout persisted for it —
+ *  the one load path shared by mount/switch/import/server-load. `relayout`
+ *  deliberately bypasses this: it is the explicit recompute. */
+function loadGraph(flow: FlowDef): { nodes: DesignerNode[]; edges: DesignerEdge[] } {
+  const graph = flowToGraph(flow);
+  return {
+    nodes: appliedLayout(graph.nodes, readLayouts(localStorage)[flow.id]),
+    edges: graph.edges,
+  };
+}
+
 export function App() {
   const [catalog, setCatalog] = useState<Catalog>(SAMPLE_CATALOG);
   const [flowId, setFlowId] = useState<string>(SAMPLE_CATALOG.flows[0]?.id ?? '');
-  const initial = useMemo(() => flowToGraph(SAMPLE_CATALOG.flows[0] as FlowDef), []);
+  const initial = useMemo(() => loadGraph(SAMPLE_CATALOG.flows[0] as FlowDef), []);
   const [nodes, setNodes] = useState<DesignerNode[]>(initial.nodes);
   const [edges, setEdges] = useState<DesignerEdge[]>(initial.edges);
   const [selection, setSelection] = useState<Selection | null>(null);
@@ -84,6 +96,13 @@ export function App() {
     setSelection(null);
   }, [history, nodes, edges]);
 
+  // Persist whatever the canvas shows — drags, undo, relayout all flow
+  // through here, so the stored layout is always the visible one.
+  // (flowId and nodes update in the same batch on every load path.)
+  useEffect(() => {
+    writeLayout(localStorage, flowId, capturedLayout(nodes));
+  }, [nodes, flowId]);
+
   // ⌘Z / ⌘⇧Z (and Ctrl+Y) — suppressed while typing so native text
   // undo inside inputs/textareas keeps working.
   useEffect(() => {
@@ -111,7 +130,7 @@ export function App() {
       setCatalog(folded);
       const target = folded.flows.find((f) => f.id === id);
       if (!target) return;
-      const graph = flowToGraph(target);
+      const graph = loadGraph(target);
       setFlowId(id);
       setNodes(graph.nodes);
       setEdges(graph.edges);
@@ -240,7 +259,7 @@ export function App() {
     };
     const next = { ...liveCatalog, flows: [...liveCatalog.flows, flow] };
     setCatalog(next);
-    const graph = flowToGraph(flow);
+    const graph = loadGraph(flow);
     setFlowId(id);
     setNodes(graph.nodes);
     setEdges(graph.edges);
@@ -251,7 +270,7 @@ export function App() {
   const loadCatalogState = useCallback((parsed: Catalog) => {
     setCatalog(parsed);
     const first = parsed.flows[0] as FlowDef;
-    const graph = flowToGraph(first);
+    const graph = loadGraph(first);
     setFlowId(first.id);
     setNodes(graph.nodes);
     setEdges(graph.edges);
