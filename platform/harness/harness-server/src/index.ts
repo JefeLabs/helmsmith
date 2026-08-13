@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { chmod, mkdir, unlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { dirname, join } from 'node:path';
 import {
@@ -624,6 +624,16 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: ServerCtx) {
     ok(res, { service, catalog: ctx.catalog, ts: new Date().toISOString() });
     return;
   }
+  // Layout sidecar (designer node positions). Deliberately NOT part of
+  // the catalog wire shape — FlowDef carries no editor concerns — but
+  // stored server-side so arrangements travel between machines and
+  // teammates. flowId → stepId → {x, y}, persisted next to flows.json.
+  if (req.method === 'GET' && url === '/v1/catalog/layout') {
+    void readLayoutSidecar(ctx)
+      .then((layouts) => ok(res, { service, layouts, ts: new Date().toISOString() }))
+      .catch(() => ok(res, { service, layouts: {}, ts: new Date().toISOString() }));
+    return;
+  }
   if (req.method === 'GET' && url === '/v1/catalog/flows') {
     ok(res, {
       service,
@@ -903,6 +913,16 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: ServerCtx) {
     }
 
     // PUT /v1/catalog — the designer's save-to-server path.
+    if (req.method === 'PUT' && url === '/v1/catalog/layout' && parsed !== null) {
+      handlePutLayout(res, parsed, ctx).catch((err: Error) => {
+        if (!res.headersSent) {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: err.message }));
+        }
+      });
+      return;
+    }
     if (req.method === 'PUT' && url === '/v1/catalog' && parsed !== null) {
       handlePutCatalog(res, parsed, ctx).catch((err: Error) => {
         if (!res.headersSent) {
@@ -1876,6 +1896,64 @@ function handleIngestEvent(res: ServerResponse, body: unknown, ctx: ServerCtx): 
  * report ids) return in the response. In-flight jobs are unaffected:
  * JobRecord.flow is a snapshot taken at submission.
  */
+/** flowId → stepId → {x, y} — the designer's layout sidecar shape.
+ *  Kept OUT of flow-spec deliberately: it is editor state, not wire
+ *  contract (the same three-line shape lives in the designer's
+ *  layout-store; duplicating it beats polluting the spec). */
+type LayoutSidecar = Record<string, Record<string, { x: number; y: number }>>;
+
+function layoutSidecarPath(ctx: ServerCtx): string {
+  return join(ctx.workspaceRoot, '.harness', 'config', 'flows.layout.json');
+}
+
+async function readLayoutSidecar(ctx: ServerCtx): Promise<LayoutSidecar> {
+  try {
+    return JSON.parse(await readFile(layoutSidecarPath(ctx), 'utf8')) as LayoutSidecar;
+  } catch {
+    return {};
+  }
+}
+
+function isLayoutSidecar(body: unknown): body is LayoutSidecar {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return false;
+  return Object.values(body as Record<string, unknown>).every(
+    (flow) =>
+      !!flow &&
+      typeof flow === 'object' &&
+      !Array.isArray(flow) &&
+      Object.values(flow as Record<string, unknown>).every(
+        (pos) =>
+          !!pos &&
+          typeof pos === 'object' &&
+          typeof (pos as { x?: unknown }).x === 'number' &&
+          typeof (pos as { y?: unknown }).y === 'number',
+      ),
+  );
+}
+
+/** Merge semantics mirror the designer's store: incoming flows replace
+ *  their stored layout wholesale; unmentioned flows keep theirs. */
+async function handlePutLayout(res: ServerResponse, body: unknown, ctx: ServerCtx): Promise<void> {
+  if (!isLayoutSidecar(body)) {
+    badRequest(
+      res,
+      'PUT /v1/catalog/layout: body must map flowId → stepId → { x: number, y: number }',
+    );
+    return;
+  }
+  const merged = { ...(await readLayoutSidecar(ctx)), ...body };
+  const configDir = join(ctx.workspaceRoot, '.harness', 'config');
+  await mkdir(configDir, { recursive: true });
+  await writeFile(layoutSidecarPath(ctx), `${JSON.stringify(merged, null, 2)}\n`, 'utf8');
+  ok(res, {
+    service: 'harness',
+    method: 'PUT',
+    path: '/v1/catalog/layout',
+    flowCount: Object.keys(body).length,
+    ts: new Date().toISOString(),
+  });
+}
+
 async function handlePutCatalog(res: ServerResponse, body: unknown, ctx: ServerCtx): Promise<void> {
   const warnings: UnsupportedFeature[] = [];
   try {

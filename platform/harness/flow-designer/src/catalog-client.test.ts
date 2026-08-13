@@ -1,6 +1,11 @@
 import type { Catalog } from '@helmsmith/flow-spec';
 import { describe, expect, it } from 'vitest';
-import { loadServerCatalog, saveServerCatalog } from './catalog-client.ts';
+import {
+  loadServerCatalog,
+  loadServerLayout,
+  saveServerCatalog,
+  saveServerLayout,
+} from './catalog-client.ts';
 
 const CATALOG: Catalog = {
   flows: [
@@ -59,6 +64,32 @@ describe('catalog client (save-to-server)', () => {
     await expect(saveServerCatalog('/harness', CATALOG, fetchFn)).rejects.toThrow(
       /save failed \(500\)/,
     );
+  });
+
+  it('layout load returns the map, and null on ANY failure (best-effort sidecar)', async () => {
+    const ok = (async () =>
+      jsonResponse({ layouts: { f: { a: { x: 1, y: 2 } } } })) as typeof fetch;
+    expect(await loadServerLayout('/harness', ok)).toEqual({ f: { a: { x: 1, y: 2 } } });
+    const missing = (async () => new Response('', { status: 404 })) as typeof fetch;
+    expect(await loadServerLayout('/harness', missing)).toBeNull();
+    const down = (async () => {
+      throw new TypeError('fetch failed');
+    }) as typeof fetch;
+    expect(await loadServerLayout('/harness', down)).toBeNull();
+  });
+
+  it('layout save PUTs the map and reports success as a boolean, never throwing', async () => {
+    let sent: unknown;
+    const ok = (async (_url: RequestInfo | URL, init?: RequestInit) => {
+      sent = JSON.parse(String(init?.body));
+      return jsonResponse({ flowCount: 1 });
+    }) as typeof fetch;
+    expect(await saveServerLayout('/harness', { f: { a: { x: 1, y: 2 } } }, ok)).toBe(true);
+    expect(sent).toEqual({ f: { a: { x: 1, y: 2 } } });
+    const down = (async () => {
+      throw new TypeError('fetch failed');
+    }) as typeof fetch;
+    expect(await saveServerLayout('/harness', {}, down)).toBe(false);
   });
 
   it('surfaces connection-level failures readably', async () => {

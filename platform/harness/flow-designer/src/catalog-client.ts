@@ -6,6 +6,7 @@
  * artifact defines it) is just a different base URL.
  */
 import type { Catalog, UnsupportedFeature } from '@helmsmith/flow-spec';
+import type { LayoutMap } from './layout-store.ts';
 
 export interface SaveResult {
   flowCount: number;
@@ -49,4 +50,43 @@ export async function saveServerCatalog(
     throw new Error(body.error ?? `save failed (${res.status})`);
   }
   return { flowCount: body.flowCount ?? catalog.flows.length, warnings: body.warnings ?? [] };
+}
+
+/**
+ * Layout sidecar transport — GET/PUT /v1/catalog/layout. Deliberately
+ * BEST-EFFORT in both directions: layout is an editor convenience, so
+ * a server without the route (e.g. a controlplane that hasn't added
+ * it), a network failure, or a malformed body must never block the
+ * catalog operations they ride along with. Load resolves null on any
+ * failure; save resolves false.
+ */
+export async function loadServerLayout(
+  base: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<LayoutMap | null> {
+  try {
+    const res = await fetchFn(`${base}/v1/catalog/layout`);
+    if (!res.ok) return null;
+    const body = (await res.json()) as { layouts?: LayoutMap };
+    return body.layouts && typeof body.layouts === 'object' ? body.layouts : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveServerLayout(
+  base: string,
+  layouts: LayoutMap,
+  fetchFn: typeof fetch = fetch,
+): Promise<boolean> {
+  try {
+    const res = await fetchFn(`${base}/v1/catalog/layout`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(layouts),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }

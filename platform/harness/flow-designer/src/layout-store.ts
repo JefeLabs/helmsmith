@@ -48,6 +48,53 @@ export function readLayouts(storage: StorageLike): LayoutMap {
   }
 }
 
+/** Snapshot merge for sidecar imports and server loads: incoming
+ *  flows replace their stored layout wholesale; flows the incoming
+ *  map does not mention keep their local arrangement. */
+export function mergedLayouts(current: LayoutMap, incoming: LayoutMap): LayoutMap {
+  return { ...current, ...incoming };
+}
+
+/** Shape detection for imported files: a layout sidecar is a
+ *  non-empty object of flowId → stepId → numeric {x, y} — and never a
+ *  catalog (which has a `flows` array). */
+export function isLayoutFile(parsed: unknown): parsed is LayoutMap {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
+  const entries = Object.entries(parsed as Record<string, unknown>);
+  if (entries.length === 0) return false;
+  if ('flows' in (parsed as Record<string, unknown>)) return false;
+  return entries.every(([, flow]) => {
+    if (!flow || typeof flow !== 'object' || Array.isArray(flow)) return false;
+    return Object.values(flow as Record<string, unknown>).every(
+      (pos) =>
+        !!pos &&
+        typeof pos === 'object' &&
+        typeof (pos as { x?: unknown }).x === 'number' &&
+        typeof (pos as { y?: unknown }).y === 'number',
+    );
+  });
+}
+
+/** Bulk merge a sidecar's layouts into storage (per-flow replace). */
+export function writeLayouts(storage: StorageLike, incoming: LayoutMap): void {
+  try {
+    storage.setItem(LAYOUT_KEY, JSON.stringify(mergedLayouts(readLayouts(storage), incoming)));
+  } catch {
+    // Layout is a convenience; losing it must never break editing.
+  }
+}
+
+/** The stored layouts for exactly these flows — what an export or a
+ *  server save carries. Never leaks other catalogs' arrangements. */
+export function layoutsForFlows(storage: StorageLike, flowIds: readonly string[]): LayoutMap {
+  const all = readLayouts(storage);
+  const out: LayoutMap = {};
+  for (const id of flowIds) {
+    if (all[id] && Object.keys(all[id]).length > 0) out[id] = all[id];
+  }
+  return out;
+}
+
 /** Replace one flow's layout, preserving the others. Swallows storage
  *  failures (private mode, quota) — persistence is best-effort. */
 export function writeLayout(storage: StorageLike, flowId: string, layout: FlowLayout): void {

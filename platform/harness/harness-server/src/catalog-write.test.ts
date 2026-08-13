@@ -145,6 +145,41 @@ describe('catalog write surface (designer save-to-server)', () => {
     return { socketPath, workspaceRoot };
   }
 
+  it('layout sidecar: PUT merges per-flow into flows.layout.json; GET returns it; bad shapes 400', async () => {
+    const { socketPath, workspaceRoot } = await bootServer();
+
+    // Empty before any write.
+    const empty = await udsJson(socketPath, 'GET', '/v1/catalog/layout');
+    expect(empty.status).toBe(200);
+    expect(empty.body.layouts).toEqual({});
+
+    // First write.
+    const l1 = { 'flow-a': { start: { x: 10, y: 20 } }, 'flow-b': { s: { x: 1, y: 1 } } };
+    expect((await udsJson(socketPath, 'PUT', '/v1/catalog/layout', l1)).status).toBe(200);
+
+    // Second write replaces flow-a wholesale, leaves flow-b untouched.
+    const l2 = { 'flow-a': { other: { x: 99, y: 99 } } };
+    expect((await udsJson(socketPath, 'PUT', '/v1/catalog/layout', l2)).status).toBe(200);
+    const got = await udsJson(socketPath, 'GET', '/v1/catalog/layout');
+    expect(got.body.layouts).toEqual({
+      'flow-a': { other: { x: 99, y: 99 } },
+      'flow-b': { s: { x: 1, y: 1 } },
+    });
+
+    // Persisted to disk for restart survival.
+    const onDisk = JSON.parse(
+      await readFile(join(workspaceRoot, '.harness', 'config', 'flows.layout.json'), 'utf8'),
+    );
+    expect(onDisk['flow-b']).toEqual({ s: { x: 1, y: 1 } });
+
+    // Malformed shapes are rejected — layout is lenient to load, strict to store.
+    expect(
+      (await udsJson(socketPath, 'PUT', '/v1/catalog/layout', { f: { s: { x: 'no', y: 2 } } }))
+        .status,
+    ).toBe(400);
+    expect((await udsJson(socketPath, 'PUT', '/v1/catalog/layout', [1, 2])).status).toBe(400);
+  });
+
   it('GET /v1/catalog returns the full live catalog', async () => {
     const { socketPath } = await bootServer();
     const r = await udsJson(socketPath, 'GET', '/v1/catalog');

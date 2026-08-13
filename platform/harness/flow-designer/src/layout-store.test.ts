@@ -3,9 +3,13 @@ import type { DesignerNode } from './graph-model.ts';
 import {
   appliedLayout,
   capturedLayout,
+  isLayoutFile,
   LAYOUT_KEY,
+  layoutsForFlows,
+  mergedLayouts,
   readLayouts,
   writeLayout,
+  writeLayouts,
 } from './layout-store.ts';
 
 function node(id: string, x: number, y: number): DesignerNode {
@@ -57,6 +61,37 @@ describe('layout store', () => {
     expect(readLayouts(storage)).toEqual({
       'flow-1': { a: { x: 9, y: 9 } },
       'flow-2': { b: { x: 3, y: 4 } },
+    });
+  });
+
+  it('merges incoming layouts per-flow: incoming replaces, unmentioned flows keep local', () => {
+    const current = { 'flow-1': { a: { x: 1, y: 1 } }, 'flow-2': { b: { x: 2, y: 2 } } };
+    const incoming = { 'flow-1': { c: { x: 9, y: 9 } } };
+    expect(mergedLayouts(current, incoming)).toEqual({
+      'flow-1': { c: { x: 9, y: 9 } }, // replaced wholesale (snapshot semantics)
+      'flow-2': { b: { x: 2, y: 2 } }, // untouched
+    });
+  });
+
+  it('detects a layout file by shape — and never confuses it with a catalog', () => {
+    expect(isLayoutFile({ 'flow-1': { a: { x: 1, y: 2 } } })).toBe(true);
+    expect(isLayoutFile({ flows: [] })).toBe(false); // a catalog
+    expect(isLayoutFile([])).toBe(false);
+    expect(isLayoutFile({ 'flow-1': { a: { x: 'nope', y: 2 } } })).toBe(false);
+    expect(isLayoutFile({})).toBe(false); // empty is meaningless, reject
+  });
+
+  it('bulk write merges into storage; layoutsForFlows exports only the named subset', () => {
+    const storage = fakeStorage();
+    writeLayout(storage, 'mine', { a: { x: 1, y: 1 } });
+    writeLayout(storage, 'other-catalog', { z: { x: 5, y: 5 } });
+    writeLayouts(storage, { mine: { a: { x: 7, y: 7 } }, imported: { b: { x: 3, y: 3 } } });
+    expect(readLayouts(storage).mine).toEqual({ a: { x: 7, y: 7 } });
+    expect(readLayouts(storage).imported).toEqual({ b: { x: 3, y: 3 } });
+    // Export never leaks other catalogs' layouts.
+    expect(layoutsForFlows(storage, ['mine', 'imported'])).toEqual({
+      mine: { a: { x: 7, y: 7 } },
+      imported: { b: { x: 3, y: 3 } },
     });
   });
 
