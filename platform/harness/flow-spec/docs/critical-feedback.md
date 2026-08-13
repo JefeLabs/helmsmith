@@ -178,19 +178,20 @@ The unifying observation: once the validator crossed into statically-knowable-ru
 |---|---|
 | 🔵 `concurrency: 'pessimistic'` validated but no lock existed — two same-role reviewers could race a decision; last write won via the status guard | Advisory-exclusive claims: `POST /v1/jobs/:id/approval/claim` (`x-actor-id` + role headers) reserves the decision — competing claims 409 naming the holder, re-claims by the holder are idempotent, `DELETE` releases (claimant only, 403 otherwise), and while claimed the resume route 409s any other actor (the SLA auto-reject bypasses by construction — the server acting as itself). Unclaimed approvals resume exactly as before, so the lock is opt-in for UIs without breaking curl-driven flows. The claim is a wire shape (`ApprovalClaim` in flow-spec, schema-rooted), surfaces on the approval read route, persists in the paused-job file (survives restarts, rehydrated at boot), and clears with the pending entry on resume/terminal. Pinned by a full lifecycle integration test (claim → conflict → locked resume 409s → release → hand-over → approve) |
 
-## 2. Open — package-level (this package's debt)
+### 1.24 Entry-point split + packaging (2026-08-13)
 
-### 🟡 The name undersells the scope — it's the platform wire-contract package now
-Originally: `ProductDef`/`ProductRepo`/`ContextSourceDef` (tenancy/git shapes) live here because `validateUnifiedCatalog` needs them. Since 2026-08-12 the run side (`FlowRunState`, HITL payloads, `NodeExit`, `ChangedFile`) lives here too — deliberately, for the shared-contract reasons in SPEC §3.1.2. Defensible, but a designer UI importing "flow types" now drags in clone-URL shapes and reviewer payloads. Exports are now curated (§1.5), which softens this but doesn't close it — rename or split entry points when the designer becomes real.
+| Was | Now |
+|---|---|
+| 🟡 The name undersold the scope — the package is the platform wire-contract, so a designer importing "flow types" dragged in clone-URL shapes and reviewer payloads; ledger said "split entry points when the designer becomes real" | Subpath entries: `./definition` (authoring — types, `validateFlowCatalog`, evaluator, schema subset), `./run` (run-side wire shapes incl. HITL payloads and `parseFlowOutput`), `./tenancy` (product/git shapes + `validateUnifiedCatalog`), `./schema` (the generated artifact, importable). The root stays the full union plus fixtures — nothing moved, the entries re-curate, so no consumer broke. A subpath test pins each entry's surface AND its deliberate absences |
+| 🔵 Packaging hygiene — the row claimed "no changeset wiring"; in fact `@changesets/cli` + `.changeset/config.json` were already wired at the monorepo root (the claim was stale). What was real: version 0.0.0 | Version stamped 0.1.0. `private: true` stays deliberately — dropping it is the act of publishing, which waits for the first out-of-repo consumer (a product decision, not hygiene) |
+
+## 2. Open — package-level (this package's debt)
 
 ### 🔵 Input delivery is stringly
 `input` mappings resolve structured values, then serialize to one string through `state.output`. Right for agents (prompts) and scripts (stdin); wasteful for transform/gate consumers that re-parse what was just serialized. A structured hand-off (an `$.inputView` state slot or executor parameter) is the eventual fix; not urgent.
 
 ### 🔵 Wire-format warts locked in 2026-08-12
 (a) Input-mapping keys must not be named `kind` — the single-Expression detection heuristic; `{ expr: … } | { map: … }` would have been unambiguous. (b) The write-once `input` reducer treats a legitimately-`null` job input as claimable by a later write; node writes to `input` are prevented by convention only. (c) ~~`nodes` growth~~ resolved §1.22 — text evidence is capped with an explicit marker; JSON evidence and the `$.output` relay stay whole.
-
-### 🔵 Packaging hygiene
-Version 0.0.0/private with no changeset wiring despite semver being a stated extraction motive. Fine today, wrong the day the first out-of-repo consumer appears. (The missing `test` script and the hoisting-only `vitest` dependency were both fixed 2026-08-12.)
 
 ## 3. Open — runtime-level (harness-core's debt, visible through the spec)
 

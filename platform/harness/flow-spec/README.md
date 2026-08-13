@@ -50,6 +50,16 @@ Reporting never changes accept/reject behavior. harness-core's `loadCatalog` wir
 | Doc | Contents |
 |---|---|
 | [`SPEC.md`](./SPEC.md) | Detailed specification — boundary, modules, contract, validation, expressions, conformance |
+### Entry points
+
+| Import | Surface |
+|---|---|
+| `@helmsmith/flow-spec` | Everything, plus the conformance fixture sets |
+| `@helmsmith/flow-spec/definition` | Authoring: flow/step/edge types, `validateFlowCatalog`, the expression evaluator, the schema subset — what a designer UI needs, nothing else |
+| `@helmsmith/flow-spec/run` | Run-side wire shapes: `FlowRunState`, HITL payloads (incl. `ApprovalClaim`), `NodeExit`, `ChangedFile`, `JobIntent`, `parseFlowOutput` |
+| `@helmsmith/flow-spec/tenancy` | Product/repo/context-source shapes + `validateUnifiedCatalog` |
+| `@helmsmith/flow-spec/schema` | The generated JSON Schema artifact, importable directly |
+
 | [`docs/capabilities-and-limits.md`](./docs/capabilities-and-limits.md) | Pattern-level guide — which shapes of flow you can build (resilience, HITL, fan-out, factory flows, …) and what you deliberately can't |
 | [`docs/steps-and-edges.md`](./docs/steps-and-edges.md) | Authoring reference — every step kind, edge, and tag with config tables, JSON examples, and support status |
 | [`docs/critical-feedback.md`](./docs/critical-feedback.md) | Consolidated critical feedback with severity and status |
