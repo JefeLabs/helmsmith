@@ -207,21 +207,17 @@ export const FlowState = Annotation.Root({
   /**
    * Staged changes across product repos, populated by the agent
    * executor after each successful node-tick (and surfaced via
-   * ApprovalRequest at HITL interrupts). Reducer merges by `id`
-   * (`${repo}::${path}`): the latest entry for a path wins, so
-   * agents that re-stage a file replace earlier entries cleanly.
-   * Entries that no longer appear in a fresh discovery still persist
-   * — once observed in state, a file stays in the changedFiles list
-   * until the job terminates. Reviewers see the cumulative diff
-   * surface, not a momentary snapshot.
+   * ApprovalRequest at HITL interrupts). Every discovery is a FULL
+   * snapshot (git diff --cached over every product repo), so the
+   * reducer REPLACES the set — the latest snapshot is the truth, and
+   * a file the agent reverted drops off the reviewer's diff surface
+   * instead of lingering forever (the old merge-by-id semantics never
+   * removed entries). Writers must therefore always emit complete
+   * snapshots, never partial deltas; executors that ran no discovery
+   * simply omit the channel.
    */
   changedFiles: Annotation<ChangedFile[]>({
-    reducer: (existing, incoming) => {
-      const merged = new Map<string, ChangedFile>();
-      for (const c of existing) merged.set(c.id, c);
-      for (const c of incoming) merged.set(c.id, c);
-      return [...merged.values()];
-    },
+    reducer: (_, incoming) => incoming,
     default: () => [],
   }),
 });
@@ -265,6 +261,12 @@ export interface CompileFlowOptions {
    *  tag. Caller can pass a Postgres/SQLite saver to make awaiting-
    *  approval / suspended jobs survive process restarts. */
   checkpointer?: BaseCheckpointSaver;
+  /** Cap (in characters) on TEXT evidence recorded at `$.nodes.<id>`
+   *  — the checkpoint-growth guard. Oversized text is cut and marked
+   *  `…[truncated N chars]`; the `$.output` relay to the next node is
+   *  never touched, and JSON evidence is never truncated (structured
+   *  data must stay addressable). Default 262144 (256K chars). */
+  maxTextEvidenceLength?: number;
   /** Compile as a subgraph: attach NO checkpointer of its own, so the
    *  graph inherits the parent's through the invoking node's config
    *  (LangGraph namespaces child checkpoints automatically). This is
@@ -327,17 +329,24 @@ export function compileFlow(opts: CompileFlowOptions) {
       // Built-in executors (gate) apply to stateless step kinds that
       // need no runJob deps — caller can still override by putting an
       // explicit entry in the executors map.
-      isSyntheticApprovalNode(node)
-        ? makeApprovalExecutor(node)
-        : isSyntheticSuspendNode(node)
-          ? makeSuspendExecutor(node)
-          : (executors.get(node.id) ?? builtinExecutor(node) ?? defaultExecutor(node.id));
+      node.kind === 'synthetic-interrupt'
+        ? node.interrupt.approval
+          ? makeApprovalExecutor(node.id, node.interrupt.approval)
+          : makeSuspendExecutor(node.id, node.interrupt.suspend)
+        : (executors.get(node.id) ?? builtinExecutor(node) ?? defaultExecutor(node.id));
     const wrapped = withJoinGuard(
       node,
       forwardSourcesByTarget.get(node.id) ?? [],
       withEffectGuard(
         node,
-        withPolicy(node, withNodeIO(node, wrapWithTags(node, withInputMapping(node, baseExec)))),
+        withPolicy(
+          node,
+          withNodeIO(
+            node,
+            wrapWithTags(node, withInputMapping(node, baseExec)),
+            opts.maxTextEvidenceLength ?? DEFAULT_MAX_TEXT_EVIDENCE,
+          ),
+        ),
       ),
     );
     builder.addNode(node.id, wrapped);
@@ -618,7 +627,7 @@ export function makeTransformExecutor(node: TaskStep): NodeExecutor {
  * rewrite needed — Loop is a within-node iteration, not a separate
  * graph node.
  */
-function wrapWithTags(step: TaskStep, exec: NodeExecutor): NodeExecutor {
+function wrapWithTags(step: RuntimeStep, exec: NodeExecutor): NodeExecutor {
   if (!step.tags?.loop) return exec;
   return loopWrapper(step.id, step.tags.loop, exec, step.output?.kind === 'json');
 }
@@ -634,7 +643,7 @@ function wrapWithTags(step: TaskStep, exec: NodeExecutor): NodeExecutor {
  * so a looped node's mapping sees the per-item state ($.output is the
  * current item).
  */
-function withInputMapping(step: TaskStep, exec: NodeExecutor): NodeExecutor {
+function withInputMapping(step: RuntimeStep, exec: NodeExecutor): NodeExecutor {
   const mapping = step.input;
   if (mapping === undefined) return exec;
   return async (state) => {
@@ -682,7 +691,7 @@ function resolveInputMapping(
  * ends without it (authors declare 'all' only over always-run sources).
  */
 function withJoinGuard(
-  step: TaskStep,
+  step: RuntimeStep,
   forwardSources: readonly string[],
   exec: NodeExecutor,
 ): NodeExecutor {
@@ -735,7 +744,7 @@ function withJoinGuard(
  * untouched — this wrapper only inspects RETURNED deltas, never
  * catches. (Synthetic nodes carry no policy anyway.)
  */
-function withPolicy(step: TaskStep, exec: NodeExecutor): NodeExecutor {
+function withPolicy(step: RuntimeStep, exec: NodeExecutor): NodeExecutor {
   const policy = step.policy;
   if (!policy) return exec;
   const nodeId = step.id;
@@ -834,7 +843,7 @@ function withTimeout(nodeId: string, timeoutMs: number, exec: NodeExecutor): Nod
  * output leaves no evidence and will re-run; publish nodes always
  * produce output.
  */
-function withEffectGuard(step: TaskStep, exec: NodeExecutor): NodeExecutor {
+function withEffectGuard(step: RuntimeStep, exec: NodeExecutor): NodeExecutor {
   if (step.effect !== 'side-effecting') return exec;
   const nodeId = step.id;
   return async (state) => {
@@ -859,7 +868,16 @@ function withEffectGuard(step: TaskStep, exec: NodeExecutor): NodeExecutor {
  * 'OutputParseError' so the flow can route around it via an error edge
  * (the raw output is kept on `state.output` for debugging).
  */
-function withNodeIO(step: TaskStep, exec: NodeExecutor): NodeExecutor {
+const DEFAULT_MAX_TEXT_EVIDENCE = 262_144;
+
+/** Snapshot-cap for text evidence: full string under the limit, else
+ *  a cut with an explicit marker so readers know data is missing. */
+function cappedTextEvidence(value: string, limit: number): string {
+  if (value.length <= limit) return value;
+  return `${value.slice(0, limit)}…[truncated ${value.length - limit} chars]`;
+}
+
+function withNodeIO(step: RuntimeStep, exec: NodeExecutor, maxTextEvidence: number): NodeExecutor {
   const nodeId = step.id;
   const wantsJson = step.output?.kind === 'json';
   return async (state) => {
@@ -879,8 +897,14 @@ function withNodeIO(step: TaskStep, exec: NodeExecutor): NodeExecutor {
     // Spread the delta's OWN nodes writes first — a loop's cross-
     // iteration accumulation (or any executor's direct nodes writes)
     // must survive the node's own evidence entry.
-    if (!wantsJson)
-      return completed({ ...delta, nodes: { ...delta.nodes, [nodeId]: delta.output } });
+    if (!wantsJson) {
+      return completed({
+        ...delta,
+        // Evidence copy only — $.output (the relay to the next node)
+        // keeps the full string; the cap guards checkpoint growth.
+        nodes: { ...delta.nodes, [nodeId]: cappedTextEvidence(delta.output, maxTextEvidence) },
+      });
+    }
     let parsed: unknown;
     try {
       parsed = JSON.parse(delta.output);
@@ -925,18 +949,41 @@ function withNodeIO(step: TaskStep, exec: NodeExecutor): NodeExecutor {
 const APPROVAL_SUFFIX = '__approval';
 const SUSPEND_SUFFIX = '__suspend';
 
-interface SyntheticApprovalNode extends TaskStep {
-  __approvalTag: ApprovalTag;
-}
-interface SyntheticSuspendNode extends TaskStep {
-  __suspendTag: SuspendTag;
+/**
+ * Runtime-internal step created by the topology rewrite — never part
+ * of the wire contract. Carries its interrupt tag as first-class data
+ * with an honest discriminator, instead of masquerading as a
+ * `kind: 'agent'` node with a cast placeholder config (the old
+ * type-system lie: walkers over rewritten flows tripped on phantom
+ * agents). The wrapper-consulted TaskStep fields are declared
+ * structurally absent so the wrapper chain accepts the union without
+ * casts — and no-ops on synthetic nodes by construction.
+ */
+interface SyntheticInterruptStep {
+  id: string;
+  kind: 'synthetic-interrupt';
+  interrupt:
+    | { approval: ApprovalTag; suspend?: undefined }
+    | { suspend: SuspendTag; approval?: undefined };
+  config?: undefined;
+  tags?: undefined;
+  policy?: undefined;
+  input?: undefined;
+  output?: undefined;
+  effect?: undefined;
+  joinStrategy?: undefined;
+  terminal?: undefined;
 }
 
-function isSyntheticApprovalNode(node: TaskStep): node is SyntheticApprovalNode {
-  return '__approvalTag' in node;
-}
-function isSyntheticSuspendNode(node: TaskStep): node is SyntheticSuspendNode {
-  return '__suspendTag' in node;
+/** What compileFlow actually iterates: wire steps plus synthetic
+ *  interrupt nodes from the rewrite. */
+type RuntimeStep = TaskStep | SyntheticInterruptStep;
+
+/** Post-rewrite graph: FlowDef topology over RuntimeSteps. */
+interface RewrittenFlow {
+  id: string;
+  nodes: RuntimeStep[];
+  edges: Edge[];
 }
 
 /**
@@ -955,35 +1002,31 @@ function isSyntheticSuspendNode(node: TaskStep): node is SyntheticSuspendNode {
  * .suspend cannot both be set), so a node gets at most one rewrite.
  * Loop tag is unaffected here — it's a wrapper, not a topology change.
  */
-function rewriteFlowForInterruptTags(flow: FlowDef): FlowDef {
+function rewriteFlowForInterruptTags(flow: FlowDef): RewrittenFlow {
   const tagged = flow.nodes.filter(
     (n) => n.tags?.approval !== undefined || n.tags?.suspend !== undefined,
   );
   if (tagged.length === 0) return flow;
 
-  const newNodes: TaskStep[] = [];
+  const newNodes: RuntimeStep[] = [];
   const renames = new Map<string, string>();
 
   for (const node of flow.nodes) {
     if (node.tags?.approval) {
       const syntheticId = `${node.id}${APPROVAL_SUFFIX}`;
-      const synthetic: SyntheticApprovalNode = {
+      const synthetic: SyntheticInterruptStep = {
         id: syntheticId,
-        kind: 'agent',
-        // The synthetic node has no real config; the executor pulls
-        // tag data from __approvalTag rather than config.
-        config: { agent: { id: syntheticId } as AgentDef },
-        __approvalTag: node.tags.approval,
+        kind: 'synthetic-interrupt',
+        interrupt: { approval: node.tags.approval },
       };
       newNodes.push({ ...node, tags: undefined }, synthetic);
       renames.set(node.id, syntheticId);
     } else if (node.tags?.suspend) {
       const syntheticId = `${node.id}${SUSPEND_SUFFIX}`;
-      const synthetic: SyntheticSuspendNode = {
+      const synthetic: SyntheticInterruptStep = {
         id: syntheticId,
-        kind: 'agent',
-        config: { agent: { id: syntheticId } as AgentDef },
-        __suspendTag: node.tags.suspend,
+        kind: 'synthetic-interrupt',
+        interrupt: { suspend: node.tags.suspend },
       };
       newNodes.push({ ...node, tags: undefined }, synthetic);
       renames.set(node.id, syntheticId);
@@ -1054,9 +1097,7 @@ function summarizeChanges(changes: readonly ChangedFile[]): string | undefined {
  *   - 'reject' → reject exit + RejectionPayload (route via reject edge;
  *     attempt counter increments on this synthetic node's id)
  */
-function makeApprovalExecutor(node: SyntheticApprovalNode): NodeExecutor {
-  const tag = node.__approvalTag;
-  const nodeId = node.id;
+function makeApprovalExecutor(nodeId: string, tag: ApprovalTag): NodeExecutor {
   // Strip the suffix to recover the original (untagged) node id for
   // the user-facing payload.
   const originalId = nodeId.replace(new RegExp(`${APPROVAL_SUFFIX}$`), '');
@@ -1128,9 +1169,7 @@ function makeApprovalExecutor(node: SyntheticApprovalNode): NodeExecutor {
  * On resume (Command({resume})): the resume value is unused; suspend
  * has no decision, just a wake-up signal. The executor returns success.
  */
-function makeSuspendExecutor(node: SyntheticSuspendNode): NodeExecutor {
-  const tag = node.__suspendTag;
-  const nodeId = node.id;
+function makeSuspendExecutor(nodeId: string, tag: SuspendTag): NodeExecutor {
   const originalId = nodeId.replace(new RegExp(`${SUSPEND_SUFFIX}$`), '');
 
   return async (state) => {
@@ -1288,11 +1327,13 @@ function mergeLoopDeltas(
       out[ch] = { ...(acc[ch] as object), ...(delta[ch] as object) } as never;
     }
   }
-  for (const ch of ['messages', 'steering', 'changedFiles'] as const) {
+  for (const ch of ['messages', 'steering'] as const) {
     if (acc[ch] !== undefined || delta[ch] !== undefined) {
       out[ch] = [...((acc[ch] as unknown[]) ?? []), ...((delta[ch] as unknown[]) ?? [])] as never;
     }
   }
+  // changedFiles carries full snapshots — the top spread already keeps
+  // the latest iteration's snapshot (delta wins; absent keys keep acc).
   return out;
 }
 
@@ -1378,18 +1419,35 @@ function buildItemState(state: FlowStateT, item: unknown): FlowStateT {
 }
 
 /**
+ * Agent ids the LEGACY compatibility path skips without running an
+ * adapter — pre-flow JobRecords register these bookkeeping agents and
+ * the historical orchestrator never executed them. One exported
+ * constant instead of string literals scattered across the runtime;
+ * the flow-based path has no implicit skips (every agent node in a
+ * FlowDef runs).
+ */
+export const LEGACY_COORDINATOR_IDS: readonly string[] = Object.freeze([
+  'coordinator',
+  'checkout-coordinator',
+]);
+
+/**
  * Synthesize a linear FlowDef from a flat agent list. Used by runJob's
  * legacy compatibility path: every existing JobRecord submission
  * provides agents directly, not a FlowDef. The synthesized flow is
  *
  *   trigger:__entry → agents[0] → agents[1] → … → agents[N-1] → END
  *
- * with sequence edges throughout. Coordinator agents are filtered out
- * to match the historical orchestrator behavior (hardcoded skip on
- * id === 'coordinator' / 'checkout-coordinator').
+ * with sequence edges throughout. Legacy coordinator agents are
+ * filtered out (see LEGACY_COORDINATOR_IDS); callers with different
+ * bookkeeping agents pass their own skip list.
  */
-export function linearFlowFromAgents(id: string, agents: readonly { id: string }[]): FlowDef {
-  const real = agents.filter((a) => a.id !== 'coordinator' && a.id !== 'checkout-coordinator');
+export function linearFlowFromAgents(
+  id: string,
+  agents: readonly { id: string }[],
+  skipIds: readonly string[] = LEGACY_COORDINATOR_IDS,
+): FlowDef {
+  const real = agents.filter((a) => !skipIds.includes(a.id));
   const TRIGGER_ID = '__trigger';
   const nodes: TaskStep[] = [
     {

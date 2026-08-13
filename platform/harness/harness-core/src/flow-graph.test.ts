@@ -1102,6 +1102,60 @@ describe('parallel fan-out + joinStrategy (2.4)', () => {
 
 // ─── node output schema enforcement (2.7) ─────────────────────────────────
 
+describe('text evidence truncation (checkpoint-growth cap)', () => {
+  it('caps oversized TEXT evidence at $.nodes.<id> while $.output keeps the full string', async () => {
+    const big = 'x'.repeat(500);
+    const flow: FlowDef = {
+      id: 'trunc',
+      nodes: [trigger('t'), agentNode('big'), agentNode('probe')],
+      edges: [
+        { from: 't', to: 'big', type: 'sequence' },
+        { from: 'big', to: 'probe', type: 'sequence' },
+      ],
+    };
+    const seen: string[] = [];
+    const executors = new Map<string, NodeExecutor>([
+      ['big', async () => ({ output: big, lastExit: { nodeId: 'big', kind: 'success' } })],
+      [
+        'probe',
+        async (state) => {
+          seen.push(state.output);
+          return { lastExit: { nodeId: 'probe', kind: 'success' } };
+        },
+      ],
+    ]);
+    const graph = compileFlow({ flow, executors, maxTextEvidenceLength: 100 });
+    const result = (await graph.invoke(initialState, {
+      configurable: { thread_id: 'trunc-1' },
+    })) as Record<string, unknown>;
+
+    // The evidence copy is capped with an explicit marker…
+    const evidence = (result.nodes as Record<string, unknown>).big as string;
+    expect(evidence.startsWith('x'.repeat(100))).toBe(true);
+    expect(evidence).toContain('[truncated 400 chars]');
+    expect(evidence.length).toBeLessThan(200);
+    // …but the $.output relay to the next node is untouched.
+    expect(seen[0]).toBe(big);
+  });
+
+  it('never truncates JSON evidence (structured data must stay addressable)', async () => {
+    const bigJson = JSON.stringify({ blob: 'y'.repeat(500) });
+    const flow: FlowDef = {
+      id: 'trunc-json',
+      nodes: [trigger('t'), { ...agentNode('shape'), output: { kind: 'json' } } as TaskStep],
+      edges: [{ from: 't', to: 'shape', type: 'sequence' }],
+    };
+    const executors = new Map<string, NodeExecutor>([
+      ['shape', async () => ({ output: bigJson, lastExit: { nodeId: 'shape', kind: 'success' } })],
+    ]);
+    const graph = compileFlow({ flow, executors, maxTextEvidenceLength: 100 });
+    const result = (await graph.invoke(initialState, {
+      configurable: { thread_id: 'trunc-2' },
+    })) as Record<string, unknown>;
+    expect((result.nodes as Record<string, { blob: string }>).shape.blob).toBe('y'.repeat(500));
+  });
+});
+
 describe('node output schema enforcement (2.7)', () => {
   function schemaFlow(): FlowDef {
     return {
@@ -2161,11 +2215,13 @@ describe('composeSystemPromptWithSteering', () => {
 // ─── state.changedFiles channel reducer ────────────────────────────────────
 
 describe('FlowState.changedFiles channel', () => {
-  // The channel reducer merges incoming entries by id, latest wins.
+  // The channel holds the latest FULL discovery snapshot (git diff
+  // --cached over every product repo) — a later write REPLACES the
+  // set, so reverted files drop off the reviewer's diff surface.
   // We can't unit-test the channel directly without compiling a graph;
   // exercise via compileFlow with two writers.
 
-  it('merges by id; later writes for the same path replace earlier ones', async () => {
+  it('a later full snapshot replaces the set — reverted files drop off', async () => {
     const flow: FlowDef = {
       id: 'merge',
       nodes: [trigger('t'), agentNode('a'), agentNode('b')],
@@ -2226,12 +2282,11 @@ describe('FlowState.changedFiles channel', () => {
     })) as Record<string, unknown>;
 
     const changed = result.changedFiles as Array<{ id: string; changeKind: string }>;
-    expect(changed).toHaveLength(2);
-    const xts = changed.find((c) => c.id === 'web::src/x.ts');
-    const readme = changed.find((c) => c.id === 'web::README.md');
-    // x.ts replaced (b's write wins); README.md preserved from a.
-    expect(xts?.changeKind).toBe('modified');
-    expect(readme?.changeKind).toBe('modified');
+    // b's snapshot no longer contains README.md — it was reverted, so
+    // it drops off; x.ts reflects b's fresh state.
+    expect(changed).toHaveLength(1);
+    expect(changed[0]?.id).toBe('web::src/x.ts');
+    expect(changed[0]?.changeKind).toBe('modified');
   });
 });
 

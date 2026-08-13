@@ -340,7 +340,10 @@ export function makeSubflowExecutor(
     return {
       output: innerOutputOut,
       lastExit: { nodeId, kind: 'success' },
-      ...(innerChangedFiles.length > 0 ? { changedFiles: innerChangedFiles } : {}),
+      // Snapshot semantics: the inner's final list IS the current
+      // truth (it started from the parent's snapshot), so always
+      // write it back — identity when the inner ran no discovery.
+      changedFiles: innerChangedFiles,
       ...(newSteering.length > 0 ? { steering: newSteering } : {}),
     };
   };

@@ -26,6 +26,7 @@ import {
   type ApprovalRequest,
   type ApprovalResume,
   compileFlow,
+  LEGACY_COORDINATOR_IDS,
   linearFlowFromAgents,
   type NodeExecutor,
   type SuspendRequest,
@@ -1032,7 +1033,7 @@ function makeAgentExecutor(
 ): NodeExecutor {
   return async (state) => {
     const agent = job.agents.find((a) => a.id === agentId);
-    if (!agent || agent.id === 'coordinator' || agent.id === 'checkout-coordinator') {
+    if (!agent || LEGACY_COORDINATOR_IDS.includes(agent.id)) {
       return { lastExit: { nodeId: agentId, kind: 'success' } };
     }
 
@@ -1109,15 +1110,20 @@ function makeAgentExecutor(
       //
       // No-op when workdirRoot or productRepos is missing — registration-
       // only / no-filesystem flows skip this cleanly.
+      // Snapshot semantics: a successful discovery ALWAYS writes —
+      // including an empty set, which is how a reverted file drops off
+      // the reviewer's surface. Only skip the channel when discovery
+      // didn't run (no workspace) or errored (null ≠ empty: a git
+      // failure must not clobber the last good snapshot).
       const changedFiles =
         job.workdirRoot && Array.isArray(job.productRepos) && job.productRepos.length > 0
-          ? await discoverChangedFiles(job.workdirRoot, job.productRepos).catch(() => [])
-          : [];
+          ? await discoverChangedFiles(job.workdirRoot, job.productRepos).catch(() => null)
+          : null;
 
       return {
         output: outcome.result,
         lastExit: { nodeId: agentId, kind: 'success' },
-        ...(changedFiles.length > 0 ? { changedFiles } : {}),
+        ...(changedFiles !== null ? { changedFiles } : {}),
       };
     }
 
