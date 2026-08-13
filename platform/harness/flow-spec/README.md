@@ -1,6 +1,6 @@
 # @helmsmith/flow-spec
 
-The flow wire contract: **types + validation + expression semantics + conformance fixtures**. This package is the spec — the shape stored in controlplane's catalog tables, edited by the (future) flow designer, and executed by harness-core.
+The flow wire contract: **types + validation + expression semantics + conformance fixtures**. This package is the spec — the shape stored in controlplane's catalog tables, edited by the flow designer (`@helmsmith/flow-designer`), and executed by harness-core.
 
 The contract covers both halves of a flow: the **definition side** (nodes, edges, tags) and the **data plane** (`FlowRunState` — the run-state shape expressions bind against). Nodes address each other's outputs via `$.nodes.<id>` (structured when a node declares `output.kind: 'json'`), read the job payload via `$.input`, and compose multi-source inputs via `input` mappings; harness-core's state schema is compile-time-asserted against `FlowRunState`, so the two cannot silently drift.
 

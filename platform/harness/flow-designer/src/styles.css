@@ -1,0 +1,240 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap");
+@import "tailwindcss";
+
+/* ── Chart-room instrument palette ──────────────────────────────── */
+:root {
+  --ink: #0a121d;
+  --ink-deep: #060c14;
+  --panel: #0f1a29;
+  --panel-raised: #14213437;
+  --line: #22344d;
+  --line-soft: #1a2a40;
+  --text: #d8e2ef;
+  --dim: #8296ad;
+  --faint: #55698227;
+  --brass: #d9a441;
+  --brass-soft: #d9a44122;
+  --error: #e5484d;
+  --warn: #d9a441;
+  --ok: #5cbf6a;
+
+  --k-trigger: #d9a441;
+  --k-agent: #4cc9f0;
+  --k-tool: #6a8fbf;
+  --k-script: #b287d8;
+  --k-transform: #43b9a5;
+  --k-gate: #e8763a;
+  --k-subflow: #7d7ff2;
+  --k-publish: #5cbf6a;
+
+  font-family: "IBM Plex Sans", sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: var(--ink-deep);
+  color: var(--text);
+}
+
+.font-display {
+  font-family: "Fraunces", serif;
+  letter-spacing: 0.01em;
+}
+.font-mono {
+  font-family: "IBM Plex Mono", monospace;
+}
+
+/* ── Canvas chart grid ──────────────────────────────────────────── */
+.react-flow {
+  background: radial-gradient(ellipse at 30% 0%, #10203622 0%, transparent 60%), var(--ink);
+}
+.react-flow__attribution {
+  background: transparent;
+  color: var(--faint);
+}
+
+/* ── Step node (instrument card) ────────────────────────────────── */
+.step-node {
+  width: 208px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--kind, var(--dim));
+  border-radius: 6px;
+  background: linear-gradient(180deg, var(--panel) 0%, #0c1624 100%);
+  box-shadow: 0 6px 24px #0006;
+  padding: 10px 12px;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+.step-node.selected {
+  border-color: var(--brass);
+  box-shadow:
+    0 0 0 1px var(--brass),
+    0 6px 28px #d9a44126;
+}
+.step-node .kind-chip {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--kind, var(--dim));
+}
+.step-node .node-id {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.step-node .node-sub {
+  font-size: 11px;
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.step-node .badges {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+.step-node .badge {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--line);
+  color: var(--dim);
+}
+.step-node .badge.fail {
+  border-color: var(--error);
+  color: var(--error);
+}
+.react-flow__handle {
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--ink);
+  background: var(--dim);
+}
+.react-flow__handle:hover {
+  background: var(--brass);
+}
+
+/* ── Panels ─────────────────────────────────────────────────────── */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line-soft);
+}
+.panel-title {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.field-label {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.input,
+.select,
+textarea.json {
+  width: 100%;
+  background: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  padding: 6px 8px;
+  outline: none;
+}
+.input:focus,
+.select:focus,
+textarea.json:focus {
+  border-color: var(--brass);
+}
+textarea.json.invalid {
+  border-color: var(--error);
+}
+.btn {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  padding: 5px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  color: var(--text);
+  background: var(--panel-raised);
+  cursor: pointer;
+  transition:
+    border-color 100ms ease,
+    color 100ms ease;
+}
+.btn:hover {
+  border-color: var(--brass);
+  color: var(--brass);
+}
+.btn.primary {
+  border-color: var(--brass);
+  color: var(--brass);
+  background: var(--brass-soft);
+}
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  cursor: pointer;
+}
+.palette-item:hover {
+  border-color: var(--line);
+  background: var(--panel-raised);
+}
+.palette-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
+}
+.flow-tab {
+  width: 100%;
+  text-align: left;
+  padding: 5px 10px;
+  border: none;
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: var(--dim);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  cursor: pointer;
+}
+.flow-tab:hover {
+  color: var(--text);
+}
+.flow-tab.active {
+  color: var(--brass);
+  border-left-color: var(--brass);
+  background: var(--brass-soft);
+}
+.status-lamp {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  display: inline-block;
+}

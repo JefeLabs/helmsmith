@@ -480,9 +480,8 @@ function scanExpressionTree(
  * adjacency. Used to enforce "non-reject edges form a DAG" constraint.
  */
 function hasCycle(adjacency: Map<string, string[]>): boolean {
+  // Colors: 0 = white (unvisited), 1 = gray (on stack), 2 = black (done).
   const WHITE = 0;
-  const _GRAY = 1;
-  const _BLACK = 2;
   const color = new Map<string, number>();
   for (const node of adjacency.keys()) color.set(node, WHITE);
   for (const node of adjacency.keys()) {
