@@ -12,6 +12,7 @@ pnpm build      # typecheck + production bundle
 
 - **Canvas editing** — all 8 step kinds from the palette; edges drawn by handle-drag (default `sequence`, retyped in the panel to conditional/error/fallback/reject with per-type fields); node/edge deletion; dagre auto-layout (`relayout`).
 - **Property panel** — id renames cascade to edges; per-kind `config`, `input`, `output`, `tags`, `policy`, `joinStrategy` edited as validated JSON (a parse failure shows inline and never corrupts the flow); `effect`/`terminal` as selects.
+- **Input-mapping & trigger builders** — `input` mappings edit as named-field rows (or one single expression; the form toggle is lossless — a field map IS an object-constructor expression), with the `kind` key and collisions guarded; trigger config edits as kind select + per-kind fields, with event matchers using the full expression builder against the `{ type, payload }` envelope.
 - **Visual expression builder** — conditional-edge conditions, transform expressions, and gate assertions edit as a recursive tree (kind select + per-kind fields, add/remove clauses); switching kinds is non-destructive (wrap into `not`/`exists` and back out, `all`↔`any` keep clauses, `compare` adopts the current expression as `lhs`); a `{ } json` toggle per field keeps the raw editor available. Builder edits ride the same apply channel as JSON edits, so undo/redo and live validation cover them.
 - **Live honesty** — every change re-runs `validateUnifiedCatalog`: path-prefixed errors and the unsupported-feature warnings appear instantly; the toolbar lamp is green/amber/red.
 - **Playgrounds** — expression evaluation (`evalExpression` + `resolveExpressionValue`) and output-schema checking (`schemaViolations`) against editable sample state, running the same code the router routes with.
@@ -22,5 +23,5 @@ pnpm build      # typecheck + production bundle
 ## v1 boundaries (deliberate)
 
 - Layout lives in this browser's localStorage keyed by flow id — it does not travel with the exported catalog or across machines (a shareable sidecar file could come later; flows with the same id share a layout slot).
-- Expressions have visual builders where they are top-level (conditions, transform, gate); expressions nested inside other JSON fields (input mappings, trigger event matchers, loop config) still edit as JSON — the `JsonField` seam keeps replacing one field at a time.
+- Expressions nested inside tag JSON (loop `path`, suspend matchers) still edit as JSON — the `JsonField` seam's last holdouts.
 - Undo/redo covers graph edits (⌘Z / ⌘⇧Z, toolbar ↶↷): semantic actions and whole drags are single history entries; selection churn and no-op field applies record nothing; native text-undo inside fields is untouched. History is per-flow-session — switching flows or importing resets it.
