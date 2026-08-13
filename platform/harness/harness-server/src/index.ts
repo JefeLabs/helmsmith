@@ -815,6 +815,16 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: ServerCtx) {
       return;
     }
 
+    // POST /v1/messages — message ingress (the message-trigger
+    // transport): a chat relay (Slack, Discord, controlplane chat)
+    // posts inbound messages here; flows subscribed to the channel
+    // start with the message TEXT as their input (conversational
+    // intake). One-way in v1 — the relay watches the spawned job.
+    if (req.method === 'POST' && url === '/v1/messages' && parsed !== null) {
+      handleIngestMessage(res, parsed, ctx);
+      return;
+    }
+
     // POST /v1/events — event ingress for suspend wake-ups (2.6).
     if (req.method === 'POST' && url === '/v1/events' && parsed !== null) {
       handleIngestEvent(res, parsed, ctx);
@@ -1721,6 +1731,46 @@ function handleIngestEvent(res: ServerResponse, body: unknown, ctx: ServerCtx): 
   });
 }
 
+/**
+ * Message ingress — the message-trigger transport. Validates
+ * `{ channel, text, from? }`, starts every flow whose message trigger
+ * subscribes to the channel with `input = text` (the conversational
+ * prompt — deliberately NOT a JSON envelope; message triggers exist
+ * for intake flows that feed the text straight to an agent).
+ */
+function handleIngestMessage(res: ServerResponse, body: unknown, ctx: ServerCtx): void {
+  const msg = body as { channel?: unknown; text?: unknown; from?: unknown } | null;
+  if (!msg || typeof msg.channel !== 'string' || !msg.channel) {
+    badRequest(res, "message ingest requires a non-empty string 'channel'");
+    return;
+  }
+  if (typeof msg.text !== 'string' || !msg.text) {
+    badRequest(res, "message ingest requires a non-empty string 'text'");
+    return;
+  }
+  const started: string[] = [];
+  for (const flow of ctx.catalog.flows) {
+    const cfg = triggerConfigOf(flow);
+    if (!cfg || cfg.kind !== 'message' || cfg.channel !== msg.channel) continue;
+    const spawnResult = spawnFlowJob(ctx, flow, {
+      input: msg.text,
+      triggeredBy: `message:${msg.channel}`,
+    });
+    if ('jobId' in spawnResult) {
+      started.push(spawnResult.jobId);
+    } else {
+      console.warn(`[harness] message trigger for flow "${flow.id}" could not fire: ${spawnResult.error}`);
+    }
+  }
+  ok(res, {
+    service: 'harness',
+    method: 'POST',
+    path: '/v1/messages',
+    started,
+    ts: new Date().toISOString(),
+  });
+}
+
 /** The trigger node's config, or null for flows without one (legacy). */
 function triggerConfigOf(flow: FlowDef): TriggerConfig | null {
   const node = flow.nodes.find((n) => n.kind === 'trigger');
@@ -1779,6 +1829,7 @@ function handleListTriggers(res: ServerResponse, ctx: ServerCtx): void {
   const schedules: Array<{ flowId: string; cron: string; nextFireAt: string | null }> = [];
   const webhooks: Array<{ flowId: string; path: string; method: string }> = [];
   const events: Array<{ flowId: string; eventType: string }> = [];
+  const messages: Array<{ flowId: string; channel: string }> = [];
   for (const flow of ctx.catalog.flows) {
     const cfg = triggerConfigOf(flow);
     if (!cfg) continue;
@@ -1794,6 +1845,8 @@ function handleListTriggers(res: ServerResponse, ctx: ServerCtx): void {
       webhooks.push({ flowId: flow.id, path: cfg.path, method: cfg.method ?? 'POST' });
     } else if (cfg.kind === 'event') {
       events.push({ flowId: flow.id, eventType: cfg.eventType });
+    } else if (cfg.kind === 'message') {
+      messages.push({ flowId: flow.id, channel: cfg.channel });
     }
   }
   ok(res, {
@@ -1803,6 +1856,7 @@ function handleListTriggers(res: ServerResponse, ctx: ServerCtx): void {
     schedules,
     webhooks,
     events,
+    messages,
     ts: new Date().toISOString(),
   });
 }
