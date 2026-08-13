@@ -197,7 +197,6 @@ Typical pattern — agent emits structured JSON, gate asserts on a field, a late
 
 | Field | What authors expect | What actually happens | Warning id |
 |---|---|---|---|
-| `terminal: "fail"` | Mark a failure endpoint | Every terminal node ends as success | `terminal-fail` |
 | `config.version` (subflow) | Version-pinned resolution | Resolution by flowId only | `subflow-version-pin` |
 
 ---

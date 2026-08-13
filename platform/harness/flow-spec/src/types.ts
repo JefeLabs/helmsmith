@@ -204,7 +204,11 @@ export interface TaskStep {
    *  may not be targeted by error/fallback/reject edges (validator-
    *  rejected); joins inside reject cycles are unsupported. */
   joinStrategy?: 'all' | 'any' | { nOfM: number };
-  /** Set on nodes with no outgoing edges. Defaults to 'success'. */
+  /** Endpoint disposition, executed: a branch ending at a
+   *  terminal:'fail' node fails the whole job (authored failure
+   *  endpoints — e.g. an error edge routing to a notify-then-fail
+   *  sink). Only valid on nodes with no outgoing edges (the validator
+   *  rejects a fail marker on a non-sink). Defaults to 'success'. */
   terminal?: 'success' | 'fail';
 }
 

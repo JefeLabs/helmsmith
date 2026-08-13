@@ -1467,6 +1467,62 @@ describe('resumeJob — recompile-on-resume + paused-status guard (2.2)', () => 
   });
 });
 
+describe("terminal: 'fail' — authored failure endpoints", () => {
+  async function runFlowEndingAt(terminal: 'fail' | undefined) {
+    const { runJob } = await import('./orchestrator.ts');
+    const job: JobRecord = {
+      jobId: 'jTerm',
+      status: 'received',
+      submittedAt: 'now',
+      input: 'x',
+      flow: {
+        id: 'f',
+        nodes: [
+          { id: '__trigger', kind: 'trigger', config: { kind: 'manual' } },
+          { id: 'work', kind: 'agent', config: { agent: { id: 'work' } as never } },
+          {
+            id: 'dead-end',
+            kind: 'transform',
+            ...(terminal ? { terminal } : {}),
+            config: { expression: { kind: 'literal', value: 'gave up' } },
+          },
+        ],
+        edges: [
+          { from: '__trigger', to: 'work', type: 'sequence' },
+          { from: 'work', to: 'dead-end', type: 'sequence' },
+        ],
+      } as JobRecord['flow'],
+      agents: [
+        { id: 'work', role: 'W', adapter: 'claude-sdk', systemPrompt: 'w', status: 'pending' },
+      ],
+    };
+    const jobs = new Map<string, JobRecord>([['jTerm', job]]);
+    const statuses: string[] = [];
+    await runJob('jTerm', {
+      jobs,
+      bus: new JobBus(),
+      broker: dummyBroker,
+      adapterFactory: () => new TestAdapter({ kind: 'ok', reply: 'worked' }),
+      onStatusChange: (_j, agentId, status) => {
+        if (agentId === null) statuses.push(status);
+      },
+    });
+    return { job, statuses };
+  }
+
+  it('a flow ending at a fail-terminal marks the job failed', async () => {
+    const { job, statuses } = await runFlowEndingAt('fail');
+    expect(job.status).toBe('failed');
+    expect(statuses).toContain('failed');
+    expect(statuses).not.toContain('completed');
+  });
+
+  it('the same flow without the marker completes', async () => {
+    const { job } = await runFlowEndingAt(undefined);
+    expect(job.status).toBe('completed');
+  });
+});
+
 describe('JobIntent emission (2.9)', () => {
   function intakeJob(jobId: string, contract: unknown): JobRecord {
     return {
