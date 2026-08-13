@@ -1022,7 +1022,7 @@
           "type": "number"
         },
         "mode": {
-          "description": "Sequential = one iteration at a time; parallel = N at once.",
+          "description": "Sequential = one iteration at a time; parallel = a per-slot pool of N with cooperative sibling cancellation on first failure.",
           "enum": [
             "sequential",
             "parallel"
@@ -1032,6 +1032,10 @@
         "path": {
           "$ref": "#/definitions/Expression",
           "description": "Expression resolving to the iterable. May reference flow state, product repos, prior node output, etc."
+        },
+        "recursive": {
+          "description": "Directory source only (3.5): walk the whole tree and iterate FILES only (default false = top-level entries, files and dirs).",
+          "type": "boolean"
         },
         "source": {
           "description": "Hint about what kind of iterable `path` resolves to. The runtime uses this to pick a default collector (e.g., 'directory' walks files; 'collection' iterates an array).",

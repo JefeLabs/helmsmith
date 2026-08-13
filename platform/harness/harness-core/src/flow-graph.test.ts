@@ -1097,6 +1097,147 @@ describe('node output schema enforcement (2.7)', () => {
   });
 });
 
+// ─── loop v2 (3.5) ────────────────────────────────────────────────────────
+
+describe('loop v2 (3.5)', () => {
+  function loopFlow(loop: LoopTag): FlowDef {
+    return {
+      id: 'lp',
+      nodes: [trigger('t'), { ...agentNode('work'), tags: { loop } }],
+      edges: [{ from: 't', to: 'work', type: 'sequence' }],
+    };
+  }
+
+  async function runLoop(
+    loop: LoopTag,
+    exec: NodeExecutor,
+    input: Partial<FlowStateT> = {},
+  ): Promise<FlowStateT> {
+    const graph = compileFlow({
+      flow: loopFlow(loop),
+      executors: new Map([['work', exec]]),
+    });
+    return (await graph.invoke(
+      { ...initialState, ...input },
+      { configurable: { thread_id: `lp-${Math.random()}` } },
+    )) as FlowStateT;
+  }
+
+  const items3: LoopTag = {
+    source: 'collection',
+    path: { kind: 'literal', value: ['a', 'b', 'c'] },
+    mode: 'sequential',
+  };
+
+  it('accumulates per-iteration deltas across iterations (nodes merge, messages concat)', async () => {
+    const state = await runLoop(items3, async (s) => ({
+      output: s.output.toUpperCase(),
+      nodes: { [`seen-${s.output}`]: s.output },
+      messages: [`ran:${s.output}`],
+      lastExit: { nodeId: 'work', kind: 'success' },
+    }));
+    // v1 kept only the LAST iteration's non-output delta.
+    expect(Object.keys(state.nodes).filter((k) => k.startsWith('seen-')).sort()).toEqual([
+      'seen-a',
+      'seen-b',
+      'seen-c',
+    ]);
+    expect(state.messages.filter((m) => String(m).startsWith('ran:'))).toHaveLength(3);
+    expect(state.output).toBe('A\n---\nB\n---\nC');
+  });
+
+  it('parallel mode is a per-slot pool: a slow item does not stall its neighbors', async () => {
+    const finished: string[] = [];
+    await runLoop(
+      {
+        source: 'collection',
+        path: { kind: 'literal', value: ['slow', 'q1', 'q2', 'q3'] },
+        mode: 'parallel',
+        concurrency: 2,
+      },
+      async (s) => {
+        await new Promise((r) => setTimeout(r, s.output === 'slow' ? 150 : 10));
+        finished.push(s.output);
+        return { output: s.output, lastExit: { nodeId: 'work', kind: 'success' } };
+      },
+    );
+    // Chunked v1 ran [slow,q1] then [q2,q3]: order slow-blocks → q1, slow, q2, q3.
+    // Per-slot v2: the free slot drains q1..q3 while slow runs.
+    expect(finished).toEqual(['q1', 'q2', 'q3', 'slow']);
+  });
+
+  it('a parallel failure aborts siblings and stops launching', async () => {
+    const started: string[] = [];
+    let sawAbort = false;
+    const result = await runLoop(
+      {
+        source: 'collection',
+        path: { kind: 'literal', value: ['boom', 'long', 'never1', 'never2'] },
+        mode: 'parallel',
+        concurrency: 2,
+      },
+      async (s, signal) => {
+        started.push(s.output);
+        if (s.output === 'boom') {
+          await new Promise((r) => setTimeout(r, 20));
+          return {
+            lastExit: { nodeId: 'work', kind: 'error', errorName: 'Boom', errorMessage: 'x' },
+          };
+        }
+        // A signal-aware executor: resolve early when siblings abort.
+        await new Promise<void>((resolve) => {
+          const t = setTimeout(resolve, 300);
+          signal?.addEventListener('abort', () => {
+            sawAbort = true;
+            clearTimeout(t);
+            resolve();
+          });
+        });
+        return { output: s.output, lastExit: { nodeId: 'work', kind: 'success' } };
+      },
+    );
+    expect(started.sort()).toEqual(['boom', 'long']);
+    expect(sawAbort).toBe(true);
+    // The loop node has no outgoing edges, so the error exit lands in
+    // final state (no router runs for out-degree-0 nodes).
+    expect(result.lastExit?.errorName).toBe('Boom');
+  });
+
+  it('recursive directory source walks the tree and yields files only', async () => {
+    const { mkdtemp, mkdir, writeFile, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const root = await mkdtemp(join(tmpdir(), 'loop-v2-'));
+    try {
+      await mkdir(join(root, 'sub/deeper'), { recursive: true });
+      await writeFile(join(root, 'top.txt'), '1');
+      await writeFile(join(root, 'sub/mid.txt'), '2');
+      await writeFile(join(root, 'sub/deeper/leaf.txt'), '3');
+
+      const seen: string[] = [];
+      await runLoop(
+        {
+          source: 'directory',
+          path: { kind: 'literal', value: root },
+          mode: 'sequential',
+          recursive: true,
+        },
+        async (s) => {
+          seen.push(s.output);
+          return { output: 'ok', lastExit: { nodeId: 'work', kind: 'success' } };
+        },
+      );
+      expect(seen.map((p) => p.slice(root.length + 1)).sort()).toEqual([
+        'sub/deeper/leaf.txt',
+        'sub/mid.txt',
+        'top.txt',
+      ]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
 // ─── buildRouter (in isolation) ───────────────────────────────────────────
 
 describe('buildRouter', () => {
@@ -1844,10 +1985,12 @@ describe('compileFlow — Loop tag', () => {
         { configurable: { thread_id: 't' } },
       ),
     ).rejects.toThrow();
-    // First chunk = ['a','b']; both run before halt detection.
-    // Second chunk would be ['c','d'] but the halt check after
-    // chunk 1 short-circuits before they're scheduled.
-    expect(seenInputs).toEqual(['a', 'b']);
+    // Per-slot v2: 'a' and 'b' launch first; 'c' may launch in the
+    // window before b's failure is observed, but once the abort fires
+    // nothing else starts — 'd' must never run.
+    expect(seenInputs).toContain('a');
+    expect(seenInputs).toContain('b');
+    expect(seenInputs).not.toContain('d');
   });
 
   it('walks a directory and iterates absolute-path items (sorted)', async () => {

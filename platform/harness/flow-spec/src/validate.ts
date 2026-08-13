@@ -908,6 +908,9 @@ function validateLoopTag(value: unknown, where: string): void {
   if (t.concurrency !== undefined && (typeof t.concurrency !== 'number' || t.concurrency <= 0)) {
     throw new CatalogError(`${where}.concurrency must be a positive number when present`);
   }
+  if (t.recursive !== undefined && typeof t.recursive !== 'boolean') {
+    throw new CatalogError(`${where}.recursive must be a boolean when present`);
+  }
 }
 
 function validateTaskStepPolicy(value: unknown, where: string): void {

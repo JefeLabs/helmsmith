@@ -1,6 +1,6 @@
 # Flow Spec — Critical Feedback (Consolidated, Current)
 
-**Date:** 2026-08-07 · **Updated:** 2026-08-12 after the data-plane slice (PR #14), the hardening slice (PR #15), a validator-consistency review (PR #17), the export-surface slice (PR #18), the HITL trust slice (PR #19), the policy slice (PR #20), the parallelism slice (PR #21), the schema slice (PR #22), the suspend-wakeup slice (PR #23), the emission slice (PR #24), the terminal-fail slice (PR #25), the trigger-ingress slice (PR #26), the designer slice (PR #27), and the adapter-registry slice (roadmap 3.4) · Companion docs: [`SPEC.md`](../SPEC.md) · [`steps-and-edges.md`](./steps-and-edges.md) · [`next-steps.md`](./next-steps.md)
+**Date:** 2026-08-07 · **Updated:** 2026-08-12 after the data-plane slice (PR #14), the hardening slice (PR #15), a validator-consistency review (PR #17), the export-surface slice (PR #18), the HITL trust slice (PR #19), the policy slice (PR #20), the parallelism slice (PR #21), the schema slice (PR #22), the suspend-wakeup slice (PR #23), the emission slice (PR #24), the terminal-fail slice (PR #25), the trigger-ingress slice (PR #26), the designer slice (PR #27), the adapter-registry slice (PR #28), and the loop-v2 slice (roadmap 3.5) · Companion docs: [`SPEC.md`](../SPEC.md) · [`steps-and-edges.md`](./steps-and-edges.md) · [`next-steps.md`](./next-steps.md)
 
 One document, every open criticism, with status. Sources: the pre-extraction design review (`docs/superpowers/specs/2026-08-07-flow-spec-design-review.md`), the package-level critique from `SPEC.md` §7, the semantic findings from documentation-as-audit, the 2026-08-12 data-plane review + its post-merge self-review (plan: `docs/superpowers/plans/2026-08-12-flow-spec-data-plane.md`), and a 2026-08-12 validator-consistency review of the merged package. Items already fixed are listed once in §1 and not re-argued.
 
@@ -127,6 +127,12 @@ The unifying observation: once the validator crossed into statically-knowable-ru
 |---|---|
 | 🟡 `AdapterId` baked two runtime implementations into the wire contract — adding an adapter was a spec change, unlike every other by-id reference (`toolId`, `flowId`) | `AdapterId = string`: the validator checks shape only (non-empty string); existence is enforced at spawn time by the adapter factory — the registry — whose unknown-id error now lists the known adapters and points at `RunJobDeps.adapterFactory` for custom registration. A third adapter is now a runtime-only addition; the spec never changes again for one. (Schema artifact updated: the enum became a string for Java consumers — the drift guard insisted) |
 
+### 1.16 Loop-v2 slice (2026-08-13, roadmap 3.5)
+
+| Finding | Resolution |
+|---|---|
+| 🟡 Loop state semantics — only the last iteration's non-output delta survived; parallel mode was chunked (a slow item stalled its chunk) with no sibling cancellation; `directory` was non-recursive | Cross-iteration accumulation with per-channel merge semantics (map channels key-merge, append channels concatenate — and a general `withNodeIO` bug fell out: it clobbered any executor's own `nodes` writes with the evidence entry; now spread-merged). Parallel mode is a per-slot sliding-window pool; the first failure aborts an `AbortSignal` now threaded through the `NodeExecutor` contract (optional second param — backward compatible) and stops further launches, with outputs kept in item order. `recursive: true` walks the directory tree, files only (spec addition, fixture-gated). |
+
 ## 2. Open — package-level (this package's debt)
 
 ### 🟡 The name undersells the scope — it's the platform wire-contract package now
@@ -153,7 +159,6 @@ Inherited from the original review, minus what the 2026-08-12 slices closed (ter
 | Join hazards under conditional routing | 🔵 | New with §1.8, documented not enforced: an `'all'` join whose counted source is conditionally skipped never fires (the flow ends without it, silently), and joins inside reject cycles are unsupported (the once-per-run marker never resets). A future validator pass could detect conditionally-reachable sources feeding an `'all'` join |
 | Approval pessimistic locking | 🔵 | `concurrency: 'pessimistic'` validates but no lock exists — two same-role reviewers can race a decision; last write wins via the status guard. (The SLA/role halves of the old approval row were closed by the HITL trust slice — §1.6) |
 | `message` triggers | 🔵 | Validated + warned (`trigger-message`) — no message transport exists; binds when one does |
-| Loop state semantics | 🟡 | Only last iteration's non-output state delta survives; chunked parallelism; no sibling cancellation. (The loop+json aggregation defect itself is fixed — §1.3) |
 | Subflow v1-light | 🟡 | No agents or interrupt tags inside subflows (compile-time ban — honest, but limits composition) |
 | Synthetic interrupt nodes typed as `kind:'agent'` | 🔵 | Type-system lie with cast placeholder configs; future walkers over rewritten flows will trip |
 | `changedFiles` only grows | 🔵 | Reverted files stay in the reviewer's diff surface (documented as intentional; still surprising) |
