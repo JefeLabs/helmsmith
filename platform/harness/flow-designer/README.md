@@ -21,4 +21,4 @@ pnpm build      # typecheck + production bundle
 
 - Node positions are session-only (FlowDef carries no layout — a sidecar layout file is a later addition; `relayout` recomputes).
 - Structured sub-objects edit as JSON, not bespoke visual builders — the `JsonField` seam replaces one field at a time later.
-- No undo/redo yet; export early, export often.
+- Undo/redo covers graph edits (⌘Z / ⌘⇧Z, toolbar ↶↷): semantic actions and whole drags are single history entries; selection churn and no-op field applies record nothing; native text-undo inside fields is untouched. History is per-flow-session — switching flows or importing resets it.

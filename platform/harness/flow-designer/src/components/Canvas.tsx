@@ -10,7 +10,7 @@ import {
   ReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import type { DesignerEdge, DesignerNode } from '../graph-model.ts';
 import { StepNode } from './StepNode.tsx';
 
@@ -50,13 +50,19 @@ export function Canvas({
   onGraphChange,
   onSelect,
   onConnect,
+  onRecordPoint,
 }: {
   nodes: DesignerNode[];
   edges: DesignerEdge[];
   onGraphChange: (nodes: DesignerNode[], edges: DesignerEdge[]) => void;
   onSelect: (sel: { type: 'node' | 'edge'; id: string } | null) => void;
   onConnect: (connection: Connection) => void;
+  /** History hook: called with the PRE-mutation state still current —
+   *  once per drag (at drag-start) and before canvas-native removals.
+   *  Selection churn never records. */
+  onRecordPoint: () => void;
 }) {
+  const dragActive = useRef(false);
   const rfEdges = useMemo(
     () =>
       edges.map((e) => {
@@ -76,15 +82,25 @@ export function Canvas({
 
   const handleNodesChange = useCallback(
     (changes: NodeChange<DesignerNode>[]) => {
+      if (changes.some((c) => c.type === 'remove')) onRecordPoint();
+      const dragging = changes.some((c) => c.type === 'position' && c.dragging === true);
+      if (dragging && !dragActive.current) {
+        dragActive.current = true;
+        onRecordPoint(); // one entry per drag, at its start
+      }
+      if (changes.some((c) => c.type === 'position' && c.dragging === false)) {
+        dragActive.current = false;
+      }
       onGraphChange(applyNodeChanges(changes, nodes), edges);
     },
-    [nodes, edges, onGraphChange],
+    [nodes, edges, onGraphChange, onRecordPoint],
   );
   const handleEdgesChange = useCallback(
     (changes: EdgeChange<DesignerEdge>[]) => {
+      if (changes.some((c) => c.type === 'remove')) onRecordPoint();
       onGraphChange(nodes, applyEdgeChanges(changes, edges) as DesignerEdge[]);
     },
-    [nodes, edges, onGraphChange],
+    [nodes, edges, onGraphChange, onRecordPoint],
   );
 
   return (
