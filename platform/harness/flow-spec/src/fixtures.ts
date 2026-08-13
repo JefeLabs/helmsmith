@@ -555,6 +555,35 @@ export const VALIDATION_CASES: readonly ValidationCase[] = [
     errorIncludes: 'must not exceed',
   },
   {
+    name: 'output schema using an unsupported keyword is rejected at load time',
+    catalog: {
+      flows: [
+        {
+          ...VALID_FLOW,
+          nodes: [
+            VALID_FLOW.nodes[0],
+            {
+              id: 'a',
+              kind: 'transform',
+              output: { kind: 'json', schema: { oneOf: [{ type: 'string' }] } },
+              config: { expression: { kind: 'literal', value: 1 } },
+            },
+          ],
+        },
+      ],
+    },
+    valid: false,
+    errorIncludes: 'unsupported keyword "oneOf"',
+  },
+  {
+    name: 'structured flow-output schema with a malformed type is rejected at load time',
+    catalog: {
+      flows: [{ ...VALID_FLOW, output: { kind: 'structured', schema: { type: 'objct' } } }],
+    },
+    valid: false,
+    errorIncludes: 'type must be one of',
+  },
+  {
     name: 'joinStrategy node with an incoming error edge is rejected (joins count forward edges only)',
     catalog: {
       flows: [
@@ -581,6 +610,94 @@ export const VALIDATION_CASES: readonly ValidationCase[] = [
     },
     valid: false,
     errorIncludes: 'forward (sequence/conditional) incoming edges',
+  },
+];
+
+// ─── Schema-subset fixtures ──────────────────────────────────────────────
+//
+// Pin `schemaViolations` semantics (the 2.7 output-contract check) the
+// same way EXPRESSION_CASES pin the evaluator: any conforming
+// implementation must agree on which values violate which schemas.
+
+export interface SchemaCase {
+  name: string;
+  schema: unknown;
+  value: unknown;
+  valid: boolean;
+  /** Substring at least one violation must contain when valid=false. */
+  violationIncludes?: string;
+}
+
+export const SCHEMA_CASES: readonly SchemaCase[] = [
+  {
+    name: 'conforming object passes',
+    schema: {
+      type: 'object',
+      required: ['score'],
+      properties: { score: { type: 'number', minimum: 0, maximum: 1 } },
+    },
+    value: { score: 0.9 },
+    valid: true,
+  },
+  {
+    name: 'missing required property is located',
+    schema: { type: 'object', required: ['verdict'] },
+    value: {},
+    valid: false,
+    violationIncludes: '$.verdict',
+  },
+  {
+    name: 'wrong type short-circuits deeper checks',
+    schema: { type: 'object', properties: { a: { type: 'string' } } },
+    value: 'not-an-object',
+    valid: false,
+    violationIncludes: 'expected object',
+  },
+  {
+    name: 'integer rejects fractional numbers',
+    schema: { type: 'integer' },
+    value: 2.5,
+    valid: false,
+    violationIncludes: 'expected integer',
+  },
+  {
+    name: 'additionalProperties false rejects undeclared keys',
+    schema: { type: 'object', additionalProperties: false, properties: { a: {} } },
+    value: { a: 1, b: 2 },
+    valid: false,
+    violationIncludes: '$.b',
+  },
+  {
+    name: 'array items are checked element-wise with an indexed path',
+    schema: { type: 'array', items: { type: 'string' } },
+    value: ['ok', 7],
+    valid: false,
+    violationIncludes: '$[1]',
+  },
+  {
+    name: 'enum matches by deep equality',
+    schema: { enum: [{ kind: 'approve' }, { kind: 'reject' }] },
+    value: { kind: 'approve' },
+    valid: true,
+  },
+  {
+    name: 'multi-type accepts any listed type',
+    schema: { type: ['string', 'null'] },
+    value: null,
+    valid: true,
+  },
+  {
+    name: 'empty schema accepts anything',
+    schema: {},
+    value: { deeply: ['nested', 1] },
+    valid: true,
+  },
+  {
+    name: 'string bounds and pattern are enforced',
+    schema: { type: 'string', minLength: 2, pattern: '^ok' },
+    value: 'x',
+    valid: false,
+    violationIncludes: 'minLength',
   },
 ];
 
@@ -640,19 +757,12 @@ export const UNSUPPORTED_CASES: readonly UnsupportedCase[] = [
         { from: 'b', to: 's', type: 'sequence' },
       ],
     },
-    // 'effect', 'policy', 'joinStrategy', and 'parallel-fan-out' are
-    // deliberately absent: the kitchen-sink flow still declares all of
-    // them (effect + policy + joinStrategy on node 'a'; two sequence
-    // edges from 'a'), pinning that they are executed and no longer
-    // reported.
-    expectedFeatures: [
-      'expression-js',
-      'flow-output-schema',
-      'node-output-schema',
-      'subflow-version-pin',
-      'terminal-fail',
-      'trigger-schedule',
-    ],
+    // 'effect', 'policy', 'joinStrategy', 'parallel-fan-out',
+    // 'node-output-schema', and 'flow-output-schema' are deliberately
+    // absent: the kitchen-sink flow still declares all of them, pinning
+    // that they are executed (schemas are now load-time subset-gated
+    // and runtime-enforced) and no longer reported.
+    expectedFeatures: ['expression-js', 'subflow-version-pin', 'terminal-fail', 'trigger-schedule'],
   },
   {
     name: 'fully-executed features produce zero reports',

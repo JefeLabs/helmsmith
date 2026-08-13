@@ -1,11 +1,12 @@
 import {
   EXPRESSION_CASES,
   resolveExpressionValue,
+  SCHEMA_CASES,
   UNSUPPORTED_CASES,
   VALIDATION_CASES,
 } from '@helmsmith/flow-spec';
 import { describe, expect, it } from 'vitest';
-import { CatalogError, validateFlowCatalog } from './catalog.ts';
+import { CatalogError, schemaViolations, validateFlowCatalog } from './catalog.ts';
 import { evalExpression } from './flow-graph.ts';
 
 // The runtime must implement spec semantics exactly — these fixture
@@ -49,6 +50,22 @@ describe('runtime conforms to flow-spec unsupported-feature fixtures', () => {
         onUnsupported: (f) => reported.push(f.feature),
       });
       expect([...reported].sort()).toEqual([...c.expectedFeatures].sort());
+    });
+  }
+});
+
+describe('runtime conforms to flow-spec schema-subset fixtures', () => {
+  for (const c of SCHEMA_CASES) {
+    it(c.name, () => {
+      const issues = schemaViolations(c.value, c.schema);
+      if (c.valid) {
+        expect(issues).toEqual([]);
+      } else {
+        expect(issues.length).toBeGreaterThan(0);
+        if (c.violationIncludes !== undefined) {
+          expect(issues.join('\n')).toContain(c.violationIncludes);
+        }
+      }
     });
   }
 });

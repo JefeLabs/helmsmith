@@ -372,9 +372,10 @@ export interface RunJobDeps {
  *                          min/max, flow-spec re-validation, structured
  *                          parse; violation fails the job, success
  *                          records job.flowOutput
- *   ❌ output schemas    — declared node/flow schemas not validated
- *                          (reported: 'node-output-schema' /
- *                          'flow-output-schema')
+ *   ✅ output schemas    — declared node/flow schemas enforced via the
+ *                          spec's JSON-Schema subset (load-time keyword
+ *                          gate; runtime 'OutputSchemaViolation' exits /
+ *                          parseFlowOutput failures)
  *   ✅ effect            — side-effecting nodes run at most once on
  *                          re-entry (withEffectGuard, flow-graph.ts);
  *                          publish executors idempotent by natural key

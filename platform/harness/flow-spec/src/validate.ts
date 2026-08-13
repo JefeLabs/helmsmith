@@ -7,6 +7,7 @@
  * the per-shape helpers stay module-private, as they were in
  * harness-core.
  */
+import { validateSchemaShape } from './schema.ts';
 import {
   type Catalog,
   CatalogError,
@@ -25,10 +26,7 @@ import {
  *
  * Current feature ids: `terminal-fail`,
  * `trigger-<kind>` (any non-manual trigger), `expression-js`,
- * `node-output-schema` (output.kind 'json' declares a schema — parse
- * happens, schema enforcement doesn't), `subflow-version-pin`
- * (version recorded, resolution stays by flowId), `flow-output-schema`
- * (flow-level structured output is parsed, its schema isn't validated).
+ * `subflow-version-pin` (version recorded, resolution stays by flowId).
  * Remove an id from
  * `reportUnsupportedFeatures` in the same change that makes the
  * runtime execute it — the reporting list IS the honest coverage
@@ -291,18 +289,6 @@ function reportUnsupportedFeatures(
   where: string,
   report: (f: UnsupportedFeature) => void,
 ): void {
-  const flowOutput = flow.output as Record<string, unknown> | undefined;
-  if (flowOutput?.kind === 'structured') {
-    // structured REQUIRES schema (enforced above), and parseFlowOutput
-    // only parses JSON — the schema itself is never validated against
-    // the terminal output.
-    report({
-      where: `${where}.output.schema`,
-      feature: 'flow-output-schema',
-      detail:
-        'terminal output is parsed as JSON, but the declared schema is not validated against it yet',
-    });
-  }
   for (const [j, n] of (flow.nodes as unknown[]).entries()) {
     const node = n as Record<string, unknown>;
     const at = `${where}.nodes[${j}]`;
@@ -322,15 +308,6 @@ function reportUnsupportedFeatures(
           detail: 'no runtime fires this trigger; jobs start by manual submission',
         });
       }
-    }
-    const output = node.output as Record<string, unknown> | undefined;
-    if (output?.kind === 'json' && output.schema !== undefined) {
-      report({
-        where: `${at}.output.schema`,
-        feature: 'node-output-schema',
-        detail:
-          'JSON output is parsed into state.nodes, but the declared schema is not validated against it yet',
-      });
     }
     if (node.kind === 'subflow' && (node.config as Record<string, unknown>).version !== undefined) {
       report({
@@ -656,6 +633,11 @@ function validateNodeOutputContract(value: unknown, where: string): void {
   }
   if (o.kind === 'text' && o.schema !== undefined) {
     throw new CatalogError(`${where}.schema is only allowed when kind is 'json'`);
+  }
+  if (o.kind === 'json' && o.schema !== undefined) {
+    // 2.7 — declared schemas are runtime-enforced, so only the
+    // supported subset may be declared (no silently-ignored keywords).
+    validateSchemaShape(o.schema, `${where}.schema`);
   }
 }
 
@@ -1149,8 +1131,12 @@ function validateFlowOutputContract(value: unknown, where: string): void {
       );
     }
   }
-  if (o.kind === 'structured' && o.schema === undefined) {
-    throw new CatalogError(`${where}.schema is required`);
+  if (o.kind === 'structured') {
+    if (o.schema === undefined) {
+      throw new CatalogError(`${where}.schema is required`);
+    }
+    // 2.7 — same subset gate as node output schemas.
+    validateSchemaShape(o.schema, `${where}.schema`);
   }
 }
 

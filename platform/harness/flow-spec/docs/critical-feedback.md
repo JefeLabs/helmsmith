@@ -1,6 +1,6 @@
 # Flow Spec — Critical Feedback (Consolidated, Current)
 
-**Date:** 2026-08-07 · **Updated:** 2026-08-12 after the data-plane slice (PR #14), the hardening slice (PR #15), a validator-consistency review (PR #17), the export-surface slice (PR #18), the HITL trust slice (PR #19), the policy slice (PR #20), and the parallelism slice (roadmap 2.4) · Companion docs: [`SPEC.md`](../SPEC.md) · [`steps-and-edges.md`](./steps-and-edges.md) · [`next-steps.md`](./next-steps.md)
+**Date:** 2026-08-07 · **Updated:** 2026-08-12 after the data-plane slice (PR #14), the hardening slice (PR #15), a validator-consistency review (PR #17), the export-surface slice (PR #18), the HITL trust slice (PR #19), the policy slice (PR #20), the parallelism slice (PR #21), and the schema slice (roadmap 1.2 + 2.7) · Companion docs: [`SPEC.md`](../SPEC.md) · [`steps-and-edges.md`](./steps-and-edges.md) · [`next-steps.md`](./next-steps.md)
 
 One document, every open criticism, with status. Sources: the pre-extraction design review (`docs/superpowers/specs/2026-08-07-flow-spec-design-review.md`), the package-level critique from `SPEC.md` §7, the semantic findings from documentation-as-audit, the 2026-08-12 data-plane review + its post-merge self-review (plan: `docs/superpowers/plans/2026-08-12-flow-spec-data-plane.md`), and a 2026-08-12 validator-consistency review of the merged package. Items already fixed are listed once in §1 and not re-argued.
 
@@ -83,6 +83,13 @@ The unifying observation: once the validator crossed into statically-knowable-ru
 |---|---|
 | 🔴 Parallel fan-out/join was the half-state the roadmap called "the worst state" — the router silently followed only the first sequence edge; `joinStrategy` validated and did nothing | Fan-out: every sequence edge fires (LangGraph parallel branches; the legacy `output` channel gained an explicit last-write-wins reducer — concurrent same-superstep writes used to throw `InvalidUpdateError`). Join: an EXPLICITLY declared `joinStrategy` is a barrier over forward-edge sources ('all'/'any'/nOfM, exactly-once per run) via runtime-private `__completions`/`__joinSkips` channels — no wire-contract change. Undeclared multi-in nodes keep trigger-per-arrival semantics (an implicit 'all' would deadlock conditional diamonds — the types.ts "Default 'all'" fiction corrected). Validator rejects exceptional edges targeting joins. v1 caveats documented: joins in reject cycles unsupported; 'all' over a conditionally-skipped source never fires. Both reports (`joinStrategy`, `parallel-fan-out`) deleted fixture-first |
 
+### 1.9 Schema slice (2026-08-12, roadmap 1.2 + 2.7)
+
+| Finding | Resolution |
+|---|---|
+| 🟡 No schema artifact — controlplane stored opaque JSONB; Phase 2 would hand-port validation rules into Java (the drift machine the original review warned about); the smithagents seam had no language-neutral contract | `schema/flow-spec.schema.json` generated from the types (`pnpm schema`, ts-json-schema-generator as a devDependency — runtime stays zero-dep): 9 wire-shape roots (catalog, flow, jobIntent, runState, HITL payloads, nodeExit, changedFile), 47 $ref'd definitions. Drift-guarded: `schema-artifact.test.ts` regenerates and compares, so a type change that skips regeneration fails CI |
+| 🟡 Output schemas accepted but never validated (`node-output-schema`/`flow-output-schema` reports) | The spec owns an enforced JSON-Schema SUBSET (`schema.ts`, browser-safe, zero-dep): `validateSchemaShape` gates declared schemas at catalog load — a keyword outside the subset (e.g. `oneOf`) is rejected, never silently ignored; `schemaViolations` checks parsed output at runtime with located messages. Node violations exit `OutputSchemaViolation` (error-edge routable, retryable) without recording evidence; structured terminal outputs fail the job through `parseFlowOutput`. `SCHEMA_CASES` join the conformance fixtures (four behaviors now); both reports deleted fixture-first |
+
 ## 2. Open — package-level (this package's debt)
 
 ### 🟡 `AdapterId` bakes two runtime implementations into the wire contract
@@ -93,9 +100,6 @@ Originally: `ProductDef`/`ProductRepo`/`ContextSourceDef` (tenancy/git shapes) l
 
 ### 🟡 Tool nodes have two overlapping input mechanisms
 `ToolConfig.args` values were already expression-resolvable; `TaskStep.input` (2026-08-12) now exists on the same node. Both answer "how does state reach this tool?" with different semantics — args merge into the ToolDef template, input rewrites the node's effective `$.output`. The spec doesn't say which to prefer or define their composition. A designer UI will surface this ambiguity immediately; pick a rule (suggest: `input` composes the payload, `args` binds it to the tool's parameters) and document it.
-
-### 🟡 No schema artifact
-Controlplane still stores opaque JSONB; Phase 2 would hand-port these rules into Java, and the smithagents seam wants a language-neutral contract. Generated JSON Schema from these types is the agreed answer and doesn't exist yet. The 2026-08-12 fixtures make this *safer* (a ported validator has three replayable behavior sets to conform to) but not less necessary.
 
 ### 🔵 Input delivery is stringly
 `input` mappings resolve structured values, then serialize to one string through `state.output`. Right for agents (prompts) and scripts (stdin); wasteful for transform/gate consumers that re-parse what was just serialized. A structured hand-off (an `$.inputView` state slot or executor parameter) is the eventual fix; not urgent.
@@ -115,7 +119,6 @@ Inherited from the original review, minus what the 2026-08-12 slices closed (ter
 | `terminal:'fail'` | 🔴 | Warned at load, ignored at runtime — terminal nodes always end the flow as success. (The `policy` and `joinStrategy` thirds of the old row were closed by §1.7/§1.8) |
 | Join hazards under conditional routing | 🔵 | New with §1.8, documented not enforced: an `'all'` join whose counted source is conditionally skipped never fires (the flow ends without it, silently), and joins inside reject cycles are unsupported (the once-per-run marker never resets). A future validator pass could detect conditionally-reachable sources feeding an `'all'` join |
 | JobIntent emission | 🟡 | New gap exposed by closing 2.5: the terminal intent is now parsed, enforced, and recorded on `job.flowOutput` — but nothing *submits* it to a JobStateMachine. Enforcement without emission (next-steps 2.9) |
-| Output schemas | 🟡 | Honestly reported: `output.schema`/`structured.schema` accepted but never validated (`node-output-schema`/`flow-output-schema`). (The `effect` half of this row was closed by the HITL trust slice — §1.6) |
 | Approval pessimistic locking | 🔵 | `concurrency: 'pessimistic'` validates but no lock exists — two same-role reviewers can race a decision; last write wins via the status guard. (The SLA/role halves of the old approval row were closed by the HITL trust slice — §1.6) |
 | Non-manual triggers | 🟡 | Validated cron/webhook/event/message shapes with no ingress, scheduler, or subscription behind them (warned) |
 | Suspend wake-ups | 🟡 | No timer/event scheduler; resume is entirely the caller's job |
@@ -127,4 +130,4 @@ Inherited from the original review, minus what the 2026-08-12 slices closed (ter
 
 ## 4. The one-sentence summary
 
-The extraction fixed the *honesty* problem (2026-08-07), the data-plane pass fixed the *capability ceiling*, the hardening pass turned the alignment mechanisms into enforced tests (three-behavior conformance fixtures) while giving the factory/fleet seam teeth (terminal output enforcement), the validator-consistency + export-surface passes closed the statically-knowable-failure gaps and made both export layers curated review points, the HITL trust slice made approval production-grade (SLA auto-reject, role-gated resume, durable checkpointer with restart rehydration, effect-aware replay), the policy slice made retry/timeout/onError real, and the parallelism slice made fan-out + joinStrategy barriers real — what remains is terminal-fail and non-manual triggers (warn-only), output-schema enforcement, suspend wake-up scheduling, and JobIntent *emission* on top of the now-enforced contract.
+The extraction fixed the *honesty* problem (2026-08-07), the data-plane pass fixed the *capability ceiling*, the hardening pass turned the alignment mechanisms into enforced tests (three-behavior conformance fixtures) while giving the factory/fleet seam teeth (terminal output enforcement), the validator-consistency + export-surface passes closed the statically-knowable-failure gaps and made both export layers curated review points, the HITL trust slice made approval production-grade (SLA auto-reject, role-gated resume, durable checkpointer with restart rehydration, effect-aware replay), the policy slice made retry/timeout/onError real, the parallelism slice made fan-out + joinStrategy barriers real, and the schema slice enforced output schemas (owned subset) and shipped the generated contract artifact — what remains is terminal-fail and non-manual triggers (warn-only), suspend wake-up scheduling, and JobIntent *emission* on top of the now-enforced contract.

@@ -9,10 +9,12 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "schema": "ts-json-schema-generator --path src/schema-roots.ts --type FlowSpecSchemaRoots --tsconfig tsconfig.json --out schema/flow-spec.schema.json"
   },
   "devDependencies": {
     "typescript": "^5.6.0",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.5",
+    "ts-json-schema-generator": "^2.9.0"
   }
 }

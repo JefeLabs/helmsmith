@@ -13,12 +13,15 @@ export { evalExpression, resolveExpressionValue, resolveJsonPath } from './expre
 export {
   EXPRESSION_CASES,
   type ExpressionCase,
+  SCHEMA_CASES,
+  type SchemaCase,
   UNSUPPORTED_CASES,
   type UnsupportedCase,
   VALIDATION_CASES,
   type ValidationCase,
 } from './fixtures.ts';
 export { type FlowOutputParseResult, parseFlowOutput } from './output.ts';
+export { schemaViolations, validateSchemaShape } from './schema.ts';
 export {
   type AdapterId,
   type AgentConfig,
