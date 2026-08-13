@@ -97,10 +97,7 @@ describe('validateFlowCatalog', () => {
   it('rejects malformed object/array constructors', () => {
     const withExpr = (expression: unknown) => ({
       ...validFlow,
-      nodes: [
-        validFlow.nodes[0],
-        { id: 'g', kind: 'transform', config: { expression } },
-      ],
+      nodes: [validFlow.nodes[0], { id: 'g', kind: 'transform', config: { expression } }],
     });
     expect(() =>
       validateFlowCatalog({ flows: [withExpr({ kind: 'object', fields: [] })] }, 'test'),

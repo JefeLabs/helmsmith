@@ -573,6 +573,9 @@ function validateNode(value: unknown, where: string): void {
 
   if (node.input !== undefined) {
     validateInputMapping(node.input, `${where}.input`);
+    if (node.kind === 'tool') {
+      validateToolInputConsumed(node.config as Record<string, unknown>, where);
+    }
   }
   if (node.output !== undefined) {
     validateNodeOutputContract(node.output, `${where}.output`);
@@ -624,13 +627,54 @@ function validateInputMapping(value: unknown, where: string): void {
   }
 }
 
+/**
+ * The tool input-mechanism rule: `input` composes the node's effective
+ * payload (rewriting the `$.output` the executor sees) and `args` bind
+ * the tool's named parameters. A ToolDef's templates interpolate
+ * against resolved args ONLY, so the composed payload reaches the tool
+ * exclusively through an args expression reading `$.output`. An
+ * `input` mapping on a tool node with no such arg can never be
+ * observed — rejected like the other statically-knowable dead config
+ * (shadowed error edges, unreachable joins). A `js`-shaped arg counts
+ * as consuming (unprovable statically; it is separately reported as
+ * unsupported). Detection mirrors the executor's top-level three-kind
+ * arg resolution — nested expression shapes pass through as plain data
+ * and therefore cannot consume.
+ */
+function validateToolInputConsumed(config: Record<string, unknown>, where: string): void {
+  const args = config.args;
+  const values =
+    args && typeof args === 'object' && !Array.isArray(args)
+      ? Object.values(args as Record<string, unknown>)
+      : [];
+  const consumes = values.some((v) => {
+    if (!v || typeof v !== 'object') return false;
+    const e = v as Record<string, unknown>;
+    if (e.kind === 'js') return true;
+    if (e.kind !== 'jsonpath' || typeof e.path !== 'string') return false;
+    return (
+      e.path === '$' ||
+      e.path === '$.output' ||
+      e.path.startsWith('$.output.') ||
+      e.path.startsWith('$.output[')
+    );
+  });
+  if (!consumes) {
+    throw new CatalogError(
+      `${where}.input: input mapping is dead config on a tool node — tool templates resolve against args only, so the composed payload must be bound by an args expression reading $.output, e.g. args: { payload: { kind: "jsonpath", path: "$.output" } }`,
+    );
+  }
+}
+
 function validateNodeOutputContract(value: unknown, where: string): void {
   if (!value || typeof value !== 'object') {
     throw new CatalogError(`${where} must be an object`);
   }
   const o = value as Record<string, unknown>;
   if (o.kind !== 'text' && o.kind !== 'json') {
-    throw new CatalogError(`${where}.kind must be 'text' or 'json' (got ${JSON.stringify(o.kind)})`);
+    throw new CatalogError(
+      `${where}.kind must be 'text' or 'json' (got ${JSON.stringify(o.kind)})`,
+    );
   }
   if (o.kind === 'text' && o.schema !== undefined) {
     throw new CatalogError(`${where}.schema is only allowed when kind is 'json'`);

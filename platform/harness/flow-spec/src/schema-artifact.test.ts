@@ -28,9 +28,7 @@ describe('generated JSON Schema artifact', () => {
     const schema = JSON.parse(
       readFileSync(join(__dirname, '..', 'schema', 'flow-spec.schema.json'), 'utf8'),
     );
-    const roots = Object.keys(
-      schema.definitions?.FlowSpecSchemaRoots?.properties ?? {},
-    ).sort();
+    const roots = Object.keys(schema.definitions?.FlowSpecSchemaRoots?.properties ?? {}).sort();
     expect(roots).toEqual([
       'approvalRequest',
       'approvalResume',

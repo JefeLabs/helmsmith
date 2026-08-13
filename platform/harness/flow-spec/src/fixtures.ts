@@ -733,7 +733,11 @@ export const VALIDATION_CASES: readonly ValidationCase[] = [
         {
           ...VALID_FLOW,
           nodes: [
-            { id: 't', kind: 'trigger', config: { kind: 'schedule', cron: '*/15 9-17 1,15 * 1-5' } },
+            {
+              id: 't',
+              kind: 'trigger',
+              config: { kind: 'schedule', cron: '*/15 9-17 1,15 * 1-5' },
+            },
             VALID_FLOW.nodes[1],
           ],
         },
@@ -794,6 +798,89 @@ export const VALIDATION_CASES: readonly ValidationCase[] = [
     },
     valid: false,
     errorIncludes: 'forward (sequence/conditional) incoming edges',
+  },
+  // ── Tool input-mechanism rule ─────────────────────────────────────
+  // `input` composes the payload (rewrites the effective $.output the
+  // executor sees); `args` bind the tool's named parameters. Templates
+  // in a ToolDef resolve against resolved args ONLY, so the composed
+  // payload reaches the tool exclusively through an args expression
+  // reading $.output. Declaring `input` on a tool node with no such
+  // arg is provably dead config — rejected like other statically-
+  // knowable dead branches (shadowed error edges, unreachable joins).
+  {
+    name: 'tool node input mapping with no args expression reading $.output is rejected as dead config',
+    catalog: {
+      flows: [
+        {
+          ...VALID_FLOW,
+          nodes: [
+            VALID_FLOW.nodes[0],
+            {
+              id: 'a',
+              kind: 'tool',
+              config: {
+                toolId: 'core:tools:jq',
+                args: { filter: { kind: 'literal', value: '.items' } },
+              },
+              input: { data: { kind: 'jsonpath', path: '$.nodes.build' } },
+            },
+          ],
+        },
+      ],
+    },
+    valid: false,
+    errorIncludes: 'input mapping is dead config',
+  },
+  {
+    name: 'tool node input mapping consumed via an args $.output expression is valid',
+    catalog: {
+      flows: [
+        {
+          ...VALID_FLOW,
+          nodes: [
+            VALID_FLOW.nodes[0],
+            {
+              id: 'a',
+              kind: 'tool',
+              config: {
+                toolId: 'core:tools:jq',
+                args: {
+                  filter: { kind: 'literal', value: '.items' },
+                  payload: { kind: 'jsonpath', path: '$.output' },
+                },
+              },
+              input: { data: { kind: 'jsonpath', path: '$.nodes.build' } },
+            },
+          ],
+        },
+      ],
+    },
+    valid: true,
+  },
+  {
+    name: 'tool node input mapping consumed via a nested $.output path is valid',
+    catalog: {
+      flows: [
+        {
+          ...VALID_FLOW,
+          nodes: [
+            VALID_FLOW.nodes[0],
+            {
+              id: 'a',
+              kind: 'tool',
+              config: {
+                toolId: 'core:tools:jq',
+                // Single-Expression string mappings pass through raw, so
+                // a dotted read INTO the payload also counts as consuming.
+                args: { first: { kind: 'jsonpath', path: '$.output.items.0' } },
+              },
+              input: { kind: 'jsonpath', path: '$.nodes.build' },
+            },
+          ],
+        },
+      ],
+    },
+    valid: true,
   },
 ];
 
@@ -944,7 +1031,12 @@ export const UNSUPPORTED_CASES: readonly UnsupportedCase[] = [
             assertions: [{ expression: { kind: 'js', expression: 'true' }, message: 'x' }],
           },
         },
-        { id: 's', kind: 'subflow', terminal: 'fail', config: { flowId: 'inner', version: '1.0.0' } },
+        {
+          id: 's',
+          kind: 'subflow',
+          terminal: 'fail',
+          config: { flowId: 'inner', version: '1.0.0' },
+        },
       ],
       edges: [
         { from: 't', to: 'a', type: 'sequence' },
