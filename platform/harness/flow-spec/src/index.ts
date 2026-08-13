@@ -20,8 +20,8 @@ export {
   VALIDATION_CASES,
   type ValidationCase,
 } from './fixtures.ts';
-export { schemaViolations, validateSchemaShape } from './schema.ts';
 export { type FlowOutputParseResult, parseFlowOutput } from './output.ts';
+export { schemaViolations, validateSchemaShape } from './schema.ts';
 export {
   type AdapterId,
   type AgentConfig,

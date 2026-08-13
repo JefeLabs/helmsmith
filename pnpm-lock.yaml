@@ -741,6 +741,9 @@ importers:
 
   platform/harness/flow-spec:
     devDependencies:
+      ts-json-schema-generator:
+        specifier: ^2.9.0
+        version: 2.9.0
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

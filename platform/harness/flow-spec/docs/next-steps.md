@@ -25,7 +25,7 @@ flowchart LR
 | # | Item | Effort | Why |
 |---|---|---|---|
 | 1.1 | ~~**Validation-verdict + unsupported-feature fixtures**~~ | M | ✅ Done 2026-08-12 (hardening slice): `VALIDATION_CASES` + `UNSUPPORTED_CASES` replayed by both packages with exact-set feature matching |
-| 1.2 | **Generate JSON Schema from the types** as a build artifact of this package | M | The controlplane Phase 2 validator and the smithagents work-order seam both need a language-neutral contract; hand-porting rules to Java is the drift machine the review warned about |
+| 1.2 | ~~**Generate JSON Schema from the types** as a build artifact of this package~~ | M | ✅ Done 2026-08-12 (schema slice): `schema/flow-spec.schema.json` via `pnpm schema` (ts-json-schema-generator devDep), 9 roots / 47 definitions, drift-guarded by `schema-artifact.test.ts` |
 | 1.3 | **Wire changesets + drop `private` when the first out-of-repo consumer appears** | S | Semver discipline was a stated reason to extract; set it up before someone needs a version to pin |
 
 ## Phase 2 — Runtime catches up to the spec (each item deletes a warning)
@@ -41,7 +41,7 @@ Ordered by risk-reduction per effort. The rule from the README applies to every 
 | 2.5 | ~~**Enforce output contracts at the terminal node**~~ | M | ✅ Done 2026-08-12 (hardening slice): `parseFlowOutput` + `finalizeOrPause` enforcement + `job.flowOutput`. Remaining: `structured.schema` (see 2.7's schema decision) and JobIntent *emission* (submitting `job.flowOutput` to the JobStateMachine — new row 2.9) |
 | 2.9 | **JobIntent emission** — submit the enforced-and-recorded `job.flowOutput` intent(s) from `job-definition` flows to the JobStateMachine to launch the actual work flow | M | The other half of the factory/fleet seam: 2.5 guarantees the work order is well-formed; this makes it DO something |
 | 2.6 | **Suspend wake-up scheduling** (timer via job queue; event via bus subscription) | M | Makes `suspend` a real durability primitive instead of a pause-forever |
-| 2.7 | **Enforce `node-output-schema`** — validate declared schemas against parsed node output (needs a browser-safe JSON-Schema subset or a generated-validator approach; zero-dep constraint applies) | M | Deletes the `node-output-schema` report; turns agent output contracts from parse-only into shape-checked |
+| 2.7 | ~~**Enforce `node-output-schema`** — validate declared schemas against parsed node output (needs a browser-safe JSON-Schema subset or a generated-validator approach; zero-dep constraint applies)~~ | M | ✅ Done 2026-08-12 (schema slice): owned JSON-Schema subset in `schema.ts` — load-time keyword gate + runtime `OutputSchemaViolation` exits; `structured.schema` enforced too (closing 2.5's remainder); `SCHEMA_CASES` conformance fixtures |
 | 2.8 | ~~**Consult `effect` on replay/retry** — skip re-running `side-effecting` nodes on checkpointer replay; require idempotency keys for publish~~ | M | ✅ Done 2026-08-12 (HITL trust slice, landed BEFORE 2.2 per the constraint): `withEffectGuard` gives side-effecting nodes at-most-once semantics; publish executors idempotent by natural key (head branch / mergeSha); `effect` report deleted fixture-first |
 
 ## Phase 3 — Platform payoffs (the reasons the package exists)

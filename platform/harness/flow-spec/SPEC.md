@@ -15,7 +15,7 @@ flowchart LR
     spec["@helmsmith/flow-spec<br/>types · validate · expression · fixtures<br/>zero deps, browser-safe"]
     core["harness-core<br/>compileFlow, executors, loadCatalog"]
     designer["flow designer UI<br/>(future, browser)"]
-    cp["controlplane Phase 2<br/>(future, via generated schema)"]
+    cp["controlplane Phase 2<br/>(via schema/flow-spec.schema.json)"]
     core -->|"depends on + re-exports"| spec
     designer -.->|"imports directly"| spec
     cp -.->|"consumes schema artifact"| spec
@@ -37,7 +37,9 @@ Deliberately **not** here: graph compilation, routing, executors (harness-core);
 | `expression.ts` | `evalExpression`, `resolveExpressionValue`, `resolveJsonPath` | Expression semantics, shared verbatim by the runtime router and any future designer preview |
 | `output.ts` | `parseFlowOutput`, `FlowOutputParseResult` | Terminal output-contract enforcement (job-intent/job-intents shape + min/max, flow-spec re-validation, structured parse); the runtime's `finalizeOrPause` fails jobs through this |
 | `fixtures.ts` | `ExpressionCase`/`EXPRESSION_CASES` (28 cases, `expectedValue` pins value semantics), `ValidationCase`/`VALIDATION_CASES`, `UnsupportedCase`/`UNSUPPORTED_CASES` — all JSON-serializability guarded | Executable spec data for all three behaviors; replayed by this package's tests and harness-core's `flow-spec-conformance.test.ts` |
-| `index.ts` | curated named exports of all five modules | Public surface — adding a symbol to the list IS the API-review point (harness-core's `catalog.ts` re-export is curated the same way, minus the fixture sets) |
+| `schema.ts` | `validateSchemaShape`, `schemaViolations` | The enforced JSON-Schema subset — load-time keyword gate + runtime violation check (2.7) |
+| `schema/flow-spec.schema.json` | generated artifact (`pnpm schema`) | Language-neutral contract for Java/other consumers; drift-guarded by `schema-artifact.test.ts` (1.2) |
+| `index.ts` | curated named exports of all six modules | Public surface — adding a symbol to the list IS the API-review point (harness-core's `catalog.ts` re-export is curated the same way, minus the fixture sets) |
 
 ## 3. The contract in detail
 
@@ -79,7 +81,7 @@ Structural rules the validator enforces: exactly one trigger (no incoming, ≥1 
 Every `TaskStep` may declare `input`, `output`, and `effect`:
 
 - **`input`** (executed): an Expression or a Record of name → Expression, resolved against `FlowRunState` into the node's *effective input* — the prompt for agents, stdin for scripts, `$.output` for everything else. This replaces the implicit "previous node's output string" contract when a node needs more than one upstream value. The single-Expression form is detected by a string `kind` field, so mapping keys must not be named `kind`. Runs inside the Loop wrapper (a looped node's mapping sees the per-item state).
-- **`output`** (`NodeOutputContract`, executed except schema): `{ kind: 'json' }` parses the node's output string into `state.nodes[id]`; invalid JSON → `errorName: 'OutputParseError'` (error-edge routable). `schema` is recorded but not enforced (§5). Omitted/`text` → the raw string is recorded.
+- **`output`** (`NodeOutputContract`, executed): `{ kind: 'json' }` parses the node's output string into `state.nodes[id]`; invalid JSON → `errorName: 'OutputParseError'` (error-edge routable). `schema` is enforced (2.7): load-time gated to the spec's JSON-Schema subset (`schema.ts` — unsupported keywords rejected, never silently ignored), runtime-checked against the parsed value — violations → `errorName: 'OutputSchemaViolation'`, and the value is not recorded as evidence. Omitted/`text` → the raw string is recorded.
 - **`effect`** (executed): `'pure' | 'idempotent' | 'side-effecting'` — replay/retry safety classification. The runtime consults it on node re-entry: a `side-effecting` node with completion evidence in `$.nodes.<id>` is skipped (at-most-once), returning its recorded output; `idempotent`/`pure`/unset re-run freely. Authors who want re-publish semantics mark publish nodes `idempotent` and rely on the executor's natural-key idempotency.
 
 ### 3.1.2 The run-state contract
@@ -112,7 +114,7 @@ Tagged union: `literal`, `jsonpath`, `compare`, `all`, `any`, `not`, `js`. The e
 
 ### 3.4 Flow kinds and output contracts
 
-`FlowDef.kind` ∈ `work` (default) | `job-definition` | `post-job`. A `job-definition` flow must declare `output: { kind: 'job-intent' }` (statically enforced) and emit a `JobIntent` — the factory/fleet work-order seam. `FlowOutputContract` also admits `agent-text`, `job-intents` (min/max fan-out), `flow-spec`, `structured` (schema required). **Runtime enforcement exists** (2026-08-12): `parseFlowOutput` runs at the terminal — job-intent(s) are shape-checked (+min/max), flow-spec emissions are re-validated through the catalog validator, structured output must parse as JSON; violation fails the job, success records `job.flowOutput`. Only `structured.schema` remains unenforced (reported as `flow-output-schema`), and nothing yet *submits* the recorded intent onward.
+`FlowDef.kind` ∈ `work` (default) | `job-definition` | `post-job`. A `job-definition` flow must declare `output: { kind: 'job-intent' }` (statically enforced) and emit a `JobIntent` — the factory/fleet work-order seam. `FlowOutputContract` also admits `agent-text`, `job-intents` (min/max fan-out), `flow-spec`, `structured` (schema required). **Runtime enforcement exists** (2026-08-12): `parseFlowOutput` runs at the terminal — job-intent(s) are shape-checked (+min/max), flow-spec emissions are re-validated through the catalog validator, structured output must parse as JSON and conform to its declared subset schema (2.7); violation fails the job, success records `job.flowOutput`. Nothing yet *submits* the recorded intent onward.
 
 ### 3.5 Catalog and product shapes
 
@@ -137,7 +139,7 @@ sequenceDiagram
     L->>A: console.warn "[catalog] …: 'terminal-fail' is not executed by the runtime yet — …"
 ```
 
-`ValidateOptions.onUnsupported` fires for: `terminal-fail`, `trigger-<kind>` (non-manual), `expression-js` (position-aware scan of exactly the expression positions the runtime evaluates — js-shaped data in a literal's `value` or in non-resolved tool args is inert and not reported), `node-output-schema` (output parsed, schema not enforced), `subflow-version-pin` (recorded, resolution by flowId), `flow-output-schema` (structured terminal output parsed, schema not enforced). Reporting never changes accept/reject behavior; no callback ≡ pre-extraction semantics. Deliberately NOT reported because they execute: node `input` mappings, `output.kind: 'json'` parsing, error-edge `on` matchers, script `secrets`, the new expression kinds, terminal output-contract parsing, `effect` (side-effecting nodes are skipped on re-entry when completion evidence exists), `policy` (retry/backoff, per-attempt timeout, onError — §3.2), parallel fan-out (every sequence edge fires) and `joinStrategy` barriers (§3.2).
+`ValidateOptions.onUnsupported` fires for: `terminal-fail`, `trigger-<kind>` (non-manual), `expression-js` (position-aware scan of exactly the expression positions the runtime evaluates — js-shaped data in a literal's `value` or in non-resolved tool args is inert and not reported), `subflow-version-pin` (recorded, resolution by flowId). Reporting never changes accept/reject behavior; no callback ≡ pre-extraction semantics. Deliberately NOT reported because they execute: node `input` mappings, `output.kind: 'json'` parsing, error-edge `on` matchers, script `secrets`, the new expression kinds, terminal output-contract parsing, `effect` (side-effecting nodes are skipped on re-entry when completion evidence exists), `policy` (retry/backoff, per-attempt timeout, onError — §3.2), parallel fan-out (every sequence edge fires) and `joinStrategy` barriers (§3.2), and output schemas — node `output.schema` and `structured.schema` are load-time subset-gated and runtime-enforced (`schema.ts`, 2.7).
 
 **The list is test-enforced, not convention-enforced** (2026-08-12): `UNSUPPORTED_CASES` fixtures pin the exact report set per flow, replayed by both this package and harness-core — implementing a feature without deleting its report (or adding dead config without a report) fails conformance until the fixture changes first.
 
@@ -145,11 +147,12 @@ sequenceDiagram
 
 ## 6. Conformance
 
-Conformance data now covers all three behaviors the package defines, as plain JSON-serializable data replayed by two suites (`fixtures.test.ts` here; `flow-spec-conformance.test.ts` in harness-core) — a future designer preview or Java validator conforms the same way:
+Conformance data now covers all four behaviors the package defines, as plain JSON-serializable data replayed by two suites (`fixtures.test.ts` here; `flow-spec-conformance.test.ts` in harness-core) — a future designer preview or Java validator conforms the same way:
 
 - `EXPRESSION_CASES` — `{ name, expr, state, expected, expectedValue? }`: `expected` pins the predicate coercion; `expectedValue` (when present) pins `resolveExpressionValue` deep-equality (constructor and raw-lookup value semantics).
 - `VALIDATION_CASES` — `{ name, catalog, valid, errorIncludes? }`: accept/reject verdicts plus error-location substrings.
 - `UNSUPPORTED_CASES` — `{ name, flow, expectedFeatures }`: EXACT sorted-set match on reported feature ids (stale and missing reports both fail).
+- `SCHEMA_CASES` — `{ name, schema, value, valid, violationIncludes? }`: output-schema subset semantics (schemaViolations verdicts + located messages).
 
 Semantics change by changing the fixture first; every conforming implementation fails until it catches up.
 
@@ -165,4 +168,4 @@ Each concern now has exactly one home (this section previously held both and is 
 | Critical feedback — consolidated, severity-rated, with resolved-item record | [`docs/critical-feedback.md`](./docs/critical-feedback.md) |
 | Suggested next steps — phased roadmap with effort estimates and sequencing | [`docs/next-steps.md`](./docs/next-steps.md) |
 
-Headline status as of 2026-08-12 (post-policy-slice): the extraction fixed the *honesty* problem; the data-plane pass fixed the *capability ceiling*; the hardening pass made the alignment *test-enforced*; the validator-consistency and export-surface passes closed the statically-knowable gaps and curated both export layers; the HITL trust slice made approval production-grade (SLA auto-reject, role-gated resume, durable checkpointer + rehydration, effect-aware replay); the policy slice made `retry`/`timeout`/`onError` real; and the parallelism slice made fan-out + `joinStrategy` barriers real. Still open: terminal-fail and non-manual triggers (warn, don't execute), schema enforcement (`node-output-schema`/`flow-output-schema`), suspend wake-up scheduling, and JobIntent *emission* on top of the enforced contract.
+Headline status as of 2026-08-12 (post-schema-slice): the extraction fixed the *honesty* problem; the data-plane pass fixed the *capability ceiling*; the hardening pass made the alignment *test-enforced*; the validator-consistency and export-surface passes closed the statically-knowable gaps and curated both export layers; the HITL trust slice made approval production-grade; the policy slice made `retry`/`timeout`/`onError` real; the parallelism slice made fan-out + `joinStrategy` barriers real; and the schema slice enforced output schemas (owned JSON-Schema subset) and shipped the generated `schema/flow-spec.schema.json` artifact for non-TypeScript consumers. Still open: terminal-fail and non-manual triggers (warn, don't execute), suspend wake-up scheduling, and JobIntent *emission* on top of the enforced contract.

@@ -73,7 +73,11 @@ export function validateSchemaShape(value: unknown, where: string): void {
     }
   }
   if (schema.properties !== undefined) {
-    if (!schema.properties || typeof schema.properties !== 'object' || Array.isArray(schema.properties)) {
+    if (
+      !schema.properties ||
+      typeof schema.properties !== 'object' ||
+      Array.isArray(schema.properties)
+    ) {
       throw new CatalogError(`${where}.properties must be an object of name → schema`);
     }
     for (const [k, sub] of Object.entries(schema.properties as Record<string, unknown>)) {
@@ -85,7 +89,10 @@ export function validateSchemaShape(value: unknown, where: string): void {
       throw new CatalogError(`${where}.required must be an array of property names`);
     }
   }
-  if (schema.additionalProperties !== undefined && typeof schema.additionalProperties !== 'boolean') {
+  if (
+    schema.additionalProperties !== undefined &&
+    typeof schema.additionalProperties !== 'boolean'
+  ) {
     throw new CatalogError(
       `${where}.additionalProperties must be a boolean in the enforced subset (schema-valued additionalProperties is not supported)`,
     );
