@@ -129,15 +129,15 @@ Credentials via the GitHub resolver cascade (local `gh` → controlplane App tok
 
 | Type | Extra fields | Cardinality (per source) | Semantics | Status |
 |---|---|---|---|---|
-| `sequence` | — | unlimited, **but only the first is followed** | Default forward path | ✅ / ❌ fan-out (warned as `parallel-fan-out`) |
+| `sequence` | — | unlimited — **every sequence edge fires** (parallel fan-out) | Default forward path; N>1 edges run their targets as parallel branches | ✅ |
 | `conditional` | `condition: Expression` | unlimited | Tried in declaration order on success exit; first truthy predicate wins | ✅ |
 | `fallback` | — | ≤ 1 | Catchall when no conditional matched and no sequence edge exists | ✅ |
 | `error` | `on?: string[]` | any number with `on`; ≤ 1 catch-all (no/empty `on`); each error name at most once per source (a shadowed name is rejected at load — it could never fire) | Catches `error` exits. `on` matches `NodeExit.errorName` (`Timeout`, `RateLimitError`, `OutputParseError`, `UnknownTool`, `AuthError`, …) — first declared match wins, catch-all last; a name matched by no edge fails the flow | ✅ |
 | `reject` | `maxAttempts?` (3), `onMaxAttempts?` `{kind:'fail'}` \| `{kind:'escalate', to}` | ≤ 1; may only originate from `gate` or approval-tagged nodes | The only cycle-permitted edge; carries `RejectionPayload`; attempts exceeded → fail (default) or escalate | ✅ |
 
-Router precedence on every node exit: **reject → error → conditional (declaration order) → sequence (first) → fallback → END.**
+Router precedence on every node exit: **reject → error → conditional (declaration order, first match) → sequence (ALL fire — fan-out) → fallback → END.**
 
-There is no parallel split/join. Multiple sequence edges from one node validate but only the first runs — the load-time `parallel-fan-out` warning is your only signal. `joinStrategy` (below) is the fan-in half of the same unimplemented feature.
+Parallel split/join is real (2026-08-12): every sequence edge from a node fires its target as a parallel branch, and a node that explicitly declares `joinStrategy` is a barrier over its forward-edge sources — `all` waits for every source, `any` fires on the first arrival, `{nOfM: n}` on the nth, exactly once per run. Undeclared multi-in nodes run once per arriving branch (no implicit join — an implicit `all` would deadlock diamonds whose branches route conditionally). Joins may not be targeted by error/fallback/reject edges (validator-rejected), joins inside reject cycles are unsupported, and an `all` join over a conditionally-skipped source never fires — declare `all` only over always-run sources. Branch outputs stay addressable at the join via `$.nodes.<id>` (the `$.output` channel is last-write-wins and nondeterministic across branches — use input mappings).
 
 ---
 
@@ -197,7 +197,6 @@ Typical pattern — agent emits structured JSON, gate asserts on a field, a late
 
 | Field | What authors expect | What actually happens | Warning id |
 |---|---|---|---|
-| `joinStrategy: "all"\|"any"\|{nOfM}` | Fan-in coordination | Ignored (and fan-out doesn't exist anyway) | `joinStrategy` |
 | `terminal: "fail"` | Mark a failure endpoint | Every terminal node ends as success | `terminal-fail` |
 | `output.schema` | JSON-Schema enforcement of node output | Output parsed, schema ignored | `node-output-schema` |
 | `config.version` (subflow) | Version-pinned resolution | Resolution by flowId only | `subflow-version-pin` |

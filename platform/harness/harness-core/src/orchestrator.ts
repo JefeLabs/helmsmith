@@ -342,7 +342,12 @@ export interface RunJobDeps {
  *                 sources (flow-graph.ts)
  *
  * Edges:
- *   ✅ sequence    — default forward
+ *   ✅ sequence    — default forward; ALL sequence edges from a node
+ *                    fire (parallel fan-out, 2.4)
+ *   ✅ joinStrategy— explicit all | any | nOfM barriers over a node's
+ *                    forward-edge sources, exactly-once per run
+ *                    (withJoinGuard, flow-graph.ts); undeclared
+ *                    multi-in nodes run once per arriving branch
  *   ✅ conditional — Expression-driven; first match wins
  *   ✅ fallback    — catchall when no other edge fires
  *   ✅ error       — catches kind:'error' exits; `on` matchers route by
@@ -370,8 +375,12 @@ export interface RunJobDeps {
  *   ❌ output schemas    — declared node/flow schemas not validated
  *                          (reported: 'node-output-schema' /
  *                          'flow-output-schema')
- *   ❌ effect            — classification recorded, not consulted on
- *                          replay/retry (reported: 'effect')
+ *   ✅ effect            — side-effecting nodes run at most once on
+ *                          re-entry (withEffectGuard, flow-graph.ts);
+ *                          publish executors idempotent by natural key
+ *   ✅ policy            — retry/backoff + per-attempt timeout +
+ *                          onError continue/fallback/propagate
+ *                          (withPolicy, flow-graph.ts)
  *   ❌ subflow version   — pin recorded, resolution by flowId only
  *                          (reported: 'subflow-version-pin')
  *

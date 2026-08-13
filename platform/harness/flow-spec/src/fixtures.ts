@@ -554,6 +554,34 @@ export const VALIDATION_CASES: readonly ValidationCase[] = [
     valid: false,
     errorIncludes: 'must not exceed',
   },
+  {
+    name: 'joinStrategy node with an incoming error edge is rejected (joins count forward edges only)',
+    catalog: {
+      flows: [
+        {
+          ...VALID_FLOW,
+          nodes: [
+            ...VALID_FLOW.nodes,
+            { id: 'b', kind: 'transform', config: { expression: { kind: 'literal', value: 1 } } },
+            {
+              id: 'j',
+              kind: 'transform',
+              joinStrategy: 'all',
+              config: { expression: { kind: 'literal', value: 1 } },
+            },
+          ],
+          edges: [
+            { from: 't', to: 'a', type: 'sequence' },
+            { from: 't', to: 'b', type: 'sequence' },
+            { from: 'a', to: 'j', type: 'sequence' },
+            { from: 'b', to: 'j', type: 'error' },
+          ],
+        },
+      ],
+    },
+    valid: false,
+    errorIncludes: 'forward (sequence/conditional) incoming edges',
+  },
 ];
 
 // ─── Unsupported-feature fixtures ────────────────────────────────────────
@@ -612,15 +640,15 @@ export const UNSUPPORTED_CASES: readonly UnsupportedCase[] = [
         { from: 'b', to: 's', type: 'sequence' },
       ],
     },
-    // 'effect' and 'policy' are deliberately absent: the kitchen-sink
-    // node still declares both, pinning that they are executed (replay
-    // guard; retry/timeout/onError) and no longer reported.
+    // 'effect', 'policy', 'joinStrategy', and 'parallel-fan-out' are
+    // deliberately absent: the kitchen-sink flow still declares all of
+    // them (effect + policy + joinStrategy on node 'a'; two sequence
+    // edges from 'a'), pinning that they are executed and no longer
+    // reported.
     expectedFeatures: [
       'expression-js',
       'flow-output-schema',
-      'joinStrategy',
       'node-output-schema',
-      'parallel-fan-out',
       'subflow-version-pin',
       'terminal-fail',
       'trigger-schedule',
