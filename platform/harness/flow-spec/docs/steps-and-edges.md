@@ -1,6 +1,6 @@
 # Flow Authoring Reference — Steps, Edges, Tags, and What Actually Runs
 
-**Package:** `@helmsmith/flow-spec` · **Date:** 2026-08-07 · **Updated:** 2026-08-12 (data plane: node I/O, error matchers, expression additions; validator-consistency pass: load-time path syntax, shadow rejection, min ≤ max) · Companion docs: [`SPEC.md`](../SPEC.md) (contract detail) · [`critical-feedback.md`](./critical-feedback.md) · [`next-steps.md`](./next-steps.md)
+**Package:** `@helmsmith/flow-spec` · **Date:** 2026-08-07 · **Updated:** 2026-08-12 (data plane: node I/O, error matchers, expression additions; validator-consistency pass: load-time path syntax, shadow rejection, min ≤ max) · Companion docs: [`SPEC.md`](../SPEC.md) (contract detail) · [`capabilities-and-limits.md`](./capabilities-and-limits.md) (pattern-level: what you can build) · [`critical-feedback.md`](./critical-feedback.md) · [`next-steps.md`](./next-steps.md)
 
 This is the catalog author's reference: every node kind, edge type, and tag — with its config fields, a working JSON example, and an honest **support status**. Status comes from the runtime as it exists today; anything marked ❌ still *validates* but triggers a load-time warning via the `onUnsupported` seam and then does nothing.
 
