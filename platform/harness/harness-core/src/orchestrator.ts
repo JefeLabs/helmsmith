@@ -356,8 +356,10 @@ export interface RunJobDeps {
  *                 flow (flow-graph.ts; banned in subflows in v1)
  *   ✅ suspend  — timer | event triggers; same propagation pattern as
  *                 approval (banned in subflows in v1)
- *   ✅ loop     — sequential | parallel modes, collection | directory
- *                 sources (flow-graph.ts)
+ *   ✅ loop     — sequential | per-slot parallel (AbortSignal sibling
+ *                 cancellation), collection | directory (recursive
+ *                 option) sources, cross-iteration delta accumulation
+ *                 (flow-graph.ts, v2)
  *
  * Edges:
  *   ✅ sequence    — default forward; ALL sequence edges from a node

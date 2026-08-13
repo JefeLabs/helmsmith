@@ -52,7 +52,7 @@ Ordered by risk-reduction per effort. The rule from the README applies to every 
 | 3.2 | ~~**Flow designer UI** consuming flow-spec directly in the browser (types + validation + expression preview against the same evaluator the router uses)~~ | L | ✅ Done 2026-08-13 (designer slice): `@helmsmith/flow-designer` — standalone Vite/React drag-and-drop editor (React Flow + dagre) importing flow-spec directly; live validateUnifiedCatalog on every edit + expression/schema playgrounds on the runtime's own code; file-based import/export (save-to-server is a later additive slice) |
 | 3.3 | **Controlplane Phase 2 validation** via the generated schema — reject bad flows at write time instead of first-load time | M | 1.2 |
 | 3.4 | ~~**Loosen `AdapterId` to a registry-checked string**~~ | S | ✅ Done 2026-08-13 (adapter-registry slice): `AdapterId = string`, validator shape-checks only, the factory IS the registry (actionable unknown-id error). The third adapter is now runtime-only — the spec-change tax was paid once, in advance |
-| 3.5 | **Loop v2** — cross-iteration state accumulation, per-slot parallelism with sibling cancellation (needs `AbortSignal` in the `NodeExecutor` contract), recursive directory source | L | Independent |
+| 3.5 | ~~**Loop v2** — cross-iteration state accumulation, per-slot parallelism with sibling cancellation (needs `AbortSignal` in the `NodeExecutor` contract), recursive directory source~~ | L | ✅ Done 2026-08-13 (loop-v2 slice): per-channel delta accumulation, per-slot pool + AbortSignal sibling cancellation (optional NodeExecutor param), `recursive: true` tree walk (files only). Bonus: withNodeIO no longer clobbers executors' own `nodes` writes |
 
 ## Suggested immediate sequence
 

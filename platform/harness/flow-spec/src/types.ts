@@ -532,8 +532,12 @@ export interface LoopTag {
   /** Expression resolving to the iterable. May reference flow state,
    *  product repos, prior node output, etc. */
   path: Expression;
-  /** Sequential = one iteration at a time; parallel = N at once. */
+  /** Sequential = one iteration at a time; parallel = a per-slot pool
+   *  of N with cooperative sibling cancellation on first failure. */
   mode: 'sequential' | 'parallel';
+  /** Directory source only (3.5): walk the whole tree and iterate
+   *  FILES only (default false = top-level entries, files and dirs). */
+  recursive?: boolean;
   /** Cap on concurrent iterations when `mode: 'parallel'`. */
   concurrency?: number;
 }

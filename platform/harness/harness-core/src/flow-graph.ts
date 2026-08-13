@@ -243,7 +243,14 @@ void _runStateCheck;
  * and propagates up to the caller (typically `runJob`), terminating the
  * job with status='failed'.
  */
-export type NodeExecutor = (state: FlowStateT) => Promise<Partial<FlowStateT>>;
+export type NodeExecutor = (
+  state: FlowStateT,
+  /** Cooperative-cancellation signal (3.5). Today only the parallel
+   *  Loop wrapper aborts it (first sibling failure); executors that
+   *  ignore it keep working — honoring it just ends wasted work
+   *  sooner. */
+  signal?: AbortSignal,
+) => Promise<Partial<FlowStateT>>;
 
 export interface CompileFlowOptions {
   flow: FlowDef;
@@ -849,7 +856,10 @@ function withNodeIO(step: TaskStep, exec: NodeExecutor): NodeExecutor {
     const delta = await exec(state);
     if (delta.output === undefined) return completed(delta);
     if (delta.lastExit && delta.lastExit.kind !== 'success') return delta;
-    if (!wantsJson) return completed({ ...delta, nodes: { [nodeId]: delta.output } });
+    // Spread the delta's OWN nodes writes first — a loop's cross-
+    // iteration accumulation (or any executor's direct nodes writes)
+    // must survive the node's own evidence entry.
+    if (!wantsJson) return completed({ ...delta, nodes: { ...delta.nodes, [nodeId]: delta.output } });
     let parsed: unknown;
     try {
       parsed = JSON.parse(delta.output);
@@ -882,7 +892,7 @@ function withNodeIO(step: TaskStep, exec: NodeExecutor): NodeExecutor {
         };
       }
     }
-    return completed({ ...delta, nodes: { [nodeId]: parsed } });
+    return completed({ ...delta, nodes: { ...delta.nodes, [nodeId]: parsed } });
   };
 }
 
@@ -1118,37 +1128,33 @@ function makeSuspendExecutor(node: SyntheticSuspendNode): NodeExecutor {
 }
 
 /**
- * Loop tag wrapper. Resolves the iteration source from state, runs the
- * inner executor once per item with `state.output` set to the item, and
- * aggregates outputs. Halts iteration on the first error or reject from
- * the inner.
+ * Loop tag wrapper (v2, 3.5). Resolves the iteration source from state,
+ * runs the inner executor once per item with `state.output` set to the
+ * item, and aggregates outputs. Halts on the first error or reject.
  *
  * Sources:
  *   - 'collection': tag.path resolves to an array; each element becomes
  *      the inner's `state.output` (stringified for non-strings).
- *   - 'directory':  tag.path resolves to a directory string; readdir-ed
- *      entries become absolute-path items, sorted alphabetically. No
- *      recursive walk in v1 — catalog authors who need a tree should
- *      compose with a `script` step that runs `find` and pipes the
- *      paths back as state.output, then loop over `collection` against
- *      that.
+ *   - 'directory':  tag.path resolves to a directory string. Non-
+ *      recursive (default): readdir entries (files AND dirs) as
+ *      absolute paths, sorted. `recursive: true`: the whole tree,
+ *      FILES ONLY (directories are traversal structure), sorted.
  *
  * Modes:
- *   - 'sequential': one iteration at a time. Halt on first failure.
- *   - 'parallel':   chunked async pool with concurrency = tag.concurrency
- *      ?? 4. Items run in chunks; after each chunk completes, the loop
- *      checks for a failure delta and short-circuits to the first one.
- *      Items already running in the failing chunk are awaited (Promise.
- *      all resolves them; their results are discarded). Subsequent
- *      chunks are skipped. Trade-off: simpler than a per-slot pool, at
- *      the cost of one slow item potentially holding up the pool.
+ *   - 'sequential': one iteration at a time; halt on first failure.
+ *   - 'parallel':   per-slot sliding-window pool (concurrency =
+ *      tag.concurrency ?? 4) — a slow item never stalls its neighbors.
+ *      The first failure aborts an AbortSignal handed to every sibling
+ *      (cooperative — signal-aware executors end early; others finish
+ *      and are discarded) and stops further launches. Outputs keep
+ *      ITEM order regardless of completion order.
  *
- * The result aggregates iteration outputs joined by `\n---\n`. Per-
- * iteration deltas to `attempts` / `changedFiles` are NOT merged across
- * iterations in v1 — only the LAST iteration's delta survives. Catalog
- * authors who need cross-iteration accumulation should rely on the
- * channel reducers (changedFiles uses one) or use a `transform` step
- * after the loop to project state.
+ * Cross-iteration accumulation (v2): per-iteration deltas merge across
+ * iterations with per-channel semantics — map channels (nodes,
+ * attempts, completions) key-merge, append channels (messages,
+ * steering, changedFiles) concatenate, last-write-wins channels take
+ * the latest — so a loop's downstream sees every iteration's writes,
+ * not just the last one's.
  */
 function loopWrapper(
   nodeId: string,
@@ -1213,6 +1219,25 @@ async function resolveLoopItems(
     };
   }
   try {
+    if (tag.recursive) {
+      // Recursive walk (3.5): the whole tree, FILES only — directories
+      // are traversal structure, not work items. Sorted for
+      // predictability.
+      const files: string[] = [];
+      const walk = async (dir: string): Promise<void> => {
+        const entries = await readdir(dir, { withFileTypes: true });
+        for (const e of entries) {
+          const p = pathJoin(dir, e.name);
+          if (e.isDirectory()) {
+            await walk(p);
+          } else {
+            files.push(p);
+          }
+        }
+      };
+      await walk(dirPath);
+      return files.sort();
+    }
     const entries = await readdir(dirPath, { withFileTypes: true });
     // Sorted alphabetical for predictability across runs / OSes —
     // readdir order is filesystem-defined. Emit absolute paths so
@@ -1228,6 +1253,31 @@ async function resolveLoopItems(
   }
 }
 
+/** Per-channel cross-iteration delta merge (3.5). Map channels
+ *  key-merge, append channels concatenate, everything else
+ *  last-write-wins — mirroring what the graph reducers would do if
+ *  each iteration's delta were applied separately. */
+function mergeLoopDeltas(
+  acc: Partial<FlowStateT>,
+  delta: Partial<FlowStateT>,
+): Partial<FlowStateT> {
+  const out: Partial<FlowStateT> = { ...acc, ...delta };
+  for (const ch of ['nodes', 'attempts', '__completions', '__joinSkips'] as const) {
+    if (acc[ch] !== undefined || delta[ch] !== undefined) {
+      out[ch] = { ...(acc[ch] as object), ...(delta[ch] as object) } as never;
+    }
+  }
+  for (const ch of ['messages', 'steering', 'changedFiles'] as const) {
+    if (acc[ch] !== undefined || delta[ch] !== undefined) {
+      out[ch] = [
+        ...((acc[ch] as unknown[]) ?? []),
+        ...((delta[ch] as unknown[]) ?? []),
+      ] as never;
+    }
+  }
+  return out;
+}
+
 async function runLoopSequential(
   items: readonly unknown[],
   inner: NodeExecutor,
@@ -1236,7 +1286,7 @@ async function runLoopSequential(
   joinOutputs: (outputs: string[]) => string,
 ): Promise<Partial<FlowStateT>> {
   const outputs: string[] = [];
-  let lastDelta: Partial<FlowStateT> = {};
+  let acc: Partial<FlowStateT> = {};
 
   for (const item of items) {
     const delta = await inner(buildItemState(state, item));
@@ -1244,11 +1294,11 @@ async function runLoopSequential(
       return delta;
     }
     if (typeof delta.output === 'string') outputs.push(delta.output);
-    lastDelta = delta;
+    acc = mergeLoopDeltas(acc, delta);
   }
 
   return {
-    ...lastDelta,
+    ...acc,
     output: joinOutputs(outputs),
     lastExit: { nodeId, kind: 'success' },
   };
@@ -1262,30 +1312,44 @@ async function runLoopParallel(
   concurrency: number,
   joinOutputs: (outputs: string[]) => string,
 ): Promise<Partial<FlowStateT>> {
-  const outputs: string[] = [];
-  let lastDelta: Partial<FlowStateT> = {};
+  // Per-slot sliding window (3.5): each worker pulls the next item as
+  // soon as it frees up — a slow item occupies one slot, not a chunk.
+  // First failure wins: it aborts the shared signal (cooperative
+  // sibling cancellation) and stops further launches; successes that
+  // were in flight complete and are discarded. Outputs keep ITEM
+  // order regardless of completion order.
+  const outputs: (string | undefined)[] = new Array(items.length);
+  let acc: Partial<FlowStateT> = {};
+  let failure: Partial<FlowStateT> | null = null;
+  const controller = new AbortController();
+  let next = 0;
 
-  // Process items in chunks of `concurrency`. Each chunk runs in
-  // parallel via Promise.all; we check for failures after the chunk
-  // completes so all in-flight iterations get to finish (sibling
-  // cancellation isn't supported — the inner executor's contract
-  // doesn't expose AbortSignal yet). The first failure in arrival
-  // order halts subsequent chunks.
-  for (let i = 0; i < items.length; i += concurrency) {
-    const chunk = items.slice(i, i + concurrency);
-    const deltas = await Promise.all(chunk.map((item) => inner(buildItemState(state, item))));
-    for (const delta of deltas) {
+  const worker = async (): Promise<void> => {
+    while (!controller.signal.aborted) {
+      const i = next;
+      next += 1;
+      if (i >= items.length) return;
+      const delta = await inner(buildItemState(state, items[i]), controller.signal);
       if (delta.lastExit?.kind === 'error' || delta.lastExit?.kind === 'reject') {
-        return delta;
+        if (failure === null) {
+          failure = delta;
+          controller.abort();
+        }
+        return;
       }
-      if (typeof delta.output === 'string') outputs.push(delta.output);
-      lastDelta = delta;
+      if (typeof delta.output === 'string') outputs[i] = delta.output;
+      acc = mergeLoopDeltas(acc, delta);
     }
-  }
+  };
 
+  await Promise.all(
+    Array.from({ length: Math.min(Math.max(1, concurrency), items.length) }, () => worker()),
+  );
+
+  if (failure !== null) return failure;
   return {
-    ...lastDelta,
-    output: joinOutputs(outputs),
+    ...acc,
+    output: joinOutputs(outputs.filter((o): o is string => o !== undefined)),
     lastExit: { nodeId, kind: 'success' },
   };
 }

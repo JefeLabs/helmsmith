@@ -584,6 +584,62 @@ export const VALIDATION_CASES: readonly ValidationCase[] = [
     errorIncludes: 'type must be one of',
   },
   {
+    name: 'a recursive directory loop validates; a non-boolean recursive is rejected',
+    catalog: {
+      flows: [
+        {
+          ...VALID_FLOW,
+          nodes: [
+            VALID_FLOW.nodes[0],
+            {
+              id: 'a',
+              kind: 'transform',
+              tags: {
+                loop: {
+                  source: 'directory',
+                  path: { kind: 'jsonpath', path: '$.input' },
+                  mode: 'parallel',
+                  concurrency: 4,
+                  recursive: true,
+                },
+              },
+              config: { expression: { kind: 'literal', value: 1 } },
+            },
+          ],
+        },
+      ],
+    },
+    valid: true,
+  },
+  {
+    name: 'a loop with a non-boolean recursive flag is rejected',
+    catalog: {
+      flows: [
+        {
+          ...VALID_FLOW,
+          nodes: [
+            VALID_FLOW.nodes[0],
+            {
+              id: 'a',
+              kind: 'transform',
+              tags: {
+                loop: {
+                  source: 'directory',
+                  path: { kind: 'jsonpath', path: '$.input' },
+                  mode: 'sequential',
+                  recursive: 'yes',
+                },
+              },
+              config: { expression: { kind: 'literal', value: 1 } },
+            },
+          ],
+        },
+      ],
+    },
+    valid: false,
+    errorIncludes: 'recursive must be a boolean',
+  },
+  {
     name: 'an agent with a custom (non-built-in) adapter id validates — adapters resolve at runtime',
     catalog: {
       flows: [
