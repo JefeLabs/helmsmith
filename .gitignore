@@ -2,7 +2,7 @@
 node_modules/
 **/node_modules/
 .screenshots/
-
+.npmrc
 # OS
 .DS_Store
 **/.DS_Store
@@ -100,6 +100,3 @@ catalog.json
 
 # Product design sources (.pen/.png Pencil files) — local-only by decision.
 /product/
-
-# npm auth token (machine-local, never committed)
-.npmrc
