@@ -100,8 +100,15 @@ export const FlowState = Annotation.Root({
   }),
   /** Accumulating text output. Each successful agent step writes here;
    *  the next step reads it as the user prompt. Equivalent to the old
-   *  orchestrator's `priorOutput` local. */
-  output: Annotation<string>,
+   *  orchestrator's `priorOutput` local. Explicit last-write-wins
+   *  reducer (2.4): parallel branches writing in the same superstep
+   *  must not throw — but which write wins is NONDETERMINISTIC across
+   *  branches, which is why `output` is the legacy channel and joins
+   *  consume specific branches via `$.nodes.<id>` input mappings. */
+  output: Annotation<string>({
+    reducer: (_, n) => n,
+    default: () => '',
+  }),
   /** Per-node outputs, keyed by node id — written by the withNodeIO
    *  wrapper after every successful node that produced output. Merge-
    *  reducer so parallel branches never clobber. jsonpath surface:
@@ -174,6 +181,27 @@ export const FlowState = Annotation.Root({
   cancelReason: Annotation<string | null>({
     reducer: (_, n) => n,
     default: () => null,
+  }),
+  /**
+   * RUNTIME-PRIVATE (2.4) — per-node success-completion counter, written
+   * by withNodeIO on every successful node exit. The join guard reads it
+   * for arrival accounting; NOT part of the FlowRunState wire contract
+   * (structural `extends` permits extra channels) and not a jsonpath
+   * surface catalogs should rely on. Double-underscore marks it private.
+   */
+  __completions: Annotation<Record<string, number>>({
+    reducer: (acc, partial) => ({ ...acc, ...partial }),
+    default: () => ({}),
+  }),
+  /**
+   * RUNTIME-PRIVATE (2.4) — per-join-node skip flag for the current
+   * superstep. The join guard sets `true` when the strategy is not yet
+   * satisfied (or the join already fired); the node's router reads it
+   * and ends that branch's traversal instead of forwarding.
+   */
+  __joinSkips: Annotation<Record<string, boolean>>({
+    reducer: (acc, partial) => ({ ...acc, ...partial }),
+    default: () => ({}),
   }),
   /**
    * Staged changes across product repos, populated by the agent
@@ -266,6 +294,16 @@ export function compileFlow(opts: CompileFlowOptions) {
   // biome-ignore lint/suspicious/noExplicitAny: builder type evolves per addNode call (LangGraph's chained-builder generics rotate the type after each addNode/addEdge). The runtime is correct; the static path-dependent types are too narrow for our dynamic-iteration construction.
   const builder: any = new StateGraph(FlowState);
 
+  // Forward-edge (sequence | conditional) sources per target — the
+  // arrival set a declared joinStrategy counts against (2.4).
+  const forwardSourcesByTarget = new Map<string, string[]>();
+  for (const e of flow.edges) {
+    if (e.type !== 'sequence' && e.type !== 'conditional') continue;
+    const list = forwardSourcesByTarget.get(e.to) ?? [];
+    if (!list.includes(e.from)) list.push(e.from);
+    forwardSourcesByTarget.set(e.to, list);
+  }
+
   for (const node of flow.nodes) {
     const baseExec =
       // Synthetic approval / suspend nodes carry tag metadata that the
@@ -278,9 +316,13 @@ export function compileFlow(opts: CompileFlowOptions) {
         : isSyntheticSuspendNode(node)
           ? makeSuspendExecutor(node)
           : (executors.get(node.id) ?? builtinExecutor(node) ?? defaultExecutor(node.id));
-    const wrapped = withEffectGuard(
+    const wrapped = withJoinGuard(
       node,
-      withPolicy(node, withNodeIO(node, wrapWithTags(node, withInputMapping(node, baseExec)))),
+      forwardSourcesByTarget.get(node.id) ?? [],
+      withEffectGuard(
+        node,
+        withPolicy(node, withNodeIO(node, wrapWithTags(node, withInputMapping(node, baseExec)))),
+      ),
     );
     builder.addNode(node.id, wrapped);
   }
@@ -337,8 +379,8 @@ export function buildRouter(
   nodeId: string,
   out: readonly Edge[],
   onError?: TaskStepPolicy['onError'],
-): (state: FlowStateT) => string {
-  const seq = out.find((e) => e.type === 'sequence');
+): (state: FlowStateT) => string | string[] {
+  const seqs = out.filter((e) => e.type === 'sequence');
   const conds = out.filter(
     (e): e is Extract<Edge, { type: 'conditional' }> => e.type === 'conditional',
   );
@@ -346,7 +388,11 @@ export function buildRouter(
   const errs = out.filter((e): e is Extract<Edge, { type: 'error' }> => e.type === 'error');
   const rej = out.find((e): e is Extract<Edge, { type: 'reject' }> => e.type === 'reject');
 
-  return (state: FlowStateT): string => {
+  return (state: FlowStateT): string | string[] => {
+    // A pending (or already-fired) join skipped this trigger — end this
+    // branch's traversal; the satisfying arrival forwards normally (2.4).
+    if (state.__joinSkips?.[nodeId]) return END;
+
     const exit = state.lastExit;
 
     if (exit?.kind === 'reject' && rej) {
@@ -386,7 +432,10 @@ export function buildRouter(
         return c.to;
       }
     }
-    if (seq) return seq.to;
+    // Fan-out (2.4): every sequence edge fires — LangGraph runs the
+    // targets as parallel branches. Single edge stays a plain string.
+    if (seqs.length === 1) return seqs[0]!.to;
+    if (seqs.length > 1) return seqs.map((e) => e.to);
     if (fb) return fb.to;
     return END;
   };
@@ -584,6 +633,55 @@ function resolveInputMapping(
 }
 
 /**
+ * Join guard (roadmap 2.4) — the runtime consult of TaskStep.joinStrategy.
+ * Applied OUTERMOST, only when a node explicitly declares a strategy
+ * (an implicit 'all' default would deadlock diamonds whose branches
+ * route conditionally — undeclared multi-in nodes keep LangGraph's
+ * trigger-per-arrival behavior).
+ *
+ * Semantics, per trigger of the join node:
+ *   - already fired this run (own __completions > 0) → skip.
+ *   - arrivals = forward-edge sources with __completions > 0.
+ *     'all' requires every source; 'any' requires one; nOfM requires n
+ *     (capped at the source count). Short → skip.
+ *   - satisfied → execute exactly once.
+ * A skip returns only a __joinSkips marker; the node's router reads it
+ * and ends that branch's traversal (END) instead of forwarding.
+ *
+ * v1 caveats (documented in the spec): joins inside reject cycles are
+ * unsupported (the once-per-run marker never resets), and an 'all' join
+ * whose counted source is conditionally skipped never fires — the flow
+ * ends without it (authors declare 'all' only over always-run sources).
+ */
+function withJoinGuard(
+  step: TaskStep,
+  forwardSources: readonly string[],
+  exec: NodeExecutor,
+): NodeExecutor {
+  const strategy = step.joinStrategy;
+  if (strategy === undefined) return exec;
+  const nodeId = step.id;
+  const required =
+    strategy === 'all'
+      ? forwardSources.length
+      : strategy === 'any'
+        ? 1
+        : Math.min(strategy.nOfM, forwardSources.length);
+
+  return async (state) => {
+    if ((state.__completions?.[nodeId] ?? 0) > 0) {
+      return { __joinSkips: { [nodeId]: true } };
+    }
+    const arrived = forwardSources.filter((s) => (state.__completions?.[s] ?? 0) > 0).length;
+    if (arrived < required) {
+      return { __joinSkips: { [nodeId]: true } };
+    }
+    const delta = await exec(state);
+    return { ...delta, __joinSkips: { [nodeId]: false } };
+  };
+}
+
+/**
  * Policy wrapper (roadmap 2.3) — the runtime consult of TaskStep.policy.
  * Sits outside withNodeIO so retries also cover OutputParseError (an
  * agent that emitted invalid JSON gets re-asked), and inside
@@ -737,12 +835,22 @@ function withNodeIO(step: TaskStep, exec: NodeExecutor): NodeExecutor {
   const nodeId = step.id;
   const wantsJson = step.output?.kind === 'json';
   return async (state) => {
+    // Success-completion accounting (2.4): every successful exit bumps
+    // the node's runtime-private counter so join guards can count
+    // arrivals even for nodes that produce no output (gates, triggers).
+    const completed = (delta: Partial<FlowStateT>): Partial<FlowStateT> =>
+      delta.lastExit && delta.lastExit.kind !== 'success'
+        ? delta
+        : {
+            ...delta,
+            __completions: { [nodeId]: (state.__completions?.[nodeId] ?? 0) + 1 },
+          };
     const delta = await exec(state);
-    if (delta.output === undefined) return delta;
+    if (delta.output === undefined) return completed(delta);
     if (delta.lastExit && delta.lastExit.kind !== 'success') return delta;
-    if (!wantsJson) return { ...delta, nodes: { [nodeId]: delta.output } };
+    if (!wantsJson) return completed({ ...delta, nodes: { [nodeId]: delta.output } });
     try {
-      return { ...delta, nodes: { [nodeId]: JSON.parse(delta.output) } };
+      return completed({ ...delta, nodes: { [nodeId]: JSON.parse(delta.output) } });
     } catch (err) {
       return {
         ...delta,
