@@ -8,6 +8,33 @@ pnpm test       # graph↔flow mapping round-trip tests
 pnpm build      # typecheck + production bundle
 ```
 
+## Use it
+
+**Standalone** (any harness or controlplane serving the `/v1/catalog` wire shape):
+
+```
+npx @helmsmith/flow-designer --harness http://127.0.0.1:8787
+```
+
+Binds loopback by default (the proxy forwards approval actor headers — network exposure is `--host 0.0.0.0`, an explicit decision).
+
+**Embedded in a React app** (react/react-dom are the only peers; React Flow, dagre, flow-spec, and the compiled styles are bundled):
+
+```tsx
+import { FlowDesigner } from '@helmsmith/flow-designer';
+import '@helmsmith/flow-designer/styles.css';
+
+<div style={{ height: '100vh' }}>
+  <FlowDesigner
+    initialCatalog={catalog}
+    onCatalogChange={(live) => save(live)}
+    serverBase={null /* or a proxy path to your harness */}
+  />
+</div>;
+```
+
+The component fills its container; `onCatalogChange` fires with the live catalog after every edit; `serverBase: null` hides the server buttons for file-only embedding.
+
 ## What it does
 
 - **Canvas editing** — all 8 step kinds from the palette; edges drawn by handle-drag (default `sequence`, retyped in the panel to conditional/error/fallback/reject with per-type fields); node/edge deletion; dagre auto-layout (`relayout`).
