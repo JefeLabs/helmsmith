@@ -4,6 +4,8 @@ import {
   EXPRESSION_CASES,
   evalExpression,
   resolveExpressionValue,
+  SCHEMA_CASES,
+  schemaViolations,
   UNSUPPORTED_CASES,
   VALIDATION_CASES,
   validateFlowCatalog,
@@ -15,10 +17,24 @@ describe('conformance fixtures', () => {
   });
 
   it('fixtures are JSON-serializable (schema / Java consumers replay them from data)', () => {
-    for (const set of [EXPRESSION_CASES, VALIDATION_CASES, UNSUPPORTED_CASES]) {
+    for (const set of [EXPRESSION_CASES, VALIDATION_CASES, UNSUPPORTED_CASES, SCHEMA_CASES]) {
       expect(JSON.parse(JSON.stringify(set))).toEqual(set);
     }
   });
+
+  for (const c of SCHEMA_CASES) {
+    it(`schema: ${c.name}`, () => {
+      const issues = schemaViolations(c.value, c.schema);
+      if (c.valid) {
+        expect(issues).toEqual([]);
+      } else {
+        expect(issues.length).toBeGreaterThan(0);
+        if (c.violationIncludes !== undefined) {
+          expect(issues.join('\n')).toContain(c.violationIncludes);
+        }
+      }
+    });
+  }
 
   for (const c of EXPRESSION_CASES) {
     it(`expression: ${c.name}`, () => {

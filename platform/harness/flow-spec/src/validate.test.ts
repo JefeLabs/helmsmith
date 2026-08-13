@@ -296,17 +296,17 @@ describe('validateFlowCatalog', () => {
 });
 
 describe('unsupported-feature reporting', () => {
-  it('reports flow-output-schema for structured flow output', () => {
+  it('structured flow output with a subset schema is executed and silent', () => {
     const reported: UnsupportedFeature[] = [];
     validateFlowCatalog(
       { flows: [{ ...validFlow, output: { kind: 'structured', schema: { type: 'object' } } }] },
       'test',
       { onUnsupported: (f) => reported.push(f) },
     );
-    expect(reported.map((f) => f.feature)).toContain('flow-output-schema');
+    expect(reported).toEqual([]);
   });
 
-  it('reports node-output-schema and subflow-version-pin; effect is executed and silent', () => {
+  it('reports subflow-version-pin; effect and output schemas are executed and silent', () => {
     const reported: UnsupportedFeature[] = [];
     const catalog = {
       flows: [
@@ -336,7 +336,8 @@ describe('unsupported-feature reporting', () => {
     };
     validateFlowCatalog(catalog, 'test', { onUnsupported: (f) => reported.push(f) });
     const features = reported.map((f) => f.feature);
-    expect(features).toContain('node-output-schema');
+    // node output schemas are load-time subset-gated + runtime-enforced.
+    expect(features).not.toContain('node-output-schema');
     // effect is consulted by the runtime (replay guard) — no report.
     expect(features).not.toContain('effect');
     expect(features).toContain('subflow-version-pin');

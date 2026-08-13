@@ -9,13 +9,14 @@
  * a job failure. Browser-safe and pure, so a designer UI can preview
  * emission with the exact function the runtime enforces with.
  *
- * Deliberately NOT enforced here: `structured.schema` — parsing happens,
- * schema validation doesn't (no browser-safe JSON-Schema dependency
- * fits the zero-dep constraint yet). That gap is reported at load time
- * as the `flow-output-schema` unsupported feature, keeping the honesty
- * rule: parse-only is what the code does, so parse-only is what the
- * spec admits to.
+ * `structured.schema` is enforced (2.7) via the spec's own JSON-Schema
+ * subset (`schema.ts` — browser-safe, zero-dep): the parsed value is
+ * checked with `schemaViolations` and any violation fails the job with
+ * located messages. The subset itself is gated at catalog load by
+ * `validateSchemaShape`, so a schema that reaches this point is fully
+ * enforceable.
  */
+import { schemaViolations } from './schema.ts';
 import type { FlowOutputContract, JobIntent } from './types.ts';
 import { validateFlowCatalog } from './validate.ts';
 
@@ -77,9 +78,18 @@ export function parseFlowOutput(
       return { ok: true, value: parsed.value };
     }
     case 'structured': {
-      // Parse only — schema enforcement is the `flow-output-schema`
-      // unsupported feature (see module header).
-      return parseJson(text, 'structured');
+      const parsed = parseJson(text, 'structured');
+      if (!parsed.ok) return parsed;
+      // 2.7 — enforce the declared subset schema against the parsed value.
+      const schema = (contract as Extract<FlowOutputContract, { kind: 'structured' }>).schema;
+      const issues = schemaViolations(parsed.value, schema);
+      if (issues.length > 0) {
+        return {
+          ok: false,
+          error: `structured output violates the declared schema: ${issues.join('; ')}`,
+        };
+      }
+      return parsed;
     }
   }
 }

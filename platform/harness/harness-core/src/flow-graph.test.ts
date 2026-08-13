@@ -1037,6 +1037,66 @@ describe('parallel fan-out + joinStrategy (2.4)', () => {
   });
 });
 
+// ─── node output schema enforcement (2.7) ─────────────────────────────────
+
+describe('node output schema enforcement (2.7)', () => {
+  function schemaFlow(): FlowDef {
+    return {
+      id: 'sch',
+      nodes: [
+        trigger('t'),
+        {
+          ...agentNode('shape'),
+          output: {
+            kind: 'json',
+            schema: {
+              type: 'object',
+              required: ['score'],
+              properties: { score: { type: 'number', minimum: 0, maximum: 1 } },
+            },
+          },
+        },
+        agentNode('done'),
+        agentNode('rescue'),
+      ],
+      edges: [
+        { from: 't', to: 'shape', type: 'sequence' },
+        { from: 'shape', to: 'done', type: 'sequence' },
+        { from: 'shape', to: 'rescue', type: 'error', on: ['OutputSchemaViolation'] },
+      ],
+    };
+  }
+
+  async function runWith(output: string) {
+    const calls: string[] = [];
+    const executors = new Map<string, NodeExecutor>([
+      ['shape', async () => ({ output, lastExit: { nodeId: 'shape', kind: 'success' } })],
+      ['done', makeRecorder(calls, 'done')],
+      ['rescue', makeRecorder(calls, 'rescue')],
+    ]);
+    const graph = compileFlow({ flow: schemaFlow(), executors });
+    const state = (await graph.invoke(initialState, {
+      configurable: { thread_id: `sch-${output.length}` },
+    })) as FlowStateT;
+    return { calls, state };
+  }
+
+  it('a conforming JSON output is recorded and the flow proceeds', async () => {
+    const { calls, state } = await runWith('{"score": 0.5}');
+    expect(calls).toContain('done');
+    expect(state.nodes.shape).toEqual({ score: 0.5 });
+  });
+
+  it('a schema-violating output exits OutputSchemaViolation, routable via error edge', async () => {
+    const { calls, state } = await runWith('{"score": 2}');
+    expect(calls).toContain('rescue');
+    expect(calls).not.toContain('done');
+    expect(state.lastExit?.errorName ?? '').not.toBe('OutputParseError');
+    // The violating value is NOT recorded as addressable evidence.
+    expect(state.nodes.shape).toBeUndefined();
+  });
+});
+
 // ─── buildRouter (in isolation) ───────────────────────────────────────────
 
 describe('buildRouter', () => {

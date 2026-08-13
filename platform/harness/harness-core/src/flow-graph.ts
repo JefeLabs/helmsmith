@@ -47,6 +47,7 @@ import {
   type FlowRunState,
   type NodeExit,
   resolveExpressionValue,
+  schemaViolations,
   type SuspendRequest,
 } from '@helmsmith/flow-spec';
 import {
@@ -849,8 +850,9 @@ function withNodeIO(step: TaskStep, exec: NodeExecutor): NodeExecutor {
     if (delta.output === undefined) return completed(delta);
     if (delta.lastExit && delta.lastExit.kind !== 'success') return delta;
     if (!wantsJson) return completed({ ...delta, nodes: { [nodeId]: delta.output } });
+    let parsed: unknown;
     try {
-      return completed({ ...delta, nodes: { [nodeId]: JSON.parse(delta.output) } });
+      parsed = JSON.parse(delta.output);
     } catch (err) {
       return {
         ...delta,
@@ -862,6 +864,25 @@ function withNodeIO(step: TaskStep, exec: NodeExecutor): NodeExecutor {
         },
       };
     }
+    // 2.7 — enforce the declared subset schema against the parsed value.
+    // Violations exit with their own errorName (error-edge routable,
+    // retryable via policy.retry) and the value is NOT recorded as
+    // addressable evidence.
+    if (step.output?.kind === 'json' && step.output.schema !== undefined) {
+      const issues = schemaViolations(parsed, step.output.schema);
+      if (issues.length > 0) {
+        return {
+          ...delta,
+          lastExit: {
+            nodeId,
+            kind: 'error',
+            errorName: 'OutputSchemaViolation',
+            errorMessage: `output violates the declared schema: ${issues.join('; ')}`,
+          },
+        };
+      }
+    }
+    return completed({ ...delta, nodes: { [nodeId]: parsed } });
   };
 }
 

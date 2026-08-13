@@ -1,4 +1,29 @@
 import { describe, expect, it } from 'vitest';
+
+describe('parseFlowOutput — structured schema enforcement (2.7)', () => {
+  const contract = {
+    kind: 'structured' as const,
+    schema: {
+      type: 'object',
+      required: ['score'],
+      properties: { score: { type: 'number', minimum: 0, maximum: 1 } },
+    },
+  };
+
+  it('accepts a conforming structured output', () => {
+    const r = parseFlowOutput(contract, '{"score": 0.7}');
+    expect(r).toEqual({ ok: true, value: { score: 0.7 } });
+  });
+
+  it('fails a schema-violating structured output with located violations', () => {
+    const r = parseFlowOutput(contract, '{"score": "high"}');
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error).toContain('violates the declared schema');
+      expect(r.error).toContain('$.score');
+    }
+  });
+});
 import { parseFlowOutput } from './index.ts';
 
 describe('parseFlowOutput', () => {
@@ -67,11 +92,10 @@ describe('parseFlowOutput', () => {
     if (!bad.ok) expect(bad.error).toMatch(/trigger/);
   });
 
-  it('structured parses JSON but does NOT enforce the schema (reported at load instead)', () => {
+  it('structured enforces the declared schema on the parsed value (2.7)', () => {
     const contract = { kind: 'structured' as const, schema: { type: 'object' } };
-    // 42 violates the declared schema — still ok: schema enforcement is
-    // the flow-output-schema unsupported feature, not silent behavior.
-    expect(parseFlowOutput(contract, '42')).toEqual({ ok: true, value: 42 });
+    expect(parseFlowOutput(contract, '42').ok).toBe(false); // violates type: object
+    expect(parseFlowOutput(contract, '{"any": 1}')).toEqual({ ok: true, value: { any: 1 } });
     expect(parseFlowOutput(contract, 'not json').ok).toBe(false);
   });
 });
