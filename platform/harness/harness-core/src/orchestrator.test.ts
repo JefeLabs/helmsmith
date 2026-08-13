@@ -1523,6 +1523,29 @@ describe("terminal: 'fail' — authored failure endpoints", () => {
   });
 });
 
+describe('adapter registry (3.4)', () => {
+  it('the default factory rejects unknown ids with the known-adapters list', async () => {
+    const { defaultAdapterFactory } = await import('./orchestrator.ts');
+    expect(() => defaultAdapterFactory('ghost-adapter', dummyBroker)).toThrow(
+      /unknown adapter id "ghost-adapter".*known adapters: claude-sdk, opencode-cli/,
+    );
+  });
+
+  it('a job whose agent names an unknown adapter fails cleanly', async () => {
+    const { runJob } = await import('./orchestrator.ts');
+    const job: JobRecord = {
+      jobId: 'jGhost',
+      status: 'received',
+      submittedAt: 'now',
+      input: 'x',
+      agents: [{ id: 'w', role: 'W', adapter: 'ghost-adapter', systemPrompt: 's', status: 'pending' }],
+    };
+    const jobs = new Map<string, JobRecord>([['jGhost', job]]);
+    await runJob('jGhost', { jobs, bus: new JobBus(), broker: dummyBroker });
+    expect(job.status).toBe('failed');
+  });
+});
+
 describe('JobIntent emission (2.9)', () => {
   function intakeJob(jobId: string, contract: unknown): JobRecord {
     return {

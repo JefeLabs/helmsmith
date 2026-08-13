@@ -584,6 +584,41 @@ export const VALIDATION_CASES: readonly ValidationCase[] = [
     errorIncludes: 'type must be one of',
   },
   {
+    name: 'an agent with a custom (non-built-in) adapter id validates — adapters resolve at runtime',
+    catalog: {
+      flows: [
+        {
+          ...VALID_FLOW,
+          nodes: [
+            VALID_FLOW.nodes[0],
+            {
+              id: 'a',
+              kind: 'agent',
+              config: { agent: { id: 'a', role: 'Worker', adapter: 'my-org:llama-local' } },
+            },
+          ],
+        },
+      ],
+    },
+    valid: true,
+  },
+  {
+    name: 'an agent with an empty adapter id is rejected',
+    catalog: {
+      flows: [
+        {
+          ...VALID_FLOW,
+          nodes: [
+            VALID_FLOW.nodes[0],
+            { id: 'a', kind: 'agent', config: { agent: { id: 'a', role: 'W', adapter: '' } } },
+          ],
+        },
+      ],
+    },
+    valid: false,
+    errorIncludes: 'adapter must be a non-empty string',
+  },
+  {
     name: 'a schedule trigger with a malformed cron field is rejected at load time',
     catalog: {
       flows: [

@@ -1,6 +1,6 @@
 # Flow Spec — Critical Feedback (Consolidated, Current)
 
-**Date:** 2026-08-07 · **Updated:** 2026-08-12 after the data-plane slice (PR #14), the hardening slice (PR #15), a validator-consistency review (PR #17), the export-surface slice (PR #18), the HITL trust slice (PR #19), the policy slice (PR #20), the parallelism slice (PR #21), the schema slice (PR #22), the suspend-wakeup slice (PR #23), the emission slice (PR #24), the terminal-fail slice (PR #25), the trigger-ingress slice (PR #26), and the designer slice (roadmap 3.2) · Companion docs: [`SPEC.md`](../SPEC.md) · [`steps-and-edges.md`](./steps-and-edges.md) · [`next-steps.md`](./next-steps.md)
+**Date:** 2026-08-07 · **Updated:** 2026-08-12 after the data-plane slice (PR #14), the hardening slice (PR #15), a validator-consistency review (PR #17), the export-surface slice (PR #18), the HITL trust slice (PR #19), the policy slice (PR #20), the parallelism slice (PR #21), the schema slice (PR #22), the suspend-wakeup slice (PR #23), the emission slice (PR #24), the terminal-fail slice (PR #25), the trigger-ingress slice (PR #26), the designer slice (PR #27), and the adapter-registry slice (roadmap 3.4) · Companion docs: [`SPEC.md`](../SPEC.md) · [`steps-and-edges.md`](./steps-and-edges.md) · [`next-steps.md`](./next-steps.md)
 
 One document, every open criticism, with status. Sources: the pre-extraction design review (`docs/superpowers/specs/2026-08-07-flow-spec-design-review.md`), the package-level critique from `SPEC.md` §7, the semantic findings from documentation-as-audit, the 2026-08-12 data-plane review + its post-merge self-review (plan: `docs/superpowers/plans/2026-08-12-flow-spec-data-plane.md`), and a 2026-08-12 validator-consistency review of the merged package. Items already fixed are listed once in §1 and not re-argued.
 
@@ -121,10 +121,13 @@ The unifying observation: once the validator crossed into statically-knowable-ru
 |---|---|
 | 🔵 The package's raison d'être — a browser designer sharing the runtime's exact semantics — existed only as an architecture diagram | `@helmsmith/flow-designer`: standalone Vite/React drag-and-drop editor (React Flow canvas, dagre layout) importing `@helmsmith/flow-spec` directly. Every edit re-runs `validateUnifiedCatalog` live (path-prefixed errors + the 3 remaining warnings); expression and output-schema playgrounds run `evalExpression`/`schemaViolations` verbatim — the designer previews what the router will do, not an approximation. File-based import/export keeps it server-independent; the FlowDef↔canvas mapping is pure and round-trip-tested. v1 boundaries stated in its README (JSON sub-editors, session-only layout, no undo) |
 
-## 2. Open — package-level (this package's debt)
+### 1.15 Adapter-registry slice (2026-08-13, roadmap 3.4)
 
-### 🟡 `AdapterId` bakes two runtime implementations into the wire contract
-`'claude-sdk' | 'opencode-cli'` is a closed union in the *spec* package — adding an adapter is a spec change. Everything else in the contract references by id and resolves at runtime (`toolId`, `flowId`); adapters should work the same way (`string` + registry check).
+| Finding | Resolution |
+|---|---|
+| 🟡 `AdapterId` baked two runtime implementations into the wire contract — adding an adapter was a spec change, unlike every other by-id reference (`toolId`, `flowId`) | `AdapterId = string`: the validator checks shape only (non-empty string); existence is enforced at spawn time by the adapter factory — the registry — whose unknown-id error now lists the known adapters and points at `RunJobDeps.adapterFactory` for custom registration. A third adapter is now a runtime-only addition; the spec never changes again for one. (Schema artifact updated: the enum became a string for Java consumers — the drift guard insisted) |
+
+## 2. Open — package-level (this package's debt)
 
 ### 🟡 The name undersells the scope — it's the platform wire-contract package now
 Originally: `ProductDef`/`ProductRepo`/`ContextSourceDef` (tenancy/git shapes) live here because `validateUnifiedCatalog` needs them. Since 2026-08-12 the run side (`FlowRunState`, HITL payloads, `NodeExit`, `ChangedFile`) lives here too — deliberately, for the shared-contract reasons in SPEC §3.1.2. Defensible, but a designer UI importing "flow types" now drags in clone-URL shapes and reviewer payloads. Exports are now curated (§1.5), which softens this but doesn't close it — rename or split entry points when the designer becomes real.

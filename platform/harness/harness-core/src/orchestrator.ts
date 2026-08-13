@@ -100,7 +100,14 @@ export const defaultAdapterFactory: AdapterFactory = (id, broker, config, workdi
     };
     return createAgent({ spec, workdir: wd, credentialBroker });
   }
-  throw new Error(`unknown adapter id: ${id}`);
+  // The registry check (3.4): AdapterId is an open string in the wire
+  // contract; existence is enforced here, at spawn time, with an
+  // actionable list. Callers with custom adapters supply their own
+  // AdapterFactory (RunJobDeps.adapterFactory) — that IS the registry.
+  throw new Error(
+    `unknown adapter id "${id}" — this factory's known adapters: claude-sdk, opencode-cli. ` +
+      `Custom adapters register by supplying RunJobDeps.adapterFactory.`,
+  );
 };
 
 /**

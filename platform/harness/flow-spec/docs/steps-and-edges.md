@@ -75,7 +75,7 @@ Config is `{ "agent": AgentDef }`:
 |---|---|---|---|
 | `id` | string | yes | Unique within the flow; used for streaming/registration |
 | `role` | string | yes | Human-readable label (TUI, logs) |
-| `adapter` | `"claude-sdk"` \| `"opencode-cli"` | yes | Closed union (a known critique — see critical-feedback §2) |
+| `adapter` | string (registry id) | yes | Resolved at runtime by the adapter factory (3.4); the default registry ships `claude-sdk` and `opencode-cli`, and an unknown id fails at spawn time with the known-ids list |
 | `systemPrompt` | string | no | Adapter default applies when omitted |
 | `config` | object | no | Adapter-specific overrides (model, endpoint, effort…) |
 | `accepts` | `string[]` \| `{ [set]: string[] }` | no | Priority-ordered `provider:model` bindings; named sets selected per-job via `set`; falls back to `default` |

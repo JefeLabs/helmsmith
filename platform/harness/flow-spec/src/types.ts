@@ -13,7 +13,14 @@
  * `orchestrator.ts`, and the honest three-column version in
  * `docs/superpowers/specs/2026-08-07-flow-spec-design-review.md`.
  */
-export type AdapterId = 'claude-sdk' | 'opencode-cli';
+/**
+ * Adapter registry id (3.4) — an open string, resolved at runtime by
+ * the harness's adapter factory (like `toolId`/`flowId`, the spec
+ * references by id and never closes over runtime implementations).
+ * The default factory ships 'claude-sdk' and 'opencode-cli'; an
+ * unknown id fails at spawn time with the registry's known-ids list.
+ */
+export type AdapterId = string;
 
 export interface AgentDef {
   /** Stable id for streaming/registration. Unique within a pipeline. */
