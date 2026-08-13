@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "src",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    // Node consumers need real module resolution, not bundler fictions.
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    // Source imports use .ts extensions (the monorepo convention);
+    // rewrite them to .js in the emitted output (TS 5.7+).
+    "rewriteRelativeImportExtensions": true
+  },
+  "include": ["src/**/*"],
+  "exclude": [
+    "src/**/*.test.ts",
+    // Generator input only — deliberately not part of the surface.
+    "src/schema-roots.ts"
+  ]
+}
