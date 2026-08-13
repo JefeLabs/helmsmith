@@ -50,6 +50,7 @@ Reporting never changes accept/reject behavior. harness-core's `loadCatalog` wir
 | Doc | Contents |
 |---|---|
 | [`SPEC.md`](./SPEC.md) | Detailed specification — boundary, modules, contract, validation, expressions, conformance |
+| [`docs/capabilities-and-limits.md`](./docs/capabilities-and-limits.md) | Pattern-level guide — which shapes of flow you can build (resilience, HITL, fan-out, factory flows, …) and what you deliberately can't |
 | [`docs/steps-and-edges.md`](./docs/steps-and-edges.md) | Authoring reference — every step kind, edge, and tag with config tables, JSON examples, and support status |
 | [`docs/critical-feedback.md`](./docs/critical-feedback.md) | Consolidated critical feedback with severity and status |
 | [`docs/next-steps.md`](./docs/next-steps.md) | Phased roadmap with effort estimates |
