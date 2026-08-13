@@ -1022,10 +1022,14 @@ export interface ApprovalResume {
 }
 
 /**
- * Payload surfaced when a Suspend-tagged node pauses. The caller is
- * responsible for scheduling the resume — timer-based or event-based.
- * The resume value is unused (suspend has no decision; resume is the
- * "wake up" signal itself).
+ * Payload surfaced when a Suspend-tagged node pauses. harness-server
+ * schedules the wake (2.6): timer triggers arm an unref'd timer
+ * (re-armed across restarts from the original pause time — an expired
+ * timer fires immediately at boot); event triggers wake through
+ * POST /v1/events when the event type matches and the declared matcher
+ * passes against the event envelope `{ type, payload }` (the matcher's
+ * defined binding surface). The resume value is unused (suspend has no
+ * decision; resume is the "wake up" signal itself).
  */
 export interface SuspendRequest {
   kind: 'suspend';

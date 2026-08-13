@@ -17,6 +17,7 @@ import {
   type CompiledFlowGraph,
   cancelJob,
   type Envelope,
+  evalExpression,
   type FlowCatalog,
   findFlow,
   findProduct,
@@ -391,6 +392,7 @@ export async function startHarnessServer(opts: HarnessServerOptions): Promise<Ha
     pendingApprovals: new Map(),
     pendingSuspends: new Map(),
     approvalTimers: new Map(),
+    suspendTimers: new Map(),
     inFlight: new Set(),
     queue: [],
     capacity: opts.maxConcurrentJobs ?? 5,
@@ -422,6 +424,9 @@ export async function startHarnessServer(opts: HarnessServerOptions): Promise<Ha
       armSlaTimer(ctx, rec.job.jobId, rec.request as ApprovalRequest, rec.pausedAt);
     } else {
       ctx.pendingSuspends.set(rec.job.jobId, rec.request as SuspendRequest);
+      // 2.6 — the wake clock resumes from the ORIGINAL pause time; a
+      // timer that expired while the server was down fires immediately.
+      armSuspendTimer(ctx, rec.job.jobId, rec.request as SuspendRequest, rec.pausedAt);
     }
   }
 
@@ -458,8 +463,9 @@ export async function startHarnessServer(opts: HarnessServerOptions): Promise<Ha
     catalog,
     ...(tcpPort !== undefined ? { tcpPort } : {}),
     async stop() {
-      // Disarm SLA timers so a stopped server can't fire auto-rejects.
+      // Disarm timers so a stopped server can't fire auto-rejects/wakes.
       for (const jobId of [...ctx.approvalTimers.keys()]) clearSlaTimer(ctx, jobId);
+      for (const jobId of [...ctx.suspendTimers.keys()]) clearSuspendTimer(ctx, jobId);
       await new Promise<void>((resolve) => udsServer.close(() => resolve()));
       if (tcpServer) await new Promise<void>((resolve) => tcpServer.close(() => resolve()));
       await unlink(opts.socketPath).catch(() => {});
@@ -520,11 +526,11 @@ interface ServerCtx {
   pendingApprovals: Map<string, ApprovalRequest>;
   /**
    * Latest SuspendRequest per paused job. Same shape rationale as
-   * pendingApprovals but for Suspend-tagged pauses. The harness-server
-   * doesn't yet schedule wake-ups (cron/event listeners are a separate
-   * slice) — for now this exists so external callers can `GET
-   * /v1/jobs/:id/suspend` to inspect what's blocked, then trigger a
-   * resume manually via POST /v1/jobs/:id/resume.
+   * pendingApprovals but for Suspend-tagged pauses. Wake scheduling
+   * (2.6): timer triggers arm suspendTimers; event triggers are matched
+   * by POST /v1/events against this map. `GET /v1/jobs/:id/suspend`
+   * inspects what's blocked; manual POST /v1/jobs/:id/resume still
+   * works.
    */
   pendingSuspends: Map<string, SuspendRequest>;
   /** SLA auto-reject timers, one per pending approval (2.1). Armed when
@@ -532,6 +538,12 @@ interface ServerCtx {
    *  on resume/terminal. Timers are unref'd — they never hold the
    *  process open. */
   approvalTimers: Map<string, NodeJS.Timeout>;
+  /** Suspend wake-up timers, one per pending timer-triggered suspend
+   *  (2.6). Same lifecycle as approvalTimers; re-armed at boot from the
+   *  original pausedAt, so a timer that expired while the server was
+   *  down fires immediately. Event-triggered suspends have no timer —
+   *  they wake through POST /v1/events. */
+  suspendTimers: Map<string, NodeJS.Timeout>;
   /** Workspace root for the container path (slice 9d-4). Defaults to
    *  process.cwd() at server start. */
   workspaceRoot: string;
@@ -646,7 +658,9 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: ServerCtx) {
   }
 
   // GET /v1/jobs/:id/suspend — pending SuspendRequest payload. Mirrors the
-  // approval route. v1 does NOT auto-schedule wakes — caller (cron, event
+  // approval route. Timer suspends wake themselves and event suspends
+  // wake via POST /v1/events (2.6); this read surface remains for
+  // inspection, and the manual resume (cron, event
   // handler, or operator) calls POST /v1/jobs/:id/resume manually.
   const suspendMatch = req.method === 'GET' && url.match(/^\/v1\/jobs\/([^/]+)\/suspend$/);
   if (suspendMatch) {
@@ -772,6 +786,12 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: ServerCtx) {
     // caller polls GET /v1/jobs/:id (or subscribes to /events) to observe
     // the next status — completed, failed, or paused-again at another
     // interrupt.
+    // POST /v1/events — event ingress for suspend wake-ups (2.6).
+    if (req.method === 'POST' && url === '/v1/events' && parsed !== null) {
+      handleIngestEvent(res, parsed, ctx);
+      return;
+    }
+
     const resumeMatch = req.method === 'POST' ? url.match(/^\/v1\/jobs\/([^/]+)\/resume$/) : null;
     if (resumeMatch && parsed !== null) {
       const id = resumeMatch[1]!;
@@ -1221,6 +1241,7 @@ async function handleSubmitJob(
             // still-armed SLA timer (2.1).
             void deletePausedJob(ctx.stateDir, jid).catch(() => {});
             clearSlaTimer(ctx, jid);
+            clearSuspendTimer(ctx, jid);
             // F19: best-effort cleanup of unconfirmed memory entries
             // scoped to this job. The endpoint, primitives, and CLI are
             // all already shipped; this is the missing auto-fire on
@@ -1249,6 +1270,7 @@ async function handleSubmitJob(
         onSuspend: (jid, request) => {
           ctx.pendingSuspends.set(jid, request);
           persistPause(ctx, jid, 'suspend', request);
+          armSuspendTimer(ctx, jid, request, new Date().toISOString());
         },
       });
     };
@@ -1364,6 +1386,7 @@ function executeResume(ctx: ServerCtx, jobId: string, resumeValue: unknown): voi
     return;
   }
   clearSlaTimer(ctx, jobId);
+  clearSuspendTimer(ctx, jobId);
   ctx.pendingApprovals.delete(jobId);
   ctx.pendingSuspends.delete(jobId);
   // 2.2 — the persisted pause record is stale once we kick resumeJob; a
@@ -1381,6 +1404,7 @@ function executeResume(ctx: ServerCtx, jobId: string, resumeValue: unknown): voi
     if (agentId === null && (status === 'completed' || status === 'failed')) {
       tokens.detach(jobId);
       clearSlaTimer(ctx, jobId);
+      clearSuspendTimer(ctx, jobId);
       ctx.pendingApprovals.delete(jobId);
       ctx.pendingSuspends.delete(jobId);
       void deletePausedJob(ctx.stateDir, jobId).catch(() => {});
@@ -1415,6 +1439,7 @@ function executeResume(ctx: ServerCtx, jobId: string, resumeValue: unknown): voi
       onSuspend: (jid, request) => {
         ctx.pendingSuspends.set(jid, request);
         persistPause(ctx, jid, 'suspend', request);
+        armSuspendTimer(ctx, jid, request, new Date().toISOString());
       },
     });
   });
@@ -1458,6 +1483,70 @@ function clearSlaTimer(ctx: ServerCtx, jobId: string): void {
     clearTimeout(timer);
     ctx.approvalTimers.delete(jobId);
   }
+}
+
+/**
+ * Arm a suspend wake-up timer (2.6) for timer-triggered suspends.
+ * `pausedAtIso` anchors the deadline so a rehydrated suspend resumes
+ * its ORIGINAL clock (an already-expired timer fires immediately).
+ * Event-triggered suspends have no timer — they wake via
+ * POST /v1/events. The wake flows through executeResume, the same path
+ * the HTTP resume route uses; the suspend executor discards the resume
+ * value, so the payload is purely diagnostic.
+ */
+function armSuspendTimer(
+  ctx: ServerCtx,
+  jobId: string,
+  request: SuspendRequest,
+  pausedAtIso: string,
+): void {
+  if (request.trigger.kind !== 'timer') return;
+  clearSuspendTimer(ctx, jobId);
+  const remaining = request.trigger.durationMs - (Date.now() - Date.parse(pausedAtIso));
+  const timer = setTimeout(() => {
+    ctx.suspendTimers.delete(jobId);
+    const job = ctx.jobs.get(jobId);
+    if (!job || job.status !== 'suspended' || !ctx.pendingSuspends.has(jobId)) return;
+    executeResume(ctx, jobId, { wake: 'timer', firedAt: new Date().toISOString() });
+  }, Math.max(0, remaining));
+  timer.unref?.();
+  ctx.suspendTimers.set(jobId, timer);
+}
+
+function clearSuspendTimer(ctx: ServerCtx, jobId: string): void {
+  const timer = ctx.suspendTimers.get(jobId);
+  if (timer) {
+    clearTimeout(timer);
+    ctx.suspendTimers.delete(jobId);
+  }
+}
+
+/**
+ * POST /v1/events (2.6) — the v1 event-ingress seam (a webhook relay,
+ * cron shim, or the controlplane posts here; a real bus subscription
+ * can replace the transport without touching the matching). Wakes every
+ * pending event-triggered suspend whose eventType matches and whose
+ * declared matcher (if any) passes against the event envelope
+ * `{ type, payload }` — the matcher's defined binding surface.
+ */
+function handleIngestEvent(res: ServerResponse, body: unknown, ctx: ServerCtx): void {
+  const event = body as { type?: unknown; payload?: unknown } | null;
+  if (!event || typeof event.type !== 'string' || !event.type) {
+    badRequest(res, "event ingest requires a non-empty string 'type' (payload optional)");
+    return;
+  }
+  const envelope = { type: event.type, payload: event.payload };
+  const woke: string[] = [];
+  for (const [jobId, request] of ctx.pendingSuspends) {
+    if (request.trigger.kind !== 'event') continue;
+    if (request.trigger.eventType !== event.type) continue;
+    if (request.trigger.matcher && !evalExpression(request.trigger.matcher, envelope)) continue;
+    const job = ctx.jobs.get(jobId);
+    if (!job || job.status !== 'suspended') continue;
+    woke.push(jobId);
+    executeResume(ctx, jobId, { wake: 'event', event: envelope });
+  }
+  ok(res, { service: 'harness', method: 'POST', path: '/v1/events', woke, ts: new Date().toISOString() });
 }
 
 /**
