@@ -1,0 +1,1922 @@
+{
+  "$ref": "#/definitions/FlowSpecSchemaRoots",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "AdapterId": {
+      "description": "Adapter registry id (3.4) — an open string, resolved at runtime by the harness's adapter factory (like `toolId`/`flowId`, the spec references by id and never closes over runtime implementations). The default factory ships 'claude-sdk' and 'opencode-cli'; an unknown id fails at spawn time with the registry's known-ids list.",
+      "type": "string"
+    },
+    "AgentConfig": {
+      "additionalProperties": false,
+      "description": "LLM-driven execution. The dominant kind.",
+      "properties": {
+        "agent": {
+          "$ref": "#/definitions/AgentDef"
+        }
+      },
+      "required": [
+        "agent"
+      ],
+      "type": "object"
+    },
+    "AgentDef": {
+      "additionalProperties": false,
+      "properties": {
+        "accepts": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "additionalProperties": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "type": "object"
+            }
+          ],
+          "description": "Priority-ordered list of `<provider>:<model>` bindings this agent will accept. Per project memory `project_per_worker_model_subscription`, the harness-server resolves this list against the configured AuthStore / Secrets Manager + the LLMProvider registry at spawn time and binds the agent to the first satisfiable entry. Mixed cloud+local pipelines are the natural payoff: a summarizer can lead with `local-qwen:qwen3` while a code-reviewer holds out for `anthropic:claude-haiku-4-5`.\n\nTwo equivalent shapes (per memory `project_set_scoped_accepts`):\n\n  1. Flat array: `[\"anthropic:claude-haiku-4-5\", \"local-qwen:qwen3\"]`      — single global priority list. Treated as `{default: [...]}`.\n\n  2. Named sets: `{ default: [...], cheap: [...], frontier: [...],      bench-claude: [...], bench-gpt: [...] }` — pick one set per-job      via the `set` field on the job submission. Falls back to      `default` when the active set isn't declared on this agent.      Selecting per-job (not per-server) lets a single running harness      serve different sets concurrently — natural for benchmarking      and per-customer policy.\n\nValidation is structural only (each leaf entry must be a non-empty `<provider>:<model>` string). Whether each entry actually exists in the registry is checked at resolve time.\n\nUse `resolveAccepts(agent, setName)` to project to a flat list. The orchestrator does this when registering agents for a job."
+        },
+        "adapter": {
+          "$ref": "#/definitions/AdapterId",
+          "description": "Which adapter implementation runs this agent."
+        },
+        "config": {
+          "additionalProperties": {},
+          "description": "Optional adapter-specific configuration. Passed through to the adapter factory; the adapter is responsible for interpreting the shape. Use this for per-agent overrides like model name, endpoint URL (for opencode-cli with a self-hosted backend), reasoning effort, timeout, etc.",
+          "type": "object"
+        },
+        "fallbackOn": {
+          "description": "Per-agent runtime-fallback policy. Names of `AdapterError` subclasses (matched against `error.name`) that should trigger fall-through to the next satisfiable binding when the current binding throws.\n\nUnset → uses the default recoverable set (BillingError, RateLimitError, NetworkError, ProviderError). AuthError + ConfigError are excluded by default because they signal structural problems (revoked key, missing model) — silent retry across providers is usually the wrong action; surface to the operator instead.\n\nSet to `[]` to disable fallback entirely for this agent (any error is terminal, even if other accept-list entries are satisfiable).\n\nPer slice 13c per-agent customization: catalog authors who want \"never silently switch providers when an auth error occurs\" default behavior get it for free; pipelines that explicitly want cross-provider auth retry opt in via `fallbackOn: [..., 'AuthError']`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "id": {
+          "description": "Stable id for streaming/registration. Unique within a pipeline.",
+          "type": "string"
+        },
+        "role": {
+          "description": "Human-readable label (TUI middle column, logs).",
+          "type": "string"
+        },
+        "skillz": {
+          "additionalProperties": false,
+          "description": "Skills this agent depends on. References items from the `@helmsmith/skillzkit` catalog — the procurement flow (workspace-cli) resolves each entry to markdown files + transitive dependencies and copies them into `<workspace>/.claude/{commands,skills}/` so the agent can invoke them at runtime.\n\nskillzkit's catalog has two top-level types: SKILLs (router agents that classify natural-language requests + dispatch to commands) and Commands (everything else — slash commands, workflows, tools, integrations, atomic tasks). The categories below mirror that split plus skillzkit's sub-classification under `.claude/commands/`:\n\n  - `routers`      — SKILL names (router agents). Lookup by name                       (e.g. `skillzkit-product-router`)   - `tools`        — local CLIs / utilities (e.g. `core:tools:npm`,                       `core:tools:gh`, `core:tools:jq`)   - `integrations` — remote services the agent connects to (e.g.                       `core:integrations:figma`, `core:integrations:linear`)   - `tasks`        — atomic action commands (smaller unit than workflow)   - `workflows`    — multi-step procedures from skillzkit's Workflow                       catalog (e.g. `engineer:feature-build`,                       `product:greenfield`)\n\nValidation here is structural only — string non-emptiness + a closed key set. Whether each slug or skill name actually exists in the installed skillzkit catalog is checked at procure time by the workspace-cli, not at catalog parse time (so a catalog can reference skills that aren't yet installed).\n\nSkipping this field is fine — agents without skill dependencies don't need any `.claude/` content beyond what the workspace-template ships.",
+          "properties": {
+            "integrations": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "routers": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "tasks": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "tools": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "workflows": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "systemPrompt": {
+          "description": "Optional system prompt; if omitted, the adapter's default applies.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "role",
+        "adapter"
+      ],
+      "type": "object"
+    },
+    "ApprovalClaim": {
+      "additionalProperties": false,
+      "description": "Advisory-exclusive reservation on a pending approval — the pessimistic-locking half of `ApprovalTag.concurrency`. Claiming is optional (an unclaimed approval resumes exactly as before), but once held, only the claiming actor may resume and competing claims conflict — two same-role reviewers can no longer race a decision. Held in server state, persisted with the paused job (survives restarts), surfaced to HITL UIs on the approval read route, and cleared on resume/terminal.",
+      "properties": {
+        "actor": {
+          "description": "Opaque actor identity asserting the claim (`x-actor-id` header — header-asserted like the role; real authn replaces the source later, the enforcement point stays).",
+          "type": "string"
+        },
+        "claimedAt": {
+          "description": "ISO timestamp of the claim.",
+          "type": "string"
+        },
+        "role": {
+          "description": "Role asserted at claim time (must match `assigneeRole`).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "actor",
+        "role",
+        "claimedAt"
+      ],
+      "type": "object"
+    },
+    "ApprovalRequest": {
+      "additionalProperties": false,
+      "description": "Payload surfaced when an Approval-tagged node pauses for review. The reviewer (or harness-server's HITL UI) inspects this, decides approve/reject, and resumes with an `ApprovalResume`.",
+      "properties": {
+        "assigneeRole": {
+          "description": "Org role authorized to approve (from the ApprovalTag).",
+          "type": "string"
+        },
+        "attempt": {
+          "description": "1-indexed attempt counter — increments each time the gate runs.",
+          "type": "number"
+        },
+        "changes": {
+          "description": "Staged file changes the reviewer can inspect. Empty when no agent has staged changes (or no product repos are wired).",
+          "items": {
+            "$ref": "#/definitions/ChangedFile"
+          },
+          "type": "array"
+        },
+        "content": {
+          "description": "The output text the reviewer is approving — pulled from `state.output` at interrupt time.",
+          "type": "string"
+        },
+        "diffSummary": {
+          "description": "Short human-readable summary of the staged diff (e.g. \"3 files, +42 −7\"), derived from `changes` at interrupt time.",
+          "type": "string"
+        },
+        "kind": {
+          "const": "approval",
+          "description": "Discriminator — distinguishes approval from suspend interrupts.",
+          "type": "string"
+        },
+        "nodeId": {
+          "description": "The original (untagged) node id whose output is being reviewed.",
+          "type": "string"
+        },
+        "prUrl": {
+          "description": "URL of the pull request opened by an upstream `publish` node (`push-and-open-pr`), when one ran before this gate.",
+          "type": "string"
+        },
+        "slaMs": {
+          "description": "Time-to-respond before the harness auto-rejects. harness-server arms an auto-reject timer from this value when the job pauses, re-armed across restarts from the original pause time (an SLA that expired while the server was down fires immediately).",
+          "type": "number"
+        },
+        "steeringInputs": {
+          "$ref": "#/definitions/SteeringInputSchema",
+          "description": "Optional structured input schema the reviewer fills in."
+        }
+      },
+      "required": [
+        "kind",
+        "nodeId",
+        "assigneeRole",
+        "slaMs",
+        "content",
+        "attempt",
+        "changes"
+      ],
+      "type": "object"
+    },
+    "ApprovalResume": {
+      "additionalProperties": false,
+      "description": "Reviewer's answer to an ApprovalRequest.",
+      "properties": {
+        "decision": {
+          "enum": [
+            "approve",
+            "reject"
+          ],
+          "type": "string"
+        },
+        "steering": {
+          "description": "Reviewer-provided steering text (free-form) or structured fields matching `steeringInputs`. Becomes the rejectionPayload.steering on reject; appended to `state.steering` on approve."
+        }
+      },
+      "required": [
+        "decision"
+      ],
+      "type": "object"
+    },
+    "ApprovalTag": {
+      "additionalProperties": false,
+      "description": "HITL gate. Pauses execution; assigns to a role; injects steering context on retry. Emits both 'sequence' (approve) and 'reject' edges.",
+      "properties": {
+        "assigneeRole": {
+          "description": "Org role authorized to approve (e.g., 'tech-lead', 'security-team').",
+          "type": "string"
+        },
+        "concurrency": {
+          "const": "pessimistic",
+          "description": "Concurrency: only 'pessimistic' (single approver locks) in v1.",
+          "type": "string"
+        },
+        "slaMs": {
+          "description": "Time before the approval auto-rejects.",
+          "type": "number"
+        },
+        "steeringInputs": {
+          "$ref": "#/definitions/SteeringInputSchema",
+          "description": "Optional structured input the reviewer fills in to steer retry."
+        }
+      },
+      "required": [
+        "assigneeRole",
+        "slaMs",
+        "concurrency"
+      ],
+      "type": "object"
+    },
+    "Assertion": {
+      "additionalProperties": false,
+      "properties": {
+        "expression": {
+          "$ref": "#/definitions/Expression"
+        },
+        "message": {
+          "description": "Human-readable message embedded in the rejection payload when this assertion fails.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "expression",
+        "message"
+      ],
+      "type": "object"
+    },
+    "BackoffPolicy": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "fixed",
+              "type": "string"
+            },
+            "ms": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "ms"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "baseMs": {
+              "type": "number"
+            },
+            "kind": {
+              "const": "exponential",
+              "type": "string"
+            },
+            "maxMs": {
+              "type": "number"
+            },
+            "multiplier": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "baseMs"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Catalog": {
+      "additionalProperties": false,
+      "description": "Unified Catalog — flows + products. This is the single shape that flows through `loadCatalog: () => Promise<Catalog>`. `FlowCatalog` is the flows-only type; `Catalog` extends it with the additional axes.",
+      "properties": {
+        "flows": {
+          "items": {
+            "$ref": "#/definitions/FlowDef"
+          },
+          "type": "array"
+        },
+        "products": {
+          "description": "Optional in v1 — workspaces without products skip this.",
+          "items": {
+            "$ref": "#/definitions/ProductDef"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "flows"
+      ],
+      "type": "object"
+    },
+    "ChangedFile": {
+      "additionalProperties": false,
+      "description": "One staged change in a product repo. Populated into `state.changedFiles` before HITL interrupts; surfaced to reviewers via ApprovalRequest + the harness-server file routes.\n\nThe `id` is stable for the same `(repo, path)` within a job — UI components can use it as a React key, content-cache identifier, etc. Renames produce ONE entry with the new path + `previousPath` filled in (matches `git diff --name-status -z` rename rows).",
+      "properties": {
+        "changeKind": {
+          "description": "What kind of change this is. Mirrors git's name-status codes collapsed to readable form.",
+          "enum": [
+            "added",
+            "modified",
+            "deleted",
+            "renamed",
+            "copied",
+            "type-changed"
+          ],
+          "type": "string"
+        },
+        "filename": {
+          "description": "Basename of `path` — for UI display.",
+          "type": "string"
+        },
+        "id": {
+          "description": "Stable id: `${repo}::${path}`. Suitable for URL paths after encodeURIComponent.",
+          "type": "string"
+        },
+        "mimeType": {
+          "description": "MIME type guessed from the file extension. Hint for UI rendering; not authoritative — clients may sniff content if needed.",
+          "type": "string"
+        },
+        "path": {
+          "description": "Path within the repo (slash-separated, no leading slash).",
+          "type": "string"
+        },
+        "previousPath": {
+          "description": "For renames/copies, the prior path. Undefined otherwise.",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repo name (matches an entry from `productRepos` on the JobRecord).",
+          "type": "string"
+        },
+        "statusCode": {
+          "description": "Raw git status code (e.g., 'M', 'A', 'D', 'R100'). Preserved for clients that want git-native semantics.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "repo",
+        "path",
+        "filename",
+        "changeKind",
+        "statusCode",
+        "mimeType"
+      ],
+      "type": "object"
+    },
+    "CompareOp": {
+      "description": "Comparison operator for `compare` expressions.\n\n ==, != — strict equality / inequality (===, !==); objects compare           by REFERENCE, so structurally equal objects are never ==.  <, <=, >, >= — numeric comparison; either side coerces via Number().                 NaN on either side ⇒ predicate is false.  in       — membership: rhs MUST resolve to an array; predicate is             true iff lhs (raw value) is found via Array.includes             (SameValueZero — NaN self-matches, a runtime-state-only             case since JSON cannot encode NaN). This op is             collection-only; string containment is `contains`.  contains / startsWith / endsWith — string ops: both sides must             resolve to strings, else false (no coercion, mirroring             `in`'s strictness).  matches  — regex test: both sides must resolve to strings; rhs is             compiled via `new RegExp(rhs)` (no flags) and tested             against lhs. An invalid pattern evaluates to false —             the evaluator never throws on bad data. When rhs is a             string literal, the validator additionally rejects             invalid patterns at load time.",
+      "enum": [
+        "==",
+        "!=",
+        "<",
+        "<=",
+        ">",
+        ">=",
+        "in",
+        "contains",
+        "startsWith",
+        "endsWith",
+        "matches"
+      ],
+      "type": "string"
+    },
+    "ConditionalEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "condition": {
+          "$ref": "#/definitions/Expression"
+        },
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        },
+        "type": {
+          "const": "conditional",
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to",
+        "type",
+        "condition"
+      ],
+      "type": "object"
+    },
+    "ContextSourceDef": {
+      "additionalProperties": false,
+      "description": "One context-source declaration on a product. Mirrors the shape used in `<workspace>/.harness/config/context-sources.yml` and in harness-workspace.yml's per-product `contextSources` block. The loader consumes these one-per-spawned-worker when `harness context load\n--product X` lands.",
+      "properties": {
+        "backend": {
+          "type": "string"
+        },
+        "embedderDim": {
+          "type": "number"
+        },
+        "embedderModel": {
+          "type": "string"
+        },
+        "embedderUrl": {
+          "description": "Per-source overrides (winning over workspace defaults).",
+          "type": "string"
+        },
+        "target": {
+          "description": "What to ingest: a path, an OSS package@version, or a URL.",
+          "type": "string"
+        },
+        "type": {
+          "description": "Source-type id from",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "target"
+      ],
+      "type": "object"
+    },
+    "Duration": {
+      "description": "Milliseconds.",
+      "type": "number"
+    },
+    "Edge": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/SequenceEdge"
+        },
+        {
+          "$ref": "#/definitions/ConditionalEdge"
+        },
+        {
+          "$ref": "#/definitions/FallbackEdge"
+        },
+        {
+          "$ref": "#/definitions/ErrorEdge"
+        },
+        {
+          "$ref": "#/definitions/RejectEdge"
+        }
+      ]
+    },
+    "ErrorEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "on": {
+          "description": "Optional list of `NodeExit.errorName` values this edge handles (e.g. ['Timeout', 'RateLimitError', 'OutputParseError']). Omitted (or empty) → catch-all. A source node may declare any number of named error edges plus at most ONE catch-all; on an error exit the router picks the first declared edge whose `on` contains the errorName, falling back to the catch-all. Names are free-form — they match whatever the executors emit (AdapterError subclass names, 'UnknownTool', 'Timeout', …), which is runtime vocabulary the spec cannot close over.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "to": {
+          "type": "string"
+        },
+        "type": {
+          "const": "error",
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to",
+        "type"
+      ],
+      "type": "object"
+    },
+    "Expression": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "jsonpath",
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "path"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "expression": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "js",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "expression"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "literal",
+              "type": "string"
+            },
+            "value": {}
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "compare",
+              "type": "string"
+            },
+            "lhs": {
+              "$ref": "#/definitions/Expression"
+            },
+            "op": {
+              "$ref": "#/definitions/CompareOp"
+            },
+            "rhs": {
+              "$ref": "#/definitions/Expression"
+            }
+          },
+          "required": [
+            "kind",
+            "lhs",
+            "op",
+            "rhs"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "exprs": {
+              "items": {
+                "$ref": "#/definitions/Expression"
+              },
+              "type": "array"
+            },
+            "kind": {
+              "const": "all",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "exprs"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "exprs": {
+              "items": {
+                "$ref": "#/definitions/Expression"
+              },
+              "type": "array"
+            },
+            "kind": {
+              "const": "any",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "exprs"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "expr": {
+              "$ref": "#/definitions/Expression"
+            },
+            "kind": {
+              "const": "not",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "expr"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "expr": {
+              "$ref": "#/definitions/Expression"
+            },
+            "kind": {
+              "const": "exists",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "expr"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "fields": {
+              "additionalProperties": {
+                "$ref": "#/definitions/Expression"
+              },
+              "type": "object"
+            },
+            "kind": {
+              "const": "object",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "fields"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "items": {
+              "items": {
+                "$ref": "#/definitions/Expression"
+              },
+              "type": "array"
+            },
+            "kind": {
+              "const": "array",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "items"
+          ],
+          "type": "object"
+        }
+      ],
+      "description": "Generic expression evaluated by the runtime. Tagged-union over evaluators so we can grow the language additively.\n\nv1 evaluator covers everything except `js`. The boolean composition primitives (`compare` / `all` / `any` / `not`) are the deliberate alternative to a JS sandbox: most catalog logic only needs simple field comparisons + AND/OR/NOT, and these primitives express that without bringing a sandbox dependency on board. The `js` kind remains in the type so authors can declare future intent, but the evaluator throws — there's no in-process JS interpreter wired."
+    },
+    "FallbackEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        },
+        "type": {
+          "const": "fallback",
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to",
+        "type"
+      ],
+      "type": "object"
+    },
+    "FlowDef": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "edges": {
+          "description": "All edges between nodes. Routing logic lives here.",
+          "items": {
+            "$ref": "#/definitions/Edge"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "description": "Flow kind discriminator. Default 'work'.   - 'work' (default) — does product work; agents run for end-user value.   - 'job-definition' — emits a JobIntent (intake conversations).     Must declare `output: { kind: 'job-intent' }`.   - 'post-job' — runs after a job for cleanup/notifications.",
+          "enum": [
+            "work",
+            "job-definition",
+            "post-job"
+          ],
+          "type": "string"
+        },
+        "nodes": {
+          "description": "All nodes (TaskSteps) in this flow. Exactly one must have `kind: 'trigger'` (the entry point).",
+          "items": {
+            "$ref": "#/definitions/TaskStep"
+          },
+          "type": "array"
+        },
+        "output": {
+          "$ref": "#/definitions/FlowOutputContract",
+          "description": "Output contract for the terminal node. Default for `kind: 'work'` is `{ kind: 'agent-text' }`. JobDefinitionFlows MUST declare `{ kind: 'job-intent' }`."
+        },
+        "version": {
+          "description": "Optional version identity (free-form, semver recommended). Gives durable checkpoints and subflow pins something stable to name; uniqueness is still keyed on `id` alone within a catalog.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "nodes",
+        "edges"
+      ],
+      "type": "object"
+    },
+    "FlowOutputContract": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "agent-text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "job-intent",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "job-intents",
+              "type": "string"
+            },
+            "max": {
+              "type": "number"
+            },
+            "min": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "flow-spec",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "structured",
+              "type": "string"
+            },
+            "schema": {}
+          },
+          "required": [
+            "kind",
+            "schema"
+          ],
+          "type": "object"
+        }
+      ],
+      "description": "Output contract for a flow. Drives validator (e.g., a `kind: 'job-definition'` flow must declare `output.kind: 'job-intent'`) and JobStateMachine emission semantics (terminal node output is parsed against this shape)."
+    },
+    "FlowRunState": {
+      "additionalProperties": false,
+      "description": "The routable run-state surface — the shape jsonpath expressions bind against at runtime. This is the data-plane half of the contract: edge conditions, gate assertions, loop paths, tool args, and node input mappings all resolve against a value of this shape. harness-core's FlowState channels must remain structurally assignable to this (compile-time-asserted there).",
+      "properties": {
+        "attempts": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "Per-node attempt counter (reject-edge cycles increment).",
+          "type": "object"
+        },
+        "cancelReason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cancelRequested": {
+          "type": "boolean"
+        },
+        "changedFiles": {
+          "items": {
+            "$ref": "#/definitions/ChangedFile"
+          },
+          "type": "array"
+        },
+        "input": {
+          "description": "Job/trigger payload. Seeded once at start; never overwritten by nodes. jsonpath surface: `$.input`."
+        },
+        "jobId": {
+          "type": "string"
+        },
+        "lastExit": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/NodeExit"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "messages": {
+          "description": "Append-only message log (reducer-merged; safe under parallelism).",
+          "items": {},
+          "type": "array"
+        },
+        "nodes": {
+          "additionalProperties": {},
+          "description": "Per-node outputs, keyed by node id. Structured (parsed JSON) when the node declares `output.kind: 'json'`; the raw output string otherwise. jsonpath surface: `$.nodes.<id>`.",
+          "type": "object"
+        },
+        "output": {
+          "description": "Latest text output (legacy single channel; last-write-wins). Each successful node writes here; the next node reads it as its default input. jsonpath surface: `$.output`.",
+          "type": "string"
+        },
+        "rejectionPayload": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RejectionPayload"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "steering": {
+          "description": "Operator steering — append-only.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "jobId",
+        "input",
+        "output",
+        "nodes",
+        "messages",
+        "attempts",
+        "lastExit",
+        "rejectionPayload",
+        "steering",
+        "cancelRequested",
+        "cancelReason",
+        "changedFiles"
+      ],
+      "type": "object"
+    },
+    "FlowSpecSchemaRoots": {
+      "additionalProperties": false,
+      "properties": {
+        "approvalClaim": {
+          "$ref": "#/definitions/ApprovalClaim"
+        },
+        "approvalRequest": {
+          "$ref": "#/definitions/ApprovalRequest",
+          "description": "HITL payloads a reviewer UI exchanges with the runtime."
+        },
+        "approvalResume": {
+          "$ref": "#/definitions/ApprovalResume"
+        },
+        "catalog": {
+          "$ref": "#/definitions/Catalog",
+          "description": "The storage/validation shape (flows + products)."
+        },
+        "changedFile": {
+          "$ref": "#/definitions/ChangedFile"
+        },
+        "flow": {
+          "$ref": "#/definitions/FlowDef",
+          "description": "A single flow definition."
+        },
+        "jobIntent": {
+          "$ref": "#/definitions/JobIntent",
+          "description": "The factory/fleet work order."
+        },
+        "nodeExit": {
+          "$ref": "#/definitions/NodeExit",
+          "description": "Routing exit signal + reviewer file surface."
+        },
+        "runState": {
+          "$ref": "#/definitions/FlowRunState",
+          "description": "The run-state surface expressions bind against."
+        },
+        "suspendRequest": {
+          "$ref": "#/definitions/SuspendRequest"
+        }
+      },
+      "required": [
+        "catalog",
+        "flow",
+        "jobIntent",
+        "runState",
+        "approvalRequest",
+        "approvalClaim",
+        "approvalResume",
+        "suspendRequest",
+        "nodeExit",
+        "changedFile"
+      ],
+      "type": "object"
+    },
+    "GateConfig": {
+      "additionalProperties": false,
+      "description": "Quality gate. Runs assertions; emits 'pass' (sequence edge) or 'reject' (reject edge) based on whether all assertions hold.",
+      "properties": {
+        "assertions": {
+          "items": {
+            "$ref": "#/definitions/Assertion"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "assertions"
+      ],
+      "type": "object"
+    },
+    "JobIntent": {
+      "additionalProperties": false,
+      "description": "The runtime representation of a JobIntent — what JobDefinitionFlows emit. Emission is real (2.9): when a `job-intent`/`job-intents` flow completes, harness-server submits one child job per intent through its dispatcher, recording `parentJobId` on the child and `spawnedJobIds` (+ per-intent `spawnErrors`) on the parent.",
+      "properties": {
+        "config": {
+          "additionalProperties": {},
+          "description": "Per-job overrides (e.g., timeout). Adapter-specific.",
+          "type": "object"
+        },
+        "flowId": {
+          "type": "string"
+        },
+        "input": {},
+        "productId": {
+          "type": "string"
+        },
+        "set": {
+          "description": "Optional: which named accepts-set to use ('default', 'cheap', 'frontier', 'bench-claude', etc.).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "flowId",
+        "productId",
+        "input"
+      ],
+      "type": "object"
+    },
+    "LoopTag": {
+      "additionalProperties": false,
+      "description": "Iterates the same node over a collection. Composes with anything; Loop+Approval = approval per iteration; Loop+Suspend = durable iteration checkpoint.",
+      "properties": {
+        "concurrency": {
+          "description": "Cap on concurrent iterations when `mode: 'parallel'`.",
+          "type": "number"
+        },
+        "mode": {
+          "description": "Sequential = one iteration at a time; parallel = a per-slot pool of N with cooperative sibling cancellation on first failure.",
+          "enum": [
+            "sequential",
+            "parallel"
+          ],
+          "type": "string"
+        },
+        "path": {
+          "$ref": "#/definitions/Expression",
+          "description": "Expression resolving to the iterable. May reference flow state, product repos, prior node output, etc."
+        },
+        "recursive": {
+          "description": "Directory source only (3.5): walk the whole tree and iterate FILES only (default false = top-level entries, files and dirs).",
+          "type": "boolean"
+        },
+        "source": {
+          "description": "Hint about what kind of iterable `path` resolves to. The runtime uses this to pick a default collector (e.g., 'directory' walks files; 'collection' iterates an array).",
+          "enum": [
+            "collection",
+            "directory"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "path",
+        "mode"
+      ],
+      "type": "object"
+    },
+    "MergePrConfig": {
+      "additionalProperties": false,
+      "description": "Merge a pull request opened earlier in the same flow (by a `push-and-open-pr` node). Typically placed immediately after an `approval`-tagged node, so it only runs on the approve edge. Writes `{ mergeSha }` into `state.output` (as JSON) and onto the JobRecord (`mergeSha`). The PR to merge is read from the JobRecord's `prUrl`.",
+      "properties": {
+        "action": {
+          "const": "merge-pr",
+          "type": "string"
+        },
+        "deleteBranch": {
+          "description": "Delete the head branch after a successful merge. Default true.",
+          "type": "boolean"
+        },
+        "method": {
+          "description": "Merge strategy. Default 'squash'.",
+          "enum": [
+            "merge",
+            "squash",
+            "rebase"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "type": "object"
+    },
+    "NodeExit": {
+      "additionalProperties": false,
+      "description": "Per-node exit signal. Drives error/fallback/reject routing in the conditional-edge router. Set by every node executor; the router reads it to choose the next node id. jsonpath surface: `$.lastExit`.",
+      "properties": {
+        "errorMessage": {
+          "type": "string"
+        },
+        "errorName": {
+          "description": "Set when kind === 'error'. Matched by `ErrorEdge.on`.",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "success",
+            "error",
+            "reject"
+          ],
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "nodeId",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "NodeOutputContract": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "json",
+              "type": "string"
+            },
+            "schema": {}
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ],
+      "description": "Per-node output contract (distinct from the flow-level FlowOutputContract, which governs the terminal node's emission). `json` makes the node's output addressable as structured data at `$.nodes.<id>` — the enabling contract for gates and conditional edges over agent results. `schema` is declared-but-not-enforced (reported via onUnsupported as 'node-output-schema')."
+    },
+    "ProductDef": {
+      "additionalProperties": false,
+      "description": "Product = a tenant boundary with its declared content sources. Per project_authority_model_jobs_pipelines, products are admin-owned shapes the runtime references at job-acceptance time. They live alongside pipelines in the unified Catalog.",
+      "properties": {
+        "contextSources": {
+          "items": {
+            "$ref": "#/definitions/ContextSourceDef"
+          },
+          "type": "array"
+        },
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "repos": {
+          "description": "Per-product git repos. When present, harness-server can resolve `repos` for the container path (slice 9d-4) without the job submission having to carry them — caller submits productId, the server looks up the repo list. Per memory `project_authority_model_jobs_pipelines`: products are admin- owned, so this is the authoritative source of truth for which repos belong to a product.\n\nWhen absent, callers must pass `repos` on the submission body (slice 9d-4 fallback path).",
+          "items": {
+            "$ref": "#/definitions/ProductRepo"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "ProductRepo": {
+      "additionalProperties": false,
+      "description": "One product repo declaration — name + git clone URL + optional baseRef + optional in-container mount path. Used by spawn-worker (slice 9d) to pre-clone the repo as a bare and add a per-job worktree before the devcontainer boots.\n\nShape mirrors `SpawnRepoSpec` from `@helmsmith/harness-server` (which the spawn primitive owns) — declared here so the catalog can carry the same shape without harness-core having to depend on harness-server. Values cross the package boundary structurally.",
+      "properties": {
+        "baseRef": {
+          "description": "Optional base ref to clone (default: remote's default branch).",
+          "type": "string"
+        },
+        "cloneUrl": {
+          "description": "git clone URL — SSH (`git@github.com:org/repo.git`) or HTTPS (`https://github.com/org/repo.git`). For private repos under HTTPS, callers can inject a PAT via `cloneEnv` on the worker spawn (slice 9d-2-creds) or use the URL form `https://<token>@github.com/...`.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Local name — also the directory under `/workspace/<name>/` in the container's synthetic monorepo (PRD F19).",
+          "type": "string"
+        },
+        "path": {
+          "description": "Optional in-container mount path. Defaults to `/workspace/<name>/` per F19's synthetic-monorepo convention.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "cloneUrl"
+      ],
+      "type": "object"
+    },
+    "PublishConfig": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/PushAndOpenPrConfig"
+        },
+        {
+          "$ref": "#/definitions/MergePrConfig"
+        }
+      ],
+      "description": "Delivery of the flow's output to an external destination. The `publish-*` family — `push-and-open-pr`, `merge-pr`, and (future) `upload-to-s3`, `export-to-figma`, … — keeps the \"how the work ships\" decision in the authored flow graph rather than baked into the orchestrator. The runtime executor (`publish-executor.ts`) reads `action` to pick the path.\n\nGitHub credentials for the `*-pr` actions resolve through a cascade (local `gh` → controlplane-issued App token); the executor takes a `GitHubCredentialResolver` from `RunJobDeps.githubResolver`."
+    },
+    "PushAndOpenPrConfig": {
+      "additionalProperties": false,
+      "description": "Push the per-job branch to `origin` and open a pull request. Placed after an agent has staged + committed changes in the worktree. Writes `{ prUrl, prNumber, branchName }` into `state.output` (as JSON) and onto the JobRecord (`branchName`, `prUrl`).",
+      "properties": {
+        "action": {
+          "const": "push-and-open-pr",
+          "type": "string"
+        },
+        "base": {
+          "description": "Base branch the PR targets. Default: the repo's default branch (resolved via the GitHub API).",
+          "type": "string"
+        },
+        "body": {
+          "description": "PR body (Markdown). Defaults to a generated body referencing the job and its base ref.",
+          "type": "string"
+        },
+        "draft": {
+          "description": "Open as a draft PR. Default false.",
+          "type": "boolean"
+        },
+        "repo": {
+          "description": "Which product repo to push — must match a name in `JobRecord.productRepos`. Omittable when the product has exactly one repo.",
+          "type": "string"
+        },
+        "title": {
+          "description": "PR title. Defaults to a generated title from the job name/id.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "type": "object"
+    },
+    "RejectEdge": {
+      "additionalProperties": false,
+      "description": "Emitted only by Approval-tagged nodes and `kind: 'gate'` nodes when they reject. Carries a structured rejection payload (steering context, findings, attempt counter). The reject edge is the only edge that may form a cycle (retry-with-context loops).",
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "maxAttempts": {
+          "description": "Default 3.",
+          "type": "number"
+        },
+        "onMaxAttempts": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "fail",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "escalate",
+                  "type": "string"
+                },
+                "to": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "to"
+              ],
+              "type": "object"
+            }
+          ],
+          "description": "Where to go when maxAttempts is exceeded. Default: fail the flow."
+        },
+        "to": {
+          "type": "string"
+        },
+        "type": {
+          "const": "reject",
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to",
+        "type"
+      ],
+      "type": "object"
+    },
+    "RejectionPayload": {
+      "additionalProperties": false,
+      "description": "The runtime payload carried by reject edges. Becomes input context to the destination node.",
+      "properties": {
+        "attempt": {
+          "description": "1-indexed; incremented each loop iteration.",
+          "type": "number"
+        },
+        "findings": {
+          "description": "Structured gate output."
+        },
+        "reason": {
+          "type": "string"
+        },
+        "steering": {
+          "description": "Reviewer-injected hints (Approval) or assertion-failure message (gate).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason",
+        "attempt"
+      ],
+      "type": "object"
+    },
+    "RetryPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "backoff": {
+          "$ref": "#/definitions/BackoffPolicy"
+        },
+        "maxAttempts": {
+          "description": "TOTAL attempts including the first (1 ≡ no retry). Retries fire only on error exits — reject exits are authored flow control.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "maxAttempts"
+      ],
+      "type": "object"
+    },
+    "ScriptConfig": {
+      "additionalProperties": false,
+      "description": "Code execution. The script's source body is dropped to a temp file and run via the language's interpreter; state.output is piped to the script as stdin (UTF-8 string), and the script's stdout becomes the new state.output. A curated FlowRunState view (incl. `input`, excl. `nodes`/`messages`/`changedFiles` for env-size reasons) is exposed as JSON via the `HARNESS_STATE_JSON` environment variable — scripts needing a node's output should declare an `input` mapping, which arrives on stdin. Non-zero exit routes to the node's error edge.",
+      "properties": {
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "language": {
+          "enum": [
+            "bash",
+            "node",
+            "python"
+          ],
+          "type": "string"
+        },
+        "secrets": {
+          "additionalProperties": {
+            "additionalProperties": false,
+            "properties": {
+              "credentialId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "credentialId"
+            ],
+            "type": "object"
+          },
+          "description": "Credential references resolved through the CredentialBroker at dispatch time and injected as environment variables — the same auth surface tools use, so secrets never appear literally in catalogs. Keys are env var names; resolved values win over any same-named `env` entry.",
+          "type": "object"
+        },
+        "source": {
+          "type": "string"
+        },
+        "timeoutMs": {
+          "description": "Hard timeout for the script run. Default 30s. SIGTERM on expiry, SIGKILL after a short grace period if the child ignores SIGTERM.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "language",
+        "source"
+      ],
+      "type": "object"
+    },
+    "SequenceEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        },
+        "type": {
+          "const": "sequence",
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to",
+        "type"
+      ],
+      "type": "object"
+    },
+    "SteeringInputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "fields": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "type": {
+                "enum": [
+                  "string",
+                  "number",
+                  "boolean"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "type"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "fields"
+      ],
+      "type": "object"
+    },
+    "SubflowConfig": {
+      "additionalProperties": false,
+      "description": "Invoke another flow as a sub-flow. The parent pauses until the sub-flow terminates; sub-flow output flows in as this node's output.",
+      "properties": {
+        "flowId": {
+          "type": "string"
+        },
+        "input": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "version": {
+          "description": "Optional version pin against the target flow's `version`. Recorded but not enforced yet — subflows resolve by flowId in the loaded catalog (reported via onUnsupported as 'subflow-version-pin').",
+          "type": "string"
+        }
+      },
+      "required": [
+        "flowId"
+      ],
+      "type": "object"
+    },
+    "SuspendRequest": {
+      "additionalProperties": false,
+      "description": "Payload surfaced when a Suspend-tagged node pauses. harness-server schedules the wake (2.6): timer triggers arm an unref'd timer (re-armed across restarts from the original pause time — an expired timer fires immediately at boot); event triggers wake through POST /v1/events when the event type matches and the declared matcher passes against the event envelope `{ type, payload }` (the matcher's defined binding surface). The resume value is unused (suspend has no decision; resume is the \"wake up\" signal itself).",
+      "properties": {
+        "changes": {
+          "description": "Staged file changes pending review while the job is suspended.",
+          "items": {
+            "$ref": "#/definitions/ChangedFile"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "const": "suspend",
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string"
+        },
+        "trigger": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "durationMs": {
+                  "type": "number"
+                },
+                "kind": {
+                  "const": "timer",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "durationMs"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "eventType": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "event",
+                  "type": "string"
+                },
+                "matcher": {
+                  "$ref": "#/definitions/Expression"
+                }
+              },
+              "required": [
+                "kind",
+                "eventType"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "nodeId",
+        "trigger",
+        "changes"
+      ],
+      "type": "object"
+    },
+    "SuspendTag": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "trigger": {
+              "additionalProperties": false,
+              "properties": {
+                "durationMs": {
+                  "type": "number"
+                },
+                "kind": {
+                  "const": "timer",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "durationMs"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "trigger"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "trigger": {
+              "additionalProperties": false,
+              "properties": {
+                "eventType": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "event",
+                  "type": "string"
+                },
+                "matcher": {
+                  "$ref": "#/definitions/Expression"
+                }
+              },
+              "required": [
+                "kind",
+                "eventType"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "trigger"
+          ],
+          "type": "object"
+        }
+      ],
+      "description": "Durable execution checkpoint. Serializes state, kills the worker, hydrates a new worker on timer expiration or external signal."
+    },
+    "TaskStep": {
+      "additionalProperties": false,
+      "description": "The single canvas primitive — every node on the flow graph is a TaskStep. Polymorphic via the `kind` discriminator; per-kind config goes in `config`, tags add behavioral modifiers, policy controls reliability, joinStrategy defines how multiple incoming edges combine.",
+      "properties": {
+        "config": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AgentConfig"
+            },
+            {
+              "$ref": "#/definitions/ToolConfig"
+            },
+            {
+              "$ref": "#/definitions/ScriptConfig"
+            },
+            {
+              "$ref": "#/definitions/TransformConfig"
+            },
+            {
+              "$ref": "#/definitions/GateConfig"
+            },
+            {
+              "$ref": "#/definitions/SubflowConfig"
+            },
+            {
+              "$ref": "#/definitions/TriggerConfig"
+            },
+            {
+              "$ref": "#/definitions/PublishConfig"
+            }
+          ],
+          "description": "Per-kind config (typed by which kind is set)."
+        },
+        "effect": {
+          "description": "Side-effect classification. Declarative for now (reported via onUnsupported): the runtime does not yet consult it when deciding whether a node is safe to re-run on replay/retry. Publish-family nodes are inherently 'side-effecting'.",
+          "enum": [
+            "pure",
+            "idempotent",
+            "side-effecting"
+          ],
+          "type": "string"
+        },
+        "id": {
+          "description": "Stable id; referenced by edges. Unique within a flow.",
+          "type": "string"
+        },
+        "input": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Expression"
+            },
+            {
+              "additionalProperties": {
+                "$ref": "#/definitions/Expression"
+              },
+              "type": "object"
+            }
+          ],
+          "description": "Input mapping — how this node composes its effective input from run state, instead of implicitly consuming the previous node's `output` string. Two forms:\n\n  - A single Expression: resolves to the effective input. Strings     pass through raw; other values are JSON-serialized.   - A Record mapping name → Expression: each field resolves against     state and the whole object is JSON-serialized. This is how a     node consumes MORE than one upstream value: `$.input`,     `$.nodes.<id>`, `$.rejectionPayload`, …\n\nThe single-Expression form is detected by a string `kind` field, so mapping keys must not be named `kind`.\n\nOn tool nodes, `input` and `ToolConfig.args` compose: `input` composes the payload (this effective `$.output`), `args` bind the tool's parameters against post-mapping state — so an args expression reading `$.output` sees the composed payload. Declaring `input` on a tool node with no `$.output`-reading arg is rejected as dead config (tool templates resolve against args only).\n\nOmitted → legacy behavior: the node reads `state.output` as-is."
+        },
+        "joinStrategy": {
+          "anyOf": [
+            {
+              "const": "all",
+              "type": "string"
+            },
+            {
+              "const": "any",
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "nOfM": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "nOfM"
+              ],
+              "type": "object"
+            }
+          ],
+          "description": "Barrier over this node's forward-edge (sequence/conditional) sources: 'all' waits for every source, 'any' fires on the first arrival, nOfM on the nth — exactly once per run. Only applies when EXPLICITLY declared: an undeclared multi-in node runs once per arriving branch (no implicit join — an implicit 'all' would deadlock diamonds whose branches route conditionally). Join nodes may not be targeted by error/fallback/reject edges (validator- rejected); joins inside reject cycles are unsupported."
+        },
+        "kind": {
+          "description": "Polymorphic discriminator.",
+          "enum": [
+            "agent",
+            "tool",
+            "script",
+            "transform",
+            "gate",
+            "subflow",
+            "trigger",
+            "publish"
+          ],
+          "type": "string"
+        },
+        "output": {
+          "$ref": "#/definitions/NodeOutputContract",
+          "description": "Per-node output contract. `json` → the runtime parses the node's output into `state.nodes[id]` (parse failure exits with errorName 'OutputParseError', routable via an error edge). Omitted / `text` → `state.nodes[id]` holds the raw output string."
+        },
+        "policy": {
+          "$ref": "#/definitions/TaskStepPolicy",
+          "description": "Reliability policy."
+        },
+        "tags": {
+          "$ref": "#/definitions/TaskStepTags",
+          "description": "Behavioral modifier tags. Multiple allowed; render order is Loop top-left, Approval/Suspend top-right. Approval and Suspend are mutually exclusive on the same node."
+        },
+        "terminal": {
+          "description": "Endpoint disposition, executed: a branch ending at a terminal:'fail' node fails the whole job (authored failure endpoints — e.g. an error edge routing to a notify-then-fail sink). Only valid on nodes with no outgoing edges (the validator rejects a fail marker on a non-sink). Defaults to 'success'.",
+          "enum": [
+            "success",
+            "fail"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "config"
+      ],
+      "type": "object"
+    },
+    "TaskStepPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "onError": {
+          "description": "Behavior when an unhandled error occurs:  - 'propagate' (default) — fail the flow  - 'continue' — log and proceed past this node  - 'fallback' — route to the node's fallback edge if present",
+          "enum": [
+            "propagate",
+            "continue",
+            "fallback"
+          ],
+          "type": "string"
+        },
+        "retry": {
+          "$ref": "#/definitions/RetryPolicy"
+        },
+        "timeout": {
+          "$ref": "#/definitions/Duration"
+        }
+      },
+      "type": "object"
+    },
+    "TaskStepTags": {
+      "additionalProperties": false,
+      "properties": {
+        "approval": {
+          "$ref": "#/definitions/ApprovalTag"
+        },
+        "loop": {
+          "$ref": "#/definitions/LoopTag"
+        },
+        "suspend": {
+          "$ref": "#/definitions/SuspendTag"
+        }
+      },
+      "type": "object"
+    },
+    "ToolConfig": {
+      "additionalProperties": false,
+      "description": "Deterministic tool/API call. References a tool by id (resolved against the tool catalog or skillzkit). The `args` map is merged with the ToolDef's own argument template at dispatch time; TOP-LEVEL values may be Expressions (jsonpath/literal) for state-driven argument synthesis, same evaluator the conditional-edge router uses.\n\nInput-mechanism rule (when the node also declares `input`): the two channels compose, they don't compete. `input` composes the PAYLOAD — it rewrites the effective `$.output` before the executor runs — and `args` BIND the tool's named parameters against that post-mapping state. A ToolDef's templates interpolate against resolved args only, so the composed payload reaches the tool exclusively through an args expression reading `$.output`; the validator rejects an `input` mapping on a tool node with no such arg as dead config.\n\nExample flow-side reference:     { id: \"lint\", kind: \"tool\", config: {         toolId: \"core:tools:eslint\",         args: { path: { kind: \"jsonpath\", path: \"$.output\" } } } }",
+      "properties": {
+        "args": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "toolId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "toolId"
+      ],
+      "type": "object"
+    },
+    "TransformConfig": {
+      "additionalProperties": false,
+      "description": "Pure data shaping. Evaluates an expression against current flow state.",
+      "properties": {
+        "expression": {
+          "$ref": "#/definitions/Expression"
+        }
+      },
+      "required": [
+        "expression"
+      ],
+      "type": "object"
+    },
+    "TriggerConfig": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "webhook",
+              "type": "string"
+            },
+            "method": {
+              "enum": [
+                "GET",
+                "POST"
+              ],
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "path"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "cron": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "schedule",
+              "type": "string"
+            },
+            "tz": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "cron"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "manual",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "eventType": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "event",
+              "type": "string"
+            },
+            "matcher": {
+              "$ref": "#/definitions/Expression"
+            }
+          },
+          "required": [
+            "kind",
+            "eventType"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "channel"
+          ],
+          "type": "object"
+        }
+      ],
+      "description": "Entry point. Exactly one trigger node per flow."
+    }
+  }
+}
