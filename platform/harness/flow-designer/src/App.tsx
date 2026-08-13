@@ -2,7 +2,12 @@ import type { Catalog, FlowDef, Edge as SpecEdge, TaskStep } from '@helmsmith/fl
 import { validateUnifiedCatalog } from '@helmsmith/flow-spec';
 import type { Connection } from '@xyflow/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { loadServerCatalog, saveServerCatalog } from './catalog-client.ts';
+import {
+  loadServerCatalog,
+  loadServerLayout,
+  saveServerCatalog,
+  saveServerLayout,
+} from './catalog-client.ts';
 import type { ValidationState } from './components/BottomPanel.tsx';
 import { BottomPanel } from './components/BottomPanel.tsx';
 import { Canvas } from './components/Canvas.tsx';
@@ -11,7 +16,15 @@ import type { DesignerEdge, DesignerNode } from './graph-model.ts';
 import { flowToGraph, graphToFlow, newStep } from './graph-model.ts';
 import { emptyHistory, type History, recorded, redone, undone } from './history.ts';
 import { kindColor, STEP_KINDS } from './kinds.ts';
-import { appliedLayout, capturedLayout, readLayouts, writeLayout } from './layout-store.ts';
+import {
+  appliedLayout,
+  capturedLayout,
+  isLayoutFile,
+  layoutsForFlows,
+  readLayouts,
+  writeLayout,
+  writeLayouts,
+} from './layout-store.ts';
 import { SAMPLE_CATALOG } from './sample-catalog.ts';
 
 interface Selection {
@@ -281,8 +294,13 @@ export function App() {
   const serverLoad = useCallback(() => {
     setServerStatus({ text: 'loading…', ok: true });
     loadServerCatalog('/harness')
-      .then((parsed) => {
+      .then(async (parsed) => {
         if (parsed.flows.length === 0) throw new Error('server catalog has no flows');
+        // Layout sidecar rides along, best-effort: seed the store
+        // BEFORE loading state so loadGraph overlays the shared
+        // arrangement. A server without the route changes nothing.
+        const layouts = await loadServerLayout('/harness');
+        if (layouts) writeLayouts(localStorage, layouts);
         loadCatalogState(parsed);
         setServerStatus({ text: `loaded ${parsed.flows.length} flow(s) ⇩`, ok: true });
       })
@@ -292,12 +310,21 @@ export function App() {
   const serverSave = useCallback(() => {
     setServerStatus({ text: 'saving…', ok: true });
     saveServerCatalog('/harness', liveCatalog)
-      .then((r) =>
+      .then((r) => {
+        // The arrangement travels with the save, best-effort — a
+        // failure (or a server without the route) never blocks.
+        void saveServerLayout(
+          '/harness',
+          layoutsForFlows(
+            localStorage,
+            liveCatalog.flows.map((f) => f.id),
+          ),
+        );
         setServerStatus({
           text: `saved ${r.flowCount} flow(s) ⇧${r.warnings.length > 0 ? ` · ${r.warnings.length} warning(s)` : ''}`,
           ok: true,
-        }),
-      )
+        });
+      })
       .catch((err) => setServerStatus({ text: (err as Error).message, ok: false }));
   }, [liveCatalog]);
 
@@ -305,30 +332,55 @@ export function App() {
     (file: File) => {
       void file.text().then((text) => {
         try {
-          const parsed = JSON.parse(text) as Catalog;
-          if (!Array.isArray(parsed.flows) || parsed.flows.length === 0) {
+          const parsed = JSON.parse(text) as unknown;
+          // A layout sidecar (flows.layout.json) imports into the
+          // layout store and re-arranges the current canvas — the
+          // catalog itself is untouched.
+          if (isLayoutFile(parsed)) {
+            recordPoint();
+            writeLayouts(localStorage, parsed);
+            setNodes((ns) => appliedLayout(ns, readLayouts(localStorage)[flowId]));
+            setServerStatus({
+              text: `layout imported for ${Object.keys(parsed).length} flow(s)`,
+              ok: true,
+            });
+            return;
+          }
+          const catalogParsed = parsed as Catalog;
+          if (!Array.isArray(catalogParsed.flows) || catalogParsed.flows.length === 0) {
             alert('catalog has no flows');
             return;
           }
-          loadCatalogState(parsed);
+          loadCatalogState(catalogParsed);
         } catch (err) {
           alert(`not a catalog: ${(err as Error).message}`);
         }
       });
     },
-    [loadCatalogState],
+    [loadCatalogState, recordPoint, flowId],
   );
 
   const exportCatalog = useCallback(() => {
-    const blob = new Blob([`${JSON.stringify(liveCatalog, null, 2)}\n`], {
-      type: 'application/json',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'flows.json';
-    a.click();
-    URL.revokeObjectURL(url);
+    const download = (name: string, value: unknown) => {
+      const blob = new Blob([`${JSON.stringify(value, null, 2)}\n`], {
+        type: 'application/json',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+    download('flows.json', liveCatalog);
+    // The arrangement travels as a SIDECAR file — the catalog itself
+    // stays byte-pure (FlowDef carries no editor concerns). Skipped
+    // when nothing is arranged.
+    const layouts = layoutsForFlows(
+      localStorage,
+      liveCatalog.flows.map((f) => f.id),
+    );
+    if (Object.keys(layouts).length > 0) download('flows.layout.json', layouts);
   }, [liveCatalog]);
 
   const lampColor =
