@@ -882,6 +882,219 @@ export const VALIDATION_CASES: readonly ValidationCase[] = [
     },
     valid: true,
   },
+  // ── Join-hazard static analysis ───────────────────────────────────
+  // A joinStrategy barrier counts arrivals from its forward-edge
+  // sources. If fewer sources are GUARANTEED to run (on every
+  // success-path execution) than the strategy requires, there exist
+  // executions where the join never fires and its branch silently
+  // ends — the wedge class documented since 2.4, now rejected at load.
+  // Guarantee is a must-reach analysis over success routing: each
+  // conditional edge is its own outcome; the else-outcome is the
+  // sequence fan-out (or the fallback edge when no sequence exists);
+  // a node with no forward outcome ends the branch. Joins inside
+  // reject cycles are rejected too (the once-per-run marker never
+  // resets across retries).
+  {
+    name: "an 'all' join over exclusively-conditional sources is rejected (it can never be satisfied)",
+    catalog: {
+      flows: [
+        {
+          id: 'demo',
+          nodes: [
+            { id: 't', kind: 'trigger', config: { kind: 'manual' } },
+            { id: 'a', kind: 'transform', config: { expression: { kind: 'literal', value: 1 } } },
+            { id: 'b', kind: 'transform', config: { expression: { kind: 'literal', value: 2 } } },
+            {
+              id: 'j',
+              kind: 'transform',
+              joinStrategy: 'all',
+              config: { expression: { kind: 'literal', value: 3 } },
+            },
+          ],
+          edges: [
+            // t routes to EXACTLY ONE of a|b — the 'all' join needs both.
+            {
+              from: 't',
+              to: 'a',
+              type: 'conditional',
+              condition: { kind: 'literal', value: true },
+            },
+            {
+              from: 't',
+              to: 'b',
+              type: 'conditional',
+              condition: { kind: 'literal', value: false },
+            },
+            { from: 'a', to: 'j', type: 'sequence' },
+            { from: 'b', to: 'j', type: 'sequence' },
+          ],
+        },
+      ],
+    },
+    valid: false,
+    errorIncludes: 'guaranteed to run',
+  },
+  {
+    name: "an 'all' join over a diamond-converged source is valid (must-reach sees through exhaustive branching)",
+    catalog: {
+      flows: [
+        {
+          id: 'demo',
+          nodes: [
+            { id: 't', kind: 'trigger', config: { kind: 'manual' } },
+            { id: 'x', kind: 'transform', config: { expression: { kind: 'literal', value: 1 } } },
+            { id: 'y', kind: 'transform', config: { expression: { kind: 'literal', value: 2 } } },
+            { id: 's', kind: 'transform', config: { expression: { kind: 'literal', value: 3 } } },
+            { id: 'w', kind: 'transform', config: { expression: { kind: 'literal', value: 4 } } },
+            {
+              id: 'j',
+              kind: 'transform',
+              joinStrategy: 'all',
+              config: { expression: { kind: 'literal', value: 5 } },
+            },
+          ],
+          edges: [
+            // t: conditional→x, sequence→y (the else) — EVERY execution
+            // takes one branch, and both branches converge on s.
+            {
+              from: 't',
+              to: 'x',
+              type: 'conditional',
+              condition: { kind: 'literal', value: true },
+            },
+            { from: 't', to: 'y', type: 'sequence' },
+            { from: 'x', to: 's', type: 'sequence' },
+            { from: 'y', to: 's', type: 'sequence' },
+            // s fans out to w and j; w also feeds j — both sources of
+            // the 'all' join are guaranteed.
+            { from: 's', to: 'w', type: 'sequence' },
+            { from: 's', to: 'j', type: 'sequence' },
+            { from: 'w', to: 'j', type: 'sequence' },
+          ],
+        },
+      ],
+    },
+    valid: true,
+  },
+  {
+    name: "an 'any' join with one guaranteed source among conditional ones is valid",
+    catalog: {
+      flows: [
+        {
+          id: 'demo',
+          nodes: [
+            { id: 't', kind: 'trigger', config: { kind: 'manual' } },
+            { id: 'g', kind: 'transform', config: { expression: { kind: 'literal', value: 1 } } },
+            { id: 'h', kind: 'transform', config: { expression: { kind: 'literal', value: 2 } } },
+            { id: 'c', kind: 'transform', config: { expression: { kind: 'literal', value: 3 } } },
+            {
+              id: 'j',
+              kind: 'transform',
+              joinStrategy: 'any',
+              config: { expression: { kind: 'literal', value: 4 } },
+            },
+          ],
+          edges: [
+            // Fan-out: g and h BOTH always run; c runs only when h's
+            // conditional matches (no else on h). 'any' needs one
+            // guaranteed source — g qualifies.
+            { from: 't', to: 'g', type: 'sequence' },
+            { from: 't', to: 'h', type: 'sequence' },
+            {
+              from: 'h',
+              to: 'c',
+              type: 'conditional',
+              condition: { kind: 'literal', value: true },
+            },
+            { from: 'g', to: 'j', type: 'sequence' },
+            { from: 'c', to: 'j', type: 'sequence' },
+          ],
+        },
+      ],
+    },
+    valid: true,
+  },
+  {
+    name: 'an nOfM join requiring more sources than are guaranteed is rejected',
+    catalog: {
+      flows: [
+        {
+          id: 'demo',
+          nodes: [
+            { id: 't', kind: 'trigger', config: { kind: 'manual' } },
+            { id: 'g', kind: 'transform', config: { expression: { kind: 'literal', value: 1 } } },
+            { id: 'h', kind: 'transform', config: { expression: { kind: 'literal', value: 2 } } },
+            { id: 'c1', kind: 'transform', config: { expression: { kind: 'literal', value: 3 } } },
+            { id: 'c2', kind: 'transform', config: { expression: { kind: 'literal', value: 4 } } },
+            {
+              id: 'j',
+              kind: 'transform',
+              joinStrategy: { nOfM: 2 },
+              config: { expression: { kind: 'literal', value: 5 } },
+            },
+          ],
+          edges: [
+            { from: 't', to: 'g', type: 'sequence' },
+            { from: 't', to: 'h', type: 'sequence' },
+            // c1/c2 are h's exclusive conditional branches — at most one
+            // runs. Guaranteed sources of j: only g. nOfM 2 > 1.
+            {
+              from: 'h',
+              to: 'c1',
+              type: 'conditional',
+              condition: { kind: 'literal', value: true },
+            },
+            {
+              from: 'h',
+              to: 'c2',
+              type: 'conditional',
+              condition: { kind: 'literal', value: false },
+            },
+            { from: 'g', to: 'j', type: 'sequence' },
+            { from: 'c1', to: 'j', type: 'sequence' },
+            { from: 'c2', to: 'j', type: 'sequence' },
+          ],
+        },
+      ],
+    },
+    valid: false,
+    errorIncludes: 'guaranteed to run',
+  },
+  {
+    name: 'a join node inside a reject cycle is rejected (the once-per-run barrier never resets)',
+    catalog: {
+      flows: [
+        {
+          id: 'demo',
+          nodes: [
+            { id: 't', kind: 'trigger', config: { kind: 'manual' } },
+            { id: 'fix', kind: 'transform', config: { expression: { kind: 'literal', value: 1 } } },
+            {
+              id: 'j',
+              kind: 'transform',
+              joinStrategy: 'all',
+              config: { expression: { kind: 'literal', value: 2 } },
+            },
+            {
+              id: 'check',
+              kind: 'gate',
+              config: {
+                assertions: [{ expression: { kind: 'literal', value: true }, message: 'ok' }],
+              },
+            },
+          ],
+          edges: [
+            { from: 't', to: 'fix', type: 'sequence' },
+            { from: 'fix', to: 'j', type: 'sequence' },
+            { from: 'j', to: 'check', type: 'sequence' },
+            { from: 'check', to: 'fix', type: 'reject', maxAttempts: 3 },
+          ],
+        },
+      ],
+    },
+    valid: false,
+    errorIncludes: 'reject cycle',
+  },
 ];
 
 // ─── Schema-subset fixtures ──────────────────────────────────────────────

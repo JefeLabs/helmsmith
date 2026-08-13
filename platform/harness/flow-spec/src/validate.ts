@@ -288,8 +288,150 @@ function validateFlow(
     );
   }
 
+  // Join-hazard static analysis — needs the DAG guarantee above.
+  if (joinNodes.size > 0) {
+    validateJoinHazards(flow, where);
+  }
+
   if (opts?.onUnsupported) {
     reportUnsupportedFeatures(flow, where, opts.onUnsupported);
+  }
+}
+
+/**
+ * Join-hazard static analysis (the 2.4 caveats, enforced at load).
+ *
+ * A joinStrategy barrier counts arrivals from its forward-edge
+ * (sequence | conditional) sources — mirroring the runtime's
+ * accounting. Two statically-knowable wedge classes are rejected:
+ *
+ * 1. UNDER-GUARANTEED JOINS. If fewer sources are guaranteed to run
+ *    than the strategy requires ('all' = every source, 'any' = 1,
+ *    nOfM = n capped at the source count), there exist executions
+ *    where the join never fires and its branch silently ends.
+ *    "Guaranteed" is a must-reach analysis over SUCCESS routing:
+ *    every outcome of every node on the way must lead to the source.
+ *    Outcomes per node mirror the router: each conditional edge is
+ *    its own outcome; the else-outcome is the sequence fan-out (all
+ *    fire together), or the fallback edge when no sequence exists;
+ *    a node with no forward outcome ends the branch. Error and
+ *    reject exits are exceptional and not counted as outcomes — the
+ *    analysis asks "does the happy path certainly arrive?", which is
+ *    exactly the arrival the barrier waits for. The check is
+ *    deliberately optimistic about joins encountered ALONG a path
+ *    (they propagate like ordinary nodes), so nested-join skips can
+ *    evade it — false negatives are the status quo; false positives
+ *    would reject valid catalogs and are what this analysis avoids.
+ *
+ * 2. JOINS INSIDE REJECT CYCLES. The barrier fires at most once per
+ *    run, so a retry pass through the cycle skips the join — the
+ *    documented "never resets" hazard. A join is inside a cycle when
+ *    it is forward-reachable from a reject edge's target and can
+ *    forward-reach that edge's source.
+ */
+function validateJoinHazards(flow: Record<string, unknown>, where: string): void {
+  const nodes = flow.nodes as Array<Record<string, unknown>>;
+  const edges = flow.edges as Array<Record<string, unknown>>;
+  const trigger = nodes.find((n) => n.kind === 'trigger');
+  if (!trigger) return; // exactly-one-trigger already enforced
+  const joinNodes = nodes.filter((n) => n.joinStrategy !== undefined);
+
+  // Success-routing outcome groups per node (see doc comment above).
+  const groupsBySource = new Map<string, string[][]>();
+  for (const n of nodes) {
+    const id = n.id as string;
+    const conds: string[] = [];
+    const seqs: string[] = [];
+    const fallbacks: string[] = [];
+    for (const e of edges) {
+      if (e.from !== id) continue;
+      if (e.type === 'conditional') conds.push(e.to as string);
+      else if (e.type === 'sequence') seqs.push(e.to as string);
+      else if (e.type === 'fallback') fallbacks.push(e.to as string);
+    }
+    const groups: string[][] = conds.map((c) => [c]);
+    if (seqs.length > 0) groups.push(seqs);
+    else if (fallbacks.length > 0) groups.push(fallbacks);
+    else groups.push([]); // no-match / sink outcome: the branch ends
+    groupsBySource.set(id, groups);
+  }
+
+  /** True iff every execution path from `start` reaches `target`
+   *  (success routing only). Memoized; the forward graph is a DAG. */
+  function mustReach(start: string, target: string, memo: Map<string, boolean>): boolean {
+    if (start === target) return true;
+    const cached = memo.get(start);
+    if (cached !== undefined) return cached;
+    memo.set(start, false);
+    const result = (groupsBySource.get(start) ?? [[]]).every((group) =>
+      group.some((next) => mustReach(next, target, memo)),
+    );
+    memo.set(start, result);
+    return result;
+  }
+
+  for (const j of joinNodes) {
+    const jid = j.id as string;
+    const sources = [
+      ...new Set(
+        edges
+          .filter((e) => (e.type === 'sequence' || e.type === 'conditional') && e.to === jid)
+          .map((e) => e.from as string),
+      ),
+    ];
+    const strategy = j.joinStrategy as 'all' | 'any' | { nOfM: number };
+    const required =
+      strategy === 'all'
+        ? sources.length
+        : strategy === 'any'
+          ? 1
+          : Math.min(strategy.nOfM, sources.length);
+    const guaranteed = sources.filter((s) => mustReach(trigger.id as string, s, new Map()));
+    if (guaranteed.length < required) {
+      const skippable = sources.filter((s) => !guaranteed.includes(s));
+      throw new CatalogError(
+        `${where}: node "${jid}" declares joinStrategy ${JSON.stringify(strategy)} requiring ${required} of ${sources.length} source(s), but only ${guaranteed.length} ${guaranteed.length === 1 ? 'is' : 'are'} guaranteed to run on every execution path — ${skippable.map((s) => `"${s}"`).join(', ')} can be skipped by conditional routing, leaving the join waiting forever while the flow silently ends; join over always-run sources or lower the requirement`,
+      );
+    }
+  }
+
+  // Reject-cycle membership: forward-reachable from the reject target
+  // AND able to forward-reach the reject source.
+  const forwardAdj = new Map<string, string[]>();
+  for (const e of edges) {
+    if (e.type !== 'sequence' && e.type !== 'conditional' && e.type !== 'fallback') continue;
+    const list = forwardAdj.get(e.from as string) ?? [];
+    list.push(e.to as string);
+    forwardAdj.set(e.from as string, list);
+  }
+  function forwardReach(from: string): Set<string> {
+    const seen = new Set<string>();
+    const stack = [from];
+    while (stack.length > 0) {
+      const cur = stack.pop() as string;
+      for (const next of forwardAdj.get(cur) ?? []) {
+        if (!seen.has(next)) {
+          seen.add(next);
+          stack.push(next);
+        }
+      }
+    }
+    return seen;
+  }
+  for (const e of edges) {
+    if (e.type !== 'reject') continue;
+    const target = e.to as string;
+    const source = e.from as string;
+    const onCycle = new Set([target, ...forwardReach(target)]);
+    for (const j of joinNodes) {
+      const jid = j.id as string;
+      if (!onCycle.has(jid)) continue;
+      if (jid === source || forwardReach(jid).has(source)) {
+        throw new CatalogError(
+          `${where}: node "${jid}" declares joinStrategy inside a reject cycle (reject edge "${source}" → "${target}") — the barrier fires at most once per run, so retry passes skip the join; move it out of the retry cycle`,
+        );
+      }
+    }
   }
 }
 

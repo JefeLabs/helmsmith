@@ -60,7 +60,7 @@ Four stacked layers, innermost first:
 Durability underneath all of it: paused/suspended jobs persist through the checkpointer and survive process restarts, including SLA and wake timers (re-armed from the original pause time).
 
 ### 2.6 Parallel fan-out and joins
-Every `sequence` edge from a node fires — N edges = N parallel branches. A node declaring `joinStrategy` (`all` / `any` / `{nOfM}`) is a barrier over its forward-edge sources, firing exactly once per run. Branch outputs stay addressable at the join via `$.nodes.<id>` (never rely on `$.output` across branches — it is last-write-wins and nondeterministic).
+Every `sequence` edge from a node fires — N edges = N parallel branches. A node declaring `joinStrategy` (`all` / `any` / `{nOfM}`) is a barrier over its forward-edge sources, firing exactly once per run. The validator statically rejects joins that could wedge: one requiring more sources than are guaranteed to run on every execution path (a must-reach analysis — exhaustive branching that reconverges still validates), and one inside a reject cycle (the barrier never resets across retries). Branch outputs stay addressable at the join via `$.nodes.<id>` (never rely on `$.output` across branches — it is last-write-wins and nondeterministic).
 
 ### 2.7 Human-in-the-loop
 - **`approval` tag**: pauses the job (`awaiting-approval`) with the node's output as review content; `slaMs` arms a server-side auto-reject timer; `assigneeRole` gates the resume route; reject can carry operator steering back into the retry cycle. The tagged node's work runs exactly once — resume never re-invokes the LLM.
@@ -104,7 +104,6 @@ A sink node with `terminal: 'fail'` fails the whole job when a branch ends there
 | Subflow `version` pin is recorded, not enforced | Resolution stays by `flowId` (warned as `subflow-version-pin`) |
 | Loop-tagged subflow node over an interrupt-bearing inner tree | Compile-rejected — iterations would share one pause namespace. Move the HITL gate out of the loop |
 | Duplicate agent ids across a subflow tree | Compile-rejected — the RegisteredAgent list is flat |
-| `all` join over a conditionally-skipped source | Never fires; the flow ends without it (declare `all` only over always-run sources). Joins inside reject cycles are unsupported |
 | Approval `concurrency: 'pessimistic'` | Validates but no lock exists — two same-role reviewers can race; last decision wins via the status guard |
 | Cron subset | No timezones (`tz` rejected at load), no month/day names, no `a-b/n` range-steps — server-local time, 5 fields |
 | `==` on objects is reference equality | Structurally equal objects are never `==` — compare leaf fields |
