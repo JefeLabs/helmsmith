@@ -417,6 +417,10 @@ export interface SubflowConfig {
 /** Entry point. Exactly one trigger node per flow. */
 export type TriggerConfig =
   | { kind: 'webhook'; path: string; method?: 'GET' | 'POST' }
+  /** Server-local cron (3.1) in the validated subset grammar: 5 fields;
+   *  `*`, `*​/n`, comma lists of numbers/ranges; dow 0-7 (7 ≡ Sunday);
+   *  standard dom/dow OR-quirk. `tz` is REJECTED by the validator —
+   *  schedules run in server-local time until tz support is added. */
   | { kind: 'schedule'; cron: string; tz?: string }
   | { kind: 'manual' }
   | { kind: 'event'; eventType: string; matcher?: Expression }

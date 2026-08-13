@@ -151,6 +151,12 @@ export interface JobRecord {
    */
   parentJobId?: string;
   /**
+   * Ingress provenance for trigger-fired jobs (3.1): `webhook:<path>`,
+   * `event:<type>`, or `schedule:<cron>`. Absent for manual
+   * submissions and intent-spawned children.
+   */
+  triggeredBy?: string;
+  /**
    * Child jobIds spawned from this job's emitted intent(s) (2.9).
    * Written by harness-server's spawn handler after the parent
    * completes; empty/absent for flows that emit no intents.

@@ -55,17 +55,17 @@ Rules that shape every flow: exactly one `trigger` node (no incoming edges, ≥1
 
 ## 2. Step kinds
 
-### 2.1 `trigger` — entry point · manual ✅, everything else ❌
+### 2.1 `trigger` — entry point · everything but `message` fires ✅
 
 | Config | Fields | Status |
 |---|---|---|
-| `{ "kind": "manual" }` | — | ✅ the only trigger that means anything: jobs start via `POST /v1/jobs` |
-| `{ "kind": "webhook" }` | `path` (required), `method?` GET\|POST | ❌ no HTTP ingress exists |
-| `{ "kind": "schedule" }` | `cron` (required), `tz?` | ❌ no scheduler exists |
-| `{ "kind": "event" }` | `eventType` (required), `matcher?` Expression | ❌ no event bus subscription exists |
-| `{ "kind": "message" }` | `channel` (required) | ❌ no channel listener exists |
+| `{ "kind": "manual" }` | — | ✅ jobs start via `POST /v1/jobs` |
+| `{ "kind": "webhook" }` | `path` (required), `method?` GET\|POST (default POST) | ✅ fires via `POST\|GET /v1/hooks/<path>`; job input = `{trigger, path, method, payload}` (POST body / GET query) |
+| `{ "kind": "schedule" }` | `cron` (required; subset grammar, load-time validated), `tz?` | ✅ server-local cron scheduler, armed at boot, re-armed per fire, `GET /v1/triggers` shows next fire. **`tz` is rejected at load** — schedules run in server-local time until tz support lands |
+| `{ "kind": "event" }` | `eventType` (required), `matcher?` Expression | ✅ fires via `POST /v1/events {type, payload}` — the matcher evaluates against that envelope (same semantics as suspend wakes; one event can wake suspends AND start flows). Job input = the envelope |
+| `{ "kind": "message" }` | `channel` (required) | ❌ no message transport exists (warned as `trigger-message`) |
 
-At runtime every trigger is an inert entry marker that immediately succeeds. Non-manual kinds warn `trigger-<kind>` at load.
+Inside the graph a trigger stays an inert entry marker that immediately succeeds; the kinds above govern what *starts* the job. Trigger-fired jobs carry `triggeredBy` provenance (`webhook:<path>` / `event:<type>` / `schedule:<cron>`). Cron subset: 5 fields; `*`, `*/n`, comma lists of numbers and `a-b` ranges; dow `0-7` (7 ≡ Sunday); restricted dom+dow use standard OR semantics.
 
 ### 2.2 `agent` — LLM work ✅
 

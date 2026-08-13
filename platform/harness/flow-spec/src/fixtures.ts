@@ -584,6 +584,73 @@ export const VALIDATION_CASES: readonly ValidationCase[] = [
     errorIncludes: 'type must be one of',
   },
   {
+    name: 'a schedule trigger with a malformed cron field is rejected at load time',
+    catalog: {
+      flows: [
+        {
+          ...VALID_FLOW,
+          nodes: [
+            { id: 't', kind: 'trigger', config: { kind: 'schedule', cron: '61 * * * *' } },
+            VALID_FLOW.nodes[1],
+          ],
+        },
+      ],
+    },
+    valid: false,
+    errorIncludes: 'cron',
+  },
+  {
+    name: 'a schedule trigger with the wrong cron field count is rejected',
+    catalog: {
+      flows: [
+        {
+          ...VALID_FLOW,
+          nodes: [
+            { id: 't', kind: 'trigger', config: { kind: 'schedule', cron: '* * *' } },
+            VALID_FLOW.nodes[1],
+          ],
+        },
+      ],
+    },
+    valid: false,
+    errorIncludes: '5 fields',
+  },
+  {
+    name: 'a schedule trigger declaring tz is rejected (schedules run in server-local time)',
+    catalog: {
+      flows: [
+        {
+          ...VALID_FLOW,
+          nodes: [
+            {
+              id: 't',
+              kind: 'trigger',
+              config: { kind: 'schedule', cron: '0 9 * * *', tz: 'America/New_York' },
+            },
+            VALID_FLOW.nodes[1],
+          ],
+        },
+      ],
+    },
+    valid: false,
+    errorIncludes: 'tz is not supported',
+  },
+  {
+    name: 'a schedule trigger with subset cron grammar (steps, ranges, lists) is accepted',
+    catalog: {
+      flows: [
+        {
+          ...VALID_FLOW,
+          nodes: [
+            { id: 't', kind: 'trigger', config: { kind: 'schedule', cron: '*/15 9-17 1,15 * 1-5' } },
+            VALID_FLOW.nodes[1],
+          ],
+        },
+      ],
+    },
+    valid: true,
+  },
+  {
     name: "terminal:'fail' on a node with outgoing edges is rejected (failure endpoints are sinks)",
     catalog: {
       flows: [
@@ -746,12 +813,26 @@ export interface UnsupportedCase {
 
 export const UNSUPPORTED_CASES: readonly UnsupportedCase[] = [
   {
+    // schedule/webhook/event triggers are ingress-backed (3.1) — no
+    // report. Only 'message' still lacks a transport and reports.
+    name: 'ingress-backed triggers (schedule) report nothing',
+    flow: {
+      id: 'cron-flow',
+      nodes: [
+        { id: 't', kind: 'trigger', config: { kind: 'schedule', cron: '*/15 9-17 * * 1-5' } },
+        { id: 'a', kind: 'transform', config: { expression: { kind: 'literal', value: 1 } } },
+      ],
+      edges: [{ from: 't', to: 'a', type: 'sequence' }],
+    },
+    expectedFeatures: [],
+  },
+  {
     name: 'every currently-unexecuted feature reports exactly once',
     flow: {
       id: 'kitchen-sink',
       output: { kind: 'structured', schema: { type: 'object' } },
       nodes: [
-        { id: 't', kind: 'trigger', config: { kind: 'schedule', cron: '0 * * * *' } },
+        { id: 't', kind: 'trigger', config: { kind: 'message', channel: 'ops' } },
         {
           id: 'a',
           kind: 'transform',
@@ -787,7 +868,7 @@ export const UNSUPPORTED_CASES: readonly UnsupportedCase[] = [
     // are deliberately absent: the kitchen-sink flow still declares all
     // of them (terminal:'fail' on leaf node 's'), pinning that they are
     // executed and no longer reported.
-    expectedFeatures: ['expression-js', 'subflow-version-pin', 'trigger-schedule'],
+    expectedFeatures: ['expression-js', 'subflow-version-pin', 'trigger-message'],
   },
   {
     name: 'fully-executed features produce zero reports',
@@ -954,6 +1035,8 @@ export const UNSUPPORTED_CASES: readonly UnsupportedCase[] = [
         { from: 'w', to: 'sf', type: 'sequence' },
       ],
     },
+    // The event trigger itself is ingress-backed (3.1) — no trigger
+    // report; only its js matcher (and the other five) report.
     expectedFeatures: [
       'expression-js',
       'expression-js',
@@ -961,7 +1044,6 @@ export const UNSUPPORTED_CASES: readonly UnsupportedCase[] = [
       'expression-js',
       'expression-js',
       'expression-js',
-      'trigger-event',
     ],
   },
 ];
