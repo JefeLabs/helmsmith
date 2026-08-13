@@ -16,7 +16,12 @@
  */
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { ApprovalRequest, JobRecord, SuspendRequest } from '@helmsmith/harness-core';
+import type {
+  ApprovalClaim,
+  ApprovalRequest,
+  JobRecord,
+  SuspendRequest,
+} from '@helmsmith/harness-core';
 
 export interface PausedJobFile {
   /** The full JobRecord — plain data, including the FlowDef needed for
@@ -26,6 +31,10 @@ export interface PausedJobFile {
   request: ApprovalRequest | SuspendRequest;
   /** ISO timestamp of the pause — SLA re-arm math reads this at boot. */
   pausedAt: string;
+  /** Advisory-exclusive claim on a pending approval (pessimistic
+   *  locking). Persisted so the lock survives restarts; absent when
+   *  unclaimed. */
+  claim?: ApprovalClaim;
 }
 
 const SUBDIR = 'paused';
@@ -37,6 +46,25 @@ function fileFor(stateDir: string, jobId: string): string {
 export async function savePausedJob(stateDir: string, file: PausedJobFile): Promise<void> {
   await mkdir(join(stateDir, SUBDIR), { recursive: true });
   await writeFile(fileFor(stateDir, file.job.jobId), JSON.stringify(file, null, 2), 'utf8');
+}
+
+/** Patch (or clear) the claim on an existing paused-job file.
+ *  Best-effort like every write here; a missing file is a no-op
+ *  (the job may have completed concurrently). */
+export async function updatePausedJobClaim(
+  stateDir: string,
+  jobId: string,
+  claim: ApprovalClaim | undefined,
+): Promise<void> {
+  try {
+    const raw = await readFile(fileFor(stateDir, jobId), 'utf8');
+    const parsed = JSON.parse(raw) as PausedJobFile;
+    if (claim) parsed.claim = claim;
+    else delete parsed.claim;
+    await writeFile(fileFor(stateDir, jobId), `${JSON.stringify(parsed, null, 2)}\n`, 'utf8');
+  } catch {
+    // Missing/unreadable file: nothing durable to patch.
+  }
 }
 
 export async function deletePausedJob(stateDir: string, jobId: string): Promise<void> {

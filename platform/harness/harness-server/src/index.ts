@@ -12,6 +12,7 @@ import {
   type AdapterFactory,
   type AdapterId,
   type AgentDef,
+  type ApprovalClaim,
   type ApprovalRequest,
   type Catalog,
   type CompiledFlowGraph,
@@ -64,7 +65,12 @@ import {
   type WorktreePolicy,
 } from './load-catalog.ts';
 import { type LoaderEvent, spawnLoaderJob } from './loader-spawn.ts';
-import { deletePausedJob, loadPausedJobs, savePausedJob } from './paused-jobs.ts';
+import {
+  deletePausedJob,
+  loadPausedJobs,
+  savePausedJob,
+  updatePausedJobClaim,
+} from './paused-jobs.ts';
 import { runJobInContainer } from './run-job-in-container.ts';
 import type { SpawnRepoSpec } from './spawn-worker.ts';
 
@@ -396,6 +402,7 @@ export async function startHarnessServer(opts: HarnessServerOptions): Promise<Ha
     checkpointer,
     stateDir,
     pendingApprovals: new Map(),
+    approvalClaims: new Map(),
     pendingSuspends: new Map(),
     approvalTimers: new Map(),
     suspendTimers: new Map(),
@@ -426,6 +433,7 @@ export async function startHarnessServer(opts: HarnessServerOptions): Promise<Ha
     ctx.jobs.set(rec.job.jobId, rec.job);
     if (rec.kind === 'approval') {
       ctx.pendingApprovals.set(rec.job.jobId, rec.request as ApprovalRequest);
+      if (rec.claim) ctx.approvalClaims.set(rec.job.jobId, rec.claim);
       // 2.1 — the SLA clock resumes from the ORIGINAL pause time; an
       // SLA that expired while the server was down fires immediately.
       armSlaTimer(ctx, rec.job.jobId, rec.request as ApprovalRequest, rec.pausedAt);
@@ -536,6 +544,10 @@ interface ServerCtx {
    * stream. Cleared when the job leaves 'awaiting-approval'.
    */
   pendingApprovals: Map<string, ApprovalRequest>;
+  /** Advisory-exclusive claims on pending approvals (pessimistic
+   *  locking): once held, only the claimant may resume. Mirrors the
+   *  paused-job file's `claim` field; cleared with the pending entry. */
+  approvalClaims: Map<string, ApprovalClaim>;
   /**
    * Latest SuspendRequest per paused job. Same shape rationale as
    * pendingApprovals but for Suspend-tagged pauses. Wake scheduling
@@ -674,7 +686,75 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: ServerCtx) {
       notFound(res, `no pending approval for job: ${id}`);
       return;
     }
-    ok(res, { service, jobId: id, request, ts: new Date().toISOString() });
+    ok(res, {
+      service,
+      jobId: id,
+      request,
+      claim: ctx.approvalClaims.get(id) ?? null,
+      ts: new Date().toISOString(),
+    });
+    return;
+  }
+
+  // POST|DELETE /v1/jobs/:id/approval/claim — advisory-exclusive claim
+  // on a pending approval (the pessimistic-locking half of
+  // ApprovalTag.concurrency). Claiming is optional — an unclaimed
+  // approval resumes as before — but once held, only the claimant may
+  // resume; competing claims 409. Persisted with the paused job so the
+  // lock survives restarts. No body needed, so handled pre-parse.
+  const claimMatch =
+    (req.method === 'POST' || req.method === 'DELETE') &&
+    url.match(/^\/v1\/jobs\/([^/]+)\/approval\/claim$/);
+  if (claimMatch) {
+    const id = claimMatch[1]!;
+    const request = ctx.pendingApprovals.get(id);
+    if (!request) {
+      notFound(res, `no pending approval for job: ${id}`);
+      return;
+    }
+    const actor = req.headers['x-actor-id'];
+    if (typeof actor !== 'string' || actor.length === 0) {
+      badRequest(res, 'x-actor-id header is required to claim or release an approval');
+      return;
+    }
+    const existing = ctx.approvalClaims.get(id);
+    if (req.method === 'DELETE') {
+      if (!existing) {
+        notFound(res, `no claim to release on job: ${id}`);
+        return;
+      }
+      if (existing.actor !== actor) {
+        forbidden(
+          res,
+          `approval for job "${id}" is claimed by "${existing.actor}" — only the claimant may release`,
+        );
+        return;
+      }
+      ctx.approvalClaims.delete(id);
+      void updatePausedJobClaim(ctx.stateDir, id, undefined).catch(() => {});
+      ok(res, { service, jobId: id, released: true, ts: new Date().toISOString() });
+      return;
+    }
+    const role = req.headers['x-actor-role'];
+    if (typeof role !== 'string' || role !== request.assigneeRole) {
+      forbidden(
+        res,
+        `role ${typeof role === 'string' ? `"${role}"` : '(none)'} is not authorized; ` +
+          `claiming the approval for job "${id}" requires role "${request.assigneeRole}"`,
+      );
+      return;
+    }
+    if (existing && existing.actor !== actor) {
+      conflict(
+        res,
+        `approval for job "${id}" is already claimed by "${existing.actor}" since ${existing.claimedAt}`,
+      );
+      return;
+    }
+    const claim: ApprovalClaim = existing ?? { actor, role, claimedAt: new Date().toISOString() };
+    ctx.approvalClaims.set(id, claim);
+    void updatePausedJobClaim(ctx.stateDir, id, claim).catch(() => {});
+    ok(res, { service, jobId: id, claim, ts: new Date().toISOString() });
     return;
   }
 
@@ -1182,6 +1262,8 @@ async function handleSubmitJob(
         // also get explicit cleanup on resume but a final sweep here
         // catches the failed-after-pause path).
         ctx.pendingApprovals.delete(jobId);
+        ctx.approvalClaims.delete(jobId);
+        ctx.approvalClaims.delete(jobId);
         ctx.pendingSuspends.delete(jobId);
       }
     };
@@ -1351,6 +1433,22 @@ async function handleResumeJob(
         );
         return;
       }
+      // Pessimistic lock: once claimed, only the claimant may resume.
+      // Unclaimed approvals resume exactly as before (advisory lock).
+      // The SLA auto-reject bypasses by construction — it calls
+      // executeResume directly, the server acting as itself.
+      const claim = ctx.approvalClaims.get(jobId);
+      if (claim) {
+        const actor = req.headers['x-actor-id'];
+        if (typeof actor !== 'string' || actor !== claim.actor) {
+          conflict(
+            res,
+            `approval for job "${jobId}" is claimed by "${claim.actor}" since ${claim.claimedAt} — ` +
+              `only the claimant may resume (release via DELETE /v1/jobs/${jobId}/approval/claim)`,
+          );
+          return;
+        }
+      }
     }
   }
 
@@ -1397,6 +1495,7 @@ function executeRun(ctx: ServerCtx, jobId: string): void {
       if (agentId === null && (status === 'completed' || status === 'failed')) {
         tokens.detach(jid);
         ctx.pendingApprovals.delete(jid);
+        ctx.approvalClaims.delete(jid);
         ctx.pendingSuspends.delete(jid);
       }
       // W1d — push job-level transitions up to the controlplane.
@@ -1566,6 +1665,7 @@ function executeResume(ctx: ServerCtx, jobId: string, resumeValue: unknown): voi
   clearSlaTimer(ctx, jobId);
   clearSuspendTimer(ctx, jobId);
   ctx.pendingApprovals.delete(jobId);
+  ctx.approvalClaims.delete(jobId);
   ctx.pendingSuspends.delete(jobId);
   // 2.2 — the persisted pause record is stale once we kick resumeJob; a
   // downstream pause writes a fresh one via the hooks below.
@@ -1584,6 +1684,7 @@ function executeResume(ctx: ServerCtx, jobId: string, resumeValue: unknown): voi
       clearSlaTimer(ctx, jobId);
       clearSuspendTimer(ctx, jobId);
       ctx.pendingApprovals.delete(jobId);
+      ctx.approvalClaims.delete(jobId);
       ctx.pendingSuspends.delete(jobId);
       void deletePausedJob(ctx.stateDir, jobId).catch(() => {});
       // Paused jobs hold their dispatcher slot until a true terminal
@@ -2770,6 +2871,11 @@ function forbidden(res: ServerResponse, error: string): void {
   res.statusCode = 403;
   res.setHeader('Content-Type', 'application/json');
   res.end(JSON.stringify({ error }));
+}
+
+function conflict(res: ServerResponse, error: string): void {
+  res.writeHead(409, { 'content-type': 'application/json' });
+  res.end(JSON.stringify({ ok: false, error }));
 }
 
 function badRequest(res: ServerResponse, error: string): void {

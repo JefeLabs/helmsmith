@@ -41,6 +41,7 @@
 import { readdir } from 'node:fs/promises';
 import { join as pathJoin } from 'node:path';
 import {
+  type ApprovalClaim,
   type ApprovalRequest,
   type ApprovalResume,
   evalExpression,
@@ -77,7 +78,7 @@ import type { ChangedFile } from './changed-files.ts';
 // Run-side wire shapes moved to @helmsmith/flow-spec (the spec owns the
 // run contract, not just the definition contract). Re-exported here so
 // existing harness-core consumers keep their import paths.
-export type { ApprovalRequest, ApprovalResume, NodeExit, SuspendRequest };
+export type { ApprovalClaim, ApprovalRequest, ApprovalResume, NodeExit, SuspendRequest };
 export { evalExpression };
 
 /**

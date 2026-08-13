@@ -172,6 +172,12 @@ The unifying observation: once the validator crossed into statically-knowable-ru
 | 🔵 `nodes` channel grew without bound — every text output duplicated as evidence with no truncation policy; checkpoint-size growth once the durable saver landed | Text evidence recorded at `$.nodes.<id>` is capped (default 256K chars, explicit `…[truncated N chars]` marker, `CompileFlowOptions.maxTextEvidenceLength` to tune). The `$.output` relay to the next node is never touched, and JSON evidence is never truncated — structured data must stay addressable |
 | 🔵 Legacy coordinator filter — `linearFlowFromAgents` hardcoded skipping ids `coordinator`/`checkout-coordinator`, and the agent executor repeated the literals | One exported constant (`LEGACY_COORDINATOR_IDS`) consumed by both sites; `linearFlowFromAgents` accepts a caller-supplied skip list. The flow-based path keeps zero implicit skips |
 
+### 1.23 Approval pessimistic locking (2026-08-13)
+
+| Was | Now |
+|---|---|
+| 🔵 `concurrency: 'pessimistic'` validated but no lock existed — two same-role reviewers could race a decision; last write won via the status guard | Advisory-exclusive claims: `POST /v1/jobs/:id/approval/claim` (`x-actor-id` + role headers) reserves the decision — competing claims 409 naming the holder, re-claims by the holder are idempotent, `DELETE` releases (claimant only, 403 otherwise), and while claimed the resume route 409s any other actor (the SLA auto-reject bypasses by construction — the server acting as itself). Unclaimed approvals resume exactly as before, so the lock is opt-in for UIs without breaking curl-driven flows. The claim is a wire shape (`ApprovalClaim` in flow-spec, schema-rooted), surfaces on the approval read route, persists in the paused-job file (survives restarts, rehydrated at boot), and clears with the pending entry on resume/terminal. Pinned by a full lifecycle integration test (claim → conflict → locked resume 409s → release → hand-over → approve) |
+
 ## 2. Open — package-level (this package's debt)
 
 ### 🟡 The name undersells the scope — it's the platform wire-contract package now
@@ -192,7 +198,6 @@ Inherited from the original review, minus what the 2026-08-12 slices closed (ter
 
 | Gap | Severity | Current truth |
 |---|---|---|
-| Approval pessimistic locking | 🔵 | `concurrency: 'pessimistic'` validates but no lock exists — two same-role reviewers can race a decision; last write wins via the status guard. (The SLA/role halves of the old approval row were closed by the HITL trust slice — §1.6) |
 
 ## 4. The one-sentence summary
 

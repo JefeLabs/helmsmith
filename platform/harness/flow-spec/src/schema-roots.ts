@@ -15,6 +15,7 @@
  * the types.
  */
 import type {
+  ApprovalClaim,
   ApprovalRequest,
   ApprovalResume,
   Catalog,
@@ -37,6 +38,7 @@ export interface FlowSpecSchemaRoots {
   runState: FlowRunState;
   /** HITL payloads a reviewer UI exchanges with the runtime. */
   approvalRequest: ApprovalRequest;
+  approvalClaim: ApprovalClaim;
   approvalResume: ApprovalResume;
   suspendRequest: SuspendRequest;
   /** Routing exit signal + reviewer file surface. */
