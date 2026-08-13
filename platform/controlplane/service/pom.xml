@@ -46,6 +46,16 @@
 			<artifactId>spring-boot-starter-jdbc</artifactId>
 		</dependency>
 		<dependency>
+			<!-- Write-time flow-spec validation (catalog PRD §6.3 Phase 2 /
+			     flow-spec roadmap 3.3): validates PUT /v1/catalog bodies
+			     against the generated schema/flow-spec.schema.json artifact.
+			     Uses its own Jackson 2 (com.fasterxml) transitively — the
+			     service's Jackson 3 (tools.jackson) is unaffected. -->
+			<groupId>com.networknt</groupId>
+			<artifactId>json-schema-validator</artifactId>
+			<version>1.5.9</version>
+		</dependency>
+		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
 			<scope>runtime</scope>

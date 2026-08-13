@@ -118,7 +118,7 @@ A sink node with `terminal: 'fail'` fails the whole job when a branch ends there
 - **Agent quality** — prompts, model choice trade-offs, skill content. The spec carries `systemPrompt`/`accepts`/`skillz` as data; making them good is authoring work.
 - **The adapter registry** — the spec validates `adapter` as a string; existence is enforced at spawn time by the runtime's factory (that IS the registry).
 - **Cross-job orchestration state** — flows don't share memory; the seam between jobs is the `JobIntent` (factory/fleet model). Deliberative multi-agent reasoning lives in the worker fleet, not the flow graph.
-- **Write-time catalog storage/authz** — the controlplane's job, against the generated `schema/flow-spec.schema.json`.
+- **Write-time catalog storage/authz** — the controlplane's job, implemented (2026-08-13): its `/v1/catalog` gate validates against the generated `schema/flow-spec.schema.json`; semantic rules stay single-sourced here and run at harness load.
 
 ---
 
