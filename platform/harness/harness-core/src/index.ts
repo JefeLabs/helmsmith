@@ -63,6 +63,7 @@ export {
   type ToolDef,
   type TransformConfig,
   type TriggerConfig,
+  type UnsupportedFeature,
   validateUnifiedCatalog,
   walkAgents,
 } from './catalog.ts';

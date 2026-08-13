@@ -1,6 +1,6 @@
 # Flow Spec — Critical Feedback (Consolidated, Current)
 
-**Date:** 2026-08-07 · **Updated:** 2026-08-12 after the data-plane slice (PR #14), the hardening slice (PR #15), a validator-consistency review (PR #17), the export-surface slice (PR #18), the HITL trust slice (PR #19), the policy slice (PR #20), the parallelism slice (PR #21), the schema slice (PR #22), the suspend-wakeup slice (PR #23), the emission slice (PR #24), the terminal-fail slice (PR #25), the trigger-ingress slice (PR #26), the designer slice (PR #27), the adapter-registry slice (PR #28), the loop-v2 slice (PR #29), and the message-transport slice · Companion docs: [`SPEC.md`](../SPEC.md) · [`steps-and-edges.md`](./steps-and-edges.md) · [`next-steps.md`](./next-steps.md)
+**Date:** 2026-08-07 · **Updated:** 2026-08-12 after the data-plane slice (PR #14), the hardening slice (PR #15), a validator-consistency review (PR #17), the export-surface slice (PR #18), the HITL trust slice (PR #19), the policy slice (PR #20), the parallelism slice (PR #21), the schema slice (PR #22), the suspend-wakeup slice (PR #23), the emission slice (PR #24), the terminal-fail slice (PR #25), the trigger-ingress slice (PR #26), the designer slice (PR #27), the adapter-registry slice (PR #28), the loop-v2 slice (PR #29), the message-transport slice (PR #30), and the save-to-server slice · Companion docs: [`SPEC.md`](../SPEC.md) · [`steps-and-edges.md`](./steps-and-edges.md) · [`next-steps.md`](./next-steps.md)
 
 One document, every open criticism, with status. Sources: the pre-extraction design review (`docs/superpowers/specs/2026-08-07-flow-spec-design-review.md`), the package-level critique from `SPEC.md` §7, the semantic findings from documentation-as-audit, the 2026-08-12 data-plane review + its post-merge self-review (plan: `docs/superpowers/plans/2026-08-12-flow-spec-data-plane.md`), and a 2026-08-12 validator-consistency review of the merged package. Items already fixed are listed once in §1 and not re-argued.
 
@@ -138,6 +138,12 @@ The unifying observation: once the validator crossed into statically-knowable-ru
 | Finding | Resolution |
 |---|---|
 | 🔵 `message` triggers validated + warned — no transport existed to bind to | `POST /v1/messages {channel, text, from?}` — the conversational-intake ingress, distinct from `/v1/events` by shape and purpose: the message TEXT becomes the job input directly (the prompt an intake flow feeds its agent), not a JSON envelope. Channel-subscribed flows start with `triggeredBy: message:<channel>`; `GET /v1/triggers` lists channels; one-way in v1 (a Slack/Discord/controlplane relay posts inbound and watches the spawned job). The `trigger-message` report is deleted — the `onUnsupported` list reaches its terminal form: `expression-js` (deliberate) and `subflow-version-pin` |
+
+### 1.18 Save-to-server slice (2026-08-13, designer follow-on)
+
+| Finding | Resolution |
+|---|---|
+| 🔵 The designer was file-only; the runtime catalog was immutable after boot (edits required a restart) | `GET`/`PUT /v1/catalog` on harness-server: PUT validates with the real validator (400 with the located message, live catalog untouched), persists to the same `.harness/config/flows.json` boot reads (awaited — the response means durable), hot-swaps the live catalog, and re-arms schedule triggers; warnings return in the response; in-flight jobs are unaffected (JobRecord.flow is a submission-time snapshot). The designer gains `server ⇩`/`server ⇧` through a dev proxy (no CORS surface on the harness). Proven end-to-end against a real harness: load → canvas edit → save → live catalog AND flows.json both updated. The endpoint pair is the controlplane seam — same wire shape, different base URL |
 
 ## 2. Open — package-level (this package's debt)
 
