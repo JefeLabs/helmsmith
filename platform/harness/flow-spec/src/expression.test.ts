@@ -106,7 +106,10 @@ describe('object / array constructors', () => {
       resolveExpressionValue(
         {
           kind: 'array',
-          items: [{ kind: 'jsonpath', path: '$.a' }, { kind: 'literal', value: 2 }],
+          items: [
+            { kind: 'jsonpath', path: '$.a' },
+            { kind: 'literal', value: 2 },
+          ],
         },
         { a: 1 },
       ),

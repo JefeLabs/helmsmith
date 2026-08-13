@@ -19,6 +19,7 @@ import type {
   Expression,
   FlowDef,
   LoopTag,
+  McpToolDef,
   SuspendTag,
   TaskStep,
 } from './catalog.ts';
@@ -35,6 +36,7 @@ import {
   type SuspendRequest,
 } from './flow-graph.ts';
 import { composeSystemPromptWithSteering } from './orchestrator.ts';
+import { makeToolExecutor } from './tool-executor.ts';
 
 // ─── helpers ──────────────────────────────────────────────────────────────
 
@@ -236,6 +238,62 @@ describe('node-addressable state', () => {
       { configurable: { thread_id: 'im-2' } },
     );
     expect(seen[0]).toBe('raw text');
+  });
+
+  it('tool input-mechanism rule: input composes the payload, args bind it via $.output', async () => {
+    const invocations: Record<string, unknown>[] = [];
+    const toolNode: TaskStep = {
+      id: 'notify',
+      kind: 'tool',
+      config: {
+        toolId: 'mcp:notify',
+        args: {
+          payload: { kind: 'jsonpath', path: '$.output' },
+          channel: { kind: 'literal', value: 'ops' },
+        },
+      },
+      input: { score: { kind: 'jsonpath', path: '$.nodes.shape.score' } },
+    };
+    const executors = new Map<string, NodeExecutor>([
+      [
+        'notify',
+        makeToolExecutor(toolNode, {
+          toolResolver: () =>
+            ({ id: 'mcp:notify', kind: 'mcp', server: 'fake', toolName: 'notify' }) as McpToolDef,
+          mcpInvokeFn: async (_def, args) => {
+            invocations.push(args);
+            return { ok: true, content: 'sent' };
+          },
+        }),
+      ],
+    ]);
+    const flow: FlowDef = {
+      id: 'f',
+      nodes: [
+        trigger('t'),
+        {
+          id: 'shape',
+          kind: 'transform',
+          output: { kind: 'json' },
+          config: {
+            expression: { kind: 'object', fields: { score: { kind: 'literal', value: 0.9 } } },
+          },
+        },
+        toolNode,
+      ],
+      edges: [
+        { from: 't', to: 'shape', type: 'sequence' },
+        { from: 'shape', to: 'notify', type: 'sequence' },
+      ],
+    };
+    const graph = compileFlow({ flow, executors });
+    await graph.invoke(initialState, { configurable: { thread_id: 'tir-1' } });
+    // `input` composed {score: 0.9} into the effective $.output (the
+    // mapping runs innermost, before the executor); the `payload` arg
+    // bound the composed payload; the literal arg passed through.
+    expect(invocations).toHaveLength(1);
+    expect(invocations[0]?.channel).toBe('ops');
+    expect(JSON.parse(String(invocations[0]?.payload))).toEqual({ score: 0.9 });
   });
 
   it('routes errors by errorName via on-matchers, catch-all last', () => {
@@ -788,7 +846,12 @@ describe('policy enforcement (2.3)', () => {
       calls++;
       if (calls <= failures) {
         return {
-          lastExit: { nodeId: id, kind: 'error' as const, errorName: 'ProviderError', errorMessage: 'boom' },
+          lastExit: {
+            nodeId: id,
+            kind: 'error' as const,
+            errorName: 'ProviderError',
+            errorMessage: 'boom',
+          },
         };
       }
       return { output: 'ok', lastExit: { nodeId: id, kind: 'success' as const } };
@@ -1137,11 +1200,11 @@ describe('loop v2 (3.5)', () => {
       lastExit: { nodeId: 'work', kind: 'success' },
     }));
     // v1 kept only the LAST iteration's non-output delta.
-    expect(Object.keys(state.nodes).filter((k) => k.startsWith('seen-')).sort()).toEqual([
-      'seen-a',
-      'seen-b',
-      'seen-c',
-    ]);
+    expect(
+      Object.keys(state.nodes)
+        .filter((k) => k.startsWith('seen-'))
+        .sort(),
+    ).toEqual(['seen-a', 'seen-b', 'seen-c']);
     expect(state.messages.filter((m) => String(m).startsWith('ran:'))).toHaveLength(3);
     expect(state.output).toBe('A\n---\nB\n---\nC');
   });
@@ -1408,26 +1471,24 @@ describe('evalExpression', () => {
   describe('kind: compare', () => {
     it('== / != with strict equality', () => {
       const lit = (value: unknown): Expression => ({ kind: 'literal', value });
-      expect(
-        evalExpression({ kind: 'compare', lhs: lit(2), op: '==', rhs: lit(2) }, s),
-      ).toBe(true);
+      expect(evalExpression({ kind: 'compare', lhs: lit(2), op: '==', rhs: lit(2) }, s)).toBe(true);
       // Strict — string and number are not equal even if loose-equal would be.
-      expect(
-        evalExpression({ kind: 'compare', lhs: lit(2), op: '==', rhs: lit('2') }, s),
-      ).toBe(false);
-      expect(
-        evalExpression({ kind: 'compare', lhs: lit('a'), op: '!=', rhs: lit('b') }, s),
-      ).toBe(true);
+      expect(evalExpression({ kind: 'compare', lhs: lit(2), op: '==', rhs: lit('2') }, s)).toBe(
+        false,
+      );
+      expect(evalExpression({ kind: 'compare', lhs: lit('a'), op: '!=', rhs: lit('b') }, s)).toBe(
+        true,
+      );
     });
 
     it('numeric ops coerce both sides via Number()', () => {
       const lit = (value: unknown): Expression => ({ kind: 'literal', value });
-      expect(
-        evalExpression({ kind: 'compare', lhs: lit('5'), op: '<', rhs: lit(10) }, s),
-      ).toBe(true);
-      expect(
-        evalExpression({ kind: 'compare', lhs: lit(10), op: '>=', rhs: lit('10') }, s),
-      ).toBe(true);
+      expect(evalExpression({ kind: 'compare', lhs: lit('5'), op: '<', rhs: lit(10) }, s)).toBe(
+        true,
+      );
+      expect(evalExpression({ kind: 'compare', lhs: lit(10), op: '>=', rhs: lit('10') }, s)).toBe(
+        true,
+      );
     });
 
     it('numeric ops return false when either side is NaN', () => {
@@ -1435,9 +1496,9 @@ describe('evalExpression', () => {
       expect(
         evalExpression({ kind: 'compare', lhs: lit('not-a-num'), op: '<', rhs: lit(5) }, s),
       ).toBe(false);
-      expect(
-        evalExpression({ kind: 'compare', lhs: lit(5), op: '>', rhs: lit('xyz') }, s),
-      ).toBe(false);
+      expect(evalExpression({ kind: 'compare', lhs: lit(5), op: '>', rhs: lit('xyz') }, s)).toBe(
+        false,
+      );
     });
 
     it('in op: true iff lhs ∈ rhs (array)', () => {
@@ -1455,12 +1516,9 @@ describe('evalExpression', () => {
         ),
       ).toBe(false);
       // rhs not an array → false (not throw)
-      expect(
-        evalExpression(
-          { kind: 'compare', lhs: lit('a'), op: 'in', rhs: lit('abc') },
-          s,
-        ),
-      ).toBe(false);
+      expect(evalExpression({ kind: 'compare', lhs: lit('a'), op: 'in', rhs: lit('abc') }, s)).toBe(
+        false,
+      );
     });
 
     it('compares state-resolved jsonpath against a literal', () => {
@@ -1957,7 +2015,11 @@ describe('compileFlow — Loop tag', () => {
         { from: 'per-item', to: 'after', type: 'sequence' },
       ],
     };
-    flow.nodes.push({ id: 'after', kind: 'transform', config: { expression: { kind: 'literal', value: 'unreached' } } });
+    flow.nodes.push({
+      id: 'after',
+      kind: 'transform',
+      config: { expression: { kind: 'literal', value: 'unreached' } },
+    });
     const executors = new Map<string, NodeExecutor>([
       [
         'per-item',
@@ -1965,7 +2027,12 @@ describe('compileFlow — Loop tag', () => {
           seenInputs.push(state.output);
           if (state.output === 'b') {
             return {
-              lastExit: { nodeId: 'per-item', kind: 'error', errorName: 'BadItem', errorMessage: 'b is bad' },
+              lastExit: {
+                nodeId: 'per-item',
+                kind: 'error',
+                errorName: 'BadItem',
+                errorMessage: 'b is bad',
+              },
             };
           }
           return { lastExit: { nodeId: 'per-item', kind: 'success' } };
@@ -2029,11 +2096,7 @@ describe('compileFlow — Loop tag', () => {
       const graph = compileFlow({ flow, executors });
       await graph.invoke(initialState, { configurable: { thread_id: 't' } });
       // Directory walk emits absolute paths, sorted alphabetically.
-      expect(seenInputs).toEqual([
-        join(root, 'a.txt'),
-        join(root, 'b.txt'),
-        join(root, 'c.txt'),
-      ]);
+      expect(seenInputs).toEqual([join(root, 'a.txt'), join(root, 'b.txt'), join(root, 'c.txt')]);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -2049,7 +2112,11 @@ describe('compileFlow — Loop tag', () => {
           path: { kind: 'literal', value: '/nonexistent/path/for/test' },
           mode: 'sequential',
         }),
-        { id: 'after', kind: 'transform', config: { expression: { kind: 'literal', value: 'unreached' } } },
+        {
+          id: 'after',
+          kind: 'transform',
+          config: { expression: { kind: 'literal', value: 'unreached' } },
+        },
       ],
       edges: [
         { from: 't', to: 'per-item', type: 'sequence' },
@@ -2060,9 +2127,9 @@ describe('compileFlow — Loop tag', () => {
     const graph = compileFlow({ flow, executors });
     // No error edge wired → router throws with an unhandled-error
     // message that includes the loop's errorName.
-    await expect(
-      graph.invoke(initialState, { configurable: { thread_id: 't' } }),
-    ).rejects.toThrow(/LoopDirectoryError|nonexistent/);
+    await expect(graph.invoke(initialState, { configurable: { thread_id: 't' } })).rejects.toThrow(
+      /LoopDirectoryError|nonexistent/,
+    );
   });
 });
 

@@ -183,6 +183,13 @@ export interface TaskStep {
    * The single-Expression form is detected by a string `kind` field,
    * so mapping keys must not be named `kind`.
    *
+   * On tool nodes, `input` and `ToolConfig.args` compose: `input`
+   * composes the payload (this effective `$.output`), `args` bind the
+   * tool's parameters against post-mapping state — so an args
+   * expression reading `$.output` sees the composed payload. Declaring
+   * `input` on a tool node with no `$.output`-reading arg is rejected
+   * as dead config (tool templates resolve against args only).
+   *
    * Omitted → legacy behavior: the node reads `state.output` as-is.
    */
   input?: Expression | Readonly<Record<string, Expression>>;
@@ -238,9 +245,18 @@ export interface AgentConfig {
 
 /** Deterministic tool/API call. References a tool by id (resolved against
  *  the tool catalog or skillzkit). The `args` map is merged with the
- *  ToolDef's own argument template at dispatch time; values may be
- *  Expressions (jsonpath/literal) for state-driven argument synthesis,
+ *  ToolDef's own argument template at dispatch time; TOP-LEVEL values may
+ *  be Expressions (jsonpath/literal) for state-driven argument synthesis,
  *  same evaluator the conditional-edge router uses.
+ *
+ *  Input-mechanism rule (when the node also declares `input`): the two
+ *  channels compose, they don't compete. `input` composes the PAYLOAD —
+ *  it rewrites the effective `$.output` before the executor runs — and
+ *  `args` BIND the tool's named parameters against that post-mapping
+ *  state. A ToolDef's templates interpolate against resolved args only,
+ *  so the composed payload reaches the tool exclusively through an args
+ *  expression reading `$.output`; the validator rejects an `input`
+ *  mapping on a tool node with no such arg as dead config.
  *
  *  Example flow-side reference:
  *      { id: "lint", kind: "tool", config: {

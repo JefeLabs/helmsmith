@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { CatalogError } from './types.ts';
 import { schemaViolations, validateSchemaShape } from './schema.ts';
+import { CatalogError } from './types.ts';
 
 describe('validateSchemaShape (load-time subset gate)', () => {
   it('accepts the supported subset', () => {
@@ -65,9 +65,9 @@ describe('schemaViolations (runtime check)', () => {
   };
 
   it('returns [] for a conforming value', () => {
-    expect(
-      schemaViolations({ score: 0.9, verdict: 'approve', files: ['a.ts'] }, review),
-    ).toEqual([]);
+    expect(schemaViolations({ score: 0.9, verdict: 'approve', files: ['a.ts'] }, review)).toEqual(
+      [],
+    );
   });
 
   it('collects every violation with a jsonpath-style location', () => {

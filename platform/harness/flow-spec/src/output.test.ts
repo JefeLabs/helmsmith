@@ -24,6 +24,7 @@ describe('parseFlowOutput — structured schema enforcement (2.7)', () => {
     }
   });
 });
+
 import { parseFlowOutput } from './index.ts';
 
 describe('parseFlowOutput', () => {
