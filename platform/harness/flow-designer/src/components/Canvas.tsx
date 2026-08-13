@@ -14,9 +14,10 @@ import { useCallback, useMemo, useRef } from 'react';
 import type { DesignerEdge, DesignerNode } from '../graph-model.ts';
 import { StepNode } from './StepNode.tsx';
 
-const nodeTypes = { step: StepNode };
+export const nodeTypes = { step: StepNode };
 
-/** Chart line-work per edge kind. */
+/** Chart line-work per edge kind — strokes come from the theming
+ *  contract (styles.css), one token per edge type. */
 function edgeStyle(edge: SpecEdge): {
   stroke: string;
   dash?: string;
@@ -25,23 +26,40 @@ function edgeStyle(edge: SpecEdge): {
 } {
   switch (edge.type) {
     case 'sequence':
-      return { stroke: '#5b7495', label: '' };
+      return { stroke: 'var(--flow-edge-sequence)', label: '' };
     case 'conditional':
-      return { stroke: '#4cc9f0', dash: '7 4', label: 'if' };
+      return { stroke: 'var(--flow-edge-conditional)', dash: '7 4', label: 'if' };
     case 'error': {
       const on = edge.on && edge.on.length > 0 ? edge.on.join(',') : '✱';
-      return { stroke: '#e5484d', dash: '3 3', label: `err:${on}` };
+      return { stroke: 'var(--flow-edge-error)', dash: '3 3', label: `err:${on}` };
     }
     case 'fallback':
-      return { stroke: '#8296ad', dash: '1 5', label: 'fallback' };
+      return { stroke: 'var(--flow-edge-fallback)', dash: '1 5', label: 'fallback' };
     case 'reject':
       return {
-        stroke: '#d9a441',
+        stroke: 'var(--flow-edge-reject)',
         dash: '9 4',
         label: `reject ≤${edge.maxAttempts ?? 3}`,
         animated: true,
       };
   }
+}
+
+/** DesignerEdge[] → rendered edges with stroke/label/marker styling.
+ *  Shared by the main canvas and the read-only subflow preview. */
+export function decorateEdges(edges: DesignerEdge[]) {
+  return edges.map((e) => {
+    const s = edgeStyle(e.data.edge);
+    return {
+      ...e,
+      label: s.label || undefined,
+      animated: s.animated ?? false,
+      style: { stroke: s.stroke, strokeDasharray: s.dash, strokeWidth: 1.6 },
+      labelStyle: { fill: s.stroke, fontFamily: 'IBM Plex Mono', fontSize: 10 },
+      labelBgStyle: { fill: 'var(--flow-canvas-bg)', fillOpacity: 0.85 },
+      markerEnd: { type: MarkerType.ArrowClosed, color: s.stroke, width: 16, height: 16 },
+    };
+  });
 }
 
 export function Canvas({
@@ -63,22 +81,7 @@ export function Canvas({
   onRecordPoint: () => void;
 }) {
   const dragActive = useRef(false);
-  const rfEdges = useMemo(
-    () =>
-      edges.map((e) => {
-        const s = edgeStyle(e.data.edge);
-        return {
-          ...e,
-          label: s.label || undefined,
-          animated: s.animated ?? false,
-          style: { stroke: s.stroke, strokeDasharray: s.dash, strokeWidth: 1.6 },
-          labelStyle: { fill: s.stroke, fontFamily: 'IBM Plex Mono', fontSize: 10 },
-          labelBgStyle: { fill: '#0a121d', fillOpacity: 0.85 },
-          markerEnd: { type: MarkerType.ArrowClosed, color: s.stroke, width: 16, height: 16 },
-        };
-      }),
-    [edges],
-  );
+  const rfEdges = useMemo(() => decorateEdges(edges), [edges]);
 
   const handleNodesChange = useCallback(
     (changes: NodeChange<DesignerNode>[]) => {

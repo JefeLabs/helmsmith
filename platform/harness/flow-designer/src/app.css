@@ -1,0 +1,11 @@
+/* Standalone (npx / dev) app shell only — never shipped to embedders.
+ * The embeddable component styles its own root; this block styles the
+ * page that hosts it when flow-designer IS the app. */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: #060c14;
+  color: #d8e2ef;
+}

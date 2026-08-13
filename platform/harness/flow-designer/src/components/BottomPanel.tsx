@@ -22,7 +22,7 @@ export function BottomPanel({ validation }: { validation: ValidationState }) {
     <div className="flex h-full flex-col">
       <div
         className="flex items-center gap-1 border-b px-3 py-1.5"
-        style={{ borderColor: 'var(--line-soft)' }}
+        style={{ borderColor: 'var(--flow-border-soft)' }}
       >
         {(['validation', 'expression', 'schema'] as const).map((t) => (
           <button
@@ -31,7 +31,7 @@ export function BottomPanel({ validation }: { validation: ValidationState }) {
             className="btn"
             style={
               tab === t
-                ? { borderColor: 'var(--brass)', color: 'var(--brass)' }
+                ? { borderColor: 'var(--flow-accent)', color: 'var(--flow-accent)' }
                 : { borderColor: 'transparent' }
             }
             onClick={() => setTab(t)}
@@ -54,7 +54,7 @@ export function BottomPanel({ validation }: { validation: ValidationState }) {
 function ValidationReport({ validation }: { validation: ValidationState }) {
   if (validation.errors.length === 0 && validation.warnings.length === 0) {
     return (
-      <div style={{ color: 'var(--ok)' }}>
+      <div style={{ color: 'var(--flow-ok)' }}>
         ✓ catalog is valid — every declared feature is executed by the runtime
       </div>
     );
@@ -62,12 +62,12 @@ function ValidationReport({ validation }: { validation: ValidationState }) {
   return (
     <div className="space-y-1">
       {validation.errors.map((e) => (
-        <div key={e} style={{ color: 'var(--error)' }}>
+        <div key={e} style={{ color: 'var(--flow-error)' }}>
           ✕ {e}
         </div>
       ))}
       {validation.warnings.map((w) => (
-        <div key={`${w.where}:${w.feature}`} style={{ color: 'var(--warn)' }}>
+        <div key={`${w.where}:${w.feature}`} style={{ color: 'var(--flow-warn)' }}>
           ⚠ {w.where}: '{w.feature}' — {w.detail}
         </div>
       ))}
@@ -83,17 +83,17 @@ function ExpressionPlayground() {
     '{\n  "input": "fix the bug",\n  "output": "done",\n  "nodes": { "reviewer": { "score": 0.9 } }\n}',
   );
   let verdict: string;
-  let color = 'var(--ok)';
+  let color = 'var(--flow-ok)';
   try {
     const e = JSON.parse(expr);
     const s = JSON.parse(state);
     const predicate = evalExpression(e, s);
     const value = resolveExpressionValue(e, s);
     verdict = `predicate ⇒ ${String(predicate)}   ·   value ⇒ ${JSON.stringify(value)}`;
-    if (!predicate) color = 'var(--warn)';
+    if (!predicate) color = 'var(--flow-warn)';
   } catch (err) {
     verdict = (err as Error).message;
-    color = 'var(--error)';
+    color = 'var(--flow-error)';
   }
   return (
     <div className="grid h-full grid-cols-2 gap-3">
@@ -128,14 +128,14 @@ function SchemaPlayground() {
   );
   const [value, setValue] = useState('{ "score": 2 }');
   let verdict: string;
-  let color = 'var(--ok)';
+  let color = 'var(--flow-ok)';
   try {
     const issues = schemaViolations(JSON.parse(value), JSON.parse(schema));
     verdict = issues.length === 0 ? '✓ conforms' : issues.join('\n');
-    if (issues.length > 0) color = 'var(--error)';
+    if (issues.length > 0) color = 'var(--flow-error)';
   } catch (err) {
     verdict = (err as Error).message;
-    color = 'var(--error)';
+    color = 'var(--flow-error)';
   }
   return (
     <div className="grid h-full grid-cols-2 gap-3">

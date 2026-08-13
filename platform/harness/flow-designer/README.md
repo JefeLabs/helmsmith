@@ -49,6 +49,39 @@ The component fills its container; `onCatalogChange` fires with the live catalog
 - **Shareable layout sidecar** — arrangements now travel: `export` writes `flows.layout.json` beside `flows.json` (skipped when nothing is arranged); `import` detects a layout file by shape and re-arranges the canvas (undoable); `server ⇧`/`server ⇩` carry the layout through `GET`/`PUT /v1/catalog/layout` (stored beside `flows.json` on the harness, per-flow replace merge). All best-effort: a server without the route, a network failure, or a bad file never blocks the catalog operation it rides with.
 - **Save-to-server** — `server ⇩` / `server ⇧` load and save the catalog of a **running harness** via `GET`/`PUT /v1/catalog`: the server validates with the real validator (rejections surface the path-prefixed message in the toolbar), persists to the same `.harness/config/flows.json` boot reads, hot-swaps its live catalog, and re-arms schedule triggers — edits go live without a restart. Start the harness with a TCP listener and point the dev proxy at it: `HARNESS_URL=http://127.0.0.1:<tcpPort> pnpm dev`. The endpoint pair is the controlplane seam — and the Spring controlplane now implements it: point the proxy at the controlplane (`HARNESS_URL=http://127.0.0.1:8080 pnpm dev`) and `server ⇩`/`server ⇧` read and write org-scoped flows in Postgres, with PUT bodies gated against the generated `schema/flow-spec.schema.json` (semantic validation still runs at harness load — the schema gate is shape-only, so the designer's live TS validation remains the richer surface).
 
+## Theming
+
+Every color the designer paints comes from a `--flow-*` CSS custom property declared on the component root (`.flow-designer`) with the chart-room palette as defaults — no hardcoded colors inside. Override any subset from plain CSS:
+
+```css
+.my-theme .flow-designer {
+  --flow-accent: #7c3aed;
+  --flow-canvas-bg: #f8fafc;
+}
+```
+
+or pass the `theme` prop (same properties, set inline on the root — handy for JS-driven theme switching):
+
+```tsx
+<FlowDesigner theme={{ '--flow-accent': '#7c3aed' }} />
+```
+
+The contract (see `src/styles.css` for defaults):
+
+| Group | Tokens |
+|---|---|
+| Surfaces | `--flow-app-bg`, `--flow-canvas-bg`, `--flow-canvas-glow`, `--flow-panel-bg`, `--flow-panel-raised-bg`, `--flow-node-bg-deep`, `--flow-subflow-inset-bg`, `--flow-shadow` |
+| Lines & text | `--flow-border`, `--flow-border-soft`, `--flow-text`, `--flow-text-dim`, `--flow-text-faint` |
+| Accent & status | `--flow-accent`, `--flow-accent-soft`, `--flow-accent-glow`, `--flow-error`, `--flow-warn`, `--flow-ok` |
+| Step kinds | `--flow-kind-trigger`, `--flow-kind-agent`, `--flow-kind-tool`, `--flow-kind-script`, `--flow-kind-transform`, `--flow-kind-gate`, `--flow-kind-subflow`, `--flow-kind-publish` |
+| Edge kinds | `--flow-edge-sequence`, `--flow-edge-conditional`, `--flow-edge-error`, `--flow-edge-fallback`, `--flow-edge-reject` |
+
+The toolbar wordmark is a slot too: `brand` accepts any ReactNode and defaults to the Helmsmith wordmark; pass `brand={null}` to render no brand at all (white-label embeds).
+
+## Subflow preview
+
+Selecting a `subflow` step reveals the actual child flow — resolved by `flowId` against the live catalog — in a translucent read-only inset under the canvas (`--flow-subflow-inset-bg` carries the alpha). Deselect and it goes away. The inset's `open <id> →` button jumps through: the child becomes the active flow with full editing on the same surface (the flows sidebar is the way back). Version-pinned targets note that the pin is recorded but resolution stays by flowId; an id with no match in the catalog explains itself instead of rendering nothing (and offers no jump). One nesting level: the preview never previews its own subflows.
+
 ## v1 boundaries (deliberate)
 
 - Layout is keyed by flow id (flows with the same id share a layout slot) and the server-side store is per-workspace, not per-user — two people arranging the same flow differently will trade arrangements on save/load.
