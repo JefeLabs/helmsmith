@@ -214,6 +214,47 @@ describe('trigger ingress (3.1)', () => {
     expect(job.body.job.triggeredBy).toBe('event:pr-merged');
   });
 
+  it('a message trigger starts its flow with the message text as input', async () => {
+    const { socketPath } = await bootServer({
+      flows: [triggeredFlow('intake-chat', { kind: 'message', channel: 'helm-requests' })],
+    });
+
+    // Wrong channel → nothing starts.
+    const miss = await udsJson(socketPath, 'POST', '/v1/messages', {
+      channel: 'random',
+      text: 'hello?',
+    });
+    expect(miss.status).toBe(200);
+    expect(miss.body.started).toEqual([]);
+
+    // Matching channel → flow starts; the TEXT is the job input (the
+    // conversational prompt), not a JSON envelope.
+    const hit = await udsJson(socketPath, 'POST', '/v1/messages', {
+      channel: 'helm-requests',
+      text: 'please build the widget',
+      from: 'edwin',
+    });
+    expect(hit.body.started).toHaveLength(1);
+    const jobId = hit.body.started[0];
+    await waitFor(async () => {
+      const r = await udsJson(socketPath, 'GET', `/v1/jobs/${jobId}`);
+      return r.body.job?.status === 'completed';
+    });
+    const job = await udsJson(socketPath, 'GET', `/v1/jobs/${jobId}`);
+    expect(job.body.job.input).toBe('please build the widget');
+    expect(job.body.job.triggeredBy).toBe('message:helm-requests');
+  });
+
+  it('rejects malformed message ingests', async () => {
+    const { socketPath } = await bootServer({
+      flows: [triggeredFlow('intake-chat', { kind: 'message', channel: 'helm-requests' })],
+    });
+    const noChannel = await udsJson(socketPath, 'POST', '/v1/messages', { text: 'x' });
+    expect(noChannel.status).toBe(400);
+    const noText = await udsJson(socketPath, 'POST', '/v1/messages', { channel: 'helm-requests' });
+    expect(noText.status).toBe(400);
+  });
+
   it('schedule triggers are armed at boot and inspectable via GET /v1/triggers', async () => {
     const { socketPath } = await bootServer({
       flows: [
@@ -230,5 +271,13 @@ describe('trigger ingress (3.1)', () => {
     expect(r.body.webhooks).toEqual([
       { flowId: 'deploy-flow', path: 'deploy', method: 'POST' },
     ]);
+  });
+
+  it('GET /v1/triggers lists message channels', async () => {
+    const { socketPath } = await bootServer({
+      flows: [triggeredFlow('intake-chat', { kind: 'message', channel: 'helm-requests' })],
+    });
+    const r = await udsJson(socketPath, 'GET', '/v1/triggers');
+    expect(r.body.messages).toEqual([{ flowId: 'intake-chat', channel: 'helm-requests' }]);
   });
 });

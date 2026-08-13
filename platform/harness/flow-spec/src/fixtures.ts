@@ -904,8 +904,7 @@ export interface UnsupportedCase {
 
 export const UNSUPPORTED_CASES: readonly UnsupportedCase[] = [
   {
-    // schedule/webhook/event triggers are ingress-backed (3.1) — no
-    // report. Only 'message' still lacks a transport and reports.
+    // All four non-manual trigger kinds are ingress-backed — no reports.
     name: 'ingress-backed triggers (schedule) report nothing',
     flow: {
       id: 'cron-flow',
@@ -954,12 +953,13 @@ export const UNSUPPORTED_CASES: readonly UnsupportedCase[] = [
         { from: 'b', to: 's', type: 'sequence' },
       ],
     },
-    // 'effect', 'policy', 'joinStrategy', 'parallel-fan-out',
-    // 'node-output-schema', 'flow-output-schema', and 'terminal-fail'
-    // are deliberately absent: the kitchen-sink flow still declares all
-    // of them (terminal:'fail' on leaf node 's'), pinning that they are
-    // executed and no longer reported.
-    expectedFeatures: ['expression-js', 'subflow-version-pin', 'trigger-message'],
+    // Every once-reported feature is deliberately absent — the
+    // kitchen-sink flow still declares them all (message trigger,
+    // effect, policy, joinStrategy, double sequence edge, schemas,
+    // terminal:'fail' on leaf 's'), pinning that they are executed and
+    // silent. Only expression-js (deliberate: no JS sandbox) and
+    // subflow-version-pin remain reportable.
+    expectedFeatures: ['expression-js', 'subflow-version-pin'],
   },
   {
     name: 'fully-executed features produce zero reports',

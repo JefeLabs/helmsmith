@@ -24,9 +24,10 @@ import {
  * accept/reject behavior — a catalog with unsupported features is
  * still a *valid* catalog; it just won't do everything it says.
  *
- * Current feature ids: `trigger-message` (no message transport;
- * schedule/webhook/event are ingress-backed), `expression-js`,
- * `subflow-version-pin` (version recorded, resolution stays by flowId).
+ * Current feature ids: `expression-js` (deliberate — no JS sandbox;
+ * compose the boolean primitives) and `subflow-version-pin` (version
+ * recorded, resolution stays by flowId). Every other feature the
+ * contract declares is executed by the runtime.
  * Remove an id from
  * `reportUnsupportedFeatures` in the same change that makes the
  * runtime execute it — the reporting list IS the honest coverage
@@ -307,19 +308,6 @@ function reportUnsupportedFeatures(
   for (const [j, n] of (flow.nodes as unknown[]).entries()) {
     const node = n as Record<string, unknown>;
     const at = `${where}.nodes[${j}]`;
-    if (node.kind === 'trigger') {
-      const kind = (node.config as Record<string, unknown>).kind;
-      // schedule/webhook/event triggers are ingress-backed (3.1);
-      // 'message' still has no transport to bind to.
-      if (kind === 'message') {
-        report({
-          where: `${at}.config`,
-          feature: 'trigger-message',
-          detail:
-            'no message transport fires this trigger; jobs start by manual submission, schedule, webhook, or event ingress',
-        });
-      }
-    }
     if (node.kind === 'subflow' && (node.config as Record<string, unknown>).version !== undefined) {
       report({
         where: `${at}.config.version`,
