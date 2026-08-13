@@ -51,6 +51,16 @@ describe('catalog client (save-to-server)', () => {
     );
   });
 
+  it('reports the status cleanly when an error response has no JSON body', async () => {
+    // A dev-proxy 502/500 answers with an empty or HTML body — the
+    // client must not surface "Unexpected end of JSON input".
+    const fetchFn = (async () => new Response('', { status: 500 })) as typeof fetch;
+    await expect(loadServerCatalog('/harness', fetchFn)).rejects.toThrow(/load failed \(500\)/);
+    await expect(saveServerCatalog('/harness', CATALOG, fetchFn)).rejects.toThrow(
+      /save failed \(500\)/,
+    );
+  });
+
   it('surfaces connection-level failures readably', async () => {
     const fetchFn = (async () => {
       throw new TypeError('fetch failed');

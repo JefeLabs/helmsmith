@@ -12,12 +12,22 @@ export interface SaveResult {
   warnings: UnsupportedFeature[];
 }
 
+/** Error responses from a dev proxy can carry empty/HTML bodies —
+ *  parse leniently so status codes surface instead of JSON.parse noise. */
+async function bodyOf(res: Response): Promise<Record<string, unknown>> {
+  try {
+    return (await res.json()) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
 export async function loadServerCatalog(
   base: string,
   fetchFn: typeof fetch = fetch,
 ): Promise<Catalog> {
   const res = await fetchFn(`${base}/v1/catalog`);
-  const body = (await res.json()) as { catalog?: Catalog; error?: string };
+  const body = (await bodyOf(res)) as { catalog?: Catalog; error?: string };
   if (!res.ok || !body.catalog) {
     throw new Error(body.error ?? `load failed (${res.status})`);
   }
@@ -34,7 +44,7 @@ export async function saveServerCatalog(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(catalog),
   });
-  const body = (await res.json()) as Partial<SaveResult> & { error?: string };
+  const body = (await bodyOf(res)) as Partial<SaveResult> & { error?: string };
   if (!res.ok) {
     throw new Error(body.error ?? `save failed (${res.status})`);
   }
