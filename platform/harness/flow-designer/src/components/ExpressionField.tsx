@@ -33,7 +33,7 @@ function parsedLiteral(text: string): unknown {
 
 /** Blur-commit input: uncontrolled while typing, remounts (via key) when
  *  the canonical value changes externally (undo, kind switch). */
-function CommitInput({
+export function CommitInput({
   value,
   onCommit,
   className,
@@ -67,7 +67,13 @@ function uniqueFieldName(existing: Readonly<Record<string, Expression>>): string
   return `f${n}`;
 }
 
-function ExprNode({ expr, onChange }: { expr: Expression; onChange: (next: Expression) => void }) {
+export function ExprNode({
+  expr,
+  onChange,
+}: {
+  expr: Expression;
+  onChange: (next: Expression) => void;
+}) {
   const kindSelect = (
     <select
       className="select expr-kind"

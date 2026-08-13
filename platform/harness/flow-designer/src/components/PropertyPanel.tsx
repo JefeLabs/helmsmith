@@ -4,11 +4,14 @@ import type {
   Edge as SpecEdge,
   TaskStep,
   TransformConfig,
+  TriggerConfig,
 } from '@helmsmith/flow-spec';
 import type { DesignerEdge, DesignerNode } from '../graph-model.ts';
 import { kindColor } from '../kinds.ts';
 import { AssertionsField, ExpressionField } from './ExpressionField.tsx';
+import { InputMappingField } from './InputMappingField.tsx';
 import { JsonField } from './JsonField.tsx';
+import { TriggerConfigField } from './TriggerConfigField.tsx';
 
 const EDGE_TYPES: ReadonlyArray<SpecEdge['type']> = [
   'sequence',
@@ -73,7 +76,14 @@ export function PropertyPanel({
             }}
           />
         </div>
-        {step.kind === 'transform' ? (
+        {step.kind === 'trigger' ? (
+          <TriggerConfigField
+            value={step.config as TriggerConfig}
+            onApply={(config) =>
+              onUpdateStep(step.id, { ...step, config: config as TaskStep['config'] })
+            }
+          />
+        ) : step.kind === 'transform' ? (
           <ExpressionField
             label="expression"
             value={(step.config as TransformConfig).expression}
@@ -103,13 +113,13 @@ export function PropertyPanel({
             rows={10}
           />
         )}
-        <JsonField
-          label="input mapping (optional)"
+        <InputMappingField
           value={step.input}
-          allowAbsent
-          rows={4}
-          onApply={(parsed) =>
-            onUpdateStep(step.id, { ...step, input: parsed as TaskStep['input'] })
+          onApply={(input) =>
+            onUpdateStep(
+              step.id,
+              input === undefined ? (({ input: _, ...rest }) => rest)(step) : { ...step, input },
+            )
           }
         />
         <JsonField
