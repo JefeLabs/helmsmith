@@ -15,7 +15,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { rm } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -122,9 +122,11 @@ describe('HITL Approval round-trip over HTTP', () => {
 
   it('pauses on submit, surfaces ApprovalRequest, resumes on approve, completes', async () => {
     const socketPath = tmpSocket();
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'ari-ws-'));
     const adapters: TestAdapter[] = [];
     const handle = await startHarnessServer({
       socketPath,
+      workspaceRoot,
       catalog,
       broker: dummyBroker,
       adapterFactory: () => {
@@ -136,6 +138,7 @@ describe('HITL Approval round-trip over HTTP', () => {
     cleanups.push(async () => {
       await handle.stop();
       await rm(socketPath, { force: true });
+      await rm(workspaceRoot, { recursive: true, force: true });
     });
 
     // Submit a job that will pause at the Approval-tagged planner.
@@ -193,9 +196,11 @@ describe('HITL Approval round-trip over HTTP', () => {
 
   it('enforces the assignee role and validates the decision on approval resumes (2.1)', async () => {
     const socketPath = tmpSocket();
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'ari-ws-'));
     const adapters: TestAdapter[] = [];
     const handle = await startHarnessServer({
       socketPath,
+      workspaceRoot,
       catalog,
       broker: dummyBroker,
       adapterFactory: () => {
@@ -207,6 +212,7 @@ describe('HITL Approval round-trip over HTTP', () => {
     cleanups.push(async () => {
       await handle.stop();
       await rm(socketPath, { force: true });
+      await rm(workspaceRoot, { recursive: true, force: true });
     });
 
     await udsJson(socketPath, 'POST', '/v1/jobs', {
@@ -266,9 +272,11 @@ describe('HITL Approval round-trip over HTTP', () => {
 
   it('routes via reject edge on resume with reject; re-runs planner; then approves', async () => {
     const socketPath = tmpSocket();
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'ari-ws-'));
     const adapters: TestAdapter[] = [];
     const handle = await startHarnessServer({
       socketPath,
+      workspaceRoot,
       catalog,
       broker: dummyBroker,
       adapterFactory: () => {
@@ -280,6 +288,7 @@ describe('HITL Approval round-trip over HTTP', () => {
     cleanups.push(async () => {
       await handle.stop();
       await rm(socketPath, { force: true });
+      await rm(workspaceRoot, { recursive: true, force: true });
     });
 
     await udsJson(socketPath, 'POST', '/v1/jobs', {
@@ -363,8 +372,10 @@ describe('HITL Approval round-trip over HTTP', () => {
       ],
     };
     const socketPath = tmpSocket();
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'ari-ws-'));
     const handle = await startHarnessServer({
       socketPath,
+      workspaceRoot,
       catalog: flatCatalog,
       broker: dummyBroker,
       adapterFactory: () => new TestAdapter('done'),
@@ -372,6 +383,7 @@ describe('HITL Approval round-trip over HTTP', () => {
     cleanups.push(async () => {
       await handle.stop();
       await rm(socketPath, { force: true });
+      await rm(workspaceRoot, { recursive: true, force: true });
     });
 
     await udsJson(socketPath, 'POST', '/v1/jobs', {
@@ -393,8 +405,10 @@ describe('HITL Approval round-trip over HTTP', () => {
 
   it('returns 404 from GET /v1/jobs/:id/approval when the job has no pending request', async () => {
     const socketPath = tmpSocket();
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'ari-ws-'));
     const handle = await startHarnessServer({
       socketPath,
+      workspaceRoot,
       catalog,
       broker: dummyBroker,
       adapterFactory: () => new TestAdapter('x'),
@@ -402,6 +416,7 @@ describe('HITL Approval round-trip over HTTP', () => {
     cleanups.push(async () => {
       await handle.stop();
       await rm(socketPath, { force: true });
+      await rm(workspaceRoot, { recursive: true, force: true });
     });
 
     const r = await udsJson(socketPath, 'GET', '/v1/jobs/nope/approval');
