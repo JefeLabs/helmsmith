@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { chmod, mkdir, unlink } from 'node:fs/promises';
+import { chmod, mkdir, unlink, writeFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { dirname, join } from 'node:path';
 import {
@@ -33,8 +33,10 @@ import {
   runJob,
   type SuspendRequest,
   steerJob,
-  type TriggerConfig,
   TokenAccumulator,
+  type TriggerConfig,
+  type UnsupportedFeature,
+  validateUnifiedCatalog,
   walkAgents,
 } from '@helmsmith/harness-core';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
@@ -42,7 +44,6 @@ import type { BaseCheckpointSaver } from '@langchain/langgraph';
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
 import { runEntryCoordinator } from './coordinator/entry-coordinator.ts';
 import { nextCronFire } from './cron.ts';
-import { deletePausedJob, loadPausedJobs, savePausedJob } from './paused-jobs.ts';
 import {
   enqueue as dispatcherEnqueue,
   fireImmediate as dispatcherFireImmediate,
@@ -63,6 +64,7 @@ import {
   type WorktreePolicy,
 } from './load-catalog.ts';
 import { type LoaderEvent, spawnLoaderJob } from './loader-spawn.ts';
+import { deletePausedJob, loadPausedJobs, savePausedJob } from './paused-jobs.ts';
 import { runJobInContainer } from './run-job-in-container.ts';
 import type { SpawnRepoSpec } from './spawn-worker.ts';
 
@@ -600,11 +602,16 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: ServerCtx) {
     return;
   }
 
-  // ─── Read-only catalog routes ───────────────────────────────────
-  // The catalog is loaded once at startup and immutable thereafter
-  // (per the authority model — admins mutate via YAML/central Catalog,
-  // not via runtime API). These routes are the read surface clients
-  // use to discover what's available.
+  // ─── Catalog routes ─────────────────────────────────────────────
+  // Loaded at startup; writable by admins via PUT /v1/catalog (the
+  // designer's save-to-server path — same socket trust model as every
+  // other mutation). Writes validate with the real validator, persist
+  // to the same .harness/config/flows.json boot reads (restart-
+  // consistent), hot-swap the live catalog, and re-arm schedules.
+  if (req.method === 'GET' && url === '/v1/catalog') {
+    ok(res, { service, catalog: ctx.catalog, ts: new Date().toISOString() });
+    return;
+  }
   if (req.method === 'GET' && url === '/v1/catalog/flows') {
     ok(res, {
       service,
@@ -812,6 +819,18 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: ServerCtx) {
     const hookMatch = url.split('?')[0]?.match(/^\/v1\/hooks\/(.+)$/);
     if (hookMatch && (req.method === 'POST' || req.method === 'GET')) {
       handleWebhook(req, res, url, decodeURIComponent(hookMatch[1] ?? ''), parsed, ctx);
+      return;
+    }
+
+    // PUT /v1/catalog — the designer's save-to-server path.
+    if (req.method === 'PUT' && url === '/v1/catalog' && parsed !== null) {
+      handlePutCatalog(res, parsed, ctx).catch((err: Error) => {
+        if (!res.headersSent) {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: err.message }));
+        }
+      });
       return;
     }
 
@@ -1475,7 +1494,9 @@ function spawnFlowJob(
   } else if (decision.kind === 'enqueue') {
     dispatcherEnqueue(ctx, jobId, fire);
   } else {
-    return { error: `dispatcher at capacity (${decision.reason}) — job ${jobId} left in 'received'` };
+    return {
+      error: `dispatcher at capacity (${decision.reason}) — job ${jobId} left in 'received'`,
+    };
   }
   return { jobId };
 }
@@ -1619,18 +1640,21 @@ function armSlaTimer(
 ): void {
   clearSlaTimer(ctx, jobId);
   const remaining = request.slaMs - (Date.now() - Date.parse(pausedAtIso));
-  const timer = setTimeout(() => {
-    ctx.approvalTimers.delete(jobId);
-    const job = ctx.jobs.get(jobId);
-    if (!job || job.status !== 'awaiting-approval' || !ctx.pendingApprovals.has(jobId)) return;
-    console.warn(
-      `[harness] approval SLA of ${request.slaMs}ms expired for job ${jobId} — auto-rejecting`,
-    );
-    executeResume(ctx, jobId, {
-      decision: 'reject',
-      steering: `auto-rejected: approval SLA of ${request.slaMs}ms expired with no reviewer decision`,
-    });
-  }, Math.max(0, remaining));
+  const timer = setTimeout(
+    () => {
+      ctx.approvalTimers.delete(jobId);
+      const job = ctx.jobs.get(jobId);
+      if (!job || job.status !== 'awaiting-approval' || !ctx.pendingApprovals.has(jobId)) return;
+      console.warn(
+        `[harness] approval SLA of ${request.slaMs}ms expired for job ${jobId} — auto-rejecting`,
+      );
+      executeResume(ctx, jobId, {
+        decision: 'reject',
+        steering: `auto-rejected: approval SLA of ${request.slaMs}ms expired with no reviewer decision`,
+      });
+    },
+    Math.max(0, remaining),
+  );
   timer.unref?.();
   ctx.approvalTimers.set(jobId, timer);
 }
@@ -1661,12 +1685,15 @@ function armSuspendTimer(
   if (request.trigger.kind !== 'timer') return;
   clearSuspendTimer(ctx, jobId);
   const remaining = request.trigger.durationMs - (Date.now() - Date.parse(pausedAtIso));
-  const timer = setTimeout(() => {
-    ctx.suspendTimers.delete(jobId);
-    const job = ctx.jobs.get(jobId);
-    if (!job || job.status !== 'suspended' || !ctx.pendingSuspends.has(jobId)) return;
-    executeResume(ctx, jobId, { wake: 'timer', firedAt: new Date().toISOString() });
-  }, Math.max(0, remaining));
+  const timer = setTimeout(
+    () => {
+      ctx.suspendTimers.delete(jobId);
+      const job = ctx.jobs.get(jobId);
+      if (!job || job.status !== 'suspended' || !ctx.pendingSuspends.has(jobId)) return;
+      executeResume(ctx, jobId, { wake: 'timer', firedAt: new Date().toISOString() });
+    },
+    Math.max(0, remaining),
+  );
   timer.unref?.();
   ctx.suspendTimers.set(jobId, timer);
 }
@@ -1718,7 +1745,9 @@ function handleIngestEvent(res: ServerResponse, body: unknown, ctx: ServerCtx): 
     if ('jobId' in spawnResult) {
       started.push(spawnResult.jobId);
     } else {
-      console.warn(`[harness] event trigger for flow "${flow.id}" could not fire: ${spawnResult.error}`);
+      console.warn(
+        `[harness] event trigger for flow "${flow.id}" could not fire: ${spawnResult.error}`,
+      );
     }
   }
   ok(res, {
@@ -1727,6 +1756,42 @@ function handleIngestEvent(res: ServerResponse, body: unknown, ctx: ServerCtx): 
     path: '/v1/events',
     woke,
     started,
+    ts: new Date().toISOString(),
+  });
+}
+
+/**
+ * PUT /v1/catalog — the designer's save-to-server path. Validates with
+ * the real validator (400 with the path-prefixed message; the live
+ * catalog untouched), persists to .harness/config/flows.json (awaited —
+ * the response means it's durable), hot-swaps ctx.catalog, and re-arms
+ * schedule triggers against the new flows. Warnings (the remaining
+ * report ids) return in the response. In-flight jobs are unaffected:
+ * JobRecord.flow is a snapshot taken at submission.
+ */
+async function handlePutCatalog(res: ServerResponse, body: unknown, ctx: ServerCtx): Promise<void> {
+  const warnings: UnsupportedFeature[] = [];
+  try {
+    validateUnifiedCatalog(body, 'PUT /v1/catalog', { onUnsupported: (f) => warnings.push(f) });
+  } catch (err) {
+    badRequest(res, (err as Error).message);
+    return;
+  }
+  const catalog = body as Catalog;
+  const configDir = join(ctx.workspaceRoot, '.harness', 'config');
+  await mkdir(configDir, { recursive: true });
+  await writeFile(join(configDir, 'flows.json'), `${JSON.stringify(catalog, null, 2)}\n`, 'utf8');
+  ctx.catalog = catalog;
+  // Re-arm schedules against the new catalog (stale flows disarm).
+  for (const t of ctx.cronTimers.values()) clearTimeout(t);
+  ctx.cronTimers.clear();
+  armScheduleTriggers(ctx);
+  ok(res, {
+    service: 'harness',
+    method: 'PUT',
+    path: '/v1/catalog',
+    flowCount: catalog.flows.length,
+    warnings,
     ts: new Date().toISOString(),
   });
 }
@@ -1759,7 +1824,9 @@ function handleIngestMessage(res: ServerResponse, body: unknown, ctx: ServerCtx)
     if ('jobId' in spawnResult) {
       started.push(spawnResult.jobId);
     } else {
-      console.warn(`[harness] message trigger for flow "${flow.id}" could not fire: ${spawnResult.error}`);
+      console.warn(
+        `[harness] message trigger for flow "${flow.id}" could not fire: ${spawnResult.error}`,
+      );
     }
   }
   ok(res, {
@@ -1891,17 +1958,26 @@ function armCronTimer(ctx: ServerCtx, flow: FlowDef, cron: string): void {
           ctx.cronTimers.delete(flow.id);
           armCronTimer(ctx, flow, cron);
         }, CRON_TIMER_CHUNK_MS)
-      : setTimeout(() => {
-          ctx.cronTimers.delete(flow.id);
-          const spawnResult = spawnFlowJob(ctx, flow, {
-            input: JSON.stringify({ trigger: 'schedule', cron, firedAt: new Date().toISOString() }),
-            triggeredBy: `schedule:${cron}`,
-          });
-          if ('error' in spawnResult) {
-            console.warn(`[harness] schedule for flow "${flow.id}" could not fire: ${spawnResult.error}`);
-          }
-          armCronTimer(ctx, flow, cron);
-        }, Math.max(0, delay));
+      : setTimeout(
+          () => {
+            ctx.cronTimers.delete(flow.id);
+            const spawnResult = spawnFlowJob(ctx, flow, {
+              input: JSON.stringify({
+                trigger: 'schedule',
+                cron,
+                firedAt: new Date().toISOString(),
+              }),
+              triggeredBy: `schedule:${cron}`,
+            });
+            if ('error' in spawnResult) {
+              console.warn(
+                `[harness] schedule for flow "${flow.id}" could not fire: ${spawnResult.error}`,
+              );
+            }
+            armCronTimer(ctx, flow, cron);
+          },
+          Math.max(0, delay),
+        );
   timer.unref?.();
   ctx.cronTimers.set(flow.id, timer);
 }

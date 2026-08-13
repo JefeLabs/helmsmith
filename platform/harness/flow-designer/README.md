@@ -14,7 +14,8 @@ pnpm build      # typecheck + production bundle
 - **Property panel** — id renames cascade to edges; per-kind `config`, `input`, `output`, `tags`, `policy`, `joinStrategy` edited as validated JSON (a parse failure shows inline and never corrupts the flow); `effect`/`terminal` as selects.
 - **Live honesty** — every change re-runs `validateUnifiedCatalog`: path-prefixed errors and the unsupported-feature warnings appear instantly; the toolbar lamp is green/amber/red.
 - **Playgrounds** — expression evaluation (`evalExpression` + `resolveExpressionValue`) and output-schema checking (`schemaViolations`) against editable sample state, running the same code the router routes with.
-- **File-based** — import a `flows.json`, export the edited catalog. Deliberately server-independent: a save-to-controlplane path can be added without touching the editor core.
+- **File-based** — import a `flows.json`, export the edited catalog.
+- **Save-to-server** — `server ⇩` / `server ⇧` load and save the catalog of a **running harness** via `GET`/`PUT /v1/catalog`: the server validates with the real validator (rejections surface the path-prefixed message in the toolbar), persists to the same `.harness/config/flows.json` boot reads, hot-swaps its live catalog, and re-arms schedule triggers — edits go live without a restart. Start the harness with a TCP listener and point the dev proxy at it: `HARNESS_URL=http://127.0.0.1:<tcpPort> pnpm dev`. The endpoint pair is the controlplane seam: a Spring catalog service implementing the same wire shape (defined by `schema/flow-spec.schema.json`) is just a different proxy target.
 
 ## v1 boundaries (deliberate)
 

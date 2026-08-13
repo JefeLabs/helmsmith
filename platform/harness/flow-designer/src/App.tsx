@@ -2,6 +2,7 @@ import type { Catalog, FlowDef, Edge as SpecEdge, TaskStep } from '@helmsmith/fl
 import { validateUnifiedCatalog } from '@helmsmith/flow-spec';
 import type { Connection } from '@xyflow/react';
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { loadServerCatalog, saveServerCatalog } from './catalog-client.ts';
 import type { ValidationState } from './components/BottomPanel.tsx';
 import { BottomPanel } from './components/BottomPanel.tsx';
 import { Canvas } from './components/Canvas.tsx';
@@ -23,6 +24,7 @@ export function App() {
   const [nodes, setNodes] = useState<DesignerNode[]>(initial.nodes);
   const [edges, setEdges] = useState<DesignerEdge[]>(initial.edges);
   const [selection, setSelection] = useState<Selection | null>(null);
+  const [serverStatus, setServerStatus] = useState<{ text: string; ok: boolean } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const currentFlow = catalog.flows.find((f) => f.id === flowId);
@@ -186,26 +188,56 @@ export function App() {
     setSelection(null);
   }, [liveCatalog]);
 
-  const importCatalog = useCallback((file: File) => {
-    void file.text().then((text) => {
-      try {
-        const parsed = JSON.parse(text) as Catalog;
-        if (!Array.isArray(parsed.flows) || parsed.flows.length === 0) {
-          alert('catalog has no flows');
-          return;
-        }
-        setCatalog(parsed);
-        const first = parsed.flows[0] as FlowDef;
-        const graph = flowToGraph(first);
-        setFlowId(first.id);
-        setNodes(graph.nodes);
-        setEdges(graph.edges);
-        setSelection(null);
-      } catch (err) {
-        alert(`not a catalog: ${(err as Error).message}`);
-      }
-    });
+  const loadCatalogState = useCallback((parsed: Catalog) => {
+    setCatalog(parsed);
+    const first = parsed.flows[0] as FlowDef;
+    const graph = flowToGraph(first);
+    setFlowId(first.id);
+    setNodes(graph.nodes);
+    setEdges(graph.edges);
+    setSelection(null);
   }, []);
+
+  const serverLoad = useCallback(() => {
+    setServerStatus({ text: 'loading…', ok: true });
+    loadServerCatalog('/harness')
+      .then((parsed) => {
+        if (parsed.flows.length === 0) throw new Error('server catalog has no flows');
+        loadCatalogState(parsed);
+        setServerStatus({ text: `loaded ${parsed.flows.length} flow(s) ⇩`, ok: true });
+      })
+      .catch((err) => setServerStatus({ text: (err as Error).message, ok: false }));
+  }, [loadCatalogState]);
+
+  const serverSave = useCallback(() => {
+    setServerStatus({ text: 'saving…', ok: true });
+    saveServerCatalog('/harness', liveCatalog)
+      .then((r) =>
+        setServerStatus({
+          text: `saved ${r.flowCount} flow(s) ⇧${r.warnings.length > 0 ? ` · ${r.warnings.length} warning(s)` : ''}`,
+          ok: true,
+        }),
+      )
+      .catch((err) => setServerStatus({ text: (err as Error).message, ok: false }));
+  }, [liveCatalog]);
+
+  const importCatalog = useCallback(
+    (file: File) => {
+      void file.text().then((text) => {
+        try {
+          const parsed = JSON.parse(text) as Catalog;
+          if (!Array.isArray(parsed.flows) || parsed.flows.length === 0) {
+            alert('catalog has no flows');
+            return;
+          }
+          loadCatalogState(parsed);
+        } catch (err) {
+          alert(`not a catalog: ${(err as Error).message}`);
+        }
+      });
+    },
+    [loadCatalogState],
+  );
 
   const exportCatalog = useCallback(() => {
     const blob = new Blob([`${JSON.stringify(liveCatalog, null, 2)}\n`], {
@@ -239,6 +271,23 @@ export function App() {
         <span className="panel-title">flow designer</span>
         <span className="status-lamp" style={{ background: lampColor }} title="catalog status" />
         <div className="ml-auto flex items-center gap-2">
+          {serverStatus && (
+            <span
+              className="font-mono text-[11px]"
+              style={{ color: serverStatus.ok ? 'var(--dim)' : 'var(--error)' }}
+              title={serverStatus.text}
+            >
+              {serverStatus.text.length > 60
+                ? `${serverStatus.text.slice(0, 59)}…`
+                : serverStatus.text}
+            </span>
+          )}
+          <button type="button" className="btn" onClick={serverLoad}>
+            server ⇩
+          </button>
+          <button type="button" className="btn" onClick={serverSave}>
+            server ⇧
+          </button>
           <button type="button" className="btn" onClick={relayout}>
             relayout
           </button>
