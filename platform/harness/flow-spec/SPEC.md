@@ -14,7 +14,7 @@ This document is the detailed companion to the package `README.md`: the full con
 flowchart LR
     spec["@helmsmith/flow-spec<br/>types · validate · expression · fixtures<br/>zero deps, browser-safe"]
     core["harness-core<br/>compileFlow, executors, loadCatalog"]
-    designer["flow designer UI<br/>(future, browser)"]
+    designer["flow designer UI<br/>(@helmsmith/flow-designer)"]
     cp["controlplane Phase 2<br/>(via schema/flow-spec.schema.json)"]
     core -->|"depends on + re-exports"| spec
     designer -.->|"imports directly"| spec

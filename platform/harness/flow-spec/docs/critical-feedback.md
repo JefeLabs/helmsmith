@@ -1,6 +1,6 @@
 # Flow Spec — Critical Feedback (Consolidated, Current)
 
-**Date:** 2026-08-07 · **Updated:** 2026-08-12 after the data-plane slice (PR #14), the hardening slice (PR #15), a validator-consistency review (PR #17), the export-surface slice (PR #18), the HITL trust slice (PR #19), the policy slice (PR #20), the parallelism slice (PR #21), the schema slice (PR #22), the suspend-wakeup slice (PR #23), the emission slice (PR #24), the terminal-fail slice (PR #25), and the trigger-ingress slice (roadmap 3.1) · Companion docs: [`SPEC.md`](../SPEC.md) · [`steps-and-edges.md`](./steps-and-edges.md) · [`next-steps.md`](./next-steps.md)
+**Date:** 2026-08-07 · **Updated:** 2026-08-12 after the data-plane slice (PR #14), the hardening slice (PR #15), a validator-consistency review (PR #17), the export-surface slice (PR #18), the HITL trust slice (PR #19), the policy slice (PR #20), the parallelism slice (PR #21), the schema slice (PR #22), the suspend-wakeup slice (PR #23), the emission slice (PR #24), the terminal-fail slice (PR #25), the trigger-ingress slice (PR #26), and the designer slice (roadmap 3.2) · Companion docs: [`SPEC.md`](../SPEC.md) · [`steps-and-edges.md`](./steps-and-edges.md) · [`next-steps.md`](./next-steps.md)
 
 One document, every open criticism, with status. Sources: the pre-extraction design review (`docs/superpowers/specs/2026-08-07-flow-spec-design-review.md`), the package-level critique from `SPEC.md` §7, the semantic findings from documentation-as-audit, the 2026-08-12 data-plane review + its post-merge self-review (plan: `docs/superpowers/plans/2026-08-12-flow-spec-data-plane.md`), and a 2026-08-12 validator-consistency review of the merged package. Items already fixed are listed once in §1 and not re-argued.
 
@@ -114,6 +114,12 @@ The unifying observation: once the validator crossed into statically-knowable-ru
 | Finding | Resolution |
 |---|---|
 | 🟡 Non-manual triggers validated with no ingress behind them — cron/webhook/event/message shapes were shapes only | `webhook` fires via `POST\|GET /v1/hooks/<path>` (body/query as the input envelope); `event` fires via the 2.6 `/v1/events` ingress (same `{type, payload}` matcher semantics as suspend wakes — one event can wake suspends AND start flows); `schedule` gets a zero-dep server-local cron engine implementing exactly the subset the validator now gates at load (5 fields; `*`, `*/n`, lists, ranges; standard dom/dow OR-quirk; `tz` REJECTED rather than silently ignored), armed at boot, re-armed per fire, 24h-chunked for long gaps, inspectable via `GET /v1/triggers`. All three spawn through `spawnFlowJob` — the single dispatcher path shared with 2.9 intent spawning — stamping `triggeredBy` provenance. `message` stays validated-and-warned: no transport exists to bind to, and aliasing it onto HTTP would be pretense |
+
+### 1.14 Designer slice (2026-08-13, roadmap 3.2)
+
+| Finding | Resolution |
+|---|---|
+| 🔵 The package's raison d'être — a browser designer sharing the runtime's exact semantics — existed only as an architecture diagram | `@helmsmith/flow-designer`: standalone Vite/React drag-and-drop editor (React Flow canvas, dagre layout) importing `@helmsmith/flow-spec` directly. Every edit re-runs `validateUnifiedCatalog` live (path-prefixed errors + the 3 remaining warnings); expression and output-schema playgrounds run `evalExpression`/`schemaViolations` verbatim — the designer previews what the router will do, not an approximation. File-based import/export keeps it server-independent; the FlowDef↔canvas mapping is pure and round-trip-tested. v1 boundaries stated in its README (JSON sub-editors, session-only layout, no undo) |
 
 ## 2. Open — package-level (this package's debt)
 
