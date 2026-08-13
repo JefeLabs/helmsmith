@@ -33,6 +33,8 @@ function freshState(jobId: string): FlowStateT {
     cancelRequested: false,
     cancelReason: null,
     changedFiles: [],
+    __completions: {},
+    __joinSkips: {},
   } as FlowStateT;
 }
 

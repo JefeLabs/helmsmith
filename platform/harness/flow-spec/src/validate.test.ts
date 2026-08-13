@@ -363,7 +363,7 @@ describe('unsupported-feature reporting', () => {
     expect(reported2).toEqual([]);
   });
 
-  it('reports joinStrategy, terminal, non-manual triggers, js expressions, and extra sequence edges — policy is executed and silent', () => {
+  it('reports terminal, non-manual triggers, and js expressions — policy/joinStrategy/fan-out are executed and silent', () => {
     const reported: UnsupportedFeature[] = [];
     const catalog = {
       flows: [
@@ -402,13 +402,7 @@ describe('unsupported-feature reporting', () => {
     };
     validateFlowCatalog(catalog, 'test', { onUnsupported: (f) => reported.push(f) });
     const features = reported.map((f) => f.feature).sort();
-    expect(features).toEqual([
-      'expression-js',
-      'joinStrategy',
-      'parallel-fan-out',
-      'terminal-fail',
-      'trigger-schedule',
-    ]);
+    expect(features).toEqual(['expression-js', 'terminal-fail', 'trigger-schedule']);
     for (const f of reported) {
       expect(f.where).toContain('test');
       expect(f.detail.length).toBeGreaterThan(0);

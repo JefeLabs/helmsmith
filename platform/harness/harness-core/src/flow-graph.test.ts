@@ -90,6 +90,8 @@ const initialState: FlowStateT = {
   cancelRequested: false,
   cancelReason: null,
   changedFiles: [],
+  __completions: {},
+  __joinSkips: {},
 };
 
 // ─── node-addressable state (input + nodes channels) ─────────────────────
@@ -901,6 +903,140 @@ describe('policy enforcement (2.3)', () => {
   });
 });
 
+// ─── parallel fan-out + joinStrategy (2.4) ─────────────────────────────────
+
+describe('parallel fan-out + joinStrategy (2.4)', () => {
+  function recorderMap(calls: string[], ids: string[]): Map<string, NodeExecutor> {
+    return new Map(ids.map((id) => [id, makeRecorder(calls, id)]));
+  }
+
+  async function run(flow: FlowDef, executors: Map<string, NodeExecutor>) {
+    const graph = compileFlow({ flow, executors });
+    return graph.invoke(initialState, { configurable: { thread_id: `par-${flow.id}` } });
+  }
+
+  it('fans out: every sequence edge from a node fires, not just the first', async () => {
+    const calls: string[] = [];
+    const flow: FlowDef = {
+      id: 'fan',
+      nodes: [trigger('t'), agentNode('a'), agentNode('b'), agentNode('c')],
+      edges: [
+        { from: 't', to: 'a', type: 'sequence' },
+        { from: 'a', to: 'b', type: 'sequence' },
+        { from: 'a', to: 'c', type: 'sequence' },
+      ],
+    };
+    await run(flow, recorderMap(calls, ['a', 'b', 'c']));
+    expect(calls).toContain('b');
+    expect(calls).toContain('c');
+  });
+
+  /** Unequal-length branches converging on j:
+   *  t → a → { b → x → j,  c → j }  — c arrives a superstep early. */
+  function diamondFlow(joinStrategy?: TaskStep['joinStrategy']): FlowDef {
+    return {
+      id: `dia-${JSON.stringify(joinStrategy) ?? 'none'}`,
+      nodes: [
+        trigger('t'),
+        agentNode('a'),
+        agentNode('b'),
+        agentNode('x'),
+        agentNode('c'),
+        { ...agentNode('j'), joinStrategy },
+        agentNode('after'),
+      ],
+      edges: [
+        { from: 't', to: 'a', type: 'sequence' },
+        { from: 'a', to: 'b', type: 'sequence' },
+        { from: 'a', to: 'c', type: 'sequence' },
+        { from: 'b', to: 'x', type: 'sequence' },
+        { from: 'x', to: 'j', type: 'sequence' },
+        { from: 'c', to: 'j', type: 'sequence' },
+        { from: 'j', to: 'after', type: 'sequence' },
+      ],
+    };
+  }
+
+  it("joinStrategy 'all' is a barrier: j runs exactly once, after BOTH branches", async () => {
+    const calls: string[] = [];
+    await run(diamondFlow('all'), recorderMap(calls, ['a', 'b', 'x', 'c', 'j', 'after']));
+    expect(calls).toContain('x');
+    expect(calls).toContain('c');
+    expect(calls.filter((c) => c === 'j')).toHaveLength(1);
+    // Both branch tails completed before the join executed.
+    expect(calls.indexOf('j')).toBeGreaterThan(calls.indexOf('x'));
+    expect(calls.indexOf('j')).toBeGreaterThan(calls.indexOf('c'));
+    expect(calls.filter((c) => c === 'after')).toHaveLength(1);
+  });
+
+  it("joinStrategy 'any' fires on the first arrival and exactly once", async () => {
+    const calls: string[] = [];
+    await run(diamondFlow('any'), recorderMap(calls, ['a', 'b', 'x', 'c', 'j', 'after']));
+    expect(calls.filter((c) => c === 'j')).toHaveLength(1);
+    // c (short branch) arrives before x (long branch tail) completes.
+    expect(calls.indexOf('j')).toBeLessThan(calls.indexOf('x'));
+    expect(calls.filter((c) => c === 'after')).toHaveLength(1);
+  });
+
+  it('joinStrategy nOfM fires on the nth arrival and exactly once', async () => {
+    // Three branches of lengths 1, 2, 3 converging on j with nOfM: 2.
+    const calls: string[] = [];
+    const flow: FlowDef = {
+      id: 'nofm',
+      nodes: [
+        trigger('t'),
+        agentNode('a'),
+        agentNode('s1'),
+        agentNode('m1'),
+        agentNode('m2'),
+        agentNode('l1'),
+        agentNode('l2'),
+        agentNode('l3'),
+        { ...agentNode('j'), joinStrategy: { nOfM: 2 } },
+      ],
+      edges: [
+        { from: 't', to: 'a', type: 'sequence' },
+        { from: 'a', to: 's1', type: 'sequence' },
+        { from: 'a', to: 'm1', type: 'sequence' },
+        { from: 'a', to: 'l1', type: 'sequence' },
+        { from: 'm1', to: 'm2', type: 'sequence' },
+        { from: 'l1', to: 'l2', type: 'sequence' },
+        { from: 'l2', to: 'l3', type: 'sequence' },
+        { from: 's1', to: 'j', type: 'sequence' },
+        { from: 'm2', to: 'j', type: 'sequence' },
+        { from: 'l3', to: 'j', type: 'sequence' },
+      ],
+    };
+    await run(flow, recorderMap(calls, ['a', 's1', 'm1', 'm2', 'l1', 'l2', 'l3', 'j']));
+    expect(calls.filter((c) => c === 'j')).toHaveLength(1);
+    // Fired at the second arrival (m2), before the long branch finished.
+    expect(calls.indexOf('j')).toBeGreaterThan(calls.indexOf('m2'));
+    expect(calls.indexOf('j')).toBeLessThan(calls.indexOf('l3'));
+  });
+
+  it('parallel branch outputs are both addressable at the join via $.nodes', async () => {
+    const calls: string[] = [];
+    const executors = new Map<string, NodeExecutor>([
+      ['a', makeRecorder(calls, 'a')],
+      ['b', async () => ({ output: 'from-b', lastExit: { nodeId: 'b', kind: 'success' } })],
+      ['x', makeRecorder(calls, 'x')],
+      ['c', async () => ({ output: 'from-c', lastExit: { nodeId: 'c', kind: 'success' } })],
+      ['j', makeRecorder(calls, 'j')],
+      ['after', makeRecorder(calls, 'after')],
+    ]);
+    const result = (await run(diamondFlow('all'), executors)) as FlowStateT;
+    expect(result.nodes.b).toBe('from-b');
+    expect(result.nodes.c).toBe('from-c');
+  });
+
+  it('a multi-in node WITHOUT joinStrategy keeps trigger-per-arrival behavior', async () => {
+    const calls: string[] = [];
+    await run(diamondFlow(undefined), recorderMap(calls, ['a', 'b', 'x', 'c', 'j', 'after']));
+    // Unequal branches, no declared join → j runs once per arrival.
+    expect(calls.filter((c) => c === 'j')).toHaveLength(2);
+  });
+});
+
 // ─── buildRouter (in isolation) ───────────────────────────────────────────
 
 describe('buildRouter', () => {
@@ -1027,6 +1163,8 @@ describe('evalExpression', () => {
     cancelRequested: false,
     cancelReason: null,
     changedFiles: [],
+    __completions: {},
+    __joinSkips: {},
   };
 
   it('handles literal true', () => {

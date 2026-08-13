@@ -195,7 +195,14 @@ export interface TaskStep {
   tags?: TaskStepTags;
   /** Reliability policy. */
   policy?: TaskStepPolicy;
-  /** Strategy for combining multiple incoming edges. Default 'all'. */
+  /** Barrier over this node's forward-edge (sequence/conditional)
+   *  sources: 'all' waits for every source, 'any' fires on the first
+   *  arrival, nOfM on the nth — exactly once per run. Only applies
+   *  when EXPLICITLY declared: an undeclared multi-in node runs once
+   *  per arriving branch (no implicit join — an implicit 'all' would
+   *  deadlock diamonds whose branches route conditionally). Join nodes
+   *  may not be targeted by error/fallback/reject edges (validator-
+   *  rejected); joins inside reject cycles are unsupported. */
   joinStrategy?: 'all' | 'any' | { nOfM: number };
   /** Set on nodes with no outgoing edges. Defaults to 'success'. */
   terminal?: 'success' | 'fail';

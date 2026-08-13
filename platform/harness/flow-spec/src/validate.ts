@@ -23,9 +23,8 @@ import {
  * accept/reject behavior — a catalog with unsupported features is
  * still a *valid* catalog; it just won't do everything it says.
  *
- * Current feature ids: `joinStrategy`, `terminal-fail`,
+ * Current feature ids: `terminal-fail`,
  * `trigger-<kind>` (any non-manual trigger), `expression-js`,
- * `parallel-fan-out` (second+ sequence edge from one node),
  * `node-output-schema` (output.kind 'json' declares a schema — parse
  * happens, schema enforcement doesn't), `subflow-version-pin`
  * (version recorded, resolution stays by flowId), `flow-output-schema`
@@ -124,6 +123,7 @@ function validateFlow(
   const nodeIds = new Set<string>();
   const nodeKinds = new Map<string, string>();
   const nodeTags = new Map<string, Record<string, unknown> | undefined>();
+  const joinNodes = new Set<string>();
   let triggerCount = 0;
   for (const [j, n] of (flow.nodes as unknown[]).entries()) {
     const nodeWhere = `${where}.nodes[${j}]`;
@@ -135,6 +135,7 @@ function validateFlow(
     nodeIds.add(node.id as string);
     nodeKinds.set(node.id as string, node.kind as string);
     nodeTags.set(node.id as string, node.tags as Record<string, unknown> | undefined);
+    if (node.joinStrategy !== undefined) joinNodes.add(node.id as string);
     if (node.kind === 'trigger') triggerCount++;
   }
 
@@ -166,6 +167,18 @@ function validateFlow(
     fromMap.set(edge.type as string, (fromMap.get(edge.type as string) ?? 0) + 1);
     outgoingByType.set(edge.from as string, fromMap);
     incomingCount.set(edge.to as string, (incomingCount.get(edge.to as string) ?? 0) + 1);
+
+    // A joinStrategy barrier counts arrivals over forward edges only —
+    // an exceptional in-edge (error/fallback/reject) would bypass or
+    // wedge the accounting, so it may not target a join node.
+    if (
+      (edge.type === 'error' || edge.type === 'fallback' || edge.type === 'reject') &&
+      joinNodes.has(edge.to as string)
+    ) {
+      throw new CatalogError(
+        `${edgeWhere}.to: node "${edge.to}" declares joinStrategy — joins count forward (sequence/conditional) incoming edges only; an '${edge.type}' edge may not target it`,
+      );
+    }
 
     // Edge-cardinality rules. Error edges: any number of named ones
     // (`on` matchers), at most one catch-all (no/empty `on`) — the
@@ -293,13 +306,6 @@ function reportUnsupportedFeatures(
   for (const [j, n] of (flow.nodes as unknown[]).entries()) {
     const node = n as Record<string, unknown>;
     const at = `${where}.nodes[${j}]`;
-    if (node.joinStrategy !== undefined) {
-      report({
-        where: at,
-        feature: 'joinStrategy',
-        detail: 'multiple incoming edges use LangGraph defaults; all/any/nOfM is not implemented',
-      });
-    }
     if (node.terminal === 'fail') {
       report({
         where: at,
@@ -332,24 +338,6 @@ function reportUnsupportedFeatures(
         feature: 'subflow-version-pin',
         detail:
           'subflows resolve by flowId in the loaded catalog; the version pin is recorded but not enforced',
-      });
-    }
-  }
-
-  // Second+ sequence edge from one source node is silently ignored by
-  // the runtime router (it follows the first). One report per source.
-  const sequenceSources = new Map<string, number>();
-  for (const e of flow.edges as Array<Record<string, unknown>>) {
-    if (e.type !== 'sequence') continue;
-    const from = e.from as string;
-    sequenceSources.set(from, (sequenceSources.get(from) ?? 0) + 1);
-  }
-  for (const [from, count] of sequenceSources) {
-    if (count > 1) {
-      report({
-        where: `${where}.edges (from "${from}")`,
-        feature: 'parallel-fan-out',
-        detail: `the router follows only the first sequence edge from a node; ${count - 1} of ${count} branches will never run`,
       });
     }
   }

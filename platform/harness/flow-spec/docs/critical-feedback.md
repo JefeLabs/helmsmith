@@ -1,6 +1,6 @@
 # Flow Spec — Critical Feedback (Consolidated, Current)
 
-**Date:** 2026-08-07 · **Updated:** 2026-08-12 after the data-plane slice (PR #14), the hardening slice (PR #15), a validator-consistency review (PR #17), the export-surface slice (PR #18), the HITL trust slice (PR #19), and the policy slice (roadmap 2.3) · Companion docs: [`SPEC.md`](../SPEC.md) · [`steps-and-edges.md`](./steps-and-edges.md) · [`next-steps.md`](./next-steps.md)
+**Date:** 2026-08-07 · **Updated:** 2026-08-12 after the data-plane slice (PR #14), the hardening slice (PR #15), a validator-consistency review (PR #17), the export-surface slice (PR #18), the HITL trust slice (PR #19), the policy slice (PR #20), and the parallelism slice (roadmap 2.4) · Companion docs: [`SPEC.md`](../SPEC.md) · [`steps-and-edges.md`](./steps-and-edges.md) · [`next-steps.md`](./next-steps.md)
 
 One document, every open criticism, with status. Sources: the pre-extraction design review (`docs/superpowers/specs/2026-08-07-flow-spec-design-review.md`), the package-level critique from `SPEC.md` §7, the semantic findings from documentation-as-audit, the 2026-08-12 data-plane review + its post-merge self-review (plan: `docs/superpowers/plans/2026-08-12-flow-spec-data-plane.md`), and a 2026-08-12 validator-consistency review of the merged package. Items already fixed are listed once in §1 and not re-argued.
 
@@ -77,6 +77,12 @@ The unifying observation: once the validator crossed into statically-knowable-ru
 |---|---|
 | 🔴 `policy` retry/timeout/onError validated but ignored — authors' reliability config did nothing (part of the old §3 headline row) | `withPolicy` in the node-wrapper chain (outside `withNodeIO` so retries cover `OutputParseError`, inside `withEffectGuard` so completed side-effecting nodes never re-enter): `retry` = maxAttempts TOTAL attempts with fixed/exponential backoff, error exits only (rejects are authored flow control); `timeout` = per-attempt deadline exiting `errorName: 'Timeout'` (error-edge routable; hung executor detached — no AbortSignal yet); `onError` `'continue'` converts the exhausted error to success, `'fallback'` routes unhandled errors to the fallback edge (in `buildRouter`), `'propagate'` unchanged. Report deleted fixture-first |
 
+### 1.8 Parallelism slice (2026-08-12, roadmap 2.4 — the "decide" resolved as IMPLEMENT)
+
+| Finding | Resolution |
+|---|---|
+| 🔴 Parallel fan-out/join was the half-state the roadmap called "the worst state" — the router silently followed only the first sequence edge; `joinStrategy` validated and did nothing | Fan-out: every sequence edge fires (LangGraph parallel branches; the legacy `output` channel gained an explicit last-write-wins reducer — concurrent same-superstep writes used to throw `InvalidUpdateError`). Join: an EXPLICITLY declared `joinStrategy` is a barrier over forward-edge sources ('all'/'any'/nOfM, exactly-once per run) via runtime-private `__completions`/`__joinSkips` channels — no wire-contract change. Undeclared multi-in nodes keep trigger-per-arrival semantics (an implicit 'all' would deadlock conditional diamonds — the types.ts "Default 'all'" fiction corrected). Validator rejects exceptional edges targeting joins. v1 caveats documented: joins in reject cycles unsupported; 'all' over a conditionally-skipped source never fires. Both reports (`joinStrategy`, `parallel-fan-out`) deleted fixture-first |
+
 ## 2. Open — package-level (this package's debt)
 
 ### 🟡 `AdapterId` bakes two runtime implementations into the wire contract
@@ -106,8 +112,8 @@ Inherited from the original review, minus what the 2026-08-12 slices closed (ter
 
 | Gap | Severity | Current truth |
 |---|---|---|
-| `joinStrategy`, `terminal:'fail'` | 🔴 | Warned at load, ignored at runtime. (The `policy` third of the old row was closed by the policy slice — §1.7) |
-| Parallel fan-out/join | 🔴 | Router follows first sequence edge only; second+ branches never run (warned). **Note:** the state-model blocker is gone — `nodes` is merge-reduced, so branches can't clobber addressable outputs; what remains is genuinely just router/join work (next-steps 2.4) |
+| `terminal:'fail'` | 🔴 | Warned at load, ignored at runtime — terminal nodes always end the flow as success. (The `policy` and `joinStrategy` thirds of the old row were closed by §1.7/§1.8) |
+| Join hazards under conditional routing | 🔵 | New with §1.8, documented not enforced: an `'all'` join whose counted source is conditionally skipped never fires (the flow ends without it, silently), and joins inside reject cycles are unsupported (the once-per-run marker never resets). A future validator pass could detect conditionally-reachable sources feeding an `'all'` join |
 | JobIntent emission | 🟡 | New gap exposed by closing 2.5: the terminal intent is now parsed, enforced, and recorded on `job.flowOutput` — but nothing *submits* it to a JobStateMachine. Enforcement without emission (next-steps 2.9) |
 | Output schemas | 🟡 | Honestly reported: `output.schema`/`structured.schema` accepted but never validated (`node-output-schema`/`flow-output-schema`). (The `effect` half of this row was closed by the HITL trust slice — §1.6) |
 | Approval pessimistic locking | 🔵 | `concurrency: 'pessimistic'` validates but no lock exists — two same-role reviewers can race a decision; last write wins via the status guard. (The SLA/role halves of the old approval row were closed by the HITL trust slice — §1.6) |
@@ -121,4 +127,4 @@ Inherited from the original review, minus what the 2026-08-12 slices closed (ter
 
 ## 4. The one-sentence summary
 
-The extraction fixed the *honesty* problem (2026-08-07), the data-plane pass fixed the *capability ceiling*, the hardening pass turned the alignment mechanisms into enforced tests (three-behavior conformance fixtures) while giving the factory/fleet seam teeth (terminal output enforcement), the validator-consistency + export-surface passes closed the statically-knowable-failure gaps and made both export layers curated review points, the HITL trust slice made approval production-grade (SLA auto-reject, role-gated resume, durable checkpointer with restart rehydration, effect-aware replay), and the policy slice made retry/timeout/onError real — what remains is the parallelism decision (join/fan-out, with 2.4's state-model excuse now gone), non-manual triggers, output-schema enforcement, suspend wake-up scheduling, and JobIntent *emission* on top of the now-enforced contract.
+The extraction fixed the *honesty* problem (2026-08-07), the data-plane pass fixed the *capability ceiling*, the hardening pass turned the alignment mechanisms into enforced tests (three-behavior conformance fixtures) while giving the factory/fleet seam teeth (terminal output enforcement), the validator-consistency + export-surface passes closed the statically-knowable-failure gaps and made both export layers curated review points, the HITL trust slice made approval production-grade (SLA auto-reject, role-gated resume, durable checkpointer with restart rehydration, effect-aware replay), the policy slice made retry/timeout/onError real, and the parallelism slice made fan-out + joinStrategy barriers real — what remains is terminal-fail and non-manual triggers (warn-only), output-schema enforcement, suspend wake-up scheduling, and JobIntent *emission* on top of the now-enforced contract.
