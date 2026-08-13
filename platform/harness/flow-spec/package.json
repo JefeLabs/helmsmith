@@ -1,11 +1,15 @@
 {
   "name": "@helmsmith/flow-spec",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "main": "src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./definition": "./src/definition.ts",
+    "./run": "./src/run.ts",
+    "./tenancy": "./src/tenancy.ts",
+    "./schema": "./schema/flow-spec.schema.json"
   },
   "scripts": {
     "test": "vitest run",
