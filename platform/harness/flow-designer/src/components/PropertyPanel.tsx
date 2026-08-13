@@ -1,6 +1,13 @@
-import type { Edge as SpecEdge, TaskStep } from '@helmsmith/flow-spec';
+import type {
+  Expression,
+  GateConfig,
+  Edge as SpecEdge,
+  TaskStep,
+  TransformConfig,
+} from '@helmsmith/flow-spec';
 import type { DesignerEdge, DesignerNode } from '../graph-model.ts';
 import { kindColor } from '../kinds.ts';
+import { AssertionsField, ExpressionField } from './ExpressionField.tsx';
 import { JsonField } from './JsonField.tsx';
 
 const EDGE_TYPES: ReadonlyArray<SpecEdge['type']> = [
@@ -66,14 +73,36 @@ export function PropertyPanel({
             }}
           />
         </div>
-        <JsonField
-          label="config"
-          value={step.config}
-          onApply={(parsed) =>
-            onUpdateStep(step.id, { ...step, config: parsed as TaskStep['config'] })
-          }
-          rows={10}
-        />
+        {step.kind === 'transform' ? (
+          <ExpressionField
+            label="expression"
+            value={(step.config as TransformConfig).expression}
+            onApply={(expression) =>
+              onUpdateStep(step.id, { ...step, config: { expression } as TaskStep['config'] })
+            }
+          />
+        ) : step.kind === 'gate' ? (
+          <>
+            <span className="field-label">assertions</span>
+            <div className="mt-1">
+              <AssertionsField
+                assertions={(step.config as GateConfig).assertions}
+                onApply={(assertions) =>
+                  onUpdateStep(step.id, { ...step, config: { assertions } as TaskStep['config'] })
+                }
+              />
+            </div>
+          </>
+        ) : (
+          <JsonField
+            label="config"
+            value={step.config}
+            onApply={(parsed) =>
+              onUpdateStep(step.id, { ...step, config: parsed as TaskStep['config'] })
+            }
+            rows={10}
+          />
+        )}
         <JsonField
           label="input mapping (optional)"
           value={step.input}
@@ -198,11 +227,12 @@ export function PropertyPanel({
         </select>
       </div>
       {edge.type === 'conditional' && (
-        <JsonField
-          label="condition (Expression)"
-          value={edge.condition}
-          rows={8}
-          onApply={(parsed) => onUpdateEdge(dEdge.id, { ...edge, condition: parsed as never })}
+        <ExpressionField
+          label="condition"
+          value={edge.condition as Expression}
+          onApply={(condition) =>
+            onUpdateEdge(dEdge.id, { ...edge, condition: condition as never })
+          }
         />
       )}
       {edge.type === 'error' && (

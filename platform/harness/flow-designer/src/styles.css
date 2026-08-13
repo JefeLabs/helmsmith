@@ -238,3 +238,108 @@ textarea.json.invalid {
   border-radius: 999px;
   display: inline-block;
 }
+
+/* ── Expression builder (nested instrument tree) ────────────────── */
+.expr-tree {
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  padding: 8px;
+  background: var(--panel-raised);
+}
+.expr-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.expr-row + .expr-row {
+  margin-top: 4px;
+}
+.select.expr-kind {
+  width: auto;
+  flex: none;
+  padding: 4px 6px;
+  font-size: 11px;
+  color: var(--dim);
+}
+.select.expr-op {
+  width: auto;
+  flex: none;
+  padding: 4px 6px;
+  font-size: 12px;
+  color: var(--brass);
+  border-color: var(--brass-soft);
+}
+.input.expr-mini,
+.input.expr-name {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+.input.expr-name {
+  color: var(--brass);
+}
+.expr-children {
+  margin: 4px 0 4px 7px;
+  padding: 4px 0 2px 10px;
+  border-left: 2px solid var(--brass-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+.expr-children > .expr-row,
+.expr-children > div {
+  align-self: stretch;
+}
+.expr-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.expr-item > div:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.expr-fieldname {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.expr-tag {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.expr-warn {
+  color: var(--warn);
+  font-size: 12px;
+  flex: none;
+}
+.btn.tiny {
+  padding: 2px 7px;
+  font-size: 10px;
+  flex: none;
+}
+.mode-toggle {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--dim);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+.mode-toggle:hover {
+  color: var(--brass);
+}
+.assertion {
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  padding: 8px 8px 0;
+  margin-bottom: 8px;
+}
