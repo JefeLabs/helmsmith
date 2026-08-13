@@ -32,6 +32,18 @@ interface Selection {
   id: string;
 }
 
+export interface FlowDesignerProps {
+  /** Catalog to open with. Defaults to the built-in sample. */
+  initialCatalog?: Catalog;
+  /** Fires with the LIVE catalog (canvas edits folded in) after every
+   *  change — how a host app observes/persists the user's work. */
+  onCatalogChange?: (catalog: Catalog) => void;
+  /** Base URL for the harness/controlplane /v1/catalog wire shape.
+   *  Default '/harness' (the dev/npx proxy path). Pass null to hide
+   *  the server ⇩/⇧ buttons entirely (file-only embedding). */
+  serverBase?: string | null;
+}
+
 /** Map a flow to canvas shapes, overlaying any layout persisted for it —
  *  the one load path shared by mount/switch/import/server-load. `relayout`
  *  deliberately bypasses this: it is the explicit recompute. */
@@ -43,10 +55,15 @@ function loadGraph(flow: FlowDef): { nodes: DesignerNode[]; edges: DesignerEdge[
   };
 }
 
-export function App() {
-  const [catalog, setCatalog] = useState<Catalog>(SAMPLE_CATALOG);
-  const [flowId, setFlowId] = useState<string>(SAMPLE_CATALOG.flows[0]?.id ?? '');
-  const initial = useMemo(() => loadGraph(SAMPLE_CATALOG.flows[0] as FlowDef), []);
+export function FlowDesigner({
+  initialCatalog = SAMPLE_CATALOG,
+  onCatalogChange,
+  serverBase = '/harness',
+}: FlowDesignerProps = {}) {
+  const [catalog, setCatalog] = useState<Catalog>(initialCatalog);
+  const [flowId, setFlowId] = useState<string>(initialCatalog.flows[0]?.id ?? '');
+  // biome-ignore lint/correctness/useExhaustiveDependencies: initial mount only
+  const initial = useMemo(() => loadGraph(initialCatalog.flows[0] as FlowDef), []);
   const [nodes, setNodes] = useState<DesignerNode[]>(initial.nodes);
   const [edges, setEdges] = useState<DesignerEdge[]>(initial.edges);
   const [selection, setSelection] = useState<Selection | null>(null);
@@ -79,6 +96,11 @@ export function App() {
       return { errors: [(err as Error).message], warnings };
     }
   }, [liveCatalog]);
+
+  // Host-app observation: every change surfaces the live catalog.
+  useEffect(() => {
+    onCatalogChange?.(liveCatalog);
+  }, [liveCatalog, onCatalogChange]);
 
   const commitGraph = useCallback((nextNodes: DesignerNode[], nextEdges: DesignerEdge[]) => {
     setNodes(nextNodes);
@@ -292,29 +314,31 @@ export function App() {
   }, []);
 
   const serverLoad = useCallback(() => {
+    if (serverBase === null) return;
     setServerStatus({ text: 'loading…', ok: true });
-    loadServerCatalog('/harness')
+    loadServerCatalog(serverBase)
       .then(async (parsed) => {
         if (parsed.flows.length === 0) throw new Error('server catalog has no flows');
         // Layout sidecar rides along, best-effort: seed the store
         // BEFORE loading state so loadGraph overlays the shared
         // arrangement. A server without the route changes nothing.
-        const layouts = await loadServerLayout('/harness');
+        const layouts = await loadServerLayout(serverBase);
         if (layouts) writeLayouts(localStorage, layouts);
         loadCatalogState(parsed);
         setServerStatus({ text: `loaded ${parsed.flows.length} flow(s) ⇩`, ok: true });
       })
       .catch((err) => setServerStatus({ text: (err as Error).message, ok: false }));
-  }, [loadCatalogState]);
+  }, [loadCatalogState, serverBase]);
 
   const serverSave = useCallback(() => {
+    if (serverBase === null) return;
     setServerStatus({ text: 'saving…', ok: true });
-    saveServerCatalog('/harness', liveCatalog)
+    saveServerCatalog(serverBase, liveCatalog)
       .then((r) => {
         // The arrangement travels with the save, best-effort — a
         // failure (or a server without the route) never blocks.
         void saveServerLayout(
-          '/harness',
+          serverBase,
           layoutsForFlows(
             localStorage,
             liveCatalog.flows.map((f) => f.id),
@@ -326,7 +350,7 @@ export function App() {
         });
       })
       .catch((err) => setServerStatus({ text: (err as Error).message, ok: false }));
-  }, [liveCatalog]);
+  }, [liveCatalog, serverBase]);
 
   const importCatalog = useCallback(
     (file: File) => {
@@ -434,12 +458,16 @@ export function App() {
                 : serverStatus.text}
             </span>
           )}
-          <button type="button" className="btn" onClick={serverLoad}>
-            server ⇩
-          </button>
-          <button type="button" className="btn" onClick={serverSave}>
-            server ⇧
-          </button>
+          {serverBase !== null && (
+            <>
+              <button type="button" className="btn" onClick={serverLoad}>
+                server ⇩
+              </button>
+              <button type="button" className="btn" onClick={serverSave}>
+                server ⇧
+              </button>
+            </>
+          )}
           <button type="button" className="btn" onClick={relayout}>
             relayout
           </button>

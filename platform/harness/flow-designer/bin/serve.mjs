@@ -48,11 +48,13 @@ export function createDesignerServer({ distDir, harnessUrl }) {
             res.end(Buffer.from(await upstream.arrayBuffer()));
           })
           .catch((err) => {
+            // Detail goes to the operator's terminal; the CLIENT gets a
+            // generic body — the internal target URL and error innards
+            // are not for arbitrary browsers to read.
+            console.error(`proxy: ${req.method} ${url} → ${target} failed: ${err.message}`);
             res.statusCode = 502;
             res.setHeader('content-type', 'application/json');
-            res.end(
-              JSON.stringify({ error: `harness unreachable at ${harnessUrl}: ${err.message}` }),
-            );
+            res.end(JSON.stringify({ error: 'harness unreachable' }));
           });
       });
       return;
