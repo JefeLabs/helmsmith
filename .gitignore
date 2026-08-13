@@ -100,3 +100,6 @@ catalog.json
 
 # Product design sources (.pen/.png Pencil files) — local-only by decision.
 /product/
+
+# npm auth token (machine-local, never committed)
+.npmrc
