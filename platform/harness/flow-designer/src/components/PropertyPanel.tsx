@@ -11,6 +11,7 @@ import { kindColor } from '../kinds.ts';
 import { AssertionsField, ExpressionField } from './ExpressionField.tsx';
 import { InputMappingField } from './InputMappingField.tsx';
 import { JsonField } from './JsonField.tsx';
+import { TagsField } from './TagsField.tsx';
 import { TriggerConfigField } from './TriggerConfigField.tsx';
 
 const EDGE_TYPES: ReadonlyArray<SpecEdge['type']> = [
@@ -131,12 +132,14 @@ export function PropertyPanel({
             onUpdateStep(step.id, { ...step, output: parsed as TaskStep['output'] })
           }
         />
-        <JsonField
-          label="tags (optional)"
+        <TagsField
           value={step.tags}
-          allowAbsent
-          rows={4}
-          onApply={(parsed) => onUpdateStep(step.id, { ...step, tags: parsed as TaskStep['tags'] })}
+          onApply={(tags) =>
+            onUpdateStep(
+              step.id,
+              tags === undefined ? (({ tags: _, ...rest }) => rest)(step) : { ...step, tags },
+            )
+          }
         />
         <JsonField
           label="policy (optional)"
