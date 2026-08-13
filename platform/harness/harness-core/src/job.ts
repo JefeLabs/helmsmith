@@ -146,6 +146,24 @@ export interface JobRecord {
   prUrl?: string;
   mergeSha?: string;
   /**
+   * Set on jobs spawned by a parent's JobIntent emission (2.9) — the
+   * factory/fleet lineage: which job's work order created this one.
+   */
+  parentJobId?: string;
+  /**
+   * Child jobIds spawned from this job's emitted intent(s) (2.9).
+   * Written by harness-server's spawn handler after the parent
+   * completes; empty/absent for flows that emit no intents.
+   */
+  spawnedJobIds?: string[];
+  /**
+   * Intents that could NOT be spawned (unknown flowId, unresolvable
+   * accepts set, dispatcher overflow) — recorded on the parent for
+   * operator visibility; also console.warn'd. The parent still
+   * completes: its own work (emitting a well-formed order) succeeded.
+   */
+  spawnErrors?: string[];
+  /**
    * Parsed terminal output when the flow declares a non-default output
    * contract — a `JobIntent` for `kind: 'job-definition'` flows (the
    * factory/fleet seam reads work orders from here), an array of them

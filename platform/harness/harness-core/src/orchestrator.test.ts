@@ -1467,6 +1467,76 @@ describe('resumeJob — recompile-on-resume + paused-status guard (2.2)', () => 
   });
 });
 
+describe('JobIntent emission (2.9)', () => {
+  function intakeJob(jobId: string, contract: unknown): JobRecord {
+    return {
+      jobId,
+      pipeline: 'intake',
+      status: 'received',
+      submittedAt: 'now',
+      input: 'plan the work',
+      flow: {
+        id: 'intake',
+        kind: 'job-definition',
+        output: contract,
+        nodes: [
+          { id: '__trigger', kind: 'trigger', config: { kind: 'manual' } },
+          { id: 'planner', kind: 'agent', config: { agent: { id: 'planner' } as never } },
+        ],
+        edges: [{ from: '__trigger', to: 'planner', type: 'sequence' }],
+      } as JobRecord['flow'],
+      agents: [
+        { id: 'planner', role: 'Plan', adapter: 'claude-sdk', systemPrompt: 'plan', status: 'pending' },
+      ],
+    };
+  }
+
+  async function runWithReply(job: JobRecord, reply: string) {
+    const { runJob } = await import('./orchestrator.ts');
+    const jobs = new Map<string, JobRecord>([[job.jobId, job]]);
+    const emitted: Array<[string, unknown[]]> = [];
+    await runJob(job.jobId, {
+      jobs,
+      bus: new JobBus(),
+      broker: dummyBroker,
+      adapterFactory: () => new TestAdapter({ kind: 'ok', reply }),
+      onJobIntents: (jid, intents) => emitted.push([jid, intents]),
+    });
+    return emitted;
+  }
+
+  it('fires onJobIntents with the parsed intent when a job-definition flow completes', async () => {
+    const job = intakeJob('jI', { kind: 'job-intent' });
+    const emitted = await runWithReply(
+      job,
+      JSON.stringify({ flowId: 'build-it', productId: 'p1', input: 'do X' }),
+    );
+    expect(job.status).toBe('completed');
+    expect(emitted).toEqual([['jI', [{ flowId: 'build-it', productId: 'p1', input: 'do X' }]]]);
+  });
+
+  it('fires once with the full array for job-intents fan-out contracts', async () => {
+    const job = intakeJob('jN', { kind: 'job-intents', min: 1 });
+    const emitted = await runWithReply(
+      job,
+      JSON.stringify([
+        { flowId: 'build-it', productId: 'p1', input: 'a' },
+        { flowId: 'build-it', productId: 'p1', input: 'b' },
+      ]),
+    );
+    expect(emitted).toHaveLength(1);
+    expect(emitted[0]?.[1]).toHaveLength(2);
+  });
+
+  it('does not fire for agent-text flows', async () => {
+    const job = intakeJob('jT', undefined);
+    if (job.flow) job.flow.kind = 'work';
+    const emitted = await runWithReply(job, 'plain text output');
+    expect(job.status).toBe('completed');
+    expect(emitted).toEqual([]);
+  });
+});
+
 describe('runJob + steerJob (operator steering reaches agent)', () => {
   it('prepends accumulated steering into the agent systemPrompt on next invocation', async () => {
     const { runJob, steerJob, resumeJob } = await import('./orchestrator.ts');
