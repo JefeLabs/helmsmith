@@ -14,7 +14,13 @@ import {
 } from '@helmsmith/agent-auth';
 import { type BaseCheckpointSaver, Command } from '@langchain/langgraph';
 import { type BindingToSpecOptions, bindingToSpec } from './binding-to-spec.ts';
-import { type AdapterId, type FlowDef, type JobIntent, type McpToolDef, parseFlowOutput } from './catalog.ts';
+import {
+  type AdapterId,
+  type FlowDef,
+  type JobIntent,
+  type McpToolDef,
+  parseFlowOutput,
+} from './catalog.ts';
 import { discoverChangedFiles } from './changed-files.ts';
 import {
   type ApprovalRequest,
@@ -29,9 +35,10 @@ import type { EventTokenUsage, JobBus } from './job-bus.ts';
 import { makePublishExecutor } from './publish-executor.ts';
 import { makeScriptExecutor } from './script-executor.ts';
 import {
-  compileNonAgentFlow,
+  compileInnerFlow,
   type FlowResolver,
   makeSubflowExecutor,
+  treeHasInterruptTags,
   validateSubflowGraph,
 } from './subflow-executor.ts';
 import { type McpResult, makeToolExecutor, type ToolResolver } from './tool-executor.ts';
@@ -293,10 +300,13 @@ export interface RunJobDeps {
    * subflow node hit without a resolver fails compile rather than
    * runtime.
    *
-   * v1 limitation: subflows can NOT contain agent nodes or
-   * Approval/Suspend tags. The validator throws CatalogError at
-   * compile time if any inner flow violates this. Catalog authors
-   * needing HITL gates put them in the parent flow.
+   * v2: subflows may contain agent nodes (executors come from the
+   * same makeAgentExecutor pipeline) and Approval/Suspend tags
+   * (interrupt-bearing inners compile as subgraphs and propagate
+   * pauses through the parent's checkpointer). Remaining limits,
+   * rejected at compile time: a loop-tagged subflow node over an
+   * interrupt-bearing inner tree, and duplicate agent ids across
+   * the subflow tree.
    */
   flowResolver?: FlowResolver;
   /**
@@ -345,17 +355,18 @@ export interface RunJobDeps {
  *   ✅ gate     — assertions evaluator → success | reject (flow-graph.ts)
  *   ✅ transform— pure expression → state.output writer (flow-graph.ts)
  *   ✅ tool     — cli + http + mcp dispatch (tool-executor.ts)
- *   ✅ subflow  — composable inner flows (subflow-executor.ts), v1-light:
- *                 inner CANNOT contain agent / approval / suspend
+ *   ✅ subflow  — composable inner flows (subflow-executor.ts), v2:
+ *                 agents run via the shared executor pipeline; inner
+ *                 approval/suspend pauses propagate to the parent
  *   ✅ script   — bash | node | python via execFile, stdin↔stdout
  *                 (script-executor.ts); `secrets` resolved through the
  *                 credential broker into child env
  *
  * Tags:
  *   ✅ approval — synthetic interrupt node + Command(resume) on parent
- *                 flow (flow-graph.ts; banned in subflows in v1)
+ *                 flow (flow-graph.ts; propagates from subflows in v2)
  *   ✅ suspend  — timer | event triggers; same propagation pattern as
- *                 approval (banned in subflows in v1)
+ *                 approval (propagates from subflows in v2)
  *   ✅ loop     — sequential | per-slot parallel (AbortSignal sibling
  *                 cancellation), collection | directory (recursive
  *                 option) sources, cross-iteration delta accumulation
@@ -438,9 +449,9 @@ export interface RunJobDeps {
  * ─────────────────────────────────────────────────────────────────────
  *  EXPLICITLY DEFERRED
  * ─────────────────────────────────────────────────────────────────────
- *   - Agents + Approval/Suspend tags inside subflows (banned by
- *     compile-time validator; v2 unlocks via interrupt-passthrough +
- *     recursive walkAgents).
+ *   - Looped subflow nodes over interrupt-bearing inner trees, and
+ *     duplicate agent ids across a subflow tree (both compile-time
+ *     rejected; everything else inside subflows is live since v2).
  *   - Sandboxed JS expressions (compare / all / any / not covers
  *     realistic v1 catalog needs without a vm dependency).
  *   - Recursive directory walk in Loop (catalog authors compose with
@@ -517,16 +528,33 @@ function compileJobGraph(
       : new Map<string, FlowDef>();
 
   const subflowGraphs = new Map<string, CompiledFlowGraph>();
+  const subflowPropagates = new Map<string, boolean>();
   for (const [parentNodeId, innerFlow] of innerByNodeId) {
+    // Interrupt-bearing inner trees compile as subgraphs (no own
+    // checkpointer) and later run with the parent node's config, so
+    // inner approval/suspend pauses persist into the PARENT's saver
+    // and resume through the parent's Command({resume}) — subflow v2.
+    // Interrupt-free inners keep the isolated v1 path.
+    const propagates =
+      deps.flowResolver !== undefined && treeHasInterruptTags(innerFlow, deps.flowResolver);
+    subflowPropagates.set(parentNodeId, propagates);
     subflowGraphs.set(
       parentNodeId,
-      compileNonAgentFlow(innerFlow, {
-        flowResolver: deps.flowResolver,
-        toolResolver: deps.toolResolver,
-        broker: deps.broker,
-        fetchFn: deps.fetchFn,
-        mcpInvokeFn: deps.mcpInvokeFn,
-      }),
+      compileInnerFlow(
+        innerFlow,
+        {
+          flowResolver: deps.flowResolver,
+          toolResolver: deps.toolResolver,
+          broker: deps.broker,
+          fetchFn: deps.fetchFn,
+          mcpInvokeFn: deps.mcpInvokeFn,
+          // Inner agents get the identical adapter-dispatch/fallback/
+          // JobRecord-status pipeline as parent agents (v2).
+          agentExecutorFactory: (agentNodeId) =>
+            makeAgentExecutor(agentNodeId, deps, factory, job, jobId),
+        },
+        { asSubgraph: propagates },
+      ),
     );
   }
 
@@ -594,7 +622,12 @@ function compileJobGraph(
         }));
         continue;
       }
-      executors.set(node.id, makeSubflowExecutor(node, innerGraph));
+      executors.set(
+        node.id,
+        makeSubflowExecutor(node, innerGraph, {
+          propagateInterrupts: subflowPropagates.get(node.id) === true,
+        }),
+      );
     } else if (node.kind === 'script') {
       executors.set(node.id, makeScriptExecutor(node, { broker: deps.broker }));
     } else if (node.kind === 'publish') {

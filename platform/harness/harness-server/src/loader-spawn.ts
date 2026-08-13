@@ -111,7 +111,16 @@ const __dirname = dirname(__filename);
 function defaultAgentxLoadCommand(): { command: string; prefixArgs: string[] } {
   // harness/harness-server/src → context/context-loader-cli/src/bin.ts
   // (context-loader-cli lives in the context/ domain group, not harness/)
-  const binPath = join(__dirname, '..', '..', '..', 'context', 'context-loader-cli', 'src', 'bin.ts');
+  const binPath = join(
+    __dirname,
+    '..',
+    '..',
+    '..',
+    'context',
+    'context-loader-cli',
+    'src',
+    'bin.ts',
+  );
   return { command: 'bun', prefixArgs: [binPath] };
 }
 

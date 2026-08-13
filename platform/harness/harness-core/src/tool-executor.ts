@@ -251,9 +251,7 @@ async function dispatchCli(
         if (err) {
           const e = err as NodeJS.ErrnoException & { code?: string | number; signal?: string };
           if (e.code === 'ENOENT') {
-            resolve(
-              errorExit(nodeId, 'UnknownExecutable', `${def.cmd} not found on PATH`),
-            );
+            resolve(errorExit(nodeId, 'UnknownExecutable', `${def.cmd} not found on PATH`));
             return;
           }
           if (e.signal === 'SIGTERM') {
@@ -267,9 +265,7 @@ async function dispatchCli(
                 // process already gone
               }
             }, SIGKILL_DELAY_MS).unref();
-            resolve(
-              errorExit(nodeId, 'Timeout', `CLI tool timed out after ${timeoutMs}ms`),
-            );
+            resolve(errorExit(nodeId, 'Timeout', `CLI tool timed out after ${timeoutMs}ms`));
             return;
           }
           // typeof e.code === 'number' is the actual exit code path.
@@ -562,11 +558,7 @@ function successExit(nodeId: string, output: string): Partial<FlowStateT> {
   };
 }
 
-function errorExit(
-  nodeId: string,
-  errorName: string,
-  errorMessage: string,
-): Partial<FlowStateT> {
+function errorExit(nodeId: string, errorName: string, errorMessage: string): Partial<FlowStateT> {
   return {
     lastExit: { nodeId, kind: 'error', errorName, errorMessage },
   };

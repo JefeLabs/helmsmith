@@ -268,9 +268,7 @@ describe('trigger ingress (3.1)', () => {
     expect(r.body.schedules[0].flowId).toBe('nightly');
     expect(r.body.schedules[0].cron).toBe('0 3 * * *');
     expect(Date.parse(r.body.schedules[0].nextFireAt)).toBeGreaterThan(Date.now());
-    expect(r.body.webhooks).toEqual([
-      { flowId: 'deploy-flow', path: 'deploy', method: 'POST' },
-    ]);
+    expect(r.body.webhooks).toEqual([{ flowId: 'deploy-flow', path: 'deploy', method: 'POST' }]);
   });
 
   it('GET /v1/triggers lists message channels', async () => {

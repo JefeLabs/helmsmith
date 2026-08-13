@@ -30,7 +30,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { TaskStep, ToolDef } from './catalog.ts';
 import type { FlowStateT } from './flow-graph.ts';
-import { makeToolExecutor, type McpResult, type ToolExecutorDeps } from './tool-executor.ts';
+import { type McpResult, makeToolExecutor, type ToolExecutorDeps } from './tool-executor.ts';
 
 function freshState(overrides: Partial<FlowStateT> = {}): FlowStateT {
   return {
@@ -104,9 +104,9 @@ describe('makeToolExecutor: resolver behavior', () => {
 
   it('throws when handed a non-tool TaskStep (programming error)', () => {
     const wrongKind = { id: 'g', kind: 'gate', config: { assertions: [] } } as TaskStep;
-    expect(() =>
-      makeToolExecutor(wrongKind, { toolResolver: staticResolver({}) }),
-    ).toThrow(/expected "tool"/);
+    expect(() => makeToolExecutor(wrongKind, { toolResolver: staticResolver({}) })).toThrow(
+      /expected "tool"/,
+    );
   });
 });
 
@@ -213,8 +213,8 @@ describe('makeToolExecutor: http kind', () => {
       method: 'GET',
       endpoint: 'https://example.test/echo',
     };
-    const fetchFn = vi.fn(async () =>
-      new Response('hello', { status: 200, statusText: 'OK' }),
+    const fetchFn = vi.fn(
+      async () => new Response('hello', { status: 200, statusText: 'OK' }),
     ) as unknown as typeof fetch;
     const ex = makeToolExecutor(toolStep('t', 'api'), {
       toolResolver: staticResolver({ api: def }),
@@ -232,8 +232,8 @@ describe('makeToolExecutor: http kind', () => {
       method: 'GET',
       endpoint: 'https://example.test/oops',
     };
-    const fetchFn = vi.fn(async () =>
-      new Response('upstream error detail', { status: 502, statusText: 'Bad Gateway' }),
+    const fetchFn = vi.fn(
+      async () => new Response('upstream error detail', { status: 502, statusText: 'Bad Gateway' }),
     ) as unknown as typeof fetch;
     const ex = makeToolExecutor(toolStep('t', 'api'), {
       toolResolver: staticResolver({ api: def }),
@@ -252,8 +252,8 @@ describe('makeToolExecutor: http kind', () => {
       method: 'GET',
       endpoint: 'https://example.test/users/{{userId}}',
     };
-    const fetchFn = vi.fn(async (url: string) =>
-      new Response(`saw ${url}`, { status: 200 }),
+    const fetchFn = vi.fn(
+      async (url: string) => new Response(`saw ${url}`, { status: 200 }),
     ) as unknown as typeof fetch;
     const ex = makeToolExecutor(toolStep('t', 'api', { userId: 'abc' }), {
       toolResolver: staticResolver({ api: def }),

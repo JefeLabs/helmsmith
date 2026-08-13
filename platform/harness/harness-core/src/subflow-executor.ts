@@ -1,23 +1,29 @@
 /**
  * `kind: 'subflow'` step-kind executor + compile-time validator.
  *
- * v1 scope (this file):
- *   - Compose deterministic flows (gate, transform, tool, trigger, nested
- *     subflow). State passes through; output flows back into the parent.
+ * v2 scope (this file):
+ *   - Compose flows of ANY step kind — including agent nodes (executors
+ *     supplied via `SubflowCompileDeps.agentExecutorFactory`; JobRecord
+ *     registration recurses via flow-spec's `walkAgents(flow, resolver)`).
+ *   - Approval / Suspend tags inside subflows: interrupt PROPAGATION.
+ *     An interrupt-bearing inner compiles as a subgraph (no own
+ *     checkpointer) and is invoked with the parent node's config
+ *     (getConfig()), so LangGraph namespaces the inner's checkpoints
+ *     under the parent's thread and propagates GraphInterrupt natively:
+ *     the parent invoke surfaces `__interrupt__` with the inner payload,
+ *     and Command({resume}) routes back to the deepest pending inner —
+ *     multi-pause and nested-subflow pauses both resume in order. The
+ *     server's pause/resume machinery is unchanged.
  *
- * Out of v1 (deferred to a follow-up slice):
- *   - Agent nodes inside subflows (would require JobRecord agent
- *     registration to recurse through subflow targets — see
- *     `walkAgents` in catalog.ts which currently walks one flow level).
- *   - Approval / Suspend tags inside subflows. LangGraph's interrupt()
- *     is single-shot per node-invocation; propagating multiple inner
- *     pauses up to the parent requires a multi-resume coordinator that
- *     materially complicates the executor. Catalogs that need HITL
- *     gates should put them in the parent flow.
- *
- * Both deferrals are enforced at parent-compile time by
- * `validateSubflowGraph` — catalog authors learn at compile, not at
- * the first subflow tick.
+ * Remaining v2 limits (enforced at parent-compile time by
+ * `validateSubflowGraph` — authors learn at compile, not at the first
+ * subflow tick):
+ *   - A loop-tagged subflow node may not target an interrupt-bearing
+ *     inner tree (loop iterations re-enter the node inside ONE node
+ *     execution; the parent-config checkpoint namespace can't tell
+ *     iterations apart, so pauses would collide).
+ *   - Agent ids must be unique across the whole subflow tree (the
+ *     JobRecord's RegisteredAgent lookup is flat, keyed by id).
  *
  * State flow:
  *   parent.state.output            ─►  inner.state.output  (passthrough)
@@ -33,10 +39,17 @@
  * initial `output` (overriding the passthrough). Catalog authors who
  * need richer shaping should use a `transform` step before the subflow.
  */
-import { CatalogError, type Expression, type FlowDef, type SubflowConfig, type TaskStep } from './catalog.ts';
+import { getConfig, isGraphInterrupt } from '@langchain/langgraph';
 import {
-  compileFlow,
+  CatalogError,
+  type Expression,
+  type FlowDef,
+  type SubflowConfig,
+  type TaskStep,
+} from './catalog.ts';
+import {
   type CompileFlowOptions,
+  compileFlow,
   type FlowStateT,
   type NodeExecutor,
 } from './flow-graph.ts';
@@ -50,19 +63,70 @@ import type { CompiledFlowGraph } from './orchestrator.ts';
 export type FlowResolver = (flowId: string) => FlowDef | undefined;
 
 /**
+ * Does this flow's tree (itself + transitively resolvable subflow
+ * targets) contain any Approval/Suspend tag? Decides per-child whether
+ * the inner compiles as a subgraph with interrupt propagation or keeps
+ * the isolated fast path. Unresolvable targets are treated as
+ * interrupt-free — `validateSubflowGraph` rejects those separately.
+ */
+export function treeHasInterruptTags(
+  flow: FlowDef,
+  resolver: FlowResolver,
+  visited: Set<string> = new Set(),
+): boolean {
+  if (visited.has(flow.id)) return false;
+  visited.add(flow.id);
+  for (const node of flow.nodes) {
+    if (node.tags?.approval || node.tags?.suspend) return true;
+    if (node.kind === 'subflow') {
+      const inner = resolver((node.config as SubflowConfig).flowId);
+      if (inner && treeHasInterruptTags(inner, resolver, visited)) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Walk a parent flow's subflow nodes and validate each inner target
- * recursively. Surfaces cycles, missing flow ids, and v1-banned kinds
- * (agent / approval / suspend) as CatalogError. Catalog authors learn
- * at compile time rather than at first subflow execution.
+ * recursively. Surfaces cycles, missing flow ids, and the two
+ * remaining v2 limits (loop-tagged subflow node over an interrupt-
+ * bearing inner tree; duplicate agent ids across the tree) as
+ * CatalogError. Catalog authors learn at compile time rather than at
+ * first subflow execution.
  *
  * Returns a Map<parentNodeId, FlowDef> of the parent's *direct*
  * subflow children. Nested subflows are validated as part of the
  * recursive walk but NOT included in the returned map — the recursion
- * inside `compileNonAgentFlow` discovers them again at each level when
+ * inside `compileInnerFlow` discovers them again at each level when
  * it builds executors.
  */
-export function validateSubflowGraph(parent: FlowDef, resolver: FlowResolver): Map<string, FlowDef> {
+export function validateSubflowGraph(
+  parent: FlowDef,
+  resolver: FlowResolver,
+): Map<string, FlowDef> {
   const directChildren = new Map<string, FlowDef>();
+  // Agent ids must be unique across the WHOLE tree — the JobRecord's
+  // RegisteredAgent list is flat and executors look agents up by id.
+  // Each flow is agent-checked once: a flow shared by two subflow
+  // nodes is one flow with one set of agents (registered once via
+  // walkAgents' same dedupe), not a duplication.
+  const agentIdsSeen = new Map<string, string>(); // agent id → first location
+  const agentCheckedFlows = new Set<string>();
+
+  function checkAgentIds(flow: FlowDef, where: string): void {
+    if (agentCheckedFlows.has(flow.id)) return;
+    agentCheckedFlows.add(flow.id);
+    for (const node of flow.nodes) {
+      if (node.kind !== 'agent') continue;
+      const prior = agentIdsSeen.get(node.id);
+      if (prior) {
+        throw new CatalogError(
+          `${where}.nodes["${node.id}"]: duplicate agent id "${node.id}" across the subflow tree (first seen at ${prior}) — RegisteredAgent lookup is flat, so every agent id must be unique across parent and inner flows`,
+        );
+      }
+      agentIdsSeen.set(node.id, `${where}.nodes["${node.id}"]`);
+    }
+  }
 
   function walk(
     flow: FlowDef,
@@ -71,6 +135,7 @@ export function validateSubflowGraph(parent: FlowDef, resolver: FlowResolver): M
     isRoot: boolean,
   ): void {
     const nextAncestors = new Set([...ancestorIds, flow.id]);
+    checkAgentIds(flow, where);
 
     for (const node of flow.nodes) {
       if (node.kind !== 'subflow') continue;
@@ -91,30 +156,19 @@ export function validateSubflowGraph(parent: FlowDef, resolver: FlowResolver): M
         );
       }
 
-      // Banned kinds + tags. Each rejection includes the offending
-      // node id from the inner flow so catalog authors can fix the
-      // exact spot.
-      for (const innerNode of inner.nodes) {
-        if (innerNode.kind === 'agent') {
-          throw new CatalogError(
-            `${at} subflow target "${innerId}" contains agent node "${innerNode.id}" — agents in subflows are not supported in v1 (put agents in the parent flow)`,
-          );
-        }
-        if (innerNode.tags?.approval) {
-          throw new CatalogError(
-            `${at} subflow target "${innerId}" contains node "${innerNode.id}" with approval tag — interrupt propagation from subflows is not supported in v1 (put HITL gates in the parent flow)`,
-          );
-        }
-        if (innerNode.tags?.suspend) {
-          throw new CatalogError(
-            `${at} subflow target "${innerId}" contains node "${innerNode.id}" with suspend tag — interrupt propagation from subflows is not supported in v1`,
-          );
-        }
+      // Loop iterations re-enter the subflow node within ONE node
+      // execution, so the parent-config checkpoint namespace cannot
+      // tell iterations apart — inner pauses would collide. Reject
+      // the combination rather than corrupt resume routing.
+      if (node.tags?.loop && treeHasInterruptTags(inner, resolver)) {
+        throw new CatalogError(
+          `${at}: loop-tagged subflow node targets "${innerId}", whose tree contains approval/suspend tags — a looped subflow cannot propagate interrupts (iterations would share one pause namespace); move the HITL gate out of the loop or drop the loop tag`,
+        );
       }
 
       // Only the parent's direct subflow children land in the
       // returned map. Deeper levels are still validated via recursion,
-      // but the orchestrator's compileNonAgentFlow rediscovers them
+      // but the orchestrator's compileInnerFlow rediscovers them
       // when it walks each inner level.
       if (isRoot) {
         directChildren.set(node.id, inner);
@@ -145,6 +199,16 @@ export function validateSubflowGraph(parent: FlowDef, resolver: FlowResolver): M
 export function makeSubflowExecutor(
   node: TaskStep,
   innerGraph: CompiledFlowGraph,
+  opts?: {
+    /** The inner tree contains approval/suspend tags: invoke the inner
+     *  with the PARENT node's config (getConfig()) so its checkpoints
+     *  namespace under the parent thread and its GraphInterrupt
+     *  propagates up (rethrown, never mapped to SubflowError). On
+     *  parent resume the node re-executes, the inner resumes from its
+     *  namespaced checkpoint, and interrupt() returns the resume
+     *  value — LangGraph's native subgraph pause machinery. */
+    propagateInterrupts?: boolean;
+  },
 ): NodeExecutor {
   if (node.kind !== 'subflow') {
     throw new Error(
@@ -153,20 +217,27 @@ export function makeSubflowExecutor(
   }
   const config = node.config as SubflowConfig;
   const nodeId = node.id;
+  const propagateInterrupts = opts?.propagateInterrupts === true;
   // Per-executor invocation counter so Loop+subflow gets a fresh
   // checkpoint thread per iteration rather than reusing the prior
   // pause state. Closure-local state is fine — the executor is built
-  // once per parent-job invocation.
+  // once per parent-job invocation. (Isolated path only: the
+  // interrupt-propagating path derives its identity from the parent
+  // config, and a counter would break resume — the node re-executes
+  // per resume, and its inner must map to the SAME namespace.)
   let invocationCount = 0;
 
   return async (state) => {
     invocationCount += 1;
-    // Compute a deterministic-but-unique thread_id for this inner
-    // invocation. Format scheme: `${parentJobId}::sub::${parentNodeId}::${seq}`
-    // — `::sub::` makes it clear in checkpointer logs which threads
-    // are nested vs top-level.
-    const innerThreadId = `${state.jobId}::sub::${nodeId}::${invocationCount}`;
-    const innerConfig = { configurable: { thread_id: innerThreadId } };
+    // Isolated path: a deterministic-but-unique thread_id per inner
+    // invocation (`${parentJobId}::sub::${parentNodeId}::${seq}` —
+    // `::sub::` marks nested threads in checkpointer logs).
+    // Propagating path: the parent node's own config, so LangGraph
+    // namespaces the inner's checkpoints under the parent thread and
+    // routes Command({resume}) back into it.
+    const innerConfig = propagateInterrupts
+      ? getConfig()
+      : { configurable: { thread_id: `${state.jobId}::sub::${nodeId}::${invocationCount}` } };
 
     // Build inner initial state. Passthrough is the default; an
     // explicit SubflowConfig.input overrides the inner's starting
@@ -205,6 +276,12 @@ export function makeSubflowExecutor(
     try {
       result = await innerGraph.invoke(initialState, innerConfig);
     } catch (err) {
+      // An inner pause is not an error: GraphInterrupt must reach the
+      // parent graph untouched so the parent pauses (the wrapper chain
+      // is already interrupt-transparent — withPolicy et al never
+      // catch). Mapping it to SubflowError would silently swallow the
+      // approval/suspend.
+      if (isGraphInterrupt(err)) throw err;
       return {
         lastExit: {
           nodeId,
@@ -234,23 +311,20 @@ export function makeSubflowExecutor(
           nodeId,
           kind: 'error',
           errorName: innerExit.errorName ?? 'SubflowError',
-          errorMessage: innerExit.errorMessage ?? `subflow "${config.flowId}" terminated with error`,
+          errorMessage:
+            innerExit.errorMessage ?? `subflow "${config.flowId}" terminated with error`,
         },
       };
     }
     if (innerExit?.kind === 'reject') {
-      const payload = result.rejectionPayload as
-        | { reason?: string }
-        | null
-        | undefined;
+      const payload = result.rejectionPayload as { reason?: string } | null | undefined;
       return {
         lastExit: {
           nodeId,
           kind: 'error',
           errorName: 'SubflowRejected',
           errorMessage:
-            payload?.reason ??
-            `subflow "${config.flowId}" had an unhandled gate rejection`,
+            payload?.reason ?? `subflow "${config.flowId}" had an unhandled gate rejection`,
         },
       };
     }
@@ -286,10 +360,7 @@ export function makeSubflowExecutor(
  * state's `output` channel is a string. Keeping types narrow at the
  * channel boundary saves a polymorphism story everywhere.
  */
-function stringifyInputOverride(
-  input: Record<string, unknown>,
-  state: FlowStateT,
-): string {
+function stringifyInputOverride(input: Record<string, unknown>, state: FlowStateT): string {
   const resolved: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(input)) {
     resolved[k] = isExpression(v) ? evalExpressionToValue(v, state) : v;
@@ -334,51 +405,90 @@ export interface SubflowCompileDeps {
   broker?: import('@helmsmith/agent-auth').CredentialBroker;
   fetchFn?: typeof fetch;
   mcpInvokeFn?: import('./tool-executor.ts').ToolExecutorDeps['mcpInvokeFn'];
+  /** Builds the executor for a `kind: 'agent'` node (v2 — agents may
+   *  live inside subflows). The orchestrator passes its own
+   *  makeAgentExecutor closure so inner agents get the identical
+   *  adapter-dispatch/fallback/JobRecord-status pipeline as parent
+   *  agents. Absent → inner agent nodes fail loud with
+   *  'UnconfiguredAgentFactory' (same pattern as toolResolver). */
+  agentExecutorFactory?: (agentNodeId: string) => NodeExecutor;
+  /** Checkpointer for the ROOT compile only (e.g. tests compiling a
+   *  parent directly through this helper). Nested inner graphs never
+   *  take it — interrupt-bearing inners compile as subgraphs
+   *  (inheriting the parent's saver through config), and isolated
+   *  inners keep their own default. */
+  checkpointer?: CompileFlowOptions['checkpointer'];
 }
 
 /**
- * Compile an inner subflow target. Recursively compiles any further-
- * nested subflows. Builds per-node executors for the kinds inner
- * flows are allowed to contain (tool, gate, transform, trigger, and
- * subflow). Agent / approval / suspend are validated out earlier by
- * `validateSubflowGraph`.
+ * Compile a flow whose per-node executors this module can construct
+ * itself — tool, subflow, and (v2) agent via the supplied factory;
+ * gate / transform / trigger use flow-graph builtins. Recursively
+ * compiles nested subflow targets.
  *
- * Returns a CompiledFlowGraph whose `invoke()` runs the inner flow
- * with its own MemorySaver checkpointer (one per inner). For v1
- * subflows can't pause, so checkpoint state is essentially write-
- * only; when interrupt propagation lands, share the parent's
- * checkpointer here.
+ * Checkpointer strategy per inner graph:
+ *   - interrupt-bearing inner tree → compiled `asSubgraph` (no own
+ *     checkpointer) and executed with the parent's config, so pauses
+ *     persist into the parent's saver and resume through the parent's
+ *     Command({resume}).
+ *   - interrupt-free inner tree → own default saver + per-invocation
+ *     thread ids (the v1 isolated path, unchanged — including under
+ *     loop tags).
+ * The ROOT compile takes `deps.checkpointer` (parents whose pauses
+ * must survive restarts pass the durable saver — the orchestrator's
+ * own parent compile path already does).
  *
  * Tool executors are constructed via a late-bound import from
  * `./tool-executor.ts` to avoid a static module cycle (subflow ↔
  * tool ↔ flow-graph). The dynamic require lands inside the function
  * body so it executes per-call after the modules have settled.
  */
-export function compileNonAgentFlow(
+export function compileInnerFlow(
   flow: FlowDef,
   deps: SubflowCompileDeps,
+  internal?: { asSubgraph?: boolean },
 ): CompiledFlowGraph {
   // Late require: avoids the static cycle that would arise if we
   // imported makeToolExecutor at module scope (tool-executor →
   // catalog → flow-graph; subflow-executor → tool-executor would
   // close it). This stays within harness-core; no runtime overhead
   // beyond the first cache.
-  const { makeToolExecutor } = require('./tool-executor.ts') as typeof import(
-    './tool-executor.ts'
-  );
+  const { makeToolExecutor } = require('./tool-executor.ts') as typeof import('./tool-executor.ts');
 
   const innerByNodeId = deps.flowResolver
     ? validateSubflowGraph(flow, deps.flowResolver)
     : new Map<string, FlowDef>();
 
   const nestedGraphs = new Map<string, CompiledFlowGraph>();
+  const nestedPropagates = new Map<string, boolean>();
   for (const [nodeId, innerFlow] of innerByNodeId) {
-    nestedGraphs.set(nodeId, compileNonAgentFlow(innerFlow, deps));
+    const propagates = deps.flowResolver
+      ? treeHasInterruptTags(innerFlow, deps.flowResolver)
+      : false;
+    nestedPropagates.set(nodeId, propagates);
+    nestedGraphs.set(
+      nodeId,
+      compileInnerFlow(innerFlow, { ...deps, checkpointer: undefined }, { asSubgraph: propagates }),
+    );
   }
 
   const executors = new Map<string, NodeExecutor>();
   for (const node of flow.nodes) {
-    if (node.kind === 'tool') {
+    if (node.kind === 'agent') {
+      if (!deps.agentExecutorFactory) {
+        const id = node.id;
+        executors.set(id, async () => ({
+          lastExit: {
+            nodeId: id,
+            kind: 'error',
+            errorName: 'UnconfiguredAgentFactory',
+            errorMessage: `agent node "${id}" inside subflow cannot dispatch — no agentExecutorFactory`,
+          },
+        }));
+        continue;
+      }
+      executors.set(node.id, deps.agentExecutorFactory(node.id));
+    } else if (node.kind === 'tool') {
       if (!deps.toolResolver) {
         const id = node.id;
         executors.set(id, async () => ({
@@ -417,12 +527,27 @@ export function compileNonAgentFlow(
         }));
         continue;
       }
-      executors.set(node.id, makeSubflowExecutor(node, innerGraph));
+      executors.set(
+        node.id,
+        makeSubflowExecutor(node, innerGraph, {
+          propagateInterrupts: nestedPropagates.get(node.id) === true,
+        }),
+      );
     }
     // gate / transform / trigger handled by flow-graph builtins.
-    // script throws via flow-graph default. agent BANNED in inner
-    // flows — validator catches it before here.
+    // script throws via flow-graph default.
   }
 
-  return compileFlow({ flow, executors }) as CompiledFlowGraph;
+  return compileFlow({
+    flow,
+    executors,
+    ...(internal?.asSubgraph
+      ? { asSubgraph: true }
+      : deps.checkpointer
+        ? { checkpointer: deps.checkpointer }
+        : {}),
+  }) as CompiledFlowGraph;
 }
+
+/** @deprecated Renamed — inner flows may contain agents since v2. */
+export const compileNonAgentFlow = compileInnerFlow;

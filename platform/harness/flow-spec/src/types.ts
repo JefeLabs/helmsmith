@@ -790,11 +790,29 @@ export interface FlowDef {
  * Walk a flow's nodes; yield every AgentDef from `kind: 'agent'` nodes.
  * Useful for surfaces that need a flat agent list — token-counting,
  * capability preflight, "register every agent for this job".
+ *
+ * With a `resolver`, the walk recurses through `kind: 'subflow'`
+ * targets (subflow v2 — agents may live inside inner flows). Each flow
+ * id is visited at most once, which both guards cycles and keeps a
+ * shared inner flow's agents from being yielded per reference — an
+ * agent registers once per job regardless of how many subflow nodes
+ * target its flow. Unresolvable targets are skipped: the walker
+ * enumerates, the validator reports.
  */
-export function* walkAgents(flow: FlowDef): Generator<AgentDef> {
+export function* walkAgents(
+  flow: FlowDef,
+  resolver?: (flowId: string) => FlowDef | undefined,
+  visited?: Set<string>,
+): Generator<AgentDef> {
+  const seen = visited ?? new Set<string>();
+  if (seen.has(flow.id)) return;
+  seen.add(flow.id);
   for (const node of flow.nodes) {
     if (node.kind === 'agent') {
       yield (node.config as AgentConfig).agent;
+    } else if (node.kind === 'subflow' && resolver) {
+      const inner = resolver((node.config as SubflowConfig).flowId);
+      if (inner) yield* walkAgents(inner, resolver, seen);
     }
   }
 }

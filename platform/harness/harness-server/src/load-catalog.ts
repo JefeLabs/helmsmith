@@ -345,8 +345,12 @@ export async function readWorkspaceYamlWorktreePolicy(
   const w = wt as Record<string, unknown>;
   return {
     keepOnSuccess:
-      typeof w.keepOnSuccess === 'boolean' ? w.keepOnSuccess : DEFAULT_WORKTREE_POLICY.keepOnSuccess,
+      typeof w.keepOnSuccess === 'boolean'
+        ? w.keepOnSuccess
+        : DEFAULT_WORKTREE_POLICY.keepOnSuccess,
     keepOnFailure:
-      typeof w.keepOnFailure === 'boolean' ? w.keepOnFailure : DEFAULT_WORKTREE_POLICY.keepOnFailure,
+      typeof w.keepOnFailure === 'boolean'
+        ? w.keepOnFailure
+        : DEFAULT_WORKTREE_POLICY.keepOnFailure,
   };
 }

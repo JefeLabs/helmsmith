@@ -116,10 +116,12 @@ export {
 export { makePublishExecutor } from './publish-executor.ts';
 export { makeScriptExecutor } from './script-executor.ts';
 export {
+  compileInnerFlow,
   compileNonAgentFlow,
   type FlowResolver,
   makeSubflowExecutor,
   type SubflowCompileDeps,
+  treeHasInterruptTags,
   validateSubflowGraph,
 } from './subflow-executor.ts';
 export { TokenAccumulator } from './token-accumulator.ts';
