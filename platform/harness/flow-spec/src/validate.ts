@@ -527,8 +527,11 @@ function validateAgentDef(value: unknown, where: string, agentIds: Set<string>):
   if (typeof agent.role !== 'string' || !agent.role) {
     throw new CatalogError(`${where}.role must be a non-empty string`);
   }
-  if (agent.adapter !== 'claude-sdk' && agent.adapter !== 'opencode-cli') {
-    throw new CatalogError(`${where}.adapter must be "claude-sdk" or "opencode-cli"`);
+  // Adapters resolve by id at runtime (3.4) — like toolId/flowId, the
+  // spec checks shape only; whether the id exists in the running
+  // harness's adapter registry is a resolve-time concern.
+  if (typeof agent.adapter !== 'string' || !agent.adapter) {
+    throw new CatalogError(`${where}.adapter must be a non-empty string (an adapter registry id)`);
   }
   if (agent.systemPrompt !== undefined && typeof agent.systemPrompt !== 'string') {
     throw new CatalogError(`${where}.systemPrompt must be a string`);
