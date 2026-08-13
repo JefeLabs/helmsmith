@@ -1709,7 +1709,7 @@
           "description": "Behavioral modifier tags. Multiple allowed; render order is Loop top-left, Approval/Suspend top-right. Approval and Suspend are mutually exclusive on the same node."
         },
         "terminal": {
-          "description": "Set on nodes with no outgoing edges. Defaults to 'success'.",
+          "description": "Endpoint disposition, executed: a branch ending at a terminal:'fail' node fails the whole job (authored failure endpoints — e.g. an error edge routing to a notify-then-fail sink). Only valid on nodes with no outgoing edges (the validator rejects a fail marker on a non-sink). Defaults to 'success'.",
           "enum": [
             "success",
             "fail"

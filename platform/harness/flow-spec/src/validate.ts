@@ -24,9 +24,9 @@ import {
  * accept/reject behavior — a catalog with unsupported features is
  * still a *valid* catalog; it just won't do everything it says.
  *
- * Current feature ids: `terminal-fail`,
- * `trigger-<kind>` (any non-manual trigger), `expression-js`,
- * `subflow-version-pin` (version recorded, resolution stays by flowId).
+ * Current feature ids: `trigger-<kind>` (any non-manual trigger),
+ * `expression-js`, `subflow-version-pin` (version recorded, resolution
+ * stays by flowId).
  * Remove an id from
  * `reportUnsupportedFeatures` in the same change that makes the
  * runtime execute it — the reporting list IS the honest coverage
@@ -255,6 +255,21 @@ function validateFlow(
     }
   }
 
+  // terminal:'fail' is executed — the flow fails when a branch ends at
+  // a fail-terminal — so a fail marker on a node WITH outgoing edges is
+  // dead config with surprising semantics (the node isn't an endpoint,
+  // yet reaching it would fail the whole run at the end): rejected.
+  for (const node of flow.nodes as Array<Record<string, unknown>>) {
+    if (node.terminal !== 'fail') continue;
+    const out = outgoingByType.get(node.id as string);
+    const totalOut = out ? [...out.values()].reduce((a, b) => a + b, 0) : 0;
+    if (totalOut > 0) {
+      throw new CatalogError(
+        `${where}: node "${node.id}" declares terminal:'fail' but has ${totalOut} outgoing edge(s) — failure endpoints must be terminal (no outgoing edges)`,
+      );
+    }
+  }
+
   // DAG check: only reject edges may form cycles. Run cycle detection
   // on the (sequence | conditional | fallback | error) sub-graph.
   const dagAdjacency = new Map<string, string[]>();
@@ -292,13 +307,6 @@ function reportUnsupportedFeatures(
   for (const [j, n] of (flow.nodes as unknown[]).entries()) {
     const node = n as Record<string, unknown>;
     const at = `${where}.nodes[${j}]`;
-    if (node.terminal === 'fail') {
-      report({
-        where: at,
-        feature: 'terminal-fail',
-        detail: 'terminal nodes always end the flow as success',
-      });
-    }
     if (node.kind === 'trigger') {
       const kind = (node.config as Record<string, unknown>).kind;
       if (kind !== 'manual') {

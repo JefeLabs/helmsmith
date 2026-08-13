@@ -36,7 +36,6 @@ Both validators accept `{ onUnsupported?: (f: UnsupportedFeature) => void }`. Th
 
 | Feature id | Runtime truth |
 |---|---|
-| `terminal-fail` | terminal nodes always end the flow as success |
 | `trigger-<kind>` | no runtime fires non-manual triggers |
 | `expression-js` | the evaluator throws on `js` expressions |
 | `subflow-version-pin` | version recorded; subflows still resolve by flowId |

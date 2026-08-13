@@ -584,6 +584,32 @@ export const VALIDATION_CASES: readonly ValidationCase[] = [
     errorIncludes: 'type must be one of',
   },
   {
+    name: "terminal:'fail' on a node with outgoing edges is rejected (failure endpoints are sinks)",
+    catalog: {
+      flows: [
+        {
+          ...VALID_FLOW,
+          nodes: [
+            VALID_FLOW.nodes[0],
+            {
+              id: 'a',
+              kind: 'transform',
+              terminal: 'fail',
+              config: { expression: { kind: 'literal', value: 1 } },
+            },
+            { id: 'b', kind: 'transform', config: { expression: { kind: 'literal', value: 1 } } },
+          ],
+          edges: [
+            { from: 't', to: 'a', type: 'sequence' },
+            { from: 'a', to: 'b', type: 'sequence' },
+          ],
+        },
+      ],
+    },
+    valid: false,
+    errorIncludes: 'failure endpoints must be terminal',
+  },
+  {
     name: 'joinStrategy node with an incoming error edge is rejected (joins count forward edges only)',
     catalog: {
       flows: [
@@ -739,7 +765,6 @@ export const UNSUPPORTED_CASES: readonly UnsupportedCase[] = [
           id: 'b',
           kind: 'transform',
           config: { expression: { kind: 'literal', value: 1 } },
-          terminal: 'fail',
         },
         {
           id: 'c',
@@ -748,7 +773,7 @@ export const UNSUPPORTED_CASES: readonly UnsupportedCase[] = [
             assertions: [{ expression: { kind: 'js', expression: 'true' }, message: 'x' }],
           },
         },
-        { id: 's', kind: 'subflow', config: { flowId: 'inner', version: '1.0.0' } },
+        { id: 's', kind: 'subflow', terminal: 'fail', config: { flowId: 'inner', version: '1.0.0' } },
       ],
       edges: [
         { from: 't', to: 'a', type: 'sequence' },
@@ -758,11 +783,11 @@ export const UNSUPPORTED_CASES: readonly UnsupportedCase[] = [
       ],
     },
     // 'effect', 'policy', 'joinStrategy', 'parallel-fan-out',
-    // 'node-output-schema', and 'flow-output-schema' are deliberately
-    // absent: the kitchen-sink flow still declares all of them, pinning
-    // that they are executed (schemas are now load-time subset-gated
-    // and runtime-enforced) and no longer reported.
-    expectedFeatures: ['expression-js', 'subflow-version-pin', 'terminal-fail', 'trigger-schedule'],
+    // 'node-output-schema', 'flow-output-schema', and 'terminal-fail'
+    // are deliberately absent: the kitchen-sink flow still declares all
+    // of them (terminal:'fail' on leaf node 's'), pinning that they are
+    // executed and no longer reported.
+    expectedFeatures: ['expression-js', 'subflow-version-pin', 'trigger-schedule'],
   },
   {
     name: 'fully-executed features produce zero reports',

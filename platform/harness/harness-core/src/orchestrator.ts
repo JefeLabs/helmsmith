@@ -870,6 +870,24 @@ function finalizeOrPause(
   // job-definition flow that emits a malformed JobIntent fails HERE,
   // not downstream when the fleet tries to consume the work order.
   if (job.status !== 'failed' && job.status !== 'cancelled') {
+    // terminal: 'fail' — authored failure endpoints (the last formerly
+    // warn-only feature). If any branch ended at a fail-terminal (its
+    // success-completion counter is set — deterministic under parallel
+    // fan-out, and counted on the ORIGINAL node id even when interrupt
+    // tags rewrote the topology), the flow failed by authorship.
+    // Output contracts don't apply to failure endpoints.
+    const failedAt = completedFailTerminal(job.flow, result);
+    if (failedAt !== null) {
+      deps.bus.publish(jobId, failedAt, {
+        kind: 'error',
+        ts: new Date().toISOString(),
+        message: `flow ended at fail-terminal node "${failedAt}"`,
+      });
+      job.status = 'failed';
+      deps.onStatusChange?.(jobId, null, 'failed');
+      deps.graphs?.delete(jobId);
+      return;
+    }
     const contract = job.flow?.output;
     const outputText = typeof result.output === 'string' ? result.output : '';
     const parsed = parseFlowOutput(contract, outputText);
@@ -899,6 +917,23 @@ function finalizeOrPause(
     }
   }
   deps.graphs?.delete(jobId);
+}
+
+/** First node declared `terminal: 'fail'` that actually ran to success
+ *  in this run (per the runtime-private __completions counter), or null
+ *  when no failure endpoint was reached. */
+function completedFailTerminal(
+  flow: FlowDef | undefined,
+  result: Record<string, unknown>,
+): string | null {
+  if (!flow) return null;
+  const completions = result.__completions as Record<string, number> | undefined;
+  for (const node of flow.nodes) {
+    if (node.terminal === 'fail' && (completions?.[node.id] ?? 0) > 0) {
+      return node.id;
+    }
+  }
+  return null;
 }
 
 function extractInterrupts(
