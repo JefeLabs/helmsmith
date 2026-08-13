@@ -612,16 +612,15 @@ export const UNSUPPORTED_CASES: readonly UnsupportedCase[] = [
         { from: 'b', to: 's', type: 'sequence' },
       ],
     },
-    // 'effect' is deliberately absent: the kitchen-sink node still
-    // declares `effect: 'pure'`, pinning that the classification is
-    // executed (replay guard) and no longer reported.
+    // 'effect' and 'policy' are deliberately absent: the kitchen-sink
+    // node still declares both, pinning that they are executed (replay
+    // guard; retry/timeout/onError) and no longer reported.
     expectedFeatures: [
       'expression-js',
       'flow-output-schema',
       'joinStrategy',
       'node-output-schema',
       'parallel-fan-out',
-      'policy',
       'subflow-version-pin',
       'terminal-fail',
       'trigger-schedule',

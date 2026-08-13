@@ -104,9 +104,9 @@ export {
 const EMPTY: FlowCatalog = { flows: [] };
 
 /** One console.warn line per spec feature the runtime does not execute
- *  yet — policy, joinStrategy, terminal:'fail', non-manual triggers,
- *  js expressions, parallel fan-out. Loud at load time so catalog
- *  authors learn before a silent no-op ships. */
+ *  yet — joinStrategy, terminal:'fail', non-manual triggers, js
+ *  expressions, parallel fan-out, unenforced schemas. Loud at load time
+ *  so catalog authors learn before a silent no-op ships. */
 function warnUnsupported(path: string, f: UnsupportedFeature): void {
   console.warn(
     `[catalog] ${path}: ${f.where}: "${f.feature}" is not executed by the runtime yet — ${f.detail}`,

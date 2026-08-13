@@ -1,6 +1,6 @@
 # Flow Spec — Critical Feedback (Consolidated, Current)
 
-**Date:** 2026-08-07 · **Updated:** 2026-08-12 after the data-plane slice (PR #14), the hardening slice (PR #15), a validator-consistency review (PR #17), the export-surface slice (PR #18), and the HITL trust slice (roadmap 2.1 + 2.2 + 2.8) · Companion docs: [`SPEC.md`](../SPEC.md) · [`steps-and-edges.md`](./steps-and-edges.md) · [`next-steps.md`](./next-steps.md)
+**Date:** 2026-08-07 · **Updated:** 2026-08-12 after the data-plane slice (PR #14), the hardening slice (PR #15), a validator-consistency review (PR #17), the export-surface slice (PR #18), the HITL trust slice (PR #19), and the policy slice (roadmap 2.3) · Companion docs: [`SPEC.md`](../SPEC.md) · [`steps-and-edges.md`](./steps-and-edges.md) · [`next-steps.md`](./next-steps.md)
 
 One document, every open criticism, with status. Sources: the pre-extraction design review (`docs/superpowers/specs/2026-08-07-flow-spec-design-review.md`), the package-level critique from `SPEC.md` §7, the semantic findings from documentation-as-audit, the 2026-08-12 data-plane review + its post-merge self-review (plan: `docs/superpowers/plans/2026-08-12-flow-spec-data-plane.md`), and a 2026-08-12 validator-consistency review of the merged package. Items already fixed are listed once in §1 and not re-argued.
 
@@ -71,6 +71,12 @@ The unifying observation: once the validator crossed into statically-knowable-ru
 | 🔴 Durability — the `MemorySaver` default lost every awaiting-approval/suspended job on restart | SqliteSaver default at `<workspace>/.harness/state/checkpoints.sqlite` (server-side; `RunJobDeps.checkpointer` is the injection seam, PG is a config swap); paused JobRecords + pending requests persist as JSON under `.harness/state/paused/` and rehydrate at boot; `resumeJob` recompiles the graph from `job.flow` on cache miss (recompile-on-resume). Proven by a stop-server-A/boot-server-B integration test |
 | 🟡 `effect` recorded but never consulted — the duplicate-PR-on-replay risk that gated the durable checkpointer | `withEffectGuard` (outermost node wrapper): `side-effecting` nodes run at most once — re-entry with completion evidence at `$.nodes.<id>` returns the recorded output. Publish executors are additionally idempotent by natural key (an existing open PR for the head branch is reused; a recorded `mergeSha` short-circuits the merge). Landed BEFORE the durable saver per the roadmap constraint; report deleted fixture-first |
 
+### 1.7 Policy slice (2026-08-12, roadmap 2.3)
+
+| Finding | Resolution |
+|---|---|
+| 🔴 `policy` retry/timeout/onError validated but ignored — authors' reliability config did nothing (part of the old §3 headline row) | `withPolicy` in the node-wrapper chain (outside `withNodeIO` so retries cover `OutputParseError`, inside `withEffectGuard` so completed side-effecting nodes never re-enter): `retry` = maxAttempts TOTAL attempts with fixed/exponential backoff, error exits only (rejects are authored flow control); `timeout` = per-attempt deadline exiting `errorName: 'Timeout'` (error-edge routable; hung executor detached — no AbortSignal yet); `onError` `'continue'` converts the exhausted error to success, `'fallback'` routes unhandled errors to the fallback edge (in `buildRouter`), `'propagate'` unchanged. Report deleted fixture-first |
+
 ## 2. Open — package-level (this package's debt)
 
 ### 🟡 `AdapterId` bakes two runtime implementations into the wire contract
@@ -100,7 +106,7 @@ Inherited from the original review, minus what the 2026-08-12 slices closed (ter
 
 | Gap | Severity | Current truth |
 |---|---|---|
-| `policy` retry/timeout/onError, `joinStrategy`, `terminal:'fail'` | 🔴 | Warned at load, ignored at runtime — authors' reliability config does nothing |
+| `joinStrategy`, `terminal:'fail'` | 🔴 | Warned at load, ignored at runtime. (The `policy` third of the old row was closed by the policy slice — §1.7) |
 | Parallel fan-out/join | 🔴 | Router follows first sequence edge only; second+ branches never run (warned). **Note:** the state-model blocker is gone — `nodes` is merge-reduced, so branches can't clobber addressable outputs; what remains is genuinely just router/join work (next-steps 2.4) |
 | JobIntent emission | 🟡 | New gap exposed by closing 2.5: the terminal intent is now parsed, enforced, and recorded on `job.flowOutput` — but nothing *submits* it to a JobStateMachine. Enforcement without emission (next-steps 2.9) |
 | Output schemas | 🟡 | Honestly reported: `output.schema`/`structured.schema` accepted but never validated (`node-output-schema`/`flow-output-schema`). (The `effect` half of this row was closed by the HITL trust slice — §1.6) |
@@ -115,4 +121,4 @@ Inherited from the original review, minus what the 2026-08-12 slices closed (ter
 
 ## 4. The one-sentence summary
 
-The extraction fixed the *honesty* problem (2026-08-07), the data-plane pass fixed the *capability ceiling*, the hardening pass turned the alignment mechanisms into enforced tests (three-behavior conformance fixtures) while giving the factory/fleet seam teeth (terminal output enforcement), the validator-consistency + export-surface passes closed the statically-knowable-failure gaps and made both export layers curated review points, and the HITL trust slice made approval production-grade (SLA auto-reject, role-gated resume, durable checkpointer with restart rehydration, effect-aware replay) — what remains is the reliability tier (policy/join/triggers/fan-out still warn-only, with 2.4's state-model excuse now gone), output-schema enforcement, suspend wake-up scheduling, and JobIntent *emission* on top of the now-enforced contract.
+The extraction fixed the *honesty* problem (2026-08-07), the data-plane pass fixed the *capability ceiling*, the hardening pass turned the alignment mechanisms into enforced tests (three-behavior conformance fixtures) while giving the factory/fleet seam teeth (terminal output enforcement), the validator-consistency + export-surface passes closed the statically-knowable-failure gaps and made both export layers curated review points, the HITL trust slice made approval production-grade (SLA auto-reject, role-gated resume, durable checkpointer with restart rehydration, effect-aware replay), and the policy slice made retry/timeout/onError real — what remains is the parallelism decision (join/fan-out, with 2.4's state-model excuse now gone), non-manual triggers, output-schema enforcement, suspend wake-up scheduling, and JobIntent *emission* on top of the now-enforced contract.

@@ -759,6 +759,148 @@ describe('effect-aware replay guard', () => {
   });
 });
 
+// ─── policy enforcement (retry / timeout / onError) ───────────────────────
+
+describe('policy enforcement (2.3)', () => {
+  /** t → work(policy) → done, plus optional extra nodes/edges. */
+  function policyFlow(
+    policy: TaskStep['policy'],
+    extraNodes: TaskStep[] = [],
+    extraEdges: Edge[] = [],
+  ): FlowDef {
+    return {
+      id: 'pf',
+      nodes: [trigger('t'), { ...agentNode('work'), policy }, agentNode('done'), ...extraNodes],
+      edges: [
+        { from: 't', to: 'work', type: 'sequence' },
+        { from: 'work', to: 'done', type: 'sequence' },
+        ...extraEdges,
+      ],
+    };
+  }
+
+  /** Executor that error-exits `failures` times, then succeeds. */
+  function flaky(id: string, failures: number) {
+    let calls = 0;
+    const exec: NodeExecutor = async () => {
+      calls++;
+      if (calls <= failures) {
+        return {
+          lastExit: { nodeId: id, kind: 'error' as const, errorName: 'ProviderError', errorMessage: 'boom' },
+        };
+      }
+      return { output: 'ok', lastExit: { nodeId: id, kind: 'success' as const } };
+    };
+    return { exec, calls: () => calls };
+  }
+
+  async function run(flow: FlowDef, executors: Map<string, NodeExecutor>) {
+    const graph = compileFlow({ flow, executors });
+    return graph.invoke(initialState, { configurable: { thread_id: `pol-${flow.id}` } });
+  }
+
+  it('retry re-runs an error-exiting node up to maxAttempts and then succeeds', async () => {
+    const calls: string[] = [];
+    const work = flaky('work', 2);
+    const executors = new Map<string, NodeExecutor>([
+      ['work', work.exec],
+      ['done', makeRecorder(calls, 'done')],
+    ]);
+    await run(policyFlow({ retry: { maxAttempts: 3 } }), executors);
+    expect(work.calls()).toBe(3);
+    expect(calls).toContain('done');
+  });
+
+  it('without a policy the first error propagates unretried', async () => {
+    const work = flaky('work', 5);
+    const executors = new Map<string, NodeExecutor>([['work', work.exec]]);
+    await expect(run(policyFlow(undefined), executors)).rejects.toThrow(/unhandled error/);
+    expect(work.calls()).toBe(1);
+  });
+
+  it('retry exhaustion propagates the final error', async () => {
+    const work = flaky('work', 5);
+    const executors = new Map<string, NodeExecutor>([['work', work.exec]]);
+    await expect(run(policyFlow({ retry: { maxAttempts: 2 } }), executors)).rejects.toThrow(
+      /unhandled error/,
+    );
+    expect(work.calls()).toBe(2);
+  });
+
+  it('fixed backoff delays each retry attempt', async () => {
+    const work = flaky('work', 2);
+    const executors = new Map<string, NodeExecutor>([['work', work.exec]]);
+    const started = Date.now();
+    await run(
+      policyFlow({ retry: { maxAttempts: 3, backoff: { kind: 'fixed', ms: 40 } } }),
+      executors,
+    );
+    expect(Date.now() - started).toBeGreaterThanOrEqual(80); // two backoff sleeps
+    expect(work.calls()).toBe(3);
+  });
+
+  it('timeout converts a hung node into an error-edge-routable Timeout exit', async () => {
+    const calls: string[] = [];
+    const executors = new Map<string, NodeExecutor>([
+      [
+        'work',
+        async () => {
+          await new Promise((r) => setTimeout(r, 300));
+          return { output: 'late', lastExit: { nodeId: 'work', kind: 'success' as const } };
+        },
+      ],
+      ['rescue', makeRecorder(calls, 'rescue')],
+      ['done', makeRecorder(calls, 'done')],
+    ]);
+    await run(
+      policyFlow(
+        { timeout: 40 },
+        [agentNode('rescue')],
+        [{ from: 'work', to: 'rescue', type: 'error', on: ['Timeout'] }],
+      ),
+      executors,
+    );
+    expect(calls).toContain('rescue');
+    expect(calls).not.toContain('done');
+  });
+
+  it("onError 'continue' proceeds past an exhausted failure", async () => {
+    const calls: string[] = [];
+    const work = flaky('work', 5);
+    const executors = new Map<string, NodeExecutor>([
+      ['work', work.exec],
+      ['done', makeRecorder(calls, 'done')],
+    ]);
+    const result = (await run(
+      policyFlow({ retry: { maxAttempts: 2 }, onError: 'continue' }),
+      executors,
+    )) as FlowStateT;
+    expect(work.calls()).toBe(2);
+    expect(calls).toContain('done');
+    expect(result.lastExit?.kind).toBe('success');
+  });
+
+  it("onError 'fallback' routes an unhandled error to the fallback edge", async () => {
+    const calls: string[] = [];
+    const work = flaky('work', 5);
+    const executors = new Map<string, NodeExecutor>([
+      ['work', work.exec],
+      ['rescue', makeRecorder(calls, 'rescue')],
+      ['done', makeRecorder(calls, 'done')],
+    ]);
+    await run(
+      policyFlow(
+        { onError: 'fallback' },
+        [agentNode('rescue')],
+        [{ from: 'work', to: 'rescue', type: 'fallback' }],
+      ),
+      executors,
+    );
+    expect(calls).toContain('rescue');
+    expect(calls).not.toContain('done');
+  });
+});
+
 // ─── buildRouter (in isolation) ───────────────────────────────────────────
 
 describe('buildRouter', () => {
