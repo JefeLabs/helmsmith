@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CatalogError, type UnsupportedFeature, validateFlowCatalog } from './index.ts';
+import { CatalogError, type UnsupportedFeature, validateFlowCatalog, walkAgents } from './index.ts';
 
 const validFlow = {
   id: 'demo',
@@ -413,5 +413,56 @@ describe('unsupported-feature reporting', () => {
     validateFlowCatalog(ok, 'test', { onUnsupported: (f) => reported.push(f) });
     expect(reported).toEqual([]);
     expect(() => validateFlowCatalog(ok, 'test')).not.toThrow();
+  });
+});
+
+describe('walkAgents', () => {
+  const agentNode = (id: string) => ({
+    id,
+    kind: 'agent' as const,
+    config: { agent: { id, role: 'r', adapter: 'claude-sdk' } as never },
+  });
+  const triggerNode = { id: 't', kind: 'trigger' as const, config: { kind: 'manual' } as never };
+  const subflowNode = (id: string, flowId: string) => ({
+    id,
+    kind: 'subflow' as const,
+    config: { flowId } as never,
+  });
+
+  it('yields agents from the flow itself without a resolver (v1 behavior unchanged)', () => {
+    const flow = { id: 'f', nodes: [triggerNode, agentNode('a1')], edges: [] };
+    expect([...walkAgents(flow as never)].map((a) => a.id)).toEqual(['a1']);
+  });
+
+  it('recurses through subflow targets when a resolver is provided', () => {
+    const inner = { id: 'inner', nodes: [triggerNode, agentNode('deep')], edges: [] };
+    const outer = {
+      id: 'outer',
+      nodes: [triggerNode, agentNode('top'), subflowNode('s', 'inner')],
+      edges: [],
+    };
+    const resolver = (id: string) => (id === 'inner' ? (inner as never) : undefined);
+    expect([...walkAgents(outer as never, resolver)].map((a) => a.id)).toEqual(['top', 'deep']);
+  });
+
+  it('visits each flow once — shared targets and cycles do not duplicate or hang', () => {
+    const inner = {
+      id: 'inner',
+      nodes: [triggerNode, agentNode('deep'), subflowNode('back', 'outer')],
+      edges: [],
+    };
+    const outer = {
+      id: 'outer',
+      nodes: [triggerNode, subflowNode('s1', 'inner'), subflowNode('s2', 'inner')],
+      edges: [],
+    };
+    const flows: Record<string, unknown> = { inner, outer };
+    const agents = [...walkAgents(outer as never, (id) => flows[id] as never)];
+    expect(agents.map((a) => a.id)).toEqual(['deep']);
+  });
+
+  it('ignores unresolvable subflow targets (validation reports those, not the walker)', () => {
+    const outer = { id: 'o', nodes: [triggerNode, subflowNode('s', 'ghost')], edges: [] };
+    expect([...walkAgents(outer as never, () => undefined)]).toEqual([]);
   });
 });

@@ -34,7 +34,7 @@
  *   - Streaming stdout. Catalog authors who need to stream should
  *     write a `tool` (cli kind) instead — scripts are batch.
  */
-import { execFile, type ChildProcess } from 'node:child_process';
+import { type ChildProcess, execFile } from 'node:child_process';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

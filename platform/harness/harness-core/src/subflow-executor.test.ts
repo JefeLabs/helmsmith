@@ -1,25 +1,24 @@
 /**
  * Unit tests for the `kind: 'subflow'` step kind.
  *
- * Two test surfaces:
+ * Test surfaces:
  *   1. validateSubflowGraph — compile-time validation. Catches missing
- *      flowIds, cycles (self + transitive), and v1-banned kinds (agent /
- *      approval / suspend in inner flows).
- *   2. End-to-end: parent compiled via compileNonAgentFlow with a real
+ *      flowIds, cycles (self + transitive), and the v2 limits (looped
+ *      subflow over an interrupt-bearing inner; duplicate agent ids).
+ *   2. End-to-end: parent compiled via compileInnerFlow with a real
  *      inner flow. Output flows back, gate-rejected inner produces
  *      error exit on parent, optional input override is honored.
+ *   3. v2: inner agents execute through agentExecutorFactory; inner
+ *      approval pauses propagate to the parent and resume in order
+ *      (single, double, and nested-two-level).
  *
- * agent-driven runJob integration is not covered here (subflows can't
- * contain agents in v1 — by design); orchestrator.test.ts owns the
- * agent + subflow integration story when v2 lifts the restriction.
+ * The full runJob→pause→resumeJob round trip (adapter pipeline +
+ * JobRecord statuses) lives in orchestrator.test.ts.
  */
+import { Command, MemorySaver } from '@langchain/langgraph';
 import { describe, expect, it } from 'vitest';
-import { CatalogError, type FlowDef, type TaskStep } from './catalog.ts';
-import {
-  compileNonAgentFlow,
-  type FlowResolver,
-  validateSubflowGraph,
-} from './subflow-executor.ts';
+import { type ApprovalRequest, CatalogError, type FlowDef, type TaskStep } from './catalog.ts';
+import { compileInnerFlow, type FlowResolver, validateSubflowGraph } from './subflow-executor.ts';
 
 // ─── helpers ──────────────────────────────────────────────────────────────
 
@@ -47,11 +46,7 @@ function gateNode(id: string, alwaysFail = false): TaskStep {
   };
 }
 
-function subflowNode(
-  id: string,
-  flowId: string,
-  input?: Record<string, unknown>,
-): TaskStep {
+function subflowNode(id: string, flowId: string, input?: Record<string, unknown>): TaskStep {
   return { id, kind: 'subflow', config: { flowId, ...(input ? { input } : {}) } };
 }
 
@@ -82,64 +77,85 @@ describe('validateSubflowGraph', () => {
 
   it('throws CatalogError when flowId does not resolve', () => {
     const parent = flowOf('parent', trigger(), subflowNode('s', 'missing'));
-    expect(() => validateSubflowGraph(parent, staticFlowResolver({}))).toThrow(
-      CatalogError,
-    );
+    expect(() => validateSubflowGraph(parent, staticFlowResolver({}))).toThrow(CatalogError);
   });
 
   it('throws CatalogError on self-reference', () => {
     const parent = flowOf('parent', trigger(), subflowNode('s', 'parent'));
-    expect(() =>
-      validateSubflowGraph(parent, staticFlowResolver({ parent })),
-    ).toThrow(/cycle/);
+    expect(() => validateSubflowGraph(parent, staticFlowResolver({ parent }))).toThrow(/cycle/);
   });
 
   it('throws CatalogError on transitive cycle (A → B → A)', () => {
     const flowA: FlowDef = flowOf('A', trigger(), subflowNode('s', 'B'));
     const flowB: FlowDef = flowOf('B', trigger(), subflowNode('s', 'A'));
-    expect(() =>
-      validateSubflowGraph(flowA, staticFlowResolver({ A: flowA, B: flowB })),
-    ).toThrow(/cycle/);
+    expect(() => validateSubflowGraph(flowA, staticFlowResolver({ A: flowA, B: flowB }))).toThrow(
+      /cycle/,
+    );
   });
 
-  it('throws CatalogError when inner contains an agent node (v1 deferral)', () => {
+  it('accepts agent nodes in inner flows (v2)', () => {
     const inner: FlowDef = flowOf('inner', trigger(), {
       id: 'a',
       kind: 'agent',
       config: { agent: { id: 'a' } as never },
     });
     const parent = flowOf('parent', trigger(), subflowNode('s', 'inner'));
-    expect(() =>
-      validateSubflowGraph(parent, staticFlowResolver({ inner })),
-    ).toThrow(/agents in subflows are not supported/);
+    const map = validateSubflowGraph(parent, staticFlowResolver({ inner }));
+    expect(map.get('s')?.id).toBe('inner');
   });
 
-  it('throws CatalogError when inner has approval-tagged node (v1 deferral)', () => {
-    const taggedNode: TaskStep = {
+  it('accepts approval- and suspend-tagged nodes in inner flows (v2)', () => {
+    const approvalNode: TaskStep = {
       id: 'gate1',
       kind: 'gate',
       config: { assertions: [{ expression: { kind: 'literal', value: true }, message: 'ok' }] },
       tags: { approval: { assigneeRole: 'reviewer', slaMs: 1000, concurrency: 'pessimistic' } },
     };
-    const inner: FlowDef = flowOf('inner', trigger(), taggedNode);
+    const suspendNode: TaskStep = {
+      ...transformNode('later', 'x'),
+      tags: { suspend: { trigger: { kind: 'timer', durationMs: 1000 } } },
+    };
+    const inner: FlowDef = flowOf('inner', trigger(), approvalNode, suspendNode);
     const parent = flowOf('parent', trigger(), subflowNode('s', 'inner'));
-    expect(() =>
-      validateSubflowGraph(parent, staticFlowResolver({ inner })),
-    ).toThrow(/interrupt propagation from subflows is not supported/);
+    const map = validateSubflowGraph(parent, staticFlowResolver({ inner }));
+    expect(map.get('s')?.id).toBe('inner');
   });
 
-  it('throws CatalogError when inner has suspend-tagged node (v1 deferral)', () => {
-    const taggedNode: TaskStep = {
+  it('rejects a loop-tagged subflow node whose inner tree contains interrupt tags', () => {
+    const approvalNode: TaskStep = {
       id: 'gate1',
       kind: 'gate',
       config: { assertions: [{ expression: { kind: 'literal', value: true }, message: 'ok' }] },
-      tags: { suspend: { trigger: { kind: 'timer', durationMs: 1000 } } },
+      tags: { approval: { assigneeRole: 'reviewer', slaMs: 1000, concurrency: 'pessimistic' } },
     };
-    const inner: FlowDef = flowOf('inner', trigger(), taggedNode);
-    const parent = flowOf('parent', trigger(), subflowNode('s', 'inner'));
-    expect(() =>
-      validateSubflowGraph(parent, staticFlowResolver({ inner })),
-    ).toThrow(/interrupt propagation from subflows is not supported/);
+    const inner: FlowDef = flowOf('inner', trigger(), approvalNode);
+    const loopedSub: TaskStep = {
+      ...subflowNode('s', 'inner'),
+      tags: {
+        loop: {
+          source: 'collection',
+          path: { kind: 'jsonpath', path: '$.output' },
+          mode: 'sequential',
+        },
+      },
+    };
+    const parent = flowOf('parent', trigger(), loopedSub);
+    expect(() => validateSubflowGraph(parent, staticFlowResolver({ inner }))).toThrow(
+      /loop.*interrupt|interrupt.*loop/i,
+    );
+  });
+
+  it('rejects duplicate agent ids across the subflow tree', () => {
+    const agentStep = (id: string): TaskStep => ({
+      id,
+      kind: 'agent',
+      config: { agent: { id } as never },
+    });
+    const inner: FlowDef = flowOf('inner', trigger(), agentStep('worker'));
+    const parent = flowOf('parent', trigger(), agentStep('worker'), subflowNode('s', 'inner'));
+    expect(() => validateSubflowGraph(parent, staticFlowResolver({ inner }))).toThrow(
+      /duplicate agent id "worker"/,
+    );
   });
 
   it('returns the parent-node-id → inner FlowDef map on a valid graph', () => {
@@ -163,18 +179,17 @@ describe('validateSubflowGraph', () => {
   });
 });
 
-// ─── End-to-end: compileNonAgentFlow + invoke ────────────────────────────
+// ─── End-to-end: compileInnerFlow + invoke ───────────────────────────────
 
-describe('compileNonAgentFlow + makeSubflowExecutor (integration)', () => {
-  // Helper: build a parent flow with a subflow node, compile via the
-  // non-agent path (sufficient since the parent here also has no
-  // agents), and invoke. Returns the final state.
+describe('compileInnerFlow + makeSubflowExecutor (integration)', () => {
+  // Helper: build a parent flow with a subflow node, compile, and
+  // invoke. Returns the final state.
   async function runParent(
     parent: FlowDef,
     flows: Record<string, FlowDef>,
     initialOutput = '',
   ): Promise<Record<string, unknown>> {
-    const graph = compileNonAgentFlow(parent, {
+    const graph = compileInnerFlow(parent, {
       flowResolver: staticFlowResolver(flows),
     });
     const initial = {
@@ -250,5 +265,182 @@ describe('compileNonAgentFlow + makeSubflowExecutor (integration)', () => {
     const parent = flowOf('parent', trigger(), subflowNode('s', 'middle'));
     const result = await runParent(parent, { middle, deepest });
     expect(result.output).toBe('from-deepest');
+  });
+});
+
+// ─── v2: agents inside subflows ───────────────────────────────────────────
+
+describe('agents inside subflows (v2)', () => {
+  const initial = {
+    jobId: 'test-job',
+    output: '',
+    messages: [],
+    attempts: {},
+    lastExit: null,
+    rejectionPayload: null,
+    steering: [],
+    cancelRequested: false,
+    cancelReason: null,
+    changedFiles: [],
+  };
+
+  it('inner agent nodes execute through agentExecutorFactory', async () => {
+    const inner: FlowDef = flowOf('inner', trigger(), {
+      id: 'worker',
+      kind: 'agent',
+      config: { agent: { id: 'worker' } as never },
+    });
+    const parent = flowOf('parent', trigger(), subflowNode('s', 'inner'));
+    const calls: string[] = [];
+    const graph = compileInnerFlow(parent, {
+      flowResolver: staticFlowResolver({ inner }),
+      agentExecutorFactory: (agentNodeId) => async () => {
+        calls.push(agentNodeId);
+        return {
+          output: `agent:${agentNodeId}`,
+          lastExit: { nodeId: agentNodeId, kind: 'success' as const },
+        };
+      },
+    });
+    const result = await graph.invoke(initial, { configurable: { thread_id: 'af-1' } });
+    expect(calls).toEqual(['worker']);
+    expect(result.output).toBe('agent:worker');
+  });
+
+  it('inner agent node without a factory fails loud, not silent', async () => {
+    const inner: FlowDef = flowOf('inner', trigger(), {
+      id: 'worker',
+      kind: 'agent',
+      config: { agent: { id: 'worker' } as never },
+    });
+    const parent = flowOf('parent', trigger(), subflowNode('s', 'inner'));
+    const graph = compileInnerFlow(parent, { flowResolver: staticFlowResolver({ inner }) });
+    const result = await graph.invoke(initial, { configurable: { thread_id: 'af-2' } });
+    expect(result.lastExit).toMatchObject({ kind: 'error', errorName: 'UnconfiguredAgentFactory' });
+  });
+});
+
+// ─── v2: interrupt propagation from subflows ──────────────────────────────
+
+describe('interrupt propagation from subflows (v2)', () => {
+  const initial = {
+    jobId: 'test-job',
+    output: '',
+    messages: [],
+    attempts: {},
+    lastExit: null,
+    rejectionPayload: null,
+    steering: [],
+    cancelRequested: false,
+    cancelReason: null,
+    changedFiles: [],
+  };
+
+  function approvalGate(id: string): TaskStep {
+    return {
+      id,
+      kind: 'gate',
+      config: { assertions: [{ expression: { kind: 'literal', value: true }, message: 'ok' }] },
+      tags: { approval: { assigneeRole: 'reviewer', slaMs: 1000, concurrency: 'pessimistic' } },
+    };
+  }
+
+  it('an approval inside a subflow pauses the parent; resume completes with inner output', async () => {
+    const inner = flowOf(
+      'inner',
+      trigger(),
+      transformNode('draft', 'draft-content'),
+      approvalGate('check'),
+      transformNode('after', 'inner-approved'),
+    );
+    const parent = flowOf(
+      'parent',
+      trigger(),
+      subflowNode('s', 'inner'),
+      transformNode('tail', 'parent-tail'),
+    );
+    const graph = compileInnerFlow(parent, {
+      flowResolver: staticFlowResolver({ inner }),
+      checkpointer: new MemorySaver(),
+    });
+    const config = { configurable: { thread_id: 'sub-appr-1' } };
+
+    const r1 = (await graph.invoke(initial, config)) as Record<string, unknown>;
+    expect(r1.__interrupt__).toBeDefined();
+    const iv = (r1.__interrupt__ as Array<{ value: ApprovalRequest }>)[0]?.value;
+    expect(iv?.kind).toBe('approval');
+    expect(iv?.content).toBe('draft-content');
+    expect(iv?.assigneeRole).toBe('reviewer');
+
+    const r2 = (await graph.invoke(
+      new Command({ resume: { decision: 'approve' } }),
+      config,
+    )) as Record<string, unknown>;
+    expect(r2.__interrupt__).toBeUndefined();
+    expect(r2.output).toBe('parent-tail');
+  });
+
+  it('two approvals inside one subflow pause and resume in order', async () => {
+    const inner = flowOf(
+      'inner',
+      trigger(),
+      transformNode('one', 'first-content'),
+      approvalGate('checkA'),
+      transformNode('two', 'second-content'),
+      approvalGate('checkB'),
+      transformNode('done', 'both-approved'),
+    );
+    const parent = flowOf('parent', trigger(), subflowNode('s', 'inner'));
+    const graph = compileInnerFlow(parent, {
+      flowResolver: staticFlowResolver({ inner }),
+      checkpointer: new MemorySaver(),
+    });
+    const config = { configurable: { thread_id: 'sub-appr-2' } };
+
+    const r1 = (await graph.invoke(initial, config)) as Record<string, unknown>;
+    expect((r1.__interrupt__ as Array<{ value: ApprovalRequest }>)[0]?.value.content).toBe(
+      'first-content',
+    );
+    const r2 = (await graph.invoke(
+      new Command({ resume: { decision: 'approve' } }),
+      config,
+    )) as Record<string, unknown>;
+    expect((r2.__interrupt__ as Array<{ value: ApprovalRequest }>)[0]?.value.content).toBe(
+      'second-content',
+    );
+    const r3 = (await graph.invoke(
+      new Command({ resume: { decision: 'approve' } }),
+      config,
+    )) as Record<string, unknown>;
+    expect(r3.__interrupt__).toBeUndefined();
+    expect(r3.output).toBe('both-approved');
+  });
+
+  it('an approval inside a NESTED subflow (two levels) propagates and resumes', async () => {
+    const deepest = flowOf(
+      'deepest',
+      trigger(),
+      transformNode('work', 'deep-work'),
+      approvalGate('check'),
+      transformNode('after', 'deep-approved'),
+    );
+    const middle = flowOf('middle', trigger(), subflowNode('m', 'deepest'));
+    const parent = flowOf('parent', trigger(), subflowNode('s', 'middle'));
+    const graph = compileInnerFlow(parent, {
+      flowResolver: staticFlowResolver({ middle, deepest }),
+      checkpointer: new MemorySaver(),
+    });
+    const config = { configurable: { thread_id: 'sub-appr-3' } };
+
+    const r1 = (await graph.invoke(initial, config)) as Record<string, unknown>;
+    expect((r1.__interrupt__ as Array<{ value: ApprovalRequest }>)[0]?.value.content).toBe(
+      'deep-work',
+    );
+    const r2 = (await graph.invoke(
+      new Command({ resume: { decision: 'approve' } }),
+      config,
+    )) as Record<string, unknown>;
+    expect(r2.__interrupt__).toBeUndefined();
+    expect(r2.output).toBe('deep-approved');
   });
 });

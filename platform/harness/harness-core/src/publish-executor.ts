@@ -43,7 +43,9 @@ interface PublishExecutorDeps {
 
 export function makePublishExecutor(node: TaskStep, deps: PublishExecutorDeps): NodeExecutor {
   if (node.kind !== 'publish') {
-    throw new Error(`makePublishExecutor: node "${node.id}" has kind "${node.kind}", expected "publish"`);
+    throw new Error(
+      `makePublishExecutor: node "${node.id}" has kind "${node.kind}", expected "publish"`,
+    );
   }
   const config = node.config as PublishConfig;
   const nodeId = node.id;
@@ -51,7 +53,11 @@ export function makePublishExecutor(node: TaskStep, deps: PublishExecutorDeps): 
 
   return async (_state) => {
     if (!deps.githubResolver) {
-      return err(nodeId, 'UnconfiguredGitHub', `publish node "${nodeId}" cannot run — RunJobDeps.githubResolver is not set`);
+      return err(
+        nodeId,
+        'UnconfiguredGitHub',
+        `publish node "${nodeId}" cannot run — RunJobDeps.githubResolver is not set`,
+      );
     }
     try {
       if (config.action === 'push-and-open-pr') {
@@ -77,26 +83,46 @@ async function runPushAndOpenPr(
 ): Promise<NodeDelta> {
   const repoName = pickRepo(config.repo, job);
   if (!repoName) {
-    return err(nodeId, 'AmbiguousRepo', `publish node "${nodeId}": no repo given and product has ${job.productRepos?.length ?? 0} repos — set config.repo`);
+    return err(
+      nodeId,
+      'AmbiguousRepo',
+      `publish node "${nodeId}": no repo given and product has ${job.productRepos?.length ?? 0} repos — set config.repo`,
+    );
   }
   if (!job.workdirRoot) {
-    return err(nodeId, 'NoWorkdir', `publish node "${nodeId}": JobRecord.workdirRoot is unset — cannot locate the worktree`);
+    return err(
+      nodeId,
+      'NoWorkdir',
+      `publish node "${nodeId}": JobRecord.workdirRoot is unset — cannot locate the worktree`,
+    );
   }
   const worktree = `${job.workdirRoot}/${repoName}`;
 
   const branchName = (await git(worktree, ['rev-parse', '--abbrev-ref', 'HEAD'])).trim();
   if (!branchName || branchName === 'HEAD') {
-    return err(nodeId, 'DetachedHead', `publish node "${nodeId}": worktree is on a detached HEAD — no branch to push`);
+    return err(
+      nodeId,
+      'DetachedHead',
+      `publish node "${nodeId}": worktree is on a detached HEAD — no branch to push`,
+    );
   }
   const remoteUrl = (await git(worktree, ['remote', 'get-url', 'origin'])).trim();
   const slug = parseRepoSlug(remoteUrl);
   if (!slug) {
-    return err(nodeId, 'UnparseableRemote', `publish node "${nodeId}": could not parse owner/name from origin URL "${remoteUrl}"`);
+    return err(
+      nodeId,
+      'UnparseableRemote',
+      `publish node "${nodeId}": could not parse owner/name from origin URL "${remoteUrl}"`,
+    );
   }
 
   const cred = await resolver.resolve({ owner: slug.owner, name: slug.name, remoteUrl });
   if (!cred) {
-    return err(nodeId, 'NoGitHubCreds', `publish node "${nodeId}": no GitHub credentials for ${slug.owner}/${slug.name} (tried local gh + controlplane)`);
+    return err(
+      nodeId,
+      'NoGitHubCreds',
+      `publish node "${nodeId}": no GitHub credentials for ${slug.owner}/${slug.name} (tried local gh + controlplane)`,
+    );
   }
 
   // Push. SSH remotes use the worker's SSH agent; HTTPS remotes get the
@@ -167,7 +193,13 @@ export async function findOrCreatePr(
     cred,
     'POST',
     `/repos/${slug.owner}/${slug.name}/pulls`,
-    { title: params.title, head: params.head, base: params.base, body: params.body, draft: params.draft },
+    {
+      title: params.title,
+      head: params.head,
+      base: params.base,
+      body: params.body,
+      draft: params.draft,
+    },
   );
   return { html_url: pr.html_url, number: pr.number, reused: false };
 }
@@ -184,11 +216,19 @@ async function runMergePr(
   fetchFn: typeof fetch,
 ): Promise<NodeDelta> {
   if (!job.prUrl) {
-    return err(nodeId, 'NoPr', `merge-pr node "${nodeId}": JobRecord.prUrl is unset — no upstream push-and-open-pr node ran`);
+    return err(
+      nodeId,
+      'NoPr',
+      `merge-pr node "${nodeId}": JobRecord.prUrl is unset — no upstream push-and-open-pr node ran`,
+    );
   }
   const ref = parsePrUrl(job.prUrl);
   if (!ref) {
-    return err(nodeId, 'UnparseablePrUrl', `merge-pr node "${nodeId}": could not parse owner/name/number from "${job.prUrl}"`);
+    return err(
+      nodeId,
+      'UnparseablePrUrl',
+      `merge-pr node "${nodeId}": could not parse owner/name/number from "${job.prUrl}"`,
+    );
   }
 
   // Idempotency short-circuit: a recorded mergeSha means this PR was
@@ -203,7 +243,11 @@ async function runMergePr(
 
   const cred = await resolver.resolve({ owner: ref.owner, name: ref.name });
   if (!cred) {
-    return err(nodeId, 'NoGitHubCreds', `merge-pr node "${nodeId}": no GitHub credentials for ${ref.owner}/${ref.name}`);
+    return err(
+      nodeId,
+      'NoGitHubCreds',
+      `merge-pr node "${nodeId}": no GitHub credentials for ${ref.owner}/${ref.name}`,
+    );
   }
 
   const method = config.method ?? 'squash';
@@ -215,16 +259,24 @@ async function runMergePr(
     { merge_method: method },
   );
   if (!merge.merged) {
-    return err(nodeId, 'MergeRejected', `merge-pr node "${nodeId}": GitHub reported merged=false for PR #${ref.number}`);
+    return err(
+      nodeId,
+      'MergeRejected',
+      `merge-pr node "${nodeId}": GitHub reported merged=false for PR #${ref.number}`,
+    );
   }
 
   job.mergeSha = merge.sha;
 
   // Best-effort branch cleanup — failures here don't fail the node.
   if ((config.deleteBranch ?? true) && job.branchName) {
-    await ghApi(fetchFn, cred, 'DELETE', `/repos/${ref.owner}/${ref.name}/git/refs/heads/${job.branchName}`, undefined).catch(
-      () => {},
-    );
+    await ghApi(
+      fetchFn,
+      cred,
+      'DELETE',
+      `/repos/${ref.owner}/${ref.name}/git/refs/heads/${job.branchName}`,
+      undefined,
+    ).catch(() => {});
   }
 
   return {
@@ -270,7 +322,13 @@ async function getDefaultBranch(
   cred: GitHubCredential,
   fetchFn: typeof fetch,
 ): Promise<string> {
-  const repo = await ghApi<{ default_branch: string }>(fetchFn, cred, 'GET', `/repos/${slug.owner}/${slug.name}`, undefined);
+  const repo = await ghApi<{ default_branch: string }>(
+    fetchFn,
+    cred,
+    'GET',
+    `/repos/${slug.owner}/${slug.name}`,
+    undefined,
+  );
   return repo.default_branch || 'main';
 }
 
@@ -313,7 +371,9 @@ async function ghApi<T>(
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(`GitHub ${method} ${path} → ${res.status} ${res.statusText}${text ? `: ${truncate(text, 300)}` : ''}`);
+    throw new Error(
+      `GitHub ${method} ${path} → ${res.status} ${res.statusText}${text ? `: ${truncate(text, 300)}` : ''}`,
+    );
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;

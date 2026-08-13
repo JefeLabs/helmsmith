@@ -1069,7 +1069,7 @@ async function handleSubmitJob(
         return;
       }
       resolvedFlow = pipeline;
-      const flatAgents = [...walkAgents(pipeline)];
+      const flatAgents = [...walkAgents(pipeline, (id) => findFlow(ctx.catalog, id))];
       agents = [
         registeredFromDef(COORDINATOR_AGENT, setName),
         ...flatAgents.map((d) => registeredFromDef(d, setName)),
@@ -1387,6 +1387,9 @@ function executeRun(ctx: ServerCtx, jobId: string): void {
     broker,
     adapterFactory: ctx.adapterFactory,
     resolver: ctx.resolver,
+    // Subflow targets resolve against the live catalog (v2: inner
+    // flows may contain agents and approval/suspend tags).
+    flowResolver: (id) => findFlow(ctx.catalog, id),
     ...(ctx.githubResolver ? { githubResolver: ctx.githubResolver } : {}),
     graphs: ctx.graphs,
     checkpointer: ctx.checkpointer,
@@ -1464,7 +1467,9 @@ function spawnFlowJob(
   try {
     agents = [
       registeredFromDef(COORDINATOR_AGENT, setName),
-      ...[...walkAgents(flow)].map((d) => registeredFromDef(d, setName)),
+      ...[...walkAgents(flow, (id) => findFlow(ctx.catalog, id))].map((d) =>
+        registeredFromDef(d, setName),
+      ),
       registeredFromDef(CHECKOUT_COORDINATOR_AGENT, setName),
     ];
   } catch (err) {
@@ -1600,6 +1605,7 @@ function executeResume(ctx: ServerCtx, jobId: string, resumeValue: unknown): voi
       broker,
       adapterFactory,
       resolver,
+      flowResolver: (id) => findFlow(ctx.catalog, id),
       graphs: ctx.graphs,
       // 2.2 — the shared durable checkpointer enables recompile-on-
       // resume after a restart, and the GitHub resolver must ride along

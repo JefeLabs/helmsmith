@@ -55,7 +55,7 @@ A flow is a graph of `TaskStep` nodes — one polymorphic primitive discriminate
 | `script` | `bash` \| `node` \| `python` + inline `source` + `secrets` (broker-resolved env credentials) | Batch subprocess, state via stdin + env |
 | `transform` | one `Expression` | Pure data shaping into `state.output` |
 | `gate` | `assertions[]` (expression + message) | All pass → success; any fail → reject with payload |
-| `subflow` | `flowId` + optional `input` | Composed inner flow (deterministic-only in v1) |
+| `subflow` | `flowId` + optional `input` | Composed inner flow (v2: agents + approval/suspend propagate) |
 | `publish` | `push-and-open-pr` \| `merge-pr` | Ship the work as a PR |
 
 Edge types and the routing precedence the runtime implements (spec'd here so a designer can preview it):

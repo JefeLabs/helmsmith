@@ -60,8 +60,7 @@ const STUB_BROKER = {
   getCredential: async (id: string) => ({ apiKey: `sk-${id}` }),
 } as unknown as CredentialBroker;
 
-const HAS_PYTHON =
-  existsSync('/usr/bin/python3') || existsSync('/usr/local/bin/python3');
+const HAS_PYTHON = existsSync('/usr/bin/python3') || existsSync('/usr/local/bin/python3');
 
 // ─── state view ───────────────────────────────────────────────────────────
 
@@ -153,9 +152,7 @@ describe('makeScriptExecutor: bash language', () => {
   });
 
   it('returns Timeout when script exceeds timeoutMs', async () => {
-    const exec = makeScriptExecutor(
-      scriptStep('s', 'bash', 'sleep 5', { timeoutMs: 100 }),
-    );
+    const exec = makeScriptExecutor(scriptStep('s', 'bash', 'sleep 5', { timeoutMs: 100 }));
     const delta = await exec(freshState());
     expect(delta.lastExit).toMatchObject({
       kind: 'error',
@@ -190,9 +187,7 @@ describe('makeScriptExecutor: node language', () => {
   });
 
   it('routes node SyntaxError to ScriptError', async () => {
-    const exec = makeScriptExecutor(
-      scriptStep('s', 'node', 'this is not valid js !!!'),
-    );
+    const exec = makeScriptExecutor(scriptStep('s', 'node', 'this is not valid js !!!'));
     const delta = await exec(freshState());
     expect(delta.lastExit).toMatchObject({
       kind: 'error',

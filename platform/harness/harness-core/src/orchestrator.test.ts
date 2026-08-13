@@ -11,6 +11,7 @@ import {
 import type { CredentialBroker, Provider, ResolvedBinding } from '@helmsmith/agent-auth';
 import { MemorySaver } from '@langchain/langgraph';
 import { describe, expect, it } from 'vitest';
+import type { FlowDef } from './catalog.ts';
 import type { ApprovalRequest } from './flow-graph.ts';
 import type { JobRecord } from './job.ts';
 import { type AdapterEvent, JobBus } from './job-bus.ts';
@@ -1375,6 +1376,103 @@ describe('runJob + resumeJob (Approval tag)', () => {
   });
 });
 
+describe('runJob — subflow v2 (agents + interrupts inside inner flows)', () => {
+  it('runs an inner agent through the shared pipeline, pauses on an inner approval, resumes to completion', async () => {
+    const { runJob, resumeJob } = await import('./orchestrator.ts');
+
+    const jobs = new Map<string, JobRecord>();
+    const bus = new JobBus();
+    const graphs = new Map<string, CompiledFlowGraph>();
+    const approvalRequests: ApprovalRequest[] = [];
+
+    const inner: FlowDef = {
+      id: 'inner-review',
+      nodes: [
+        { id: '__t', kind: 'trigger', config: { kind: 'manual' } },
+        {
+          id: 'worker',
+          kind: 'agent',
+          config: { agent: { id: 'worker' } as never },
+          tags: {
+            approval: { assigneeRole: 'reviewer', slaMs: 60_000, concurrency: 'pessimistic' },
+          },
+        },
+      ],
+      edges: [{ from: '__t', to: 'worker', type: 'sequence' }],
+    };
+    const parent: FlowDef = {
+      id: 'parent-flow',
+      nodes: [
+        { id: '__trigger', kind: 'trigger', config: { kind: 'manual' } },
+        { id: 'sub', kind: 'subflow', config: { flowId: 'inner-review' } },
+        {
+          id: 'tail',
+          kind: 'transform',
+          config: { expression: { kind: 'literal', value: 'after-subflow' } },
+        },
+      ],
+      edges: [
+        { from: '__trigger', to: 'sub', type: 'sequence' },
+        { from: 'sub', to: 'tail', type: 'sequence' },
+      ],
+    };
+    const job: JobRecord = {
+      jobId: 'jSub',
+      pipeline: 'parent-flow',
+      status: 'received',
+      submittedAt: 'now',
+      input: 'review this',
+      flow: parent,
+      // Registration recursion (walkAgents + resolver) puts inner
+      // agents on the flat list — mirrored here.
+      agents: [
+        { id: 'worker', role: 'Work', adapter: 'claude-sdk', systemPrompt: 'w', status: 'pending' },
+      ],
+    };
+    jobs.set('jSub', job);
+
+    let factoryCalls = 0;
+    const factory: AdapterFactory = () => {
+      factoryCalls++;
+      return new TestAdapter({ kind: 'ok', reply: `inner-reply-${factoryCalls}` });
+    };
+    const flowResolver = (id: string) => (id === 'inner-review' ? inner : undefined);
+
+    await runJob('jSub', {
+      jobs,
+      bus,
+      broker: dummyBroker,
+      adapterFactory: factory,
+      flowResolver,
+      graphs,
+      onAwaitingApproval: (_jobId, request) => {
+        approvalRequests.push(request);
+      },
+    });
+
+    // The inner agent ran through the shared executor pipeline (its
+    // RegisteredAgent status updated), then the inner approval paused
+    // the PARENT job through the propagated interrupt.
+    expect(job.status).toBe('awaiting-approval');
+    expect(job.agents.find((a) => a.id === 'worker')?.status).toBe('completed');
+    expect(approvalRequests).toHaveLength(1);
+    expect(approvalRequests[0]?.nodeId).toBe('worker');
+    expect(approvalRequests[0]?.content).toBe('inner-reply-1');
+
+    await resumeJob(
+      'jSub',
+      { decision: 'approve' },
+      { jobs, bus, broker: dummyBroker, adapterFactory: factory, flowResolver, graphs },
+    );
+
+    // Inner completed; parent continued past the subflow node.
+    expect(job.status).toBe('completed');
+    // The inner agent did NOT re-run on resume (synthetic node owns
+    // the interrupt; the effect-guarded re-entry restores its output).
+    expect(factoryCalls).toBe(1);
+  });
+});
+
 describe('resumeJob — recompile-on-resume + paused-status guard (2.2)', () => {
   function approvalJob(jobId: string): JobRecord {
     return {
@@ -1403,8 +1501,20 @@ describe('resumeJob — recompile-on-resume + paused-status guard (2.2)', () => 
         ],
       },
       agents: [
-        { id: 'planner', role: 'Plan', adapter: 'claude-sdk', systemPrompt: 'plan', status: 'pending' },
-        { id: 'builder', role: 'Build', adapter: 'claude-sdk', systemPrompt: 'build', status: 'pending' },
+        {
+          id: 'planner',
+          role: 'Plan',
+          adapter: 'claude-sdk',
+          systemPrompt: 'plan',
+          status: 'pending',
+        },
+        {
+          id: 'builder',
+          role: 'Build',
+          adapter: 'claude-sdk',
+          systemPrompt: 'build',
+          status: 'pending',
+        },
       ],
     };
   }
@@ -1450,9 +1560,7 @@ describe('resumeJob — recompile-on-resume + paused-status guard (2.2)', () => 
     await runJob('jN', deps);
     graphs.delete('jN');
 
-    await expect(resumeJob('jN', { decision: 'approve' }, deps)).rejects.toThrow(
-      /no cached graph/,
-    );
+    await expect(resumeJob('jN', { decision: 'approve' }, deps)).rejects.toThrow(/no cached graph/);
   });
 
   it('rejects resuming a job that is not paused', async () => {
@@ -1538,7 +1646,9 @@ describe('adapter registry (3.4)', () => {
       status: 'received',
       submittedAt: 'now',
       input: 'x',
-      agents: [{ id: 'w', role: 'W', adapter: 'ghost-adapter', systemPrompt: 's', status: 'pending' }],
+      agents: [
+        { id: 'w', role: 'W', adapter: 'ghost-adapter', systemPrompt: 's', status: 'pending' },
+      ],
     };
     const jobs = new Map<string, JobRecord>([['jGhost', job]]);
     await runJob('jGhost', { jobs, bus: new JobBus(), broker: dummyBroker });
@@ -1565,7 +1675,13 @@ describe('JobIntent emission (2.9)', () => {
         edges: [{ from: '__trigger', to: 'planner', type: 'sequence' }],
       } as JobRecord['flow'],
       agents: [
-        { id: 'planner', role: 'Plan', adapter: 'claude-sdk', systemPrompt: 'plan', status: 'pending' },
+        {
+          id: 'planner',
+          role: 'Plan',
+          adapter: 'claude-sdk',
+          systemPrompt: 'plan',
+          status: 'pending',
+        },
       ],
     };
   }

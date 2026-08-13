@@ -47,8 +47,8 @@ import {
   type FlowRunState,
   type NodeExit,
   resolveExpressionValue,
-  schemaViolations,
   type SuspendRequest,
+  schemaViolations,
 } from '@helmsmith/flow-spec';
 import {
   Annotation,
@@ -265,6 +265,14 @@ export interface CompileFlowOptions {
    *  tag. Caller can pass a Postgres/SQLite saver to make awaiting-
    *  approval / suspended jobs survive process restarts. */
   checkpointer?: BaseCheckpointSaver;
+  /** Compile as a subgraph: attach NO checkpointer of its own, so the
+   *  graph inherits the parent's through the invoking node's config
+   *  (LangGraph namespaces child checkpoints automatically). This is
+   *  what lets an inner subflow's interrupt() persist into the SAME
+   *  durable saver as the parent and resume through the parent's
+   *  Command({resume}) — subflow v2's interrupt propagation. Mutually
+   *  exclusive with `checkpointer`. */
+  asSubgraph?: boolean;
 }
 
 /**
@@ -363,6 +371,18 @@ export function compileFlow(opts: CompileFlowOptions) {
   //
   // Caller-supplied checkpointer wins, as before — production swaps in
   // PostgresSaver / SqliteSaver via opts.checkpointer.
+  //
+  // Subgraphs attach NONE: a compiled graph invoked inside a parent
+  // node with the parent's config inherits the parent's checkpointer
+  // under a namespaced checkpoint_ns — attaching its own here would
+  // sever that link and strand inner interrupt state in a private
+  // MemorySaver (invisible to the parent's resume and lost on restart).
+  if (opts.asSubgraph) {
+    if (opts.checkpointer) {
+      throw new Error('compileFlow: asSubgraph and checkpointer are mutually exclusive');
+    }
+    return builder.compile();
+  }
   const checkpointer = opts.checkpointer ?? new MemorySaver();
 
   return builder.compile({ checkpointer });
@@ -859,7 +879,8 @@ function withNodeIO(step: TaskStep, exec: NodeExecutor): NodeExecutor {
     // Spread the delta's OWN nodes writes first — a loop's cross-
     // iteration accumulation (or any executor's direct nodes writes)
     // must survive the node's own evidence entry.
-    if (!wantsJson) return completed({ ...delta, nodes: { ...delta.nodes, [nodeId]: delta.output } });
+    if (!wantsJson)
+      return completed({ ...delta, nodes: { ...delta.nodes, [nodeId]: delta.output } });
     let parsed: unknown;
     try {
       parsed = JSON.parse(delta.output);
@@ -1269,10 +1290,7 @@ function mergeLoopDeltas(
   }
   for (const ch of ['messages', 'steering', 'changedFiles'] as const) {
     if (acc[ch] !== undefined || delta[ch] !== undefined) {
-      out[ch] = [
-        ...((acc[ch] as unknown[]) ?? []),
-        ...((delta[ch] as unknown[]) ?? []),
-      ] as never;
+      out[ch] = [...((acc[ch] as unknown[]) ?? []), ...((delta[ch] as unknown[]) ?? [])] as never;
     }
   }
   return out;

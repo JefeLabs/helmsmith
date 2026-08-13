@@ -112,9 +112,11 @@ Config: `{ "expression": Expression }`. Writes the resolved value to `state.outp
 
 Config: `{ "assertions": [{ "expression": Expression, "message": string }, …] }` (non-empty). All hold → success; any fail → reject exit with a `RejectionPayload` (`reason` = joined messages, `findings` = structured failures, `attempt` counter). Route the reject edge back to the producing node for retry-with-context loops.
 
-### 2.7 `subflow` — composition ⚠️ (deterministic-only)
+### 2.7 `subflow` — composition ✅ (v2: agents + interrupts)
 
-Config: `{ "flowId": string, "version"?: string, "input"?: Record<string, unknown> }` (input values are Expressions). Parent state passes through; inner output replaces parent `output`; `changedFiles`/`steering` merge back. `version` pins the target flow's `version` — recorded but **not enforced** (resolution stays by flowId; warned as `subflow-version-pin`). **v1 bans, enforced at compile time:** no `agent` nodes and no `approval`/`suspend` tags inside a subflow (or any nested subflow). Cycles across subflow references are also rejected.
+Config: `{ "flowId": string, "version"?: string, "input"?: Record<string, unknown> }` (input values are Expressions). Parent state passes through; inner output replaces parent `output`; `changedFiles`/`steering` merge back. `version` pins the target flow's `version` — recorded but **not enforced** (resolution stays by flowId; warned as `subflow-version-pin`).
+
+**v2 composition:** inner flows may contain `agent` nodes (executed through the same adapter-dispatch/fallback/JobRecord pipeline as parent agents; registration recurses via `walkAgents(flow, resolver)`) and `approval`/`suspend` tags. An interrupt-bearing inner compiles as a subgraph sharing the parent's checkpointer (namespaced), so an inner pause **pauses the parent job** with the same request payload, persists durably, and resumes through the same resume route — multi-pause and nested-subflow pauses resume in order. **Remaining compile-time rejections:** a loop-tagged subflow node whose inner tree contains interrupt tags (iterations would share one pause namespace); duplicate agent ids across the subflow tree (the RegisteredAgent list is flat); cycles across subflow references.
 
 ### 2.8 `publish` — delivery ✅
 
