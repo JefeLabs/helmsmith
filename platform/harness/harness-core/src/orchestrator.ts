@@ -14,7 +14,7 @@ import {
 } from '@helmsmith/agent-auth';
 import { type BaseCheckpointSaver, Command } from '@langchain/langgraph';
 import { type BindingToSpecOptions, bindingToSpec } from './binding-to-spec.ts';
-import { type AdapterId, type FlowDef, type McpToolDef, parseFlowOutput } from './catalog.ts';
+import { type AdapterId, type FlowDef, type JobIntent, type McpToolDef, parseFlowOutput } from './catalog.ts';
 import { discoverChangedFiles } from './changed-files.ts';
 import {
   type ApprovalRequest,
@@ -240,6 +240,17 @@ export interface RunJobDeps {
    * with any value (suspend has no meaningful resume payload).
    */
   onSuspend?: (jobId: string, request: SuspendRequest) => void;
+  /**
+   * Fired when a flow with a `job-intent` / `job-intents` output
+   * contract completes (2.9) — the factory/fleet seam's second half.
+   * The intents have already been shape-enforced by parseFlowOutput
+   * and recorded on `job.flowOutput`; the callback's job is submission
+   * (harness-server spawns child jobs through its dispatcher). Fired
+   * AFTER the 'completed' status transition so a spawning callback
+   * observes a settled parent. Single-intent contracts deliver a
+   * one-element array.
+   */
+  onJobIntents?: (jobId: string, intents: JobIntent[]) => void;
   /**
    * Resolver for `kind: 'tool'` step references. Maps a TaskStep's
    * `ToolConfig.toolId` to a `ToolDef` (cli/http/mcp). Returns
@@ -878,6 +889,13 @@ function finalizeOrPause(
       }
       job.status = 'completed';
       deps.onStatusChange?.(jobId, null, 'completed');
+      // 2.9 — hand the enforced work order(s) to the caller for
+      // submission. parseFlowOutput already guaranteed the shape.
+      if (contract?.kind === 'job-intent') {
+        deps.onJobIntents?.(jobId, [parsed.value as JobIntent]);
+      } else if (contract?.kind === 'job-intents') {
+        deps.onJobIntents?.(jobId, parsed.value as JobIntent[]);
+      }
     }
   }
   deps.graphs?.delete(jobId);

@@ -708,8 +708,10 @@ export type FlowOutputContract =
   | { kind: 'structured'; schema: unknown };
 
 /** The runtime representation of a JobIntent — what JobDefinitionFlows
- *  emit, what gets submitted to JobStateMachine to launch the actual
- *  work flow. */
+ *  emit. Emission is real (2.9): when a `job-intent`/`job-intents`
+ *  flow completes, harness-server submits one child job per intent
+ *  through its dispatcher, recording `parentJobId` on the child and
+ *  `spawnedJobIds` (+ per-intent `spawnErrors`) on the parent. */
 export interface JobIntent {
   flowId: string;
   productId: string;

@@ -23,6 +23,7 @@ import {
   findProduct,
   getJobSteering,
   JobBus,
+  type JobIntent,
   type JobRecord,
   mimeFromPath,
   type RegisteredAgent,
@@ -1212,68 +1213,9 @@ async function handleSubmitJob(
     // with FIFO queueing. Capacity check has already happened above
     // (we 503'd before responding 200 if the queue overflow threshold
     // was hit) — this fire closure either runs immediately or waits in
-    // the queue for a slot.
-    const fire = () => {
-      void runJob(jobId, {
-        jobs: ctx.jobs,
-        bus: ctx.bus,
-        broker,
-        adapterFactory,
-        resolver,
-        ...(githubResolver ? { githubResolver } : {}),
-        graphs: ctx.graphs,
-        checkpointer: ctx.checkpointer,
-        onStatusChange: (jid, agentId, status) => {
-          onJobTerminal(agentId, status);
-          // W1d — push job-level transitions up to the controlplane.
-          if (agentId === null) emitJobStatusToControlplane(jid, status);
-          // Free the dispatcher slot on terminal status. Paused statuses
-          // (awaiting-approval / suspended) are intentionally NOT
-          // terminal — paused jobs continue holding their slot until
-          // they actually complete or fail.
-          if (
-            agentId === null &&
-            (status === 'completed' || status === 'failed' || status === 'cancelled')
-          ) {
-            dispatcherOnJobTerminal(ctx, jid);
-            // 2.2 — a terminal job is no longer paused; drop its
-            // persisted pause record (no-op when none exists) and any
-            // still-armed SLA timer (2.1).
-            void deletePausedJob(ctx.stateDir, jid).catch(() => {});
-            clearSlaTimer(ctx, jid);
-            clearSuspendTimer(ctx, jid);
-            // F19: best-effort cleanup of unconfirmed memory entries
-            // scoped to this job. The endpoint, primitives, and CLI are
-            // all already shipped; this is the missing auto-fire on
-            // job-end. Cleanup failures are swallowed — operators can
-            // always run `edge-memory cleanup --scope jobId:X` as the
-            // fallback.
-            if (ctx.memorySocketPath) {
-              void cleanupJobMemory(ctx.memorySocketPath, jid).catch(() => {
-                // already logged inside cleanupJobMemory
-              });
-            }
-          }
-        },
-        onAwaitingApproval: (jid, request) => {
-          ctx.pendingApprovals.set(jid, request);
-          persistPause(ctx, jid, 'approval', request);
-          armSlaTimer(ctx, jid, request, new Date().toISOString());
-          // Gate 2b — best-effort: surface the (PR-enriched) approval
-          // request to the controlplane so the web HITL view can show
-          // it. No-op when CONTROLPLANE_URL is unset (local-only setups
-          // read the request via GET /v1/jobs/:id/approval instead).
-          // Failures are swallowed — the UDS surface is the source of
-          // truth; the controlplane copy is a convenience mirror.
-          emitApprovalToControlplane(jid, request);
-        },
-        onSuspend: (jid, request) => {
-          ctx.pendingSuspends.set(jid, request);
-          persistPause(ctx, jid, 'suspend', request);
-          armSuspendTimer(ctx, jid, request, new Date().toISOString());
-        },
-      });
-    };
+    // the queue for a slot. executeRun carries the full hook wiring,
+    // shared with JobIntent child spawns (2.9).
+    const fire = () => executeRun(ctx, jobId);
 
     const decision = evaluateSubmission(ctx);
     if (decision.kind === 'fire-immediate') {
@@ -1371,6 +1313,146 @@ async function handleResumeJob(
 }
 
 /**
+ * The single in-process run-execution path (2.9) — shared by the HTTP
+ * submit route's dispatcher fire and JobIntent child spawns, so every
+ * job gets identical hook wiring: status/controlplane emission,
+ * dispatcher-slot release, pause persistence, SLA/suspend timers,
+ * pending-request bookkeeping, token detach, memory cleanup, and
+ * recursive intent emission.
+ */
+function executeRun(ctx: ServerCtx, jobId: string): void {
+  const broker = ctx.broker;
+  if (!broker) return; // registration-only mode — callers gate on this too
+  const tokens = ctx.tokens;
+  void runJob(jobId, {
+    jobs: ctx.jobs,
+    bus: ctx.bus,
+    broker,
+    adapterFactory: ctx.adapterFactory,
+    resolver: ctx.resolver,
+    ...(ctx.githubResolver ? { githubResolver: ctx.githubResolver } : {}),
+    graphs: ctx.graphs,
+    checkpointer: ctx.checkpointer,
+    onStatusChange: (jid, agentId, status) => {
+      if (agentId === null && (status === 'completed' || status === 'failed')) {
+        tokens.detach(jid);
+        ctx.pendingApprovals.delete(jid);
+        ctx.pendingSuspends.delete(jid);
+      }
+      // W1d — push job-level transitions up to the controlplane.
+      if (agentId === null) emitJobStatusToControlplane(jid, status);
+      // Free the dispatcher slot on terminal status. Paused statuses
+      // (awaiting-approval / suspended) are intentionally NOT terminal —
+      // paused jobs continue holding their slot until they actually
+      // complete or fail.
+      if (
+        agentId === null &&
+        (status === 'completed' || status === 'failed' || status === 'cancelled')
+      ) {
+        dispatcherOnJobTerminal(ctx, jid);
+        // 2.2 — a terminal job is no longer paused; drop its persisted
+        // pause record (no-op when none exists) and any timers.
+        void deletePausedJob(ctx.stateDir, jid).catch(() => {});
+        clearSlaTimer(ctx, jid);
+        clearSuspendTimer(ctx, jid);
+        // F19: best-effort cleanup of unconfirmed memory entries scoped
+        // to this job. Failures are swallowed — operators can run
+        // `edge-memory cleanup --scope jobId:X` as the fallback.
+        if (ctx.memorySocketPath) {
+          void cleanupJobMemory(ctx.memorySocketPath, jid).catch(() => {
+            // already logged inside cleanupJobMemory
+          });
+        }
+      }
+    },
+    onAwaitingApproval: (jid, request) => {
+      ctx.pendingApprovals.set(jid, request);
+      persistPause(ctx, jid, 'approval', request);
+      armSlaTimer(ctx, jid, request, new Date().toISOString());
+      // Gate 2b — best-effort mirror to the controlplane HITL view.
+      emitApprovalToControlplane(jid, request);
+    },
+    onSuspend: (jid, request) => {
+      ctx.pendingSuspends.set(jid, request);
+      persistPause(ctx, jid, 'suspend', request);
+      armSuspendTimer(ctx, jid, request, new Date().toISOString());
+    },
+    onJobIntents: (jid, intents) => spawnJobsFromIntents(ctx, jid, intents),
+  });
+}
+
+/**
+ * JobIntent emission (2.9) — the factory/fleet seam's second half.
+ * Called when a job-definition flow completes with enforced intent(s):
+ * each intent becomes a child job submitted through the same dispatcher
+ * as HTTP submissions. Lineage is recorded both ways (parentJobId /
+ * spawnedJobIds); intents that cannot spawn (unknown flowId,
+ * unresolvable accepts set) land on parent.spawnErrors and are warned —
+ * the parent stays completed: its own work (emitting a well-formed
+ * order) succeeded.
+ */
+function spawnJobsFromIntents(ctx: ServerCtx, parentJobId: string, intents: JobIntent[]): void {
+  const parent = ctx.jobs.get(parentJobId);
+  const spawned: string[] = [];
+  const errors: string[] = [];
+  for (const intent of intents) {
+    const flow = findFlow(ctx.catalog, intent.flowId);
+    if (!flow) {
+      errors.push(`intent flowId "${intent.flowId}" is not in the catalog`);
+      continue;
+    }
+    const setName = intent.set ?? 'default';
+    let agents: RegisteredAgent[];
+    try {
+      agents = [
+        registeredFromDef(COORDINATOR_AGENT, setName),
+        ...[...walkAgents(flow)].map((d) => registeredFromDef(d, setName)),
+        registeredFromDef(CHECKOUT_COORDINATOR_AGENT, setName),
+      ];
+    } catch (err) {
+      errors.push(`intent for "${intent.flowId}": ${(err as Error).message}`);
+      continue;
+    }
+    const childId = `job_${randomUUID().slice(0, 8)}`;
+    const child: JobRecord = {
+      jobId: childId,
+      pipeline: flow.id,
+      productId: intent.productId,
+      input: typeof intent.input === 'string' ? intent.input : JSON.stringify(intent.input),
+      ...(intent.config ? { config: intent.config } : {}),
+      flow,
+      workdirRoot: ctx.workspaceRoot,
+      status: 'received',
+      submittedAt: new Date().toISOString(),
+      agents,
+      parentJobId,
+    };
+    ctx.jobs.set(childId, child);
+    ctx.tokens.attach(ctx.bus, childId);
+    spawned.push(childId);
+    const decision = evaluateSubmission(ctx);
+    const fire = () => executeRun(ctx, childId);
+    if (decision.kind === 'fire-immediate') {
+      dispatcherFireImmediate(ctx, childId, fire);
+    } else if (decision.kind === 'enqueue') {
+      dispatcherEnqueue(ctx, childId, fire);
+    } else {
+      // Queue overflow: the child record stays 'received' for operator
+      // visibility rather than being silently dropped.
+      spawned.pop();
+      errors.push(`intent for "${intent.flowId}": dispatcher at capacity (${decision.reason})`);
+    }
+  }
+  if (parent) {
+    parent.spawnedJobIds = spawned;
+    if (errors.length > 0) parent.spawnErrors = errors;
+  }
+  for (const e of errors) {
+    console.warn(`[harness] job ${parentJobId}: intent spawn skipped — ${e}`);
+  }
+}
+
+/**
  * The single resume-execution path (2.1) — shared by the HTTP route and
  * the SLA auto-reject timer, so both clear the same state and fire the
  * same hooks. Clears the pending request + SLA timer + persisted pause
@@ -1408,6 +1490,10 @@ function executeResume(ctx: ServerCtx, jobId: string, resumeValue: unknown): voi
       ctx.pendingApprovals.delete(jobId);
       ctx.pendingSuspends.delete(jobId);
       void deletePausedJob(ctx.stateDir, jobId).catch(() => {});
+      // Paused jobs hold their dispatcher slot until a true terminal
+      // state — release it here (the run-path release only fires for
+      // jobs that never paused; a resumed job ends through THIS hook).
+      dispatcherOnJobTerminal(ctx, jobId);
       // F19: same cleanup hook as the initial-submission paths. A
       // resumed job that ultimately completes from this path should
       // also clean up its unconfirmed memory.
@@ -1441,6 +1527,8 @@ function executeResume(ctx: ServerCtx, jobId: string, resumeValue: unknown): voi
         persistPause(ctx, jid, 'suspend', request);
         armSuspendTimer(ctx, jid, request, new Date().toISOString());
       },
+      // 2.9 — a job-definition flow resumed past a pause still emits.
+      onJobIntents: (jid, intents) => spawnJobsFromIntents(ctx, jid, intents),
     });
   });
 }
