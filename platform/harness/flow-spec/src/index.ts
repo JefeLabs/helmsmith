@@ -26,6 +26,7 @@ export {
   type AdapterId,
   type AgentConfig,
   type AgentDef,
+  type ApprovalClaim,
   type ApprovalRequest,
   type ApprovalResume,
   type ApprovalTag,

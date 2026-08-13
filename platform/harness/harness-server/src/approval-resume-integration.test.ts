@@ -194,6 +194,117 @@ describe('HITL Approval round-trip over HTTP', () => {
     expect(after.status).toBe(404);
   });
 
+  it('pessimistic claim: once held, only the claimant may resume; release hands it over', async () => {
+    const socketPath = tmpSocket();
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'ari-ws-'));
+    const adapters: TestAdapter[] = [];
+    const handle = await startHarnessServer({
+      socketPath,
+      workspaceRoot,
+      catalog,
+      broker: dummyBroker,
+      adapterFactory: () => {
+        const a = new TestAdapter(`reply-${adapters.length + 1}`);
+        adapters.push(a);
+        return a;
+      },
+    });
+    cleanups.push(async () => {
+      await handle.stop();
+      await rm(socketPath, { force: true });
+      await rm(workspaceRoot, { recursive: true, force: true });
+    });
+
+    await udsJson(socketPath, 'POST', '/v1/jobs', {
+      jobId: 'jClaim',
+      pipeline: 'plan-then-build',
+      input: 'work',
+    });
+    await waitFor(async () => {
+      const r = await udsJson(socketPath, 'GET', '/v1/jobs/jClaim');
+      return r.body.job?.status === 'awaiting-approval';
+    });
+
+    const claimUrl = '/v1/jobs/jClaim/approval/claim';
+    // Missing actor id → 400; wrong role → 403.
+    expect(
+      (await udsJson(socketPath, 'POST', claimUrl, {}, { 'x-actor-role': 'tech-lead' })).status,
+    ).toBe(400);
+    expect(
+      (
+        await udsJson(
+          socketPath,
+          'POST',
+          claimUrl,
+          {},
+          {
+            'x-actor-role': 'intern',
+            'x-actor-id': 'alice',
+          },
+        )
+      ).status,
+    ).toBe(403);
+
+    // Alice claims; Bob's competing claim conflicts (naming Alice);
+    // Alice's re-claim is idempotent.
+    const aliceHeaders = { 'x-actor-role': 'tech-lead', 'x-actor-id': 'alice' };
+    const bobHeaders = { 'x-actor-role': 'tech-lead', 'x-actor-id': 'bob' };
+    const c1 = await udsJson(socketPath, 'POST', claimUrl, {}, aliceHeaders);
+    expect(c1.status).toBe(200);
+    expect(c1.body.claim.actor).toBe('alice');
+    const c2 = await udsJson(socketPath, 'POST', claimUrl, {}, bobHeaders);
+    expect(c2.status).toBe(409);
+    expect(String(c2.body.error)).toContain('alice');
+    expect((await udsJson(socketPath, 'POST', claimUrl, {}, aliceHeaders)).status).toBe(200);
+
+    // The pending-approval read surface shows the claim.
+    const g = await udsJson(socketPath, 'GET', '/v1/jobs/jClaim/approval');
+    expect(g.body.claim?.actor).toBe('alice');
+
+    // While claimed: Bob's resume and an anonymous resume both 409.
+    expect(
+      (
+        await udsJson(
+          socketPath,
+          'POST',
+          '/v1/jobs/jClaim/resume',
+          { decision: 'approve' },
+          bobHeaders,
+        )
+      ).status,
+    ).toBe(409);
+    expect(
+      (
+        await udsJson(
+          socketPath,
+          'POST',
+          '/v1/jobs/jClaim/resume',
+          { decision: 'approve' },
+          { 'x-actor-role': 'tech-lead' },
+        )
+      ).status,
+    ).toBe(409);
+
+    // Release: Bob can't (403); Alice can (200); Bob then claims and approves.
+    expect((await udsJson(socketPath, 'DELETE', claimUrl, undefined, bobHeaders)).status).toBe(403);
+    expect((await udsJson(socketPath, 'DELETE', claimUrl, undefined, aliceHeaders)).status).toBe(
+      200,
+    );
+    expect((await udsJson(socketPath, 'POST', claimUrl, {}, bobHeaders)).status).toBe(200);
+    const done = await udsJson(
+      socketPath,
+      'POST',
+      '/v1/jobs/jClaim/resume',
+      { decision: 'approve' },
+      bobHeaders,
+    );
+    expect(done.status).toBe(200);
+    await waitFor(async () => {
+      const r = await udsJson(socketPath, 'GET', '/v1/jobs/jClaim');
+      return r.body.job?.status === 'completed';
+    });
+  });
+
   it('enforces the assignee role and validates the decision on approval resumes (2.1)', async () => {
     const socketPath = tmpSocket();
     const workspaceRoot = await mkdtemp(join(tmpdir(), 'ari-ws-'));

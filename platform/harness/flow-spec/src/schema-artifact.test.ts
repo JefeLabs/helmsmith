@@ -30,6 +30,7 @@ describe('generated JSON Schema artifact', () => {
     );
     const roots = Object.keys(schema.definitions?.FlowSpecSchemaRoots?.properties ?? {}).sort();
     expect(roots).toEqual([
+      'approvalClaim',
       'approvalRequest',
       'approvalResume',
       'catalog',

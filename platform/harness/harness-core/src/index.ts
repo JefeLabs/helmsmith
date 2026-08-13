@@ -75,6 +75,7 @@ export {
   runGit,
 } from './changed-files.ts';
 export {
+  type ApprovalClaim,
   type ApprovalRequest,
   type ApprovalResume,
   buildRouter,

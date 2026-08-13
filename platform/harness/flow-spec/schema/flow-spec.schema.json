@@ -115,6 +115,30 @@
       ],
       "type": "object"
     },
+    "ApprovalClaim": {
+      "additionalProperties": false,
+      "description": "Advisory-exclusive reservation on a pending approval — the pessimistic-locking half of `ApprovalTag.concurrency`. Claiming is optional (an unclaimed approval resumes exactly as before), but once held, only the claiming actor may resume and competing claims conflict — two same-role reviewers can no longer race a decision. Held in server state, persisted with the paused job (survives restarts), surfaced to HITL UIs on the approval read route, and cleared on resume/terminal.",
+      "properties": {
+        "actor": {
+          "description": "Opaque actor identity asserting the claim (`x-actor-id` header — header-asserted like the role; real authn replaces the source later, the enforcement point stays).",
+          "type": "string"
+        },
+        "claimedAt": {
+          "description": "ISO timestamp of the claim.",
+          "type": "string"
+        },
+        "role": {
+          "description": "Role asserted at claim time (must match `assigneeRole`).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "actor",
+        "role",
+        "claimedAt"
+      ],
+      "type": "object"
+    },
     "ApprovalRequest": {
       "additionalProperties": false,
       "description": "Payload surfaced when an Approval-tagged node pauses for review. The reviewer (or harness-server's HITL UI) inspects this, decides approve/reject, and resumes with an `ApprovalResume`.",
@@ -922,6 +946,9 @@
     "FlowSpecSchemaRoots": {
       "additionalProperties": false,
       "properties": {
+        "approvalClaim": {
+          "$ref": "#/definitions/ApprovalClaim"
+        },
         "approvalRequest": {
           "$ref": "#/definitions/ApprovalRequest",
           "description": "HITL payloads a reviewer UI exchanges with the runtime."
@@ -962,6 +989,7 @@
         "jobIntent",
         "runState",
         "approvalRequest",
+        "approvalClaim",
         "approvalResume",
         "suspendRequest",
         "nodeExit",

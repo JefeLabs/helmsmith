@@ -1067,6 +1067,27 @@ export interface ApprovalRequest {
   diffSummary?: string;
 }
 
+/**
+ * Advisory-exclusive reservation on a pending approval — the
+ * pessimistic-locking half of `ApprovalTag.concurrency`. Claiming is
+ * optional (an unclaimed approval resumes exactly as before), but once
+ * held, only the claiming actor may resume and competing claims
+ * conflict — two same-role reviewers can no longer race a decision.
+ * Held in server state, persisted with the paused job (survives
+ * restarts), surfaced to HITL UIs on the approval read route, and
+ * cleared on resume/terminal.
+ */
+export interface ApprovalClaim {
+  /** Opaque actor identity asserting the claim (`x-actor-id` header —
+   *  header-asserted like the role; real authn replaces the source
+   *  later, the enforcement point stays). */
+  actor: string;
+  /** Role asserted at claim time (must match `assigneeRole`). */
+  role: string;
+  /** ISO timestamp of the claim. */
+  claimedAt: string;
+}
+
 /** Reviewer's answer to an ApprovalRequest. */
 export interface ApprovalResume {
   decision: 'approve' | 'reject';
