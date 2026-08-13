@@ -83,6 +83,7 @@ export {
   evalExpression,
   FlowState,
   type FlowStateT,
+  LEGACY_COORDINATOR_IDS,
   linearFlowFromAgents,
   makeGateExecutor,
   makeTransformExecutor,

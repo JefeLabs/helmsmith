@@ -163,6 +163,15 @@ The unifying observation: once the validator crossed into statically-knowable-ru
 |---|---|
 | 🔵 Join hazards under conditional routing — documented, not enforced: an `'all'` join whose counted source is conditionally skipped never fires (the flow ends without it, silently), and joins inside reject cycles are unsupported (the once-per-run marker never resets) | Both wedge classes rejected at load by `validateJoinHazards` (flow-spec validator, so the designer surfaces them live). Under-guaranteed joins: a **must-reach analysis over success routing** computes which sources are guaranteed on every execution path (outcome groups mirror the router — each conditional its own outcome, sequence fan-out as the else, fallback when no sequence, branch-end otherwise); a join whose requirement ('all' = every source, 'any' = 1, nOfM capped at source count) exceeds its guaranteed count is rejected with the skippable sources named. Exhaustive branching that reconverges still validates (the diamond-with-else fixture pins the no-false-positive property); the analysis is deliberately optimistic about joins along the path (nested-join skips can evade — false negatives are the status quo, false positives would reject valid catalogs). Reject-cycle joins: forward-reachable from a reject target AND able to reach its source → rejected. Pinned by five `VALIDATION_CASES` fixtures replayed by both packages |
 
+### 1.22 Runtime blue-tier cleanups (2026-08-13)
+
+| Was | Now |
+|---|---|
+| 🔵 Synthetic interrupt nodes typed as `kind:'agent'` — type-system lie with cast placeholder configs; walkers over rewritten flows would trip on phantom agents | Honest internal union: `RuntimeStep = TaskStep \| SyntheticInterruptStep` with a `kind: 'synthetic-interrupt'` discriminator carrying the tag as first-class data (`interrupt.approval` / `interrupt.suspend`); the rewrite returns a `RewrittenFlow` over RuntimeSteps, the wrapper chain accepts the union without casts (wrapper-consulted fields structurally absent on synthetic nodes), and the interrupt executors take `(nodeId, tag)` directly. Zero behavior change — the type system now tells the truth |
+| 🔵 `changedFiles` only grew — reverted files stayed on the reviewer's diff surface forever (merge-by-id reducer never removed entries; empty discoveries were dropped by a `length > 0` guard) | Snapshot-replace semantics: discovery was always a FULL `git diff --cached` snapshot across product repos, so the channel reducer now replaces the set — the latest snapshot is the truth and reverted files drop off. Empty snapshots propagate (that's how the last file reverts away); a FAILED discovery writes nothing (null ≠ empty — git errors must not clobber the last good snapshot); loop iterations keep the latest iteration's snapshot; subflows write their final list back unconditionally (identity when the inner ran no discovery) |
+| 🔵 `nodes` channel grew without bound — every text output duplicated as evidence with no truncation policy; checkpoint-size growth once the durable saver landed | Text evidence recorded at `$.nodes.<id>` is capped (default 256K chars, explicit `…[truncated N chars]` marker, `CompileFlowOptions.maxTextEvidenceLength` to tune). The `$.output` relay to the next node is never touched, and JSON evidence is never truncated — structured data must stay addressable |
+| 🔵 Legacy coordinator filter — `linearFlowFromAgents` hardcoded skipping ids `coordinator`/`checkout-coordinator`, and the agent executor repeated the literals | One exported constant (`LEGACY_COORDINATOR_IDS`) consumed by both sites; `linearFlowFromAgents` accepts a caller-supplied skip list. The flow-based path keeps zero implicit skips |
+
 ## 2. Open — package-level (this package's debt)
 
 ### 🟡 The name undersells the scope — it's the platform wire-contract package now
@@ -172,7 +181,7 @@ Originally: `ProductDef`/`ProductRepo`/`ContextSourceDef` (tenancy/git shapes) l
 `input` mappings resolve structured values, then serialize to one string through `state.output`. Right for agents (prompts) and scripts (stdin); wasteful for transform/gate consumers that re-parse what was just serialized. A structured hand-off (an `$.inputView` state slot or executor parameter) is the eventual fix; not urgent.
 
 ### 🔵 Wire-format warts locked in 2026-08-12
-(a) Input-mapping keys must not be named `kind` — the single-Expression detection heuristic; `{ expr: … } | { map: … }` would have been unambiguous. (b) The write-once `input` reducer treats a legitimately-`null` job input as claimable by a later write; node writes to `input` are prevented by convention only. (c) `nodes` duplicates every output alongside `output` with no truncation policy — irrelevant in-memory, becomes checkpoint-size growth when the durable checkpointer (2.2) lands.
+(a) Input-mapping keys must not be named `kind` — the single-Expression detection heuristic; `{ expr: … } | { map: … }` would have been unambiguous. (b) The write-once `input` reducer treats a legitimately-`null` job input as claimable by a later write; node writes to `input` are prevented by convention only. (c) ~~`nodes` growth~~ resolved §1.22 — text evidence is capped with an explicit marker; JSON evidence and the `$.output` relay stay whole.
 
 ### 🔵 Packaging hygiene
 Version 0.0.0/private with no changeset wiring despite semver being a stated extraction motive. Fine today, wrong the day the first out-of-repo consumer appears. (The missing `test` script and the hoisting-only `vitest` dependency were both fixed 2026-08-12.)
@@ -184,9 +193,6 @@ Inherited from the original review, minus what the 2026-08-12 slices closed (ter
 | Gap | Severity | Current truth |
 |---|---|---|
 | Approval pessimistic locking | 🔵 | `concurrency: 'pessimistic'` validates but no lock exists — two same-role reviewers can race a decision; last write wins via the status guard. (The SLA/role halves of the old approval row were closed by the HITL trust slice — §1.6) |
-| Synthetic interrupt nodes typed as `kind:'agent'` | 🔵 | Type-system lie with cast placeholder configs; future walkers over rewritten flows will trip |
-| `changedFiles` only grows | 🔵 | Reverted files stay in the reviewer's diff surface (documented as intentional; still surprising) |
-| Legacy coordinator filter | 🔵 | `linearFlowFromAgents` hardcodes skipping ids `coordinator`/`checkout-coordinator` |
 
 ## 4. The one-sentence summary
 
