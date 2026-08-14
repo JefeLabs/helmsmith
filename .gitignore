@@ -65,6 +65,9 @@ catalog.json
 # harness-server tests that omit workspaceRoot default to the package dir and
 # create .harness/state (sqlite checkpointer + paused-job records) there.
 /platform/harness/harness-server/.harness/
+# harness-cli's suite does the same — its sqlite checkpointer writes
+# .harness/state/checkpoints.sqlite (plus -shm/-wal) into the package dir.
+/platform/harness/harness-cli/.harness/
 
 # Spring Boot Modulith control plane (Java/Maven sub-project)
 /platform/controlplane/service/target/
