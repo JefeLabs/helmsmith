@@ -1,6 +1,6 @@
 {
   "name": "@helmsmith/flow-designer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -28,7 +28,7 @@
     "vite": "^5.4.0",
     "vitest": "^4.1.5"
   },
-  "description": "Visual flow designer for @helmsmith/flow-spec catalogs \u2014 drag-and-drop canvas with the exact validator and expression evaluator the runtime uses, live on every edit. Run with npx against any harness or controlplane serving the /v1/catalog wire shape.",
+  "description": "Visual flow designer for @helmsmith/flow-spec catalogs — drag-and-drop canvas with the exact validator and expression evaluator the runtime uses, live on every edit. Run with npx against any harness or controlplane serving the /v1/catalog wire shape.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
