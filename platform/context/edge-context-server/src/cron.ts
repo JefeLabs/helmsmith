@@ -46,7 +46,8 @@ export class CronScheduler {
   constructor(opts: CronSchedulerOptions = {}) {
     this.nowFn = opts.now ?? (() => Date.now());
     this.setTimeoutFn = opts.setTimeout ?? ((cb, ms) => setTimeout(cb, ms));
-    this.clearTimeoutFn = opts.clearTimeout ?? ((h) => clearTimeout(h as ReturnType<typeof setTimeout>));
+    this.clearTimeoutFn =
+      opts.clearTimeout ?? ((h) => clearTimeout(h as ReturnType<typeof setTimeout>));
   }
 
   /** Register a job. Throws if the expression is malformed. Idempotent
@@ -107,9 +108,7 @@ export class CronScheduler {
       void Promise.resolve()
         .then(() => job.task())
         .catch((err: Error) => {
-          process.stderr.write(
-            `[cron] job '${job.name}' failed: ${err.message}\n`,
-          );
+          process.stderr.write(`[cron] job '${job.name}' failed: ${err.message}\n`);
         })
         .finally(() => {
           this.scheduleNext(job);

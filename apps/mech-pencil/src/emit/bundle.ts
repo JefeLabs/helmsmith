@@ -43,7 +43,10 @@ const ctxFor = (alias: string): BuildContext => ({
 });
 
 const slugify = (s: string) =>
-  s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 
 function tokensDoc(t: TokenSet): PenDocument {
   const d = new PenDocument();
@@ -182,11 +185,7 @@ export function emitBundle(cfg: ThemeConfig): EmittedBundle {
   const coreFile = (s: ComponentSpec) => `core/${slugify(s.category)}.lib.pen`;
   const dsLevelFile = (s: ComponentSpec) => `design-system/${s.level}s.lib.pen`;
   const groupSource = (s: ComponentSpec) => [BRAND_FILE, coreFile(s)];
-  const dsSource = (s: ComponentSpec) => [
-    BRAND_FILE,
-    coreFile(s),
-    dsLevelFile(s),
-  ];
+  const dsSource = (s: ComponentSpec) => [BRAND_FILE, coreFile(s), dsLevelFile(s)];
 
   // LAYER 2: one .lib.pen per HeroUI category, atomic-ordered inside.
   const groups: EmittedBundle['groups'] = [];
@@ -247,9 +246,7 @@ export function emitBundle(cfg: ThemeConfig): EmittedBundle {
       headingNode(`ds-${level}s-h`, `Design System · ${level}s (${inLevel.length})`),
     ];
     if (inLevel.length === 0) {
-      sections.push(
-        headingNode(`ds-${level}s-empty`, 'No components at this level yet.', false),
-      );
+      sections.push(headingNode(`ds-${level}s-empty`, 'No components at this level yet.', false));
     }
     for (const category of CATEGORY_ORDER) {
       const inCat = inLevel.filter((s) => s.category === category);
@@ -324,10 +321,7 @@ export function emitBundle(cfg: ThemeConfig): EmittedBundle {
     const used = new Set<string>();
     for (const n of screenNodes) collectRefs(n, used);
 
-    const mockSource = (s: ComponentSpec) => [
-      ...dsSource(s),
-      `mocks/${spec.slug}.pen`,
-    ];
+    const mockSource = (s: ComponentSpec) => [...dsSource(s), `mocks/${spec.slug}.pen`];
     const d = new PenDocument().importLib(ALIAS, relBrand(true));
     d.add(
       frame(

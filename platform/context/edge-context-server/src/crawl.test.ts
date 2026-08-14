@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { Crawler, __test__ } from './crawl.ts';
+import { __test__, Crawler } from './crawl.ts';
 
 const {
   extractReadable,
@@ -152,7 +152,9 @@ describe('Crawler.crawl', () => {
   it('fetches + extracts a simple HTML page', async () => {
     const fetchImpl = fakeFetch((url) => {
       if (url.endsWith('/robots.txt')) return new Response('', { status: 404 });
-      return htmlResponse(`<html><head><title>Hi</title></head><body><main><h1>X</h1><p>Y</p></main></body></html>`);
+      return htmlResponse(
+        `<html><head><title>Hi</title></head><body><main><h1>X</h1><p>Y</p></main></body></html>`,
+      );
     });
     const c = new Crawler({ fetchImpl });
     const r = await c.crawl({ url: 'https://example.com/page' });

@@ -63,7 +63,9 @@ describe('ControlplaneGitHubResolver', () => {
   });
 
   it('returns null on 404 (repo not registered / App not installed)', async () => {
-    const fetchImpl = vi.fn(async () => new Response(null, { status: 404 })) as unknown as typeof fetch;
+    const fetchImpl = vi.fn(
+      async () => new Response(null, { status: 404 }),
+    ) as unknown as typeof fetch;
     const r = new ControlplaneGitHubResolver({ controlplaneUrl: 'http://cp', fetchImpl });
     expect(await r.resolve(REPO)).toBeNull();
   });
@@ -71,10 +73,17 @@ describe('ControlplaneGitHubResolver', () => {
   it('maps a 200 response into a GitHubCredential', async () => {
     const fetchImpl = vi.fn(
       async () =>
-        new Response(JSON.stringify({ token: 'ghs_xxx', expiresAt: '2026-05-11T12:00:00Z', appSlug: 'agentx-bot' }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }),
+        new Response(
+          JSON.stringify({
+            token: 'ghs_xxx',
+            expiresAt: '2026-05-11T12:00:00Z',
+            appSlug: 'agentx-bot',
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        ),
     ) as unknown as typeof fetch;
     const r = new ControlplaneGitHubResolver({ controlplaneUrl: 'http://cp/', fetchImpl });
     const cred = await r.resolve(REPO);
@@ -87,7 +96,9 @@ describe('ControlplaneGitHubResolver', () => {
   });
 
   it('throws on 5xx so the chain can distinguish "down" from "declined"', async () => {
-    const fetchImpl = vi.fn(async () => new Response('boom', { status: 503 })) as unknown as typeof fetch;
+    const fetchImpl = vi.fn(
+      async () => new Response('boom', { status: 503 }),
+    ) as unknown as typeof fetch;
     const r = new ControlplaneGitHubResolver({ controlplaneUrl: 'http://cp', fetchImpl });
     await expect(r.resolve(REPO)).rejects.toThrow(GitHubCredentialError);
   });

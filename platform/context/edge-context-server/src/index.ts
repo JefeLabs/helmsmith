@@ -1,22 +1,22 @@
 import { chmod, mkdir, unlink } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import type { Duplex } from 'node:stream';
 import { dirname } from 'node:path';
+import type { Duplex } from 'node:stream';
 import { WebSocketServer } from 'ws';
+import { CronScheduler, type ScheduledJob } from './cron.ts';
+import type {
+  ConfluenceIngestRequest,
+  GithubIssuesIngestRequest,
+  JiraIngestRequest,
+} from './external-sources.ts';
 import type {
   CrawlIngestRequest,
   IngestService,
   RepoIngestRequest,
   UploadIngestRequest,
 } from './ingest.ts';
-import type {
-  ConfluenceIngestRequest,
-  GithubIssuesIngestRequest,
-  JiraIngestRequest,
-} from './external-sources.ts';
-import type { Plugin, PluginContext, RegisteredPlugin } from './plugins.ts';
-import { CronScheduler, type ScheduledJob } from './cron.ts';
 import { OPENAPI_SPEC } from './openapi.ts';
+import type { Plugin, PluginContext, RegisteredPlugin } from './plugins.ts';
 import type {
   ContextQueryRequest,
   CypherRequest,
@@ -357,9 +357,12 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: RouteContext): vo
             !Array.isArray(reqBody.expandPredicateWeights)
               ? (reqBody.expandPredicateWeights as Record<string, number>)
               : undefined,
-          hubDampening: typeof reqBody.hubDampening === 'boolean' ? reqBody.hubDampening : undefined,
+          hubDampening:
+            typeof reqBody.hubDampening === 'boolean' ? reqBody.hubDampening : undefined,
           maxNeighborsPerSeed:
-            typeof reqBody.maxNeighborsPerSeed === 'number' ? reqBody.maxNeighborsPerSeed : undefined,
+            typeof reqBody.maxNeighborsPerSeed === 'number'
+              ? reqBody.maxNeighborsPerSeed
+              : undefined,
         });
         ok(res, { service: 'context', result, ts: new Date().toISOString() });
       } catch (err) {
@@ -469,7 +472,12 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: RouteContext): vo
       if (!body.source || typeof body.source !== 'object') {
         return badRequest(res, 'body must include object `source`');
       }
-      const src = body.source as { type?: unknown; path?: unknown; cloneUrl?: unknown; branch?: unknown };
+      const src = body.source as {
+        type?: unknown;
+        path?: unknown;
+        cloneUrl?: unknown;
+        branch?: unknown;
+      };
       if (src.type !== 'local' && src.type !== 'git') {
         return badRequest(res, `source.type must be 'local' or 'git' (got ${String(src.type)})`);
       }
@@ -494,7 +502,11 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: RouteContext): vo
         productId: typeof body.productId === 'string' ? body.productId : undefined,
       });
       ctx.metrics.ingestsStarted += 1;
-      accepted(res, { service: 'context', ingestId: result.ingestId, ts: new Date().toISOString() });
+      accepted(res, {
+        service: 'context',
+        ingestId: result.ingestId,
+        ts: new Date().toISOString(),
+      });
     });
     return;
   }
@@ -525,7 +537,11 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: RouteContext): vo
         productId: typeof body.productId === 'string' ? body.productId : undefined,
       });
       ctx.metrics.ingestsStarted += 1;
-      accepted(res, { service: 'context', ingestId: result.ingestId, ts: new Date().toISOString() });
+      accepted(res, {
+        service: 'context',
+        ingestId: result.ingestId,
+        ts: new Date().toISOString(),
+      });
     });
     return;
   }
@@ -551,7 +567,11 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: RouteContext): vo
         productId: typeof body.productId === 'string' ? body.productId : undefined,
       });
       ctx.metrics.ingestsStarted += 1;
-      accepted(res, { service: 'context', ingestId: result.ingestId, ts: new Date().toISOString() });
+      accepted(res, {
+        service: 'context',
+        ingestId: result.ingestId,
+        ts: new Date().toISOString(),
+      });
     });
     return;
   }
@@ -574,7 +594,11 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: RouteContext): vo
         productId: typeof body.productId === 'string' ? body.productId : undefined,
       });
       ctx.metrics.ingestsStarted += 1;
-      accepted(res, { service: 'context', ingestId: result.ingestId, ts: new Date().toISOString() });
+      accepted(res, {
+        service: 'context',
+        ingestId: result.ingestId,
+        ts: new Date().toISOString(),
+      });
     });
     return;
   }
@@ -612,7 +636,11 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: RouteContext): vo
           typeof body.ifModifiedSince === 'string' ? body.ifModifiedSince : undefined,
       });
       ctx.metrics.ingestsStarted += 1;
-      accepted(res, { service: 'context', ingestId: result.ingestId, ts: new Date().toISOString() });
+      accepted(res, {
+        service: 'context',
+        ingestId: result.ingestId,
+        ts: new Date().toISOString(),
+      });
     });
     return;
   }
@@ -643,7 +671,11 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: RouteContext): vo
   if (req.method === 'GET' && url === '/v1/ingest') {
     bumpRoute(ctx.metrics, 'ingest_list');
     if (!opts.ingest) return notReady(res, 'backend not configured');
-    ok(res, { service: 'context', ingests: opts.ingest.listIngests(), ts: new Date().toISOString() });
+    ok(res, {
+      service: 'context',
+      ingests: opts.ingest.listIngests(),
+      ts: new Date().toISOString(),
+    });
     return;
   }
 
@@ -665,7 +697,9 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: RouteContext): vo
     if (!opts.ingest) return notReady(res, 'backend not configured');
     void opts.ingest
       .listUploads()
-      .then((entries) => ok(res, { service: 'context', uploads: entries, ts: new Date().toISOString() }))
+      .then((entries) =>
+        ok(res, { service: 'context', uploads: entries, ts: new Date().toISOString() }),
+      )
       .catch((err: Error) => serverError(res, err.message));
     return;
   }
@@ -956,9 +990,7 @@ function attachWsClient(
     for (const s of ingest.listIngests()) {
       if (filterId && s.ingestId !== filterId) continue;
       for (const ev of s.events) send({ ingestId: s.ingestId, event: ev });
-      const u = ingest.subscribe(s.ingestId, (ev) =>
-        send({ ingestId: s.ingestId, event: ev }),
-      );
+      const u = ingest.subscribe(s.ingestId, (ev) => send({ ingestId: s.ingestId, event: ev }));
       unsubs.push(u);
     }
   };
@@ -1004,7 +1036,9 @@ function formatMetrics(m: MetricsCounters): string {
   lines.push('# HELP edge_context_ws_connects_total Total WebSocket upgrades served');
   lines.push('# TYPE edge_context_ws_connects_total counter');
   lines.push(`edge_context_ws_connects_total ${m.wsConnects}`);
-  lines.push('# HELP edge_context_idle_throttles_total Times the server idle-released backend resources');
+  lines.push(
+    '# HELP edge_context_idle_throttles_total Times the server idle-released backend resources',
+  );
   lines.push('# TYPE edge_context_idle_throttles_total counter');
   lines.push(`edge_context_idle_throttles_total ${m.idleThrottles}`);
   lines.push('# HELP edge_context_requests_by_route_total Requests grouped by route name');
@@ -1015,24 +1049,30 @@ function formatMetrics(m: MetricsCounters): string {
   return `${lines.join('\n')}\n`;
 }
 
+export type { CrawlerOptions, CrawlRequest, CrawlResult, CrawlScope } from './crawl.ts';
+export { Crawler } from './crawl.ts';
+export type { CronTask, ParsedCron, ScheduledJob } from './cron.ts';
+export { CronScheduler, nextFireTime, parseCron } from './cron.ts';
 export type {
-  ContextQueryHit,
-  ContextQueryRequest,
-  ContextQueryResult,
-  ContextQueryServiceOptions,
-  ContextStatsResult,
-  CypherRequest,
-  CypherResult,
-  QueryService,
-  RelatedHit,
-  RelatedRequest,
-  RelatedResult,
-  TraverseEdge,
-  TraverseNode,
-  TraverseRequest,
-  TraverseResult,
-} from './query.ts';
-export { ContextQueryService } from './query.ts';
+  ConfluenceIngestRequest,
+  ConfluencePage,
+  ExternalIngestEvent,
+  ExternalIngestSummary,
+  ExternalSourceFetcher,
+  ExternalSourceOptions,
+  GithubIssue,
+  GithubIssuesIngestRequest,
+  JiraIngestRequest,
+  JiraIssue,
+} from './external-sources.ts';
+export {
+  ConfluenceFetcher,
+  GithubIssuesFetcher,
+  JiraFetcher,
+  runConfluenceIngest,
+  runGithubIssuesIngest,
+  runJiraIngest,
+} from './external-sources.ts';
 export type {
   CrawlIngestRequest,
   EventCallback,
@@ -1054,27 +1094,21 @@ export type {
   RegisteredPlugin,
 } from './plugins.ts';
 export { OpenApiPlugin } from './plugins.ts';
-export type { CronTask, ParsedCron, ScheduledJob } from './cron.ts';
-export { CronScheduler, parseCron, nextFireTime } from './cron.ts';
-export type { CrawlRequest, CrawlResult, CrawlScope, CrawlerOptions } from './crawl.ts';
-export { Crawler } from './crawl.ts';
 export type {
-  ConfluenceIngestRequest,
-  ConfluencePage,
-  ExternalIngestEvent,
-  ExternalIngestSummary,
-  ExternalSourceFetcher,
-  ExternalSourceOptions,
-  GithubIssue,
-  GithubIssuesIngestRequest,
-  JiraIngestRequest,
-  JiraIssue,
-} from './external-sources.ts';
-export {
-  ConfluenceFetcher,
-  GithubIssuesFetcher,
-  JiraFetcher,
-  runConfluenceIngest,
-  runGithubIssuesIngest,
-  runJiraIngest,
-} from './external-sources.ts';
+  ContextQueryHit,
+  ContextQueryRequest,
+  ContextQueryResult,
+  ContextQueryServiceOptions,
+  ContextStatsResult,
+  CypherRequest,
+  CypherResult,
+  QueryService,
+  RelatedHit,
+  RelatedRequest,
+  RelatedResult,
+  TraverseEdge,
+  TraverseNode,
+  TraverseRequest,
+  TraverseResult,
+} from './query.ts';
+export { ContextQueryService } from './query.ts';

@@ -18,7 +18,7 @@
  * document can be fixed in one pass.
  */
 
-import { type Child, CHILD_TYPES, type Document, PEN_VERSION } from './schema.ts';
+import { CHILD_TYPES, type Child, type Document, PEN_VERSION } from './schema.ts';
 
 export interface ValidationIssue {
   path: string;
@@ -75,7 +75,10 @@ function walk(
 
     const type = (node as { type?: string }).type;
     if (!type) {
-      issues.push({ path: `${here} (${node.id ?? '?'})`, message: 'node is missing required `type`' });
+      issues.push({
+        path: `${here} (${node.id ?? '?'})`,
+        message: 'node is missing required `type`',
+      });
     } else if (!CHILD_TYPE_SET.has(type)) {
       issues.push({ path: `${here} (${node.id ?? '?'})`, message: `unknown node type "${type}"` });
     }

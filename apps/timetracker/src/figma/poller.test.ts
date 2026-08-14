@@ -46,7 +46,9 @@ describe('runFigmaPollOnce', () => {
         fileA: [{ id: 'v1', created_at: '2026-07-06T14:00:00Z', user: ana }],
       },
       comments: {
-        fileB: [{ id: 'c1', created_at: '2026-07-06T15:00:00Z', user: { id: 'u2', handle: 'marco' } }],
+        fileB: [
+          { id: 'c1', created_at: '2026-07-06T15:00:00Z', user: { id: 'u2', handle: 'marco' } },
+        ],
       },
     });
     const r = await runFigmaPollOnce(api, deps);

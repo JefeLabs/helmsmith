@@ -259,13 +259,14 @@ describe('OpenApiPlugin (route surface)', () => {
 
     // Stub the reindex() backend write by overriding it — plugin still
     // populates its in-memory operations map via parseOpenApi.
-    (plugin as unknown as { reindex: (ctx: PluginContext) => Promise<void> }).reindex = async () => {
-      const ops = parseOpenApi(spec, 'stripe');
-      (plugin as unknown as { operations: Map<string, unknown> }).operations = new Map([
-        ['stripe', ops],
-      ]);
-      (plugin as unknown as { indexed: boolean }).indexed = true;
-    };
+    (plugin as unknown as { reindex: (ctx: PluginContext) => Promise<void> }).reindex =
+      async () => {
+        const ops = parseOpenApi(spec, 'stripe');
+        (plugin as unknown as { operations: Map<string, unknown> }).operations = new Map([
+          ['stripe', ops],
+        ]);
+        (plugin as unknown as { indexed: boolean }).indexed = true;
+      };
 
     const ctx: PluginContext = {
       pluginId: 'openapi',
@@ -278,7 +279,7 @@ describe('OpenApiPlugin (route surface)', () => {
     const lookupReq: any = { method: 'POST', url: '/lookup', on: () => {} };
     // Simulate body: we'll bypass readJsonBody by calling handler with a
     // stub req that emits 'data' + 'end' events after handler subscribes.
-    let listeners: Record<string, Function[]> = {};
+    const listeners: Record<string, Function[]> = {};
     const eventReq: any = {
       method: 'POST',
       url: '/lookup',
@@ -300,7 +301,9 @@ describe('OpenApiPlugin (route surface)', () => {
       headersSent: false,
     };
     const handlerPromise = handler(eventReq, eventRes, 'lookup');
-    listeners['data']?.[0]?.(Buffer.from(JSON.stringify({ api: 'stripe', operation: 'createCharge' })));
+    listeners['data']?.[0]?.(
+      Buffer.from(JSON.stringify({ api: 'stripe', operation: 'createCharge' })),
+    );
     listeners['end']?.[0]?.();
     await handlerPromise;
     expect(writeHead.s).toBe(200);

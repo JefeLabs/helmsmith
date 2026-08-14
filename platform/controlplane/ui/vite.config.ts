@@ -1,6 +1,6 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import tailwindcss from "@tailwindcss/vite";
+import tailwindcss from '@tailwindcss/vite';
+import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vite';
 
 // Phase 6 dev config: proxy all /api/* requests to the running Spring
 // controlplane (default port 8080). Tenant headers are forwarded from
@@ -11,8 +11,8 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      "/api": {
-        target: "http://localhost:8080",
+      '/api': {
+        target: 'http://localhost:8080',
         changeOrigin: false,
       },
     },
@@ -20,7 +20,7 @@ export default defineConfig({
   build: {
     // Build output goes to controlplane/src/main/resources/static/
     // when packaged for prod (handled by a Maven copy step at build time).
-    outDir: "dist",
+    outDir: 'dist',
     sourcemap: true,
   },
 });

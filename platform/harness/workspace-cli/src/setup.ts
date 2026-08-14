@@ -120,6 +120,8 @@ export async function runSetup(opts: SetupOptions): Promise<void> {
   }
 
   console.log();
-  console.log(`Next: workspace start    # boot the platform (controlplane + harness/context/memory)`);
+  console.log(
+    `Next: workspace start    # boot the platform (controlplane + harness/context/memory)`,
+  );
   console.log(`      workspace web      # open the browser UI`);
 }

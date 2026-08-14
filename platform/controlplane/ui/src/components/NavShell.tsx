@@ -1,15 +1,15 @@
-import { ReactNode } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Navbar, NavbarBrand, NavbarContent, NavbarItem } from "@heroui/react";
+import { Navbar, NavbarBrand, NavbarContent, NavbarItem } from '@heroui/react';
+import { ReactNode } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 
 const links = [
-  { to: "/intake", label: "Intake" },
-  { to: "/sessions", label: "Sessions" },
-  { to: "/jobs", label: "Jobs" },
-  { to: "/catalog", label: "Catalog" },
-  { to: "/benchmarks", label: "Benchmarks" },
-  { to: "/proposals", label: "Proposals" },
-  { to: "/compose", label: "Compose" },
+  { to: '/intake', label: 'Intake' },
+  { to: '/sessions', label: 'Sessions' },
+  { to: '/jobs', label: 'Jobs' },
+  { to: '/catalog', label: 'Catalog' },
+  { to: '/benchmarks', label: 'Benchmarks' },
+  { to: '/proposals', label: 'Proposals' },
+  { to: '/compose', label: 'Compose' },
 ];
 
 export default function NavShell({ children }: { children: ReactNode }) {

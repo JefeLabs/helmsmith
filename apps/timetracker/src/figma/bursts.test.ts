@@ -75,9 +75,13 @@ describe('attributeBursts', () => {
     // Session starts 10:35; events at 10:25/10:30 — the raw burst [10:10, 10:30]
     // (padded start) ends before… actually endAt 10:30 < 10:35 start → NOT in
     // session. An event at 10:40 would connect it. Guard the boundary exactly:
-    const b1 = attributeBursts(clusterBursts([ev('10:25'), ev('10:35')], CFG), {
-      startAt: at('10:35'),
-    }, now);
+    const b1 = attributeBursts(
+      clusterBursts([ev('10:25'), ev('10:35')], CFG),
+      {
+        startAt: at('10:35'),
+      },
+      now,
+    );
     expect(b1[0].inSession).toBe(true); // touches the boundary
   });
 

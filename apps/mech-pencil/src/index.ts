@@ -9,26 +9,34 @@
  *   import { emitDocument, getFramework } from '@helmsmith/mech-pencil';
  */
 
-// .pen schema engine
-export * from './pen/schema.ts';
-export * from './pen/builder.ts';
-export { PenDocument } from './pen/document.ts';
+// Brand tokens
 export {
-  type ValidationIssue,
-  type ValidationResult,
-  validateDocument,
-} from './pen/validate.ts';
-
-// Design-system model
-export * from './design-system/tokens.ts';
+  assertBrandFile,
+  type BrandFile,
+  type Ramp,
+} from './brand/schema.ts';
+export { type BrandTokens, brandToTokens } from './brand/to-tokens.ts';
+export { ColorMixNotImplemented, mixOklab } from './color/mix.ts';
+// Color engine (token pre-resolver)
+export { type Lab, parseColor, toHex } from './color/oklch.ts';
 export {
+  ATOMIC_ORDER,
   type AtomicLevel,
   type BuildContext,
   type ComponentSpec,
-  ATOMIC_ORDER,
   defaultBuildContext,
 } from './design-system/atomic.ts';
+// Design-system model
+export * from './design-system/tokens.ts';
+export { type EmittedBrand, emitBrand } from './emit/brand.ts';
+export { type EmittedBundle, emitBundle } from './emit/bundle.ts';
 
+// Emitters
+export {
+  type EmitOptions,
+  type EmittedDocument,
+  emitDocument,
+} from './emit/document.ts';
 // Framework adapters
 export type {
   FrameworkAdapter,
@@ -40,47 +48,34 @@ export {
   getFramework,
   listFrameworks,
 } from './frameworks/_core/registry.ts';
-
-// Emitters
-export {
-  type EmitOptions,
-  type EmittedDocument,
-  emitDocument,
-} from './emit/document.ts';
-export { type EmittedBrand, emitBrand } from './emit/brand.ts';
-export { type EmittedBundle, emitBundle } from './emit/bundle.ts';
-export {
-  type Manifest,
-  type ManifestComponent,
-  type ManifestToken,
-  buildManifest,
-} from './manifest/build.ts';
 export {
   CATEGORY_ORDER,
   categoryOf,
   heroUIComponents,
   reactName,
 } from './frameworks/heroui/catalog.ts';
-
-// Brand tokens
+export { deriveTokens } from './frameworks/heroui/derive.ts';
 export {
-  type BrandFile,
-  type Ramp,
-  assertBrandFile,
-} from './brand/schema.ts';
-export { type BrandTokens, brandToTokens } from './brand/to-tokens.ts';
-
+  buildManifest,
+  type Manifest,
+  type ManifestComponent,
+  type ManifestToken,
+} from './manifest/build.ts';
+export * from './pen/builder.ts';
+export { PenDocument } from './pen/document.ts';
+// .pen schema engine
+export * from './pen/schema.ts';
+export {
+  type ValidationIssue,
+  type ValidationResult,
+  validateDocument,
+} from './pen/validate.ts';
 // HeroUI Themes-style theme generation
 export {
-  type RadiusId,
-  type ThemeConfig,
   DEFAULT_THEME,
   RADIUS_REM,
+  type RadiusId,
   resolveTheme,
+  type ThemeConfig,
 } from './theme/config.ts';
 export { themeTokens } from './theme/generate.ts';
-export { deriveTokens } from './frameworks/heroui/derive.ts';
-
-// Color engine (token pre-resolver)
-export { type Lab, parseColor, toHex } from './color/oklch.ts';
-export { ColorMixNotImplemented, mixOklab } from './color/mix.ts';

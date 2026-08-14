@@ -14,9 +14,7 @@
           "$ref": "#/definitions/AgentDef"
         }
       },
-      "required": [
-        "agent"
-      ],
+      "required": ["agent"],
       "type": "object"
     },
     "AgentDef": {
@@ -108,11 +106,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "id",
-        "role",
-        "adapter"
-      ],
+      "required": ["id", "role", "adapter"],
       "type": "object"
     },
     "ApprovalClaim": {
@@ -132,11 +126,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "actor",
-        "role",
-        "claimedAt"
-      ],
+      "required": ["actor", "role", "claimedAt"],
       "type": "object"
     },
     "ApprovalRequest": {
@@ -188,15 +178,7 @@
           "description": "Optional structured input schema the reviewer fills in."
         }
       },
-      "required": [
-        "kind",
-        "nodeId",
-        "assigneeRole",
-        "slaMs",
-        "content",
-        "attempt",
-        "changes"
-      ],
+      "required": ["kind", "nodeId", "assigneeRole", "slaMs", "content", "attempt", "changes"],
       "type": "object"
     },
     "ApprovalResume": {
@@ -204,19 +186,14 @@
       "description": "Reviewer's answer to an ApprovalRequest.",
       "properties": {
         "decision": {
-          "enum": [
-            "approve",
-            "reject"
-          ],
+          "enum": ["approve", "reject"],
           "type": "string"
         },
         "steering": {
           "description": "Reviewer-provided steering text (free-form) or structured fields matching `steeringInputs`. Becomes the rejectionPayload.steering on reject; appended to `state.steering` on approve."
         }
       },
-      "required": [
-        "decision"
-      ],
+      "required": ["decision"],
       "type": "object"
     },
     "ApprovalTag": {
@@ -241,11 +218,7 @@
           "description": "Optional structured input the reviewer fills in to steer retry."
         }
       },
-      "required": [
-        "assigneeRole",
-        "slaMs",
-        "concurrency"
-      ],
+      "required": ["assigneeRole", "slaMs", "concurrency"],
       "type": "object"
     },
     "Assertion": {
@@ -259,10 +232,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "expression",
-        "message"
-      ],
+      "required": ["expression", "message"],
       "type": "object"
     },
     "BackoffPolicy": {
@@ -278,10 +248,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "kind",
-            "ms"
-          ],
+          "required": ["kind", "ms"],
           "type": "object"
         },
         {
@@ -301,10 +268,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "kind",
-            "baseMs"
-          ],
+          "required": ["kind", "baseMs"],
           "type": "object"
         }
       ]
@@ -327,9 +291,7 @@
           "type": "array"
         }
       },
-      "required": [
-        "flows"
-      ],
+      "required": ["flows"],
       "type": "object"
     },
     "ChangedFile": {
@@ -338,14 +300,7 @@
       "properties": {
         "changeKind": {
           "description": "What kind of change this is. Mirrors git's name-status codes collapsed to readable form.",
-          "enum": [
-            "added",
-            "modified",
-            "deleted",
-            "renamed",
-            "copied",
-            "type-changed"
-          ],
+          "enum": ["added", "modified", "deleted", "renamed", "copied", "type-changed"],
           "type": "string"
         },
         "filename": {
@@ -377,15 +332,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "id",
-        "repo",
-        "path",
-        "filename",
-        "changeKind",
-        "statusCode",
-        "mimeType"
-      ],
+      "required": ["id", "repo", "path", "filename", "changeKind", "statusCode", "mimeType"],
       "type": "object"
     },
     "CompareOp": {
@@ -422,12 +369,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "from",
-        "to",
-        "type",
-        "condition"
-      ],
+      "required": ["from", "to", "type", "condition"],
       "type": "object"
     },
     "ContextSourceDef": {
@@ -456,10 +398,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "type",
-        "target"
-      ],
+      "required": ["type", "target"],
       "type": "object"
     },
     "Duration": {
@@ -506,11 +445,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "from",
-        "to",
-        "type"
-      ],
+      "required": ["from", "to", "type"],
       "type": "object"
     },
     "Expression": {
@@ -526,10 +461,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "kind",
-            "path"
-          ],
+          "required": ["kind", "path"],
           "type": "object"
         },
         {
@@ -543,10 +475,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "kind",
-            "expression"
-          ],
+          "required": ["kind", "expression"],
           "type": "object"
         },
         {
@@ -558,10 +487,7 @@
             },
             "value": {}
           },
-          "required": [
-            "kind",
-            "value"
-          ],
+          "required": ["kind", "value"],
           "type": "object"
         },
         {
@@ -581,12 +507,7 @@
               "$ref": "#/definitions/Expression"
             }
           },
-          "required": [
-            "kind",
-            "lhs",
-            "op",
-            "rhs"
-          ],
+          "required": ["kind", "lhs", "op", "rhs"],
           "type": "object"
         },
         {
@@ -603,10 +524,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "kind",
-            "exprs"
-          ],
+          "required": ["kind", "exprs"],
           "type": "object"
         },
         {
@@ -623,10 +541,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "kind",
-            "exprs"
-          ],
+          "required": ["kind", "exprs"],
           "type": "object"
         },
         {
@@ -640,10 +555,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "kind",
-            "expr"
-          ],
+          "required": ["kind", "expr"],
           "type": "object"
         },
         {
@@ -657,10 +569,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "kind",
-            "expr"
-          ],
+          "required": ["kind", "expr"],
           "type": "object"
         },
         {
@@ -677,10 +586,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "kind",
-            "fields"
-          ],
+          "required": ["kind", "fields"],
           "type": "object"
         },
         {
@@ -697,10 +603,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "kind",
-            "items"
-          ],
+          "required": ["kind", "items"],
           "type": "object"
         }
       ],
@@ -720,11 +623,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "from",
-        "to",
-        "type"
-      ],
+      "required": ["from", "to", "type"],
       "type": "object"
     },
     "FlowDef": {
@@ -745,11 +644,7 @@
         },
         "kind": {
           "description": "Flow kind discriminator. Default 'work'.   - 'work' (default) — does product work; agents run for end-user value.   - 'job-definition' — emits a JobIntent (intake conversations).     Must declare `output: { kind: 'job-intent' }`.   - 'post-job' — runs after a job for cleanup/notifications.",
-          "enum": [
-            "work",
-            "job-definition",
-            "post-job"
-          ],
+          "enum": ["work", "job-definition", "post-job"],
           "type": "string"
         },
         "nodes": {
@@ -768,11 +663,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "id",
-        "nodes",
-        "edges"
-      ],
+      "required": ["id", "nodes", "edges"],
       "type": "object"
     },
     "FlowOutputContract": {
@@ -785,9 +676,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "kind"
-          ],
+          "required": ["kind"],
           "type": "object"
         },
         {
@@ -798,9 +687,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "kind"
-          ],
+          "required": ["kind"],
           "type": "object"
         },
         {
@@ -817,9 +704,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "kind"
-          ],
+          "required": ["kind"],
           "type": "object"
         },
         {
@@ -830,9 +715,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "kind"
-          ],
+          "required": ["kind"],
           "type": "object"
         },
         {
@@ -844,10 +727,7 @@
             },
             "schema": {}
           },
-          "required": [
-            "kind",
-            "schema"
-          ],
+          "required": ["kind", "schema"],
           "type": "object"
         }
       ],
@@ -865,10 +745,7 @@
           "type": "object"
         },
         "cancelReason": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": ["string", "null"]
         },
         "cancelRequested": {
           "type": "boolean"
@@ -1008,9 +885,7 @@
           "type": "array"
         }
       },
-      "required": [
-        "assertions"
-      ],
+      "required": ["assertions"],
       "type": "object"
     },
     "JobIntent": {
@@ -1034,11 +909,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "flowId",
-        "productId",
-        "input"
-      ],
+      "required": ["flowId", "productId", "input"],
       "type": "object"
     },
     "LoopTag": {
@@ -1051,10 +922,7 @@
         },
         "mode": {
           "description": "Sequential = one iteration at a time; parallel = a per-slot pool of N with cooperative sibling cancellation on first failure.",
-          "enum": [
-            "sequential",
-            "parallel"
-          ],
+          "enum": ["sequential", "parallel"],
           "type": "string"
         },
         "path": {
@@ -1067,18 +935,11 @@
         },
         "source": {
           "description": "Hint about what kind of iterable `path` resolves to. The runtime uses this to pick a default collector (e.g., 'directory' walks files; 'collection' iterates an array).",
-          "enum": [
-            "collection",
-            "directory"
-          ],
+          "enum": ["collection", "directory"],
           "type": "string"
         }
       },
-      "required": [
-        "source",
-        "path",
-        "mode"
-      ],
+      "required": ["source", "path", "mode"],
       "type": "object"
     },
     "MergePrConfig": {
@@ -1095,17 +956,11 @@
         },
         "method": {
           "description": "Merge strategy. Default 'squash'.",
-          "enum": [
-            "merge",
-            "squash",
-            "rebase"
-          ],
+          "enum": ["merge", "squash", "rebase"],
           "type": "string"
         }
       },
-      "required": [
-        "action"
-      ],
+      "required": ["action"],
       "type": "object"
     },
     "NodeExit": {
@@ -1120,21 +975,14 @@
           "type": "string"
         },
         "kind": {
-          "enum": [
-            "success",
-            "error",
-            "reject"
-          ],
+          "enum": ["success", "error", "reject"],
           "type": "string"
         },
         "nodeId": {
           "type": "string"
         }
       },
-      "required": [
-        "nodeId",
-        "kind"
-      ],
+      "required": ["nodeId", "kind"],
       "type": "object"
     },
     "NodeOutputContract": {
@@ -1147,9 +995,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "kind"
-          ],
+          "required": ["kind"],
           "type": "object"
         },
         {
@@ -1161,9 +1007,7 @@
             },
             "schema": {}
           },
-          "required": [
-            "kind"
-          ],
+          "required": ["kind"],
           "type": "object"
         }
       ],
@@ -1193,9 +1037,7 @@
           "type": "array"
         }
       },
-      "required": [
-        "id"
-      ],
+      "required": ["id"],
       "type": "object"
     },
     "ProductRepo": {
@@ -1219,10 +1061,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "name",
-        "cloneUrl"
-      ],
+      "required": ["name", "cloneUrl"],
       "type": "object"
     },
     "PublishConfig": {
@@ -1265,9 +1104,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "action"
-      ],
+      "required": ["action"],
       "type": "object"
     },
     "RejectEdge": {
@@ -1291,9 +1128,7 @@
                   "type": "string"
                 }
               },
-              "required": [
-                "kind"
-              ],
+              "required": ["kind"],
               "type": "object"
             },
             {
@@ -1307,10 +1142,7 @@
                   "type": "string"
                 }
               },
-              "required": [
-                "kind",
-                "to"
-              ],
+              "required": ["kind", "to"],
               "type": "object"
             }
           ],
@@ -1324,11 +1156,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "from",
-        "to",
-        "type"
-      ],
+      "required": ["from", "to", "type"],
       "type": "object"
     },
     "RejectionPayload": {
@@ -1350,10 +1178,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "reason",
-        "attempt"
-      ],
+      "required": ["reason", "attempt"],
       "type": "object"
     },
     "RetryPolicy": {
@@ -1367,9 +1192,7 @@
           "type": "number"
         }
       },
-      "required": [
-        "maxAttempts"
-      ],
+      "required": ["maxAttempts"],
       "type": "object"
     },
     "ScriptConfig": {
@@ -1383,11 +1206,7 @@
           "type": "object"
         },
         "language": {
-          "enum": [
-            "bash",
-            "node",
-            "python"
-          ],
+          "enum": ["bash", "node", "python"],
           "type": "string"
         },
         "secrets": {
@@ -1398,9 +1217,7 @@
                 "type": "string"
               }
             },
-            "required": [
-              "credentialId"
-            ],
+            "required": ["credentialId"],
             "type": "object"
           },
           "description": "Credential references resolved through the CredentialBroker at dispatch time and injected as environment variables — the same auth surface tools use, so secrets never appear literally in catalogs. Keys are env var names; resolved values win over any same-named `env` entry.",
@@ -1414,10 +1231,7 @@
           "type": "number"
         }
       },
-      "required": [
-        "language",
-        "source"
-      ],
+      "required": ["language", "source"],
       "type": "object"
     },
     "SequenceEdge": {
@@ -1434,11 +1248,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "from",
-        "to",
-        "type"
-      ],
+      "required": ["from", "to", "type"],
       "type": "object"
     },
     "SteeringInputSchema": {
@@ -1455,26 +1265,17 @@
                 "type": "boolean"
               },
               "type": {
-                "enum": [
-                  "string",
-                  "number",
-                  "boolean"
-                ],
+                "enum": ["string", "number", "boolean"],
                 "type": "string"
               }
             },
-            "required": [
-              "name",
-              "type"
-            ],
+            "required": ["name", "type"],
             "type": "object"
           },
           "type": "array"
         }
       },
-      "required": [
-        "fields"
-      ],
+      "required": ["fields"],
       "type": "object"
     },
     "SubflowConfig": {
@@ -1493,9 +1294,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "flowId"
-      ],
+      "required": ["flowId"],
       "type": "object"
     },
     "SuspendRequest": {
@@ -1529,10 +1328,7 @@
                   "type": "string"
                 }
               },
-              "required": [
-                "kind",
-                "durationMs"
-              ],
+              "required": ["kind", "durationMs"],
               "type": "object"
             },
             {
@@ -1549,21 +1345,13 @@
                   "$ref": "#/definitions/Expression"
                 }
               },
-              "required": [
-                "kind",
-                "eventType"
-              ],
+              "required": ["kind", "eventType"],
               "type": "object"
             }
           ]
         }
       },
-      "required": [
-        "kind",
-        "nodeId",
-        "trigger",
-        "changes"
-      ],
+      "required": ["kind", "nodeId", "trigger", "changes"],
       "type": "object"
     },
     "SuspendTag": {
@@ -1582,16 +1370,11 @@
                   "type": "string"
                 }
               },
-              "required": [
-                "kind",
-                "durationMs"
-              ],
+              "required": ["kind", "durationMs"],
               "type": "object"
             }
           },
-          "required": [
-            "trigger"
-          ],
+          "required": ["trigger"],
           "type": "object"
         },
         {
@@ -1611,16 +1394,11 @@
                   "$ref": "#/definitions/Expression"
                 }
               },
-              "required": [
-                "kind",
-                "eventType"
-              ],
+              "required": ["kind", "eventType"],
               "type": "object"
             }
           },
-          "required": [
-            "trigger"
-          ],
+          "required": ["trigger"],
           "type": "object"
         }
       ],
@@ -1661,11 +1439,7 @@
         },
         "effect": {
           "description": "Side-effect classification. Declarative for now (reported via onUnsupported): the runtime does not yet consult it when deciding whether a node is safe to re-run on replay/retry. Publish-family nodes are inherently 'side-effecting'.",
-          "enum": [
-            "pure",
-            "idempotent",
-            "side-effecting"
-          ],
+          "enum": ["pure", "idempotent", "side-effecting"],
           "type": "string"
         },
         "id": {
@@ -1703,9 +1477,7 @@
                   "type": "number"
                 }
               },
-              "required": [
-                "nOfM"
-              ],
+              "required": ["nOfM"],
               "type": "object"
             }
           ],
@@ -1713,16 +1485,7 @@
         },
         "kind": {
           "description": "Polymorphic discriminator.",
-          "enum": [
-            "agent",
-            "tool",
-            "script",
-            "transform",
-            "gate",
-            "subflow",
-            "trigger",
-            "publish"
-          ],
+          "enum": ["agent", "tool", "script", "transform", "gate", "subflow", "trigger", "publish"],
           "type": "string"
         },
         "output": {
@@ -1739,18 +1502,11 @@
         },
         "terminal": {
           "description": "Endpoint disposition, executed: a branch ending at a terminal:'fail' node fails the whole job (authored failure endpoints — e.g. an error edge routing to a notify-then-fail sink). Only valid on nodes with no outgoing edges (the validator rejects a fail marker on a non-sink). Defaults to 'success'.",
-          "enum": [
-            "success",
-            "fail"
-          ],
+          "enum": ["success", "fail"],
           "type": "string"
         }
       },
-      "required": [
-        "id",
-        "kind",
-        "config"
-      ],
+      "required": ["id", "kind", "config"],
       "type": "object"
     },
     "TaskStepPolicy": {
@@ -1758,11 +1514,7 @@
       "properties": {
         "onError": {
           "description": "Behavior when an unhandled error occurs:  - 'propagate' (default) — fail the flow  - 'continue' — log and proceed past this node  - 'fallback' — route to the node's fallback edge if present",
-          "enum": [
-            "propagate",
-            "continue",
-            "fallback"
-          ],
+          "enum": ["propagate", "continue", "fallback"],
           "type": "string"
         },
         "retry": {
@@ -1801,9 +1553,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "toolId"
-      ],
+      "required": ["toolId"],
       "type": "object"
     },
     "TransformConfig": {
@@ -1814,9 +1564,7 @@
           "$ref": "#/definitions/Expression"
         }
       },
-      "required": [
-        "expression"
-      ],
+      "required": ["expression"],
       "type": "object"
     },
     "TriggerConfig": {
@@ -1829,20 +1577,14 @@
               "type": "string"
             },
             "method": {
-              "enum": [
-                "GET",
-                "POST"
-              ],
+              "enum": ["GET", "POST"],
               "type": "string"
             },
             "path": {
               "type": "string"
             }
           },
-          "required": [
-            "kind",
-            "path"
-          ],
+          "required": ["kind", "path"],
           "type": "object"
         },
         {
@@ -1859,10 +1601,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "kind",
-            "cron"
-          ],
+          "required": ["kind", "cron"],
           "type": "object"
         },
         {
@@ -1873,9 +1612,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "kind"
-          ],
+          "required": ["kind"],
           "type": "object"
         },
         {
@@ -1892,10 +1629,7 @@
               "$ref": "#/definitions/Expression"
             }
           },
-          "required": [
-            "kind",
-            "eventType"
-          ],
+          "required": ["kind", "eventType"],
           "type": "object"
         },
         {
@@ -1909,10 +1643,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "kind",
-            "channel"
-          ],
+          "required": ["kind", "channel"],
           "type": "object"
         }
       ],

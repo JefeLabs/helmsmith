@@ -42,7 +42,9 @@ export function emitTemplates(_tokens: TokenSet): TemplateArtifact[] {
   const arts: TemplateArtifact[] = [];
 
   for (const t of PAGE_TEMPLATES) {
-    const localSpecs = t.uses.map((id) => specsById.get(id)).filter((s): s is NonNullable<typeof s> => !!s);
+    const localSpecs = t.uses
+      .map((id) => specsById.get(id))
+      .filter((s): s is NonNullable<typeof s> => !!s);
     for (const vp of VIEWPORTS) {
       const slug = `${t.id}-${vp.id}`;
       const page = reusable(t.build(mockCtx, vp));
@@ -51,10 +53,19 @@ export function emitTemplates(_tokens: TokenSet): TemplateArtifact[] {
       const imports = aliasesReferenced(JSON.stringify([...localComps, page]));
 
       const compsFrame = (): Child =>
-        frame(`tpl-${slug}-components`, {
-          name: 'Components', x: 1600, y: 0, layout: 'vertical', gap: 24, padding: 32,
-          fill: '$colors:color.background',
-        }, structuredClone(localComps));
+        frame(
+          `tpl-${slug}-components`,
+          {
+            name: 'Components',
+            x: 1600,
+            y: 0,
+            layout: 'vertical',
+            gap: 24,
+            padding: 32,
+            fill: '$colors:color.background',
+          },
+          structuredClone(localComps),
+        );
 
       const assemble = (pageNode: Child): PenDocument => {
         const d = new PenDocument();

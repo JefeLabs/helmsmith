@@ -144,7 +144,8 @@ export function renderFigmaDaily(
   tz: string,
   opts: { includePresenceNow?: boolean } = {},
 ): string {
-  if (!f.available) return `Figma activity — ${f.date}\n(figma tracking not available on this storage backend)`;
+  if (!f.available)
+    return `Figma activity — ${f.date}\n(figma tracking not available on this storage backend)`;
 
   const out: string[] = [`Figma activity — ${f.date} (${tz})`];
 
@@ -173,7 +174,8 @@ export function renderFigmaDaily(
       m.presenceMinutes > 0 ? formatDuration(m.presenceMinutes) : '—',
     ]);
     out.push(table(['Member', 'Events', 'Est. burst', 'In-file'], rows));
-    if (f.members.some((m) => !m.mapped)) out.push('  ⚠ = not mapped to a Discord user (run `figma map-members`)');
+    if (f.members.some((m) => !m.mapped))
+      out.push('  ⚠ = not mapped to a Discord user (run `figma map-members`)');
   }
 
   // File heat.
@@ -192,7 +194,9 @@ export function renderFigmaDaily(
   if (f.events.length > 0) {
     out.push('\nRecent events');
     for (const e of f.events.slice(0, 15)) {
-      out.push(`  [${formatTime(e.at, tz)}] ${e.handle} — ${FIGMA_EVENT_LABEL[e.eventType] ?? e.eventType} — ${e.fileName}`);
+      out.push(
+        `  [${formatTime(e.at, tz)}] ${e.handle} — ${FIGMA_EVENT_LABEL[e.eventType] ?? e.eventType} — ${e.fileName}`,
+      );
     }
   }
 

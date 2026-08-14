@@ -13,7 +13,6 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@helmsmith/agent-adapter": "workspace:*",
     "@helmsmith/agent-auth": "workspace:*",
     "@vscode/tree-sitter-wasm": "^0.3.1",
     "neo4j-driver": "^6.0.1",

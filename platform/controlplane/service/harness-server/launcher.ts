@@ -85,7 +85,9 @@ const loadCatalog = async (): Promise<Catalog> => {
       return [] as ProductDef[];
     }),
   ]);
-  console.log(`[harness-server] catalog loaded: ${flows.length} flow(s), ${products.length} product(s)`);
+  console.log(
+    `[harness-server] catalog loaded: ${flows.length} flow(s), ${products.length} product(s)`,
+  );
   return { flows, products };
 };
 

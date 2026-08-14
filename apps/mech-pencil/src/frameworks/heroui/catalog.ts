@@ -14,47 +14,10 @@
  * complete library.
  */
 
-import type {
-  AtomicLevel,
-  BuildContext,
-  ComponentSpec,
-} from '../../design-system/atomic.ts';
+import type { AtomicLevel, BuildContext, ComponentSpec } from '../../design-system/atomic.ts';
 import type { Child } from '../../pen/schema.ts';
 import { buildButton } from './components/button.ts';
 import { buildCard } from './components/card.ts';
-import {
-  buildAlert,
-  buildAvatar,
-  buildBadge,
-  buildCheckbox,
-  buildChip,
-  buildInput,
-  buildPagination,
-  buildSwitch,
-  buildTabs,
-  buildTooltip,
-} from './components/primitives.ts';
-import {
-  buildButtonGroup,
-  buildCheckboxGroup,
-  buildCloseButton,
-  buildDescription,
-  buildFieldset,
-  buildInputGroup,
-  buildInputOtp,
-  buildKbd,
-  buildLabelComp,
-  buildLink,
-  buildNumberField,
-  buildRadioGroup,
-  buildSearchField,
-  buildSlider,
-  buildTagGroup,
-  buildTextArea,
-  buildTextField,
-  buildToggleButton,
-  buildToggleButtonGroup,
-} from './components/controls.ts';
 import {
   buildAccordion,
   buildAlertDialog,
@@ -78,6 +41,27 @@ import {
   buildToolbar,
 } from './components/complex.ts';
 import {
+  buildButtonGroup,
+  buildCheckboxGroup,
+  buildCloseButton,
+  buildDescription,
+  buildFieldset,
+  buildInputGroup,
+  buildInputOtp,
+  buildKbd,
+  buildLabelComp,
+  buildLink,
+  buildNumberField,
+  buildRadioGroup,
+  buildSearchField,
+  buildSlider,
+  buildTagGroup,
+  buildTextArea,
+  buildTextField,
+  buildToggleButton,
+  buildToggleButtonGroup,
+} from './components/controls.ts';
+import {
   buildBreadcrumbs,
   buildColorArea,
   buildColorField,
@@ -99,6 +83,18 @@ import {
   buildTimeField,
   buildTypography,
 } from './components/display.ts';
+import {
+  buildAlert,
+  buildAvatar,
+  buildBadge,
+  buildCheckbox,
+  buildChip,
+  buildInput,
+  buildPagination,
+  buildSwitch,
+  buildTabs,
+  buildTooltip,
+} from './components/primitives.ts';
 import { buildStub } from './components/stub.ts';
 
 interface CatalogEntry {
@@ -139,15 +135,54 @@ export const HEROUI_PACKAGE = '@heroui/react';
 const CATEGORY_GROUPS: Record<string, string[]> = {
   Buttons: ['button', 'button-group', 'close-button', 'toggle-button', 'toggle-button-group'],
   Collections: ['dropdown', 'list-box', 'tag-group'],
-  Colors: ['color-area', 'color-field', 'color-picker', 'color-slider', 'color-swatch', 'color-swatch-picker'],
+  Colors: [
+    'color-area',
+    'color-field',
+    'color-picker',
+    'color-slider',
+    'color-swatch',
+    'color-swatch-picker',
+  ],
   Controls: ['slider', 'switch'],
   'Data Display': ['badge', 'chip', 'table'],
-  'Date and Time': ['calendar', 'date-field', 'date-picker', 'date-range-picker', 'range-calendar', 'time-field'],
+  'Date and Time': [
+    'calendar',
+    'date-field',
+    'date-picker',
+    'date-range-picker',
+    'range-calendar',
+    'time-field',
+  ],
   Feedback: ['alert', 'meter', 'progress-bar', 'progress-circle', 'skeleton', 'spinner'],
-  Forms: ['checkbox', 'checkbox-group', 'description', 'error-message', 'field-error', 'fieldset', 'form', 'input', 'input-group', 'input-otp', 'label', 'number-field', 'radio-group', 'search-field', 'text-field', 'text-area'],
+  Forms: [
+    'checkbox',
+    'checkbox-group',
+    'description',
+    'error-message',
+    'field-error',
+    'fieldset',
+    'form',
+    'input',
+    'input-group',
+    'input-otp',
+    'label',
+    'number-field',
+    'radio-group',
+    'search-field',
+    'text-field',
+    'text-area',
+  ],
   Layout: ['card', 'separator', 'surface', 'toolbar'],
   Media: ['avatar'],
-  Navigation: ['accordion', 'breadcrumbs', 'disclosure', 'disclosure-group', 'link', 'pagination', 'tabs'],
+  Navigation: [
+    'accordion',
+    'breadcrumbs',
+    'disclosure',
+    'disclosure-group',
+    'link',
+    'pagination',
+    'tabs',
+  ],
   Overlays: ['alert-dialog', 'drawer', 'modal', 'popover', 'toast', 'tooltip'],
   Pickers: ['autocomplete', 'combo-box', 'select'],
   Typography: ['kbd', 'typography'],
@@ -155,9 +190,7 @@ const CATEGORY_GROUPS: Record<string, string[]> = {
 };
 
 const CATEGORY_BY_SLUG: Record<string, string> = Object.fromEntries(
-  Object.entries(CATEGORY_GROUPS).flatMap(([cat, slugs]) =>
-    slugs.map((s) => [s, cat]),
-  ),
+  Object.entries(CATEGORY_GROUPS).flatMap(([cat, slugs]) => slugs.map((s) => [s, cat])),
 );
 
 // Atomic-design layering is OUR taxonomy; HeroUI's own functional
@@ -167,26 +200,83 @@ const CATEGORY_BY_SLUG: Record<string, string> = Object.fromEntries(
 // dot-notation subpart of RadioGroup, not a standalone component
 // (heroui.com/docs/react/components/radio is 404).
 const ATOMS = [
-  'button', 'close-button', 'toggle-button', 'link', 'kbd', 'label',
-  'description', 'badge', 'chip', 'avatar', 'spinner', 'skeleton',
-  'separator', 'surface', 'scroll-shadow', 'switch', 'checkbox',
-  'slider', 'meter', 'progress-bar', 'progress-circle', 'color-swatch',
-  'error-message', 'field-error', 'input', 'text-area', 'typography',
+  'button',
+  'close-button',
+  'toggle-button',
+  'link',
+  'kbd',
+  'label',
+  'description',
+  'badge',
+  'chip',
+  'avatar',
+  'spinner',
+  'skeleton',
+  'separator',
+  'surface',
+  'scroll-shadow',
+  'switch',
+  'checkbox',
+  'slider',
+  'meter',
+  'progress-bar',
+  'progress-circle',
+  'color-swatch',
+  'error-message',
+  'field-error',
+  'input',
+  'text-area',
+  'typography',
 ];
 
 const MOLECULES = [
-  'button-group', 'toggle-button-group', 'text-field', 'search-field',
-  'number-field', 'color-field', 'date-field', 'time-field', 'input-group',
-  'input-otp', 'fieldset', 'checkbox-group', 'radio-group', 'tag-group',
-  'color-slider', 'color-area', 'color-swatch-picker', 'tooltip',
-  'breadcrumbs', 'pagination', 'tabs', 'alert', 'disclosure', 'card',
+  'button-group',
+  'toggle-button-group',
+  'text-field',
+  'search-field',
+  'number-field',
+  'color-field',
+  'date-field',
+  'time-field',
+  'input-group',
+  'input-otp',
+  'fieldset',
+  'checkbox-group',
+  'radio-group',
+  'tag-group',
+  'color-slider',
+  'color-area',
+  'color-swatch-picker',
+  'tooltip',
+  'breadcrumbs',
+  'pagination',
+  'tabs',
+  'alert',
+  'disclosure',
+  'card',
 ];
 
 const ORGANISMS = [
-  'form', 'table', 'list-box', 'dropdown', 'accordion', 'disclosure-group',
-  'toolbar', 'calendar', 'range-calendar', 'date-picker',
-  'date-range-picker', 'color-picker', 'autocomplete', 'combo-box',
-  'select', 'alert-dialog', 'drawer', 'modal', 'popover', 'toast',
+  'form',
+  'table',
+  'list-box',
+  'dropdown',
+  'accordion',
+  'disclosure-group',
+  'toolbar',
+  'calendar',
+  'range-calendar',
+  'date-picker',
+  'date-range-picker',
+  'color-picker',
+  'autocomplete',
+  'combo-box',
+  'select',
+  'alert-dialog',
+  'drawer',
+  'modal',
+  'popover',
+  'toast',
 ];
 
 /** HeroUI Storybook category order (welcome-page nav order). */
@@ -197,9 +287,24 @@ export function categoryOf(slug: string): string {
 }
 
 const CATALOG: CatalogEntry[] = [
-  ...ATOMS.map((id) => ({ id, name: reactName(id), level: 'atom' as const, category: categoryOf(id) })),
-  ...MOLECULES.map((id) => ({ id, name: reactName(id), level: 'molecule' as const, category: categoryOf(id) })),
-  ...ORGANISMS.map((id) => ({ id, name: reactName(id), level: 'organism' as const, category: categoryOf(id) })),
+  ...ATOMS.map((id) => ({
+    id,
+    name: reactName(id),
+    level: 'atom' as const,
+    category: categoryOf(id),
+  })),
+  ...MOLECULES.map((id) => ({
+    id,
+    name: reactName(id),
+    level: 'molecule' as const,
+    category: categoryOf(id),
+  })),
+  ...ORGANISMS.map((id) => ({
+    id,
+    name: reactName(id),
+    level: 'organism' as const,
+    category: categoryOf(id),
+  })),
 ];
 
 /** Hand-authored builders. Keyed by component id. */

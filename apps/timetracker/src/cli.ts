@@ -86,7 +86,9 @@ figma
   .action(() => runFigmaMapMembers());
 figma
   .command('report')
-  .description('Print/post a Figma activity report (presence, per-member activity, file heat, events)')
+  .description(
+    'Print/post a Figma activity report (presence, per-member activity, file heat, events)',
+  )
   .option('-d, --date <iso>', 'anchor date (YYYY-MM-DD); defaults to today')
   .option('--json', 'machine-readable JSON output')
   .option('--post', 'post the report to the Discord report channel instead of printing')

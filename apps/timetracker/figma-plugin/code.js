@@ -34,9 +34,7 @@ async function snapshot() {
     status('error', 'figma.fileKey unavailable — is the plugin imported as a private plugin?');
     return;
   }
-  var users = figma.activeUsers.map(function (u) {
-    return { id: u.id, name: u.name };
-  });
+  var users = figma.activeUsers.map((u) => ({ id: u.id, name: u.name }));
   var body = {
     passcode: PASSCODE || undefined,
     file_key: fileKey,
@@ -59,7 +57,10 @@ async function snapshot() {
     status('ok', users.length + ' active user(s) posted');
   } catch (err) {
     consecutiveErrors++;
-    status('error', 'POST failed: ' + (err && err.message ? err.message : err) + ' (x' + consecutiveErrors + ')');
+    status(
+      'error',
+      'POST failed: ' + (err && err.message ? err.message : err) + ' (x' + consecutiveErrors + ')',
+    );
   }
 }
 

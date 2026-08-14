@@ -35,7 +35,6 @@
   ],
   "license": "UNLICENSED",
   "dependencies": {
-    "@helmsmith/agent-adapter": "workspace:*",
     "@helmsmith/agent-auth": "workspace:*",
     "@helmsmith/cli-kit": "workspace:*",
     "@helmsmith/tui-view-components": "workspace:*",

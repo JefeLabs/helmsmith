@@ -8,13 +8,9 @@
  * Figma→Discord member mapping intentionally reuses the existing identity_map
  * (provider 'figma') rather than adding a second mapping mechanism.
  */
-import type {
-  FigmaEvent,
-  FigmaFile,
-  FigmaMember,
-  FigmaPresenceInterval,
-} from '../figma/types.js';
+
 import type { ISODate } from '../domain/types.js';
+import type { FigmaEvent, FigmaFile, FigmaMember, FigmaPresenceInterval } from '../figma/types.js';
 import type { StorageAdapter } from './StorageAdapter.js';
 
 export interface FigmaStorage {

@@ -1,5 +1,3 @@
-import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
 import {
   Button,
   Card,
@@ -11,11 +9,13 @@ import {
   Input,
   Spinner,
   Textarea,
-} from "@heroui/react";
-import { intent, IntentSession, subscribeToSession } from "../lib/api";
+} from '@heroui/react';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { IntentSession, intent, subscribeToSession } from '../lib/api';
 
 interface ChatLine {
-  who: "user" | "system";
+  who: 'user' | 'system';
   text: string;
   at: string;
 }
@@ -41,9 +41,9 @@ export default function IntakePage() {
   const [error, setError] = useState<string | null>(null);
 
   // Form state for "start session"
-  const [pipelineId, setPipelineId] = useState("default-intake");
-  const [productId, setProductId] = useState("demo-product");
-  const [initial, setInitial] = useState("");
+  const [pipelineId, setPipelineId] = useState('default-intake');
+  const [productId, setProductId] = useState('demo-product');
+  const [initial, setInitial] = useState('');
 
   const cleanupRef = useRef<(() => void) | null>(null);
 
@@ -65,7 +65,7 @@ export default function IntakePage() {
         setSession(s);
         setLines([
           {
-            who: "system",
+            who: 'system',
             text: `session ${s.id} (status=${s.status})`,
             at: s.createdAt,
           },
@@ -79,20 +79,29 @@ export default function IntakePage() {
         setLines((prev) => [
           ...prev,
           {
-            who: "system",
+            who: 'system',
             text: `event:${kind} ${JSON.stringify(data)}`,
             at: new Date().toISOString(),
           },
         ]);
       },
       onIntentReady: () => {
-        intent.get(sessionId).then(setSession).catch(() => {});
+        intent
+          .get(sessionId)
+          .then(setSession)
+          .catch(() => {});
       },
       onJobSubmitted: () => {
-        intent.get(sessionId).then(setSession).catch(() => {});
+        intent
+          .get(sessionId)
+          .then(setSession)
+          .catch(() => {});
       },
       onAborted: () => {
-        intent.get(sessionId).then(setSession).catch(() => {});
+        intent
+          .get(sessionId)
+          .then(setSession)
+          .catch(() => {});
       },
     });
     cleanupRef.current = cleanup;
@@ -109,7 +118,7 @@ export default function IntakePage() {
       const s = await intent.start({
         intakePipelineId: pipelineId || undefined,
         productId: productId || undefined,
-        initialInput: initial ? safeJson(initial) ?? { message: initial } : undefined,
+        initialInput: initial ? (safeJson(initial) ?? { message: initial }) : undefined,
       });
       navigate(`/intake/${s.id}`);
     } catch (e) {
@@ -121,10 +130,7 @@ export default function IntakePage() {
 
   async function sendMessage(message: string) {
     if (!session) return;
-    setLines((prev) => [
-      ...prev,
-      { who: "user", text: message, at: new Date().toISOString() },
-    ]);
+    setLines((prev) => [...prev, { who: 'user', text: message, at: new Date().toISOString() }]);
     try {
       await intent.message(session.id, message);
     } catch (e) {
@@ -164,7 +170,7 @@ export default function IntakePage() {
           <div className="flex flex-col">
             <p className="text-md">Start an intake session</p>
             <p className="text-sm text-default-500">
-              Submits a job-definition pipeline and tracks it through{" "}
+              Submits a job-definition pipeline and tracks it through{' '}
               <Code size="sm">intent-ready</Code>.
             </p>
           </div>
@@ -213,7 +219,7 @@ export default function IntakePage() {
             <Code size="sm">{sessionId.slice(0, 8)}…</Code>
             {session && <StatusChip status={session.status} />}
           </div>
-          <Button size="sm" variant="flat" onPress={() => navigate("/intake")}>
+          <Button size="sm" variant="flat" onPress={() => navigate('/intake')}>
             New session
           </Button>
         </CardHeader>
@@ -225,10 +231,10 @@ export default function IntakePage() {
               <div
                 key={i}
                 className={
-                  "p-2 rounded-md text-sm " +
-                  (l.who === "user"
-                    ? "bg-primary-100/30 ml-12"
-                    : "bg-default-100 mr-12 font-mono text-xs")
+                  'p-2 rounded-md text-sm ' +
+                  (l.who === 'user'
+                    ? 'bg-primary-100/30 ml-12'
+                    : 'bg-default-100 mr-12 font-mono text-xs')
                 }
               >
                 {l.text}
@@ -239,9 +245,9 @@ export default function IntakePage() {
           <MessageBar
             disabled={
               !session ||
-              session.status === "aborted" ||
-              session.status === "submitted" ||
-              session.status === "expired"
+              session.status === 'aborted' ||
+              session.status === 'submitted' ||
+              session.status === 'expired'
             }
             onSend={sendMessage}
           />
@@ -260,13 +266,10 @@ export default function IntakePage() {
               <DetailRow label="status" value={<StatusChip status={session.status} />} />
               <DetailRow
                 label="intake job"
-                value={<Code size="sm">{session.intakeJobId ?? "—"}</Code>}
+                value={<Code size="sm">{session.intakeJobId ?? '—'}</Code>}
               />
               {session.workJobId && (
-                <DetailRow
-                  label="work job"
-                  value={<Code size="sm">{session.workJobId}</Code>}
-                />
+                <DetailRow label="work job" value={<Code size="sm">{session.workJobId}</Code>} />
               )}
               {session.resolvedIntent && (
                 <div>
@@ -278,14 +281,14 @@ export default function IntakePage() {
               )}
               <Divider />
               <div className="flex flex-col gap-2">
-                {session.status === "intent-ready" && (
+                {session.status === 'intent-ready' && (
                   <Button color="success" onPress={confirmAndRun}>
                     Confirm & run
                   </Button>
                 )}
-                {session.status !== "submitted" &&
-                  session.status !== "aborted" &&
-                  session.status !== "expired" && (
+                {session.status !== 'submitted' &&
+                  session.status !== 'aborted' &&
+                  session.status !== 'expired' && (
                     <Button color="danger" variant="flat" onPress={abortSession}>
                       Abort session
                     </Button>
@@ -299,14 +302,8 @@ export default function IntakePage() {
   );
 }
 
-function MessageBar({
-  disabled,
-  onSend,
-}: {
-  disabled: boolean;
-  onSend: (text: string) => void;
-}) {
-  const [text, setText] = useState("");
+function MessageBar({ disabled, onSend }: { disabled: boolean; onSend: (text: string) => void }) {
+  const [text, setText] = useState('');
   return (
     <div className="flex gap-2">
       <Input
@@ -315,9 +312,9 @@ function MessageBar({
         onValueChange={setText}
         isDisabled={disabled}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && text && !disabled) {
+          if (e.key === 'Enter' && text && !disabled) {
             onSend(text);
-            setText("");
+            setText('');
           }
         }}
       />
@@ -327,7 +324,7 @@ function MessageBar({
         onPress={() => {
           if (text) {
             onSend(text);
-            setText("");
+            setText('');
           }
         }}
       >
@@ -346,12 +343,15 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   );
 }
 
-function StatusChip({ status }: { status: IntentSession["status"] }) {
+function StatusChip({ status }: { status: IntentSession['status'] }) {
   const tone =
-    status === "submitted" ? "success" :
-    status === "intent-ready" ? "primary" :
-    status === "aborted" || status === "failed" || status === "expired" ? "danger" :
-    "default";
+    status === 'submitted'
+      ? 'success'
+      : status === 'intent-ready'
+        ? 'primary'
+        : status === 'aborted' || status === 'failed' || status === 'expired'
+          ? 'danger'
+          : 'default';
   return (
     <Chip size="sm" color={tone} variant="flat">
       {status}

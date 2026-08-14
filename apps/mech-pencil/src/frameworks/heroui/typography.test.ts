@@ -3,7 +3,7 @@ import { emitDocument } from '../../emit/document.ts';
 import type { MockupContext } from '../_core/adapter.ts';
 import { deriveHeroUITokens } from './derive.ts';
 import { heroUIAdapter } from './index.ts';
-import { TYPE_STEPS, heroUITypography, typographyFoundation } from './typography.ts';
+import { heroUITypography, TYPE_STEPS, typographyFoundation } from './typography.ts';
 
 const ctx: MockupContext = { component: (id) => id, token: (k) => `$${k}` };
 

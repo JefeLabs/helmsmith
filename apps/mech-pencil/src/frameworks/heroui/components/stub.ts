@@ -16,12 +16,7 @@ import type { BuildContext } from '../../../design-system/atomic.ts';
 import { frame, reusable, text, withMeta } from '../../../pen/builder.ts';
 import type { Child } from '../../../pen/schema.ts';
 
-export function buildStub(
-  id: string,
-  name: string,
-  level: string,
-  ctx: BuildContext,
-): Child {
+export function buildStub(id: string, name: string, level: string, ctx: BuildContext): Child {
   const stripe = frame(`${id}-stripe`, {
     name: 'Stripe',
     width: 'fill_container',

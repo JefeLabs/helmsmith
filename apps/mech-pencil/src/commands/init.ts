@@ -10,8 +10,8 @@
 import { resolve } from 'node:path';
 import { emitDocument } from '../emit/document.ts';
 import { getFramework } from '../frameworks/_core/registry.ts';
-import { dim, err, heading, ok, warn } from '../ui.ts';
 import { documentPath, writeText } from '../lib/workspace.ts';
+import { dim, err, heading, ok, warn } from '../ui.ts';
 
 export interface GenerateOptions {
   framework: string;
@@ -21,8 +21,7 @@ export interface GenerateOptions {
 
 export function runGenerate(options: GenerateOptions): void {
   const adapter = getFramework(options.framework);
-  const { doc, validation, variableKeys, componentIds, screenSlugs } =
-    emitDocument(adapter);
+  const { doc, validation, variableKeys, componentIds, screenSlugs } = emitDocument(adapter);
 
   if (!validation.ok) {
     console.error(err(`generated document is invalid (${validation.issues.length} issue(s)):`));

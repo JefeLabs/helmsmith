@@ -45,7 +45,10 @@ describe('frame() normalization', () => {
 
 describe('rect() normalization', () => {
   it('applies the same stroke + fit_content normalization as frame', () => {
-    const r = rect('r', { stroke: { thickness: 3, fill: '#111111' }, width: 'fit_content' } as never);
+    const r = rect('r', {
+      stroke: { thickness: 3, fill: '#111111' },
+      width: 'fit_content',
+    } as never);
     expect(r).toMatchObject({ stroke: '#111111', strokeWidth: 3, width: 'fit_content(0)' });
   });
 });

@@ -22,12 +22,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { runBuildWorker } from './build-worker.ts';
 
-export type EmbedderVariant =
-  | 'qwen-0.6b'
-  | 'qwen-4b'
-  | 'qwen-8b'
-  | 'openai'
-  | 'bedrock';
+export type EmbedderVariant = 'qwen-0.6b' | 'qwen-4b' | 'qwen-8b' | 'openai' | 'bedrock';
 
 export interface StartOptions {
   /** Embedder variant; default 'qwen-0.6b'. */
@@ -55,13 +50,7 @@ export interface StartOptions {
   skipWorker?: boolean;
 }
 
-const VALID_VARIANTS: EmbedderVariant[] = [
-  'qwen-0.6b',
-  'qwen-4b',
-  'qwen-8b',
-  'openai',
-  'bedrock',
-];
+const VALID_VARIANTS: EmbedderVariant[] = ['qwen-0.6b', 'qwen-4b', 'qwen-8b', 'openai', 'bedrock'];
 
 export async function runStart(opts: StartOptions): Promise<void> {
   const variant = opts.embedder ?? 'qwen-0.6b';
@@ -88,8 +77,8 @@ export async function runStart(opts: StartOptions): Promise<void> {
   }
 
   const composeFiles = [baseFile, overlayFile];
-  let services: string[] = [];          // empty = "all in compose"
-  let envOverrides: NodeJS.ProcessEnv = {};
+  let services: string[] = []; // empty = "all in compose"
+  const envOverrides: NodeJS.ProcessEnv = {};
 
   if (opts.remoteControlplane) {
     if (!existsSync(remoteOverlayFile)) {
@@ -110,13 +99,7 @@ export async function runStart(opts: StartOptions): Promise<void> {
 
   console.log(`[workspace] compose: ${composeFiles.map((f) => `-f ${f}`).join(' ')}`);
 
-  const args = [
-    'compose',
-    ...composeFiles.flatMap((f) => ['-f', f]),
-    'up',
-    '-d',
-    ...services,
-  ];
+  const args = ['compose', ...composeFiles.flatMap((f) => ['-f', f]), 'up', '-d', ...services];
 
   await runDocker(args, composeDir, envOverrides);
 

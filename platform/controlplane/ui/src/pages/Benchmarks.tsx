@@ -1,6 +1,3 @@
-import { useState, useMemo } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import {
   Button,
   Card,
@@ -16,7 +13,10 @@ import {
   TableColumn,
   TableHeader,
   TableRow,
-} from "@heroui/react";
+} from '@heroui/react';
+import { useQuery } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Bar,
   BarChart,
@@ -26,8 +26,8 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-} from "recharts";
-import { benchmarks, BenchmarkRunSummary } from "../lib/api";
+} from 'recharts';
+import { BenchmarkRunSummary, benchmarks } from '../lib/api';
 
 /**
  * Benchmark compare page. URL drives state — ?runIds=A,B,C lets users
@@ -37,16 +37,20 @@ import { benchmarks, BenchmarkRunSummary } from "../lib/api";
  */
 export default function BenchmarksPage() {
   const [params, setParams] = useSearchParams();
-  const runIdsParam = params.get("runIds") ?? "";
+  const runIdsParam = params.get('runIds') ?? '';
   const runIds = useMemo(
-    () => runIdsParam.split(",").map((s) => s.trim()).filter(Boolean),
+    () =>
+      runIdsParam
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
     [runIdsParam],
   );
 
   const [draft, setDraft] = useState(runIdsParam);
 
   const { data, isPending, error, refetch } = useQuery({
-    queryKey: ["benchmarks-compare", runIds.join(",")],
+    queryKey: ['benchmarks-compare', runIds.join(',')],
     queryFn: () => benchmarks.compare(runIds),
     enabled: runIds.length > 0,
     refetchInterval: 5_000,
@@ -62,8 +66,8 @@ export default function BenchmarksPage() {
         <CardHeader className="flex flex-col gap-1 items-start">
           <p className="text-md font-semibold">Benchmark compare</p>
           <p className="text-sm text-default-500">
-            Paste comma-separated run IDs (returned by{" "}
-            <Code size="sm">workspace bench run</Code>); auto-refresh every 5s.
+            Paste comma-separated run IDs (returned by <Code size="sm">workspace bench run</Code>);
+            auto-refresh every 5s.
           </p>
         </CardHeader>
         <Divider />
@@ -74,7 +78,7 @@ export default function BenchmarksPage() {
             value={draft}
             onValueChange={setDraft}
             onKeyDown={(e) => {
-              if (e.key === "Enter") applyDraft();
+              if (e.key === 'Enter') applyDraft();
             }}
           />
           <Button color="primary" onPress={applyDraft} isDisabled={!draft.trim()}>
@@ -102,27 +106,27 @@ export default function BenchmarksPage() {
 
 function CompareView({ rows }: { rows: BenchmarkRunSummary[] }) {
   // Color cycle for the bars per run — Hero UI's Tailwind palette.
-  const colors = ["#6366f1", "#22c55e", "#f59e0b", "#ec4899", "#0ea5e9"];
+  const colors = ['#6366f1', '#22c55e', '#f59e0b', '#ec4899', '#0ea5e9'];
 
   // Build chart data: one row per metric, columns per run.
   const metricChart = [
     {
-      metric: "success rate",
+      metric: 'success rate',
       ...rowsByLabel(rows, (r) => r.successRate),
     },
     {
-      metric: "avg score",
+      metric: 'avg score',
       ...rowsByLabel(rows, (r) => r.avgScore ?? 0),
     },
   ];
 
   const latencyChart = [
     {
-      metric: "p50 (ms)",
+      metric: 'p50 (ms)',
       ...rowsByLabel(rows, (r) => r.p50LatencyMs),
     },
     {
-      metric: "p95 (ms)",
+      metric: 'p95 (ms)',
       ...rowsByLabel(rows, (r) => r.p95LatencyMs),
     },
   ];
@@ -132,11 +136,11 @@ function CompareView({ rows }: { rows: BenchmarkRunSummary[] }) {
   const anyEstimated = rows.some((r) => r.estimated > 0);
   const estimationChart = [
     {
-      metric: "MAE (pts)",
+      metric: 'MAE (pts)',
       ...rowsByLabel(rows, (r) => r.meanAbsError ?? 0),
     },
     {
-      metric: "bias (pts)",
+      metric: 'bias (pts)',
       ...rowsByLabel(rows, (r) => r.bias ?? 0),
     },
   ];
@@ -156,7 +160,7 @@ function CompareView({ rows }: { rows: BenchmarkRunSummary[] }) {
                   className="text-sm font-semibold mt-1"
                   style={{ color: colors[idx % colors.length] }}
                 >
-                  {r.label ?? "—"}
+                  {r.label ?? '—'}
                 </p>
               </div>
               <Button
@@ -171,7 +175,10 @@ function CompareView({ rows }: { rows: BenchmarkRunSummary[] }) {
             <Divider />
             <CardBody className="space-y-1 text-sm">
               <Row label="total" value={r.total} />
-              <Row label="completed" value={`${r.completed} (${(r.successRate * 100).toFixed(1)}%)`} />
+              <Row
+                label="completed"
+                value={`${r.completed} (${(r.successRate * 100).toFixed(1)}%)`}
+              />
               <Row label="failed" value={r.failed} />
               <Row label="in-flight" value={r.inFlight} />
               <Divider className="my-1" />
@@ -179,22 +186,16 @@ function CompareView({ rows }: { rows: BenchmarkRunSummary[] }) {
               <Row label="p95 latency" value={`${r.p95LatencyMs} ms`} />
               <Divider className="my-1" />
               <Row label="scored" value={`${r.scored} / ${r.total}`} />
-              <Row
-                label="avg score"
-                value={r.avgScore != null ? r.avgScore.toFixed(3) : "—"}
-              />
+              <Row label="avg score" value={r.avgScore != null ? r.avgScore.toFixed(3) : '—'} />
               {r.estimated > 0 && (
                 <>
                   <Divider className="my-1" />
                   <Row label="estimated" value={`${r.estimated} / ${r.total}`} />
                   <Row
                     label="MAE (pts)"
-                    value={r.meanAbsError != null ? r.meanAbsError.toFixed(2) : "—"}
+                    value={r.meanAbsError != null ? r.meanAbsError.toFixed(2) : '—'}
                   />
-                  <Row
-                    label="bias (pts)"
-                    value={r.bias != null ? formatBias(r.bias) : "—"}
-                  />
+                  <Row label="bias (pts)" value={r.bias != null ? formatBias(r.bias) : '—'} />
                 </>
               )}
             </CardBody>
@@ -214,14 +215,10 @@ function CompareView({ rows }: { rows: BenchmarkRunSummary[] }) {
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis dataKey="metric" stroke="#9ca3af" />
               <YAxis domain={[0, 1]} stroke="#9ca3af" />
-              <Tooltip contentStyle={{ background: "#1f2937", border: "none" }} />
+              <Tooltip contentStyle={{ background: '#1f2937', border: 'none' }} />
               <Legend />
               {rows.map((r, idx) => (
-                <Bar
-                  key={r.runId}
-                  dataKey={labelKey(r)}
-                  fill={colors[idx % colors.length]}
-                />
+                <Bar key={r.runId} dataKey={labelKey(r)} fill={colors[idx % colors.length]} />
               ))}
             </BarChart>
           </ResponsiveContainer>
@@ -240,14 +237,10 @@ function CompareView({ rows }: { rows: BenchmarkRunSummary[] }) {
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis dataKey="metric" stroke="#9ca3af" />
               <YAxis stroke="#9ca3af" />
-              <Tooltip contentStyle={{ background: "#1f2937", border: "none" }} />
+              <Tooltip contentStyle={{ background: '#1f2937', border: 'none' }} />
               <Legend />
               {rows.map((r, idx) => (
-                <Bar
-                  key={r.runId}
-                  dataKey={labelKey(r)}
-                  fill={colors[idx % colors.length]}
-                />
+                <Bar key={r.runId} dataKey={labelKey(r)} fill={colors[idx % colors.length]} />
               ))}
             </BarChart>
           </ResponsiveContainer>
@@ -260,10 +253,10 @@ function CompareView({ rows }: { rows: BenchmarkRunSummary[] }) {
           <CardHeader className="flex flex-col gap-1 items-start">
             <p className="text-md">Estimation accuracy</p>
             <p className="text-xs text-default-500">
-              <Code size="sm">MAE</Code> = mean(|actual − estimated|) — lower is
-              better. <Code size="sm">bias</Code> = mean(actual − estimated) —
-              positive means consistently under-estimating; negative means
-              over-estimating; near zero means estimates are well-calibrated.
+              <Code size="sm">MAE</Code> = mean(|actual − estimated|) — lower is better.{' '}
+              <Code size="sm">bias</Code> = mean(actual − estimated) — positive means consistently
+              under-estimating; negative means over-estimating; near zero means estimates are
+              well-calibrated.
             </p>
           </CardHeader>
           <Divider />
@@ -273,14 +266,10 @@ function CompareView({ rows }: { rows: BenchmarkRunSummary[] }) {
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                 <XAxis dataKey="metric" stroke="#9ca3af" />
                 <YAxis stroke="#9ca3af" />
-                <Tooltip contentStyle={{ background: "#1f2937", border: "none" }} />
+                <Tooltip contentStyle={{ background: '#1f2937', border: 'none' }} />
                 <Legend />
                 {rows.map((r, idx) => (
-                  <Bar
-                    key={r.runId}
-                    dataKey={labelKey(r)}
-                    fill={colors[idx % colors.length]}
-                  />
+                  <Bar key={r.runId} dataKey={labelKey(r)} fill={colors[idx % colors.length]} />
                 ))}
               </BarChart>
             </ResponsiveContainer>
@@ -318,7 +307,7 @@ function CompareView({ rows }: { rows: BenchmarkRunSummary[] }) {
                   <TableCell>
                     <Code size="sm">{r.runId.slice(0, 12)}…</Code>
                   </TableCell>
-                  <TableCell>{r.label ?? "—"}</TableCell>
+                  <TableCell>{r.label ?? '—'}</TableCell>
                   <TableCell>{r.total}</TableCell>
                   <TableCell>{r.completed}</TableCell>
                   <TableCell>{r.failed}</TableCell>
@@ -327,10 +316,10 @@ function CompareView({ rows }: { rows: BenchmarkRunSummary[] }) {
                   <TableCell>{r.p95LatencyMs}</TableCell>
                   <TableCell>{(r.successRate * 100).toFixed(1)}%</TableCell>
                   <TableCell>{r.scored}</TableCell>
-                  <TableCell>{r.avgScore != null ? r.avgScore.toFixed(3) : "—"}</TableCell>
+                  <TableCell>{r.avgScore != null ? r.avgScore.toFixed(3) : '—'}</TableCell>
                   <TableCell>{r.estimated}</TableCell>
-                  <TableCell>{r.meanAbsError != null ? r.meanAbsError.toFixed(2) : "—"}</TableCell>
-                  <TableCell>{r.bias != null ? formatBias(r.bias) : "—"}</TableCell>
+                  <TableCell>{r.meanAbsError != null ? r.meanAbsError.toFixed(2) : '—'}</TableCell>
+                  <TableCell>{r.bias != null ? formatBias(r.bias) : '—'}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

@@ -51,7 +51,9 @@ export const OPENAPI_SPEC = {
       post: {
         summary: 'Hybrid graph + similarity search',
         requestBody: {
-          content: { 'application/json': { schema: { $ref: '#/components/schemas/QueryRequest' } } },
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/QueryRequest' } },
+          },
         },
         responses: { '200': { description: 'Search hits' } },
       },
@@ -110,7 +112,8 @@ export const OPENAPI_SPEC = {
     '/v1/ingest/jira': {
       post: {
         summary: 'Ingest Jira issues by JQL',
-        description: 'Reads JIRA_TOKEN, JIRA_BASE_URL, JIRA_EMAIL from server env. Atlassian Cloud uses Basic auth (email:token); set JIRA_AUTH_SCHEME=Bearer for self-hosted.',
+        description:
+          'Reads JIRA_TOKEN, JIRA_BASE_URL, JIRA_EMAIL from server env. Atlassian Cloud uses Basic auth (email:token); set JIRA_AUTH_SCHEME=Bearer for self-hosted.',
         requestBody: {
           content: {
             'application/json': { schema: { $ref: '#/components/schemas/JiraIngestRequest' } },
@@ -126,7 +129,8 @@ export const OPENAPI_SPEC = {
     '/v1/ingest/confluence': {
       post: {
         summary: 'Ingest Confluence space pages',
-        description: 'Reads CONFLUENCE_TOKEN, CONFLUENCE_BASE_URL, CONFLUENCE_EMAIL from server env.',
+        description:
+          'Reads CONFLUENCE_TOKEN, CONFLUENCE_BASE_URL, CONFLUENCE_EMAIL from server env.',
         requestBody: {
           content: {
             'application/json': {
@@ -256,8 +260,7 @@ export const OPENAPI_SPEC = {
     '/v1/ingest/events': {
       get: {
         summary: 'WebSocket upgrade — stream of ingestion events',
-        description:
-          'Send `{ "subscribe": "<ingestId>" }` after connect to filter to one ingest.',
+        description: 'Send `{ "subscribe": "<ingestId>" }` after connect to filter to one ingest.',
         responses: {
           '101': { description: 'Upgraded to WebSocket' },
           '400': { description: 'Not a valid upgrade request' },
@@ -283,8 +286,14 @@ export const OPENAPI_SPEC = {
         { name: 'pluginId', in: 'path', required: true, schema: { type: 'string' } },
         { name: 'sub', in: 'path', required: true, schema: { type: 'string' } },
       ],
-      get: { summary: 'Dispatched to plugin GET handler', responses: { '200': { description: 'plugin response' } } },
-      post: { summary: 'Dispatched to plugin POST handler', responses: { '200': { description: 'plugin response' } } },
+      get: {
+        summary: 'Dispatched to plugin GET handler',
+        responses: { '200': { description: 'plugin response' } },
+      },
+      post: {
+        summary: 'Dispatched to plugin POST handler',
+        responses: { '200': { description: 'plugin response' } },
+      },
     },
     '/metrics': {
       get: {

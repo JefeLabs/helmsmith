@@ -23,9 +23,9 @@ import { basename, resolve } from 'node:path';
 import { BUILTIN_SOURCE_TYPES } from '../catalog/index.ts';
 import type { IngestionSummary, IngestSpec, SourceType } from '../types.ts';
 import { type ChunkOutput, chunkHeadingBased } from './chunkers/heading-based.ts';
-import { classifyDomain } from './domain.ts';
 import { chunkCodeFull } from './chunkers/tree-sitter.ts';
 import { chunkWholeFile } from './chunkers/whole-file.ts';
+import { classifyDomain } from './domain.ts';
 import { createHttpEmbedderClient, type EmbedderClient } from './embedder-client.ts';
 import { compileMatcher } from './matcher.ts';
 import { buildProvenanceGraph, readOssPackageMeta } from './oss-meta.ts';
@@ -192,9 +192,7 @@ export async function ingest(spec: IngestSpecExt): Promise<IngestionSummary> {
       .update('\0')
       .update(content)
       .digest('hex');
-    const rootNode = chunked.nodes.find(
-      (n) => n.label.endsWith('File') || n.label.endsWith('Doc'),
-    );
+    const rootNode = chunked.nodes.find((n) => n.label.endsWith('File') || n.label.endsWith('Doc'));
     if (rootNode) rootNode.properties.contentHash = fileHash;
     if (!spec.force && rootNode && typeof spec.backend.getContentHashes === 'function') {
       const existing = await spec.backend.getContentHashes([rootNode.id]);

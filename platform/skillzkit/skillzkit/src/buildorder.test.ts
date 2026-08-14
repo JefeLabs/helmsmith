@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -23,7 +23,11 @@ function cmd(slug: string, dependsOn: string[] = []): Command {
 
 describe('buildOrder', () => {
   it('orders dependencies before dependents', () => {
-    const cmds = [cmd('a:forms', ['a:buttons']), cmd('a:buttons', ['a:surfaces']), cmd('a:surfaces')];
+    const cmds = [
+      cmd('a:forms', ['a:buttons']),
+      cmd('a:buttons', ['a:surfaces']),
+      cmd('a:surfaces'),
+    ];
     const order = buildOrder(cmds).map((c) => c.slug);
     expect(order.indexOf('a:surfaces')).toBeLessThan(order.indexOf('a:buttons'));
     expect(order.indexOf('a:buttons')).toBeLessThan(order.indexOf('a:forms'));
@@ -42,7 +46,11 @@ describe('buildOrder', () => {
 
 describe('dependencyTree', () => {
   it('builds the transitive dependsOn tree', () => {
-    const cmds = [cmd('a:forms', ['a:buttons']), cmd('a:buttons', ['a:surfaces']), cmd('a:surfaces')];
+    const cmds = [
+      cmd('a:forms', ['a:buttons']),
+      cmd('a:buttons', ['a:surfaces']),
+      cmd('a:surfaces'),
+    ];
     const tree = dependencyTree('a:forms', cmds);
     expect(tree.dependsOn[0].slug).toBe('a:buttons');
     expect(tree.dependsOn[0].dependsOn[0].slug).toBe('a:surfaces');
@@ -66,7 +74,10 @@ describe('loadCommands — build-order graph from requires/produces', () => {
       // surfaces produces a .pen; buttons requires it exactly; an aggregator
       // requires a glob that surfaces' output also satisfies.
       write('surfaces', 'description: surfaces\nproduces:\n  - design/components/surfaces.pen');
-      write('buttons', 'description: buttons\nrequires:\n  - design/components/surfaces.pen\nproduces:\n  - design/components/buttons.pen');
+      write(
+        'buttons',
+        'description: buttons\nrequires:\n  - design/components/surfaces.pen\nproduces:\n  - design/components/buttons.pen',
+      );
       write('all', 'description: all\nrequires:\n  - design/components/*.pen');
 
       const cmds = loadCommands(root);

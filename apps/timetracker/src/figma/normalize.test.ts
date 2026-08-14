@@ -73,7 +73,11 @@ describe('webhookEvent', () => {
   });
 
   it('maps LIBRARY_PUBLISH and FILE_DELETE', () => {
-    const base = { file_key: 'fileA', timestamp: '2026-07-06T14:00:00Z', triggered_by: { id: 'u2', handle: 'marco' } };
+    const base = {
+      file_key: 'fileA',
+      timestamp: '2026-07-06T14:00:00Z',
+      triggered_by: { id: 'u2', handle: 'marco' },
+    };
     expect(webhookEvent({ ...base, event_type: 'LIBRARY_PUBLISH' }, TZ).event?.eventType).toBe(
       'library_publish',
     );

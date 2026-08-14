@@ -1,16 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
-import {
-  Card,
-  CardBody,
-  CardHeader,
-  Chip,
-  Code,
-  Divider,
-  Spinner,
-  Tab,
-  Tabs,
-} from "@heroui/react";
-import { catalog, Flow, Product } from "../lib/api";
+import { Card, CardBody, CardHeader, Chip, Code, Divider, Spinner, Tab, Tabs } from '@heroui/react';
+import { useQuery } from '@tanstack/react-query';
+import { catalog, Flow, Product } from '../lib/api';
 
 export default function CatalogPage() {
   return (
@@ -26,7 +16,7 @@ export default function CatalogPage() {
 }
 
 function FlowsTab() {
-  const { data, isPending, error } = useQuery({ queryKey: ["flows"], queryFn: catalog.flows });
+  const { data, isPending, error } = useQuery({ queryKey: ['flows'], queryFn: catalog.flows });
   if (isPending) return <Spinner label="Loading flows…" />;
   if (error) return <Code color="danger">{String(error)}</Code>;
   return (
@@ -43,7 +33,9 @@ function FlowsTab() {
           <CardBody className="gap-2 text-sm">
             <p className="text-default-700">{f.description ?? <em>no description</em>}</p>
             <details className="text-xs">
-              <summary className="cursor-pointer text-default-500">nodes ({nodeCount(f.nodes)})</summary>
+              <summary className="cursor-pointer text-default-500">
+                nodes ({nodeCount(f.nodes)})
+              </summary>
               <pre className="bg-default-100 p-2 rounded mt-1 overflow-x-auto">
                 {JSON.stringify(f.nodes, null, 2)}
               </pre>
@@ -55,8 +47,7 @@ function FlowsTab() {
         <Card>
           <CardBody>
             <p className="text-default-500">
-              No flows registered. Register one with{" "}
-              <Code size="sm">POST /api/catalog/flows</Code>.
+              No flows registered. Register one with <Code size="sm">POST /api/catalog/flows</Code>.
             </p>
           </CardBody>
         </Card>
@@ -67,7 +58,7 @@ function FlowsTab() {
 
 function ProductsTab() {
   const { data, isPending, error } = useQuery({
-    queryKey: ["products"],
+    queryKey: ['products'],
     queryFn: catalog.products,
   });
   if (isPending) return <Spinner label="Loading products…" />;
@@ -88,12 +79,8 @@ function ProductsTab() {
   );
 }
 
-function kindColor(kind: Flow["kind"]) {
-  return kind === "work"
-    ? "primary"
-    : kind === "job-definition"
-      ? "success"
-      : "warning";
+function kindColor(kind: Flow['kind']) {
+  return kind === 'work' ? 'primary' : kind === 'job-definition' ? 'success' : 'warning';
 }
 
 function nodeCount(nodes: unknown): number {

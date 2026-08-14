@@ -28,15 +28,15 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  createHttpEmbedderClient,
   type EmbedderConfig,
   type IngestionEvent,
   type IngestionSummary,
-  Neo4jBackend,
   ingest,
+  Neo4jBackend,
 } from '@helmsmith/context-loader-core';
 import neo4j, { type Driver } from 'neo4j-driver';
 import { Crawler, type CrawlRequest, type CrawlScope } from './crawl.ts';
-import { createHttpEmbedderClient } from '@helmsmith/context-loader-core';
 import {
   ConfluenceFetcher,
   type ConfluenceIngestRequest,
@@ -235,9 +235,7 @@ export class ContextIngestService implements IngestService {
     return { ingestId };
   }
 
-  async startGithubIssuesIngest(
-    req: GithubIssuesIngestRequest,
-  ): Promise<{ ingestId: string }> {
+  async startGithubIssuesIngest(req: GithubIssuesIngestRequest): Promise<{ ingestId: string }> {
     const ingestId = newIngestId();
     const status: IngestStatus = {
       ingestId,
@@ -363,9 +361,7 @@ export class ContextIngestService implements IngestService {
   }
 
   listIngests(): IngestStatus[] {
-    return [...this.ingests.values()].sort((a, b) =>
-      b.startedAt.localeCompare(a.startedAt),
-    );
+    return [...this.ingests.values()].sort((a, b) => b.startedAt.localeCompare(a.startedAt));
   }
 
   cancelIngest(ingestId: string): boolean {

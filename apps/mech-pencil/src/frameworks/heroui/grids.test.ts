@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { emitDocument } from '../../emit/document.ts';
 import type { MockupContext } from '../_core/adapter.ts';
 import { deriveHeroUITokens } from './derive.ts';
-import { HEROUI_GRID, gridsFoundation } from './grids.ts';
+import { gridsFoundation, HEROUI_GRID } from './grids.ts';
 import { heroUIAdapter } from './index.ts';
 
 const ctx: MockupContext = { component: (id) => id, token: (k) => `$${k}` };
@@ -11,7 +11,12 @@ describe('grids & spacing foundation', () => {
   it('registers the spacing scale + grid tokens as scalars', () => {
     const keys = deriveHeroUITokens().tokens.scalars.map((s) => s.key);
     for (const k of HEROUI_GRID.spaceKeys) expect(keys).toContain(k);
-    for (const k of [HEROUI_GRID.columnsKey, HEROUI_GRID.gutterKey, HEROUI_GRID.marginKey, HEROUI_GRID.maxWidthKey]) {
+    for (const k of [
+      HEROUI_GRID.columnsKey,
+      HEROUI_GRID.gutterKey,
+      HEROUI_GRID.marginKey,
+      HEROUI_GRID.maxWidthKey,
+    ]) {
       expect(keys).toContain(k);
     }
   });

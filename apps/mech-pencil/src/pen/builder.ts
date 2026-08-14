@@ -10,16 +10,7 @@
  * paths by id, so stable, meaningful ids are load-bearing, not cosmetic.
  */
 
-import type {
-  Child,
-  Fills,
-  Frame,
-  IconFont,
-  Layout,
-  Rectangle,
-  Ref,
-  Text,
-} from './schema.ts';
+import type { Child, Fills, Frame, IconFont, Layout, Rectangle, Ref, Text } from './schema.ts';
 
 /** Slug an arbitrary label into a stable, path-safe id segment. */
 export function slug(label: string): string {

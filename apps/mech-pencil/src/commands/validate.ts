@@ -7,10 +7,10 @@
  */
 
 import { resolve } from 'node:path';
+import { readJson } from '../lib/workspace.ts';
 import type { Document } from '../pen/schema.ts';
 import { validateDocument } from '../pen/validate.ts';
 import { dim, err, ok } from '../ui.ts';
-import { readJson } from '../lib/workspace.ts';
 
 export function runValidate(file: string): void {
   const target = resolve(file);

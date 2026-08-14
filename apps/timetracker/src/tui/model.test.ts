@@ -74,7 +74,12 @@ describe('column definitions', () => {
 describe('figma panel lines', () => {
   it('renders the live-log line in the PRD shape', () => {
     const line = figmaEventLine(
-      { at: '2026-07-06T18:32:00Z', eventType: 'version', handle: 'ana', fileName: 'design-system' },
+      {
+        at: '2026-07-06T18:32:00Z',
+        eventType: 'version',
+        handle: 'ana',
+        fileName: 'design-system',
+      },
       'UTC',
     );
     expect(line).toBe('[18:32] ana — version saved — design-system');

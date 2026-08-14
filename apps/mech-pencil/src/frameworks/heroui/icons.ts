@@ -56,7 +56,12 @@ export const HEROUI_ICONS: IconFoundation = {
 // 0 (verified). The icon scale still lives in tokens (code-gen); the .pen bakes
 // the px from it. Mirrors the icon.* SCALAR values in tokens.ts.
 const ICON_PX: Record<string, number> = {
-  'icon.xs': 12, 'icon.sm': 16, 'icon.md': 20, 'icon.lg': 24, 'icon.xl': 32, 'icon.2xl': 40,
+  'icon.xs': 12,
+  'icon.sm': 16,
+  'icon.md': 20,
+  'icon.lg': 24,
+  'icon.xl': 32,
+  'icon.2xl': 40,
 };
 
 const STATUS_TINT: Record<string, string> = {
@@ -84,24 +89,50 @@ function buildIconsPage(ctx: MockupContext): Child[] {
   const fam = ctx.token('font.family');
 
   const header = frame('fi-header', { name: 'Header', layout: 'vertical', gap: 4 }, [
-    text('fi-title', 'Icons', { fill: fg, fontFamily: ctx.token('font.display'), fontSize: 28, fontWeight: '700' }),
-    text('fi-sub', `Font Awesome · ${HEROUI_ICONS.sizeKeys.length} sizes · ${HEROUI_ICONS.semantic.length} semantic roles`, {
-      fill: muted,
-      fontFamily: ctx.token('font.mono'),
-      fontSize: 14,
+    text('fi-title', 'Icons', {
+      fill: fg,
+      fontFamily: ctx.token('font.display'),
+      fontSize: 28,
+      fontWeight: '700',
     }),
+    text(
+      'fi-sub',
+      `Font Awesome · ${HEROUI_ICONS.sizeKeys.length} sizes · ${HEROUI_ICONS.semantic.length} semantic roles`,
+      {
+        fill: muted,
+        fontFamily: ctx.token('font.mono'),
+        fontSize: 14,
+      },
+    ),
   ]);
 
   // Size scale — one representative glyph at each $icon.* token size.
   const sizeCells = HEROUI_ICONS.sizeKeys.map((key) =>
-    frame(nid('size'), { name: key, layout: 'vertical', gap: 6, alignItems: 'center', width: CELL }, [
-      faIconNode(nid('sizeglyph'), 'gear', ICON_PX[key] ?? 24, fg),
-      text(nid('sizelabel'), key.replace('icon.', ''), { fill: muted, fontFamily: fam, fontSize: 11 }),
-    ]),
+    frame(
+      nid('size'),
+      { name: key, layout: 'vertical', gap: 6, alignItems: 'center', width: CELL },
+      [
+        faIconNode(nid('sizeglyph'), 'gear', ICON_PX[key] ?? 24, fg),
+        text(nid('sizelabel'), key.replace('icon.', ''), {
+          fill: muted,
+          fontFamily: fam,
+          fontSize: 11,
+        }),
+      ],
+    ),
   );
   const sizes = frame('fi-sizes', { name: 'Size scale', layout: 'vertical', gap: 10 }, [
-    text('fi-sizes-h', 'Size scale', { fill: fg, fontFamily: fam, fontSize: 14, fontWeight: '600' }),
-    frame('fi-sizes-row', { name: 'row', layout: 'horizontal', gap: 16, alignItems: 'end' }, sizeCells),
+    text('fi-sizes-h', 'Size scale', {
+      fill: fg,
+      fontFamily: fam,
+      fontSize: 14,
+      fontWeight: '600',
+    }),
+    frame(
+      'fi-sizes-row',
+      { name: 'row', layout: 'horizontal', gap: 16, alignItems: 'end' },
+      sizeCells,
+    ),
   ]);
 
   // Semantic grid — grouped role→glyph, tinted by $color.*.
@@ -110,13 +141,30 @@ function buildIconsPage(ctx: MockupContext): Child[] {
   for (const group of groups) {
     const entries = HEROUI_ICONS.semantic.filter((e) => (e.group ?? 'General') === group);
     const rows = chunk(entries, PER_ROW).map((row) =>
-      frame(nid('semrow'), { name: 'row', layout: 'horizontal', gap: 8 }, row.map((e) =>
-        frame(nid('cell'), { name: e.role, layout: 'vertical', gap: 5, alignItems: 'center', width: CELL }, [
-          faIconNode(nid('glyph'), e.icon, ICON_PX['icon.lg'], ctx.token(STATUS_TINT[e.role] ?? 'color.foreground')),
-          text(nid('role'), e.role, { fill: fg, fontFamily: fam, fontSize: 11 }),
-          text(nid('glyphname'), e.icon, { fill: muted, fontFamily: ctx.token('font.mono'), fontSize: 9 }),
-        ]),
-      )),
+      frame(
+        nid('semrow'),
+        { name: 'row', layout: 'horizontal', gap: 8 },
+        row.map((e) =>
+          frame(
+            nid('cell'),
+            { name: e.role, layout: 'vertical', gap: 5, alignItems: 'center', width: CELL },
+            [
+              faIconNode(
+                nid('glyph'),
+                e.icon,
+                ICON_PX['icon.lg'],
+                ctx.token(STATUS_TINT[e.role] ?? 'color.foreground'),
+              ),
+              text(nid('role'), e.role, { fill: fg, fontFamily: fam, fontSize: 11 }),
+              text(nid('glyphname'), e.icon, {
+                fill: muted,
+                fontFamily: ctx.token('font.mono'),
+                fontSize: 9,
+              }),
+            ],
+          ),
+        ),
+      ),
     );
     sections.push(
       frame(nid('group'), { name: group, layout: 'vertical', gap: 10 }, [
@@ -125,7 +173,11 @@ function buildIconsPage(ctx: MockupContext): Child[] {
       ]),
     );
   }
-  const semantic = frame('fi-semantic', { name: 'Semantic', layout: 'vertical', gap: 20 }, sections);
+  const semantic = frame(
+    'fi-semantic',
+    { name: 'Semantic', layout: 'vertical', gap: 20 },
+    sections,
+  );
 
   return [
     frame(

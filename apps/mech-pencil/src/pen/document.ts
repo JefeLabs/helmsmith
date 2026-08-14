@@ -8,12 +8,7 @@
  *   - a `*.pen` mockup that `imports` a library and instantiates refs
  */
 
-import {
-  type Child,
-  type Document,
-  PEN_VERSION,
-  type VariableDecl,
-} from './schema.ts';
+import { type Child, type Document, PEN_VERSION, type VariableDecl } from './schema.ts';
 
 /**
  * Structural normalizations Pencil applies on save — emitting the un-normalized
@@ -34,7 +29,18 @@ import {
 function pathToRelative(d: string): string {
   const toks = d.match(/[a-zA-Z]|-?\d*\.?\d+(?:e-?\d+)?/gi);
   if (!toks) return d;
-  const argc: Record<string, number> = { m: 2, l: 2, h: 1, v: 1, c: 6, s: 4, q: 4, t: 2, a: 7, z: 0 };
+  const argc: Record<string, number> = {
+    m: 2,
+    l: 2,
+    h: 1,
+    v: 1,
+    c: 6,
+    s: 4,
+    q: 4,
+    t: 2,
+    a: 7,
+    z: 0,
+  };
   let i = 0;
   let cx = 0;
   let cy = 0;
@@ -130,7 +136,12 @@ function normalizePencilNode(node: unknown): void {
 
   const effects = Array.isArray(n.effect) ? n.effect : n.effect ? [n.effect] : [];
   for (const e of effects) {
-    if (e && typeof e === 'object' && (e as Record<string, unknown>).type === 'shadow' && (e as Record<string, unknown>).spread === 0) {
+    if (
+      e &&
+      typeof e === 'object' &&
+      (e as Record<string, unknown>).type === 'shadow' &&
+      (e as Record<string, unknown>).spread === 0
+    ) {
       delete (e as Record<string, unknown>).spread;
     }
   }

@@ -97,28 +97,24 @@ function templateMockup(): MockupSpec {
               width: 'fill_container',
             },
           ),
-          frame(
-            'hp-ctas',
-            { name: 'CTAs', layout: 'horizontal', gap: 16, alignItems: 'center' },
-            [
-              ref('hp-cta-primary', ctx.component('button'), {
-                descendants: { 'button-label': { content: 'Get started' } },
-              }),
-              ref('hp-cta-secondary', ctx.component('button'), {
-                fill: ctx.token('color.surface'),
-                stroke: {
-                  thickness: ctx.token('border.width'),
-                  fill: ctx.token('color.border'),
+          frame('hp-ctas', { name: 'CTAs', layout: 'horizontal', gap: 16, alignItems: 'center' }, [
+            ref('hp-cta-primary', ctx.component('button'), {
+              descendants: { 'button-label': { content: 'Get started' } },
+            }),
+            ref('hp-cta-secondary', ctx.component('button'), {
+              fill: ctx.token('color.surface'),
+              stroke: {
+                thickness: ctx.token('border.width'),
+                fill: ctx.token('color.border'),
+              },
+              descendants: {
+                'button-label': {
+                  content: 'Documentation',
+                  fill: ctx.token('color.foreground'),
                 },
-                descendants: {
-                  'button-label': {
-                    content: 'Documentation',
-                    fill: ctx.token('color.foreground'),
-                  },
-                },
-              }),
-            ],
-          ),
+              },
+            }),
+          ]),
         ],
       );
 
@@ -129,7 +125,13 @@ function templateMockup(): MockupSpec {
       ];
       const features = frame(
         'hp-features',
-        { name: 'Features', layout: 'horizontal', width: 'fill_container', gap: 24, alignItems: 'start' },
+        {
+          name: 'Features',
+          layout: 'horizontal',
+          width: 'fill_container',
+          gap: 24,
+          alignItems: 'start',
+        },
         featureCopy.map((f, i) =>
           ref(`hp-card-${i}`, ctx.component('card'), {
             width: 'fill_container',
@@ -196,9 +198,7 @@ export const heroUIAdapter: FrameworkAdapter = {
     const d = derived();
     const { total, rich } = catalogStats();
     if (d.note) out.push(d.note);
-    out.push(
-      `catalog: ${total} components (${rich} hand-authored, ${total - rich} token stubs)`,
-    );
+    out.push(`catalog: ${total} components (${rich} hand-authored, ${total - rich} token stubs)`);
     return out;
   },
 };

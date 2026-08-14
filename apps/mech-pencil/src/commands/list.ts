@@ -35,7 +35,12 @@ export function runList(options: ListOptions = {}): void {
     const names = inLevel.map((s) => s.name);
     // Three-column layout for a compact catalog.
     for (let i = 0; i < names.length; i += 3) {
-      console.log(`  ${names.slice(i, i + 3).map((n) => n.padEnd(22)).join('')}`);
+      console.log(
+        `  ${names
+          .slice(i, i + 3)
+          .map((n) => n.padEnd(22))
+          .join('')}`,
+      );
     }
   }
 }

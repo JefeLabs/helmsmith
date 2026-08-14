@@ -42,8 +42,7 @@ export interface SummaryViewProps {
   onQuit: () => void;
 }
 
-const HELP =
-  '[d] daily  [w] weekly  [f] figma  [←/→] page  [↑/↓] move  [enter] detail  [q] quit';
+const HELP = '[d] daily  [w] weekly  [f] figma  [←/→] page  [↑/↓] move  [enter] detail  [q] quit';
 
 export function SummaryView({
   reports,
@@ -224,7 +223,10 @@ function WeekDetail({ row }: { row: UserWeekRow }) {
       <Text variant="muted">Active / day (Mon→Sun):</Text>
       <Text>{sparkline(row.perDay.map((d) => d.activeMinutes))}</Text>
       {row.perDay.map((d) => (
-        <Text key={d.date} variant="muted">{`${d.date}  active ${formatDuration(d.activeMinutes)}  ·  idle ${formatDuration(d.idleMinutes)}`}</Text>
+        <Text
+          key={d.date}
+          variant="muted"
+        >{`${d.date}  active ${formatDuration(d.activeMinutes)}  ·  idle ${formatDuration(d.idleMinutes)}`}</Text>
       ))}
     </Box>
   );

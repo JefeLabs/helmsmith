@@ -5,9 +5,9 @@
  * one-line change confined to this file.
  */
 
-import type { FrameworkAdapter } from './adapter.ts';
 import { heroUIAdapter } from '../heroui/index.ts';
 import { heroUIProAdapter } from '../heroui-pro/index.ts';
+import type { FrameworkAdapter } from './adapter.ts';
 
 const ADAPTERS: FrameworkAdapter[] = [heroUIAdapter, heroUIProAdapter];
 

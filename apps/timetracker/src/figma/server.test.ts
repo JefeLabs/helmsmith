@@ -106,7 +106,10 @@ describe('handlePresence', () => {
       deps,
       trackers,
       snapshot(
-        [{ id: 'u1', name: 'ana' }, { id: 'sentinel', name: 'tracker-bot' }],
+        [
+          { id: 'u1', name: 'ana' },
+          { id: 'sentinel', name: 'tracker-bot' },
+        ],
         '2026-07-06T14:00:00Z',
       ),
     );

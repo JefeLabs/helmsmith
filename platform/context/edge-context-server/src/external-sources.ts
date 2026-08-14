@@ -25,10 +25,10 @@
  */
 
 import {
-  type EmbedderClient,
-  type GraphIngestionBackend,
   createHttpEmbedderClient,
+  type EmbedderClient,
   type EmbedderConfig,
+  type GraphIngestionBackend,
 } from '@helmsmith/context-loader-core';
 
 export interface GithubIssuesIngestRequest {
@@ -90,9 +90,10 @@ export class GithubIssuesFetcher implements ExternalSourceFetcher {
     }
 
     const maxPages = req.maxPages ?? 10;
-    const labelsParam = req.labels && req.labels.length > 0
-      ? `&labels=${encodeURIComponent(req.labels.join(','))}`
-      : '';
+    const labelsParam =
+      req.labels && req.labels.length > 0
+        ? `&labels=${encodeURIComponent(req.labels.join(','))}`
+        : '';
     const stateParam = `&state=${req.state ?? 'all'}`;
     const sinceParam = req.since ? `&since=${encodeURIComponent(req.since)}` : '';
 
@@ -107,9 +108,10 @@ export class GithubIssuesFetcher implements ExternalSourceFetcher {
       });
       if (r.status === 401) throw new Error('GitHub returned 401 — check GITHUB_TOKEN');
       if (r.status === 403) {
-        const msg = r.headers.get('x-ratelimit-remaining') === '0'
-          ? 'GitHub rate limit exhausted'
-          : 'GitHub returned 403 — token lacks scope?';
+        const msg =
+          r.headers.get('x-ratelimit-remaining') === '0'
+            ? 'GitHub rate limit exhausted'
+            : 'GitHub returned 403 — token lacks scope?';
         throw new Error(msg);
       }
       if (r.status >= 400) throw new Error(`GitHub returned ${r.status} for ${url}`);
@@ -222,8 +224,10 @@ export class JiraFetcher {
     const baseUrl = this.envGet('JIRA_BASE_URL');
     const email = this.envGet('JIRA_EMAIL');
     if (!token) throw new Error('JIRA_TOKEN env var required for Jira ingestion');
-    if (!baseUrl) throw new Error('JIRA_BASE_URL env var required (e.g., https://myorg.atlassian.net)');
-    if (!email) throw new Error('JIRA_EMAIL env var required (Atlassian Cloud uses email+token Basic auth)');
+    if (!baseUrl)
+      throw new Error('JIRA_BASE_URL env var required (e.g., https://myorg.atlassian.net)');
+    if (!email)
+      throw new Error('JIRA_EMAIL env var required (Atlassian Cloud uses email+token Basic auth)');
 
     // Atlassian Cloud uses Basic auth with email:token. Self-hosted
     // Jira uses Bearer; we default to Basic which works for Cloud and
@@ -330,8 +334,7 @@ export class ConfluenceFetcher {
     const cap = Math.min(req.maxResults ?? 100, 1000);
     const pageSize = 100;
     let count = 0;
-    let nextUrl =
-      `${baseUrl.replace(/\/$/, '')}/wiki/api/v2/spaces/${encodeURIComponent(req.space)}/pages?body-format=storage&limit=${pageSize}`;
+    let nextUrl = `${baseUrl.replace(/\/$/, '')}/wiki/api/v2/spaces/${encodeURIComponent(req.space)}/pages?body-format=storage&limit=${pageSize}`;
 
     while (nextUrl && count < cap) {
       const r = await this.fetchImpl(nextUrl, {
@@ -501,8 +504,7 @@ export async function runJiraIngest(opts: JiraRunOptions): Promise<ExternalInges
 
   // Jira's SourceRef variant in loader-core: { kind: 'jira', project, baseUrl }
   const project = (request.jql.match(/project\s*=\s*"?([\w-]+)"?/i) ?? [])[1] ?? '';
-  const baseUrl =
-    (typeof process !== 'undefined' ? process.env.JIRA_BASE_URL : undefined) ?? '';
+  const baseUrl = (typeof process !== 'undefined' ? process.env.JIRA_BASE_URL : undefined) ?? '';
   onEvent?.({
     kind: 'source-resolved',
     source: { kind: 'jira', project, baseUrl },
@@ -568,7 +570,12 @@ export async function runJiraIngest(opts: JiraRunOptions): Promise<ExternalInges
         if (batch.length >= batchSize) await flush();
       } catch (err) {
         errors += 1;
-        onEvent?.({ kind: 'error', phase: 'embed', item: issue.key, message: (err as Error).message });
+        onEvent?.({
+          kind: 'error',
+          phase: 'embed',
+          item: issue.key,
+          message: (err as Error).message,
+        });
       }
     }
     await flush();
@@ -617,7 +624,8 @@ function jiraDescriptionToText(desc: unknown): string {
   }
 }
 
-export interface ConfluenceRunOptions extends Omit<ExternalIngestRunOptions, 'fetcher' | 'request'> {
+export interface ConfluenceRunOptions
+  extends Omit<ExternalIngestRunOptions, 'fetcher' | 'request'> {
   fetcher: ConfluenceFetcher;
   request: ConfluenceIngestRequest;
 }
@@ -707,7 +715,12 @@ export async function runConfluenceIngest(
         if (batch.length >= batchSize) await flush();
       } catch (err) {
         errors += 1;
-        onEvent?.({ kind: 'error', phase: 'embed', item: page.id, message: (err as Error).message });
+        onEvent?.({
+          kind: 'error',
+          phase: 'embed',
+          item: page.id,
+          message: (err as Error).message,
+        });
       }
     }
     await flush();

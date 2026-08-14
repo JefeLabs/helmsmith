@@ -156,7 +156,12 @@ const DECLARATION_NODE_TYPES: Record<string, ReadonlySet<string>> = {
     'enum_declaration',
     'constructor_declaration',
   ]),
-  cpp: new Set(['function_definition', 'class_specifier', 'struct_specifier', 'namespace_definition']),
+  cpp: new Set([
+    'function_definition',
+    'class_specifier',
+    'struct_specifier',
+    'namespace_definition',
+  ]),
   c: new Set(['function_definition', 'declaration', 'struct_specifier']),
 };
 

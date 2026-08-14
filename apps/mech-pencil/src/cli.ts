@@ -158,7 +158,9 @@ program
 
 program
   .command('system')
-  .description('Emit the full system: per-foundation + component + template .lib.pen + base.pen (deterministic; PNG previews are opt-in via --png)')
+  .description(
+    'Emit the full system: per-foundation + component + template .lib.pen + base.pen (deterministic; PNG previews are opt-in via --png)',
+  )
   .option('-a, --accent <color>', 'Accent color (hex or oklch())')
   .option('-b, --base <number>', 'Neutral gray-tint (HeroUI base; 0–0.02)')
   .option('--font <name>', 'Sans font family (inter, instrument-sans, …)')

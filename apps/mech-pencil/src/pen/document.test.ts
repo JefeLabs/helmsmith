@@ -13,9 +13,13 @@ function normalized(node: Record<string, unknown>): Record<string, unknown> {
 
 describe('normalizePencilNode (via toObject)', () => {
   it('forces text fontWeight to the "normal" keyword (400 / absent both crash)', () => {
-    expect(normalized({ id: 't', type: 'text', content: 'hi', fontWeight: '400' }).fontWeight).toBe('normal');
+    expect(normalized({ id: 't', type: 'text', content: 'hi', fontWeight: '400' }).fontWeight).toBe(
+      'normal',
+    );
     expect(normalized({ id: 't', type: 'text', content: 'hi' }).fontWeight).toBe('normal');
-    expect(normalized({ id: 't', type: 'text', content: 'hi', fontWeight: '700' }).fontWeight).toBe('700');
+    expect(normalized({ id: 't', type: 'text', content: 'hi', fontWeight: '700' }).fontWeight).toBe(
+      '700',
+    );
   });
 
   it('strips redundant defaults Pencil omits on save', () => {
@@ -35,7 +39,9 @@ describe('normalizePencilNode (via toObject)', () => {
 
   it('collapses symmetric padding to the compact form', () => {
     expect(normalized({ id: 'a', type: 'frame', padding: [8, 8, 8, 8] }).padding).toBe(8);
-    expect(normalized({ id: 'b', type: 'frame', padding: [8, 16, 8, 16] }).padding).toEqual([8, 16]);
+    expect(normalized({ id: 'b', type: 'frame', padding: [8, 16, 8, 16] }).padding).toEqual([
+      8, 16,
+    ]);
   });
 
   it('enables gradient fills (a disabled gradient renders nothing)', () => {
@@ -45,7 +51,11 @@ describe('normalizePencilNode (via toObject)', () => {
 
   it('recurses into children', () => {
     const root = new PenDocument()
-      .add({ id: 'root', type: 'frame', children: [{ id: 'kid', type: 'text', content: 'x', fontWeight: '400' }] } as never)
+      .add({
+        id: 'root',
+        type: 'frame',
+        children: [{ id: 'kid', type: 'text', content: 'x', fontWeight: '400' }],
+      } as never)
       .toObject().children[0] as Record<string, unknown>;
     expect((root.children as Record<string, unknown>[])[0].fontWeight).toBe('normal');
   });

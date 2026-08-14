@@ -300,11 +300,17 @@ function extractReadable(html: string): { title?: string; markdown: string } {
   md = md.replace(/<h4\b[^>]*>([\s\S]*?)<\/h4>/gi, (_, c) => `\n\n#### ${stripTags(c)}\n\n`);
   md = md.replace(/<h5\b[^>]*>([\s\S]*?)<\/h5>/gi, (_, c) => `\n\n##### ${stripTags(c)}\n\n`);
   md = md.replace(/<h6\b[^>]*>([\s\S]*?)<\/h6>/gi, (_, c) => `\n\n###### ${stripTags(c)}\n\n`);
-  md = md.replace(/<pre\b[^>]*>([\s\S]*?)<\/pre>/gi, (_, c) => `\n\n\`\`\`\n${stripTags(c)}\n\`\`\`\n\n`);
+  md = md.replace(
+    /<pre\b[^>]*>([\s\S]*?)<\/pre>/gi,
+    (_, c) => `\n\n\`\`\`\n${stripTags(c)}\n\`\`\`\n\n`,
+  );
   md = md.replace(/<\/(p|li|tr)>/gi, '\n');
   md = stripTags(md);
   md = decodeEntities(md);
-  md = md.replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+  md = md
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 
   return { title, markdown: md };
 }

@@ -217,11 +217,9 @@ export class ChainedGitHubResolver implements GitHubCredentialResolver {
  * `controlplaneUrl` to enable the second link; omit it for a
  * local-only setup (the chain then just wraps the `gh` resolver).
  */
-export function defaultGitHubResolver(opts: {
-  ghBin?: string;
-  controlplaneUrl?: string;
-  controlplaneAuthorization?: string;
-} = {}): ChainedGitHubResolver {
+export function defaultGitHubResolver(
+  opts: { ghBin?: string; controlplaneUrl?: string; controlplaneAuthorization?: string } = {},
+): ChainedGitHubResolver {
   return new ChainedGitHubResolver([
     new LocalAmbientGitHubResolver({ ...(opts.ghBin ? { ghBin: opts.ghBin } : {}) }),
     new ControlplaneGitHubResolver({

@@ -47,9 +47,7 @@ export function figmaStorageContract(
     });
 
     it('lists events by day-key range ordered by timestamp', async () => {
-      await store.insertFigmaEvent(
-        event({ externalId: 'v2', at: `${DAY}T15:00:00.000Z` }),
-      );
+      await store.insertFigmaEvent(event({ externalId: 'v2', at: `${DAY}T15:00:00.000Z` }));
       await store.insertFigmaEvent(event({ externalId: 'v1', at: `${DAY}T09:00:00.000Z` }));
       await store.insertFigmaEvent(
         event({ externalId: 'v0', at: '2026-07-01T09:00:00.000Z', date: '2026-07-01' }),

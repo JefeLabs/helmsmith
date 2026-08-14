@@ -1,6 +1,3 @@
-import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import {
   Accordion,
   AccordionItem,
@@ -12,8 +9,11 @@ import {
   Code,
   Divider,
   Spinner,
-} from "@heroui/react";
-import { Job, jobs } from "../lib/api";
+} from '@heroui/react';
+import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { Job, jobs } from '../lib/api';
 
 /**
  * Per-input drill-down for a benchmark run. Lists jobs in the cohort
@@ -25,7 +25,7 @@ export default function BenchmarkRunPage() {
   const { runId } = useParams<{ runId: string }>();
 
   const { data, isPending, error } = useQuery({
-    queryKey: ["benchmark-run", runId],
+    queryKey: ['benchmark-run', runId],
     queryFn: () => jobs.listByBenchmarkRun(runId!),
     enabled: !!runId,
     refetchInterval: 5_000,
@@ -55,7 +55,7 @@ export default function BenchmarkRunPage() {
             <Code size="sm">{runId}</Code>
             {label && <p className="text-sm font-semibold">{label}</p>}
             <p className="text-xs text-default-500">
-              {data.length} job(s) · {counts.completed} completed · {counts.failed} failed ·{" "}
+              {data.length} job(s) · {counts.completed} completed · {counts.failed} failed ·{' '}
               {counts.inFlight} in-flight
             </p>
           </div>
@@ -72,9 +72,7 @@ export default function BenchmarkRunPage() {
             aria-label={`job ${idx + 1}`}
             title={<JobRowTitle job={job} index={idx + 1} />}
             subtitle={
-              <span className="text-xs text-default-500 font-mono">
-                {job.id.slice(0, 24)}…
-              </span>
+              <span className="text-xs text-default-500 font-mono">{job.id.slice(0, 24)}…</span>
             }
           >
             <JobDetail job={job} />
@@ -115,12 +113,8 @@ function JobDetail({ job }: { job: Job }) {
       <div className="flex flex-col gap-1">
         <div className="flex justify-between items-center">
           <span className="text-default-500">input</span>
-          <Button
-            size="sm"
-            variant="light"
-            onPress={() => setShowFullInput((s) => !s)}
-          >
-            {showFullInput ? "collapse" : "expand"}
+          <Button size="sm" variant="light" onPress={() => setShowFullInput((s) => !s)}>
+            {showFullInput ? 'collapse' : 'expand'}
           </Button>
         </div>
         <pre className="text-xs bg-default-100 p-2 rounded max-h-96 overflow-auto">
@@ -133,17 +127,13 @@ function JobDetail({ job }: { job: Job }) {
       <div className="flex flex-col gap-1">
         <div className="flex justify-between items-center">
           <span className="text-default-500">output</span>
-          <Button
-            size="sm"
-            variant="light"
-            onPress={() => setShowFullOutput((s) => !s)}
-          >
-            {showFullOutput ? "collapse" : "expand"}
+          <Button size="sm" variant="light" onPress={() => setShowFullOutput((s) => !s)}>
+            {showFullOutput ? 'collapse' : 'expand'}
           </Button>
         </div>
         <pre className="text-xs bg-default-100 p-2 rounded max-h-96 overflow-auto">
           {job.output == null
-            ? "(no output yet)"
+            ? '(no output yet)'
             : showFullOutput
               ? JSON.stringify(job.output, null, 2)
               : truncate(JSON.stringify(job.output, null, 2), 240)}
@@ -163,9 +153,7 @@ function JobDetail({ job }: { job: Job }) {
                 </Chip>
               )}
             </div>
-            {job.evalRationale && (
-              <p className="text-default-700 text-xs">{job.evalRationale}</p>
-            )}
+            {job.evalRationale && <p className="text-default-700 text-xs">{job.evalRationale}</p>}
           </div>
         </>
       )}
@@ -198,7 +186,7 @@ function ScoreChip({ score }: { score?: number | null }) {
       </Chip>
     );
   }
-  const tone = score >= 0.7 ? "success" : score >= 0.3 ? "warning" : "danger";
+  const tone = score >= 0.7 ? 'success' : score >= 0.3 ? 'warning' : 'danger';
   return (
     <Chip size="sm" color={tone} variant="flat">
       {score.toFixed(2)}
@@ -206,23 +194,23 @@ function ScoreChip({ score }: { score?: number | null }) {
   );
 }
 
-function statusColor(status: Job["status"]) {
-  return status === "completed"
-    ? "success"
-    : status === "failed" || status === "cancelled"
-      ? "danger"
-      : status === "running"
-        ? "primary"
-        : "default";
+function statusColor(status: Job['status']) {
+  return status === 'completed'
+    ? 'success'
+    : status === 'failed' || status === 'cancelled'
+      ? 'danger'
+      : status === 'running'
+        ? 'primary'
+        : 'default';
 }
 
 function summarizeInput(input: unknown): string {
-  if (input == null) return "(no input)";
-  if (typeof input === "string") return truncate(input, 100);
-  if (typeof input === "object") {
+  if (input == null) return '(no input)';
+  if (typeof input === 'string') return truncate(input, 100);
+  if (typeof input === 'object') {
     const o = input as Record<string, unknown>;
-    if (typeof o.prompt === "string") return truncate(o.prompt, 100);
-    if (typeof o.text === "string") return truncate(o.text, 100);
+    if (typeof o.prompt === 'string') return truncate(o.prompt, 100);
+    if (typeof o.text === 'string') return truncate(o.text, 100);
     return truncate(JSON.stringify(input), 100);
   }
   return String(input);
@@ -233,8 +221,8 @@ function countByStatus(rows: Job[]) {
     failed = 0,
     inFlight = 0;
   for (const j of rows) {
-    if (j.status === "completed") completed += 1;
-    else if (j.status === "failed" || j.status === "cancelled") failed += 1;
+    if (j.status === 'completed') completed += 1;
+    else if (j.status === 'failed' || j.status === 'cancelled') failed += 1;
     else inFlight += 1;
   }
   return { completed, failed, inFlight };

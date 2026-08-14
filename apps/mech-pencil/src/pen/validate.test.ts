@@ -20,10 +20,7 @@ describe('validateDocument', () => {
 
   it('flags duplicate ids within the same parent (breaks descendants paths)', () => {
     const doc = new PenDocument()
-      .add(
-        { id: 'a', type: 'rectangle' },
-        { id: 'a', type: 'rectangle' },
-      )
+      .add({ id: 'a', type: 'rectangle' }, { id: 'a', type: 'rectangle' })
       .toObject();
     const r = validateDocument(doc);
     expect(r.ok).toBe(false);
@@ -31,25 +28,19 @@ describe('validateDocument', () => {
   });
 
   it('flags a bare ref with no matching local reusable component', () => {
-    const doc = new PenDocument()
-      .add({ id: 'inst', type: 'ref', ref: 'missing' })
-      .toObject();
+    const doc = new PenDocument().add({ id: 'inst', type: 'ref', ref: 'missing' }).toObject();
     expect(validateDocument(doc).ok).toBe(false);
   });
 
   it('rejects a node id containing "/" (reserved as the descendants separator)', () => {
-    const doc = new PenDocument()
-      .add({ id: 'card/title', type: 'text', content: 'x' })
-      .toObject();
+    const doc = new PenDocument().add({ id: 'card/title', type: 'text', content: 'x' }).toObject();
     const r = validateDocument(doc);
     expect(r.ok).toBe(false);
     expect(r.issues.some((i) => i.message.includes("contains '/'"))).toBe(true);
   });
 
   it('rejects a cross-file ref to an UNDECLARED import alias', () => {
-    const doc = new PenDocument()
-      .add({ id: 'inst', type: 'ref', ref: 'ds:button' })
-      .toObject();
+    const doc = new PenDocument().add({ id: 'inst', type: 'ref', ref: 'ds:button' }).toObject();
     const r = validateDocument(doc);
     expect(r.ok).toBe(false);
     expect(r.issues.some((i) => i.message.includes('unknown import alias'))).toBe(true);
@@ -66,7 +57,12 @@ describe('validateDocument', () => {
   it('rejects descendants on a cross-file ref (they do not cross files)', () => {
     const doc = new PenDocument()
       .importLib('ds', './design-system.lib.pen')
-      .add({ id: 'inst', type: 'ref', ref: 'ds:button', descendants: { 'ds:label': { content: 'x' } } })
+      .add({
+        id: 'inst',
+        type: 'ref',
+        ref: 'ds:button',
+        descendants: { 'ds:label': { content: 'x' } },
+      })
       .toObject();
     const r = validateDocument(doc);
     expect(r.ok).toBe(false);

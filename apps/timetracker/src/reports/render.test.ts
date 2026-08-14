@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { FigmaDailySummary } from './types.js';
 import { formatDuration, formatTime, renderFigmaDaily } from './render.js';
+import type { FigmaDailySummary } from './types.js';
 
 describe('formatDuration', () => {
   it('formats hours/minutes; em-dash for zero', () => {
@@ -15,13 +15,47 @@ describe('renderFigmaDaily', () => {
   const base: FigmaDailySummary = {
     date: '2026-07-07',
     available: true,
-    presenceNow: [{ fileKey: 'F', fileName: 'design-system', users: [{ handle: 'ana', minutes: 12 }] }],
-    members: [
-      { figmaUserId: 'u1', handle: 'ana', discordName: 'Ana', mapped: true, eventCount: 5, byType: {}, estBurstMinutes: 75, presenceMinutes: 118 },
-      { figmaUserId: 'u9', handle: 'ghost', mapped: false, eventCount: 2, byType: {}, estBurstMinutes: 30, presenceMinutes: 0 },
+    presenceNow: [
+      { fileKey: 'F', fileName: 'design-system', users: [{ handle: 'ana', minutes: 12 }] },
     ],
-    fileHeat: [{ fileKey: 'F', name: 'design-system', events: 7, lastTouchAt: '2026-07-07T18:32:00Z', lastEditor: 'ana' }],
-    events: [{ at: '2026-07-07T18:32:00Z', eventType: 'version', handle: 'ana', fileName: 'design-system' }],
+    members: [
+      {
+        figmaUserId: 'u1',
+        handle: 'ana',
+        discordName: 'Ana',
+        mapped: true,
+        eventCount: 5,
+        byType: {},
+        estBurstMinutes: 75,
+        presenceMinutes: 118,
+      },
+      {
+        figmaUserId: 'u9',
+        handle: 'ghost',
+        mapped: false,
+        eventCount: 2,
+        byType: {},
+        estBurstMinutes: 30,
+        presenceMinutes: 0,
+      },
+    ],
+    fileHeat: [
+      {
+        fileKey: 'F',
+        name: 'design-system',
+        events: 7,
+        lastTouchAt: '2026-07-07T18:32:00Z',
+        lastEditor: 'ana',
+      },
+    ],
+    events: [
+      {
+        at: '2026-07-07T18:32:00Z',
+        eventType: 'version',
+        handle: 'ana',
+        fileName: 'design-system',
+      },
+    ],
     heartbeatAt: '2026-07-07T18:31:00Z',
     stale: false,
   };

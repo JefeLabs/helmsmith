@@ -369,7 +369,10 @@ describe.skipIf(!RUN_INTEGRATION)('ContextQueryService — hybrid BM25 + RRF', (
     const docs: Array<{ id: string; text: string }> = [
       { id: 'h-auth', text: 'user authentication and login session handling with tokens' },
       // A rare exact token the embedder has no good representation for.
-      { id: 'h-errcode', text: 'the gateway raises ERRXQ7TOKEN when the upstream service times out' },
+      {
+        id: 'h-errcode',
+        text: 'the gateway raises ERRXQ7TOKEN when the upstream service times out',
+      },
       { id: 'h-ui', text: 'rendering a responsive navigation bar in the web frontend' },
       { id: 'h-db', text: 'running database schema migrations safely in production' },
     ];
@@ -509,7 +512,9 @@ describe.skipIf(!RUN_INTEGRATION)('ContextQueryService — weighted graph expans
       config: { url: EMBEDDER_URL, model: EMBEDDER_MODEL, dim: 1024 },
     });
     const [seedVec] = await embedder.embed([seed.text]);
-    await backend.upsertVectorsBulk([{ nodeId: 't4-seed', vector: seedVec!, meta: { kind: 'test' } }]);
+    await backend.upsertVectorsBulk([
+      { nodeId: 't4-seed', vector: seedVec!, meta: { kind: 'test' } },
+    ]);
 
     const s = rawSession(backend);
     try {

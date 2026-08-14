@@ -27,9 +27,11 @@ import type { EmbedderConfig } from '@helmsmith/context-loader-core';
 import { Neo4jBackend } from '@helmsmith/context-loader-core';
 import neo4j, { type Driver } from 'neo4j-driver';
 
-export interface PluginRouteHandler {
-  (req: IncomingMessage, res: ServerResponse, sub: string): void | Promise<void>;
-}
+export type PluginRouteHandler = (
+  req: IncomingMessage,
+  res: ServerResponse,
+  sub: string,
+) => void | Promise<void>;
 
 export interface PluginContext {
   /** Plugin id — for diagnostics + log lines. */

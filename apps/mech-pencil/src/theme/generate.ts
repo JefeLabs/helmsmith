@@ -61,7 +61,7 @@ function accentLCH(color: string): { L: number; C: number; H: number } {
   return {
     L: lab.L,
     C: Math.hypot(lab.a, lab.b),
-    H: (((Math.atan2(lab.b, lab.a) * 180) / Math.PI) % 360 + 360) % 360,
+    H: ((((Math.atan2(lab.b, lab.a) * 180) / Math.PI) % 360) + 360) % 360,
   };
 }
 
@@ -81,8 +81,7 @@ export function themeTokens(cfg: ThemeConfig): DeriveResult {
   const { L, C, H } = accentLCH(cfg.accent);
   const accent = okl(L, C, H);
   // HeroUI `m()`: light accents get a dark fg, dark accents get snow.
-  const accentFg =
-    L > 0.65 ? okl(0.15, Math.min(0.2 * C, 0.03), H) : 'oklch(99.11% 0 0)';
+  const accentFg = L > 0.65 ? okl(0.15, Math.min(0.2 * C, 0.03), H) : 'oklch(99.11% 0 0)';
 
   const build = (
     anchors: Record<string, Anchor>,
@@ -108,11 +107,7 @@ export function themeTokens(cfg: ThemeConfig): DeriveResult {
   };
 
   const light = build(LIGHT_ANCHORS, LIGHT_COLORS, okl(0.2103, 0.0059, H));
-  const dark = build(
-    DARK_ANCHORS,
-    { ...LIGHT_COLORS, ...DARK_COLORS },
-    'oklch(99.11% 0 0)',
-  );
+  const dark = build(DARK_ANCHORS, { ...LIGHT_COLORS, ...DARK_COLORS }, 'oklch(99.11% 0 0)');
 
   // Scalars: radius scale from the preset (HeroUI calc() chain),
   // field radius from formRadius, font family; rest inherited.

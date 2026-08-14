@@ -1,14 +1,14 @@
-import { Route, Routes, Navigate } from "react-router-dom";
-import NavShell from "./components/NavShell";
-import IntakePage from "./pages/Intake";
-import SessionsPage from "./pages/Sessions";
-import JobsPage from "./pages/Jobs";
-import SubmitJobPage from "./pages/SubmitJob";
-import CatalogPage from "./pages/Catalog";
-import BenchmarksPage from "./pages/Benchmarks";
-import BenchmarkRunPage from "./pages/BenchmarkRun";
-import ProposalsPage from "./pages/Proposals";
-import ComposePage from "./pages/Compose";
+import { Navigate, Route, Routes } from 'react-router-dom';
+import NavShell from './components/NavShell';
+import BenchmarkRunPage from './pages/BenchmarkRun';
+import BenchmarksPage from './pages/Benchmarks';
+import CatalogPage from './pages/Catalog';
+import ComposePage from './pages/Compose';
+import IntakePage from './pages/Intake';
+import JobsPage from './pages/Jobs';
+import ProposalsPage from './pages/Proposals';
+import SessionsPage from './pages/Sessions';
+import SubmitJobPage from './pages/SubmitJob';
 
 export default function App() {
   return (

@@ -1,5 +1,3 @@
-import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Button,
   Card,
@@ -18,8 +16,10 @@ import {
   Tab,
   Tabs,
   useDisclosure,
-} from "@heroui/react";
-import { ProposalStatus, RemoteStatus, SkillProposal, skillProposals } from "../lib/api";
+} from '@heroui/react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { ProposalStatus, RemoteStatus, SkillProposal, skillProposals } from '../lib/api';
 
 /**
  * Skill-proposal admin queue. Shows proposals (defaults to status=
@@ -31,10 +31,10 @@ import { ProposalStatus, RemoteStatus, SkillProposal, skillProposals } from "../
  * Reject: prompts for a reason via modal → POSTs with the reason.
  */
 export default function ProposalsPage() {
-  const [status, setStatus] = useState<ProposalStatus>("proposed");
+  const [status, setStatus] = useState<ProposalStatus>('proposed');
 
   const { data, isPending, error } = useQuery({
-    queryKey: ["skill-proposals", status],
+    queryKey: ['skill-proposals', status],
     queryFn: () => skillProposals.list(status),
     refetchInterval: 5_000,
   });
@@ -45,9 +45,9 @@ export default function ProposalsPage() {
         <CardHeader className="flex flex-col gap-1 items-start">
           <p className="text-md font-semibold">Skill proposals</p>
           <p className="text-sm text-default-500">
-            Surfaced from job reflections that flagged{" "}
-            <Code size="sm">{`{kind:"missing-skill"}`}</Code> surprises.
-            Approve to seed a draft into the catalog.
+            Surfaced from job reflections that flagged{' '}
+            <Code size="sm">{`{kind:"missing-skill"}`}</Code> surprises. Approve to seed a draft
+            into the catalog.
           </p>
         </CardHeader>
         <Divider />
@@ -87,7 +87,7 @@ export default function ProposalsPage() {
 function ProposalCard({ proposal }: { proposal: SkillProposal }) {
   const qc = useQueryClient();
   const rejectModal = useDisclosure();
-  const [rejectReason, setRejectReason] = useState("");
+  const [rejectReason, setRejectReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,7 +96,7 @@ function ProposalCard({ proposal }: { proposal: SkillProposal }) {
     setError(null);
     try {
       await skillProposals.approve(proposal.id);
-      await qc.invalidateQueries({ queryKey: ["skill-proposals"] });
+      await qc.invalidateQueries({ queryKey: ['skill-proposals'] });
     } catch (e) {
       setError(String(e));
     } finally {
@@ -111,8 +111,8 @@ function ProposalCard({ proposal }: { proposal: SkillProposal }) {
     try {
       await skillProposals.reject(proposal.id, rejectReason);
       rejectModal.onClose();
-      setRejectReason("");
-      await qc.invalidateQueries({ queryKey: ["skill-proposals"] });
+      setRejectReason('');
+      await qc.invalidateQueries({ queryKey: ['skill-proposals'] });
     } catch (e) {
       setError(String(e));
     } finally {
@@ -125,7 +125,7 @@ function ProposalCard({ proposal }: { proposal: SkillProposal }) {
     setError(null);
     try {
       await skillProposals.resubmit(proposal.id);
-      await qc.invalidateQueries({ queryKey: ["skill-proposals"] });
+      await qc.invalidateQueries({ queryKey: ['skill-proposals'] });
     } catch (e) {
       setError(String(e));
     } finally {
@@ -140,8 +140,8 @@ function ProposalCard({ proposal }: { proposal: SkillProposal }) {
   // (accepted/promoted/rejected by skillzkit) shouldn't show resubmit:
   // they're either polling or settled.
   const canResubmit =
-    proposal.status === "approved" &&
-    (proposal.remoteStatus == null || proposal.remoteStatus === "failed");
+    proposal.status === 'approved' &&
+    (proposal.remoteStatus == null || proposal.remoteStatus === 'failed');
 
   return (
     <Card>
@@ -162,11 +162,8 @@ function ProposalCard({ proposal }: { proposal: SkillProposal }) {
               </Chip>
             ))}
             <StatusChip status={proposal.status} />
-            {proposal.status === "approved" && (
-              <SkillzkitChip
-                remoteStatus={proposal.remoteStatus}
-                remoteUrl={proposal.remoteUrl}
-              />
+            {proposal.status === 'approved' && (
+              <SkillzkitChip remoteStatus={proposal.remoteStatus} remoteUrl={proposal.remoteUrl} />
             )}
           </div>
         </div>
@@ -193,7 +190,7 @@ function ProposalCard({ proposal }: { proposal: SkillProposal }) {
             </Code>
           </div>
         )}
-        {proposal.status === "approved" && proposal.catalogItemId && (
+        {proposal.status === 'approved' && proposal.catalogItemId && (
           <div>
             <span className="text-default-500 text-xs">catalog item</span>
             <Code size="sm" className="block">
@@ -201,13 +198,13 @@ function ProposalCard({ proposal }: { proposal: SkillProposal }) {
             </Code>
           </div>
         )}
-        {proposal.status === "rejected" && proposal.rejectionReason && (
+        {proposal.status === 'rejected' && proposal.rejectionReason && (
           <div>
             <span className="text-default-500 text-xs">rejection reason</span>
             <p className="text-danger-500">{proposal.rejectionReason}</p>
           </div>
         )}
-        {proposal.status === "approved" && proposal.remoteError && (
+        {proposal.status === 'approved' && proposal.remoteError && (
           <div>
             <span className="text-default-500 text-xs">skillzkit error</span>
             <p className="text-danger-500 break-words">{proposal.remoteError}</p>
@@ -215,7 +212,7 @@ function ProposalCard({ proposal }: { proposal: SkillProposal }) {
         )}
         {error && <Code color="danger">{error}</Code>}
 
-        {proposal.status === "proposed" && (
+        {proposal.status === 'proposed' && (
           <>
             <Divider />
             <div className="flex gap-2">
@@ -237,9 +234,9 @@ function ProposalCard({ proposal }: { proposal: SkillProposal }) {
                 Resubmit to skillzkit
               </Button>
               <span className="text-xs text-default-500">
-                {proposal.remoteStatus === "failed"
-                  ? "Last submit failed — retry"
-                  : "Approved before skillzkit was wired"}
+                {proposal.remoteStatus === 'failed'
+                  ? 'Last submit failed — retry'
+                  : 'Approved before skillzkit was wired'}
               </span>
             </div>
           </>
@@ -261,7 +258,12 @@ function ProposalCard({ proposal }: { proposal: SkillProposal }) {
             <Button variant="flat" onPress={rejectModal.onClose}>
               Cancel
             </Button>
-            <Button color="danger" onPress={reject} isLoading={busy} isDisabled={!rejectReason.trim()}>
+            <Button
+              color="danger"
+              onPress={reject}
+              isLoading={busy}
+              isDisabled={!rejectReason.trim()}
+            >
               Reject
             </Button>
           </ModalFooter>
@@ -272,12 +274,7 @@ function ProposalCard({ proposal }: { proposal: SkillProposal }) {
 }
 
 function StatusChip({ status }: { status: ProposalStatus }) {
-  const tone =
-    status === "approved"
-      ? "success"
-      : status === "rejected"
-        ? "danger"
-        : "primary";
+  const tone = status === 'approved' ? 'success' : status === 'rejected' ? 'danger' : 'primary';
   return (
     <Chip size="sm" color={tone} variant="flat">
       {status}
@@ -314,14 +311,14 @@ function SkillzkitChip({
       </Chip>
     );
   }
-  const tone: "primary" | "success" | "danger" | "warning" =
-    remoteStatus === "accepted" || remoteStatus === "promoted"
-      ? "success"
-      : remoteStatus === "rejected" || remoteStatus === "failed"
-        ? "danger"
-        : remoteStatus === "reviewing"
-          ? "primary"
-          : "warning"; // 'pending'
+  const tone: 'primary' | 'success' | 'danger' | 'warning' =
+    remoteStatus === 'accepted' || remoteStatus === 'promoted'
+      ? 'success'
+      : remoteStatus === 'rejected' || remoteStatus === 'failed'
+        ? 'danger'
+        : remoteStatus === 'reviewing'
+          ? 'primary'
+          : 'warning'; // 'pending'
   const label = `skillzkit: ${remoteStatus}`;
 
   // Wrap the chip in a link only when we have a destination. The

@@ -139,9 +139,7 @@ class StubQueryService implements QueryService {
         entity: req.entity,
         predicate: req.predicate,
         depth: req.depth,
-        hits: [
-          { nodeId: 'r1', label: 'Doc', properties: { title: 'r1' }, distance: 1 },
-        ],
+        hits: [{ nodeId: 'r1', label: 'Doc', properties: { title: 'r1' }, distance: 1 }],
         truncated: false,
       }
     );

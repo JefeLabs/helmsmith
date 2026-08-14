@@ -19,8 +19,8 @@ import type { ComponentSpec } from '../design-system/atomic.ts';
 import type { TokenSet } from '../design-system/tokens.ts';
 import { CATEGORY_ORDER, heroUIComponents } from '../frameworks/heroui/catalog.ts';
 import {
-  FOUNDATIONS,
   aliasesReferenced,
+  FOUNDATIONS,
   multiAliasBuildContext,
   multiAliasContext,
   slugForAlias,
@@ -31,10 +31,14 @@ import { frame, text } from '../pen/builder.ts';
 import { PenDocument } from '../pen/document.ts';
 import type { Child } from '../pen/schema.ts';
 import { type ValidationResult, validateDocument } from '../pen/validate.ts';
-import { type FoundationArtifact, emitFoundations } from './foundations.ts';
-import { type TemplateArtifact, emitTemplates } from './templates.ts';
+import { emitFoundations, type FoundationArtifact } from './foundations.ts';
+import { emitTemplates, type TemplateArtifact } from './templates.ts';
 
-const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+const slugify = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 
 const heading = (id: string, s: string, big = true): Child =>
   text(id, s, {
@@ -55,10 +59,22 @@ function catalogFrame(id: string, title: string, specs: ComponentSpec[]): Child 
   const ctx = multiAliasBuildContext();
   return frame(
     id,
-    { name: title, x: 0, y: 0, layout: 'vertical', gap: 24, padding: 32, fill: '$colors:color.background' },
+    {
+      name: title,
+      x: 0,
+      y: 0,
+      layout: 'vertical',
+      gap: 24,
+      padding: 32,
+      fill: '$colors:color.background',
+    },
     [
       heading(`${id}-h`, title),
-      frame(`${id}-items`, { name: 'Items', layout: 'vertical', width: 'fit_content', gap: 16 }, specs.map((s) => s.build(ctx))),
+      frame(
+        `${id}-items`,
+        { name: 'Items', layout: 'vertical', width: 'fit_content', gap: 16 },
+        specs.map((s) => s.build(ctx)),
+      ),
     ],
   );
 }
@@ -71,7 +87,12 @@ export interface SystemFile {
 
 export interface SystemBundle {
   foundations: FoundationArtifact[];
-  components: (SystemFile & { category: string; count: number; imports: string[]; preview: SystemFile })[];
+  components: (SystemFile & {
+    category: string;
+    count: number;
+    imports: string[];
+    preview: SystemFile;
+  })[];
   templates: TemplateArtifact[];
   base: SystemFile & { imports: string[]; screens: string[]; demos: string[] };
 }
@@ -116,7 +137,11 @@ export function emitSystem(tokens: TokenSet): SystemBundle {
   // base.pen — imports every foundation lib; LOCAL component palette + screens.
   const base = new PenDocument();
   for (const f of FOUNDATIONS) base.importLib(f.alias, `./foundations/${f.slug}.lib.pen`);
-  const palette = catalogFrame('base-components', `Components · ${specs.length} (local & editable)`, specs);
+  const palette = catalogFrame(
+    'base-components',
+    `Components · ${specs.length} (local & editable)`,
+    specs,
+  );
   (palette as Child & { x?: number }).x = 1600;
   base.add(palette);
 

@@ -27,25 +27,38 @@ function buildColorsPage(ctx: MockupContext): Child[] {
   const monoFam = ctx.token('font.mono');
 
   const header = frame('fc-header', { name: 'Header', layout: 'vertical', gap: 4 }, [
-    text('fc-title', 'Colors', { fill: fg, fontFamily: ctx.token('font.display'), fontSize: 28, fontWeight: '700' }),
-    text('fc-sub', 'semantic color tokens · themed light + dark', { fill: muted, fontFamily: monoFam, fontSize: 14 }),
+    text('fc-title', 'Colors', {
+      fill: fg,
+      fontFamily: ctx.token('font.display'),
+      fontSize: 28,
+      fontWeight: '700',
+    }),
+    text('fc-sub', 'semantic color tokens · themed light + dark', {
+      fill: muted,
+      fontFamily: monoFam,
+      fontSize: 14,
+    }),
   ]);
 
   const groups = GROUPS.map((g) =>
     frame(nid('group'), { name: g.title, layout: 'vertical', gap: 8 }, [
       text(nid('gh'), g.title, { fill: fg, fontFamily: fam, fontSize: 14, fontWeight: '600' }),
-      frame(nid('row'), { name: 'row', layout: 'horizontal', gap: 12 }, g.names.map((name) =>
-        frame(nid('cell'), { name, layout: 'vertical', gap: 6, width: 120 }, [
-          rect(nid('sw'), {
-            width: 120,
-            height: 56,
-            cornerRadius: 8,
-            fill: ctx.token(`color.${name}`),
-            stroke: { thickness: 1, fill: ctx.token('color.border') },
-          }),
-          text(nid('label'), name, { fill: muted, fontFamily: monoFam, fontSize: 10 }),
-        ]),
-      )),
+      frame(
+        nid('row'),
+        { name: 'row', layout: 'horizontal', gap: 12 },
+        g.names.map((name) =>
+          frame(nid('cell'), { name, layout: 'vertical', gap: 6, width: 120 }, [
+            rect(nid('sw'), {
+              width: 120,
+              height: 56,
+              cornerRadius: 8,
+              fill: ctx.token(`color.${name}`),
+              stroke: { thickness: 1, fill: ctx.token('color.border') },
+            }),
+            text(nid('label'), name, { fill: muted, fontFamily: monoFam, fontSize: 10 }),
+          ]),
+        ),
+      ),
     ]),
   );
 

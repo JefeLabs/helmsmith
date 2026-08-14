@@ -48,9 +48,8 @@ export function udsJson<T = unknown>(
   opts: UdsRequestOptions = {},
 ): Promise<UdsResponse<T>> {
   return new Promise((resolve, reject) => {
-    const headers: Record<string, string> = body !== undefined
-      ? { 'content-type': 'application/json' }
-      : {};
+    const headers: Record<string, string> =
+      body !== undefined ? { 'content-type': 'application/json' } : {};
     const req = request(
       { socketPath, path, method, headers, timeout: opts.timeoutMs ?? 10_000 },
       (res) => {

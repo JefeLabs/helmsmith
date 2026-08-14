@@ -15,6 +15,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
+import type {
+  ConfluenceIngestRequest,
+  GithubIssuesIngestRequest,
+  JiraIngestRequest,
+} from './external-sources.ts';
 import { startContextServer } from './index.ts';
 import type {
   CrawlIngestRequest,
@@ -25,11 +30,6 @@ import type {
   UploadEntry,
   UploadIngestRequest,
 } from './ingest.ts';
-import type {
-  ConfluenceIngestRequest,
-  GithubIssuesIngestRequest,
-  JiraIngestRequest,
-} from './external-sources.ts';
 
 const tmpSocket = () => join(tmpdir(), `ctx-ing-${randomUUID().slice(0, 8)}.sock`);
 
@@ -122,7 +122,14 @@ class StubIngestService implements IngestService {
       startedAt: new Date().toISOString(),
       completedAt: new Date().toISOString(),
       productId: req.productId,
-      summary: { filesIngested: 7, filesSkipped: 0, chunksWritten: 7, vectorsWritten: 7, errors: 0, durationMs: 30 },
+      summary: {
+        filesIngested: 7,
+        filesSkipped: 0,
+        chunksWritten: 7,
+        vectorsWritten: 7,
+        errors: 0,
+        durationMs: 30,
+      },
       events: [],
     });
     return { ingestId };
@@ -138,15 +145,20 @@ class StubIngestService implements IngestService {
       startedAt: new Date().toISOString(),
       completedAt: new Date().toISOString(),
       productId: req.productId,
-      summary: { filesIngested: 12, filesSkipped: 0, chunksWritten: 12, vectorsWritten: 12, errors: 0, durationMs: 60 },
+      summary: {
+        filesIngested: 12,
+        filesSkipped: 0,
+        chunksWritten: 12,
+        vectorsWritten: 12,
+        errors: 0,
+        durationMs: 60,
+      },
       events: [],
     });
     return { ingestId };
   }
 
-  async startGithubIssuesIngest(
-    req: GithubIssuesIngestRequest,
-  ): Promise<{ ingestId: string }> {
+  async startGithubIssuesIngest(req: GithubIssuesIngestRequest): Promise<{ ingestId: string }> {
     this.lastGithubReq = req;
     const ingestId = `ing_gh_${Math.random().toString(36).slice(2, 8)}`;
     this.ingests.set(ingestId, {
@@ -156,7 +168,14 @@ class StubIngestService implements IngestService {
       startedAt: new Date().toISOString(),
       completedAt: new Date().toISOString(),
       productId: req.productId,
-      summary: { filesIngested: 4, filesSkipped: 0, chunksWritten: 4, vectorsWritten: 4, errors: 0, durationMs: 25 },
+      summary: {
+        filesIngested: 4,
+        filesSkipped: 0,
+        chunksWritten: 4,
+        vectorsWritten: 4,
+        errors: 0,
+        durationMs: 25,
+      },
       events: [],
     });
     return { ingestId };
@@ -172,7 +191,14 @@ class StubIngestService implements IngestService {
       startedAt: new Date().toISOString(),
       completedAt: new Date().toISOString(),
       productId: req.productId,
-      summary: { filesIngested: 1, filesSkipped: 0, chunksWritten: 4, vectorsWritten: 4, errors: 0, durationMs: 50 },
+      summary: {
+        filesIngested: 1,
+        filesSkipped: 0,
+        chunksWritten: 4,
+        vectorsWritten: 4,
+        errors: 0,
+        durationMs: 50,
+      },
       events: [],
     });
     return { ingestId };
@@ -200,7 +226,14 @@ class StubIngestService implements IngestService {
       state: 'completed',
       startedAt: new Date().toISOString(),
       completedAt: new Date().toISOString(),
-      summary: { filesIngested: 1, filesSkipped: 0, chunksWritten: 0, vectorsWritten: 0, errors: 0, durationMs: 1 },
+      summary: {
+        filesIngested: 1,
+        filesSkipped: 0,
+        chunksWritten: 0,
+        vectorsWritten: 0,
+        errors: 0,
+        durationMs: 1,
+      },
       events: [{ kind: 'node-written', nodeId: docId, label: 'Doc' }],
     });
     return { ingestId, entry };
@@ -363,9 +396,7 @@ describe('edge-context-server — ingest routes', () => {
         'Content-Disposition: form-data; name="description"\r\n\r\nMobile checkout v2\r\n',
       ),
       Buffer.from(`--${boundary}\r\n`),
-      Buffer.from(
-        'Content-Disposition: form-data; name="file"; filename="design.pdf"\r\n',
-      ),
+      Buffer.from('Content-Disposition: form-data; name="file"; filename="design.pdf"\r\n'),
       Buffer.from('Content-Type: application/pdf\r\n\r\n'),
       Buffer.from('%PDF-1.4 fake pdf bytes'),
       Buffer.from(`\r\n--${boundary}--\r\n`),

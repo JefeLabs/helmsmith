@@ -106,7 +106,11 @@ export function parseColor(input: string): Lab {
   const rgb = s.match(/^rgba?\(\s*([^)]+)\)$/);
   if (rgb) {
     const parts = rgb[1].split(/[,/]/).map((p) => p.trim());
-    const [r, g, b] = parts.slice(0, 3).map((p) => num(p) > 1 || /\d{2,}/.test(p) ? Number.parseFloat(p) / 255 : Number.parseFloat(p));
+    const [r, g, b] = parts
+      .slice(0, 3)
+      .map((p) =>
+        num(p) > 1 || /\d{2,}/.test(p) ? Number.parseFloat(p) / 255 : Number.parseFloat(p),
+      );
     const alpha = parts[3] !== undefined ? num(parts[3]) : 1;
     const lab = linearRgbToOklab(srgbToLinear(r), srgbToLinear(g), srgbToLinear(b));
     return { ...lab, alpha };
@@ -115,8 +119,16 @@ export function parseColor(input: string): Lab {
   const hex = s.match(/^#([0-9a-f]{3,8})$/);
   if (hex) {
     let h = hex[1];
-    if (h.length === 3) h = h.split('').map((c) => c + c).join('');
-    if (h.length === 4) h = h.split('').map((c) => c + c).join('');
+    if (h.length === 3)
+      h = h
+        .split('')
+        .map((c) => c + c)
+        .join('');
+    if (h.length === 4)
+      h = h
+        .split('')
+        .map((c) => c + c)
+        .join('');
     const r = Number.parseInt(h.slice(0, 2), 16) / 255;
     const g = Number.parseInt(h.slice(2, 4), 16) / 255;
     const b = Number.parseInt(h.slice(4, 6), 16) / 255;

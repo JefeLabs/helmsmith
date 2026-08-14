@@ -49,7 +49,12 @@ const SCALAR_DEFAULTS: Record<string, number> = {
   'font.size-lg': 20,
 };
 
-function pick(ramps: Record<string, Ramp> | undefined, ramp: string, step: string, fallback: string): string {
+function pick(
+  ramps: Record<string, Ramp> | undefined,
+  ramp: string,
+  step: string,
+  fallback: string,
+): string {
   return (ramp && ramps?.[ramp]?.[step]) || fallback;
 }
 

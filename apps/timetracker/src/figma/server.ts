@@ -97,7 +97,10 @@ export async function handlePresence(
     tracker = new FilePresenceTracker();
     trackers.set(fileKey, tracker);
   }
-  const decisions = tracker.apply(users.map((u) => u.id), ts);
+  const decisions = tracker.apply(
+    users.map((u) => u.id),
+    ts,
+  );
   const date = dayKeyFor(new Date(ts), deps.timezone);
   for (const userId of decisions.open) {
     await deps.storage.openFigmaPresence(userId, fileKey, date, ts);

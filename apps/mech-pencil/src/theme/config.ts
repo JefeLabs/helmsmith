@@ -12,13 +12,7 @@
  * color and derive those — see theme/generate.ts.)
  */
 
-export type RadiusId =
-  | 'none'
-  | 'extra-small'
-  | 'small'
-  | 'medium'
-  | 'large'
-  | 'extra-large';
+export type RadiusId = 'none' | 'extra-small' | 'small' | 'medium' | 'large' | 'extra-large';
 
 /** HeroUI `radiusCssMap`: preset → rem (verbatim from the builder). */
 export const RADIUS_REM: Record<RadiusId, number> = {
@@ -70,9 +64,7 @@ export function resolveTheme(input: Partial<ThemeConfig>): ThemeConfig {
     ['form-radius', formRadius],
   ] as const) {
     if (!(r in RADIUS_REM)) {
-      throw new Error(
-        `theme: invalid ${label} "${r}" — one of ${RADIUS_IDS.join(', ')}`,
-      );
+      throw new Error(`theme: invalid ${label} "${r}" — one of ${RADIUS_IDS.join(', ')}`);
     }
   }
   const base = input.base ?? DEFAULT_THEME.base;

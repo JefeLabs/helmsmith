@@ -17,8 +17,8 @@ import { ConfigError, loadConfig } from '../config/load.js';
 import { addDays, todayKey } from '../domain/dayKey.js';
 import type { ISODate } from '../domain/types.js';
 import { log } from '../logger.js';
-import { renderDaily } from '../reports/render.js';
 import { reportServiceFor } from '../reports/ReportService.js';
+import { renderDaily } from '../reports/render.js';
 import { createStorage } from '../storage/factory.js';
 
 export interface BackfillOptions {

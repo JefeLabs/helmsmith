@@ -376,7 +376,11 @@ export class ContextQueryService implements QueryService {
     // Tier 3: a retrieval mode supplies preset params under any explicit ones.
     req = applyMode(req);
     const topK = req.topK ?? 10;
-    const expandDepth = clamp(req.expandDepth ?? QUERY_EXPAND_DEPTH_DEFAULT, 0, QUERY_EXPAND_DEPTH_MAX);
+    const expandDepth = clamp(
+      req.expandDepth ?? QUERY_EXPAND_DEPTH_DEFAULT,
+      0,
+      QUERY_EXPAND_DEPTH_MAX,
+    );
     const weights: RrfWeights = {
       vector: clampNonNeg(req.vectorWeight ?? QUERY_RRF_VECTOR_WEIGHT),
       bm25: clampNonNeg(req.bm25Weight ?? QUERY_RRF_BM25_WEIGHT),
@@ -1102,7 +1106,9 @@ function firstLabel(v: unknown): string {
   return '';
 }
 
-function stripVectorProps(props: Record<string, unknown> | null | undefined): Record<string, unknown> {
+function stripVectorProps(
+  props: Record<string, unknown> | null | undefined,
+): Record<string, unknown> {
   if (!props) return {};
   const copy = { ...props };
   delete copy.embedding;
@@ -1142,7 +1148,11 @@ function normalizeCypherValue(v: unknown): unknown {
   if (typeof v !== 'object') return v;
 
   // neo4j Integer
-  if (typeof (v as { toNumber?: unknown }).toNumber === 'function' && 'low' in (v as object) && 'high' in (v as object)) {
+  if (
+    typeof (v as { toNumber?: unknown }).toNumber === 'function' &&
+    'low' in (v as object) &&
+    'high' in (v as object)
+  ) {
     return (v as { toNumber(): number }).toNumber();
   }
   // Node — has identity + labels + properties

@@ -86,9 +86,8 @@ export class FigmaApi {
       });
       if (res.status === 429 && attempt < MAX_RETRIES) {
         const retryAfter = Number(res.headers.get('Retry-After'));
-        const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
-          ? retryAfter * 1000
-          : 2 ** attempt * 1000;
+        const waitMs =
+          Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 2 ** attempt * 1000;
         log.warn(`figma api throttled (429) — retrying ${path} in ${waitMs}ms`);
         await sleep(waitMs);
         continue;
@@ -162,9 +161,7 @@ export class FigmaApi {
    */
   async ensureTeamWebhooks(teamId: string, endpoint: string, passcode: string): Promise<number> {
     const existing = await this.listTeamWebhooks(teamId);
-    const have = new Set(
-      existing.filter((w) => w.endpoint === endpoint).map((w) => w.event_type),
-    );
+    const have = new Set(existing.filter((w) => w.endpoint === endpoint).map((w) => w.event_type));
     let created = 0;
     for (const eventType of WEBHOOK_EVENT_TYPES) {
       if (have.has(eventType)) continue;

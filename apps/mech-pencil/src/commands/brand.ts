@@ -8,8 +8,8 @@ import { resolve } from 'node:path';
 import { assertBrandFile, type BrandFile } from '../brand/schema.ts';
 import { emitBrand } from '../emit/brand.ts';
 import { getFramework } from '../frameworks/_core/registry.ts';
-import { dim, err, heading, ok, warn } from '../ui.ts';
 import { documentPath, readJson, writeText } from '../lib/workspace.ts';
+import { dim, err, heading, ok, warn } from '../ui.ts';
 
 export interface BrandOptions {
   file: string;
@@ -35,11 +35,7 @@ export function runBrand(options: BrandOptions): void {
   const brand = raw as BrandFile;
 
   const adapter = getFramework(options.framework);
-  const { brandDoc, brandValidation, counts, design } = emitBrand(
-    adapter,
-    brand,
-    brandName,
-  );
+  const { brandDoc, brandValidation, counts, design } = emitBrand(adapter, brand, brandName);
 
   const problems = [
     ...(brandValidation.ok ? [] : [['brand', brandValidation] as const]),
@@ -74,7 +70,5 @@ export function runBrand(options: BrandOptions): void {
     ),
   );
   for (const note of adapter.notes?.() ?? []) console.log(warn(note));
-  console.log(
-    dim('  swap/regenerate brand.pen per project — design.pen is untouched.'),
-  );
+  console.log(dim('  swap/regenerate brand.pen per project — design.pen is untouched.'));
 }

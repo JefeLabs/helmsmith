@@ -55,7 +55,8 @@ export function runSystem(options: SystemCmdOptions): void {
   ].filter((v) => !v.ok);
   if (invalid.length > 0) {
     console.error(err(`generated ${invalid.length} invalid document(s):`));
-    for (const v of invalid) for (const i of v.issues) console.error(dim(`  ${i.path}: ${i.message}`));
+    for (const v of invalid)
+      for (const i of v.issues) console.error(dim(`  ${i.path}: ${i.message}`));
     process.exitCode = 1;
     return;
   }
@@ -81,7 +82,9 @@ export function runSystem(options: SystemCmdOptions): void {
       console.log(dim('  run `pencil login` or set PENCIL_CLI_KEY to render PNGs.'));
     }
   } else {
-    console.log(dim('  PNG previews skipped — re-run with --png to render (headless Pencil export).'));
+    console.log(
+      dim('  PNG previews skipped — re-run with --png to render (headless Pencil export).'),
+    );
   }
   console.log(dim('  base.pen imports the libs; open it in Pencil to view/edit.'));
 }

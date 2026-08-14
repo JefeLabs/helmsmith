@@ -17,13 +17,13 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  ADAPTER_CATALOG,
   type AdapterCapabilities,
   type AgentAdapter,
   type AgentChunk,
   type AgentInput,
   type AgentInvocationResult,
   type AgentSpecType,
-  CAPABILITY_MATRIX,
 } from '@helmsmith/agent-adapter';
 import { AIMessage, HumanMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph';
@@ -33,7 +33,7 @@ import type { CompiledGraph } from './langgraph-adapter.ts';
 
 class StubAdapter implements AgentAdapter {
   readonly type: AgentSpecType = 'claude-sdk';
-  readonly capabilities: AdapterCapabilities = CAPABILITY_MATRIX['claude-sdk'];
+  readonly capabilities: AdapterCapabilities = ADAPTER_CATALOG['claude-sdk'].capabilities;
   readonly workdir = '/tmp';
   readonly invocations: AgentInput[] = [];
 
@@ -125,7 +125,7 @@ describe('HarnessChatModel', () => {
   it('propagates adapter errors', async () => {
     const failingAdapter: AgentAdapter = {
       type: 'claude-sdk',
-      capabilities: CAPABILITY_MATRIX['claude-sdk'],
+      capabilities: ADAPTER_CATALOG['claude-sdk'].capabilities,
       workdir: '/tmp',
       async invoke() {
         throw new Error('adapter failure');

@@ -50,11 +50,11 @@ export async function runBuildWorker(opts: BuildWorkerOptions): Promise<void> {
   console.log(`[build-worker]   context:    ${root}`);
 
   await new Promise<void>((resolve, reject) => {
-    const child = spawn(
-      'docker',
-      ['build', '-f', dockerfile, '-t', tag, root],
-      { cwd: root, env: process.env, stdio: 'inherit' },
-    );
+    const child = spawn('docker', ['build', '-f', dockerfile, '-t', tag, root], {
+      cwd: root,
+      env: process.env,
+      stdio: 'inherit',
+    });
     child.on('exit', (code) => {
       if (code === 0) resolve();
       else reject(new Error(`docker build exited with code ${code}`));

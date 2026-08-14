@@ -71,8 +71,7 @@ export function mixOklab(a: Lab, b: Lab, weightA: number): Lab {
   const wB = 1 - wA;
   const alpha = a.alpha * wA + b.alpha * wB;
   if (alpha === 0) return { L: 0, a: 0, b: 0, alpha: 0 };
-  const un = (ca: number, cb: number) =>
-    (ca * a.alpha * wA + cb * b.alpha * wB) / alpha;
+  const un = (ca: number, cb: number) => (ca * a.alpha * wA + cb * b.alpha * wB) / alpha;
   return {
     L: un(a.L, b.L),
     a: un(a.a, b.a),

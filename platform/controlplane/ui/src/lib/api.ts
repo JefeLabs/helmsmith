@@ -2,13 +2,13 @@
 // surface is small and codegen adds tooling weight. When the backend
 // API stabilizes, swap these for generated types from /v3/api-docs.
 
-const ORG_ID = "dev-org"; // Phase 7 will replace with OIDC-derived tenant
-const USER_ID = "dev-user";
+const ORG_ID = 'dev-org'; // Phase 7 will replace with OIDC-derived tenant
+const USER_ID = 'dev-user';
 
 const headers: HeadersInit = {
-  "Content-Type": "application/json",
-  "X-Org-Id": ORG_ID,
-  "X-User-Id": USER_ID,
+  'Content-Type': 'application/json',
+  'X-Org-Id': ORG_ID,
+  'X-User-Id': USER_ID,
 };
 
 /**
@@ -25,7 +25,7 @@ export class ApiError extends Error {
     public readonly details?: Record<string, unknown>,
   ) {
     super(message);
-    this.name = "ApiError";
+    this.name = 'ApiError';
   }
 }
 
@@ -40,7 +40,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     // returns { code, message, details? } on every non-2xx; the
     // controlplane proxy preserves that shape on validation
     // failures + author/version conflicts.
-    let envelope: { code?: string; message?: string; details?: Record<string, unknown> } | null = null;
+    let envelope: { code?: string; message?: string; details?: Record<string, unknown> } | null =
+      null;
     try {
       envelope = JSON.parse(text);
     } catch {
@@ -66,14 +67,14 @@ export interface IntentSession {
   intakeJobId?: string;
   workJobId?: string;
   status:
-    | "awaiting-message"
-    | "processing"
-    | "intent-ready"
-    | "pipeline-creation-required"
-    | "submitted"
-    | "expired"
-    | "aborted"
-    | "failed";
+    | 'awaiting-message'
+    | 'processing'
+    | 'intent-ready'
+    | 'pipeline-creation-required'
+    | 'submitted'
+    | 'expired'
+    | 'aborted'
+    | 'failed';
   resolvedIntent?: unknown;
   failureReason?: string;
   createdAt: string;
@@ -82,19 +83,19 @@ export interface IntentSession {
 
 export const intent = {
   start: (body: { intakePipelineId?: string; productId?: string; initialInput?: unknown }) =>
-    request<IntentSession>("/api/intent/sessions", { method: "POST", body: JSON.stringify(body) }),
-  list: () => request<IntentSession[]>("/api/intent/sessions"),
+    request<IntentSession>('/api/intent/sessions', { method: 'POST', body: JSON.stringify(body) }),
+  list: () => request<IntentSession[]>('/api/intent/sessions'),
   get: (id: string) => request<IntentSession>(`/api/intent/sessions/${id}`),
   abort: (id: string) =>
-    request<IntentSession>(`/api/intent/sessions/${id}/abort`, { method: "POST" }),
+    request<IntentSession>(`/api/intent/sessions/${id}/abort`, { method: 'POST' }),
   message: (id: string, message: string) =>
     request<IntentSession>(`/api/intent/sessions/${id}/messages`, {
-      method: "POST",
+      method: 'POST',
       body: JSON.stringify({ message }),
     }),
   confirm: (id: string, intent: { flowId: string; productId: string; input?: unknown }) =>
     request<IntentSession>(`/api/intent/sessions/${id}/confirm`, {
-      method: "POST",
+      method: 'POST',
       body: JSON.stringify(intent),
     }),
 };
@@ -105,7 +106,7 @@ export interface Job {
   id: string;
   flowId: string;
   productId: string;
-  status: "queued" | "running" | "completed" | "failed" | "cancelled";
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
   input?: unknown;
   output?: unknown;
   failureReason?: string;
@@ -136,16 +137,14 @@ export interface SubmitJobRequest {
 }
 
 export const jobs = {
-  list: () => request<Job[]>("/api/jobs"),
+  list: () => request<Job[]>('/api/jobs'),
   listByBenchmarkRun: (runId: string, limit = 500) =>
-    request<Job[]>(
-      `/api/jobs?benchmarkRunId=${encodeURIComponent(runId)}&limit=${limit}`,
-    ),
+    request<Job[]>(`/api/jobs?benchmarkRunId=${encodeURIComponent(runId)}&limit=${limit}`),
   get: (id: string) => request<Job>(`/api/jobs/${id}`),
   submit: (body: SubmitJobRequest) =>
-    request<Job>("/api/jobs", { method: "POST", body: JSON.stringify(body) }),
-  start: (id: string) => request<Job>(`/api/jobs/${id}/start`, { method: "POST" }),
-  cancel: (id: string) => request<Job>(`/api/jobs/${id}/cancel`, { method: "POST" }),
+    request<Job>('/api/jobs', { method: 'POST', body: JSON.stringify(body) }),
+  start: (id: string) => request<Job>(`/api/jobs/${id}/start`, { method: 'POST' }),
+  cancel: (id: string) => request<Job>(`/api/jobs/${id}/cancel`, { method: 'POST' }),
 };
 
 // ── Benchmarks ────────────────────────────────────────────────────────
@@ -175,24 +174,24 @@ export interface BenchmarkRunSummary {
 export const benchmarks = {
   compare: (runIds: string[]) =>
     request<BenchmarkRunSummary[]>(
-      `/api/benchmarks/compare?runIds=${encodeURIComponent(runIds.join(","))}`,
+      `/api/benchmarks/compare?runIds=${encodeURIComponent(runIds.join(','))}`,
     ),
 };
 
 // ── Skill proposals ──────────────────────────────────────────────────
 
-export type ProposalStatus = "proposed" | "approved" | "rejected";
+export type ProposalStatus = 'proposed' | 'approved' | 'rejected';
 
 /** Mirrors skillzkit's ContributionStatus union plus a local-only
  *  'failed' for transport / 5xx errors. Null = never submitted (e.g.,
  *  approved before skillzkit was wired). */
 export type RemoteStatus =
-  | "pending"
-  | "reviewing"
-  | "accepted"
-  | "rejected"
-  | "promoted"
-  | "failed";
+  | 'pending'
+  | 'reviewing'
+  | 'accepted'
+  | 'rejected'
+  | 'promoted'
+  | 'failed';
 
 export interface SkillProposal {
   id: string;
@@ -219,22 +218,20 @@ export interface SkillProposal {
 
 export const skillProposals = {
   list: (status?: ProposalStatus) =>
-    request<SkillProposal[]>(
-      `/api/skill-proposals${status ? `?status=${status}` : ""}`,
-    ),
+    request<SkillProposal[]>(`/api/skill-proposals${status ? `?status=${status}` : ''}`),
   approve: (id: string) =>
     request<SkillProposal>(`/api/skill-proposals/${id}/approve`, {
-      method: "POST",
+      method: 'POST',
       body: JSON.stringify({}),
     }),
   reject: (id: string, reason: string) =>
     request<SkillProposal>(`/api/skill-proposals/${id}/reject`, {
-      method: "POST",
+      method: 'POST',
       body: JSON.stringify({ reason }),
     }),
   resubmit: (id: string) =>
     request<SkillProposal>(`/api/skill-proposals/${id}/resubmit`, {
-      method: "POST",
+      method: 'POST',
       body: JSON.stringify({}),
     }),
 };
@@ -244,7 +241,7 @@ export const skillProposals = {
 export interface Flow {
   id: string;
   description?: string;
-  kind: "work" | "job-definition" | "post-job";
+  kind: 'work' | 'job-definition' | 'post-job';
   output?: unknown;
   nodes: unknown;
   edges: unknown;
@@ -261,9 +258,9 @@ export interface Product {
 }
 
 export const catalog = {
-  flows: () => request<Flow[]>("/api/catalog/flows"),
+  flows: () => request<Flow[]>('/api/catalog/flows'),
   flow: (id: string) => request<Flow>(`/api/catalog/flows/${id}`),
-  products: () => request<Product[]>("/api/catalog/products"),
+  products: () => request<Product[]>('/api/catalog/products'),
 };
 
 // ── Compose (author-from-scratch contribution) ──────────────────────
@@ -305,7 +302,7 @@ export interface ContributionFile {
   content: string;
 }
 
-export type ContributionKind = "command" | "workflow" | "skill";
+export type ContributionKind = 'command' | 'workflow' | 'skill';
 
 /**
  * A single validation finding from skillzkit's three-layer pipeline
@@ -313,8 +310,8 @@ export type ContributionKind = "command" | "workflow" | "skill";
  * block decision (high blocks; medium/low surface but allow).
  */
 export interface ReviewFinding {
-  severity: "low" | "medium" | "high";
-  axis: "structural" | "bundle" | "quality" | "tag-fit" | "safety";
+  severity: 'low' | 'medium' | 'high';
+  axis: 'structural' | 'bundle' | 'quality' | 'tag-fit' | 'safety';
   message: string;
   /** File within the bundle the finding applies to, when scoped. */
   fileRef?: string;
@@ -327,7 +324,7 @@ export interface ComposeRequest {
   /** Frontmatter parsed from the primary file - keys depend on kind. */
   frontmatter: Record<string, unknown>;
   files: ContributionFile[];
-  versionBump?: "major" | "minor" | "patch";
+  versionBump?: 'major' | 'minor' | 'patch';
   changelog?: string;
 }
 
@@ -337,12 +334,7 @@ export interface AuthorIdentity {
   email?: string;
 }
 
-export type ContributionStatus =
-  | "pending"
-  | "reviewing"
-  | "accepted"
-  | "rejected"
-  | "promoted";
+export type ContributionStatus = 'pending' | 'reviewing' | 'accepted' | 'rejected' | 'promoted';
 
 export interface ComposeResponse {
   /** Content-addressable id: "<kind>:<slug>@<version>". */
@@ -369,8 +361,8 @@ export const compose = {
    * slug conflict).
    */
   submit: (req: ComposeRequest) =>
-    request<ComposeResponse>("/api/skill-proposals/compose", {
-      method: "POST",
+    request<ComposeResponse>('/api/skill-proposals/compose', {
+      method: 'POST',
       body: JSON.stringify(req),
     }),
 };
@@ -405,13 +397,13 @@ export function subscribeToSession(
     });
   };
 
-  wire("intent-ready", handlers.onIntentReady as (d: unknown) => void);
-  wire("job-submitted", handlers.onJobSubmitted as (d: unknown) => void);
-  wire("aborted", handlers.onAborted as (d: unknown) => void);
-  wire("pipeline-creation-required", handlers.onPipelineCreationRequired as (d: unknown) => void);
-  wire("error", handlers.onError as (d: unknown) => void);
-  wire("session-started", undefined);
-  wire("pipeline-created", undefined);
+  wire('intent-ready', handlers.onIntentReady as (d: unknown) => void);
+  wire('job-submitted', handlers.onJobSubmitted as (d: unknown) => void);
+  wire('aborted', handlers.onAborted as (d: unknown) => void);
+  wire('pipeline-creation-required', handlers.onPipelineCreationRequired as (d: unknown) => void);
+  wire('error', handlers.onError as (d: unknown) => void);
+  wire('session-started', undefined);
+  wire('pipeline-created', undefined);
 
   return () => es.close();
 }

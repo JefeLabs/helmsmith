@@ -17,13 +17,12 @@
  * follow-up slices once this contract is exercised by tests.
  */
 
+import { type AgentAdapter, createAgent } from '@helmsmith/agent-adapter';
 import {
-  type AgentAdapter,
-  createAgent,
   OpenCodeServer,
   type OpenCodeServerOptions,
   type OpencodeProviderEntry,
-} from '@helmsmith/agent-adapter';
+} from '@helmsmith/agent-adapter/adapters/opencode-cli';
 import { bridgeBroker, type ResolvedBinding } from '@helmsmith/agent-auth';
 import {
   type BindingToSpecOptions,
@@ -34,6 +33,7 @@ import {
   JobBus,
   type JobRecord,
   type RegisteredAgent,
+  registerBindingAdapters,
   runJob,
 } from '@helmsmith/harness-core';
 import type { JobSpec, SpecAgent } from './spec.ts';
@@ -153,6 +153,11 @@ export async function runHarnessPipeline(
   spec: JobSpec,
   options: RunHarnessPipelineOptions = {},
 ): Promise<RunHarnessPipelineResult> {
+  // Step 0: register the adapters bindingToSpec can emit. This CLI is a
+  // composition root — @helmsmith/agent-adapter registers nothing on import, so
+  // without this createAgent() below has no factory to dispatch to.
+  registerBindingAdapters();
+
   // Step 1: build the broker from pre-resolved credentials.
   const broker = new SpecBroker(spec.bindings);
 

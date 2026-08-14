@@ -6,8 +6,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { dailyColumns } from '../tui/model.js';
-import type { ReportService } from './ReportService.js';
 import { dailyMessage } from './discord.js';
+import type { ReportService } from './ReportService.js';
 import { renderDaily } from './render.js';
 import type { DailySummary } from './types.js';
 

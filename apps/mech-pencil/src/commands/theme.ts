@@ -10,7 +10,7 @@ import { emitDocument } from '../emit/document.ts';
 import type { FrameworkAdapter } from '../frameworks/_core/adapter.ts';
 import { heroUIAdapter } from '../frameworks/heroui/index.ts';
 import { documentPath, writeText } from '../lib/workspace.ts';
-import { type ThemeConfig, resolveTheme } from '../theme/config.ts';
+import { resolveTheme, type ThemeConfig } from '../theme/config.ts';
 import { themeTokens } from '../theme/generate.ts';
 import { dim, err, heading, ok, warn } from '../ui.ts';
 
@@ -56,8 +56,7 @@ export function runTheme(options: ThemeCmdOptions): void {
   }
 
   const adapter = themedAdapter(cfg);
-  const { doc, validation, variableKeys, componentIds, screenSlugs } =
-    emitDocument(adapter);
+  const { doc, validation, variableKeys, componentIds, screenSlugs } = emitDocument(adapter);
 
   if (!validation.ok) {
     console.error(err(`generated document is invalid (${validation.issues.length} issue(s)):`));
@@ -77,7 +76,9 @@ export function runTheme(options: ThemeCmdOptions): void {
     ),
   );
   console.log(
-    dim(`  ${variableKeys.length} tokens · ${componentIds.length} components · screen: ${screenSlugs.join(', ')}`),
+    dim(
+      `  ${variableKeys.length} tokens · ${componentIds.length} components · screen: ${screenSlugs.join(', ')}`,
+    ),
   );
   for (const note of adapter.notes?.() ?? []) console.log(warn(note));
 }

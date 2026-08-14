@@ -80,11 +80,19 @@ export class ReportService {
    */
   async figmaDaily(date: ISODate, now: Date = new Date()): Promise<FigmaDailySummary> {
     if (!supportsFigma(this.storage)) {
-      return { date, available: false, events: [], fileHeat: [], members: [], presenceNow: [], stale: false };
+      return {
+        date,
+        available: false,
+        events: [],
+        fileHeat: [],
+        members: [],
+        presenceNow: [],
+        stale: false,
+      };
     }
     const s = this.storage;
-    const [events, members, presence, files, names, heartbeatAt, openIntervals] =
-      await Promise.all([
+    const [events, members, presence, files, names, heartbeatAt, openIntervals] = await Promise.all(
+      [
         s.listFigmaEventsRange(date, date),
         s.listFigmaMembers(),
         s.listFigmaPresenceRange(date, date),
@@ -92,7 +100,8 @@ export class ReportService {
         s.getUserNames(),
         s.getMeta(FIGMA_META.presenceHeartbeat),
         s.listOpenFigmaPresence(),
-      ]);
+      ],
+    );
 
     const fileName = new Map(files.map((f) => [f.fileKey, f.name ?? f.fileKey]));
     const memberById = new Map(members.map((m) => [m.figmaUserId, m]));
@@ -252,10 +261,7 @@ function countByType(events: FigmaEvent[]): Partial<Record<FigmaEventType, numbe
 }
 
 /** Minutes per figma user across intervals; open intervals count up to `now`. */
-function presenceMinutesByUser(
-  intervals: FigmaPresenceInterval[],
-  now: Date,
-): Map<string, number> {
+function presenceMinutesByUser(intervals: FigmaPresenceInterval[], now: Date): Map<string, number> {
   const out = new Map<string, number>();
   for (const iv of intervals) {
     const end = iv.endAt ? Date.parse(iv.endAt) : now.getTime();

@@ -1,6 +1,3 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Button,
   Card,
@@ -12,8 +9,11 @@ import {
   SelectItem,
   Spinner,
   Textarea,
-} from "@heroui/react";
-import { catalog, jobs, type SubmitJobRequest } from "../lib/api";
+} from '@heroui/react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { catalog, jobs, type SubmitJobRequest } from '../lib/api';
 
 /**
  * Gate 1b.2 — direct job submission surface for users who already know
@@ -27,23 +27,20 @@ import { catalog, jobs, type SubmitJobRequest } from "../lib/api";
 export default function SubmitJobPage() {
   const navigate = useNavigate();
 
-  const flowsQ = useQuery({ queryKey: ["catalog", "flows"], queryFn: catalog.flows });
-  const productsQ = useQuery({ queryKey: ["catalog", "products"], queryFn: catalog.products });
+  const flowsQ = useQuery({ queryKey: ['catalog', 'flows'], queryFn: catalog.flows });
+  const productsQ = useQuery({ queryKey: ['catalog', 'products'], queryFn: catalog.products });
 
-  const [flowId, setFlowId] = useState("");
-  const [productId, setProductId] = useState("");
-  const [change, setChange] = useState("");
+  const [flowId, setFlowId] = useState('');
+  const [productId, setProductId] = useState('');
+  const [change, setChange] = useState('');
 
   const submitM = useMutation({
     mutationFn: (body: SubmitJobRequest) => jobs.submit(body),
-    onSuccess: () => navigate("/jobs"),
+    onSuccess: () => navigate('/jobs'),
   });
 
   const disabled =
-    submitM.isPending ||
-    flowId.trim() === "" ||
-    productId.trim() === "" ||
-    change.trim() === "";
+    submitM.isPending || flowId.trim() === '' || productId.trim() === '' || change.trim() === '';
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -56,15 +53,15 @@ export default function SubmitJobPage() {
 
   // Only "work" flows are valid here. job-definition flows belong to the
   // Intake surface; post-job flows aren't user-submittable.
-  const workFlows = (flowsQ.data ?? []).filter((f) => f.kind === "work");
+  const workFlows = (flowsQ.data ?? []).filter((f) => f.kind === 'work');
 
   return (
     <Card>
       <CardHeader className="flex flex-col items-start gap-1">
         <span className="text-lg font-semibold">Submit job</span>
         <span className="text-sm text-default-500">
-          Direct submission to <Code size="sm">POST /api/jobs</Code>. For
-          guided intent capture, use the Intake page.
+          Direct submission to <Code size="sm">POST /api/jobs</Code>. For guided intent capture, use
+          the Intake page.
         </span>
       </CardHeader>
       <Divider />
@@ -72,7 +69,7 @@ export default function SubmitJobPage() {
         <form onSubmit={onSubmit} className="flex flex-col gap-4 max-w-2xl">
           <Select
             label="Flow"
-            placeholder={flowsQ.isPending ? "Loading flows…" : "Pick a work flow"}
+            placeholder={flowsQ.isPending ? 'Loading flows…' : 'Pick a work flow'}
             isDisabled={flowsQ.isPending || !!flowsQ.error}
             selectedKeys={flowId ? [flowId] : []}
             onChange={(e) => setFlowId(e.target.value)}
@@ -86,7 +83,7 @@ export default function SubmitJobPage() {
 
           <Select
             label="Product"
-            placeholder={productsQ.isPending ? "Loading products…" : "Pick a product"}
+            placeholder={productsQ.isPending ? 'Loading products…' : 'Pick a product'}
             isDisabled={productsQ.isPending || !!productsQ.error}
             selectedKeys={productId ? [productId] : []}
             onChange={(e) => setProductId(e.target.value)}
@@ -114,9 +111,9 @@ export default function SubmitJobPage() {
 
           <div className="flex items-center gap-3">
             <Button color="primary" type="submit" isDisabled={disabled}>
-              {submitM.isPending ? <Spinner size="sm" color="white" /> : "Submit"}
+              {submitM.isPending ? <Spinner size="sm" color="white" /> : 'Submit'}
             </Button>
-            <Button variant="light" onPress={() => navigate("/jobs")}>
+            <Button variant="light" onPress={() => navigate('/jobs')}>
               Cancel
             </Button>
           </div>

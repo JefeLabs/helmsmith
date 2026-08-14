@@ -1,21 +1,21 @@
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
 import {
+  Chip,
+  Code,
+  Spinner,
   Table,
   TableBody,
   TableCell,
   TableColumn,
   TableHeader,
   TableRow,
-  Spinner,
-  Chip,
-  Code,
-} from "@heroui/react";
-import { intent, IntentSession } from "../lib/api";
+} from '@heroui/react';
+import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { IntentSession, intent } from '../lib/api';
 
 export default function SessionsPage() {
   const { data, isPending, error } = useQuery({
-    queryKey: ["sessions"],
+    queryKey: ['sessions'],
     queryFn: intent.list,
     refetchInterval: 3_000,
   });
@@ -50,11 +50,9 @@ export default function SessionsPage() {
               </Chip>
             </TableCell>
             <TableCell className="text-xs font-mono">
-              {s.intakeJobId?.slice(0, 12) ?? "—"}
+              {s.intakeJobId?.slice(0, 12) ?? '—'}
             </TableCell>
-            <TableCell className="text-xs font-mono">
-              {s.workJobId?.slice(0, 12) ?? "—"}
-            </TableCell>
+            <TableCell className="text-xs font-mono">{s.workJobId?.slice(0, 12) ?? '—'}</TableCell>
             <TableCell className="text-xs text-default-500">
               {new Date(s.createdAt).toLocaleString()}
             </TableCell>

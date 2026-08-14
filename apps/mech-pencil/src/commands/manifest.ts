@@ -5,9 +5,9 @@
  */
 
 import { resolve } from 'node:path';
+import { writeText } from '../lib/workspace.ts';
 import { buildManifest } from '../manifest/build.ts';
 import { dim, ok } from '../ui.ts';
-import { writeText } from '../lib/workspace.ts';
 
 export interface ManifestCmdOptions {
   out?: string;
@@ -24,6 +24,8 @@ export function runManifest(options: ManifestCmdOptions = {}): void {
   const m = buildManifest();
   console.log(ok(file));
   console.log(
-    dim(`  ${m.componentCount} components · ${m.tokens.length} tokens · ${m.constraints.length} constraints`),
+    dim(
+      `  ${m.componentCount} components · ${m.tokens.length} tokens · ${m.constraints.length} constraints`,
+    ),
   );
 }

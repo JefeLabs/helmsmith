@@ -150,7 +150,9 @@ export class SqliteAdapter implements StorageAdapter, FigmaStorage {
     // CREATE above covers fresh DBs; this ALTER covers existing ones (and is a
     // harmless no-op error on fresh ones, hence the swallow).
     try {
-      this.db.exec('ALTER TABLE daily_activity ADD COLUMN presence_idle INTEGER NOT NULL DEFAULT 0');
+      this.db.exec(
+        'ALTER TABLE daily_activity ADD COLUMN presence_idle INTEGER NOT NULL DEFAULT 0',
+      );
     } catch {
       // column already exists — nothing to do
     }
@@ -428,7 +430,9 @@ export class SqliteAdapter implements StorageAdapter, FigmaStorage {
     // INSERT OR IGNORE + the UNIQUE(event_type, file_key, external_id) key is
     // the whole webhook/poll dedupe story: same version from both paths → one row.
     const before = this.db
-      .prepare('SELECT 1 FROM figma_events WHERE event_type = ? AND file_key = ? AND external_id = ?')
+      .prepare(
+        'SELECT 1 FROM figma_events WHERE event_type = ? AND file_key = ? AND external_id = ?',
+      )
       .get(e.eventType, e.fileKey, e.externalId);
     if (before) return false;
     this.db

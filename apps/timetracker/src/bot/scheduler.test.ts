@@ -67,13 +67,17 @@ describe('dueReports', () => {
     });
 
     it('does not repost the same day, and tracks its own last-run', () => {
-      const r = dueReports(new Date('2026-06-10T12:00:00Z'), FIG, { lastFigmaRunDay: '2026-06-10' });
+      const r = dueReports(new Date('2026-06-10T12:00:00Z'), FIG, {
+        lastFigmaRunDay: '2026-06-10',
+      });
       expect(r.figma).toBeUndefined();
     });
 
     it('is independent of the daily last-run (a figma-only failure recovers)', () => {
       // daily already went out today, but figma hasn't → figma still fires.
-      const r = dueReports(new Date('2026-06-10T10:00:00Z'), FIG, { lastDailyRunDay: '2026-06-10' });
+      const r = dueReports(new Date('2026-06-10T10:00:00Z'), FIG, {
+        lastDailyRunDay: '2026-06-10',
+      });
       expect(r.daily).toBeUndefined();
       expect(r.figma).toBe('2026-06-09');
     });
@@ -98,36 +102,63 @@ const noEnd = (userId: string, date = '2026-06-10') => emptyDay(userId, date, `$
 
 describe('dueEndOfDay — completion mode', () => {
   it('publishes once every tracked user has end-of-day, before the deadline', () => {
-    const r = dueEndOfDay(new Date('2026-06-10T18:30:00Z'), EOD, TRACKED, [withEnd('U1'), withEnd('U2')], {});
+    const r = dueEndOfDay(
+      new Date('2026-06-10T18:30:00Z'),
+      EOD,
+      TRACKED,
+      [withEnd('U1'), withEnd('U2')],
+      {},
+    );
     expect(r.publish).toBe('2026-06-10');
     expect(r.state.lastEodPublishDay).toBe('2026-06-10');
   });
 
   it('waits while someone is still missing and the deadline has not passed', () => {
-    const r = dueEndOfDay(new Date('2026-06-10T18:30:00Z'), EOD, TRACKED, [withEnd('U1'), noEnd('U2')], {});
+    const r = dueEndOfDay(
+      new Date('2026-06-10T18:30:00Z'),
+      EOD,
+      TRACKED,
+      [withEnd('U1'), noEnd('U2')],
+      {},
+    );
     expect(r.publish).toBeUndefined();
   });
 
   it('publishes at the deadline even if not everyone is done', () => {
-    const r = dueEndOfDay(new Date('2026-06-10T22:00:00Z'), EOD, TRACKED, [withEnd('U1'), noEnd('U2')], {});
+    const r = dueEndOfDay(
+      new Date('2026-06-10T22:00:00Z'),
+      EOD,
+      TRACKED,
+      [withEnd('U1'), noEnd('U2')],
+      {},
+    );
     expect(r.publish).toBe('2026-06-10');
   });
 
   it('does not republish the same day', () => {
-    const r = dueEndOfDay(new Date('2026-06-10T19:00:00Z'), EOD, TRACKED, [withEnd('U1'), withEnd('U2')], {
-      lastEodPublishDay: '2026-06-10',
-    });
+    const r = dueEndOfDay(
+      new Date('2026-06-10T19:00:00Z'),
+      EOD,
+      TRACKED,
+      [withEnd('U1'), withEnd('U2')],
+      {
+        lastEodPublishDay: '2026-06-10',
+      },
+    );
     expect(r.publish).toBeUndefined();
   });
 
   it('skips weekends when weekdaysOnly', () => {
     const rows = [withEnd('U1', '2026-06-13'), withEnd('U2', '2026-06-13')]; // Saturday
-    expect(dueEndOfDay(new Date('2026-06-13T19:00:00Z'), EOD, TRACKED, rows, {}).publish).toBeUndefined();
+    expect(
+      dueEndOfDay(new Date('2026-06-13T19:00:00Z'), EOD, TRACKED, rows, {}).publish,
+    ).toBeUndefined();
   });
 
   it('is a no-op when disabled', () => {
     expect(
-      dueEndOfDay(new Date('2026-06-10T23:00:00Z'), { ...EOD, enabled: false }, TRACKED, [], {}).publish,
+      dueEndOfDay(new Date('2026-06-10T23:00:00Z'), { ...EOD, enabled: false }, TRACKED, [], {})
+        .publish,
     ).toBeUndefined();
   });
 });
@@ -135,9 +166,13 @@ describe('dueEndOfDay — completion mode', () => {
 describe('dueEndOfDay — fixed mode', () => {
   const FIXED: EndOfDayConfig = { ...EOD, mode: 'fixed', at: '18:00' };
   it('does not publish before the fixed time', () => {
-    expect(dueEndOfDay(new Date('2026-06-10T17:59:00Z'), FIXED, TRACKED, [], {}).publish).toBeUndefined();
+    expect(
+      dueEndOfDay(new Date('2026-06-10T17:59:00Z'), FIXED, TRACKED, [], {}).publish,
+    ).toBeUndefined();
   });
   it('publishes at/after the fixed time, regardless of completion', () => {
-    expect(dueEndOfDay(new Date('2026-06-10T18:00:00Z'), FIXED, TRACKED, [], {}).publish).toBe('2026-06-10');
+    expect(dueEndOfDay(new Date('2026-06-10T18:00:00Z'), FIXED, TRACKED, [], {}).publish).toBe(
+      '2026-06-10',
+    );
   });
 });

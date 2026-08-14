@@ -18,7 +18,7 @@ import { join, resolve } from 'node:path';
 import { emitBundle } from '../emit/bundle.ts';
 import { copyLibrary, libraryExists } from '../lib/library-assets.ts';
 import { writeText } from '../lib/workspace.ts';
-import { type ThemeConfig, resolveTheme } from '../theme/config.ts';
+import { resolveTheme, type ThemeConfig } from '../theme/config.ts';
 import { dim, err, heading, ok, warn } from '../ui.ts';
 
 export interface BundleCmdOptions {
@@ -101,9 +101,15 @@ export function runBundle(options: BundleCmdOptions): void {
 
   console.log(heading('HeroUI v3 → bundle (reused committed library)'));
   console.log(themeLine);
-  console.log(ok(`${join(root, bundle.brand.path)}  ${dim('per-project (defaults + your overrides)')}`));
   console.log(
-    dim(`  + reused committed library: core/ (${bundle.groups.length} categories) · design-system/ (${bundle.designSystem.length} levels) · mocks (all ×{lib,preview})`),
+    ok(`${join(root, bundle.brand.path)}  ${dim('per-project (defaults + your overrides)')}`),
   );
-  console.log(dim('  open design-system/*.preview.pen / core/*.preview.pen / mocks/*.pen to view themed.'));
+  console.log(
+    dim(
+      `  + reused committed library: core/ (${bundle.groups.length} categories) · design-system/ (${bundle.designSystem.length} levels) · mocks (all ×{lib,preview})`,
+    ),
+  );
+  console.log(
+    dim('  open design-system/*.preview.pen / core/*.preview.pen / mocks/*.pen to view themed.'),
+  );
 }

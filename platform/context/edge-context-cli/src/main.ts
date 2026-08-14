@@ -38,7 +38,7 @@ import type {
   TraverseResult,
   UploadEntry,
 } from '@helmsmith/edge-context-server';
-import { udsJson, UdsRequestError } from './uds-client.ts';
+import { UdsRequestError, udsJson } from './uds-client.ts';
 
 export interface RunIO {
   argv: string[];
@@ -241,7 +241,9 @@ export async function run(io: RunIO): Promise<number> {
     const e = err as NodeJS.ErrnoException;
     if (e.code === 'ENOENT') {
       stderr(`error: socket not found at ${socket}\n`);
-      stderr('hint: is edge-context-server running? Check $CONTEXT_SOCKET_PATH or pass --socket.\n');
+      stderr(
+        'hint: is edge-context-server running? Check $CONTEXT_SOCKET_PATH or pass --socket.\n',
+      );
       return 1;
     }
     if (e.code === 'ECONNREFUSED') {
@@ -271,7 +273,11 @@ async function cmdTraverse(
   const limit = numberFlag(parsed.flags, 'limit');
 
   const body: Record<string, unknown> = { entity, depth };
-  if (predicates) body.predicates = predicates.split(',').map((s) => s.trim()).filter(Boolean);
+  if (predicates)
+    body.predicates = predicates
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
   if (productId) body.productId = productId;
   if (limit != null) body.limit = limit;
 
@@ -339,8 +345,16 @@ async function cmdSearch(
   const body: Record<string, unknown> = { q };
   if (topK != null) body.topK = topK;
   if (productId) body.productId = productId;
-  if (labels) body.labels = labels.split(',').map((s) => s.trim()).filter(Boolean);
-  if (domains) body.domains = domains.split(',').map((s) => s.trim()).filter(Boolean);
+  if (labels)
+    body.labels = labels
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  if (domains)
+    body.domains = domains
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
   if (mode) body.mode = mode;
   if (expandDepth != null) body.expandDepth = expandDepth;
   if (vectorWeight != null) body.vectorWeight = vectorWeight;
@@ -348,7 +362,10 @@ async function cmdSearch(
   if (graphWeight != null) body.graphWeight = graphWeight;
   if (hubCeiling != null) body.hubDegreeCeiling = hubCeiling;
   if (expandPredicates)
-    body.expandPredicates = expandPredicates.split(',').map((s) => s.trim()).filter(Boolean);
+    body.expandPredicates = expandPredicates
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
   if (predicateWeightStr) {
     // Parse `CALLS=1,MENTIONS=0.5` → { CALLS: 1, MENTIONS: 0.5 }.
     const w: Record<string, number> = {};
@@ -362,7 +379,12 @@ async function cmdSearch(
   if (hubDampen) body.hubDampening = true;
   if (maxNeighbors != null) body.maxNeighborsPerSeed = maxNeighbors;
 
-  const r = await udsJson<{ result: ContextQueryResult }>(socket, 'POST', '/v1/context/query', body);
+  const r = await udsJson<{ result: ContextQueryResult }>(
+    socket,
+    'POST',
+    '/v1/context/query',
+    body,
+  );
   if (json) {
     stdout(`${JSON.stringify(r.body.result)}\n`);
   } else {
@@ -379,7 +401,9 @@ async function cmdCypher(
 ): Promise<number> {
   const cypher = parsed.positionals[0];
   if (!cypher) {
-    throw new Error('cypher requires the query as a positional arg, e.g. cypher "MATCH (n) RETURN n LIMIT 1"');
+    throw new Error(
+      'cypher requires the query as a positional arg, e.g. cypher "MATCH (n) RETURN n LIMIT 1"',
+    );
   }
   const paramsRaw = stringFlag(parsed.flags, 'params');
   let params: Record<string, unknown> | undefined;
@@ -463,12 +487,16 @@ function numberFlag(flags: Record<string, string | boolean>, name: string): numb
 
 function formatTraverse(r: TraverseResult): string {
   const lines: string[] = [];
-  lines.push(`entity: ${r.entity}   depth: ${r.depth}   nodes: ${r.nodes.length}   edges: ${r.edges.length}${r.truncated ? '   (truncated)' : ''}`);
+  lines.push(
+    `entity: ${r.entity}   depth: ${r.depth}   nodes: ${r.nodes.length}   edges: ${r.edges.length}${r.truncated ? '   (truncated)' : ''}`,
+  );
   lines.push('');
   lines.push('NODES:');
   for (const n of r.nodes) {
     const name = n.properties.name ?? n.properties.title ?? n.nodeId;
-    lines.push(`  [d=${n.distance}] ${n.label.padEnd(12)} ${n.nodeId}  ${name !== n.nodeId ? `(${name})` : ''}`);
+    lines.push(
+      `  [d=${n.distance}] ${n.label.padEnd(12)} ${n.nodeId}  ${name !== n.nodeId ? `(${name})` : ''}`,
+    );
   }
   if (r.edges.length) {
     lines.push('');
@@ -482,18 +510,24 @@ function formatTraverse(r: TraverseResult): string {
 
 function formatRelated(r: RelatedResult): string {
   const lines: string[] = [];
-  lines.push(`entity: ${r.entity}   predicate: ${r.predicate}   depth: ${r.depth}   hits: ${r.hits.length}${r.truncated ? '   (truncated)' : ''}`);
+  lines.push(
+    `entity: ${r.entity}   predicate: ${r.predicate}   depth: ${r.depth}   hits: ${r.hits.length}${r.truncated ? '   (truncated)' : ''}`,
+  );
   lines.push('');
   for (const h of r.hits) {
     const name = h.properties.name ?? h.properties.title ?? h.nodeId;
-    lines.push(`  [d=${h.distance}] ${h.label.padEnd(12)} ${h.nodeId}  ${name !== h.nodeId ? `(${name})` : ''}`);
+    lines.push(
+      `  [d=${h.distance}] ${h.label.padEnd(12)} ${h.nodeId}  ${name !== h.nodeId ? `(${name})` : ''}`,
+    );
   }
   return lines.join('\n') + '\n';
 }
 
 function formatSearch(r: ContextQueryResult): string {
   const lines: string[] = [];
-  lines.push(`q: ${r.q}   hits: ${r.hits.length}   topK: ${r.topK}   embed: ${r.embeddingMs}ms   search: ${r.searchMs}ms`);
+  lines.push(
+    `q: ${r.q}   hits: ${r.hits.length}   topK: ${r.topK}   embed: ${r.embeddingMs}ms   search: ${r.searchMs}ms`,
+  );
   lines.push('');
   for (const h of r.hits) {
     const text = (h.properties.text ?? h.properties.title ?? h.properties.name ?? '') as string;
@@ -508,7 +542,9 @@ function formatSearch(r: ContextQueryResult): string {
 
 function formatCypher(r: CypherResult): string {
   const lines: string[] = [];
-  lines.push(`columns: ${r.columns.join(', ')}   rows: ${r.rowCount}${r.truncated ? '   (truncated)' : ''}`);
+  lines.push(
+    `columns: ${r.columns.join(', ')}   rows: ${r.rowCount}${r.truncated ? '   (truncated)' : ''}`,
+  );
   lines.push('');
   for (const row of r.rows) {
     lines.push(JSON.stringify(row));
@@ -660,18 +696,17 @@ async function cmdIngestIssues(
   const maxPages = numberFlag(parsed.flags, 'max-pages');
 
   const body: Record<string, unknown> = { name, repo };
-  if (labels) body.labels = labels.split(',').map((s) => s.trim()).filter(Boolean);
+  if (labels)
+    body.labels = labels
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
   if (state === 'open' || state === 'closed' || state === 'all') body.state = state;
   if (since) body.since = since;
   if (productId) body.productId = productId;
   if (maxPages != null) body.maxPages = maxPages;
 
-  const r = await udsJson<{ ingestId: string }>(
-    socket,
-    'POST',
-    '/v1/ingest/github-issues',
-    body,
-  );
+  const r = await udsJson<{ ingestId: string }>(socket, 'POST', '/v1/ingest/github-issues', body);
   if (json) {
     stdout(`${JSON.stringify(r.body)}\n`);
   } else {
@@ -770,7 +805,10 @@ async function cmdCrawl(
   if (maxDepth != null) body.maxDepth = maxDepth;
   if (maxPages != null) body.maxPages = maxPages;
   if (allowedDomains)
-    body.allowedDomains = allowedDomains.split(',').map((s) => s.trim()).filter(Boolean);
+    body.allowedDomains = allowedDomains
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
   if (productId) body.productId = productId;
   if (rateLimit != null) body.rateLimitPerHost = rateLimit;
   if (ifNoneMatch) body.ifNoneMatch = ifNoneMatch;
@@ -916,7 +954,9 @@ function formatIngestList(ingests: IngestStatus[]): string {
 function formatUploadList(uploads: UploadEntry[]): string {
   if (uploads.length === 0) return '(no uploads)\n';
   const lines: string[] = [];
-  lines.push('DOC_ID            FILENAME                       SIZE     CONTENT_TYPE        UPLOADED');
+  lines.push(
+    'DOC_ID            FILENAME                       SIZE     CONTENT_TYPE        UPLOADED',
+  );
   for (const u of uploads) {
     lines.push(
       `${u.docId.padEnd(17)} ${u.filename.slice(0, 30).padEnd(30)} ${String(u.sizeBytes).padStart(8)} ${u.contentType.padEnd(19)} ${u.uploadedAt}`,

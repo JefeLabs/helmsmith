@@ -10,18 +10,18 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  type ConfluenceIngestRequest,
   type ContextQueryRequest,
   type ContextQueryResult,
   type ContextStatsResult,
-  type ConfluenceIngestRequest,
   type CrawlIngestRequest,
-  type JiraIngestRequest,
   type CypherRequest,
   type CypherResult,
   type EventCallback,
   type GithubIssuesIngestRequest,
   type IngestService,
   type IngestStatus,
+  type JiraIngestRequest,
   type QueryService,
   type RelatedRequest,
   type RelatedResult,
@@ -63,7 +63,12 @@ class StubQueryService implements QueryService {
   }
 
   async stats(): Promise<ContextStatsResult> {
-    return { nodeCount: 100, edgeCount: 200, indexedLabels: ['Symbol'], ts: '2026-05-07T00:00:00Z' };
+    return {
+      nodeCount: 100,
+      edgeCount: 200,
+      indexedLabels: ['Symbol'],
+      ts: '2026-05-07T00:00:00Z',
+    };
   }
 
   async traverse(req: TraverseRequest): Promise<TraverseResult> {
@@ -178,15 +183,7 @@ describe('harness-context CLI', () => {
     cleanups.push(h.stop);
 
     await run(
-      makeIO(h, [
-        'traverse',
-        '--entity',
-        'X',
-        '--depth',
-        '1',
-        '--predicate',
-        'CALLS,IMPORTS',
-      ]),
+      makeIO(h, ['traverse', '--entity', 'X', '--depth', '1', '--predicate', 'CALLS,IMPORTS']),
     );
     expect(h.stub.lastTraverse?.predicates).toEqual(['CALLS', 'IMPORTS']);
   });
@@ -196,7 +193,15 @@ describe('harness-context CLI', () => {
     cleanups.push(h.stop);
 
     const code = await run(
-      makeIO(h, ['related', '--entity', 'UserComponent', '--predicate', 'MENTIONS', '--depth', '1']),
+      makeIO(h, [
+        'related',
+        '--entity',
+        'UserComponent',
+        '--predicate',
+        'MENTIONS',
+        '--depth',
+        '1',
+      ]),
     );
     expect(code).toBe(0);
     expect(h.out.join('')).toContain('MENTIONS');
@@ -356,9 +361,7 @@ class StubIngestService implements IngestService {
     return { ingestId };
   }
 
-  async startGithubIssuesIngest(
-    req: GithubIssuesIngestRequest,
-  ): Promise<{ ingestId: string }> {
+  async startGithubIssuesIngest(req: GithubIssuesIngestRequest): Promise<{ ingestId: string }> {
     this.lastGithubReq = req;
     const ingestId = `ing_gh_${Math.random().toString(36).slice(2, 8)}`;
     this.ingests.set(ingestId, {
@@ -398,7 +401,14 @@ class StubIngestService implements IngestService {
       startedAt: '2026-05-07T00:00:00Z',
       completedAt: '2026-05-07T00:00:01Z',
       productId: req.productId,
-      summary: { filesIngested: 3, filesSkipped: 0, chunksWritten: 7, vectorsWritten: 7, errors: 0, durationMs: 50 },
+      summary: {
+        filesIngested: 3,
+        filesSkipped: 0,
+        chunksWritten: 7,
+        vectorsWritten: 7,
+        errors: 0,
+        durationMs: 50,
+      },
       events: [],
     });
     return { ingestId };

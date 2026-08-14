@@ -17,7 +17,8 @@ describe('emitTemplates (option A, B2)', () => {
 
   it('covers primary/secondary/tertiary/modal across desktop/tablet/mobile', () => {
     const slugs = new Set(arts.map((a) => a.slug));
-    for (const t of PAGE_TEMPLATES) for (const vp of VIEWPORTS) expect(slugs.has(`${t.id}-${vp.id}`)).toBe(true);
+    for (const t of PAGE_TEMPLATES)
+      for (const vp of VIEWPORTS) expect(slugs.has(`${t.id}-${vp.id}`)).toBe(true);
   });
 
   it('template libs import only foundation libs (relative path)', () => {

@@ -1,4 +1,3 @@
-import { useMemo, useState } from "react";
 import {
   Button,
   Card,
@@ -14,14 +13,9 @@ import {
   SelectItem,
   Spinner,
   Textarea,
-} from "@heroui/react";
-import {
-  ApiError,
-  ComposeResponse,
-  ContributionKind,
-  ReviewFinding,
-  compose,
-} from "../lib/api";
+} from '@heroui/react';
+import { useMemo, useState } from 'react';
+import { ApiError, ComposeResponse, ContributionKind, compose, ReviewFinding } from '../lib/api';
 
 /**
  * Compose page - author a new skillzkit contribution from scratch.
@@ -42,16 +36,14 @@ import {
  *   - generic error: status code + message.
  */
 export default function ComposePage() {
-  const [kind, setKind] = useState<ContributionKind>("command");
-  const [slug, setSlug] = useState("");
-  const [description, setDescription] = useState("");
-  const [tagsInput, setTagsInput] = useState("");
-  const [body, setBody] = useState("");
-  const [outcome, setOutcome] = useState(""); // workflow-only
-  const [versionBump, setVersionBump] = useState<"major" | "minor" | "patch">(
-    "patch",
-  );
-  const [changelog, setChangelog] = useState("");
+  const [kind, setKind] = useState<ContributionKind>('command');
+  const [slug, setSlug] = useState('');
+  const [description, setDescription] = useState('');
+  const [tagsInput, setTagsInput] = useState('');
+  const [body, setBody] = useState('');
+  const [outcome, setOutcome] = useState(''); // workflow-only
+  const [versionBump, setVersionBump] = useState<'major' | 'minor' | 'patch'>('patch');
+  const [changelog, setChangelog] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ComposeResponse | null>(null);
   const [err, setErr] = useState<ApiError | Error | null>(null);
@@ -59,7 +51,7 @@ export default function ComposePage() {
   const tags = useMemo(
     () =>
       tagsInput
-        .split(",")
+        .split(',')
         .map((t) => t.trim())
         .filter(Boolean),
     [tagsInput],
@@ -69,25 +61,25 @@ export default function ComposePage() {
   //   command/workflow: lowercase, colon-separated, e.g. core:tools:my-thing
   //   skill: lowercase, hyphenated, e.g. skillzkit-my-router
   const slugHint =
-    kind === "skill"
-      ? "lowercase, hyphenated (e.g. skillzkit-my-router)"
-      : "lowercase, colon-separated (e.g. core:tools:my-thing or product:strategy:my-task)";
+    kind === 'skill'
+      ? 'lowercase, hyphenated (e.g. skillzkit-my-router)'
+      : 'lowercase, colon-separated (e.g. core:tools:my-thing or product:strategy:my-task)';
 
   // Derive the file path for the bundle from the slug. For skills,
   // SKILL.md is at the root. For commands/workflows, the path mirrors
   // the slug structure - so `core:tools:foo` lands at
   // `core/tools/foo.md`.
   const filePath = useMemo(() => {
-    if (kind === "skill") return "SKILL.md";
-    return slug.replace(/:/g, "/") + ".md";
+    if (kind === 'skill') return 'SKILL.md';
+    return slug.replace(/:/g, '/') + '.md';
   }, [kind, slug]);
 
   function buildFrontmatter(): Record<string, unknown> {
     const fm: Record<string, unknown> = {};
     if (description.trim()) fm.description = description.trim();
     if (tags.length > 0) fm.tags = tags;
-    if (kind === "workflow" && outcome.trim()) fm.outcome = outcome.trim();
-    if (kind === "skill" && slug.trim()) fm.name = slug.trim();
+    if (kind === 'workflow' && outcome.trim()) fm.outcome = outcome.trim();
+    if (kind === 'skill' && slug.trim()) fm.name = slug.trim();
     return fm;
   }
 
@@ -98,18 +90,18 @@ export default function ComposePage() {
     // synthesize it, which is fragile.
     const fm = buildFrontmatter();
     if (Object.keys(fm).length === 0) return body;
-    const lines: string[] = ["---"];
+    const lines: string[] = ['---'];
     for (const [k, v] of Object.entries(fm)) {
       if (Array.isArray(v)) {
-        lines.push(`${k}: [${v.join(", ")}]`);
+        lines.push(`${k}: [${v.join(', ')}]`);
       } else {
-        lines.push(`${k}: ${typeof v === "string" ? JSON.stringify(v) : v}`);
+        lines.push(`${k}: ${typeof v === 'string' ? JSON.stringify(v) : v}`);
       }
     }
-    lines.push("---");
-    lines.push("");
+    lines.push('---');
+    lines.push('');
     lines.push(body);
-    return lines.join("\n");
+    return lines.join('\n');
   }
 
   function canSubmit(): boolean {
@@ -117,7 +109,7 @@ export default function ComposePage() {
     if (!slug.trim()) return false;
     if (!description.trim()) return false;
     if (!body.trim()) return false;
-    if (kind === "workflow" && !outcome.trim()) return false;
+    if (kind === 'workflow' && !outcome.trim()) return false;
     return true;
   }
 
@@ -143,12 +135,12 @@ export default function ComposePage() {
   }
 
   function reset() {
-    setSlug("");
-    setDescription("");
-    setTagsInput("");
-    setBody("");
-    setOutcome("");
-    setChangelog("");
+    setSlug('');
+    setDescription('');
+    setTagsInput('');
+    setBody('');
+    setOutcome('');
+    setChangelog('');
     setResult(null);
     setErr(null);
   }
@@ -159,10 +151,9 @@ export default function ComposePage() {
         <CardHeader className="flex flex-col gap-1 items-start">
           <p className="text-md font-semibold">Compose a contribution</p>
           <p className="text-sm text-default-500">
-            Author a new skillzkit command, workflow, or skill and submit it
-            directly to the upstream catalog. The bundle goes through
-            structural + file + agent-review validation server-side; findings
-            (if any) are shown below.
+            Author a new skillzkit command, workflow, or skill and submit it directly to the
+            upstream catalog. The bundle goes through structural + file + agent-review validation
+            server-side; findings (if any) are shown below.
           </p>
         </CardHeader>
         <Divider />
@@ -180,9 +171,7 @@ export default function ComposePage() {
 
           <Input
             label="Slug"
-            placeholder={
-              kind === "skill" ? "skillzkit-my-router" : "core:tools:my-thing"
-            }
+            placeholder={kind === 'skill' ? 'skillzkit-my-router' : 'core:tools:my-thing'}
             description={slugHint}
             value={slug}
             onValueChange={setSlug}
@@ -205,7 +194,7 @@ export default function ComposePage() {
             onValueChange={setTagsInput}
           />
 
-          {kind === "workflow" && (
+          {kind === 'workflow' && (
             <Input
               label="Outcome"
               placeholder="Imperative verb + outcome, e.g. 'Apply a brand refresh'"
@@ -218,11 +207,11 @@ export default function ComposePage() {
 
           <Textarea
             label="Body (markdown)"
-            placeholder={`# ${slug || "Your artifact"}\n\nThe markdown body that drives this artifact.`}
+            placeholder={`# ${slug || 'Your artifact'}\n\nThe markdown body that drives this artifact.`}
             description={
-              kind === "skill"
+              kind === 'skill'
                 ? "SKILL.md body - the agent-facing prompt that defines this skill's behavior."
-                : "The slash-command body - what runs when /<slug> is invoked."
+                : 'The slash-command body - what runs when /<slug> is invoked.'
             }
             minRows={10}
             maxRows={30}
@@ -236,7 +225,7 @@ export default function ComposePage() {
               label="Version bump"
               selectedKeys={[versionBump]}
               onSelectionChange={(keys) => {
-                const k = Array.from(keys)[0] as "major" | "minor" | "patch";
+                const k = Array.from(keys)[0] as 'major' | 'minor' | 'patch';
                 if (k) setVersionBump(k);
               }}
               description="patch by default; bump higher for breaking changes"
@@ -256,12 +245,7 @@ export default function ComposePage() {
           <Divider />
 
           <div className="flex gap-2">
-            <Button
-              color="primary"
-              onPress={submit}
-              isLoading={busy}
-              isDisabled={!canSubmit()}
-            >
+            <Button color="primary" onPress={submit} isLoading={busy} isDisabled={!canSubmit()}>
               Submit to skillzkit
             </Button>
             <Button variant="flat" onPress={reset} isDisabled={busy}>
@@ -269,11 +253,10 @@ export default function ComposePage() {
             </Button>
           </div>
 
-          {kind === "skill" && (
+          {kind === 'skill' && (
             <p className="text-xs text-default-500">
-              Skill bundles can include companion script files (.py, .sh,
-              .json, etc.) — adding a multi-file uploader is a planned v2
-              enhancement. For now, single-body skills only.
+              Skill bundles can include companion script files (.py, .sh, .json, etc.) — adding a
+              multi-file uploader is a planned v2 enhancement. For now, single-body skills only.
             </p>
           )}
         </CardBody>
@@ -291,9 +274,7 @@ function SuccessCard({ result }: { result: ComposeResponse }) {
   return (
     <Card>
       <CardHeader>
-        <p className="text-md font-semibold text-success">
-          ✓ Accepted by skillzkit
-        </p>
+        <p className="text-md font-semibold text-success">✓ Accepted by skillzkit</p>
       </CardHeader>
       <Divider />
       <CardBody className="space-y-2 text-sm">
@@ -314,14 +295,13 @@ function SuccessCard({ result }: { result: ComposeResponse }) {
         </div>
         {result.version && (
           <p>
-            <span className="text-default-500 text-xs">version</span>{" "}
+            <span className="text-default-500 text-xs">version</span>{' '}
             <Code size="sm">{result.version}</Code>
           </p>
         )}
         <p>
-          <span className="text-default-500 text-xs">author</span>{" "}
-          {result.author.displayName}
-          {result.author.email ? ` <${result.author.email}>` : ""}
+          <span className="text-default-500 text-xs">author</span> {result.author.displayName}
+          {result.author.email ? ` <${result.author.email}>` : ''}
         </p>
         {result.findings.length > 0 && (
           <details>
@@ -332,10 +312,9 @@ function SuccessCard({ result }: { result: ComposeResponse }) {
           </details>
         )}
         <p className="text-xs text-default-500">
-          Stored at{" "}
-          <Code size="sm">{`v1/${result.kind}s/${result.slug}@${result.version}.json`}</Code>
-          . A maintainer can promote this version to the catalog index from
-          the Proposals page.
+          Stored at{' '}
+          <Code size="sm">{`v1/${result.kind}s/${result.slug}@${result.version}.json`}</Code>. A
+          maintainer can promote this version to the catalog index from the Proposals page.
         </p>
       </CardBody>
     </Card>
@@ -346,28 +325,26 @@ function ErrorCard({ error }: { error: ApiError | Error }) {
   const apiErr = error instanceof ApiError ? error : null;
   const code = apiErr?.code;
   const findings =
-    (apiErr?.details as { findings?: ReviewFinding[] } | undefined)?.findings ??
-    null;
+    (apiErr?.details as { findings?: ReviewFinding[] } | undefined)?.findings ?? null;
   const ownerAuthorId =
-    (apiErr?.details as { ownerAuthorId?: string } | undefined)?.ownerAuthorId ??
-    null;
+    (apiErr?.details as { ownerAuthorId?: string } | undefined)?.ownerAuthorId ?? null;
 
-  let title = "Submission failed";
+  let title = 'Submission failed';
   let hint: string | null = null;
-  if (code === "validation_failed") {
-    title = "Validation failed";
-    hint = "Fix the findings below and resubmit.";
-  } else if (code === "author_mismatch") {
-    title = "Slug owned by another author";
+  if (code === 'validation_failed') {
+    title = 'Validation failed';
+    hint = 'Fix the findings below and resubmit.';
+  } else if (code === 'author_mismatch') {
+    title = 'Slug owned by another author';
     hint = ownerAuthorId
       ? `${ownerAuthorId} already publishes this slug. Pick a different slug, or coordinate with that author.`
-      : "Pick a different slug.";
-  } else if (code === "slug_conflict") {
-    title = "Version already exists";
-    hint = "Bump the version and resubmit.";
-  } else if (code === "unauthorized") {
-    title = "Authentication failed";
-    hint = "Your skillzkit credentials may be expired. Contact your administrator.";
+      : 'Pick a different slug.';
+  } else if (code === 'slug_conflict') {
+    title = 'Version already exists';
+    hint = 'Bump the version and resubmit.';
+  } else if (code === 'unauthorized') {
+    title = 'Authentication failed';
+    hint = 'Your skillzkit credentials may be expired. Contact your administrator.';
   }
 
   return (
@@ -381,9 +358,7 @@ function ErrorCard({ error }: { error: ApiError | Error }) {
           {error.message}
         </Code>
         {hint && <p className="text-default-700">{hint}</p>}
-        {findings && findings.length > 0 && (
-          <FindingsList findings={findings} />
-        )}
+        {findings && findings.length > 0 && <FindingsList findings={findings} />}
       </CardBody>
     </Card>
   );
@@ -391,7 +366,7 @@ function ErrorCard({ error }: { error: ApiError | Error }) {
 
 function FindingsList({ findings }: { findings: ReviewFinding[] }) {
   // Group by severity so reviewers fix the blockers first
-  const grouped: Record<"high" | "medium" | "low", ReviewFinding[]> = {
+  const grouped: Record<'high' | 'medium' | 'low', ReviewFinding[]> = {
     high: [],
     medium: [],
     low: [],
@@ -400,11 +375,10 @@ function FindingsList({ findings }: { findings: ReviewFinding[] }) {
 
   return (
     <div className="space-y-3">
-      {(["high", "medium", "low"] as const).map((sev) => {
+      {(['high', 'medium', 'low'] as const).map((sev) => {
         const items = grouped[sev];
         if (items.length === 0) return null;
-        const tone =
-          sev === "high" ? "danger" : sev === "medium" ? "warning" : "default";
+        const tone = sev === 'high' ? 'danger' : sev === 'medium' ? 'warning' : 'default';
         return (
           <div key={sev} className="space-y-1">
             <Chip size="sm" color={tone} variant="flat">
@@ -413,8 +387,7 @@ function FindingsList({ findings }: { findings: ReviewFinding[] }) {
             <ul className="space-y-1 ml-2">
               {items.map((f, idx) => (
                 <li key={idx} className="text-sm">
-                  <span className="text-default-500 text-xs">{f.axis}:</span>{" "}
-                  {f.message}
+                  <span className="text-default-500 text-xs">{f.axis}:</span> {f.message}
                   {f.fileRef && (
                     <Code size="sm" className="ml-1">
                       {f.fileRef}

@@ -13,8 +13,8 @@ import { describe, expect, it } from 'vitest';
 import {
   ConfluenceFetcher,
   type ConfluencePage,
-  GithubIssuesFetcher,
   type GithubIssue,
+  GithubIssuesFetcher,
   JiraFetcher,
   type JiraIssue,
 } from './external-sources.ts';
@@ -35,7 +35,9 @@ function makeIssue(overrides: Partial<GithubIssue> = {}): GithubIssue {
   };
 }
 
-function fakeFetch(handler: (url: string, init: RequestInit | undefined) => Response): typeof fetch {
+function fakeFetch(
+  handler: (url: string, init: RequestInit | undefined) => Response,
+): typeof fetch {
   return ((input: RequestInfo | URL, init?: RequestInit) => {
     const u = typeof input === 'string' ? input : input.toString();
     return Promise.resolve(handler(u, init));
@@ -78,7 +80,8 @@ describe('GithubIssuesFetcher', () => {
   it('maps 403 + remaining=0 to a rate-limit error', async () => {
     const f = new GithubIssuesFetcher({
       fetchImpl: fakeFetch(
-        () => new Response('rate limited', { status: 403, headers: { 'x-ratelimit-remaining': '0' } }),
+        () =>
+          new Response('rate limited', { status: 403, headers: { 'x-ratelimit-remaining': '0' } }),
       ),
       envGet: (k) => (k === 'GITHUB_TOKEN' ? 't' : undefined),
     });
@@ -134,13 +137,15 @@ describe('GithubIssuesFetcher', () => {
       }),
       envGet: (k) => (k === 'GITHUB_TOKEN' ? 't' : undefined),
     });
-    const iter = f.fetchIssues({
-      name: 'x',
-      repo: 'org/r',
-      labels: ['bug', 'priority-1'],
-      state: 'open',
-      since: '2026-01-01T00:00:00Z',
-    })[Symbol.asyncIterator]();
+    const iter = f
+      .fetchIssues({
+        name: 'x',
+        repo: 'org/r',
+        labels: ['bug', 'priority-1'],
+        state: 'open',
+        since: '2026-01-01T00:00:00Z',
+      })
+      [Symbol.asyncIterator]();
     await iter.next();
     expect(capturedUrl).toContain('labels=bug%2Cpriority-1');
     expect(capturedUrl).toContain('state=open');
@@ -266,11 +271,13 @@ describe('JiraFetcher', () => {
       }),
       envGet: jiraEnv(),
     });
-    const iter = f.fetchIssues({
-      name: 'x',
-      jql: 'project = MOBILE',
-      fields: ['summary', 'status'],
-    })[Symbol.asyncIterator]();
+    const iter = f
+      .fetchIssues({
+        name: 'x',
+        jql: 'project = MOBILE',
+        fields: ['summary', 'status'],
+      })
+      [Symbol.asyncIterator]();
     await iter.next();
     expect(capturedUrl).toContain('jql=project+%3D+MOBILE');
     expect(capturedUrl).toContain('fields=summary%2Cstatus');
@@ -282,7 +289,11 @@ describe('JiraFetcher', () => {
       fetchImpl: fakeFetch(() => {
         pageCount += 1;
         return new Response(
-          JSON.stringify({ issues: [makeIssue({ key: `MOB-${pageCount}` })], total: 1, startAt: 0 }),
+          JSON.stringify({
+            issues: [makeIssue({ key: `MOB-${pageCount}` })],
+            total: 1,
+            startAt: 0,
+          }),
           { status: 200 },
         );
       }),

@@ -9,6 +9,9 @@
  */
 
 import { type AgentAdapter, createAgent } from '@helmsmith/agent-adapter';
+import { registerClaudeSdk } from '@helmsmith/agent-adapter/adapters/claude-sdk';
+import { registerCopilotSdk } from '@helmsmith/agent-adapter/adapters/copilot-sdk';
+import { registerOpenAiSdk } from '@helmsmith/agent-adapter/adapters/openai-sdk';
 import {
   bridgeBroker,
   type Credential,
@@ -21,6 +24,13 @@ import type { CategorizedFiles } from './categorizer.js';
 import type { Config } from './config.js';
 import { type PullRequestTemplate, templatePromptGuidance } from './pr-template.js';
 import { ticketPromptGuidance } from './ticket.js';
+
+// pritty is a composition root: @helmsmith/agent-adapter registers nothing on
+// import, so declare the three providers this app can actually reach. Anything
+// not listed here fails at createAgent() with a message naming the fix.
+registerClaudeSdk();
+registerCopilotSdk();
+registerOpenAiSdk();
 
 /** Anthropic / OpenAI adapters expect a CredentialBroker; this is
  *  the env-var-only variant pritty uses for those two providers. */

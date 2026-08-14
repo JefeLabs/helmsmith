@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseColor, toHex, TRANSPARENT } from './oklch.ts';
+import { parseColor, TRANSPARENT, toHex } from './oklch.ts';
 
 describe('oklch color engine', () => {
   it('round-trips oklch white/black to sRGB hex', () => {

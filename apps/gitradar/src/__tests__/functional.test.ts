@@ -52,10 +52,25 @@ const REPO_PLANS: { name: string; group: string; commits: Commit[] }[] = [
     name: 'skoolscout-com',
     group: 'SkoolScout',
     commits: [
-      { author: EDWIN, daysAgo: 18, message: 'init', files: { 'src/index.ts': lines(90), 'package.json': PKG_JSON } },
+      {
+        author: EDWIN,
+        daysAgo: 18,
+        message: 'init',
+        files: { 'src/index.ts': lines(90), 'package.json': PKG_JSON },
+      },
       // index.ts 90 → 60 lines = 30 clean deletions; util.ts adds 40 insertions
-      { author: EDWIN, daysAgo: 11, message: 'refactor', files: { 'src/index.ts': lines(60), 'src/util.ts': lines(40) } },
-      { author: ANA, daysAgo: 11, message: 'add tests', files: { 'src/__tests__/index.test.ts': lines(25), 'tsconfig.json': TS_CONFIG } },
+      {
+        author: EDWIN,
+        daysAgo: 11,
+        message: 'refactor',
+        files: { 'src/index.ts': lines(60), 'src/util.ts': lines(40) },
+      },
+      {
+        author: ANA,
+        daysAgo: 11,
+        message: 'add tests',
+        files: { 'src/__tests__/index.test.ts': lines(25), 'tsconfig.json': TS_CONFIG },
+      },
       { author: PAT, daysAgo: 4, message: 'contrib', files: { 'src/contrib.ts': lines(20) } },
     ],
   },
@@ -63,7 +78,12 @@ const REPO_PLANS: { name: string; group: string; commits: Commit[] }[] = [
     name: 'jefelabs-com',
     group: 'SkoolScout',
     commits: [
-      { author: EDWIN, daysAgo: 11, message: 'init', files: { 'src/app.ts': lines(50), 'package.json': PKG_JSON } },
+      {
+        author: EDWIN,
+        daysAgo: 11,
+        message: 'init',
+        files: { 'src/app.ts': lines(50), 'package.json': PKG_JSON },
+      },
       { author: ANA, daysAgo: 4, message: 'trim', files: { 'src/app.ts': lines(38) } }, // 50 → 38 = 12 deletions
     ],
   },
@@ -71,13 +91,20 @@ const REPO_PLANS: { name: string; group: string; commits: Commit[] }[] = [
     name: 'skoolscout-com-tenants',
     group: 'SkoolScout',
     commits: [
-      { author: ANA, daysAgo: 18, message: 'tenants', files: { 'src/tenant.ts': lines(40), 'src/tenant.test.ts': lines(15) } },
+      {
+        author: ANA,
+        daysAgo: 18,
+        message: 'tenants',
+        files: { 'src/tenant.ts': lines(40), 'src/tenant.test.ts': lines(15) },
+      },
     ],
   },
   {
     name: 'jefelabs-clients',
     group: 'SkoolScout',
-    commits: [{ author: PAT, daysAgo: 11, message: 'client', files: { 'src/client.ts': lines(30) } }],
+    commits: [
+      { author: PAT, daysAgo: 11, message: 'client', files: { 'src/client.ts': lines(30) } },
+    ],
   },
 ];
 

@@ -48,7 +48,8 @@ export async function startFigmaTracker(
   // heartbeat so a crash never inflates presence time (PRD §4.5).
   const lastHeartbeat = await storage.getMeta(FIGMA_META.presenceHeartbeat);
   const orphans = await storage.closeAllFigmaPresence(lastHeartbeat ?? new Date().toISOString());
-  if (orphans > 0) log.warn(`figma: closed ${orphans} orphaned presence interval(s) from a previous run`);
+  if (orphans > 0)
+    log.warn(`figma: closed ${orphans} orphaned presence interval(s) from a previous run`);
 
   // Webhook registration — idempotent, only when we know our public URL.
   if (figma.webhook.enabled && figma.webhook.publicUrl && figma.webhook.passcode) {

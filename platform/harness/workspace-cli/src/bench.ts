@@ -97,7 +97,7 @@ interface RunBenchOptions extends BenchOptions {
   flow: string;
   product: string;
   label?: string;
-  config?: string;       // JSON string of extra config to merge
+  config?: string; // JSON string of extra config to merge
 }
 
 export async function runBenchRun(suiteId: string, opts: RunBenchOptions): Promise<void> {
@@ -110,7 +110,7 @@ export async function runBenchRun(suiteId: string, opts: RunBenchOptions): Promi
     process.exit(2);
   }
 
-  let config: unknown = undefined;
+  let config: unknown;
   if (opts.config) {
     try {
       config = JSON.parse(opts.config);
@@ -262,7 +262,9 @@ function deepEqual(a: unknown, b: unknown): boolean {
   if (ka.length !== kb.length) return false;
   for (let i = 0; i < ka.length; i++) {
     if (ka[i] !== kb[i]) return false;
-    if (!deepEqual((a as Record<string, unknown>)[ka[i]!], (b as Record<string, unknown>)[kb[i]!])) {
+    if (
+      !deepEqual((a as Record<string, unknown>)[ka[i]!], (b as Record<string, unknown>)[kb[i]!])
+    ) {
       return false;
     }
   }
@@ -306,7 +308,11 @@ export async function runBenchCompare(runIdsCsv: string, opts: CompareBenchOptio
     process.exit(2);
   }
   const fetcher = makeFetcher(opts);
-  const runIdParam = runIdsCsv.split(',').map((s) => s.trim()).filter(Boolean).join(',');
+  const runIdParam = runIdsCsv
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join(',');
   const rows = await fetcher<SummaryRow[]>(
     'GET',
     `/api/benchmarks/compare?runIds=${encodeURIComponent(runIdParam)}`,
@@ -316,28 +322,41 @@ export async function runBenchCompare(runIdsCsv: string, opts: CompareBenchOptio
   // Estimation columns trail at the end so existing scripts that
   // only consume the first N fields keep working.
   const cols = [
-    'runId', 'label', 'total', 'completed', 'failed', 'inFlight',
-    'p50ms', 'p95ms', 'success', 'scored', 'avgScore',
-    'est', 'MAE', 'bias',
+    'runId',
+    'label',
+    'total',
+    'completed',
+    'failed',
+    'inFlight',
+    'p50ms',
+    'p95ms',
+    'success',
+    'scored',
+    'avgScore',
+    'est',
+    'MAE',
+    'bias',
   ];
   console.log(cols.join('\t'));
   for (const r of rows) {
-    console.log([
-      r.runId,
-      r.label ?? '',
-      r.total,
-      r.completed,
-      r.failed,
-      r.inFlight,
-      r.p50LatencyMs,
-      r.p95LatencyMs,
-      `${(r.successRate * 100).toFixed(1)}%`,
-      r.scored,
-      r.avgScore != null ? r.avgScore.toFixed(3) : '—',
-      r.estimated,
-      r.meanAbsError != null ? r.meanAbsError.toFixed(2) : '—',
-      r.bias != null ? formatBias(r.bias) : '—',
-    ].join('\t'));
+    console.log(
+      [
+        r.runId,
+        r.label ?? '',
+        r.total,
+        r.completed,
+        r.failed,
+        r.inFlight,
+        r.p50LatencyMs,
+        r.p95LatencyMs,
+        `${(r.successRate * 100).toFixed(1)}%`,
+        r.scored,
+        r.avgScore != null ? r.avgScore.toFixed(3) : '—',
+        r.estimated,
+        r.meanAbsError != null ? r.meanAbsError.toFixed(2) : '—',
+        r.bias != null ? formatBias(r.bias) : '—',
+      ].join('\t'),
+    );
   }
 }
 

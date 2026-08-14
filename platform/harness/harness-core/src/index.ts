@@ -116,6 +116,9 @@ export {
   steerJob,
 } from './orchestrator.ts';
 export { makePublishExecutor } from './publish-executor.ts';
+// Adapter registration for the types bindingToSpec emits. Call once at your
+// composition root — harness-core is a library and registers nothing on import.
+export { registerBindingAdapters } from './register-binding-adapters.ts';
 export { makeScriptExecutor } from './script-executor.ts';
 export {
   compileInnerFlow,

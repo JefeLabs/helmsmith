@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import { CronScheduler, parseCron, nextFireTime } from './cron.ts';
+import { CronScheduler, nextFireTime, parseCron } from './cron.ts';
 
 describe('parseCron', () => {
   it('parses standard 5-field expressions', () => {

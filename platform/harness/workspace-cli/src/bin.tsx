@@ -35,7 +35,11 @@ program
   .option('--no-tui', 'fail fast on missing/invalid input instead of launching the TUI')
   .option('--no-clone', 'skip the eager git clone step (advanced)')
   .option('--skills <slugs...>', 'skillzkit catalog items to install (e.g. core:tools:npm)')
-  .option('--skillzkit-bin <command>', 'override the skillzkit invocation', 'npx -y @helmsmith/skillzkit')
+  .option(
+    '--skillzkit-bin <command>',
+    'override the skillzkit invocation',
+    'npx -y @helmsmith/skillzkit',
+  )
   .action(async (positionalName: string | undefined, opts) => {
     await runSetup({
       ...opts,
@@ -45,7 +49,9 @@ program
 
 program
   .command('start')
-  .description('boot the platform via docker compose (central-data + controlplane + embedder overlay)')
+  .description(
+    'boot the platform via docker compose (central-data + controlplane + embedder overlay)',
+  )
   .option(
     '--embedder <variant>',
     'embedder variant: qwen-0.6b | qwen-4b | qwen-8b | openai | bedrock',
@@ -55,9 +61,15 @@ program
     '--remote-controlplane <url>',
     'point harness at a hosted controlplane (skips local central-data + controlplane); only edge-server + harness-server come up locally',
   )
-  .option('--rebuild-worker', 'force rebuild of the per-job worker devcontainer image (default: skip when present)')
+  .option(
+    '--rebuild-worker',
+    'force rebuild of the per-job worker devcontainer image (default: skip when present)',
+  )
   .option('--skip-worker', 'skip building the worker devcontainer image entirely')
-  .option('--platform-root <dir>', 'override the agentx-platform repo root (env: AGENTX_PLATFORM_ROOT)')
+  .option(
+    '--platform-root <dir>',
+    'override the agentx-platform repo root (env: AGENTX_PLATFORM_ROOT)',
+  )
   .action(async (opts) => {
     await runStart(opts);
   });
@@ -85,7 +97,7 @@ bench
   .requiredOption('--flow <flowId>', 'flow id to dispatch each input against')
   .requiredOption('--product <productId>', 'product id (context scope)')
   .option('--label <label>', 'human-readable variant label, e.g. "qwen-0.6b run-1"')
-  .option('--config <json>', 'JSON string merged into each job\'s config')
+  .option('--config <json>', "JSON string merged into each job's config")
   .option('--url <url>', 'controlplane base URL (default: http://localhost:8080)')
   .option('--org <orgId>', 'X-Org-Id tenant (default: dev-org)')
   .action(async (suiteId, opts) => {
@@ -117,7 +129,10 @@ program
   .description('build (or rebuild) the per-job worker devcontainer image (agentx/worker:dev)')
   .option('--force', 'rebuild even if the image already exists locally')
   .option('--tag <tag>', 'override the image tag (default: agentx/worker:dev)')
-  .option('--platform-root <dir>', 'override the agentx-platform repo root (env: AGENTX_PLATFORM_ROOT)')
+  .option(
+    '--platform-root <dir>',
+    'override the agentx-platform repo root (env: AGENTX_PLATFORM_ROOT)',
+  )
   .action(async (opts) => {
     await runBuildWorker(opts);
   });
@@ -134,7 +149,10 @@ program
 program
   .command('tmux')
   .description('launch the agentx ops dashboard (TUI + server log panes) in tmux')
-  .option('--platform-root <dir>', 'override the agentx-platform repo root (env: AGENTX_PLATFORM_ROOT)')
+  .option(
+    '--platform-root <dir>',
+    'override the agentx-platform repo root (env: AGENTX_PLATFORM_ROOT)',
+  )
   .option('--session <name>', 'tmux session name (default: agentx)')
   .action(async (opts) => {
     await runTmux(opts);

@@ -9,16 +9,10 @@
  *      a usable library.
  */
 
-import type { ThemeMode, TokenSet } from '../../design-system/tokens.ts';
 import { ColorMixNotImplemented, mixOklab } from '../../color/mix.ts';
 import { type Lab, parseColor, toHex } from '../../color/oklch.ts';
-import {
-  DARK_COLORS,
-  DERIVED,
-  LIGHT_COLORS,
-  PRIMITIVES,
-  SCALARS,
-} from './tokens.ts';
+import type { ThemeMode, TokenSet } from '../../design-system/tokens.ts';
+import { DARK_COLORS, DERIVED, LIGHT_COLORS, PRIMITIVES, SCALARS } from './tokens.ts';
 
 const MODES: ThemeMode[] = ['light', 'dark'];
 

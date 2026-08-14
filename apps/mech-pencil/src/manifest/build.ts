@@ -13,8 +13,8 @@
 
 import { defaultBuildContext } from '../design-system/atomic.ts';
 import { HEROUI_PACKAGE, heroUIComponents } from '../frameworks/heroui/catalog.ts';
-import { PEN_VERSION } from '../pen/schema.ts';
 import type { Child } from '../pen/schema.ts';
+import { PEN_VERSION } from '../pen/schema.ts';
 import { resolveTheme } from '../theme/config.ts';
 import { themeTokens } from '../theme/generate.ts';
 

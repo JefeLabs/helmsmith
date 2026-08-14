@@ -8,7 +8,12 @@ describe('emitBundle', () => {
   it('every non-token file is theme-INVARIANT (the reuse guarantee)', () => {
     const a = emitBundle(resolveTheme({ accent: '#3f5694' }));
     const z = emitBundle(
-      resolveTheme({ accent: '#aa0000', base: 0.02, radius: 'large', fontFamily: 'instrument-sans' }),
+      resolveTheme({
+        accent: '#aa0000',
+        base: 0.02,
+        radius: 'large',
+        fontFamily: 'instrument-sans',
+      }),
     );
     const nonBrand = (e: typeof a) => [
       ...e.designSystem,
@@ -18,7 +23,9 @@ describe('emitBundle', () => {
       ...e.mocks,
     ];
     const dump = (e: typeof a) =>
-      nonBrand(e).map((f) => `${f.path}\n${f.doc.toJSON()}`).join('\n');
+      nonBrand(e)
+        .map((f) => `${f.path}\n${f.doc.toJSON()}`)
+        .join('\n');
     expect(dump(a)).toBe(dump(z)); // identical regardless of theme
     expect(a.brand.doc.toJSON()).not.toBe(z.brand.doc.toJSON()); // only tokens change
   });
@@ -51,7 +58,7 @@ describe('emitBundle', () => {
     expect(atoms?.path).toBe('design-system/atoms.lib.pen');
     expect(atoms?.preview.path).toBe('design-system/atoms.preview.pen');
     expect(atoms?.doc.toObject().imports).toEqual({ tokens: '../design-tokens.lib.pen' });
-    expect((atoms?.count ?? 0)).toBeGreaterThan(0);
+    expect(atoms?.count ?? 0).toBeGreaterThan(0);
     // templates has no components yet but is still a valid placeholder
     const templates = b.designSystem.find((d) => d.level === 'templates');
     expect(templates?.count).toBe(0);

@@ -13,7 +13,12 @@
  * bindings.
  */
 
-import type { Credential, CredentialBroker, Provider, ResolvedBinding } from '@helmsmith/agent-auth';
+import type {
+  Credential,
+  CredentialBroker,
+  Provider,
+  ResolvedBinding,
+} from '@helmsmith/agent-auth';
 
 export class SpecBroker implements CredentialBroker {
   /**

@@ -85,7 +85,10 @@ describe('loadConfig', () => {
     const dir = tmp();
     const key = 'TT_TEST_EMPTY';
     delete process.env[key];
-    writeFileSync(join(dir, '.env'), `${key}=          # public HTTPS route; set → auto-register\n`);
+    writeFileSync(
+      join(dir, '.env'),
+      `${key}=          # public HTTPS route; set → auto-register\n`,
+    );
     loadDotEnv(dir);
     expect(process.env[key]).toBe('');
     delete process.env[key];
@@ -154,9 +157,9 @@ describe('loadConfig', () => {
 
   it('requires the webhook passcode when the webhook receiver is enabled', () => {
     const base = { FIGMA_TOKEN: 'figd_x', FIGMA_TEAM_ID: '12345' };
-    expect(() =>
-      loadConfig(tmp(), validEnv({ ...base, FIGMA_WEBHOOK_ENABLED: 'true' })),
-    ).toThrow(/FIGMA_WEBHOOK_SECRET/);
+    expect(() => loadConfig(tmp(), validEnv({ ...base, FIGMA_WEBHOOK_ENABLED: 'true' }))).toThrow(
+      /FIGMA_WEBHOOK_SECRET/,
+    );
     const cfg = loadConfig(
       tmp(),
       validEnv({ ...base, FIGMA_WEBHOOK_ENABLED: 'true', FIGMA_WEBHOOK_SECRET: 'pass' }),
@@ -166,9 +169,9 @@ describe('loadConfig', () => {
 
   it('requires the sentinel user id when presence is enabled', () => {
     const base = { FIGMA_TOKEN: 'figd_x', FIGMA_TEAM_ID: '12345' };
-    expect(() =>
-      loadConfig(tmp(), validEnv({ ...base, FIGMA_PRESENCE_ENABLED: 'true' })),
-    ).toThrow(/FIGMA_SENTINEL_USER_ID/);
+    expect(() => loadConfig(tmp(), validEnv({ ...base, FIGMA_PRESENCE_ENABLED: 'true' }))).toThrow(
+      /FIGMA_SENTINEL_USER_ID/,
+    );
     const cfg = loadConfig(
       tmp(),
       validEnv({ ...base, FIGMA_PRESENCE_ENABLED: 'true', FIGMA_SENTINEL_USER_ID: 'u9' }),

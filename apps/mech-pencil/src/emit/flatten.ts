@@ -57,7 +57,8 @@ export function flattenForRender(docObj: Obj, tokens: TokenSet): Obj {
     };
   }
   for (const s of tokens.scalars) {
-    vars[s.key] = s.type === 'number' ? { type: 'number', value: s.value } : { type: 'string', value: s.value };
+    vars[s.key] =
+      s.type === 'number' ? { type: 'number', value: s.value } : { type: 'string', value: s.value };
   }
   c.variables = vars;
   c.themes = c.themes ?? { mode: ['light', 'dark'] };
