@@ -205,10 +205,17 @@ function dispatchByProviderDefault(
     return cloudOpenCodeSpec(binding, options);
   }
   if (providerId === 'bedrock') {
+    // harness-core deliberately does NOT register bedrock-sdk: doing so would
+    // pull @aws-sdk into every harness-core consumer, which is exactly the
+    // forced-provider tax the adapter externalization removed. The caller owns
+    // this one.
     throw new Error(
-      `bindingToSpec: bedrock bindings carry no AWS region — construct a ` +
-        `{ type: 'bedrock-sdk', model, region } spec directly, or remove ` +
-        `bedrock:* entries from this agent's accepts list.`,
+      `bindingToSpec: bedrock bindings carry no AWS region. Register the adapter ` +
+        `at your entry point and construct the spec directly:\n` +
+        `  import { registerBedrockSdk } from '@helmsmith/agent-adapter/adapters/bedrock-sdk';\n` +
+        `  registerBedrockSdk();\n` +
+        `  createAgent({ spec: { type: 'bedrock-sdk', model, region }, workdir });\n` +
+        `Or remove bedrock:* entries from this agent's accepts list.`,
     );
   }
   throw new Error(`bindingToSpec: unhandled provider id "${providerId}"`);

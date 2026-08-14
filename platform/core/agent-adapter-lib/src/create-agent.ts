@@ -14,7 +14,32 @@
 import { spawnSync } from 'node:child_process';
 import type { AgentAdapter, CreateAgentArgs } from './agent.ts';
 import { WorkdirNotARepoError } from './errors.ts';
-import { getAdapterFactory } from './registry.ts';
+import { getAdapterFactory, registeredAdapterTypes } from './registry.ts';
+
+// ---------------------------------------------------------------------------
+// Registrar naming
+// ---------------------------------------------------------------------------
+
+/**
+ * Registrar names that a naive word-by-word capitalization gets wrong, because
+ * the type string spells a compound word as one token.
+ */
+const REGISTRAR_OVERRIDES: Record<string, string> = {
+  'opencode-cli': 'OpenCodeCli',
+  'openai-sdk': 'OpenAiSdk',
+};
+
+/** 'claude-agent-sdk' → 'ClaudeAgentSdk'. Mirrors the exported registrar names. */
+function registrarSuffix(type: string): string {
+  const override = REGISTRAR_OVERRIDES[type];
+  if (override) return override;
+
+  const ACRONYMS: Record<string, string> = { sdk: 'Sdk', cli: 'Cli' };
+  return type
+    .split('-')
+    .map((part) => ACRONYMS[part] ?? part.charAt(0).toUpperCase() + part.slice(1))
+    .join('');
+}
 
 // ---------------------------------------------------------------------------
 // Git helpers (synchronous — spawnSync is safe here; this is a CLI factory)
@@ -74,10 +99,14 @@ export function createAgent(args: CreateAgentArgs): AgentAdapter {
   // Step 3 — look up factory
   const entry = getAdapterFactory(spec.type);
   if (!entry) {
+    const registered = registeredAdapterTypes();
+    const registrar = `register${registrarSuffix(spec.type)}`;
     throw new Error(
-      `No adapter factory registered for spec.type '${spec.type}'. ` +
-        `Adapters are self-registered in Phases B–D′. ` +
-        `Ensure the adapter module has been imported before calling createAgent().`,
+      `No adapter factory registered for spec.type '${spec.type}'.\n` +
+        `Register it at your entry point:\n` +
+        `  import { ${registrar} } from '@helmsmith/agent-adapter/adapters/${spec.type}';\n` +
+        `  ${registrar}();\n` +
+        `Currently registered: ${registered.length > 0 ? registered.join(', ') : '(none)'}`,
     );
   }
 

@@ -172,6 +172,70 @@ describe('createAgent', () => {
       expect(thrown!.message).toContain('opencode-cli');
     });
 
+    it('names the exact subpath and registrar to import', () => {
+      let message = '';
+      try {
+        createAgent({
+          spec: { type: 'bedrock-sdk', model: 'm', region: 'us-east-1' } as AgentSpec,
+          workdir: gitDir,
+        });
+      } catch (err) {
+        message = (err as Error).message;
+      }
+
+      expect(message).toContain("'bedrock-sdk'");
+      expect(message).toContain('@helmsmith/agent-adapter/adapters/bedrock-sdk');
+      expect(message).toContain('registerBedrockSdk');
+    });
+
+    it('reports which adapters ARE registered', () => {
+      registerAdapter('claude-sdk', () => makeAdapter('claude-sdk', gitDir), makeCaps());
+
+      let message = '';
+      try {
+        createAgent({ spec: { type: 'codex-cli', model: 'm' } as AgentSpec, workdir: gitDir });
+      } catch (err) {
+        message = (err as Error).message;
+      }
+
+      expect(message).toContain('Currently registered: claude-sdk');
+    });
+
+    it('says "(none)" when nothing is registered', () => {
+      let message = '';
+      try {
+        createAgent({ spec: { type: 'codex-cli', model: 'm' } as AgentSpec, workdir: gitDir });
+      } catch (err) {
+        message = (err as Error).message;
+      }
+
+      expect(message).toContain('Currently registered: (none)');
+    });
+
+    it('derives the irregular opencode-cli registrar name correctly', () => {
+      // Naive PascalCase would produce registerOpencodeCli, which does not exist.
+      let message = '';
+      try {
+        createAgent({ spec: { type: 'opencode-cli', model: 'm' } as AgentSpec, workdir: gitDir });
+      } catch (err) {
+        message = (err as Error).message;
+      }
+
+      expect(message).toContain('registerOpenCodeCli');
+      expect(message).not.toContain('registerOpencodeCli');
+    });
+
+    it('derives the irregular openai-sdk registrar name correctly', () => {
+      let message = '';
+      try {
+        createAgent({ spec: { type: 'openai-sdk', model: 'm' } as AgentSpec, workdir: gitDir });
+      } catch (err) {
+        message = (err as Error).message;
+      }
+
+      expect(message).toContain('registerOpenAiSdk');
+    });
+
     it('calls the registered factory and returns the adapter', () => {
       const fakeAdapter = makeAdapter('claude-sdk', gitDir);
       const factory = vi.fn((_spec: AgentSpec, deps: { workdir: string }) =>
