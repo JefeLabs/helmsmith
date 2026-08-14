@@ -33,6 +33,15 @@ was empty relative to `main`. Changes:
 - **§3.5, §3.6** — new: registry idempotency, and the unregistered-type
   error message plus the `bindingToSpec` bedrock message it forces.
 
+**2026-08-14 (implementation)** — §3.3 corrected against measured behavior while
+implementing: module augmentations apply per *program*, not per import, so the
+claimed per-import narrowing does not hold within one tsconfig; and
+`AgentSpecType` needs a `string` fallback for the empty registry, without which
+`AgentAdapter` becomes unimplementable for type-only consumers. Both are
+documented inline in §3.3. Implemented on
+`feat/agent-adapter-provider-externalization`; plan at
+`docs/superpowers/plans/2026-08-14-agent-adapter-provider-externalization.md`.
+
 ## 1. Problem
 
 Adopting `@helmsmith/agent-adapter` forces a hosting application to carry
@@ -169,21 +178,50 @@ re-export remains during migration with a deprecation note, because
 ```ts
 // core agent.ts
 export interface AgentSpecRegistry {}                 // providers augment this
-export type AgentSpecType = keyof AgentSpecRegistry & string;
-export type AgentSpec = AgentSpecRegistry[AgentSpecType];
+type RegisteredSpecTypes = keyof AgentSpecRegistry & string;
+export type AgentSpecType = [RegisteredSpecTypes] extends [never]
+  ? string
+  : RegisteredSpecTypes;
+export type AgentSpec = [RegisteredSpecTypes] extends [never]
+  ? BaseSpec & { type: string }
+  : AgentSpecRegistry[RegisteredSpecTypes];
 
 // in each provider module
-declare module '../agent.ts' {
+declare module '../../agent.ts' {
   interface AgentSpecRegistry { 'openai-sdk': OpenAiSdkSpec }
 }
 ```
 
-The host's type universe mirrors its runtime registry: import two providers
-and `AgentSpecType` has exactly two members; import none and it is `never`.
-You cannot construct a spec for a provider whose module you never imported.
-External packages (agent-node) augment the same interface from outside the
-lib. The registry map is keyed by `string` internally; `registerAdapter` /
-`getAdapterFactory` / `createAgent` stay typed against `AgentSpecType`.
+External packages (agent-node) augment the same interface from outside the lib
+— this is the goal that matters, and it holds unconditionally. The registry map
+is keyed by `string` internally; `registerAdapter` / `getAdapterFactory` /
+`createAgent` stay typed against `AgentSpecType`.
+
+**Two corrections, both measured during implementation on 2026-08-14.**
+
+*Augmentation scope.* An earlier draft claimed "import two providers and
+`AgentSpecType` has exactly two members; import none and it is `never`." That is
+false within a single TypeScript program. TS applies module augmentations per
+**program**, not per import: a probe in which `check.ts` imported only `aug-a.ts`
+still saw `aug-b.ts`'s contribution, because both files were in the same
+tsconfig. The narrowing is real only across program boundaries — a consuming
+package whose tsconfig never pulls in an adapter file. Inside this library's own
+typecheck all 11 always contribute.
+
+*The `never` fallback.* Bare `keyof AgentSpecRegistry & string` yields `never`
+for a package that imports no adapter, which makes `AgentAdapter`
+**unimplementable**: `type: never` cannot be written. `harness-server` has
+`class TestAdapter implements AgentAdapter` in two test files and imports types
+only, so it would have been forced to import adapters it never calls — the
+forced-provider tax this spec exists to remove. Falling back to `string` when
+nothing is augmented keeps type-only consumers compiling while preserving the
+narrow union for consumers that do import adapters.
+
+`AgentSpecRegistry` must stay an **empty `interface`**. Biome's
+`lint/suspicious/noEmptyInterface` autofix rewrites it to a `type` alias, which
+silently destroys declaration merging — every augmentation becomes a duplicate
+identifier. Tests still pass in that state because vitest does not typecheck;
+only `tsc` catches it. The declaration carries a `biome-ignore` for that rule.
 
 ### 3.4 Two capability planes
 
