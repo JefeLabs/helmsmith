@@ -59,7 +59,7 @@ import {
   classifyNetworkError,
   MissingCredentialError,
 } from '../../errors.ts';
-import type { AdapterDeps } from '../../registry.ts';
+import type { AdapterDeps, AdapterFactory } from '../../registry.ts';
 import { registerAdapter } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
 import { reduceStream } from '../../stream.ts';
@@ -375,10 +375,20 @@ function classifyBedrockError(err: unknown): AdapterError {
 // Factory + self-registration
 // ---------------------------------------------------------------------------
 
-registerAdapter(
-  'bedrock-sdk',
+export const bedrockSdkFactory: AdapterFactory =
   // region validation (ConfigError) happens in the constructor — fail fast at
   // createAgent() time. Credentials resolve lazily via the AWS chain on first call.
-  (spec, deps) => new BedrockSdkAdapter(spec as BedrockSdkSpec, deps),
-  ADAPTER_CATALOG['bedrock-sdk'].capabilities,
-);
+  (spec, deps) => new BedrockSdkAdapter(spec as BedrockSdkSpec, deps);
+
+export const bedrockSdkCapabilities = ADAPTER_CATALOG['bedrock-sdk'].capabilities;
+
+/**
+ * Register the bedrock-sdk adapter with the process-wide registry.
+ *
+ * Call this once at your composition root. Importing this module does NOT
+ * register anything — that is what lets a host carry only the providers it
+ * uses. Idempotent: calling it twice registers once.
+ */
+export function registerBedrockSdk(): void {
+  registerAdapter('bedrock-sdk', bedrockSdkFactory, bedrockSdkCapabilities);
+}

@@ -37,7 +37,7 @@ import {
   classifyNetworkError,
   MissingCredentialError,
 } from '../../errors.ts';
-import type { AdapterDeps } from '../../registry.ts';
+import type { AdapterDeps, AdapterFactory } from '../../registry.ts';
 import { registerAdapter } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
 import { reduceStream } from '../../stream.ts';
@@ -318,28 +318,37 @@ async function resolveApiKey(
   );
 }
 
-registerAdapter(
-  'claude-sdk',
-  (spec, deps) => {
-    // The factory is synchronous (createAgent contract). Precedence must match
-    // resolveApiKey: spec → broker → env. Only an explicit spec.apiKey
-    // short-circuits; when a broker is present we defer to lazy resolution so
-    // the broker is PREFERRED over env (token rotation), resolving on first
-    // invoke/stream. Env is the last-resort synchronous fallback.
-    const claudeSpec = spec as ClaudeSdkSpec;
-    if (claudeSpec.apiKey) return new ClaudeSdkAdapter(claudeSpec, deps, claudeSpec.apiKey);
-    if (deps.credentialBroker) {
-      return new LazyClaudeSdkAdapter(claudeSpec, deps, deps.credentialBroker);
-    }
-    const envKey = process.env.ANTHROPIC_API_KEY;
-    if (envKey) return new ClaudeSdkAdapter(claudeSpec, deps, envKey);
-    throw new MissingCredentialError(
-      'No Anthropic API key found. Provide one via spec.apiKey, ' +
-        'CredentialBroker.getCredential("anthropic"), or the ANTHROPIC_API_KEY environment variable.',
-    );
-  },
-  ADAPTER_CATALOG['claude-sdk'].capabilities,
-);
+export const claudeSdkFactory: AdapterFactory = (spec, deps) => {
+  // The factory is synchronous (createAgent contract). Precedence must match
+  // resolveApiKey: spec → broker → env. Only an explicit spec.apiKey
+  // short-circuits; when a broker is present we defer to lazy resolution so
+  // the broker is PREFERRED over env (token rotation), resolving on first
+  // invoke/stream. Env is the last-resort synchronous fallback.
+  const claudeSpec = spec as ClaudeSdkSpec;
+  if (claudeSpec.apiKey) return new ClaudeSdkAdapter(claudeSpec, deps, claudeSpec.apiKey);
+  if (deps.credentialBroker) {
+    return new LazyClaudeSdkAdapter(claudeSpec, deps, deps.credentialBroker);
+  }
+  const envKey = process.env.ANTHROPIC_API_KEY;
+  if (envKey) return new ClaudeSdkAdapter(claudeSpec, deps, envKey);
+  throw new MissingCredentialError(
+    'No Anthropic API key found. Provide one via spec.apiKey, ' +
+      'CredentialBroker.getCredential("anthropic"), or the ANTHROPIC_API_KEY environment variable.',
+  );
+};
+
+export const claudeSdkCapabilities = ADAPTER_CATALOG['claude-sdk'].capabilities;
+
+/**
+ * Register the claude-sdk adapter with the process-wide registry.
+ *
+ * Call this once at your composition root. Importing this module does NOT
+ * register anything — that is what lets a host carry only the providers it
+ * uses. Idempotent: calling it twice registers once.
+ */
+export function registerClaudeSdk(): void {
+  registerAdapter('claude-sdk', claudeSdkFactory, claudeSdkCapabilities);
+}
 
 // ---------------------------------------------------------------------------
 // LazyClaudeSdkAdapter — defers API key resolution to first invoke/stream

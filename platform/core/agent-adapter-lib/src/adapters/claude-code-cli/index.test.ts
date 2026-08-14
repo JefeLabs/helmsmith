@@ -18,6 +18,10 @@ import type { AdapterDeps } from '../../registry.ts';
 import { getAdapterFactory } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
 
+// NOTE: ./index.ts is imported DYNAMICALLY inside tests, never statically at the
+// top. The hoisted vi.mock below closes over `mockSpawn`, so evaluating the
+// adapter during the import phase would hit the temporal dead zone.
+
 // ---------------------------------------------------------------------------
 // Mock node:child_process (spawn only)
 // ---------------------------------------------------------------------------
@@ -258,7 +262,8 @@ describe('ClaudeCodeCliAdapter — abort', () => {
 
 describe('ClaudeCodeCliAdapter — auth', () => {
   it('factory throws MissingCredentialError when no key and no broker', async () => {
-    await import('./index.ts'); // ensure self-registration ran
+    const { registerClaudeCodeCli } = await import('./index.ts');
+    registerClaudeCodeCli(); // registration is explicit now
     delete process.env.ANTHROPIC_API_KEY;
     const factory = getAdapterFactory('claude-code-cli');
     expect(factory).toBeDefined();
@@ -269,7 +274,8 @@ describe('ClaudeCodeCliAdapter — auth', () => {
 
   it('injects the broker-resolved key as ANTHROPIC_API_KEY into the child env', async () => {
     mockSpawn.mockImplementation(() => fakeChild(SIMPLE));
-    await import('./index.ts');
+    const { registerClaudeCodeCli } = await import('./index.ts');
+    registerClaudeCodeCli();
     delete process.env.ANTHROPIC_API_KEY;
 
     const factory = getAdapterFactory('claude-code-cli');

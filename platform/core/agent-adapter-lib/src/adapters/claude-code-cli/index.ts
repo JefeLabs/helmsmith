@@ -37,7 +37,7 @@ import type { AdapterCapabilities } from '../../capabilities.ts';
 import { ADAPTER_CATALOG } from '../../catalog.ts';
 import type { CredentialBroker } from '../../credentials/broker.ts';
 import { AdapterError, MissingCredentialError, ProviderError } from '../../errors.ts';
-import type { AdapterDeps } from '../../registry.ts';
+import type { AdapterDeps, AdapterFactory } from '../../registry.ts';
 import { registerAdapter } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
 import { reduceStream } from '../../stream.ts';
@@ -251,26 +251,35 @@ export async function resolveApiKey(
 // Factory + self-registration
 // ---------------------------------------------------------------------------
 
-registerAdapter(
-  'claude-code-cli',
-  (spec, deps) => {
-    const cliSpec = spec as ClaudeCodeCliSpec;
-    // Precedence must match resolveApiKey: spec → broker → env. Only an explicit
-    // spec.apiKey short-circuits; when a broker is present we defer to lazy
-    // resolution so the broker is PREFERRED over env (token rotation).
-    if (cliSpec.apiKey) return new ClaudeCodeCliAdapter(cliSpec, deps, cliSpec.apiKey);
-    if (deps.credentialBroker) {
-      return new LazyClaudeCodeCliAdapter(cliSpec, deps, deps.credentialBroker);
-    }
-    const envKey = process.env.ANTHROPIC_API_KEY;
-    if (envKey) return new ClaudeCodeCliAdapter(cliSpec, deps, envKey);
-    throw new MissingCredentialError(
-      'No Anthropic API key found for claude-code-cli adapter. Provide one via spec.apiKey, ' +
-        'CredentialBroker.getCredential("anthropic"), or the ANTHROPIC_API_KEY environment variable.',
-    );
-  },
-  ADAPTER_CATALOG['claude-code-cli'].capabilities,
-);
+export const claudeCodeCliFactory: AdapterFactory = (spec, deps) => {
+  const cliSpec = spec as ClaudeCodeCliSpec;
+  // Precedence must match resolveApiKey: spec → broker → env. Only an explicit
+  // spec.apiKey short-circuits; when a broker is present we defer to lazy
+  // resolution so the broker is PREFERRED over env (token rotation).
+  if (cliSpec.apiKey) return new ClaudeCodeCliAdapter(cliSpec, deps, cliSpec.apiKey);
+  if (deps.credentialBroker) {
+    return new LazyClaudeCodeCliAdapter(cliSpec, deps, deps.credentialBroker);
+  }
+  const envKey = process.env.ANTHROPIC_API_KEY;
+  if (envKey) return new ClaudeCodeCliAdapter(cliSpec, deps, envKey);
+  throw new MissingCredentialError(
+    'No Anthropic API key found for claude-code-cli adapter. Provide one via spec.apiKey, ' +
+      'CredentialBroker.getCredential("anthropic"), or the ANTHROPIC_API_KEY environment variable.',
+  );
+};
+
+export const claudeCodeCliCapabilities = ADAPTER_CATALOG['claude-code-cli'].capabilities;
+
+/**
+ * Register the claude-code-cli adapter with the process-wide registry.
+ *
+ * Call this once at your composition root. Importing this module does NOT
+ * register anything — that is what lets a host carry only the providers it
+ * uses. Idempotent: calling it twice registers once.
+ */
+export function registerClaudeCodeCli(): void {
+  registerAdapter('claude-code-cli', claudeCodeCliFactory, claudeCodeCliCapabilities);
+}
 
 // ---------------------------------------------------------------------------
 // LazyClaudeCodeCliAdapter — defers API key resolution to first invoke/stream

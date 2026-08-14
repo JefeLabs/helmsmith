@@ -39,7 +39,7 @@ import {
   classifyNetworkError,
   MissingCredentialError,
 } from '../../errors.ts';
-import type { AdapterDeps } from '../../registry.ts';
+import type { AdapterDeps, AdapterFactory } from '../../registry.ts';
 import { registerAdapter } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
 import { reduceStream } from '../../stream.ts';
@@ -266,26 +266,35 @@ export async function resolveApiKey(
 // Factory + self-registration
 // ---------------------------------------------------------------------------
 
-registerAdapter(
-  'gemini-sdk',
-  (spec, deps) => {
-    const sdkSpec = spec as GeminiSdkSpec;
-    // Precedence must match resolveApiKey: spec → broker → env. Only an explicit
-    // spec.apiKey short-circuits; when a broker is present we defer to lazy
-    // resolution so the broker is PREFERRED over env (token rotation).
-    if (sdkSpec.apiKey) return new GeminiSdkAdapter(sdkSpec, deps, sdkSpec.apiKey);
-    if (deps.credentialBroker) {
-      return new LazyGeminiSdkAdapter(sdkSpec, deps, deps.credentialBroker);
-    }
-    const envKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
-    if (envKey) return new GeminiSdkAdapter(sdkSpec, deps, envKey);
-    throw new MissingCredentialError(
-      'No Google/Gemini API key found for gemini-sdk adapter. Provide one via spec.apiKey, ' +
-        'CredentialBroker.getCredential("google"), or the GEMINI_API_KEY / GOOGLE_API_KEY env var.',
-    );
-  },
-  ADAPTER_CATALOG['gemini-sdk'].capabilities,
-);
+export const geminiSdkFactory: AdapterFactory = (spec, deps) => {
+  const sdkSpec = spec as GeminiSdkSpec;
+  // Precedence must match resolveApiKey: spec → broker → env. Only an explicit
+  // spec.apiKey short-circuits; when a broker is present we defer to lazy
+  // resolution so the broker is PREFERRED over env (token rotation).
+  if (sdkSpec.apiKey) return new GeminiSdkAdapter(sdkSpec, deps, sdkSpec.apiKey);
+  if (deps.credentialBroker) {
+    return new LazyGeminiSdkAdapter(sdkSpec, deps, deps.credentialBroker);
+  }
+  const envKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
+  if (envKey) return new GeminiSdkAdapter(sdkSpec, deps, envKey);
+  throw new MissingCredentialError(
+    'No Google/Gemini API key found for gemini-sdk adapter. Provide one via spec.apiKey, ' +
+      'CredentialBroker.getCredential("google"), or the GEMINI_API_KEY / GOOGLE_API_KEY env var.',
+  );
+};
+
+export const geminiSdkCapabilities = ADAPTER_CATALOG['gemini-sdk'].capabilities;
+
+/**
+ * Register the gemini-sdk adapter with the process-wide registry.
+ *
+ * Call this once at your composition root. Importing this module does NOT
+ * register anything — that is what lets a host carry only the providers it
+ * uses. Idempotent: calling it twice registers once.
+ */
+export function registerGeminiSdk(): void {
+  registerAdapter('gemini-sdk', geminiSdkFactory, geminiSdkCapabilities);
+}
 
 // ---------------------------------------------------------------------------
 // LazyGeminiSdkAdapter — defers API-key resolution to first invoke/stream

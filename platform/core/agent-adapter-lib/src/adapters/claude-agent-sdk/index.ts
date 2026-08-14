@@ -53,7 +53,7 @@ import type { AdapterCapabilities } from '../../capabilities.ts';
 import { ADAPTER_CATALOG } from '../../catalog.ts';
 import type { CredentialBroker } from '../../credentials/broker.ts';
 import { ConfigError, classifyNetworkError, MissingCredentialError } from '../../errors.ts';
-import type { AdapterDeps } from '../../registry.ts';
+import type { AdapterDeps, AdapterFactory } from '../../registry.ts';
 import { registerAdapter } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
 import { reduceStream } from '../../stream.ts';
@@ -431,26 +431,35 @@ async function resolveApiKey(
 // Factory + self-registration
 // ---------------------------------------------------------------------------
 
-registerAdapter(
-  'claude-agent-sdk',
-  (spec, deps) => {
-    const agentSpec = spec as ClaudeAgentSdkSpec;
-    // Precedence must match resolveApiKey: spec → broker → env. Only an explicit
-    // spec.apiKey short-circuits; when a broker is present we defer to lazy
-    // resolution so the broker is PREFERRED over env (token rotation).
-    if (agentSpec.apiKey) return new ClaudeAgentSdkAdapter(agentSpec, deps, agentSpec.apiKey);
-    if (deps.credentialBroker) {
-      return new LazyClaudeAgentSdkAdapter(agentSpec, deps, deps.credentialBroker);
-    }
-    const envKey = process.env.ANTHROPIC_API_KEY;
-    if (envKey) return new ClaudeAgentSdkAdapter(agentSpec, deps, envKey);
-    throw new MissingCredentialError(
-      'No Anthropic API key found for claude-agent-sdk adapter. Provide one via spec.apiKey, ' +
-        'CredentialBroker.getCredential("anthropic"), or the ANTHROPIC_API_KEY environment variable.',
-    );
-  },
-  ADAPTER_CATALOG['claude-agent-sdk'].capabilities,
-);
+export const claudeAgentSdkFactory: AdapterFactory = (spec, deps) => {
+  const agentSpec = spec as ClaudeAgentSdkSpec;
+  // Precedence must match resolveApiKey: spec → broker → env. Only an explicit
+  // spec.apiKey short-circuits; when a broker is present we defer to lazy
+  // resolution so the broker is PREFERRED over env (token rotation).
+  if (agentSpec.apiKey) return new ClaudeAgentSdkAdapter(agentSpec, deps, agentSpec.apiKey);
+  if (deps.credentialBroker) {
+    return new LazyClaudeAgentSdkAdapter(agentSpec, deps, deps.credentialBroker);
+  }
+  const envKey = process.env.ANTHROPIC_API_KEY;
+  if (envKey) return new ClaudeAgentSdkAdapter(agentSpec, deps, envKey);
+  throw new MissingCredentialError(
+    'No Anthropic API key found for claude-agent-sdk adapter. Provide one via spec.apiKey, ' +
+      'CredentialBroker.getCredential("anthropic"), or the ANTHROPIC_API_KEY environment variable.',
+  );
+};
+
+export const claudeAgentSdkCapabilities = ADAPTER_CATALOG['claude-agent-sdk'].capabilities;
+
+/**
+ * Register the claude-agent-sdk adapter with the process-wide registry.
+ *
+ * Call this once at your composition root. Importing this module does NOT
+ * register anything — that is what lets a host carry only the providers it
+ * uses. Idempotent: calling it twice registers once.
+ */
+export function registerClaudeAgentSdk(): void {
+  registerAdapter('claude-agent-sdk', claudeAgentSdkFactory, claudeAgentSdkCapabilities);
+}
 
 // ---------------------------------------------------------------------------
 // LazyClaudeAgentSdkAdapter — defers API key resolution to first invoke/stream

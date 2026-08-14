@@ -8,11 +8,17 @@
  * error classification.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AdapterDeps } from '../../registry.ts';
 import { getAdapterFactory } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
-import { CopilotSdkAdapter, resolveCopilotToken } from './index.ts';
+import { CopilotSdkAdapter, registerCopilotSdk, resolveCopilotToken } from './index.ts';
+
+// Registration is explicit: importing the adapter module no longer self-registers.
+// Register once so the getAdapterFactory() assertions exercise the real factory.
+beforeAll(() => {
+  registerCopilotSdk();
+});
 
 // ---------------------------------------------------------------------------
 // Helpers

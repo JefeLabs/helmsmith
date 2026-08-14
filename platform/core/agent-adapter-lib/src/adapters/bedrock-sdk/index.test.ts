@@ -9,14 +9,20 @@
  * AWS_PROFILE auth wrinkle.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BedrockSdkSpec } from '../../agent.ts';
 import { ADAPTER_CATALOG } from '../../catalog.ts';
 import { AuthError, ConfigError, MissingCredentialError } from '../../errors.ts';
 import type { AdapterDeps } from '../../registry.ts';
 import { getAdapterFactory } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
-import { BedrockSdkAdapter, resolveRegion } from './index.ts';
+import { BedrockSdkAdapter, registerBedrockSdk, resolveRegion } from './index.ts';
+
+// Registration is explicit: importing the adapter module no longer self-registers.
+// Register once so the getAdapterFactory() assertions exercise the real factory.
+beforeAll(() => {
+  registerBedrockSdk();
+});
 
 // ---------------------------------------------------------------------------
 // Mock `@aws-sdk/client-bedrock-runtime`

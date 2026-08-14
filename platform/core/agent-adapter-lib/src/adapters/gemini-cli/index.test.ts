@@ -18,6 +18,10 @@ import type { AdapterDeps } from '../../registry.ts';
 import { getAdapterFactory } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
 
+// NOTE: ./index.ts is imported DYNAMICALLY inside tests, never statically at the
+// top. The hoisted vi.mock below closes over a const, so evaluating the adapter
+// during the import phase would hit the temporal dead zone.
+
 const mockSpawn = vi.fn();
 vi.mock('node:child_process', () => ({ spawn: mockSpawn }));
 
@@ -228,7 +232,8 @@ describe('GeminiCliAdapter — abort', () => {
 
 describe('GeminiCliAdapter — auth', () => {
   it('factory throws MissingCredentialError when no key and no broker', async () => {
-    await import('./index.ts');
+    const { registerGeminiCli } = await import('./index.ts');
+    registerGeminiCli(); // registration is explicit now
     delete process.env.GEMINI_API_KEY;
     const factory = getAdapterFactory('gemini-cli');
     expect(factory).toBeDefined();
@@ -239,7 +244,8 @@ describe('GeminiCliAdapter — auth', () => {
 
   it('injects the broker-resolved key as GEMINI_API_KEY into the child env', async () => {
     mockSpawn.mockImplementation(() => fakeChild(SIMPLE));
-    await import('./index.ts');
+    const { registerGeminiCli } = await import('./index.ts');
+    registerGeminiCli(); // registration is explicit now
     delete process.env.GEMINI_API_KEY;
 
     const factory = getAdapterFactory('gemini-cli');

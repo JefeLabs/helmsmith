@@ -42,7 +42,7 @@ import type { AdapterCapabilities } from '../../capabilities.ts';
 import { ADAPTER_CATALOG } from '../../catalog.ts';
 import type { CredentialBroker } from '../../credentials/broker.ts';
 import { AdapterError, MissingCredentialError, ProviderError } from '../../errors.ts';
-import type { AdapterDeps } from '../../registry.ts';
+import type { AdapterDeps, AdapterFactory } from '../../registry.ts';
 import { registerAdapter } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
 import { reduceStream } from '../../stream.ts';
@@ -239,26 +239,35 @@ export async function resolveApiKey(
 // Factory + self-registration
 // ---------------------------------------------------------------------------
 
-registerAdapter(
-  'codex-cli',
-  (spec, deps) => {
-    const cliSpec = spec as CodexCliSpec;
-    // Precedence must match resolveApiKey: spec → broker → env. Only an explicit
-    // spec.apiKey short-circuits; when a broker is present we defer to lazy
-    // resolution so the broker is PREFERRED over env (token rotation).
-    if (cliSpec.apiKey) return new CodexCliAdapter(cliSpec, deps, cliSpec.apiKey);
-    if (deps.credentialBroker) {
-      return new LazyCodexCliAdapter(cliSpec, deps, deps.credentialBroker);
-    }
-    const envKey = process.env[CODEX_API_KEY_ENV];
-    if (envKey) return new CodexCliAdapter(cliSpec, deps, envKey);
-    throw new MissingCredentialError(
-      'No OpenAI API key found for codex-cli adapter. Provide one via spec.apiKey, ' +
-        'CredentialBroker.getCredential("openai"), or the OPENAI_API_KEY environment variable.',
-    );
-  },
-  ADAPTER_CATALOG['codex-cli'].capabilities,
-);
+export const codexCliFactory: AdapterFactory = (spec, deps) => {
+  const cliSpec = spec as CodexCliSpec;
+  // Precedence must match resolveApiKey: spec → broker → env. Only an explicit
+  // spec.apiKey short-circuits; when a broker is present we defer to lazy
+  // resolution so the broker is PREFERRED over env (token rotation).
+  if (cliSpec.apiKey) return new CodexCliAdapter(cliSpec, deps, cliSpec.apiKey);
+  if (deps.credentialBroker) {
+    return new LazyCodexCliAdapter(cliSpec, deps, deps.credentialBroker);
+  }
+  const envKey = process.env[CODEX_API_KEY_ENV];
+  if (envKey) return new CodexCliAdapter(cliSpec, deps, envKey);
+  throw new MissingCredentialError(
+    'No OpenAI API key found for codex-cli adapter. Provide one via spec.apiKey, ' +
+      'CredentialBroker.getCredential("openai"), or the OPENAI_API_KEY environment variable.',
+  );
+};
+
+export const codexCliCapabilities = ADAPTER_CATALOG['codex-cli'].capabilities;
+
+/**
+ * Register the codex-cli adapter with the process-wide registry.
+ *
+ * Call this once at your composition root. Importing this module does NOT
+ * register anything — that is what lets a host carry only the providers it
+ * uses. Idempotent: calling it twice registers once.
+ */
+export function registerCodexCli(): void {
+  registerAdapter('codex-cli', codexCliFactory, codexCliCapabilities);
+}
 
 // ---------------------------------------------------------------------------
 // LazyCodexCliAdapter — defers API key resolution to first invoke/stream

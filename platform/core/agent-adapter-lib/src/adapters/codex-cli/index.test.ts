@@ -19,6 +19,10 @@ import type { AdapterDeps } from '../../registry.ts';
 import { getAdapterFactory } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
 
+// NOTE: ./index.ts is imported DYNAMICALLY inside tests, never statically at the
+// top. The hoisted vi.mock below closes over a const, so evaluating the adapter
+// during the import phase would hit the temporal dead zone.
+
 const mockSpawn = vi.fn();
 vi.mock('node:child_process', () => ({ spawn: mockSpawn }));
 
@@ -224,7 +228,8 @@ describe('CodexCliAdapter — abort', () => {
 
 describe('CodexCliAdapter — auth', () => {
   it('factory throws MissingCredentialError when no key and no broker', async () => {
-    await import('./index.ts');
+    const { registerCodexCli } = await import('./index.ts');
+    registerCodexCli(); // registration is explicit now
     delete process.env.OPENAI_API_KEY;
     const factory = getAdapterFactory('codex-cli');
     expect(factory).toBeDefined();
@@ -235,7 +240,8 @@ describe('CodexCliAdapter — auth', () => {
 
   it('injects the broker-resolved key as OPENAI_API_KEY into the child env', async () => {
     mockSpawn.mockImplementation(() => fakeChild(SIMPLE));
-    await import('./index.ts');
+    const { registerCodexCli } = await import('./index.ts');
+    registerCodexCli(); // registration is explicit now
     delete process.env.OPENAI_API_KEY;
 
     const factory = getAdapterFactory('codex-cli');

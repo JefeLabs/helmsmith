@@ -42,7 +42,7 @@ import type { AdapterCapabilities } from '../../capabilities.ts';
 import { ADAPTER_CATALOG } from '../../catalog.ts';
 import type { CredentialBroker } from '../../credentials/broker.ts';
 import { AdapterError, MissingCredentialError, ProviderError } from '../../errors.ts';
-import type { AdapterDeps } from '../../registry.ts';
+import type { AdapterDeps, AdapterFactory } from '../../registry.ts';
 import { registerAdapter } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
 import { reduceStream } from '../../stream.ts';
@@ -239,26 +239,35 @@ export async function resolveApiKey(
 // Factory + self-registration
 // ---------------------------------------------------------------------------
 
-registerAdapter(
-  'gemini-cli',
-  (spec, deps) => {
-    const cliSpec = spec as GeminiCliSpec;
-    // Precedence must match resolveApiKey: spec → broker → env. Only an explicit
-    // spec.apiKey short-circuits; when a broker is present we defer to lazy
-    // resolution so the broker is PREFERRED over env (token rotation).
-    if (cliSpec.apiKey) return new GeminiCliAdapter(cliSpec, deps, cliSpec.apiKey);
-    if (deps.credentialBroker) {
-      return new LazyGeminiCliAdapter(cliSpec, deps, deps.credentialBroker);
-    }
-    const envKey = process.env[GEMINI_API_KEY_ENV];
-    if (envKey) return new GeminiCliAdapter(cliSpec, deps, envKey);
-    throw new MissingCredentialError(
-      'No Google/Gemini API key found for gemini-cli adapter. Provide one via spec.apiKey, ' +
-        'CredentialBroker.getCredential("google"), or the GEMINI_API_KEY environment variable.',
-    );
-  },
-  ADAPTER_CATALOG['gemini-cli'].capabilities,
-);
+export const geminiCliFactory: AdapterFactory = (spec, deps) => {
+  const cliSpec = spec as GeminiCliSpec;
+  // Precedence must match resolveApiKey: spec → broker → env. Only an explicit
+  // spec.apiKey short-circuits; when a broker is present we defer to lazy
+  // resolution so the broker is PREFERRED over env (token rotation).
+  if (cliSpec.apiKey) return new GeminiCliAdapter(cliSpec, deps, cliSpec.apiKey);
+  if (deps.credentialBroker) {
+    return new LazyGeminiCliAdapter(cliSpec, deps, deps.credentialBroker);
+  }
+  const envKey = process.env[GEMINI_API_KEY_ENV];
+  if (envKey) return new GeminiCliAdapter(cliSpec, deps, envKey);
+  throw new MissingCredentialError(
+    'No Google/Gemini API key found for gemini-cli adapter. Provide one via spec.apiKey, ' +
+      'CredentialBroker.getCredential("google"), or the GEMINI_API_KEY environment variable.',
+  );
+};
+
+export const geminiCliCapabilities = ADAPTER_CATALOG['gemini-cli'].capabilities;
+
+/**
+ * Register the gemini-cli adapter with the process-wide registry.
+ *
+ * Call this once at your composition root. Importing this module does NOT
+ * register anything — that is what lets a host carry only the providers it
+ * uses. Idempotent: calling it twice registers once.
+ */
+export function registerGeminiCli(): void {
+  registerAdapter('gemini-cli', geminiCliFactory, geminiCliCapabilities);
+}
 
 // ---------------------------------------------------------------------------
 // LazyGeminiCliAdapter — defers API key resolution to first invoke/stream

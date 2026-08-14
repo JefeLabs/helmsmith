@@ -47,7 +47,7 @@ import type { AdapterCapabilities } from '../../capabilities.ts';
 import { ADAPTER_CATALOG } from '../../catalog.ts';
 import type { CredentialBroker } from '../../credentials/broker.ts';
 import { AdapterError, MissingCredentialError, ProviderError } from '../../errors.ts';
-import type { AdapterDeps } from '../../registry.ts';
+import type { AdapterDeps, AdapterFactory } from '../../registry.ts';
 import { registerAdapter } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
 import { reduceStream } from '../../stream.ts';
@@ -231,29 +231,38 @@ export async function resolveCopilotToken(
 // Factory + self-registration
 // ---------------------------------------------------------------------------
 
-registerAdapter(
-  'copilot-cli',
-  (spec, deps) => {
-    const cliSpec = spec as CopilotCliSpec;
-    const syncToken = tokenFromEnv(cliSpec);
+export const copilotCliFactory: AdapterFactory = (spec, deps) => {
+  const cliSpec = spec as CopilotCliSpec;
+  const syncToken = tokenFromEnv(cliSpec);
 
-    if (!syncToken && !deps.credentialBroker) {
-      throw new MissingCredentialError(
-        'No GitHub token found for copilot-cli adapter. The standalone `copilot` needs a token via ' +
-          'COPILOT_GITHUB_TOKEN / GH_TOKEN / GITHUB_TOKEN (a fine-grained PAT with "Copilot ' +
-          'Requests", a Copilot CLI OAuth token, or a `gh` OAuth token). Provide it via spec.env, ' +
-          'the environment, or a broker resolving the "github" provider.',
-      );
-    }
+  if (!syncToken && !deps.credentialBroker) {
+    throw new MissingCredentialError(
+      'No GitHub token found for copilot-cli adapter. The standalone `copilot` needs a token via ' +
+        'COPILOT_GITHUB_TOKEN / GH_TOKEN / GITHUB_TOKEN (a fine-grained PAT with "Copilot ' +
+        'Requests", a Copilot CLI OAuth token, or a `gh` OAuth token). Provide it via spec.env, ' +
+        'the environment, or a broker resolving the "github" provider.',
+    );
+  }
 
-    if (!syncToken && deps.credentialBroker) {
-      return new LazyCopilotCliAdapter(cliSpec, deps, deps.credentialBroker);
-    }
+  if (!syncToken && deps.credentialBroker) {
+    return new LazyCopilotCliAdapter(cliSpec, deps, deps.credentialBroker);
+  }
 
-    return new CopilotCliAdapter(cliSpec, deps, syncToken as string);
-  },
-  ADAPTER_CATALOG['copilot-cli'].capabilities,
-);
+  return new CopilotCliAdapter(cliSpec, deps, syncToken as string);
+};
+
+export const copilotCliCapabilities = ADAPTER_CATALOG['copilot-cli'].capabilities;
+
+/**
+ * Register the copilot-cli adapter with the process-wide registry.
+ *
+ * Call this once at your composition root. Importing this module does NOT
+ * register anything — that is what lets a host carry only the providers it
+ * uses. Idempotent: calling it twice registers once.
+ */
+export function registerCopilotCli(): void {
+  registerAdapter('copilot-cli', copilotCliFactory, copilotCliCapabilities);
+}
 
 // ---------------------------------------------------------------------------
 // LazyCopilotCliAdapter — defers token resolution to first invoke/stream

@@ -17,6 +17,10 @@ import type { AdapterDeps } from '../../registry.ts';
 import { getAdapterFactory } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
 
+// NOTE: ./index.ts is imported DYNAMICALLY inside tests, never statically at the
+// top. The hoisted vi.mock below closes over a const, so evaluating the adapter
+// during the import phase would hit the temporal dead zone.
+
 // ---------------------------------------------------------------------------
 // Mock node:child_process (spawn only)
 // ---------------------------------------------------------------------------
@@ -238,7 +242,8 @@ describe('CopilotCliAdapter — autonomous capability + abort', () => {
 
 describe('CopilotCliAdapter — auth', () => {
   it('factory throws MissingCredentialError when no token and no broker', async () => {
-    await import('./index.ts');
+    const { registerCopilotCli } = await import('./index.ts');
+    registerCopilotCli(); // registration is explicit now
     const factory = getAdapterFactory('copilot-cli');
     expect(factory).toBeDefined();
     expect(() => factory?.factory({ type: 'copilot-cli', model: 'm' }, makeDeps())).toThrow(
@@ -248,7 +253,8 @@ describe('CopilotCliAdapter — auth', () => {
 
   it('injects the broker-resolved github token into the child env', async () => {
     mockSpawn.mockImplementation(() => fakeChild(['ok']));
-    await import('./index.ts');
+    const { registerCopilotCli } = await import('./index.ts');
+    registerCopilotCli(); // registration is explicit now
     const factory = getAdapterFactory('copilot-cli');
     const broker = { getCredential: vi.fn(async () => ({ apiKey: 'gho_from_broker' })) };
     const adapter = factory?.factory(
@@ -266,7 +272,8 @@ describe('CopilotCliAdapter — auth', () => {
 
   it('reads COPILOT_GITHUB_TOKEN from spec.env when present', async () => {
     mockSpawn.mockImplementation(() => fakeChild(['ok']));
-    await import('./index.ts');
+    const { registerCopilotCli } = await import('./index.ts');
+    registerCopilotCli(); // registration is explicit now
     const factory = getAdapterFactory('copilot-cli');
     const adapter = factory?.factory(
       {

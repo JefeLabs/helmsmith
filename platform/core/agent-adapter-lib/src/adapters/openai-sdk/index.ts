@@ -39,7 +39,7 @@ import {
   classifyNetworkError,
   MissingCredentialError,
 } from '../../errors.ts';
-import type { AdapterDeps } from '../../registry.ts';
+import type { AdapterDeps, AdapterFactory } from '../../registry.ts';
 import { registerAdapter } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
 import { reduceStream } from '../../stream.ts';
@@ -296,26 +296,35 @@ export async function resolveApiKey(
 // Factory + self-registration
 // ---------------------------------------------------------------------------
 
-registerAdapter(
-  'openai-sdk',
-  (spec, deps) => {
-    const sdkSpec = spec as OpenAiSdkSpec;
-    // Precedence must match resolveApiKey: spec → broker → env. Only an explicit
-    // spec.apiKey short-circuits; when a broker is present we defer to lazy
-    // resolution so the broker is PREFERRED over env (token rotation).
-    if (sdkSpec.apiKey) return new OpenAiSdkAdapter(sdkSpec, deps, sdkSpec.apiKey);
-    if (deps.credentialBroker) {
-      return new LazyOpenAiSdkAdapter(sdkSpec, deps, deps.credentialBroker);
-    }
-    const envKey = process.env.OPENAI_API_KEY;
-    if (envKey) return new OpenAiSdkAdapter(sdkSpec, deps, envKey);
-    throw new MissingCredentialError(
-      'No OpenAI API key found for openai-sdk adapter. Provide one via spec.apiKey, ' +
-        'CredentialBroker.getCredential("openai"), or the OPENAI_API_KEY env var.',
-    );
-  },
-  ADAPTER_CATALOG['openai-sdk'].capabilities,
-);
+export const openAiSdkFactory: AdapterFactory = (spec, deps) => {
+  const sdkSpec = spec as OpenAiSdkSpec;
+  // Precedence must match resolveApiKey: spec → broker → env. Only an explicit
+  // spec.apiKey short-circuits; when a broker is present we defer to lazy
+  // resolution so the broker is PREFERRED over env (token rotation).
+  if (sdkSpec.apiKey) return new OpenAiSdkAdapter(sdkSpec, deps, sdkSpec.apiKey);
+  if (deps.credentialBroker) {
+    return new LazyOpenAiSdkAdapter(sdkSpec, deps, deps.credentialBroker);
+  }
+  const envKey = process.env.OPENAI_API_KEY;
+  if (envKey) return new OpenAiSdkAdapter(sdkSpec, deps, envKey);
+  throw new MissingCredentialError(
+    'No OpenAI API key found for openai-sdk adapter. Provide one via spec.apiKey, ' +
+      'CredentialBroker.getCredential("openai"), or the OPENAI_API_KEY env var.',
+  );
+};
+
+export const openAiSdkCapabilities = ADAPTER_CATALOG['openai-sdk'].capabilities;
+
+/**
+ * Register the openai-sdk adapter with the process-wide registry.
+ *
+ * Call this once at your composition root. Importing this module does NOT
+ * register anything — that is what lets a host carry only the providers it
+ * uses. Idempotent: calling it twice registers once.
+ */
+export function registerOpenAiSdk(): void {
+  registerAdapter('openai-sdk', openAiSdkFactory, openAiSdkCapabilities);
+}
 
 // ---------------------------------------------------------------------------
 // LazyOpenAiSdkAdapter — defers API-key resolution to first invoke/stream

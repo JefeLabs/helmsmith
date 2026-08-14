@@ -20,6 +20,10 @@ import type { AdapterDeps } from '../../registry.ts';
 import { getAdapterFactory } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
 
+// NOTE: ./index.ts is imported DYNAMICALLY inside tests, never statically at the
+// top. The hoisted vi.mock below closes over a const, so evaluating the adapter
+// during the import phase would hit the temporal dead zone.
+
 const mockSpawn = vi.fn();
 vi.mock('node:child_process', () => ({ spawn: mockSpawn }));
 
@@ -295,7 +299,8 @@ describe('OpenCodeCliAdapter — abort', () => {
 
 describe('OpenCodeCliAdapter — auth', () => {
   it('factory throws MissingCredentialError when no key and no broker', async () => {
-    await import('./index.ts'); // ensure self-registration ran
+    const { registerOpenCodeCli } = await import('./index.ts');
+    registerOpenCodeCli(); // registration is explicit now
     const factory = getAdapterFactory('opencode-cli');
     expect(factory).toBeDefined();
     expect(() =>
@@ -305,7 +310,8 @@ describe('OpenCodeCliAdapter — auth', () => {
 
   it('injects the broker-resolved key as the provider env var (openai → OPENAI_API_KEY)', async () => {
     mockSpawn.mockImplementation(() => fakeChild(SIMPLE));
-    await import('./index.ts');
+    const { registerOpenCodeCli } = await import('./index.ts');
+    registerOpenCodeCli(); // registration is explicit now
 
     const factory = getAdapterFactory('opencode-cli');
     const broker = { getCredential: vi.fn(async () => ({ apiKey: 'sk-from-broker' })) };

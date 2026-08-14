@@ -38,7 +38,7 @@ import type { AdapterCapabilities } from '../../capabilities.ts';
 import { ADAPTER_CATALOG } from '../../catalog.ts';
 import type { CredentialBroker } from '../../credentials/broker.ts';
 import { classifyHttpError, classifyNetworkError, MissingCredentialError } from '../../errors.ts';
-import type { AdapterDeps } from '../../registry.ts';
+import type { AdapterDeps, AdapterFactory } from '../../registry.ts';
 import { registerAdapter } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
 import { reduceStream } from '../../stream.ts';
@@ -215,27 +215,36 @@ export async function resolveCopilotToken(
 // Factory + self-registration
 // ---------------------------------------------------------------------------
 
-registerAdapter(
-  'copilot-sdk',
-  (spec, deps) => {
-    const sdkSpec = spec as CopilotSdkSpec;
-    // Precedence must match resolveCopilotToken: spec → broker → env. Only an
-    // explicit spec.apiKey short-circuits; when a broker is present we defer to
-    // lazy resolution so the broker is PREFERRED over env (token rotation —
-    // Copilot session tokens are short-lived and the broker refreshes them).
-    if (sdkSpec.apiKey) return new CopilotSdkAdapter(sdkSpec, deps, sdkSpec.apiKey);
-    if (deps.credentialBroker) {
-      return new LazyCopilotSdkAdapter(sdkSpec, deps, deps.credentialBroker);
-    }
-    const envToken = process.env.COPILOT_TOKEN;
-    if (envToken) return new CopilotSdkAdapter(sdkSpec, deps, envToken);
-    throw new MissingCredentialError(
-      'No Copilot session token found for copilot-sdk adapter. Provide one via spec.apiKey, ' +
-        `CredentialBroker.getCredential("${COPILOT_PROVIDER}"), or the COPILOT_TOKEN env var.`,
-    );
-  },
-  ADAPTER_CATALOG['copilot-sdk'].capabilities,
-);
+export const copilotSdkFactory: AdapterFactory = (spec, deps) => {
+  const sdkSpec = spec as CopilotSdkSpec;
+  // Precedence must match resolveCopilotToken: spec → broker → env. Only an
+  // explicit spec.apiKey short-circuits; when a broker is present we defer to
+  // lazy resolution so the broker is PREFERRED over env (token rotation —
+  // Copilot session tokens are short-lived and the broker refreshes them).
+  if (sdkSpec.apiKey) return new CopilotSdkAdapter(sdkSpec, deps, sdkSpec.apiKey);
+  if (deps.credentialBroker) {
+    return new LazyCopilotSdkAdapter(sdkSpec, deps, deps.credentialBroker);
+  }
+  const envToken = process.env.COPILOT_TOKEN;
+  if (envToken) return new CopilotSdkAdapter(sdkSpec, deps, envToken);
+  throw new MissingCredentialError(
+    'No Copilot session token found for copilot-sdk adapter. Provide one via spec.apiKey, ' +
+      `CredentialBroker.getCredential("${COPILOT_PROVIDER}"), or the COPILOT_TOKEN env var.`,
+  );
+};
+
+export const copilotSdkCapabilities = ADAPTER_CATALOG['copilot-sdk'].capabilities;
+
+/**
+ * Register the copilot-sdk adapter with the process-wide registry.
+ *
+ * Call this once at your composition root. Importing this module does NOT
+ * register anything — that is what lets a host carry only the providers it
+ * uses. Idempotent: calling it twice registers once.
+ */
+export function registerCopilotSdk(): void {
+  registerAdapter('copilot-sdk', copilotSdkFactory, copilotSdkCapabilities);
+}
 
 // ---------------------------------------------------------------------------
 // LazyCopilotSdkAdapter — defers token resolution to first invoke/stream

@@ -55,7 +55,7 @@ import type { AdapterCapabilities } from '../../capabilities.ts';
 import { ADAPTER_CATALOG } from '../../catalog.ts';
 import type { CredentialBroker } from '../../credentials/broker.ts';
 import { AdapterError, ConfigError, MissingCredentialError, ProviderError } from '../../errors.ts';
-import type { AdapterDeps } from '../../registry.ts';
+import type { AdapterDeps, AdapterFactory } from '../../registry.ts';
 import { registerAdapter } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
 import { reduceStream } from '../../stream.ts';
@@ -374,34 +374,43 @@ export async function resolveApiKey(
 // Factory + self-registration
 // ---------------------------------------------------------------------------
 
-registerAdapter(
-  'opencode-cli',
-  (spec, deps) => {
-    const cliSpec = spec as OpenCodeCliSpec;
-    const target = resolveOpencodeTarget(cliSpec);
+export const openCodeCliFactory: AdapterFactory = (spec, deps) => {
+  const cliSpec = spec as OpenCodeCliSpec;
+  const target = resolveOpencodeTarget(cliSpec);
 
-    // Local-endpoint mode needs no broker credential.
-    if (target.isLocal) {
-      return new OpenCodeCliAdapter(cliSpec, deps, cliSpec.staticApiKey ?? 'no-auth-required');
-    }
+  // Local-endpoint mode needs no broker credential.
+  if (target.isLocal) {
+    return new OpenCodeCliAdapter(cliSpec, deps, cliSpec.staticApiKey ?? 'no-auth-required');
+  }
 
-    // Precedence must match resolveApiKey: spec → broker → env. Only an explicit
-    // spec.apiKey short-circuits; when a broker is present we defer to lazy
-    // resolution so the broker is PREFERRED over env (token rotation).
-    if (cliSpec.apiKey) return new OpenCodeCliAdapter(cliSpec, deps, cliSpec.apiKey);
-    if (deps.credentialBroker) {
-      return new LazyOpenCodeCliAdapter(cliSpec, deps, deps.credentialBroker);
-    }
-    const envKey = target.envVar ? process.env[target.envVar] : undefined;
-    if (envKey) return new OpenCodeCliAdapter(cliSpec, deps, envKey);
-    throw new MissingCredentialError(
-      `No API key found for opencode-cli adapter (provider '${target.provider}'). Provide one via ` +
-        `spec.apiKey, CredentialBroker.getCredential("${target.provider}"), or the ` +
-        `${target.envVar ?? 'provider'} environment variable.`,
-    );
-  },
-  ADAPTER_CATALOG['opencode-cli'].capabilities,
-);
+  // Precedence must match resolveApiKey: spec → broker → env. Only an explicit
+  // spec.apiKey short-circuits; when a broker is present we defer to lazy
+  // resolution so the broker is PREFERRED over env (token rotation).
+  if (cliSpec.apiKey) return new OpenCodeCliAdapter(cliSpec, deps, cliSpec.apiKey);
+  if (deps.credentialBroker) {
+    return new LazyOpenCodeCliAdapter(cliSpec, deps, deps.credentialBroker);
+  }
+  const envKey = target.envVar ? process.env[target.envVar] : undefined;
+  if (envKey) return new OpenCodeCliAdapter(cliSpec, deps, envKey);
+  throw new MissingCredentialError(
+    `No API key found for opencode-cli adapter (provider '${target.provider}'). Provide one via ` +
+      `spec.apiKey, CredentialBroker.getCredential("${target.provider}"), or the ` +
+      `${target.envVar ?? 'provider'} environment variable.`,
+  );
+};
+
+export const openCodeCliCapabilities = ADAPTER_CATALOG['opencode-cli'].capabilities;
+
+/**
+ * Register the opencode-cli adapter with the process-wide registry.
+ *
+ * Call this once at your composition root. Importing this module does NOT
+ * register anything — that is what lets a host carry only the providers it
+ * uses. Idempotent: calling it twice registers once.
+ */
+export function registerOpenCodeCli(): void {
+  registerAdapter('opencode-cli', openCodeCliFactory, openCodeCliCapabilities);
+}
 
 // ---------------------------------------------------------------------------
 // LazyOpenCodeCliAdapter — defers API key resolution to first invoke/stream
