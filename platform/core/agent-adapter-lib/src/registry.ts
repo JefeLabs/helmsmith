@@ -56,16 +56,22 @@ const _registry = new Map<AgentSpecType, RegistryEntry>();
 /**
  * Register an adapter factory for the given type.
  *
- * Registering a type that already has a factory emits a warning and
- * overwrites the previous entry. This allows test code to override
- * built-in adapters and lets late-loading plugins replace stubs.
+ * Idempotent by factory identity: re-registering the SAME factory reference is
+ * a silent no-op, because two packages in one process legitimately register the
+ * same adapter (an app and a library it depends on both wanting 'claude-sdk').
+ *
+ * Registering a DIFFERENT factory for a type that already has one still warns
+ * and overwrites, so the warning keeps its meaning for the cases that deserve
+ * it: test doubles overriding a built-in, and late-loading plugins replacing
+ * stubs.
  */
 export function registerAdapter(
   type: AgentSpecType,
   factory: AdapterFactory,
   capabilities: AdapterCapabilities,
 ): void {
-  if (_registry.has(type)) {
+  const existing = _registry.get(type);
+  if (existing && existing.factory !== factory) {
     console.warn(`[agent-adapter/registry] overwriting existing factory for type '${type}'`);
   }
   _registry.set(type, { factory, capabilities });

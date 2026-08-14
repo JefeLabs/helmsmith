@@ -109,6 +109,23 @@ describe('registry', () => {
   });
 
   describe('duplicate registration', () => {
+    it('is a silent no-op when the same factory reference is re-registered', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const factory = vi.fn(() => makeAdapter('claude-sdk'));
+
+        registerAdapter('claude-sdk', factory, makeCaps());
+        registerAdapter('claude-sdk', factory, makeCaps());
+
+        // Two packages in one process legitimately register the same adapter.
+        expect(warnSpy).not.toHaveBeenCalled();
+        expect(getAdapterFactory('claude-sdk')!.factory).toBe(factory);
+        expect(registeredAdapterTypes()).toEqual(['claude-sdk']);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
     it('overwrites the existing factory with a warning', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       try {
