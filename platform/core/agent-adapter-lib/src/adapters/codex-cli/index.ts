@@ -25,7 +25,7 @@
  *     surfaced as tool-call-* / tool-result chunks for observability only (PRD §11).
  *   - Reasoning items are surfaced as thinking-delta chunks.
  *   - AbortSignal → SIGTERM→SIGKILL (shared child-process) → finishReason:'aborted'.
- *   - Capabilities: CAPABILITY_MATRIX['codex-cli'].
+ *   - Capabilities: ADAPTER_CATALOG['codex-cli'].capabilities.
  */
 
 import type {
@@ -39,7 +39,7 @@ import type {
   Logger,
 } from '../../agent.ts';
 import type { AdapterCapabilities } from '../../capabilities.ts';
-import { CAPABILITY_MATRIX } from '../../capabilities.ts';
+import { ADAPTER_CATALOG } from '../../catalog.ts';
 import type { CredentialBroker } from '../../credentials/broker.ts';
 import { AdapterError, MissingCredentialError, ProviderError } from '../../errors.ts';
 import type { AdapterDeps } from '../../registry.ts';
@@ -72,7 +72,7 @@ export class CodexCliAdapter implements AgentAdapter {
   constructor(spec: CodexCliSpec, deps: AdapterDeps, apiKey: string) {
     this.spec = spec;
     this.workdir = deps.workdir;
-    this.capabilities = CAPABILITY_MATRIX['codex-cli'];
+    this.capabilities = ADAPTER_CATALOG['codex-cli'].capabilities;
     this.apiKey = apiKey;
     this.logger = deps.logger;
     this.binary = resolveBinary(CODEX_BINARY, spec.binaryPath);
@@ -257,7 +257,7 @@ registerAdapter(
         'CredentialBroker.getCredential("openai"), or the OPENAI_API_KEY environment variable.',
     );
   },
-  CAPABILITY_MATRIX['codex-cli'],
+  ADAPTER_CATALOG['codex-cli'].capabilities,
 );
 
 // ---------------------------------------------------------------------------
@@ -278,7 +278,7 @@ class LazyCodexCliAdapter implements AgentAdapter {
     private readonly broker: CredentialBroker,
   ) {
     this.workdir = deps.workdir;
-    this.capabilities = CAPABILITY_MATRIX['codex-cli'];
+    this.capabilities = ADAPTER_CATALOG['codex-cli'].capabilities;
   }
 
   private async _resolve(): Promise<CodexCliAdapter> {

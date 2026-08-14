@@ -11,7 +11,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BedrockSdkSpec } from '../../agent.ts';
-import { CAPABILITY_MATRIX } from '../../capabilities.ts';
+import { ADAPTER_CATALOG } from '../../catalog.ts';
 import { AuthError, ConfigError, MissingCredentialError } from '../../errors.ts';
 import type { AdapterDeps } from '../../registry.ts';
 import { getAdapterFactory } from '../../registry.ts';
@@ -138,7 +138,7 @@ describe('BedrockSdkAdapter — basics', () => {
   it('reports the bedrock-sdk capability matrix (host-loop, no json mode)', () => {
     const adapter = makeAdapter();
     expect(adapter.type).toBe('bedrock-sdk');
-    expect(adapter.capabilities).toEqual(CAPABILITY_MATRIX['bedrock-sdk']);
+    expect(adapter.capabilities).toEqual(ADAPTER_CATALOG['bedrock-sdk'].capabilities);
     expect(adapter.capabilities.supportsToolUse).toBe(true);
     expect(adapter.capabilities.supportsJsonMode).toBe(false);
     expect(adapter.capabilities.supportsExtendedThinking).toBe(true);

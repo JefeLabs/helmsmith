@@ -15,7 +15,7 @@
  *   - Auth: broker.getCredential('openai') → apiKey, fallback OPENAI_API_KEY,
  *     else MissingCredentialError at construction (fail-fast).
  *   - AbortSignal: forwarded via RequestOptions.signal → finishReason 'aborted'.
- *   - Capabilities: from CAPABILITY_MATRIX['openai-sdk'] (supportsJsonMode: true).
+ *   - Capabilities: from ADAPTER_CATALOG['openai-sdk'].capabilities (supportsJsonMode: true).
  */
 
 import OpenAI from 'openai';
@@ -30,7 +30,7 @@ import type {
   TokenUsage,
 } from '../../agent.ts';
 import type { AdapterCapabilities } from '../../capabilities.ts';
-import { CAPABILITY_MATRIX } from '../../capabilities.ts';
+import { ADAPTER_CATALOG } from '../../catalog.ts';
 import type { CredentialBroker } from '../../credentials/broker.ts';
 import {
   type AdapterError,
@@ -88,7 +88,7 @@ export class OpenAiSdkAdapter implements AgentAdapter {
   constructor(spec: OpenAiSdkSpec, deps: AdapterDeps, apiKey: string) {
     this.spec = spec;
     this.workdir = deps.workdir;
-    this.capabilities = CAPABILITY_MATRIX['openai-sdk'];
+    this.capabilities = ADAPTER_CATALOG['openai-sdk'].capabilities;
     this.client = new OpenAI({ apiKey });
     this.logger = deps.logger;
   }
@@ -314,7 +314,7 @@ registerAdapter(
         'CredentialBroker.getCredential("openai"), or the OPENAI_API_KEY env var.',
     );
   },
-  CAPABILITY_MATRIX['openai-sdk'],
+  ADAPTER_CATALOG['openai-sdk'].capabilities,
 );
 
 // ---------------------------------------------------------------------------
@@ -335,7 +335,7 @@ class LazyOpenAiSdkAdapter implements AgentAdapter {
     private readonly broker: CredentialBroker,
   ) {
     this.workdir = deps.workdir;
-    this.capabilities = CAPABILITY_MATRIX['openai-sdk'];
+    this.capabilities = ADAPTER_CATALOG['openai-sdk'].capabilities;
   }
 
   private async _resolve(): Promise<OpenAiSdkAdapter> {

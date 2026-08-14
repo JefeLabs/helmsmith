@@ -22,7 +22,7 @@
  *   - Tool use: custom OpenAI-style function calling — `tools` forwarded;
  *     `tool_calls` deltas surfaced as tool-call-* (host-loop, PRD §11).
  *   - fetchFn injection for tests; AbortSignal aborts the fetch → 'aborted'.
- *   - Capabilities: CAPABILITY_MATRIX['copilot-sdk'].
+ *   - Capabilities: ADAPTER_CATALOG['copilot-sdk'].capabilities.
  */
 
 import type {
@@ -35,7 +35,7 @@ import type {
   Logger,
 } from '../../agent.ts';
 import type { AdapterCapabilities } from '../../capabilities.ts';
-import { CAPABILITY_MATRIX } from '../../capabilities.ts';
+import { ADAPTER_CATALOG } from '../../catalog.ts';
 import type { CredentialBroker } from '../../credentials/broker.ts';
 import { classifyHttpError, classifyNetworkError, MissingCredentialError } from '../../errors.ts';
 import type { AdapterDeps } from '../../registry.ts';
@@ -65,7 +65,7 @@ export class CopilotSdkAdapter implements AgentAdapter {
   constructor(spec: CopilotSdkSpec, deps: AdapterDeps, token: string, fetchFn?: typeof fetch) {
     this.spec = spec;
     this.workdir = deps.workdir;
-    this.capabilities = CAPABILITY_MATRIX['copilot-sdk'];
+    this.capabilities = ADAPTER_CATALOG['copilot-sdk'].capabilities;
     this.token = token;
     this.fetchFn = fetchFn ?? fetch;
     this.logger = deps.logger;
@@ -234,7 +234,7 @@ registerAdapter(
         `CredentialBroker.getCredential("${COPILOT_PROVIDER}"), or the COPILOT_TOKEN env var.`,
     );
   },
-  CAPABILITY_MATRIX['copilot-sdk'],
+  ADAPTER_CATALOG['copilot-sdk'].capabilities,
 );
 
 // ---------------------------------------------------------------------------
@@ -255,7 +255,7 @@ class LazyCopilotSdkAdapter implements AgentAdapter {
     private readonly broker: CredentialBroker,
   ) {
     this.workdir = deps.workdir;
-    this.capabilities = CAPABILITY_MATRIX['copilot-sdk'];
+    this.capabilities = ADAPTER_CATALOG['copilot-sdk'].capabilities;
   }
 
   private async _resolve(): Promise<CopilotSdkAdapter> {

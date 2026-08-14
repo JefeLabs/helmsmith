@@ -41,7 +41,10 @@ export type {
   ToolDefinition,
 } from './agent.ts';
 // --- Capabilities (capabilities.ts) ------------------------------------------
-export { CAPABILITY_MATRIX, intersectCapabilities, listAdapterTypes } from './capabilities.ts';
+export { getCapabilities, intersectCapabilities, listAdapterTypes } from './capabilities.ts';
+// --- Catalog (catalog.ts) ----------------------------------------------------
+// The "what exists" plane: static, readable with nothing registered.
+export { ADAPTER_CATALOG, type AdapterCatalogEntry } from './catalog.ts';
 // --- Factory -----------------------------------------------------------------
 export { createAgent } from './create-agent.ts';
 // --- Credentials (credentials/broker.ts) -------------------------------------

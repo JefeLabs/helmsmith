@@ -14,7 +14,7 @@
  *     else MissingCredentialError at construction. (PRD §12, §13 D7)
  *   - AbortSignal: forwarded to SDK stream options → finishReason:'aborted'.
  *   - maxTokens: driven from spec (default 8192, NEVER hardcoded 256).
- *   - Capabilities: from CAPABILITY_MATRIX['claude-sdk'].
+ *   - Capabilities: from ADAPTER_CATALOG['claude-sdk'].capabilities.
  */
 
 import Anthropic, { APIUserAbortError } from '@anthropic-ai/sdk';
@@ -29,7 +29,7 @@ import type {
   TokenUsage,
 } from '../../agent.ts';
 import type { AdapterCapabilities } from '../../capabilities.ts';
-import { CAPABILITY_MATRIX } from '../../capabilities.ts';
+import { ADAPTER_CATALOG } from '../../catalog.ts';
 import type { CredentialBroker } from '../../credentials/broker.ts';
 import {
   CapabilityMismatchError,
@@ -64,7 +64,7 @@ export class ClaudeSdkAdapter implements AgentAdapter {
   constructor(spec: ClaudeSdkSpec, deps: AdapterDeps, apiKey: string) {
     this.spec = spec;
     this.workdir = deps.workdir;
-    this.capabilities = CAPABILITY_MATRIX['claude-sdk'];
+    this.capabilities = ADAPTER_CATALOG['claude-sdk'].capabilities;
     this.client = new Anthropic({ apiKey });
   }
 
@@ -338,7 +338,7 @@ registerAdapter(
         'CredentialBroker.getCredential("anthropic"), or the ANTHROPIC_API_KEY environment variable.',
     );
   },
-  CAPABILITY_MATRIX['claude-sdk'],
+  ADAPTER_CATALOG['claude-sdk'].capabilities,
 );
 
 // ---------------------------------------------------------------------------
@@ -364,7 +364,7 @@ class LazyClaudeSdkAdapter implements AgentAdapter {
     private readonly broker: CredentialBroker,
   ) {
     this.workdir = deps.workdir;
-    this.capabilities = CAPABILITY_MATRIX['claude-sdk'];
+    this.capabilities = ADAPTER_CATALOG['claude-sdk'].capabilities;
   }
 
   private async _resolve(): Promise<ClaudeSdkAdapter> {

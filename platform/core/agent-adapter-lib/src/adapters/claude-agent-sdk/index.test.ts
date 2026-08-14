@@ -8,7 +8,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ClaudeAgentSdkSpec } from '../../agent.ts';
-import { CAPABILITY_MATRIX } from '../../capabilities.ts';
+import { ADAPTER_CATALOG } from '../../catalog.ts';
 import { CapabilityMismatchError, MissingCredentialError } from '../../errors.ts';
 import type { AdapterDeps } from '../../registry.ts';
 import { getAdapterFactory } from '../../registry.ts';
@@ -152,7 +152,7 @@ describe('ClaudeAgentSdkAdapter — basics', () => {
   it('has the correct type and capabilities', () => {
     const adapter = makeAdapter();
     expect(adapter.type).toBe('claude-agent-sdk');
-    expect(adapter.capabilities).toEqual(CAPABILITY_MATRIX['claude-agent-sdk']);
+    expect(adapter.capabilities).toEqual(ADAPTER_CATALOG['claude-agent-sdk'].capabilities);
     expect(adapter.capabilities.supportsToolUse).toBe(true);
     expect(adapter.capabilities.supportsExtendedThinking).toBe(true);
     expect(adapter.capabilities.supportsJsonMode).toBe(false);

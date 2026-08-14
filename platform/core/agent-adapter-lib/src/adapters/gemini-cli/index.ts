@@ -25,7 +25,7 @@
  *   - Built-in tools run autonomously and are surfaced as tool-call-* /
  *     tool-result chunks for observability only (PRD §11).
  *   - AbortSignal → SIGTERM→SIGKILL (shared child-process) → finishReason:'aborted'.
- *   - Capabilities: CAPABILITY_MATRIX['gemini-cli'].
+ *   - Capabilities: ADAPTER_CATALOG['gemini-cli'].capabilities.
  */
 
 import type {
@@ -39,7 +39,7 @@ import type {
   Logger,
 } from '../../agent.ts';
 import type { AdapterCapabilities } from '../../capabilities.ts';
-import { CAPABILITY_MATRIX } from '../../capabilities.ts';
+import { ADAPTER_CATALOG } from '../../catalog.ts';
 import type { CredentialBroker } from '../../credentials/broker.ts';
 import { AdapterError, MissingCredentialError, ProviderError } from '../../errors.ts';
 import type { AdapterDeps } from '../../registry.ts';
@@ -72,7 +72,7 @@ export class GeminiCliAdapter implements AgentAdapter {
   constructor(spec: GeminiCliSpec, deps: AdapterDeps, apiKey: string) {
     this.spec = spec;
     this.workdir = deps.workdir;
-    this.capabilities = CAPABILITY_MATRIX['gemini-cli'];
+    this.capabilities = ADAPTER_CATALOG['gemini-cli'].capabilities;
     this.apiKey = apiKey;
     this.logger = deps.logger;
     this.binary = resolveBinary(GEMINI_BINARY, spec.binaryPath);
@@ -257,7 +257,7 @@ registerAdapter(
         'CredentialBroker.getCredential("google"), or the GEMINI_API_KEY environment variable.',
     );
   },
-  CAPABILITY_MATRIX['gemini-cli'],
+  ADAPTER_CATALOG['gemini-cli'].capabilities,
 );
 
 // ---------------------------------------------------------------------------
@@ -278,7 +278,7 @@ class LazyGeminiCliAdapter implements AgentAdapter {
     private readonly broker: CredentialBroker,
   ) {
     this.workdir = deps.workdir;
-    this.capabilities = CAPABILITY_MATRIX['gemini-cli'];
+    this.capabilities = ADAPTER_CATALOG['gemini-cli'].capabilities;
   }
 
   private async _resolve(): Promise<GeminiCliAdapter> {

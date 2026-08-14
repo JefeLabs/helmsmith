@@ -20,7 +20,7 @@
  *     tool-call-* / tool-result chunks for observability only (PRD §11); the
  *     host cannot inject custom tool definitions.
  *   - AbortSignal → SIGTERM→SIGKILL (shared child-process) → finishReason:'aborted'.
- *   - Capabilities: CAPABILITY_MATRIX['claude-code-cli'].
+ *   - Capabilities: ADAPTER_CATALOG['claude-code-cli'].capabilities.
  */
 
 import type {
@@ -34,7 +34,7 @@ import type {
   Logger,
 } from '../../agent.ts';
 import type { AdapterCapabilities } from '../../capabilities.ts';
-import { CAPABILITY_MATRIX } from '../../capabilities.ts';
+import { ADAPTER_CATALOG } from '../../catalog.ts';
 import type { CredentialBroker } from '../../credentials/broker.ts';
 import { AdapterError, MissingCredentialError, ProviderError } from '../../errors.ts';
 import type { AdapterDeps } from '../../registry.ts';
@@ -63,7 +63,7 @@ export class ClaudeCodeCliAdapter implements AgentAdapter {
   constructor(spec: ClaudeCodeCliSpec, deps: AdapterDeps, apiKey: string) {
     this.spec = spec;
     this.workdir = deps.workdir;
-    this.capabilities = CAPABILITY_MATRIX['claude-code-cli'];
+    this.capabilities = ADAPTER_CATALOG['claude-code-cli'].capabilities;
     this.apiKey = apiKey;
     this.logger = deps.logger;
     // Resolve the binary at construction (fail-fast BinaryNotFoundError, PRD §9).
@@ -269,7 +269,7 @@ registerAdapter(
         'CredentialBroker.getCredential("anthropic"), or the ANTHROPIC_API_KEY environment variable.',
     );
   },
-  CAPABILITY_MATRIX['claude-code-cli'],
+  ADAPTER_CATALOG['claude-code-cli'].capabilities,
 );
 
 // ---------------------------------------------------------------------------
@@ -290,7 +290,7 @@ class LazyClaudeCodeCliAdapter implements AgentAdapter {
     private readonly broker: CredentialBroker,
   ) {
     this.workdir = deps.workdir;
-    this.capabilities = CAPABILITY_MATRIX['claude-code-cli'];
+    this.capabilities = ADAPTER_CATALOG['claude-code-cli'].capabilities;
   }
 
   private async _resolve(): Promise<ClaudeCodeCliAdapter> {

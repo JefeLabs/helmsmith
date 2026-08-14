@@ -8,7 +8,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ClaudeSdkSpec } from '../../agent.ts';
-import { CAPABILITY_MATRIX } from '../../capabilities.ts';
+import { ADAPTER_CATALOG } from '../../catalog.ts';
 import { MissingCredentialError } from '../../errors.ts';
 import type { AdapterDeps } from '../../registry.ts';
 import { getAdapterFactory } from '../../registry.ts';
@@ -192,7 +192,7 @@ describe('ClaudeSdkAdapter — basics', () => {
   it('has the correct type and capabilities', () => {
     const adapter = makeAdapter();
     expect(adapter.type).toBe('claude-sdk');
-    expect(adapter.capabilities).toEqual(CAPABILITY_MATRIX['claude-sdk']);
+    expect(adapter.capabilities).toEqual(ADAPTER_CATALOG['claude-sdk'].capabilities);
     expect(adapter.capabilities.supportsToolUse).toBe(true);
     expect(adapter.capabilities.supportsJsonMode).toBe(false);
     expect(adapter.capabilities.supportsSessionResume).toBe(false);
@@ -557,7 +557,7 @@ describe('ClaudeSdkAdapter — capability check', () => {
     const adapter = makeAdapter();
     // Override capabilities to simulate a non-tool-use adapter
     Object.defineProperty(adapter, 'capabilities', {
-      value: { ...CAPABILITY_MATRIX['claude-sdk'], supportsToolUse: false },
+      value: { ...ADAPTER_CATALOG['claude-sdk'].capabilities, supportsToolUse: false },
     });
 
     const { CapabilityMismatchError } = await import('../../errors.ts');

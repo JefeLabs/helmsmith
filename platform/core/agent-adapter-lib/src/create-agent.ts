@@ -5,20 +5,15 @@
  *   1. Validate workdir is a git working tree → WorkdirNotARepoError.
  *   2. Resolve repo metadata (repoRoot, commit, branch) — best-effort.
  *   3. Look up factory for spec.type → throws for unregistered types.
- *   4. CapabilityMismatchError if spec implies a capability the type lacks.
- *   5. Invoke the factory + return the adapter.
+ *   4. Invoke the factory + return the adapter.
  *
  * Git check is synchronous (spawnSync) so createAgent() itself is synchronous.
  * Credential resolution happens inside invoke()/stream() — not here.
- *
- * NOT exported from index.ts in Phase A (coexistence rule).
  */
 
 import { spawnSync } from 'node:child_process';
-import type { AgentAdapter, AgentSpec, CreateAgentArgs } from './agent.ts';
-import { CAPABILITY_MATRIX } from './capabilities.ts';
+import type { AgentAdapter, CreateAgentArgs } from './agent.ts';
 import { WorkdirNotARepoError } from './errors.ts';
-// CapabilityMismatchError is used in Phase B+ when adapters land; import added then.
 import { getAdapterFactory } from './registry.ts';
 
 // ---------------------------------------------------------------------------
@@ -57,28 +52,6 @@ function resolveRepoMetadata(workdir: string): {
 }
 
 // ---------------------------------------------------------------------------
-// Capability mismatch check
-// ---------------------------------------------------------------------------
-
-/**
- * Check that the spec type's static capabilities are consistent with any
- * capability requirements implied by spec fields.
- *
- * Phase A: only a structural hook. Actual per-field checks are added as
- * adapters land in Phases B–D′ (e.g. tool definitions in AgentInput).
- */
-function checkCapabilityMismatch(spec: AgentSpec): void {
-  const caps = CAPABILITY_MATRIX[spec.type];
-  if (!caps) return; // unregistered type — handled below
-
-  // Future: if spec carries explicit tool definitions at spec level, check
-  // caps.supportsToolUse. For now the only spec-level capability signal is
-  // the type itself, so no mismatch is possible in Phase A.
-  // Kept as a placeholder with a clear throw path for Phase B+.
-  void caps; // satisfy linter
-}
-
-// ---------------------------------------------------------------------------
 // createAgent
 // ---------------------------------------------------------------------------
 
@@ -86,9 +59,8 @@ function checkCapabilityMismatch(spec: AgentSpec): void {
  * Construct an AgentAdapter bound to the given workdir and spec.
  *
  * Throws:
- *   - WorkdirNotARepoError   if workdir is not a git working tree.
- *   - CapabilityMismatchError if the spec requires a capability the type lacks.
- *   - Error                  if spec.type has no registered factory.
+ *   - WorkdirNotARepoError if workdir is not a git working tree.
+ *   - Error                if spec.type has no registered factory.
  */
 export function createAgent(args: CreateAgentArgs): AgentAdapter {
   const { spec, workdir, credentialBroker, logger, signal } = args;
@@ -109,20 +81,11 @@ export function createAgent(args: CreateAgentArgs): AgentAdapter {
     );
   }
 
-  // Step 4 — capability mismatch check
-  checkCapabilityMismatch(spec);
-
-  // Additional: verify static matrix agrees with registered capabilities.
-  // If the registered capabilities differ from the static matrix, prefer
-  // the registered entry (allows adapters to override statics).
-  const staticCaps = CAPABILITY_MATRIX[spec.type];
-  if (staticCaps) {
-    // Phase A: no mismatch checks against user input (tools are in AgentInput,
-    // not in CreateAgentArgs). CapabilityMismatchError reserved for Phase B+.
-    void staticCaps;
-  }
-
-  // Step 5 — construct + return
+  // Step 4 — construct + return.
+  //
+  // `entry.capabilities` is the authoritative descriptor: built-ins pass their
+  // ADAPTER_CATALOG row at registration, and external adapters supply their own.
+  // There is no separate static matrix to reconcile against.
   return entry.factory(spec, {
     workdir,
     repoRoot,

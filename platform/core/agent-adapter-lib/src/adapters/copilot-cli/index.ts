@@ -31,7 +31,7 @@
  *     (classic ghp_ PATs are NOT supported). MissingCredentialError at
  *     construction when none resolves (fail-fast).
  *   - AbortSignal → SIGTERM→SIGKILL (shared child-process) → finishReason:'aborted'.
- *   - Capabilities: CAPABILITY_MATRIX['copilot-cli'].
+ *   - Capabilities: ADAPTER_CATALOG['copilot-cli'].capabilities.
  */
 
 import type {
@@ -44,7 +44,7 @@ import type {
   Logger,
 } from '../../agent.ts';
 import type { AdapterCapabilities } from '../../capabilities.ts';
-import { CAPABILITY_MATRIX } from '../../capabilities.ts';
+import { ADAPTER_CATALOG } from '../../catalog.ts';
 import type { CredentialBroker } from '../../credentials/broker.ts';
 import { AdapterError, MissingCredentialError, ProviderError } from '../../errors.ts';
 import type { AdapterDeps } from '../../registry.ts';
@@ -72,7 +72,7 @@ export class CopilotCliAdapter implements AgentAdapter {
   constructor(spec: CopilotCliSpec, deps: AdapterDeps, token: string) {
     this.spec = spec;
     this.workdir = deps.workdir;
-    this.capabilities = CAPABILITY_MATRIX['copilot-cli'];
+    this.capabilities = ADAPTER_CATALOG['copilot-cli'].capabilities;
     this.token = token;
     this.logger = deps.logger;
     // Resolve the binary at construction (fail-fast BinaryNotFoundError, PRD §9).
@@ -252,7 +252,7 @@ registerAdapter(
 
     return new CopilotCliAdapter(cliSpec, deps, syncToken as string);
   },
-  CAPABILITY_MATRIX['copilot-cli'],
+  ADAPTER_CATALOG['copilot-cli'].capabilities,
 );
 
 // ---------------------------------------------------------------------------
@@ -273,7 +273,7 @@ class LazyCopilotCliAdapter implements AgentAdapter {
     private readonly broker: CredentialBroker,
   ) {
     this.workdir = deps.workdir;
-    this.capabilities = CAPABILITY_MATRIX['copilot-cli'];
+    this.capabilities = ADAPTER_CATALOG['copilot-cli'].capabilities;
   }
 
   private async _resolve(): Promise<CopilotCliAdapter> {

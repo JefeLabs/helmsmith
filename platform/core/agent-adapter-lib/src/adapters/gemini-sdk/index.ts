@@ -15,7 +15,7 @@
  *   - Auth: broker.getCredential('google') → apiKey, fallback GEMINI_API_KEY /
  *     GOOGLE_API_KEY, else MissingCredentialError at construction (fail-fast).
  *   - AbortSignal: forwarded via config.abortSignal → finishReason 'aborted'.
- *   - Capabilities: from CAPABILITY_MATRIX['gemini-sdk'] (supportsJsonMode: true).
+ *   - Capabilities: from ADAPTER_CATALOG['gemini-sdk'].capabilities (supportsJsonMode: true).
  */
 
 import { GoogleGenAI } from '@google/genai';
@@ -30,7 +30,7 @@ import type {
   TokenUsage,
 } from '../../agent.ts';
 import type { AdapterCapabilities } from '../../capabilities.ts';
-import { CAPABILITY_MATRIX } from '../../capabilities.ts';
+import { ADAPTER_CATALOG } from '../../catalog.ts';
 import type { CredentialBroker } from '../../credentials/broker.ts';
 import {
   type AdapterError,
@@ -102,7 +102,7 @@ export class GeminiSdkAdapter implements AgentAdapter {
   constructor(spec: GeminiSdkSpec, deps: AdapterDeps, apiKey: string) {
     this.spec = spec;
     this.workdir = deps.workdir;
-    this.capabilities = CAPABILITY_MATRIX['gemini-sdk'];
+    this.capabilities = ADAPTER_CATALOG['gemini-sdk'].capabilities;
     this.client = new GoogleGenAI({ apiKey });
   }
 
@@ -284,7 +284,7 @@ registerAdapter(
         'CredentialBroker.getCredential("google"), or the GEMINI_API_KEY / GOOGLE_API_KEY env var.',
     );
   },
-  CAPABILITY_MATRIX['gemini-sdk'],
+  ADAPTER_CATALOG['gemini-sdk'].capabilities,
 );
 
 // ---------------------------------------------------------------------------
@@ -305,7 +305,7 @@ class LazyGeminiSdkAdapter implements AgentAdapter {
     private readonly broker: CredentialBroker,
   ) {
     this.workdir = deps.workdir;
-    this.capabilities = CAPABILITY_MATRIX['gemini-sdk'];
+    this.capabilities = ADAPTER_CATALOG['gemini-sdk'].capabilities;
   }
 
   private async _resolve(): Promise<GeminiSdkAdapter> {

@@ -36,7 +36,7 @@
  *   - Auth: broker.getCredential('anthropic') → ANTHROPIC_API_KEY via env option
  *     MissingCredentialError at construction if not resolvable
  *   - AbortSignal → abortController.abort() → finishReason:'aborted'
- *   - Capabilities: CAPABILITY_MATRIX['claude-agent-sdk']
+ *   - Capabilities: ADAPTER_CATALOG['claude-agent-sdk'].capabilities
  */
 
 import type {
@@ -50,7 +50,7 @@ import type {
   TokenUsage,
 } from '../../agent.ts';
 import type { AdapterCapabilities } from '../../capabilities.ts';
-import { CAPABILITY_MATRIX } from '../../capabilities.ts';
+import { ADAPTER_CATALOG } from '../../catalog.ts';
 import type { CredentialBroker } from '../../credentials/broker.ts';
 import { ConfigError, classifyNetworkError, MissingCredentialError } from '../../errors.ts';
 import type { AdapterDeps } from '../../registry.ts';
@@ -198,7 +198,7 @@ export class ClaudeAgentSdkAdapter implements AgentAdapter {
   constructor(spec: ClaudeAgentSdkSpec, deps: AdapterDeps, apiKey: string) {
     this.spec = spec;
     this.workdir = deps.workdir;
-    this.capabilities = CAPABILITY_MATRIX['claude-agent-sdk'];
+    this.capabilities = ADAPTER_CATALOG['claude-agent-sdk'].capabilities;
     this.apiKey = apiKey;
   }
 
@@ -449,7 +449,7 @@ registerAdapter(
         'CredentialBroker.getCredential("anthropic"), or the ANTHROPIC_API_KEY environment variable.',
     );
   },
-  CAPABILITY_MATRIX['claude-agent-sdk'],
+  ADAPTER_CATALOG['claude-agent-sdk'].capabilities,
 );
 
 // ---------------------------------------------------------------------------
@@ -470,7 +470,7 @@ class LazyClaudeAgentSdkAdapter implements AgentAdapter {
     private readonly broker: CredentialBroker,
   ) {
     this.workdir = deps.workdir;
-    this.capabilities = CAPABILITY_MATRIX['claude-agent-sdk'];
+    this.capabilities = ADAPTER_CATALOG['claude-agent-sdk'].capabilities;
   }
 
   private async _resolve(): Promise<ClaudeAgentSdkAdapter> {

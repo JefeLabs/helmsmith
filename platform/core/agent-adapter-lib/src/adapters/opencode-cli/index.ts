@@ -26,12 +26,12 @@
  *     XDG config-dir isolation + MCP suppression, --attach/serverUrl mode,
  *     provider env-var injection.
  *   - AbortSignal → SIGTERM→SIGKILL (shared child-process) → finishReason:'aborted'.
- *   - Capabilities: CAPABILITY_MATRIX['opencode-cli'].
+ *   - Capabilities: ADAPTER_CATALOG['opencode-cli'].capabilities.
  *
  * KNOWN MATRIX DISCREPANCY (flagged, not silently diverged — see report):
  *   The v1.17.5 `--format json` stream DOES report token usage (step_finish
  *   `tokens`) and DOES surface reasoning (`reasoning` events + `--thinking`).
- *   CAPABILITY_MATRIX['opencode-cli'] still has the conservative Phase-A TBDs
+ *   ADAPTER_CATALOG['opencode-cli'].capabilities still has the conservative Phase-A TBDs
  *   reportsUsage:false / supportsExtendedThinking:false. Flipping them is a
  *   Phase-A capabilities.ts change (its capabilities.test.ts asserts the
  *   current false values) and is intentionally left to that follow-up so this
@@ -52,7 +52,7 @@ import type {
   OpenCodeCliSpec,
 } from '../../agent.ts';
 import type { AdapterCapabilities } from '../../capabilities.ts';
-import { CAPABILITY_MATRIX } from '../../capabilities.ts';
+import { ADAPTER_CATALOG } from '../../catalog.ts';
 import type { CredentialBroker } from '../../credentials/broker.ts';
 import { AdapterError, ConfigError, MissingCredentialError, ProviderError } from '../../errors.ts';
 import type { AdapterDeps } from '../../registry.ts';
@@ -128,7 +128,7 @@ export class OpenCodeCliAdapter implements AgentAdapter {
   constructor(spec: OpenCodeCliSpec, deps: AdapterDeps, apiKey: string) {
     this.spec = spec;
     this.workdir = deps.workdir;
-    this.capabilities = CAPABILITY_MATRIX['opencode-cli'];
+    this.capabilities = ADAPTER_CATALOG['opencode-cli'].capabilities;
     this.apiKey = apiKey;
     this.logger = deps.logger;
     this.target = resolveOpencodeTarget(spec);
@@ -400,7 +400,7 @@ registerAdapter(
         `${target.envVar ?? 'provider'} environment variable.`,
     );
   },
-  CAPABILITY_MATRIX['opencode-cli'],
+  ADAPTER_CATALOG['opencode-cli'].capabilities,
 );
 
 // ---------------------------------------------------------------------------
@@ -421,7 +421,7 @@ class LazyOpenCodeCliAdapter implements AgentAdapter {
     private readonly broker: CredentialBroker,
   ) {
     this.workdir = deps.workdir;
-    this.capabilities = CAPABILITY_MATRIX['opencode-cli'];
+    this.capabilities = ADAPTER_CATALOG['opencode-cli'].capabilities;
   }
 
   private async _resolve(): Promise<OpenCodeCliAdapter> {

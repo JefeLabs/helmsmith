@@ -42,6 +42,6 @@ describe('public surface', () => {
     expect(lib.AuthError).toBeDefined();
     expect(lib.WorkdirNotARepoError).toBeDefined();
     expect(lib.listAdapterTypes()).toHaveLength(11);
-    expect(Object.keys(lib.CAPABILITY_MATRIX)).toHaveLength(11);
+    expect(Object.keys(lib.ADAPTER_CATALOG)).toHaveLength(11);
   });
 });

@@ -9,7 +9,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OpenAiSdkSpec } from '../../agent.ts';
-import { CAPABILITY_MATRIX } from '../../capabilities.ts';
+import { ADAPTER_CATALOG } from '../../catalog.ts';
 import { AuthError, MissingCredentialError } from '../../errors.ts';
 import type { AdapterDeps } from '../../registry.ts';
 import { getAdapterFactory } from '../../registry.ts';
@@ -129,7 +129,7 @@ describe('OpenAiSdkAdapter — basics', () => {
   it('reports the openai-sdk capability matrix (supportsJsonMode: true)', () => {
     const adapter = makeAdapter();
     expect(adapter.type).toBe('openai-sdk');
-    expect(adapter.capabilities).toEqual(CAPABILITY_MATRIX['openai-sdk']);
+    expect(adapter.capabilities).toEqual(ADAPTER_CATALOG['openai-sdk'].capabilities);
     expect(adapter.capabilities.supportsToolUse).toBe(true);
     expect(adapter.capabilities.supportsJsonMode).toBe(true);
     expect(adapter.capabilities.reportsUsage).toBe(true);

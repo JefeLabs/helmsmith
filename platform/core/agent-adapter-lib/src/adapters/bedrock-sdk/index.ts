@@ -33,7 +33,7 @@
  * error chunk with AWS-specific remediation.
  *
  *   - AbortSignal: forwarded via client.send(cmd, { abortSignal }) → 'aborted'.
- *   - Capabilities: from CAPABILITY_MATRIX['bedrock-sdk'] (supportsJsonMode: false,
+ *   - Capabilities: from ADAPTER_CATALOG['bedrock-sdk'].capabilities (supportsJsonMode: false,
  *     supportsExtendedThinking: true via reasoningContent).
  */
 
@@ -49,7 +49,7 @@ import type {
   TokenUsage,
 } from '../../agent.ts';
 import type { AdapterCapabilities } from '../../capabilities.ts';
-import { CAPABILITY_MATRIX } from '../../capabilities.ts';
+import { ADAPTER_CATALOG } from '../../catalog.ts';
 import {
   type AdapterError,
   AuthError,
@@ -148,7 +148,7 @@ export class BedrockSdkAdapter implements AgentAdapter {
   constructor(spec: BedrockSdkSpec, deps: AdapterDeps) {
     this.spec = spec;
     this.workdir = deps.workdir;
-    this.capabilities = CAPABILITY_MATRIX['bedrock-sdk'];
+    this.capabilities = ADAPTER_CATALOG['bedrock-sdk'].capabilities;
     this.logger = deps.logger;
     this.region = resolveRegion(spec);
 
@@ -380,5 +380,5 @@ registerAdapter(
   // region validation (ConfigError) happens in the constructor — fail fast at
   // createAgent() time. Credentials resolve lazily via the AWS chain on first call.
   (spec, deps) => new BedrockSdkAdapter(spec as BedrockSdkSpec, deps),
-  CAPABILITY_MATRIX['bedrock-sdk'],
+  ADAPTER_CATALOG['bedrock-sdk'].capabilities,
 );
