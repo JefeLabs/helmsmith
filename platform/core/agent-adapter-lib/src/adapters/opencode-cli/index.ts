@@ -454,3 +454,18 @@ class LazyOpenCodeCliAdapter implements AgentAdapter {
     yield* adapter.stream(input, opts);
   }
 }
+
+// ---------------------------------------------------------------------------
+// OpenCodeServer — published from this entry, not the root
+// ---------------------------------------------------------------------------
+
+// Interface-agnostic helper (node builtins only) for spawning / attaching to a
+// long-running `opencode serve`. It lives on the opencode-cli entry so hosts
+// that never use opencode do not carry it on their surface.
+export {
+  OpenCodeServer,
+  OpenCodeServerError,
+  type OpenCodeServerHandle,
+  type OpenCodeServerOptions,
+  type OpencodeProviderEntry,
+} from '../../opencode-server.ts';

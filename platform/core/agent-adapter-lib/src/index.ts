@@ -1,16 +1,22 @@
 /**
  * @helmsmith/agent-adapter — public surface (PRD §6/§7).
  *
- * The `createAgent()`-based surface. Importing this module registers all 11
- * built-in adapters as a side-effect (via ./adapters/index.ts) so
- * `createAgent()` resolves any `spec.type` out of the box.
+ * The `createAgent()`-based surface. Importing this module registers NOTHING
+ * and loads no provider SDK — that is what lets a host carry only the providers
+ * it actually uses.
+ *
+ * To make an adapter available, import its entry and call its registrar at your
+ * composition root:
+ *
+ *   import { registerCodexCli } from '@helmsmith/agent-adapter/adapters/codex-cli';
+ *   registerCodexCli();
+ *
+ * To browse what exists before choosing, read ADAPTER_CATALOG — static data that
+ * needs no adapter module loaded.
  *
  * The conformance suite is a separate entry point:
  * `@helmsmith/agent-adapter/conformance`.
  */
-
-// Side-effect: register all 11 built-in adapter factories.
-import './adapters/index.ts';
 
 // --- Core types (agent.ts) ---------------------------------------------------
 export type {
@@ -66,10 +72,9 @@ export {
   WorkdirNotARepoError,
 } from './errors.ts';
 // --- OpenCode server helper --------------------------------------------------
-// Interface-agnostic utility (node builtins only) for spawning / attaching to a
-// long-running `opencode serve`. Kept on the barrel because a consumer
-// (harness-pipeline-cli) imports it directly and it carries no old-surface
-// coupling.
+// DEPRECATED here: import from '@helmsmith/agent-adapter/adapters/opencode-cli'.
+// Retained only until harness-pipeline-cli migrates, then removed. A helper for
+// one provider does not belong on the provider-neutral root.
 export {
   OpenCodeServer,
   OpenCodeServerError,
