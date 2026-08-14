@@ -41,7 +41,7 @@ export function PropertyPanel({
 }) {
   if (!selection) {
     return (
-      <div className="p-4 text-xs" style={{ color: 'var(--dim)' }}>
+      <div className="p-4 text-xs" style={{ color: 'var(--flow-text-dim)' }}>
         Select a node or an edge to inspect and edit it. Drag from a node's right handle to draw a
         new edge; Backspace deletes the selection.
       </div>

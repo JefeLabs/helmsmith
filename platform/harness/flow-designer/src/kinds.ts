@@ -12,7 +12,7 @@ export const STEP_KINDS: ReadonlyArray<TaskStep['kind']> = [
 ];
 
 export function kindColor(kind: TaskStep['kind']): string {
-  return `var(--k-${kind})`;
+  return `var(--flow-kind-${kind})`;
 }
 
 /** One-line config summary for the node card. */
