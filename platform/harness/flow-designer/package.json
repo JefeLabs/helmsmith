@@ -11,9 +11,11 @@
     "prepublishOnly": "npm run test && npm run build && npm run build:lib",
     "build:lib": "rm -rf dist-lib && vite build -c vite.lib.config.ts && tsc -p tsconfig.lib.json"
   },
+  "dependencies": {
+    "@helmsmith/flow-spec": "workspace:*"
+  },
   "devDependencies": {
     "@dagrejs/dagre": "^3.1.1",
-    "@helmsmith/flow-spec": "workspace:*",
     "@xyflow/react": "^12.11.3",
     "react": "19.2.6",
     "react-dom": "19.2.6",
