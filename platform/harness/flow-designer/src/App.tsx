@@ -12,6 +12,7 @@ import type { ValidationState } from './components/BottomPanel.tsx';
 import { BottomPanel } from './components/BottomPanel.tsx';
 import { Canvas } from './components/Canvas.tsx';
 import { PropertyPanel } from './components/PropertyPanel.tsx';
+import { SubflowPreview } from './components/SubflowPreview.tsx';
 import type { DesignerEdge, DesignerNode } from './graph-model.ts';
 import { flowToGraph, graphToFlow, newStep } from './graph-model.ts';
 import { emptyHistory, type History, recorded, redone, undone } from './history.ts';
@@ -42,6 +43,14 @@ export interface FlowDesignerProps {
    *  Default '/harness' (the dev/npx proxy path). Pass null to hide
    *  the server ⇩/⇧ buttons entirely (file-only embedding). */
   serverBase?: string | null;
+  /** Theming overrides: --flow-* custom properties (see styles.css /
+   *  README for the contract) set inline on the component root. Plain
+   *  CSS (`.my-theme .flow-designer { --flow-accent: … }`) reaches the
+   *  same properties without this prop. */
+  theme?: Readonly<Record<string, string>>;
+  /** Toolbar wordmark. Defaults to the Helmsmith wordmark for the
+   *  standalone app; pass null to render no brand at all (embeds). */
+  brand?: React.ReactNode | null;
 }
 
 /** Map a flow to canvas shapes, overlaying any layout persisted for it —
@@ -59,6 +68,8 @@ export function FlowDesigner({
   initialCatalog = SAMPLE_CATALOG,
   onCatalogChange,
   serverBase = '/harness',
+  theme,
+  brand = 'Helmsmith',
 }: FlowDesignerProps = {}) {
   const [catalog, setCatalog] = useState<Catalog>(initialCatalog);
   const [flowId, setFlowId] = useState<string>(initialCatalog.flows[0]?.id ?? '');
@@ -409,21 +420,41 @@ export function FlowDesigner({
 
   const lampColor =
     validation.errors.length > 0
-      ? 'var(--error)'
+      ? 'var(--flow-error)'
       : validation.warnings.length > 0
-        ? 'var(--warn)'
-        : 'var(--ok)';
+        ? 'var(--flow-warn)'
+        : 'var(--flow-ok)';
+
+  // A selected subflow step reveals its child flow in the translucent
+  // inset under the canvas — resolved by flowId against the live catalog.
+  const selectedSubflow = useMemo(() => {
+    if (selection?.type !== 'node') return null;
+    const step = nodes.find((n) => n.id === selection.id)?.data.step;
+    if (!step || step.kind !== 'subflow') return null;
+    const cfg = step.config as { flowId?: string; version?: string };
+    const target = cfg.flowId ?? '';
+    return {
+      target,
+      version: cfg.version,
+      flow: liveCatalog.flows.find((f) => f.id === target),
+    };
+  }, [selection, nodes, liveCatalog]);
 
   return (
-    <div className="grid h-full" style={{ gridTemplateRows: '52px minmax(0,1fr) 220px' }}>
+    <div
+      className="flow-designer grid h-full"
+      style={{ gridTemplateRows: '52px minmax(0,1fr) 220px', ...theme } as React.CSSProperties}
+    >
       {/* ── Toolbar ── */}
       <header
         className="panel flex items-center gap-4 border-x-0 border-t-0 px-4"
-        style={{ background: 'var(--ink-deep)' }}
+        style={{ background: 'var(--flow-app-bg)' }}
       >
-        <span className="font-display text-lg" style={{ color: 'var(--brass)' }}>
-          Helmsmith
-        </span>
+        {brand !== null && (
+          <span className="font-display text-lg" style={{ color: 'var(--flow-accent)' }}>
+            {brand}
+          </span>
+        )}
         <span className="panel-title">flow designer</span>
         <span className="status-lamp" style={{ background: lampColor }} title="catalog status" />
         <div className="ml-auto flex items-center gap-2">
@@ -450,7 +481,7 @@ export function FlowDesigner({
           {serverStatus && (
             <span
               className="font-mono text-[11px]"
-              style={{ color: serverStatus.ok ? 'var(--dim)' : 'var(--error)' }}
+              style={{ color: serverStatus.ok ? 'var(--flow-text-dim)' : 'var(--flow-error)' }}
               title={serverStatus.text}
             >
               {serverStatus.text.length > 60
@@ -494,7 +525,7 @@ export function FlowDesigner({
       {/* ── Main ── */}
       <div className="grid min-h-0" style={{ gridTemplateColumns: '216px minmax(0,1fr) 340px' }}>
         <aside className="panel flex min-h-0 flex-col border-y-0 border-l-0">
-          <div className="border-b px-3 py-2" style={{ borderColor: 'var(--line-soft)' }}>
+          <div className="border-b px-3 py-2" style={{ borderColor: 'var(--flow-border-soft)' }}>
             <div className="mb-1 flex items-center justify-between">
               <span className="panel-title">flows</span>
               <button type="button" className="btn" onClick={addFlow}>
@@ -530,7 +561,7 @@ export function FlowDesigner({
           </div>
         </aside>
 
-        <main className="min-h-0">
+        <main className="relative min-h-0">
           <Canvas
             nodes={nodes}
             edges={edges}
@@ -539,6 +570,14 @@ export function FlowDesigner({
             onConnect={onConnect}
             onRecordPoint={recordPoint}
           />
+          {selectedSubflow && (
+            <SubflowPreview
+              flow={selectedSubflow.flow}
+              targetId={selectedSubflow.target}
+              versionPin={selectedSubflow.version}
+              onOpen={() => switchFlow(selectedSubflow.target)}
+            />
+          )}
         </main>
 
         <aside className="panel min-h-0 border-y-0 border-r-0">

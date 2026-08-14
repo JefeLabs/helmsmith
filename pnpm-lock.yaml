@@ -328,6 +328,9 @@ importers:
 
   apps/taskmaster:
     dependencies:
+      '@helmsmith/agent-adapter':
+        specifier: workspace:*
+        version: link:../../platform/core/agent-adapter-lib
       '@helmsmith/agent-auth':
         specifier: workspace:*
         version: link:../../platform/core/agent-auth-lib
@@ -519,6 +522,9 @@ importers:
 
   platform/context/context-loader-core:
     dependencies:
+      '@helmsmith/agent-adapter':
+        specifier: workspace:*
+        version: link:../../core/agent-adapter-lib
       '@helmsmith/agent-auth':
         specifier: workspace:*
         version: link:../../core/agent-auth-lib
@@ -646,31 +652,35 @@ importers:
         version: 5.9.3
 
   platform/core/agent-adapter-lib:
-    devDependencies:
-      '@anthropic-ai/claude-agent-sdk':
-        specifier: ^0.3.195
-        version: 0.3.195(@anthropic-ai/sdk@0.30.1)(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(zod@4.4.3)
+    dependencies:
       '@anthropic-ai/sdk':
         specifier: ^0.30.1
         version: 0.30.1
+      '@helmsmith/agent-auth':
+        specifier: workspace:*
+        version: link:../agent-auth-lib
+      zod:
+        specifier: ^3.25.32
+        version: 3.25.76
+    devDependencies:
+      '@anthropic-ai/claude-agent-sdk':
+        specifier: ^0.3.195
+        version: 0.3.195(@anthropic-ai/sdk@0.30.1)(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@3.25.76))(zod@3.25.76)
       '@aws-sdk/client-bedrock-runtime':
         specifier: ^3.1076.0
         version: 3.1076.0
       '@google/genai':
         specifier: ^2.10.0
-        version: 2.10.0(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))
+        version: 2.10.0(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@3.25.76))
       '@types/node':
         specifier: ^22.7.0
         version: 22.20.0
       openai:
         specifier: ^6.45.0
-        version: 6.45.0(@aws-sdk/credential-provider-node@3.972.59)(@smithy/signature-v4@5.6.0)(ws@8.21.0)(zod@4.4.3)
+        version: 6.45.0(@aws-sdk/credential-provider-node@3.972.59)(@smithy/signature-v4@5.6.0)(ws@8.21.0)(zod@3.25.76)
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
-      vitest:
-        specifier: ^4.1.5
-        version: 4.1.9(@types/node@22.20.0)(vite@6.4.3(@types/node@22.20.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.4)(yaml@2.9.0))
 
   platform/core/agent-auth-lib:
     devDependencies:
@@ -730,13 +740,23 @@ importers:
         version: 4.1.9(@types/node@22.20.0)(vite@6.4.3(@types/node@22.20.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.4)(yaml@2.9.0))
 
   platform/harness/flow-designer:
-    devDependencies:
+    dependencies:
       '@dagrejs/dagre':
         specifier: ^3.1.1
         version: 3.1.1
       '@helmsmith/flow-spec':
         specifier: workspace:*
         version: link:../flow-spec
+      '@xyflow/react':
+        specifier: ^12.11.3
+        version: 12.11.3(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      react:
+        specifier: 19.2.6
+        version: 19.2.6
+      react-dom:
+        specifier: 19.2.6
+        version: 19.2.6(react@19.2.6)
+    devDependencies:
       '@tailwindcss/vite':
         specifier: ^4.0.0
         version: 4.3.1(vite@6.4.3(@types/node@25.9.4)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.4)(yaml@2.9.0))
@@ -749,15 +769,6 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^4.3.0
         version: 4.7.0(vite@6.4.3(@types/node@25.9.4)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.4)(yaml@2.9.0))
-      '@xyflow/react':
-        specifier: ^12.11.3
-        version: 12.11.3(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
-      react:
-        specifier: 19.2.6
-        version: 19.2.6
-      react-dom:
-        specifier: 19.2.6
-        version: 19.2.6(react@19.2.6)
       tailwindcss:
         specifier: ^4.0.0
         version: 4.3.1
@@ -853,9 +864,6 @@ importers:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
-      vitest:
-        specifier: ^4.1.5
-        version: 4.1.9(@types/node@22.20.0)(vite@6.4.3(@types/node@22.20.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.4)(yaml@2.9.0))
 
   platform/harness/harness-pipeline-cli:
     dependencies:
@@ -6768,11 +6776,11 @@ snapshots:
   '@anthropic-ai/claude-agent-sdk-win32-x64@0.3.195':
     optional: true
 
-  '@anthropic-ai/claude-agent-sdk@0.3.195(@anthropic-ai/sdk@0.30.1)(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(zod@4.4.3)':
+  '@anthropic-ai/claude-agent-sdk@0.3.195(@anthropic-ai/sdk@0.30.1)(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@3.25.76))(zod@3.25.76)':
     dependencies:
       '@anthropic-ai/sdk': 0.30.1
-      '@modelcontextprotocol/sdk': 1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)
-      zod: 4.4.3
+      '@modelcontextprotocol/sdk': 1.29.0(@cfworker/json-schema@4.1.1)(zod@3.25.76)
+      zod: 3.25.76
     optionalDependencies:
       '@anthropic-ai/claude-agent-sdk-darwin-arm64': 0.3.195
       '@anthropic-ai/claude-agent-sdk-darwin-x64': 0.3.195
@@ -7669,14 +7677,14 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@google/genai@2.10.0(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))':
+  '@google/genai@2.10.0(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@3.25.76))':
     dependencies:
       google-auth-library: 10.9.0
       p-retry: 4.6.2
       protobufjs: 7.6.4
       ws: 8.21.0
     optionalDependencies:
-      '@modelcontextprotocol/sdk': 1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)
+      '@modelcontextprotocol/sdk': 1.29.0(@cfworker/json-schema@4.1.1)(zod@3.25.76)
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -9249,7 +9257,7 @@ snapshots:
       globby: 11.1.0
       read-yaml-file: 1.1.0
 
-  '@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)':
+  '@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@3.25.76)':
     dependencies:
       '@hono/node-server': 1.19.14(hono@4.12.27)
       ajv: 8.20.0
@@ -9266,8 +9274,8 @@ snapshots:
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
       raw-body: 3.0.2
-      zod: 4.4.3
-      zod-to-json-schema: 3.25.2(zod@4.4.3)
+      zod: 3.25.76
+      zod-to-json-schema: 3.25.2(zod@3.25.76)
     optionalDependencies:
       '@cfworker/json-schema': 4.1.1
     transitivePeerDependencies:
@@ -12533,7 +12541,6 @@ snapshots:
       '@smithy/signature-v4': 5.6.0
       ws: 8.21.0
       zod: 3.25.76
-    optional: true
 
   openai@6.45.0(@aws-sdk/credential-provider-node@3.972.59)(@smithy/signature-v4@5.6.0)(ws@8.21.0)(zod@4.4.3):
     optionalDependencies:
@@ -12541,6 +12548,7 @@ snapshots:
       '@smithy/signature-v4': 5.6.0
       ws: 8.21.0
       zod: 4.4.3
+    optional: true
 
   ora@8.2.0:
     dependencies:
@@ -13524,9 +13532,9 @@ snapshots:
 
   yoga-layout@3.2.1: {}
 
-  zod-to-json-schema@3.25.2(zod@4.4.3):
+  zod-to-json-schema@3.25.2(zod@3.25.76):
     dependencies:
-      zod: 4.4.3
+      zod: 3.25.76
 
   zod@3.25.76: {}
 

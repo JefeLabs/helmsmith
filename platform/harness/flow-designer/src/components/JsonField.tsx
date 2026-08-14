@@ -56,7 +56,7 @@ export function JsonField({
       <div className="mb-1 flex items-center justify-between">
         <span className="field-label">{label}</span>
         {error && (
-          <span className="text-[10px]" style={{ color: 'var(--error)' }}>
+          <span className="text-[10px]" style={{ color: 'var(--flow-error)' }}>
             {error}
           </span>
         )}
