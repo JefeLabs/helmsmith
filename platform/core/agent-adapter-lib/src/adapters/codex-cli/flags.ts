@@ -1,3 +1,4 @@
+import type { CodexCliSpec } from './index.ts';
 /**
  * CodexCliSpec → `codex exec` CLI flags (Phase D‴).
  *
@@ -32,8 +33,6 @@
  * tool-result chunks for observability only (PRD §11); the host cannot inject
  * custom tool definitions, so AgentInput.tools is NOT forwarded.
  */
-
-import type { CodexCliSpec } from '../../agent.ts';
 
 /** The CLI binary name (resolved via PATH or spec.binaryPath in the adapter). */
 export const CODEX_BINARY = 'codex';

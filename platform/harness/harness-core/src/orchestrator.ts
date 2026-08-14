@@ -2,9 +2,10 @@ import {
   AdapterError,
   type AgentAdapter,
   createAgent,
-  type OpenCodeCliSpec,
   type TokenUsage,
 } from '@helmsmith/agent-adapter';
+// Provider spec types live on their adapter entry, not the root.
+import type { OpenCodeCliSpec } from '@helmsmith/agent-adapter/adapters/opencode-cli';
 import {
   type BindingResolver,
   bridgeBroker,

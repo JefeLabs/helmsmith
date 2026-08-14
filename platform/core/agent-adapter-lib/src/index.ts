@@ -19,6 +19,11 @@
  */
 
 // --- Core types (agent.ts) ---------------------------------------------------
+//
+// Provider spec types (ClaudeSdkSpec, OpenAiSdkSpec, …) are NOT re-exported
+// here. Each lives on its adapter entry — import OpenAiSdkSpec from
+// '@helmsmith/agent-adapter/adapters/openai-sdk'. Keeping them off the root is
+// the type-level half of carrying only the providers you use.
 export type {
   AdapterCapabilities,
   AgentAdapter,
@@ -26,23 +31,14 @@ export type {
   AgentInput,
   AgentInvocationResult,
   AgentSpec,
+  AgentSpecRegistry,
   AgentSpecType,
-  BedrockSdkSpec,
+  BaseSpec,
   ChatMessage,
-  ClaudeAgentSdkSpec,
-  ClaudeCodeCliSpec,
-  ClaudeSdkSpec,
-  CodexCliSpec,
   ContentBlock,
-  CopilotCliSpec,
-  CopilotSdkSpec,
   CreateAgentArgs,
-  GeminiCliSpec,
-  GeminiSdkSpec,
   InvokeOptions,
   Logger,
-  OpenAiSdkSpec,
-  OpenCodeCliSpec,
   TokenUsage,
   ToolDefinition,
 } from './agent.ts';

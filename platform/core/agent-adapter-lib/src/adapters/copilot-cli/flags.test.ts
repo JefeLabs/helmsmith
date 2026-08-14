@@ -7,8 +7,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { CopilotCliSpec } from '../../agent.ts';
 import { buildCopilotCliArgs, COPILOT_CLI_BINARY, flattenPrompt } from './flags.ts';
+import type { CopilotCliSpec } from './index.ts';
 
 const SPEC: CopilotCliSpec = { type: 'copilot-cli', model: 'gpt-4o' };
 const WORKDIR = '/work/dir';

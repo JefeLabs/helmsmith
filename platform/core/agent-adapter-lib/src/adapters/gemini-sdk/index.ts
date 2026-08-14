@@ -24,7 +24,7 @@ import type {
   AgentInput,
   AgentInvocationResult,
   AgentSpecType,
-  GeminiSdkSpec,
+  BaseSpec,
   InvokeOptions,
   Logger,
   TokenUsage,
@@ -52,6 +52,31 @@ import {
   normalizeToolChoice,
   normalizeTools,
 } from './normalize.ts';
+
+// ---------------------------------------------------------------------------
+// GeminiSdkSpec — owned by this adapter, contributed to the open registry
+// ---------------------------------------------------------------------------
+
+/**
+ * Google Gemini SDK — in-process `@google/genai`, chat-mode host-loop tool use
+ * (provider: google). Mirrors claude-sdk: stream()/invoke()=reduceStream,
+ * broker auth, API-level tool-use surfaced as tool-call-* chunks.
+ */
+export interface GeminiSdkSpec extends BaseSpec {
+  type: 'gemini-sdk';
+  /**
+   * Pre-resolved Google/Gemini API key (skips CredentialBroker when set). When
+   * unset, resolved via broker.getCredential('google'); falls back to the
+   * GEMINI_API_KEY / GOOGLE_API_KEY environment variables.
+   */
+  apiKey?: string;
+}
+
+declare module '../../agent.ts' {
+  interface AgentSpecRegistry {
+    'gemini-sdk': GeminiSdkSpec;
+  }
+}
 
 const GEMINI_PROVIDER = 'google';
 const DEFAULT_MAX_TOKENS = 8192;

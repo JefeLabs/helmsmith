@@ -33,8 +33,8 @@ import type {
   AgentInput,
   AgentInvocationResult,
   AgentSpecType,
+  BaseSpec,
   ChatMessage,
-  CodexCliSpec,
   InvokeOptions,
   Logger,
 } from '../../agent.ts';
@@ -50,6 +50,40 @@ import { resolveBinary, spawnAgentProcess } from '../shared/child-process.ts';
 import { rejectCustomTools } from '../shared/reject-custom-tools.ts';
 import { buildCodexFlags, CODEX_BINARY } from './flags.ts';
 import { CodexStreamParser } from './stream-parser.ts';
+
+// ---------------------------------------------------------------------------
+// CodexCliSpec — owned by this adapter, contributed to the open registry
+// ---------------------------------------------------------------------------
+
+/**
+ * Codex CLI subprocess (`codex`, provider: openai). Autonomous built-in tools,
+ * headless via the `codex exec <prompt> --json` non-interactive subcommand.
+ */
+export interface CodexCliSpec extends BaseSpec {
+  type: 'codex-cli';
+  binaryPath?: string;
+  env?: Record<string, string>;
+  /**
+   * Pre-resolved OpenAI API key. When unset, resolved via
+   * broker.getCredential('openai') → injected as OPENAI_API_KEY (the $HOME
+   * sandbox hides codex's own ~/.codex/auth.json ChatGPT OAuth). Falls back to
+   * the OPENAI_API_KEY env var.
+   */
+  apiKey?: string;
+  /**
+   * Sandbox policy for `codex exec --sandbox`. Defaults to 'workspace-write'
+   * (writes confined to the workspace + temp; network off) — the safe
+   * non-interactive choice. The adapter additionally sandboxes $HOME/$TMPDIR
+   * to the workdir.
+   */
+  sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
+}
+
+declare module '../../agent.ts' {
+  interface AgentSpecRegistry {
+    'codex-cli': CodexCliSpec;
+  }
+}
 
 /** The provider whose credential this adapter injects, and the env var it reads. */
 const CODEX_PROVIDER = 'openai';

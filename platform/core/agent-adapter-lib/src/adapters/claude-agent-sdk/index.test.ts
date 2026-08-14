@@ -7,12 +7,12 @@
  */
 
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ClaudeAgentSdkSpec } from '../../agent.ts';
 import { ADAPTER_CATALOG } from '../../catalog.ts';
 import { CapabilityMismatchError, MissingCredentialError } from '../../errors.ts';
 import type { AdapterDeps } from '../../registry.ts';
 import { getAdapterFactory } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
+import type { ClaudeAgentSdkSpec } from './index.ts';
 import { ClaudeAgentSdkAdapter, registerClaudeAgentSdk, resolveApiKey } from './index.ts';
 
 // Registration is explicit: importing the adapter module no longer self-registers.

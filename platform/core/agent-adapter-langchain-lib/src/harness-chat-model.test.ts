@@ -25,6 +25,10 @@ import {
   type AgentInvocationResult,
   type AgentSpecType,
 } from '@helmsmith/agent-adapter';
+// Importing the adapter entry contributes 'claude-sdk' to AgentSpecRegistry, so
+// the spec literal below typechecks with its provider fields. Calling the
+// registrar is what makes createAgent able to dispatch to it.
+import { registerClaudeSdk } from '@helmsmith/agent-adapter/adapters/claude-sdk';
 import { AIMessage, HumanMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph';
 import { describe, expect, it } from 'vitest';
@@ -165,6 +169,7 @@ describe('HarnessChatModel inside a LangGraph node', () => {
 
 describe('createHarnessChatModel — createAgent helper', () => {
   it('builds a HarnessChatModel from an AgentSpec via createAgent', () => {
+    registerClaudeSdk();
     const dir = mkdtempSync(join(tmpdir(), 'hcm-'));
     execFileSync('git', ['-C', dir, 'init'], { stdio: 'ignore' });
     const model = createHarnessChatModel({

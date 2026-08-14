@@ -33,8 +33,8 @@ import type {
   AgentInput,
   AgentInvocationResult,
   AgentSpecType,
+  BaseSpec,
   ChatMessage,
-  GeminiCliSpec,
   InvokeOptions,
   Logger,
 } from '../../agent.ts';
@@ -50,6 +50,38 @@ import { resolveBinary, spawnAgentProcess } from '../shared/child-process.ts';
 import { rejectCustomTools } from '../shared/reject-custom-tools.ts';
 import { buildGeminiFlags, GEMINI_BINARY } from './flags.ts';
 import { GeminiStreamParser } from './stream-parser.ts';
+
+// ---------------------------------------------------------------------------
+// GeminiCliSpec — owned by this adapter, contributed to the open registry
+// ---------------------------------------------------------------------------
+
+/**
+ * Gemini CLI subprocess (`gemini`, provider: google). Autonomous built-in
+ * tools, headless via `-p <prompt> -o stream-json --approval-mode yolo`.
+ */
+export interface GeminiCliSpec extends BaseSpec {
+  type: 'gemini-cli';
+  binaryPath?: string;
+  env?: Record<string, string>;
+  /**
+   * Pre-resolved Google/Gemini API key. When unset, resolved via
+   * broker.getCredential('google') → injected as GEMINI_API_KEY (the var the
+   * gemini CLI reads for USE_GEMINI API-key auth; the $HOME sandbox hides its
+   * own OAuth state). Falls back to the GEMINI_API_KEY env var.
+   */
+  apiKey?: string;
+  /**
+   * Tool-approval mode passed to `--approval-mode`. Defaults to 'yolo'
+   * (auto-approve all tools) so the agent runs non-interactively.
+   */
+  approvalMode?: 'default' | 'auto_edit' | 'yolo' | 'plan';
+}
+
+declare module '../../agent.ts' {
+  interface AgentSpecRegistry {
+    'gemini-cli': GeminiCliSpec;
+  }
+}
 
 /** The provider whose credential this adapter injects, and the env var it reads. */
 const GEMINI_PROVIDER = 'google';

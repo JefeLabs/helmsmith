@@ -43,7 +43,7 @@ import type {
   AgentInput,
   AgentInvocationResult,
   AgentSpecType,
-  BedrockSdkSpec,
+  BaseSpec,
   InvokeOptions,
   Logger,
   TokenUsage,
@@ -64,6 +64,45 @@ import { registerAdapter } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
 import { reduceStream } from '../../stream.ts';
 import { buildRequest, mapStopReason } from './normalize.ts';
+
+// ---------------------------------------------------------------------------
+// BedrockSdkSpec — owned by this adapter, contributed to the open registry
+// ---------------------------------------------------------------------------
+
+/**
+ * AWS Bedrock SDK — in-process `@aws-sdk/client-bedrock-runtime` Converse /
+ * ConverseStream, chat-mode host-loop tool use (provider: bedrock). Mirrors
+ * claude-sdk: stream()/invoke()=reduceStream, API-level tool-use surfaced as
+ * tool-call-* chunks.
+ *
+ * AUTH WRINKLE: unlike the other SDK adapters, Bedrock does NOT take an
+ * `apiKey`. It authenticates via the AWS credential chain (env vars, shared
+ * `~/.aws` config, SSO, IAM role). The `CredentialBroker` is therefore bypassed
+ * for this type — the AWS SDK resolves credentials itself. See the adapter
+ * docstring for the full rationale.
+ */
+export interface BedrockSdkSpec extends BaseSpec {
+  type: 'bedrock-sdk';
+  /**
+   * AWS region the Bedrock runtime client targets (e.g. 'us-east-1'). REQUIRED:
+   * resolved from this field or the AWS_REGION / AWS_DEFAULT_REGION env var. The
+   * adapter throws ConfigError at construction when neither is present.
+   */
+  region?: string;
+  /**
+   * Optional AWS named profile (from `~/.aws/credentials` / `~/.aws/config`).
+   * When set, the adapter surfaces it to the AWS default credential chain via
+   * the standard AWS_PROFILE env convention (it does not clobber an AWS_PROFILE
+   * already set in the environment).
+   */
+  profile?: string;
+}
+
+declare module '../../agent.ts' {
+  interface AgentSpecRegistry {
+    'bedrock-sdk': BedrockSdkSpec;
+  }
+}
 
 const BEDROCK_PROVIDER = 'bedrock';
 

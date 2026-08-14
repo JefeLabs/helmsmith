@@ -1,3 +1,4 @@
+import type { GeminiCliSpec } from './index.ts';
 /**
  * GeminiCliSpec → `gemini` CLI flags (Phase D‴).
  *
@@ -24,8 +25,6 @@
  * tool-call-* / tool-result chunks for observability only (PRD §11); the host
  * cannot inject custom tool definitions, so AgentInput.tools is NOT forwarded.
  */
-
-import type { GeminiCliSpec } from '../../agent.ts';
 
 /** The CLI binary name (resolved via PATH or spec.binaryPath in the adapter). */
 export const GEMINI_BINARY = 'gemini';

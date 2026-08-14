@@ -3,8 +3,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { CodexCliSpec } from '../../agent.ts';
 import { buildCodexFlags, CODEX_BINARY, normalizeCodexModel } from './flags.ts';
+import type { CodexCliSpec } from './index.ts';
 
 const baseSpec: CodexCliSpec = { type: 'codex-cli', model: 'gpt-5-codex' };
 

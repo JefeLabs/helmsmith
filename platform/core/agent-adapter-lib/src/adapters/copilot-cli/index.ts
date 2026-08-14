@@ -39,7 +39,7 @@ import type {
   AgentInput,
   AgentInvocationResult,
   AgentSpecType,
-  CopilotCliSpec,
+  BaseSpec,
   InvokeOptions,
   Logger,
 } from '../../agent.ts';
@@ -54,6 +54,31 @@ import { reduceStream } from '../../stream.ts';
 import { resolveBinary, spawnAgentProcess } from '../shared/child-process.ts';
 import { rejectCustomTools } from '../shared/reject-custom-tools.ts';
 import { buildCopilotCliArgs, COPILOT_CLI_BINARY } from './flags.ts';
+
+// ---------------------------------------------------------------------------
+// CopilotCliSpec — owned by this adapter, contributed to the open registry
+// ---------------------------------------------------------------------------
+
+/**
+ * Standalone GitHub Copilot CLI (`copilot`) — autonomous built-in tools,
+ * headless via `copilot -p <prompt> --allow-all-tools --add-dir <workdir>`.
+ *
+ * Auth (PRD §8.5 / §12): the standalone `copilot` reads its token from the env
+ * vars COPILOT_GITHUB_TOKEN → GH_TOKEN → GITHUB_TOKEN (in that precedence). The
+ * adapter sandboxes $HOME to the workdir, hiding `copilot login`'s stored
+ * credential store, so an env token is required for headless use.
+ */
+export interface CopilotCliSpec extends BaseSpec {
+  type: 'copilot-cli';
+  binaryPath?: string;
+  env?: Record<string, string>;
+}
+
+declare module '../../agent.ts' {
+  interface AgentSpecRegistry {
+    'copilot-cli': CopilotCliSpec;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // CopilotCliAdapter

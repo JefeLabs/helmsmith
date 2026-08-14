@@ -34,7 +34,8 @@
  * Auth is via env (COPILOT_GITHUB_TOKEN → GH_TOKEN → GITHUB_TOKEN); see index.ts.
  */
 
-import type { AgentInput, ChatMessage, CopilotCliSpec } from '../../agent.ts';
+import type { AgentInput, ChatMessage } from '../../agent.ts';
+import type { CopilotCliSpec } from './index.ts';
 
 /** The standalone Copilot CLI binary (resolved via PATH or spec.binaryPath). */
 export const COPILOT_CLI_BINARY = 'copilot';

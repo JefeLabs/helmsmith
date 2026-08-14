@@ -16,229 +16,54 @@ import type { AgentChunk } from './stream.ts';
 // AgentSpecType — discriminator for AgentSpec
 // ---------------------------------------------------------------------------
 
-/** All supported adapter type identifiers. */
-export type AgentSpecType =
-  | 'claude-sdk'
-  | 'claude-agent-sdk'
-  | 'claude-code-cli'
-  | 'opencode-cli'
-  | 'copilot-sdk'
-  | 'copilot-cli'
-  | 'gemini-cli'
-  | 'gemini-sdk'
-  | 'openai-sdk'
-  | 'codex-cli'
-  | 'bedrock-sdk';
+/**
+ * Open adapter-type registry.
+ *
+ * Each adapter module augments this interface via `declare module`, so importing
+ * an adapter contributes its type. External packages augment it the same way —
+ * that is what lets an out-of-tree adapter register without casts.
+ *
+ * SCOPE: TypeScript applies module augmentations per PROGRAM, not per import.
+ * Within one tsconfig, every adapter file in the program contributes regardless
+ * of who imports it. The narrowing is therefore real across program boundaries
+ * (a consuming package that never pulls in an adapter file) but NOT within this
+ * library's own typecheck.
+ *
+ * FALLBACK: with nothing augmented, `keyof` yields `never`, which would make
+ * AgentAdapter unimplementable for type-only consumers — they could not even
+ * write `type: never`. harness-server's `class TestAdapter implements
+ * AgentAdapter` is exactly that case. Falling back to `string` keeps those
+ * packages working without forcing them to import adapters they never call.
+ */
+// MUST stay an `interface`: adapter modules extend it via `declare module`
+// declaration merging, which works on interfaces only. As a `type` alias every
+// augmentation becomes a duplicate identifier and the open registry breaks.
+// MUST stay an empty `interface`: adapter modules extend it via `declare module`
+// declaration merging, which works on interfaces only. As a `type` alias every
+// augmentation becomes a duplicate identifier and the open registry breaks.
+// biome-ignore lint/suspicious/noEmptyInterface: declaration-merging target; adapters augment it
+export interface AgentSpecRegistry {}
+
+type RegisteredSpecTypes = keyof AgentSpecRegistry & string;
+
+/** Adapter type identifiers contributed to this program. */
+export type AgentSpecType = [RegisteredSpecTypes] extends [never] ? string : RegisteredSpecTypes;
 
 // ---------------------------------------------------------------------------
 // AgentSpec — discriminated union (each variant carries its own fields)
 // ---------------------------------------------------------------------------
 
-interface BaseSpec {
+export interface BaseSpec {
   /** Target model identifier (passed verbatim to the backend). */
   model: string;
   /** Optional system prompt override at the spec level. */
   systemPrompt?: string;
 }
 
-/** Anthropic SDK — in-process, single-turn host-loop tool use. */
-export interface ClaudeSdkSpec extends BaseSpec {
-  type: 'claude-sdk';
-  /** Pre-resolved API key (skips CredentialBroker when set). */
-  apiKey?: string;
-}
-
-/** Anthropic agent SDK — autonomous tool use, extended thinking, streaming. */
-export interface ClaudeAgentSdkSpec extends BaseSpec {
-  type: 'claude-agent-sdk';
-  apiKey?: string;
-}
-
-/** Claude Code CLI subprocess. */
-export interface ClaudeCodeCliSpec extends BaseSpec {
-  type: 'claude-code-cli';
-  binaryPath?: string;
-  env?: Record<string, string>;
-  apiKey?: string;
-}
-
-/** OpenCode CLI subprocess. */
-export interface OpenCodeCliSpec extends BaseSpec {
-  type: 'opencode-cli';
-  binaryPath?: string;
-  env?: Record<string, string>;
-  apiKey?: string;
-  /**
-   * Provider whose credential is injected as an env var (anthropic →
-   * ANTHROPIC_API_KEY, openai → OPENAI_API_KEY, google → GOOGLE_API_KEY).
-   * Defaults to the `<provider>/` prefix of `model`. Ignored in local-endpoint
-   * mode (`endpoint` set).
-   */
-  provider?: string;
-  /**
-   * HTTP endpoint of an OpenAI-compatible inference server. When set, the
-   * adapter SKIPS broker credential lookup and writes a custom provider into a
-   * temp opencode.json pointing at this baseURL (self-hosted models). Ported
-   * from the old flat adapter's local-endpoint mode.
-   */
-  endpoint?: string;
-  /** Logical provider id for the local `endpoint`. Defaults to `'local'`. */
-  endpointProviderId?: string;
-  /** Static API key for the local `endpoint` (servers usually ignore it). */
-  staticApiKey?: string;
-  /**
-   * URL of a long-running `opencode serve` instance. When set, the adapter
-   * runs `opencode run --attach <serverUrl> ...` so a warm server is shared
-   * across invocations. Ported from the old flat adapter's serverUrl mode.
-   */
-  serverUrl?: string;
-  /**
-   * Auto-approve built-in tool permissions (`--dangerously-skip-permissions`)
-   * so the agent runs tools autonomously in headless mode. Off by default; the
-   * adapter sandboxes $HOME/$TMPDIR + cwd to the workdir, bounding blast radius.
-   */
-  dangerouslySkipPermissions?: boolean;
-}
-
-/** GitHub Copilot Chat HTTP API (OpenAI-compatible). */
-export interface CopilotSdkSpec extends BaseSpec {
-  type: 'copilot-sdk';
-  apiKey?: string;
-}
-
-/**
- * Google Gemini SDK — in-process `@google/genai`, chat-mode host-loop tool use
- * (provider: google). Mirrors claude-sdk: stream()/invoke()=reduceStream,
- * broker auth, API-level tool-use surfaced as tool-call-* chunks.
- */
-export interface GeminiSdkSpec extends BaseSpec {
-  type: 'gemini-sdk';
-  /**
-   * Pre-resolved Google/Gemini API key (skips CredentialBroker when set). When
-   * unset, resolved via broker.getCredential('google'); falls back to the
-   * GEMINI_API_KEY / GOOGLE_API_KEY environment variables.
-   */
-  apiKey?: string;
-}
-
-/**
- * OpenAI SDK — in-process `openai` Chat Completions, chat-mode host-loop tool
- * use (provider: openai). Mirrors claude-sdk: stream()/invoke()=reduceStream,
- * broker auth, API-level tool-use surfaced as tool-call-* chunks.
- */
-export interface OpenAiSdkSpec extends BaseSpec {
-  type: 'openai-sdk';
-  /**
-   * Pre-resolved OpenAI API key (skips CredentialBroker when set). When unset,
-   * resolved via broker.getCredential('openai'); falls back to the
-   * OPENAI_API_KEY environment variable.
-   */
-  apiKey?: string;
-}
-
-/**
- * Standalone GitHub Copilot CLI (`copilot`) — autonomous built-in tools,
- * headless via `copilot -p <prompt> --allow-all-tools --add-dir <workdir>`.
- *
- * Auth (PRD §8.5 / §12): the standalone `copilot` reads its token from the env
- * vars COPILOT_GITHUB_TOKEN → GH_TOKEN → GITHUB_TOKEN (in that precedence). The
- * adapter sandboxes $HOME to the workdir, hiding `copilot login`'s stored
- * credential store, so an env token is required for headless use.
- */
-export interface CopilotCliSpec extends BaseSpec {
-  type: 'copilot-cli';
-  binaryPath?: string;
-  env?: Record<string, string>;
-}
-
-/**
- * Gemini CLI subprocess (`gemini`, provider: google). Autonomous built-in
- * tools, headless via `-p <prompt> -o stream-json --approval-mode yolo`.
- */
-export interface GeminiCliSpec extends BaseSpec {
-  type: 'gemini-cli';
-  binaryPath?: string;
-  env?: Record<string, string>;
-  /**
-   * Pre-resolved Google/Gemini API key. When unset, resolved via
-   * broker.getCredential('google') → injected as GEMINI_API_KEY (the var the
-   * gemini CLI reads for USE_GEMINI API-key auth; the $HOME sandbox hides its
-   * own OAuth state). Falls back to the GEMINI_API_KEY env var.
-   */
-  apiKey?: string;
-  /**
-   * Tool-approval mode passed to `--approval-mode`. Defaults to 'yolo'
-   * (auto-approve all tools) so the agent runs non-interactively.
-   */
-  approvalMode?: 'default' | 'auto_edit' | 'yolo' | 'plan';
-}
-
-/**
- * Codex CLI subprocess (`codex`, provider: openai). Autonomous built-in tools,
- * headless via the `codex exec <prompt> --json` non-interactive subcommand.
- */
-export interface CodexCliSpec extends BaseSpec {
-  type: 'codex-cli';
-  binaryPath?: string;
-  env?: Record<string, string>;
-  /**
-   * Pre-resolved OpenAI API key. When unset, resolved via
-   * broker.getCredential('openai') → injected as OPENAI_API_KEY (the $HOME
-   * sandbox hides codex's own ~/.codex/auth.json ChatGPT OAuth). Falls back to
-   * the OPENAI_API_KEY env var.
-   */
-  apiKey?: string;
-  /**
-   * Sandbox policy for `codex exec --sandbox`. Defaults to 'workspace-write'
-   * (writes confined to the workspace + temp; network off) — the safe
-   * non-interactive choice. The adapter additionally sandboxes $HOME/$TMPDIR
-   * to the workdir.
-   */
-  sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
-}
-
-/**
- * AWS Bedrock SDK — in-process `@aws-sdk/client-bedrock-runtime` Converse /
- * ConverseStream, chat-mode host-loop tool use (provider: bedrock). Mirrors
- * claude-sdk: stream()/invoke()=reduceStream, API-level tool-use surfaced as
- * tool-call-* chunks.
- *
- * AUTH WRINKLE: unlike the other SDK adapters, Bedrock does NOT take an
- * `apiKey`. It authenticates via the AWS credential chain (env vars, shared
- * `~/.aws` config, SSO, IAM role). The `CredentialBroker` is therefore bypassed
- * for this type — the AWS SDK resolves credentials itself. See the adapter
- * docstring for the full rationale.
- */
-export interface BedrockSdkSpec extends BaseSpec {
-  type: 'bedrock-sdk';
-  /**
-   * AWS region the Bedrock runtime client targets (e.g. 'us-east-1'). REQUIRED:
-   * resolved from this field or the AWS_REGION / AWS_DEFAULT_REGION env var. The
-   * adapter throws ConfigError at construction when neither is present.
-   */
-  region?: string;
-  /**
-   * Optional AWS named profile (from `~/.aws/credentials` / `~/.aws/config`).
-   * When set, the adapter surfaces it to the AWS default credential chain via
-   * the standard AWS_PROFILE env convention (it does not clobber an AWS_PROFILE
-   * already set in the environment).
-   */
-  profile?: string;
-}
-
 /** Discriminated union of all supported adapter specs. */
-export type AgentSpec =
-  | ClaudeSdkSpec
-  | ClaudeAgentSdkSpec
-  | ClaudeCodeCliSpec
-  | OpenCodeCliSpec
-  | CopilotSdkSpec
-  | CopilotCliSpec
-  | GeminiCliSpec
-  | GeminiSdkSpec
-  | OpenAiSdkSpec
-  | CodexCliSpec
-  | BedrockSdkSpec;
+export type AgentSpec = [RegisteredSpecTypes] extends [never]
+  ? BaseSpec & { type: string }
+  : AgentSpecRegistry[RegisteredSpecTypes];
 
 // ---------------------------------------------------------------------------
 // I/O types (PRD §7)

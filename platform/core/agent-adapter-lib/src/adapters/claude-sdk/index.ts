@@ -23,7 +23,7 @@ import type {
   AgentInput,
   AgentInvocationResult,
   AgentSpecType,
-  ClaudeSdkSpec,
+  BaseSpec,
   InvokeOptions,
   Logger,
   TokenUsage,
@@ -42,6 +42,23 @@ import { registerAdapter } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
 import { reduceStream } from '../../stream.ts';
 import { mapStopReason, normalizeMessages, normalizeTools } from './normalize.ts';
+
+// ---------------------------------------------------------------------------
+// ClaudeSdkSpec — owned by this adapter, contributed to the open registry
+// ---------------------------------------------------------------------------
+
+/** Anthropic SDK — in-process, single-turn host-loop tool use. */
+export interface ClaudeSdkSpec extends BaseSpec {
+  type: 'claude-sdk';
+  /** Pre-resolved API key (skips CredentialBroker when set). */
+  apiKey?: string;
+}
+
+declare module '../../agent.ts' {
+  interface AgentSpecRegistry {
+    'claude-sdk': ClaudeSdkSpec;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Constants

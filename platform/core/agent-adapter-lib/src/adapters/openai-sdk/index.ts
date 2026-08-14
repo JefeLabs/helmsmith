@@ -24,9 +24,9 @@ import type {
   AgentInput,
   AgentInvocationResult,
   AgentSpecType,
+  BaseSpec,
   InvokeOptions,
   Logger,
-  OpenAiSdkSpec,
   TokenUsage,
 } from '../../agent.ts';
 import type { AdapterCapabilities } from '../../capabilities.ts';
@@ -44,6 +44,31 @@ import { registerAdapter } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
 import { reduceStream } from '../../stream.ts';
 import { buildRequestBody, mapFinishReason } from './normalize.ts';
+
+// ---------------------------------------------------------------------------
+// OpenAiSdkSpec — owned by this adapter, contributed to the open registry
+// ---------------------------------------------------------------------------
+
+/**
+ * OpenAI SDK — in-process `openai` Chat Completions, chat-mode host-loop tool
+ * use (provider: openai). Mirrors claude-sdk: stream()/invoke()=reduceStream,
+ * broker auth, API-level tool-use surfaced as tool-call-* chunks.
+ */
+export interface OpenAiSdkSpec extends BaseSpec {
+  type: 'openai-sdk';
+  /**
+   * Pre-resolved OpenAI API key (skips CredentialBroker when set). When unset,
+   * resolved via broker.getCredential('openai'); falls back to the
+   * OPENAI_API_KEY environment variable.
+   */
+  apiKey?: string;
+}
+
+declare module '../../agent.ts' {
+  interface AgentSpecRegistry {
+    'openai-sdk': OpenAiSdkSpec;
+  }
+}
 
 const OPENAI_PROVIDER = 'openai';
 

@@ -28,8 +28,8 @@ import type {
   AgentInput,
   AgentInvocationResult,
   AgentSpecType,
+  BaseSpec,
   ChatMessage,
-  ClaudeCodeCliSpec,
   InvokeOptions,
   Logger,
 } from '../../agent.ts';
@@ -45,6 +45,24 @@ import { resolveBinary, spawnAgentProcess } from '../shared/child-process.ts';
 import { rejectCustomTools } from '../shared/reject-custom-tools.ts';
 import { buildClaudeFlags, CLAUDE_BINARY } from './flags.ts';
 import { ClaudeStreamParser } from './stream-parser.ts';
+
+// ---------------------------------------------------------------------------
+// ClaudeCodeCliSpec — owned by this adapter, contributed to the open registry
+// ---------------------------------------------------------------------------
+
+/** Claude Code CLI subprocess. */
+export interface ClaudeCodeCliSpec extends BaseSpec {
+  type: 'claude-code-cli';
+  binaryPath?: string;
+  env?: Record<string, string>;
+  apiKey?: string;
+}
+
+declare module '../../agent.ts' {
+  interface AgentSpecRegistry {
+    'claude-code-cli': ClaudeCodeCliSpec;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // ClaudeCodeCliAdapter

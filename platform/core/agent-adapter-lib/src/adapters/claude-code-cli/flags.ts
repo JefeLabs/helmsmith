@@ -17,7 +17,8 @@
  * capability guard only if the matrix ever flips supportsToolUse to false.
  */
 
-import type { AgentInput, ClaudeCodeCliSpec } from '../../agent.ts';
+import type { AgentInput } from '../../agent.ts';
+import type { ClaudeCodeCliSpec } from './index.ts';
 
 /** The CLI binary name (resolved via PATH or spec.binaryPath in the adapter). */
 export const CLAUDE_BINARY = 'claude';

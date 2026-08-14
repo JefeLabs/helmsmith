@@ -3,8 +3,9 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { AgentInput, ClaudeCodeCliSpec } from '../../agent.ts';
+import type { AgentInput } from '../../agent.ts';
 import { buildClaudeFlags, CLAUDE_BINARY } from './flags.ts';
+import type { ClaudeCodeCliSpec } from './index.ts';
 
 const baseSpec: ClaudeCodeCliSpec = { type: 'claude-code-cli', model: 'claude-sonnet-4-6' };
 const emptyInput: AgentInput = { messages: [{ role: 'user', content: 'hi' }] };

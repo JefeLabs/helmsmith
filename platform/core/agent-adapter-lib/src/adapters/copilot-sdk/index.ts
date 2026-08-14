@@ -30,7 +30,7 @@ import type {
   AgentInput,
   AgentInvocationResult,
   AgentSpecType,
-  CopilotSdkSpec,
+  BaseSpec,
   InvokeOptions,
   Logger,
 } from '../../agent.ts';
@@ -45,6 +45,22 @@ import { reduceStream } from '../../stream.ts';
 import { buildCopilotHeaders, COPILOT_CHAT_URL, COPILOT_CONTRACT_HEADERS } from './headers.ts';
 import { buildRequestBody } from './normalize.ts';
 import { SseParser } from './sse-parser.ts';
+
+// ---------------------------------------------------------------------------
+// CopilotSdkSpec — owned by this adapter, contributed to the open registry
+// ---------------------------------------------------------------------------
+
+/** GitHub Copilot Chat HTTP API (OpenAI-compatible). */
+export interface CopilotSdkSpec extends BaseSpec {
+  type: 'copilot-sdk';
+  apiKey?: string;
+}
+
+declare module '../../agent.ts' {
+  interface AgentSpecRegistry {
+    'copilot-sdk': CopilotSdkSpec;
+  }
+}
 
 const COPILOT_PROVIDER = 'github-copilot';
 

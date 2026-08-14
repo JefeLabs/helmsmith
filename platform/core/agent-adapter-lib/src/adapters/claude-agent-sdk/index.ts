@@ -44,7 +44,7 @@ import type {
   AgentInput,
   AgentInvocationResult,
   AgentSpecType,
-  ClaudeAgentSdkSpec,
+  BaseSpec,
   InvokeOptions,
   Logger,
   TokenUsage,
@@ -58,6 +58,22 @@ import { registerAdapter } from '../../registry.ts';
 import type { AgentChunk } from '../../stream.ts';
 import { reduceStream } from '../../stream.ts';
 import { rejectCustomTools } from '../shared/reject-custom-tools.ts';
+
+// ---------------------------------------------------------------------------
+// ClaudeAgentSdkSpec — owned by this adapter, contributed to the open registry
+// ---------------------------------------------------------------------------
+
+/** Anthropic agent SDK — autonomous tool use, extended thinking, streaming. */
+export interface ClaudeAgentSdkSpec extends BaseSpec {
+  type: 'claude-agent-sdk';
+  apiKey?: string;
+}
+
+declare module '../../agent.ts' {
+  interface AgentSpecRegistry {
+    'claude-agent-sdk': ClaudeAgentSdkSpec;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // SDK type shims

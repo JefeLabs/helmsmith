@@ -21,7 +21,9 @@
  * `options.localEndpoint`; the resolver itself is endpoint-agnostic.
  */
 
-import type { AgentSpec, OpenCodeCliSpec } from '@helmsmith/agent-adapter';
+import type { AgentSpec } from '@helmsmith/agent-adapter';
+// Provider spec types live on their adapter entry, not the root.
+import type { OpenCodeCliSpec } from '@helmsmith/agent-adapter/adapters/opencode-cli';
 import type { ResolvedBinding, ToolId } from '@helmsmith/agent-auth';
 
 export interface BindingToSpecOptions {

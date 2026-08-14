@@ -3,8 +3,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { GeminiCliSpec } from '../../agent.ts';
 import { buildGeminiFlags, GEMINI_BINARY, normalizeGeminiModel } from './flags.ts';
+import type { GeminiCliSpec } from './index.ts';
 
 const baseSpec: GeminiCliSpec = { type: 'gemini-cli', model: 'gemini-2.5-pro' };
 
