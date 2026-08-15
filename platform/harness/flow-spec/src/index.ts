@@ -32,6 +32,7 @@ export {
   type ApprovalTag,
   type Assertion,
   type BackoffPolicy,
+  type BootstrapStep,
   type Catalog,
   CatalogError,
   type ChangedFile,

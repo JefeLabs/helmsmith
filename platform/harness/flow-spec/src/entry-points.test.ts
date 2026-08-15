@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import type { BootstrapStep as BootstrapStepFromDefinition } from './definition.ts';
 import * as definition from './definition.ts';
+import type { BootstrapStep as BootstrapStepFromRoot } from './index.ts';
 import * as run from './run.ts';
 import * as tenancy from './tenancy.ts';
 
@@ -7,6 +9,21 @@ import * as tenancy from './tenancy.ts';
  *  definition surface without dragging run-side or tenancy shapes —
  *  each entry re-exports a curated subset of the root surface. */
 describe('subpath entry points', () => {
+  // Types erase at runtime, so this is a compile-time assertion wearing a
+  // test's clothes: it fails to transform if either entry stops exporting
+  // BootstrapStep. The ./definition entry matters most — a designer UI
+  // building the argv editor imports from the authoring surface, not root.
+  it('carries BootstrapStep on both the root and ./definition entries', () => {
+    const fromRoot: BootstrapStepFromRoot = {
+      run: ['copilot', 'plugin', 'install', 'superpowers@superpowers-marketplace'],
+      description: 'install the plugin the system prompt assumes is present',
+    };
+    const fromDefinition: BootstrapStepFromDefinition = { run: ['copilot', '--version'] };
+
+    expect(fromRoot.run[0]).toBe('copilot');
+    expect(fromDefinition.run).toHaveLength(2);
+  });
+
   it('./definition carries the authoring surface (types + validator + evaluator)', () => {
     expect(typeof definition.validateFlowCatalog).toBe('function');
     expect(typeof definition.evalExpression).toBe('function');

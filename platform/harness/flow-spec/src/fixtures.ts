@@ -1095,6 +1095,130 @@ export const VALIDATION_CASES: readonly ValidationCase[] = [
     valid: false,
     errorIncludes: 'reject cycle',
   },
+  // ── AgentDef.bootstrap ──────────────────────────────────────────────
+  // Every implementation of this contract must agree on these, including
+  // the metacharacter case: the steps run as argv WITHOUT a shell, so a
+  // validator that "hardens" by rejecting `;` breaks legitimate arguments
+  // and diverges from the reference.
+  {
+    name: 'bootstrap on a CLI-backed adapter is accepted',
+    catalog: {
+      flows: [
+        {
+          ...VALID_FLOW,
+          nodes: [
+            VALID_FLOW.nodes[0],
+            {
+              id: 'b',
+              kind: 'agent',
+              config: {
+                agent: {
+                  id: 'b',
+                  role: 'Builder',
+                  adapter: 'copilot-cli',
+                  bootstrap: [
+                    {
+                      run: [
+                        'copilot',
+                        'plugin',
+                        'marketplace',
+                        'add',
+                        'obra/superpowers-marketplace',
+                      ],
+                      description: 'Register the marketplace this plugin comes from.',
+                    },
+                    {
+                      run: ['copilot', 'plugin', 'install', 'superpowers@superpowers-marketplace'],
+                    },
+                  ],
+                },
+              },
+            },
+          ],
+          edges: [{ from: 't', to: 'b', type: 'sequence' }],
+        },
+      ],
+    },
+    valid: true,
+  },
+  {
+    name: 'bootstrap on a non-CLI adapter is rejected',
+    catalog: {
+      flows: [
+        {
+          ...VALID_FLOW,
+          nodes: [
+            VALID_FLOW.nodes[0],
+            {
+              id: 'b',
+              kind: 'agent',
+              config: {
+                agent: {
+                  id: 'b',
+                  role: 'Builder',
+                  adapter: 'claude-sdk',
+                  bootstrap: [{ run: ['copilot', 'plugin', 'install', 'x'] }],
+                },
+              },
+            },
+          ],
+          edges: [{ from: 't', to: 'b', type: 'sequence' }],
+        },
+      ],
+    },
+    valid: false,
+    errorIncludes: 'only supported on CLI-backed adapters',
+  },
+  {
+    name: 'an empty bootstrap list is rejected as dead config',
+    catalog: {
+      flows: [
+        {
+          ...VALID_FLOW,
+          nodes: [
+            VALID_FLOW.nodes[0],
+            {
+              id: 'b',
+              kind: 'agent',
+              config: {
+                agent: { id: 'b', role: 'Builder', adapter: 'copilot-cli', bootstrap: [] },
+              },
+            },
+          ],
+          edges: [{ from: 't', to: 'b', type: 'sequence' }],
+        },
+      ],
+    },
+    valid: false,
+    errorIncludes: 'must not be empty when present',
+  },
+  {
+    name: 'shell metacharacters in argv are accepted (argv is not a shell)',
+    catalog: {
+      flows: [
+        {
+          ...VALID_FLOW,
+          nodes: [
+            VALID_FLOW.nodes[0],
+            {
+              id: 'b',
+              kind: 'agent',
+              config: {
+                agent: {
+                  id: 'b',
+                  role: 'Builder',
+                  adapter: 'copilot-cli',
+                  bootstrap: [{ run: ['mytool', '--glob', 'src/**/*.ts;'] }],
+                },
+              },
+            },
+          ],
+          edges: [{ from: 't', to: 'b', type: 'sequence' }],
+        },
+      ],
+    },
+    valid: true,
+  },
 ];
 
 // ─── Schema-subset fixtures ──────────────────────────────────────────────

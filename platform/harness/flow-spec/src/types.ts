@@ -22,6 +22,27 @@
  */
 export type AdapterId = string;
 
+/**
+ * One environment-preparation step for a CLI-backed agent.
+ *
+ * `run` is argv, executed WITHOUT a shell: `run[0]` is the executable and the
+ * rest are passed as literal arguments. No pipes, redirection, globbing or
+ * command substitution — a catalog is data that gets opened in an editor, and
+ * must not become executable code by being read or run.
+ *
+ * Because there is no shell, characters like `;` `|` `$(` are inert literal
+ * arguments, so this contract deliberately does NOT filter them: filtering
+ * would break legitimate arguments (a glob passed to a tool that expands it
+ * itself) while adding no safety. The boundary is argv-plus-no-shell.
+ */
+export interface BootstrapStep {
+  /** argv; `run[0]` is the executable. Non-empty, as is each entry. */
+  run: readonly string[];
+  /** Why this step exists. Surfaced in the designer and in run logs, where
+   *  "why is this flow installing that?" is the question a reader has. */
+  description?: string;
+}
+
 export interface AgentDef {
   /** Stable id for streaming/registration. Unique within a pipeline. */
   id: string;
@@ -31,6 +52,29 @@ export interface AgentDef {
   adapter: AdapterId;
   /** Optional system prompt; if omitted, the adapter's default applies. */
   systemPrompt?: string;
+  /**
+   * Environment preparation for CLI-backed agents, run in order before the
+   * agent's first turn.
+   *
+   * Runs on EVERY spawn. That is deliberate: preparing a workspace once and
+   * reusing it makes a flow depend on state it does not declare, so the same
+   * catalog succeeds in one workspace and fails in a fresh one. Every step
+   * MUST therefore be idempotent — re-installing an already-installed plugin
+   * has to be a no-op. Caching repeated work is the runtime's business and is
+   * invisible to this contract.
+   *
+   * A non-zero exit fails the spawn, reporting the failing step's index, argv
+   * and exit code. There is no partial continuation: an agent whose
+   * environment was only half-prepared produces failures far from their cause.
+   *
+   * CLI-backed adapters only. The validator decides CLI-ness by the `-cli`
+   * suffix on the adapter id — a convention every registered CLI adapter
+   * follows (claude-code-cli, codex-cli, copilot-cli, gemini-cli,
+   * opencode-cli) and which `claude-sdk` does not. That convention is
+   * contractual from here on; `ValidateOptions.cliAdapters` overrides it for
+   * an adapter that breaks it.
+   */
+  bootstrap?: readonly BootstrapStep[];
   /**
    * Optional adapter-specific configuration. Passed through to the adapter
    * factory; the adapter is responsible for interpreting the shape. Use this

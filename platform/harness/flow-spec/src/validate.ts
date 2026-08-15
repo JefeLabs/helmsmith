@@ -44,6 +44,12 @@ export interface UnsupportedFeature {
 
 export interface ValidateOptions {
   onUnsupported?: (feature: UnsupportedFeature) => void;
+  /**
+   * Adapter ids to treat as CLI-backed, REPLACING the default `-cli` suffix
+   * rule. Supply this only for an adapter that breaks the convention — a new
+   * conforming adapter needs no flow-spec release. See AgentDef.bootstrap.
+   */
+  cliAdapters?: readonly string[];
 }
 
 export function validateFlowCatalog(
@@ -126,7 +132,7 @@ function validateFlow(
   let triggerCount = 0;
   for (const [j, n] of (flow.nodes as unknown[]).entries()) {
     const nodeWhere = `${where}.nodes[${j}]`;
-    validateNode(n, nodeWhere);
+    validateNode(n, nodeWhere, opts);
     const node = n as Record<string, unknown>;
     if (nodeIds.has(node.id as string)) {
       throw new CatalogError(`${where} has duplicate node id "${node.id}"`);
@@ -637,12 +643,69 @@ function dfsCycle(
   return false;
 }
 
+/** CLI-backed by the `-cli` suffix convention every registered CLI adapter
+ *  follows, or by an explicit caller list that REPLACES it. See
+ *  AgentDef.bootstrap for why the convention is contractual. */
+function isCliAdapter(adapter: string, opts?: ValidateOptions): boolean {
+  return opts?.cliAdapters ? opts.cliAdapters.includes(adapter) : adapter.endsWith('-cli');
+}
+
+/**
+ * Validate AgentDef.bootstrap: argv steps run before a CLI-backed agent's
+ * first turn.
+ *
+ * Note what is deliberately absent — any filtering of shell metacharacters.
+ * The steps are executed as argv without a shell, so `;` and `|` are inert
+ * literal arguments; rejecting them would break legitimate args (a glob
+ * passed to a tool that expands it itself) while adding no safety.
+ */
+function validateBootstrapField(
+  value: unknown,
+  where: string,
+  adapter: string,
+  opts?: ValidateOptions,
+): void {
+  if (!Array.isArray(value)) {
+    throw new CatalogError(`${where} must be an array when present`);
+  }
+  // Checked before the adapter rule: an empty list is the more actionable
+  // complaint, and reporting the adapter first would send the author to fix
+  // the wrong thing.
+  if (value.length === 0) {
+    throw new CatalogError(`${where} must not be empty when present`);
+  }
+  if (!isCliAdapter(adapter, opts)) {
+    throw new CatalogError(
+      `${where} is only supported on CLI-backed adapters (got ${JSON.stringify(adapter)})`,
+    );
+  }
+  for (const [i, raw] of value.entries()) {
+    const step = raw as Record<string, unknown> | null;
+    if (!step || typeof step !== 'object' || !Array.isArray(step.run) || step.run.length === 0) {
+      throw new CatalogError(`${where}[${i}].run must be a non-empty array of strings`);
+    }
+    for (const [j, arg] of step.run.entries()) {
+      if (typeof arg !== 'string' || !arg) {
+        throw new CatalogError(`${where}[${i}].run[${j}] must be a non-empty string`);
+      }
+    }
+    if (step.description !== undefined && typeof step.description !== 'string') {
+      throw new CatalogError(`${where}[${i}].description must be a string when present`);
+    }
+  }
+}
+
 /**
  * Validate a single AgentDef. Centralized so legacy `agents[]` and new
  * `AgentStep` validation share the same rules. `agentIds` is a per-pipeline
  * set tracking already-seen agent ids for duplicate detection.
  */
-function validateAgentDef(value: unknown, where: string, agentIds: Set<string>): void {
+function validateAgentDef(
+  value: unknown,
+  where: string,
+  agentIds: Set<string>,
+  opts?: ValidateOptions,
+): void {
   if (!value || typeof value !== 'object') {
     throw new CatalogError(`${where} must be an object`);
   }
@@ -675,6 +738,10 @@ function validateAgentDef(value: unknown, where: string, agentIds: Set<string>):
   if (agent.skillz !== undefined) {
     validateSkillzField(agent.skillz, `${where}.skillz`);
   }
+  if (agent.bootstrap !== undefined) {
+    // agent.adapter is guaranteed a non-empty string by the check above.
+    validateBootstrapField(agent.bootstrap, `${where}.bootstrap`, agent.adapter, opts);
+  }
 }
 
 /**
@@ -695,7 +762,7 @@ const VALID_NODE_KINDS = new Set([
 
 const VALID_PUBLISH_ACTIONS = new Set(['push-and-open-pr', 'merge-pr']);
 
-function validateNode(value: unknown, where: string): void {
+function validateNode(value: unknown, where: string, opts?: ValidateOptions): void {
   if (!value || typeof value !== 'object') {
     throw new CatalogError(`${where} must be an object`);
   }
@@ -711,7 +778,7 @@ function validateNode(value: unknown, where: string): void {
   if (!node.config || typeof node.config !== 'object') {
     throw new CatalogError(`${where}.config must be an object`);
   }
-  validateNodeConfig(node.kind, node.config, `${where}.config`);
+  validateNodeConfig(node.kind, node.config, `${where}.config`, opts);
 
   if (node.input !== undefined) {
     validateInputMapping(node.input, `${where}.input`);
@@ -828,12 +895,17 @@ function validateNodeOutputContract(value: unknown, where: string): void {
   }
 }
 
-function validateNodeConfig(kind: string, config: object, where: string): void {
+function validateNodeConfig(
+  kind: string,
+  config: object,
+  where: string,
+  opts?: ValidateOptions,
+): void {
   const c = config as Record<string, unknown>;
   switch (kind) {
     case 'agent': {
       const agentIds = new Set<string>();
-      validateAgentDef(c.agent, `${where}.agent`, agentIds);
+      validateAgentDef(c.agent, `${where}.agent`, agentIds, opts);
       break;
     }
     case 'tool':
