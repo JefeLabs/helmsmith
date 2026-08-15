@@ -44,6 +44,12 @@ export interface UnsupportedFeature {
 
 export interface ValidateOptions {
   onUnsupported?: (feature: UnsupportedFeature) => void;
+  /**
+   * Adapter ids to treat as CLI-backed, REPLACING the default `-cli` suffix
+   * rule. Supply this only for an adapter that breaks the convention — a new
+   * conforming adapter needs no flow-spec release. See AgentDef.bootstrap.
+   */
+  cliAdapters?: readonly string[];
 }
 
 export function validateFlowCatalog(
@@ -126,7 +132,7 @@ function validateFlow(
   let triggerCount = 0;
   for (const [j, n] of (flow.nodes as unknown[]).entries()) {
     const nodeWhere = `${where}.nodes[${j}]`;
-    validateNode(n, nodeWhere);
+    validateNode(n, nodeWhere, opts);
     const node = n as Record<string, unknown>;
     if (nodeIds.has(node.id as string)) {
       throw new CatalogError(`${where} has duplicate node id "${node.id}"`);
@@ -642,7 +648,12 @@ function dfsCycle(
  * `AgentStep` validation share the same rules. `agentIds` is a per-pipeline
  * set tracking already-seen agent ids for duplicate detection.
  */
-function validateAgentDef(value: unknown, where: string, agentIds: Set<string>): void {
+function validateAgentDef(
+  value: unknown,
+  where: string,
+  agentIds: Set<string>,
+  opts?: ValidateOptions,
+): void {
   if (!value || typeof value !== 'object') {
     throw new CatalogError(`${where} must be an object`);
   }
@@ -695,7 +706,7 @@ const VALID_NODE_KINDS = new Set([
 
 const VALID_PUBLISH_ACTIONS = new Set(['push-and-open-pr', 'merge-pr']);
 
-function validateNode(value: unknown, where: string): void {
+function validateNode(value: unknown, where: string, opts?: ValidateOptions): void {
   if (!value || typeof value !== 'object') {
     throw new CatalogError(`${where} must be an object`);
   }
@@ -711,7 +722,7 @@ function validateNode(value: unknown, where: string): void {
   if (!node.config || typeof node.config !== 'object') {
     throw new CatalogError(`${where}.config must be an object`);
   }
-  validateNodeConfig(node.kind, node.config, `${where}.config`);
+  validateNodeConfig(node.kind, node.config, `${where}.config`, opts);
 
   if (node.input !== undefined) {
     validateInputMapping(node.input, `${where}.input`);
@@ -828,12 +839,17 @@ function validateNodeOutputContract(value: unknown, where: string): void {
   }
 }
 
-function validateNodeConfig(kind: string, config: object, where: string): void {
+function validateNodeConfig(
+  kind: string,
+  config: object,
+  where: string,
+  opts?: ValidateOptions,
+): void {
   const c = config as Record<string, unknown>;
   switch (kind) {
     case 'agent': {
       const agentIds = new Set<string>();
-      validateAgentDef(c.agent, `${where}.agent`, agentIds);
+      validateAgentDef(c.agent, `${where}.agent`, agentIds, opts);
       break;
     }
     case 'tool':
