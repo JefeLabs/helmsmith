@@ -15,6 +15,97 @@ const validFlow = {
 };
 
 describe('validateFlowCatalog', () => {
+  // ── AgentDef.bootstrap ───────────────────────────────────────────────
+  // Environment prep for CLI-backed agents: argv, no shell, CLI adapters only.
+  const flowWithAgent = (agent: Record<string, unknown>) => ({
+    ...validFlow,
+    nodes: [validFlow.nodes[0], { id: 'a', kind: 'agent', config: { agent } }],
+    edges: [{ from: 't', to: 'a', type: 'sequence' }],
+  });
+  const cliAgent = (bootstrap: unknown) => ({
+    id: 'a',
+    role: 'Agent',
+    adapter: 'copilot-cli',
+    bootstrap,
+  });
+
+  it('accepts bootstrap on a CLI-backed adapter', () => {
+    const flow = flowWithAgent(
+      cliAgent([
+        { run: ['copilot', 'plugin', 'marketplace', 'add', 'obra/superpowers-marketplace'] },
+        {
+          run: ['copilot', 'plugin', 'install', 'superpowers@superpowers-marketplace'],
+          description: 'install the plugin the system prompt assumes',
+        },
+      ]),
+    );
+    expect(() => validateFlowCatalog({ flows: [flow] }, 'test')).not.toThrow();
+  });
+
+  it('rejects bootstrap on an adapter that is not CLI-backed', () => {
+    const flow = flowWithAgent({
+      id: 'a',
+      role: 'Agent',
+      adapter: 'claude-sdk',
+      bootstrap: [{ run: ['copilot', 'plugin', 'install', 'x'] }],
+    });
+    expect(() => validateFlowCatalog({ flows: [flow] }, 'test')).toThrow(CatalogError);
+    expect(() => validateFlowCatalog({ flows: [flow] }, 'test')).toThrow(
+      /only supported on CLI-backed adapters/,
+    );
+  });
+
+  it('rejects an empty bootstrap list as dead config', () => {
+    const flow = flowWithAgent(cliAgent([]));
+    expect(() => validateFlowCatalog({ flows: [flow] }, 'test')).toThrow(
+      /bootstrap must not be empty when present/,
+    );
+  });
+
+  it('rejects a step whose run is missing, empty, or not an array', () => {
+    for (const bad of [[{}], [{ run: [] }], [{ run: 'copilot plugin install x' }]]) {
+      const flow = flowWithAgent(cliAgent(bad));
+      expect(() => validateFlowCatalog({ flows: [flow] }, 'test')).toThrow(
+        /run must be a non-empty array of strings/,
+      );
+    }
+  });
+
+  it('rejects an empty argv entry, locating which one', () => {
+    const flow = flowWithAgent(cliAgent([{ run: ['copilot', ''] }]));
+    expect(() => validateFlowCatalog({ flows: [flow] }, 'test')).toThrow(
+      /bootstrap\[0\]\.run\[1\] must be a non-empty string/,
+    );
+  });
+
+  // With no shell these are inert literal arguments. Filtering them would
+  // break legitimate args while adding no safety — this pins that decision.
+  it('accepts argv entries containing shell metacharacters', () => {
+    const flow = flowWithAgent(cliAgent([{ run: ['mytool', '--glob', 'src/**/*.ts;'] }]));
+    expect(() => validateFlowCatalog({ flows: [flow] }, 'test')).not.toThrow();
+  });
+
+  it('honours cliAdapters in both directions', () => {
+    const nonConforming = flowWithAgent({
+      id: 'a',
+      role: 'Agent',
+      adapter: 'copilot',
+      bootstrap: [{ run: ['copilot', 'plugin', 'install', 'x'] }],
+    });
+    expect(() => validateFlowCatalog({ flows: [nonConforming] }, 'test')).toThrow(
+      /only supported on CLI-backed adapters/,
+    );
+    expect(() =>
+      validateFlowCatalog({ flows: [nonConforming] }, 'test', { cliAdapters: ['copilot'] }),
+    ).not.toThrow();
+
+    // The override REPLACES the suffix rule, so a -cli adapter absent from
+    // the list is then rejected.
+    const suffixed = flowWithAgent(cliAgent([{ run: ['copilot', 'plugin', 'install', 'x'] }]));
+    expect(() =>
+      validateFlowCatalog({ flows: [suffixed] }, 'test', { cliAdapters: ['something-else'] }),
+    ).toThrow(/only supported on CLI-backed adapters/);
+  });
   it('accepts a minimal valid catalog', () => {
     expect(() => validateFlowCatalog({ flows: [validFlow] }, 'test')).not.toThrow();
   });

@@ -643,6 +643,58 @@ function dfsCycle(
   return false;
 }
 
+/** CLI-backed by the `-cli` suffix convention every registered CLI adapter
+ *  follows, or by an explicit caller list that REPLACES it. See
+ *  AgentDef.bootstrap for why the convention is contractual. */
+function isCliAdapter(adapter: string, opts?: ValidateOptions): boolean {
+  return opts?.cliAdapters ? opts.cliAdapters.includes(adapter) : adapter.endsWith('-cli');
+}
+
+/**
+ * Validate AgentDef.bootstrap: argv steps run before a CLI-backed agent's
+ * first turn.
+ *
+ * Note what is deliberately absent — any filtering of shell metacharacters.
+ * The steps are executed as argv without a shell, so `;` and `|` are inert
+ * literal arguments; rejecting them would break legitimate args (a glob
+ * passed to a tool that expands it itself) while adding no safety.
+ */
+function validateBootstrapField(
+  value: unknown,
+  where: string,
+  adapter: string,
+  opts?: ValidateOptions,
+): void {
+  if (!Array.isArray(value)) {
+    throw new CatalogError(`${where} must be an array when present`);
+  }
+  // Checked before the adapter rule: an empty list is the more actionable
+  // complaint, and reporting the adapter first would send the author to fix
+  // the wrong thing.
+  if (value.length === 0) {
+    throw new CatalogError(`${where} must not be empty when present`);
+  }
+  if (!isCliAdapter(adapter, opts)) {
+    throw new CatalogError(
+      `${where} is only supported on CLI-backed adapters (got ${JSON.stringify(adapter)})`,
+    );
+  }
+  for (const [i, raw] of value.entries()) {
+    const step = raw as Record<string, unknown> | null;
+    if (!step || typeof step !== 'object' || !Array.isArray(step.run) || step.run.length === 0) {
+      throw new CatalogError(`${where}[${i}].run must be a non-empty array of strings`);
+    }
+    for (const [j, arg] of step.run.entries()) {
+      if (typeof arg !== 'string' || !arg) {
+        throw new CatalogError(`${where}[${i}].run[${j}] must be a non-empty string`);
+      }
+    }
+    if (step.description !== undefined && typeof step.description !== 'string') {
+      throw new CatalogError(`${where}[${i}].description must be a string when present`);
+    }
+  }
+}
+
 /**
  * Validate a single AgentDef. Centralized so legacy `agents[]` and new
  * `AgentStep` validation share the same rules. `agentIds` is a per-pipeline
@@ -685,6 +737,10 @@ function validateAgentDef(
   }
   if (agent.skillz !== undefined) {
     validateSkillzField(agent.skillz, `${where}.skillz`);
+  }
+  if (agent.bootstrap !== undefined) {
+    // agent.adapter is guaranteed a non-empty string by the check above.
+    validateBootstrapField(agent.bootstrap, `${where}.bootstrap`, agent.adapter, opts);
   }
 }
 
