@@ -15,6 +15,7 @@ export {
   type ApprovalTag,
   type Assertion,
   type BackoffPolicy,
+  type BootstrapStep,
   CatalogError,
   type CliToolDef,
   type CompareOp,
