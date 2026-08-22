@@ -17,8 +17,13 @@ export function expandTilde(filepath: string): string {
 
 /**
  * Root config directory: ~/.agentx/gitradar/
+ *
+ * Override with GITRADAR_HOME to relocate config, data, and cache together —
+ * used by tests and sandboxes so they never touch the real store.
  */
 export function getConfigDir(): string {
+  const override = process.env.GITRADAR_HOME;
+  if (override) return override;
   return join(homedir(), '.agentx', 'gitradar');
 }
 

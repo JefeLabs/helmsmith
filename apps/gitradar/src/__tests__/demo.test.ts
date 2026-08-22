@@ -3,6 +3,20 @@ import { generateDemoData } from '../demo.js';
 import { ConfigSchema, UserWeekRepoRecordSchema } from '../types/schema.js';
 
 describe('generateDemoData', () => {
+  it('gives every record an activeDayMask consistent with its activeDays', () => {
+    const { records } = generateDemoData();
+    expect(records.length).toBeGreaterThan(0);
+    for (const r of records) {
+      expect(r.activeDayMask).toBeDefined();
+      const mask = r.activeDayMask!;
+      expect(mask).toBeGreaterThan(0);
+      expect(mask).toBeLessThan(128);
+      let bits = 0;
+      for (let m = mask; m; m >>= 1) bits += m & 1;
+      expect(bits).toBe(r.activeDays);
+    }
+  });
+
   it('returns a valid Config object', () => {
     const { config } = generateDemoData();
     const result = ConfigSchema.safeParse(config);

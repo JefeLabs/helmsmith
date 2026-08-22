@@ -77,6 +77,8 @@ vi.mock('../collector/classifier.js', () => ({
   DEFAULT_IGNORE_PATTERNS: [],
 }));
 
+const { buildIgnoreMatcher } = await import('../collector/classifier.js');
+
 const {
   parseGitLogOutput,
   getISOWeek,
@@ -317,6 +319,91 @@ describe('scanRepo', () => {
     expect(record.commits).toBe(1);
     expect(record.filetype.app.insertions).toBe(10);
     expect(record.filetype.test.insertions).toBe(5);
+  });
+
+  it('does not count a commit that touches only ignored files', async () => {
+    vi.mocked(buildIgnoreMatcher).mockImplementationOnce(
+      () => (filePath: string) =>
+        filePath.endsWith('package-lock.json') || filePath.includes('node_modules/'),
+    );
+    spawnQueue.push(
+      [
+        // Lockfile-only commit on a Friday: must not add a commit or an active day
+        'aaa111|alice@acme.com|Alice Johnson|2026-02-20T10:00:00Z',
+        '500\t500\tpackage-lock.json',
+        '9000\t0\tnode_modules/lodash/index.js',
+        '',
+        // Real commit on a Thursday
+        'bbb222|alice@acme.com|Alice Johnson|2026-02-19T10:00:00Z',
+        '10\t2\tsrc/index.ts',
+      ].join('\n'),
+    );
+
+    const result = await scanRepo('/repos/frontend', {
+      repoName: 'frontend',
+      group: 'web',
+      authorMap: makeAuthorMap(),
+      recentHashes: new Set(),
+    });
+
+    // Both hashes are remembered so the ignored commit is not re-read next scan
+    expect(result.newHashes).toEqual(['aaa111', 'bbb222']);
+    expect(result.commitCount).toBe(2);
+    expect(result.ignoredCommitCount).toBe(1);
+
+    expect(result.newRecords).toHaveLength(1);
+    const record = result.newRecords[0];
+    expect(record.commits).toBe(1);
+    expect(record.activeDays).toBe(1);
+    expect(record.intent?.other).toBe(1);
+    expect(record.filetype.app.insertions).toBe(10);
+    expect(record.filetype.config.insertions).toBe(0);
+  });
+
+  it('passes ignorePatternsReplaceDefaults through to buildIgnoreMatcher', async () => {
+    spawnQueue.push('');
+
+    await scanRepo('/repos/frontend', {
+      repoName: 'frontend',
+      group: 'web',
+      authorMap: makeAuthorMap(),
+      recentHashes: new Set(),
+      ignorePatterns: ['*.foo'],
+      ignorePatternsReplaceDefaults: true,
+    });
+
+    expect(vi.mocked(buildIgnoreMatcher)).toHaveBeenCalledWith(['*.foo'], {
+      replaceDefaults: true,
+    });
+  });
+
+  it('records an activeDayMask bit per weekday with commits (Mon=bit0 … Sun=bit6)', async () => {
+    // 2026-02-16 is a Monday; 2026-02-18 is a Wednesday (both ISO week 2026-W08).
+    spawnQueue.push(
+      [
+        'aaa001|alice@acme.com|Alice Johnson|2026-02-18T10:00:00Z',
+        '1\t0\tsrc/a.ts',
+        '',
+        'aaa002|alice@acme.com|Alice Johnson|2026-02-18T15:00:00Z',
+        '1\t0\tsrc/b.ts',
+        '',
+        'aaa003|alice@acme.com|Alice Johnson|2026-02-16T09:00:00Z',
+        '1\t0\tsrc/c.ts',
+      ].join('\n'),
+    );
+
+    const result = await scanRepo('/repos/frontend', {
+      repoName: 'frontend',
+      group: 'web',
+      authorMap: makeAuthorMap(),
+      recentHashes: new Set(),
+    });
+
+    expect(result.newRecords).toHaveLength(1);
+    const record = result.newRecords[0];
+    expect(record.week).toBe('2026-W08');
+    expect(record.activeDays).toBe(2);
+    expect(record.activeDayMask).toBe(0b0000101);
   });
 
   it('skips commits already in recentHashes', async () => {

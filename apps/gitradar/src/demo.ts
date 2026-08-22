@@ -207,8 +207,10 @@ export function generateDemoData(weeks: number = 12): {
 
             // Base commits 3-15 with weekly variation
             const baseCommits = 3 + Math.floor(rand() * 13);
-            // Active days 1-5
+            // Active days 1-5, as a contiguous run of weekdays (bit0 = Monday)
             const activeDays = 1 + Math.floor(rand() * 5);
+            const firstDay = Math.floor(rand() * (6 - activeDays));
+            const activeDayMask = ((1 << activeDays) - 1) << firstDay;
 
             // File type distribution: ~55% app, ~22% test, ~10% config, ~5% storybook, ~8% doc
             const totalFiles = 2 + Math.floor(rand() * 12);
@@ -267,6 +269,7 @@ export function generateDemoData(weeks: number = 12): {
               group: repo.group,
               commits: baseCommits,
               activeDays,
+              activeDayMask,
               intent: {
                 feat: featCommits,
                 fix: fixCommits,

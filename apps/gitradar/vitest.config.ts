@@ -22,6 +22,7 @@ export default defineConfig({
     exclude: [
       ...configDefaults.exclude,
       'src/__tests__/sqlite-store.test.ts',
+      'src/__tests__/sqlite-active-days.test.ts',
       'src/__tests__/functional.test.ts',
     ],
   },

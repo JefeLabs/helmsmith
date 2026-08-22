@@ -62,6 +62,73 @@ describe('rollup', () => {
     expect(acme.commits).toBe(10);
   });
 
+  it('unions activeDays for one member across repos in the same week (mask-aware)', () => {
+    const records = [
+      // Mon, Tue, Wed in web-app
+      makeRecord({ member: 'alice', repo: 'web-app', activeDays: 3, activeDayMask: 0b0000111 }),
+      // Tue, Wed in api — overlaps entirely with the days above
+      makeRecord({ member: 'alice', repo: 'api', activeDays: 2, activeDayMask: 0b0000110 }),
+      // Fri in infra — a genuinely new day
+      makeRecord({ member: 'alice', repo: 'infra', activeDays: 1, activeDayMask: 0b0010000 }),
+    ];
+
+    const result = rollup(records, (r) => r.org);
+    const acme = result.get('Acme')!;
+
+    // Naive sum would be 6; the real number of distinct days is 4
+    expect(acme.activeDays).toBe(4);
+  });
+
+  it('keeps activeDays per member-week separate when unioning', () => {
+    const records = [
+      makeRecord({
+        member: 'alice',
+        repo: 'web-app',
+        week: '2026-W08',
+        activeDays: 2,
+        activeDayMask: 0b11,
+      }),
+      makeRecord({
+        member: 'alice',
+        repo: 'api',
+        week: '2026-W09',
+        activeDays: 2,
+        activeDayMask: 0b11,
+      }),
+      makeRecord({
+        member: 'bob',
+        repo: 'api',
+        week: '2026-W08',
+        activeDays: 2,
+        activeDayMask: 0b11,
+      }),
+    ];
+
+    const acme = rollup(records, (r) => r.org).get('Acme')!;
+    // Different weeks and different members never collapse into each other
+    expect(acme.activeDays).toBe(6);
+  });
+
+  it('falls back to summing activeDays for legacy records without a mask', () => {
+    const records = [
+      makeRecord({ member: 'alice', repo: 'web-app', activeDays: 3 }),
+      makeRecord({ member: 'alice', repo: 'api', activeDays: 2 }),
+    ];
+
+    const acme = rollup(records, (r) => r.org).get('Acme')!;
+    expect(acme.activeDays).toBe(5);
+  });
+
+  it('caps a mixed mask + legacy member-week at 7 days', () => {
+    const records = [
+      makeRecord({ member: 'alice', repo: 'web-app', activeDays: 5, activeDayMask: 0b0011111 }),
+      makeRecord({ member: 'alice', repo: 'api', activeDays: 4 }),
+    ];
+
+    const acme = rollup(records, (r) => r.org).get('Acme')!;
+    expect(acme.activeDays).toBe(7);
+  });
+
   it('sums activeDays across grouped records', () => {
     const records = [
       makeRecord({ member: 'alice', activeDays: 3 }),

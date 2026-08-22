@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock os.homedir before importing the module
 const MOCK_HOME = '/mock/home';
@@ -19,6 +19,34 @@ const { expandTilde, getConfigDir, getDataDir, getConfigPath, ensureDataDir } = 
 );
 
 const { mkdir } = await import('node:fs/promises');
+
+// ── GITRADAR_HOME override ──────────────────────────────────────────────────
+
+describe('GITRADAR_HOME override', () => {
+  const original = process.env.GITRADAR_HOME;
+
+  afterEach(() => {
+    if (original === undefined) delete process.env.GITRADAR_HOME;
+    else process.env.GITRADAR_HOME = original;
+  });
+
+  it('uses ~/.agentx/gitradar when GITRADAR_HOME is unset', () => {
+    delete process.env.GITRADAR_HOME;
+    expect(getConfigDir()).toBe(join(MOCK_HOME, '.agentx', 'gitradar'));
+  });
+
+  it('redirects every path under GITRADAR_HOME when set (tests, sandboxes, CI)', () => {
+    process.env.GITRADAR_HOME = '/sandbox/gitradar';
+    expect(getConfigDir()).toBe('/sandbox/gitradar');
+    expect(getDataDir()).toBe(join('/sandbox/gitradar', 'data'));
+    expect(getConfigPath()).toBe(join('/sandbox/gitradar', 'config.yml'));
+  });
+
+  it('ignores an empty GITRADAR_HOME', () => {
+    process.env.GITRADAR_HOME = '';
+    expect(getConfigDir()).toBe(join(MOCK_HOME, '.agentx', 'gitradar'));
+  });
+});
 
 // ── expandTilde ─────────────────────────────────────────────────────────────
 

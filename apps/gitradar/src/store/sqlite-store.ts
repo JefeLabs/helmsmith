@@ -65,6 +65,7 @@ function ensureSchema(db: Database): void {
       grp TEXT NOT NULL,
       commits INTEGER NOT NULL DEFAULT 0,
       active_days INTEGER NOT NULL DEFAULT 0,
+      active_day_mask INTEGER NOT NULL DEFAULT 0,
       intent_feat INTEGER NOT NULL DEFAULT 0,
       intent_fix INTEGER NOT NULL DEFAULT 0,
       intent_refactor INTEGER NOT NULL DEFAULT 0,
@@ -152,7 +153,40 @@ function ensureSchema(db: Database): void {
   // Migrations for existing databases
   migrateEnrichmentBranchColumns(db);
   migrateRecordsScopeColumns(db);
+  migrateRecordsActiveDayMask(db);
 }
+
+/** Add active_day_mask to records if it doesn't exist (migration v4). */
+function migrateRecordsActiveDayMask(db: Database): void {
+  const cols = db.prepare('PRAGMA table_info(records)').all() as Array<{ name: string }>;
+  if (!cols.some((c) => c.name === 'active_day_mask')) {
+    db.exec('ALTER TABLE records ADD COLUMN active_day_mask INTEGER NOT NULL DEFAULT 0;');
+  }
+}
+
+// ── Active-day SQL helpers ──────────────────────────────────────────────────
+// active_day_mask is a 7-bit weekday mask (bit0 = Monday). Distinct days for a
+// member-week = popcount of the OR of masks across its rows. Rows from before
+// the mask existed (mask = 0) fall back to their stored count.
+
+/** SQL expression: popcount of the low 7 bits of `expr`. */
+function sqlPopcount7(expr: string): string {
+  return Array.from({ length: 7 }, (_, i) => `((${expr} >> ${i}) & 1)`).join(' + ');
+}
+
+/** SQL aggregate expression: popcount of the OR of `col` across grouped rows. */
+function sqlUnionPopcount7(col: string): string {
+  return Array.from({ length: 7 }, (_, i) => `MAX((${col} >> ${i}) & 1)`).join(' + ');
+}
+
+/** ON CONFLICT merge for active_days: union masks when both rows carry one. */
+const ACTIVE_DAYS_MERGE_SQL = `
+      active_days = CASE
+        WHEN active_day_mask > 0 AND excluded.active_day_mask > 0
+          THEN ${sqlPopcount7('(active_day_mask | excluded.active_day_mask)')}
+        ELSE MIN(active_days + excluded.active_days, 7)
+      END,
+      active_day_mask = active_day_mask | excluded.active_day_mask,`;
 
 /** Add pr_branch columns to enrichments if they don't exist (migration v2). */
 function migrateEnrichmentBranchColumns(db: Database): void {
@@ -199,6 +233,7 @@ function recordToRow(r: UserWeekRepoRecord): BindParams {
     grp: r.group,
     commits: r.commits,
     active_days: r.activeDays,
+    active_day_mask: r.activeDayMask ?? 0,
     intent_feat: r.intent?.feat ?? 0,
     intent_fix: r.intent?.fix ?? 0,
     intent_refactor: r.intent?.refactor ?? 0,
@@ -249,6 +284,8 @@ function rowToRecord(row: Record<string, unknown>): UserWeekRepoRecord {
     group: row.grp as string,
     commits: row.commits as number,
     activeDays: row.active_days as number,
+    activeDayMask:
+      (row.active_day_mask as number) > 0 ? (row.active_day_mask as number) : undefined,
     intent: {
       feat: row.intent_feat as number,
       fix: row.intent_fix as number,
@@ -353,7 +390,7 @@ export function saveCommitsDataSQL(data: CommitsByFiletype): void {
   const upsert = db.prepare(`
     INSERT INTO records (
       member, email, org, org_type, team, tag, week, repo, grp,
-      commits, active_days,
+      commits, active_days, active_day_mask,
       intent_feat, intent_fix, intent_refactor, intent_docs, intent_test, intent_chore, intent_other,
       app_files, app_files_added, app_files_deleted, app_ins, app_del,
       test_files, test_files_added, test_files_deleted, test_ins, test_del,
@@ -363,7 +400,7 @@ export function saveCommitsDataSQL(data: CommitsByFiletype): void {
       breaking_changes, scopes
     ) VALUES (
       @member, @email, @org, @org_type, @team, @tag, @week, @repo, @grp,
-      @commits, @active_days,
+      @commits, @active_days, @active_day_mask,
       @intent_feat, @intent_fix, @intent_refactor, @intent_docs, @intent_test, @intent_chore, @intent_other,
       @app_files, @app_files_added, @app_files_deleted, @app_ins, @app_del,
       @test_files, @test_files_added, @test_files_deleted, @test_ins, @test_del,
@@ -374,7 +411,7 @@ export function saveCommitsDataSQL(data: CommitsByFiletype): void {
     )
     ON CONFLICT (member, week, repo) DO UPDATE SET
       commits = commits + excluded.commits,
-      active_days = MIN(active_days + excluded.active_days, 7),
+${ACTIVE_DAYS_MERGE_SQL}
       intent_feat = intent_feat + excluded.intent_feat,
       intent_fix = intent_fix + excluded.intent_fix,
       intent_refactor = intent_refactor + excluded.intent_refactor,
@@ -614,7 +651,6 @@ export function queryRollup(filters: RollupFilters, groupBy: RollupGroupBy): Map
     SELECT
       ${groupCol} as group_key,
       SUM(commits) as commits,
-      SUM(active_days) as active_days,
       COUNT(DISTINCT member) as active_members,
       SUM(app_files) as app_files,
       SUM(app_files_added) as app_files_added,
@@ -648,6 +684,30 @@ export function queryRollup(filters: RollupFilters, groupBy: RollupGroupBy): Map
   `;
 
   const rows = db.prepare(sql).all(params) as Array<Record<string, number | string>>;
+
+  // Active days can't be a plain SUM: union weekday masks per member-week first
+  // (a day spent in three repos is one day), then sum those per group.
+  const innerGroupBy = groupBy === 'all' ? 'member, week' : `${groupCol}, member, week`;
+  const activeDaysSql = `
+    SELECT gk as group_key, SUM(days) as active_days
+    FROM (
+      SELECT ${groupCol} as gk, member, week,
+        MIN(
+          (${sqlUnionPopcount7('active_day_mask')})
+          + SUM(CASE WHEN active_day_mask = 0 THEN active_days ELSE 0 END),
+          7
+        ) as days
+      FROM records
+      ${where}
+      GROUP BY ${innerGroupBy}
+    )
+    ${groupBy === 'all' ? '' : 'GROUP BY gk'}
+  `;
+  const activeDaysByKey = new Map<string, number>();
+  for (const row of db.prepare(activeDaysSql).all(params) as Array<Record<string, unknown>>) {
+    activeDaysByKey.set(String(row.group_key), (row.active_days as number | null) ?? 0);
+  }
+
   const result = new Map<string, RolledUp>();
 
   for (const row of rows) {
@@ -704,7 +764,7 @@ export function queryRollup(filters: RollupFilters, groupBy: RollupGroupBy): Map
 
     result.set(key, {
       commits: row.commits as number,
-      activeDays: row.active_days as number,
+      activeDays: activeDaysByKey.get(key) ?? 0,
       activeMembers: row.active_members as number,
       insertions,
       deletions,
@@ -1056,7 +1116,7 @@ export function upsertRecords(records: UserWeekRepoRecord[]): void {
   const upsert = db.prepare(`
     INSERT INTO records (
       member, email, org, org_type, team, tag, week, repo, grp,
-      commits, active_days,
+      commits, active_days, active_day_mask,
       intent_feat, intent_fix, intent_refactor, intent_docs, intent_test, intent_chore, intent_other,
       app_files, app_files_added, app_files_deleted, app_ins, app_del,
       test_files, test_files_added, test_files_deleted, test_ins, test_del,
@@ -1066,7 +1126,7 @@ export function upsertRecords(records: UserWeekRepoRecord[]): void {
       breaking_changes, scopes
     ) VALUES (
       @member, @email, @org, @org_type, @team, @tag, @week, @repo, @grp,
-      @commits, @active_days,
+      @commits, @active_days, @active_day_mask,
       @intent_feat, @intent_fix, @intent_refactor, @intent_docs, @intent_test, @intent_chore, @intent_other,
       @app_files, @app_files_added, @app_files_deleted, @app_ins, @app_del,
       @test_files, @test_files_added, @test_files_deleted, @test_ins, @test_del,
@@ -1077,7 +1137,7 @@ export function upsertRecords(records: UserWeekRepoRecord[]): void {
     )
     ON CONFLICT (member, week, repo) DO UPDATE SET
       commits = commits + excluded.commits,
-      active_days = MIN(active_days + excluded.active_days, 7),
+${ACTIVE_DAYS_MERGE_SQL}
       intent_feat = intent_feat + excluded.intent_feat,
       intent_fix = intent_fix + excluded.intent_fix,
       intent_refactor = intent_refactor + excluded.intent_refactor,

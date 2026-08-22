@@ -63,6 +63,7 @@ function makeScanResult(overrides?: Partial<ScanResult>): ScanResult {
     newHashes: [],
     commitCount: 0,
     skippedCount: 0,
+    ignoredCommitCount: 0,
     discoveredAuthors: [],
     ...overrides,
   };

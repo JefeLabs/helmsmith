@@ -405,12 +405,91 @@ describe('buildIgnoreMatcher', () => {
     });
   });
 
+  describe('default patterns — dependency and build directories', () => {
+    const isIgnored = buildIgnoreMatcher();
+
+    it('ignores accidentally tracked node_modules at any depth', () => {
+      expect(isIgnored('node_modules/lodash/index.js')).toBe(true);
+      expect(isIgnored('packages/web/node_modules/react/index.js')).toBe(true);
+    });
+
+    it('ignores vendored dependency directories', () => {
+      expect(isIgnored('vendor/github.com/foo/bar.go')).toBe(true);
+      expect(isIgnored('ios/Pods/Alamofire/Source/Alamofire.swift')).toBe(true);
+      expect(isIgnored('.venv/lib/python3.12/site-packages/x.py')).toBe(true);
+      expect(isIgnored('app/__pycache__/main.cpython-312.pyc')).toBe(true);
+    });
+
+    it('ignores build, output, and cache directories', () => {
+      expect(isIgnored('out/index.html')).toBe(true);
+      expect(isIgnored('target/debug/app')).toBe(true);
+      expect(isIgnored('coverage/lcov.info')).toBe(true);
+      expect(isIgnored('.turbo/cache/abc')).toBe(true);
+      expect(isIgnored('.nuxt/dist/client.js')).toBe(true);
+      expect(isIgnored('.gradle/caches/x')).toBe(true);
+      expect(isIgnored('.cache/webpack/x.pack')).toBe(true);
+    });
+
+    it('does NOT ignore source dirs that merely contain those names', () => {
+      expect(isIgnored('src/vendor-adapter.ts')).toBe(false);
+      expect(isIgnored('src/targets/index.ts')).toBe(false);
+      expect(isIgnored('src/coverage-report.ts')).toBe(false);
+    });
+  });
+
+  describe('default patterns — lock files', () => {
+    const isIgnored = buildIgnoreMatcher();
+
+    it('ignores any *.lock / *.lockb file generically', () => {
+      expect(isIgnored('bun.lock')).toBe(true);
+      expect(isIgnored('bun.lockb')).toBe(true);
+      expect(isIgnored('flake.lock')).toBe(true);
+      expect(isIgnored('mix.lock')).toBe(true);
+      expect(isIgnored('pubspec.lock')).toBe(true);
+      expect(isIgnored('Podfile.lock')).toBe(true);
+    });
+
+    it('ignores lock files that do not use the .lock suffix', () => {
+      expect(isIgnored('go.sum')).toBe(true);
+      expect(isIgnored('packages.lock.json')).toBe(true);
+      expect(isIgnored('Package.resolved')).toBe(true);
+      expect(isIgnored('gradle.lockfile')).toBe(true);
+    });
+  });
+
+  describe('default patterns — generated artifacts', () => {
+    const isIgnored = buildIgnoreMatcher();
+
+    it('ignores test snapshots', () => {
+      expect(isIgnored('src/__snapshots__/Button.test.tsx.snap')).toBe(true);
+      expect(isIgnored('src/Button.snap')).toBe(true);
+    });
+
+    it('ignores protobuf and codegen output', () => {
+      expect(isIgnored('api/v1/service.pb.go')).toBe(true);
+      expect(isIgnored('api/service_pb2.py')).toBe(true);
+      expect(isIgnored('api/service_pb2_grpc.py')).toBe(true);
+      expect(isIgnored('src/__generated__/graphql.ts')).toBe(true);
+    });
+
+    it('ignores svg assets', () => {
+      expect(isIgnored('assets/logo.svg')).toBe(true);
+    });
+  });
+
   describe('custom patterns', () => {
-    it('uses only user-provided patterns when specified', () => {
+    it('extends the defaults by default (user patterns are additive)', () => {
       const isIgnored = buildIgnoreMatcher(['custom.lock', '*.generated.ts']);
       expect(isIgnored('custom.lock')).toBe(true);
       expect(isIgnored('schema.generated.ts')).toBe(true);
-      // Default patterns should NOT apply
+      // Defaults still apply — adding one pattern must not silently drop them
+      expect(isIgnored('package-lock.json')).toBe(true);
+      expect(isIgnored('node_modules/x/index.js')).toBe(true);
+    });
+
+    it('uses only user-provided patterns when replaceDefaults is set', () => {
+      const isIgnored = buildIgnoreMatcher(['custom.lock'], { replaceDefaults: true });
+      expect(isIgnored('custom.lock')).toBe(true);
       expect(isIgnored('package-lock.json')).toBe(false);
     });
 

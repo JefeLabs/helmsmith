@@ -56,6 +56,8 @@ export const ConfigSchema = z.object({
       trend_threshold: z.number().optional().default(0.1),
       /** Glob patterns for files to exclude from metrics (e.g. "package-lock.json", "*.min.js", "dist/*"). */
       ignore_patterns: z.array(z.string()).optional(),
+      /** When true, `ignore_patterns` replaces the built-in defaults instead of extending them. */
+      ignore_patterns_replace_defaults: z.boolean().optional().default(false),
       /** How many days before the analysis period to look for "recently modified" files
        *  when computing churn rate. A longer window catches more instability but may
        *  over-count churn on actively developed files. Default: 21 days. */
@@ -84,6 +86,7 @@ export const ConfigSchema = z.object({
       segment_high_pct: 20,
       segment_low_pct: 20,
       auto_prune_weeks: 0,
+      ignore_patterns_replace_defaults: false,
     }),
 });
 
@@ -98,6 +101,7 @@ export const DEFAULT_SETTINGS: Config['settings'] = {
   segment_high_pct: 20,
   segment_low_pct: 20,
   auto_prune_weeks: 0,
+  ignore_patterns_replace_defaults: false,
 };
 
 // ── Data Schemas ────────────────────────────────────────────────────────────
@@ -127,6 +131,10 @@ export const UserWeekRepoRecordSchema = z.object({
   // Metrics
   commits: z.number(),
   activeDays: z.number(),
+  /** Bitmask of weekdays with at least one commit (bit0 = Monday … bit6 = Sunday).
+   *  Lets rollups union days across repos instead of summing counts. Optional for
+   *  records created before this field existed (those fall back to activeDays). */
+  activeDayMask: z.number().int().min(0).max(127).optional(),
 
   // Semantic intent breakdown (from conventional commit prefixes).
   // Optional for backwards compatibility with records created before this field existed.

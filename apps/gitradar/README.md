@@ -33,6 +33,7 @@ gitradar
 |---------|-------------|
 | Multi-repo scanning | Scans any number of local git repos with incremental updates |
 | File classification | Categorizes changes as app, test, config, storybook, or doc |
+| Noise filtering | Lock files, dependency/build dirs, and generated files never count; lockfile-only commits are skipped |
 | Commit intent | Parses conventional commits (feat/fix/refactor/docs/test/chore) |
 | GitHub enrichment | Pulls PR metrics, cycle time, reviews, and churn via GitHub API |
 | Segment filtering | Hide/show top 20%, middle 60%, or bottom 20% contributors |
@@ -120,7 +121,14 @@ orgs:
 settings:
   weeks_back: 12
   staleness_minutes: 60
+  ignore_patterns: ["*.fixture.json"]   # extends the built-in list
 ```
+
+Lock files, `node_modules/`, `vendor/`, build output, snapshots, and other
+generated files are ignored out of the box; a commit that touches only ignored
+files is not counted at all. Add your own patterns with `ignore_patterns`
+(additive), or set `ignore_patterns_replace_defaults: true` to start from an
+empty list. `GITRADAR_HOME` relocates the whole `~/.agentx/gitradar` directory.
 
 Or skip the YAML and configure everything from the **Manage tab** in the TUI.
 

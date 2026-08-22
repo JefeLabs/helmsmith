@@ -117,6 +117,7 @@ export async function scanAllRepos(
       chunkMonths: options?.chunkMonths,
       identifierRules,
       ignorePatterns: config.settings.ignore_patterns,
+      ignorePatternsReplaceDefaults: config.settings.ignore_patterns_replace_defaults,
       classificationRules: config.classification,
     });
 
@@ -156,8 +157,10 @@ export async function scanAllRepos(
       await options.onScanStateUpdated(currentState);
     }
 
+    const ignoredNote =
+      result.ignoredCommitCount > 0 ? ` (${result.ignoredCommitCount} ignored-only)` : '';
     console.log(
-      `✓ ${repoName}: +${result.commitCount} commits → ${result.newRecords.length} new records`,
+      `✓ ${repoName}: +${result.commitCount} commits${ignoredNote} → ${result.newRecords.length} new records`,
     );
   }
 

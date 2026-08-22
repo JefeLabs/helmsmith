@@ -197,6 +197,16 @@ describe('ConfigSchema', () => {
     expect(result.settings).toEqual(DEFAULT_SETTINGS);
   });
 
+  it('defaults ignore_patterns_replace_defaults to false so user patterns extend the built-ins', () => {
+    const result = ConfigSchema.parse({ settings: { ignore_patterns: ['*.snap'] } });
+    expect(result.settings.ignore_patterns).toEqual(['*.snap']);
+    expect(result.settings.ignore_patterns_replace_defaults).toBe(false);
+    expect(
+      ConfigSchema.parse({ settings: { ignore_patterns_replace_defaults: true } }).settings
+        .ignore_patterns_replace_defaults,
+    ).toBe(true);
+  });
+
   it('allows overriding settings', () => {
     const result = ConfigSchema.parse({
       repos: [{ path: '/p' }],
@@ -312,6 +322,16 @@ describe('UserWeekRepoRecordSchema', () => {
   it('rejects missing required identity fields', () => {
     const { member: _, ...noMember } = makeRecord();
     expect(() => UserWeekRepoRecordSchema.parse(noMember)).toThrow();
+  });
+
+  it('accepts an optional 7-bit activeDayMask and rejects out-of-range values', () => {
+    expect(UserWeekRepoRecordSchema.parse(makeRecord()).activeDayMask).toBeUndefined();
+    expect(
+      UserWeekRepoRecordSchema.parse(makeRecord({ activeDayMask: 0b1010101 })).activeDayMask,
+    ).toBe(0b1010101);
+    expect(() => UserWeekRepoRecordSchema.parse(makeRecord({ activeDayMask: 128 }))).toThrow();
+    expect(() => UserWeekRepoRecordSchema.parse(makeRecord({ activeDayMask: -1 }))).toThrow();
+    expect(() => UserWeekRepoRecordSchema.parse(makeRecord({ activeDayMask: 1.5 }))).toThrow();
   });
 });
 

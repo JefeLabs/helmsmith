@@ -10,7 +10,7 @@
     "build": "tsup",
     "dev": "tsx src/cli.ts",
     "test": "vitest run && bun run test:bun",
-    "test:bun": "bun test src/__tests__/sqlite-store.test.ts src/__tests__/functional.test.ts",
+    "test:bun": "bun test src/__tests__/sqlite-store.test.ts src/__tests__/functional.test.ts && bun test src/__tests__/sqlite-active-days.test.ts",
     "test:watch": "vitest",
     "test:e2e": "vitest run tests/e2e",
     "typecheck": "tsc --noEmit"

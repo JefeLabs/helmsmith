@@ -272,6 +272,28 @@ Every changed file in every commit is automatically classified:
 
 Classification priority: storybook > test > config > doc > app (first match wins).
 
+### Ignored Files
+
+Some tracked files are noise, not work. Before classification, GitRadar drops
+any file matching an ignore pattern so it contributes no lines or file counts:
+
+| Group | Default patterns |
+|-------|------------------|
+| Lock files | `*.lock`, `*.lockb`, `package-lock.json`, `packages.lock.json`, `pnpm-lock.yaml`, `go.sum`, `Package.resolved`, `gradle.lockfile` |
+| Dependency dirs | `node_modules/`, `vendor/`, `Pods/`, `.venv/`, `venv/`, `__pycache__/` |
+| Build / cache dirs | `dist/`, `build/`, `out/`, `target/`, `coverage/`, `.next/`, `.nuxt/`, `.turbo/`, `.cache/`, `.gradle/` |
+| Bundled output | `*.min.js`, `*.min.css`, `*.bundle.js`, `*.chunk.js`, `*.map` |
+| Generated | `*.generated.*`, `*.auto.*`, `__generated__/`, `__snapshots__/`, `*.snap`, `*.pb.go`, `*.pb.ts`, `*_pb2.py`, `*_pb2_grpc.py`, `*.svg` |
+
+Directory patterns match at any depth (`packages/web/node_modules/…` is ignored too).
+
+A commit whose files are *all* ignored — a lockfile bump, an accidental
+`node_modules` check-in — is skipped entirely: it adds no commit, no active day,
+and no intent tally. The scan summary reports these as `(N ignored-only)`.
+
+Extend the list with `settings.ignore_patterns` (additive). To start from an
+empty list instead, set `settings.ignore_patterns_replace_defaults: true`.
+
 ---
 
 ## 7. Commit Intent Tracking
@@ -427,7 +449,14 @@ settings:
   segment_high_pct: 20     # top segment threshold
   segment_low_pct: 20      # bottom segment threshold
   trend_threshold: 0.10    # 10% delta for trend indicators
+  ignore_patterns:         # added to the built-in ignore list (see §6)
+    - "*.fixture.json"
+    - "generated/*"
+  ignore_patterns_replace_defaults: false   # true = use only the patterns above
 ```
+
+Set `GITRADAR_HOME=/some/dir` to relocate config, data, and cache together
+(useful for sandboxes and CI; defaults to `~/.agentx/gitradar`).
 
 Key configuration features:
 - **Aliases** — Match commits from multiple email addresses or names to one person
@@ -437,6 +466,7 @@ Key configuration features:
 - **Identifiers** — Auto-assign authors based on parenthesized codes in git names
 - **Path resolution** — Supports `~` expansion and relative paths (resolved against config location)
 - **Segment thresholds** — Customize the high/low percentile boundaries
+- **Ignore patterns** — Extend (or replace) the built-in list of lockfiles, dependency dirs, and generated files that never count as work
 
 ---
 

@@ -49,6 +49,10 @@ export function rollup(
 ): Map<string, RolledUp> {
   const result = new Map<string, RolledUp>();
   const memberSets = new Map<string, Set<string>>();
+  // Per group → per member-week → union of weekday masks (+ legacy counts).
+  // Records are stored per (member, week, repo); a day spent in three repos
+  // is still one day, so days are unioned per member-week, not summed.
+  const dayTrackers = new Map<string, Map<string, ActiveDayTracker>>();
 
   for (const r of records) {
     const key = groupBy(r);
@@ -58,13 +62,23 @@ export function rollup(
       agg = emptyRolledUp();
       result.set(key, agg);
       memberSets.set(key, new Set());
+      dayTrackers.set(key, new Map());
     }
 
     const members = memberSets.get(key)!;
     members.add(r.member);
 
+    const trackers = dayTrackers.get(key)!;
+    const memberWeek = `${r.member}::${r.week}`;
+    let tracker = trackers.get(memberWeek);
+    if (!tracker) {
+      tracker = { mask: 0, legacyDays: 0 };
+      trackers.set(memberWeek, tracker);
+    }
+    if (r.activeDayMask) tracker.mask |= r.activeDayMask;
+    else tracker.legacyDays += r.activeDays;
+
     agg.commits += r.commits;
-    agg.activeDays += r.activeDays;
     agg.breakingChanges += r.breakingChanges ?? 0;
 
     for (const ft of FILETYPE_KEYS) {
@@ -94,5 +108,25 @@ export function rollup(
     agg.activeMembers = members.size;
   }
 
+  for (const [key, trackers] of dayTrackers) {
+    let days = 0;
+    for (const t of trackers.values()) days += activeDaysFromTracker(t);
+    result.get(key)!.activeDays = days;
+  }
+
   return result;
+}
+
+interface ActiveDayTracker {
+  /** OR of activeDayMask across repos for one member-week. */
+  mask: number;
+  /** Sum of activeDays from records that predate the mask (best effort). */
+  legacyDays: number;
+}
+
+/** Distinct days for one member-week: popcount(mask) + legacy count, capped at 7. */
+function activeDaysFromTracker(t: ActiveDayTracker): number {
+  let bits = 0;
+  for (let m = t.mask; m; m >>= 1) bits += m & 1;
+  return Math.min(bits + t.legacyDays, 7);
 }

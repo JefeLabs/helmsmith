@@ -118,8 +118,11 @@ export interface ScanOptions {
     team: string;
     tag: string;
   }>;
-  /** Glob patterns for files to exclude from metrics. Uses defaults if undefined. */
+  /** Glob patterns for files to exclude from metrics. Extends the built-in defaults unless
+   *  `ignorePatternsReplaceDefaults` is set. */
   ignorePatterns?: string[];
+  /** When true, `ignorePatterns` replaces the built-in defaults instead of extending them. */
+  ignorePatternsReplaceDefaults?: boolean;
   /** User-defined classification rules: glob pattern → filetype category. Takes priority over built-in rules. */
   classificationRules?: Record<string, FileType>;
 }
@@ -142,6 +145,9 @@ export interface ScanResult {
   newHashes: string[];
   commitCount: number;
   skippedCount: number;
+  /** Commits whose every file matched an ignore pattern (e.g. lockfile-only bumps).
+   *  They are remembered for dedup but contribute no commits, lines, or active days. */
+  ignoredCommitCount: number;
   /** All unique authors seen in this scan (resolved or not). */
   discoveredAuthors: RawAuthor[];
 }
@@ -473,18 +479,19 @@ async function streamGitLog(
     shouldIgnore?: (filePath: string) => boolean;
     classify?: (filePath: string) => FileType;
   },
-): Promise<{ commitCount: number; skippedCount: number }> {
+): Promise<{ commitCount: number; skippedCount: number; ignoredCount: number }> {
   return new Promise((resolve, reject) => {
     const child = spawn('git', args, { cwd: repoPath, stdio: ['ignore', 'pipe', 'pipe'] });
 
     const parser = new GitLogLineParser();
     let commitCount = 0;
     let skippedCount = 0;
+    let ignoredCount = 0;
     const stderrChunks: Buffer[] = [];
 
     const handleCommit = (commit: ParsedCommit) => {
       commitCount++;
-      skippedCount += processCommitBatch(
+      const outcome = processCommitBatch(
         [commit],
         batchArgs.repoName,
         batchArgs.group,
@@ -498,6 +505,8 @@ async function streamGitLog(
         batchArgs.shouldIgnore,
         batchArgs.classify,
       );
+      skippedCount += outcome.skipped;
+      ignoredCount += outcome.ignored;
     };
 
     const rl = createInterface({ input: child.stdout!, crlfDelay: Infinity });
@@ -525,7 +534,7 @@ async function streamGitLog(
         const stderr = Buffer.concat(stderrChunks).toString().trim();
         reject(new Error(stderr || `git log exited with code ${code}`));
       } else {
-        resolve({ commitCount, skippedCount });
+        resolve({ commitCount, skippedCount, ignoredCount });
       }
     });
   });
@@ -625,7 +634,8 @@ function buildScanRanges(
 
 /**
  * Process a batch of parsed commits into the shared accumulator maps.
- * Returns the count of skipped (deduped) commits.
+ * Returns the count of skipped (deduped) commits and of ignored commits
+ * (every file matched an ignore pattern — nothing to measure).
  * Also collects all unique authors into rawAuthorsMap (resolved or not).
  */
 function processCommitBatch(
@@ -641,8 +651,9 @@ function processCommitBatch(
   identifierRules?: ScanOptions['identifierRules'],
   shouldIgnore?: (filePath: string) => boolean,
   classify?: (filePath: string) => FileType,
-): number {
+): { skipped: number; ignored: number } {
   let skipped = 0;
+  let ignored = 0;
 
   for (const commit of commits) {
     if (recentHashes.has(commit.hash)) {
@@ -668,6 +679,17 @@ function processCommitBatch(
         commitCount: 1,
         lastDate: commit.date,
       });
+    }
+
+    // A commit that only touches ignored files (lockfile bump, vendored node_modules, …)
+    // is not work we can measure: skip it entirely so it doesn't inflate commit counts,
+    // active days, or intent tallies. The hash was already recorded for dedup.
+    const countedFiles = shouldIgnore
+      ? commit.files.filter((f) => !shouldIgnore(f.path))
+      : commit.files;
+    if (commit.files.length > 0 && countedFiles.length === 0) {
+      ignored++;
+      continue;
     }
 
     const author = resolveAuthor(authorMap, commit.email, commit.name, identifierRules) ?? {
@@ -726,8 +748,7 @@ function processCommitBatch(
     }
 
     const classifyFn = classify ?? classifyFile;
-    for (const file of commit.files) {
-      if (shouldIgnore?.(file.path)) continue;
+    for (const file of countedFiles) {
       const category = classifyFn(file.path);
       record.filetype[category].files += 1;
       if (file.status === 'A') record.filetype[category].filesAdded += 1;
@@ -737,7 +758,20 @@ function processCommitBatch(
     }
   }
 
-  return skipped;
+  return { skipped, ignored };
+}
+
+/**
+ * Fold a set of "YYYY-MM-DD" day strings into a 7-bit weekday mask
+ * (bit0 = Monday … bit6 = Sunday).
+ */
+function toActiveDayMask(days: Set<string>): number {
+  let mask = 0;
+  for (const day of days) {
+    const dow = new Date(`${day}T00:00:00Z`).getUTCDay(); // 0 = Sunday
+    mask |= 1 << ((dow + 6) % 7);
+  }
+  return mask;
 }
 
 /**
@@ -764,10 +798,13 @@ export async function scanRepo(repoPath: string, options: ScanOptions): Promise<
     chunkMonths,
     identifierRules,
     ignorePatterns,
+    ignorePatternsReplaceDefaults,
     classificationRules,
   } = options;
 
-  const shouldIgnore = buildIgnoreMatcher(ignorePatterns);
+  const shouldIgnore = buildIgnoreMatcher(ignorePatterns, {
+    replaceDefaults: ignorePatternsReplaceDefaults,
+  });
   const classify = buildClassifier(classificationRules);
   const ranges = buildScanRanges(since, chunkMonths);
 
@@ -778,6 +815,7 @@ export async function scanRepo(repoPath: string, options: ScanOptions): Promise<
   const rawAuthorsMap = new Map<string, RawAuthor>();
   const newHashes: string[] = [];
   let totalCommitCount = 0;
+  let ignoredCommitCount = 0;
   let skippedCount = 0;
 
   const batchArgs = {
@@ -803,6 +841,7 @@ export async function scanRepo(repoPath: string, options: ScanOptions): Promise<
       const result = await streamGitLog(repoPath, args, batchArgs);
       totalCommitCount += result.commitCount;
       skippedCount += result.skippedCount;
+      ignoredCommitCount += result.ignoredCount;
     } catch (error) {
       const gitErr = classifyGitError(error);
       if (gitErr.severity === 'fatal') {
@@ -812,6 +851,7 @@ export async function scanRepo(repoPath: string, options: ScanOptions): Promise<
           newHashes: [],
           commitCount: 0,
           skippedCount: 0,
+          ignoredCommitCount: 0,
           discoveredAuthors: [],
         };
       }
@@ -825,17 +865,19 @@ export async function scanRepo(repoPath: string, options: ScanOptions): Promise<
           newHashes: [],
           commitCount: 0,
           skippedCount: 0,
+          ignoredCommitCount: 0,
           discoveredAuthors: [],
         };
       }
     }
   }
 
-  // Finalize activeDays from the tracked sets
+  // Finalize activeDays (and the weekday mask) from the tracked sets
   for (const [key, days] of activeDaysMap) {
     const record = recordMap.get(key);
     if (record) {
       record.activeDays = Math.min(days.size, 7);
+      record.activeDayMask = toActiveDayMask(days);
     }
   }
 
@@ -844,6 +886,7 @@ export async function scanRepo(repoPath: string, options: ScanOptions): Promise<
     newHashes,
     commitCount: totalCommitCount,
     skippedCount,
+    ignoredCommitCount,
     discoveredAuthors: Array.from(rawAuthorsMap.values()),
   };
 }
