@@ -877,4 +877,110 @@ describe('Functional: Full CLI Pipeline (Engine + SQLite)', () => {
       `  queryRollup(weeks): ${rolled.size} members, ${rollupCommits} commits across ${weeks.length} weeks`,
     );
   });
+
+  // ── Step 20: post-passes against a real merge commit ──────────────────────
+  //
+  // Every other test of runPrProxy / runRework mocks simple-git. This one runs
+  // both against real git output: a merge commit's first-parent --numstat shape,
+  // blame --porcelain, and --diff-filter=MD.
+
+  it('Step 20: a real merged PR lands on the branch author and its deleted line on the writer', async () => {
+    const { scanAllRepos } = await import('../collector/index.js');
+    const { DEFAULT_SETTINGS } = await import('../types/schema.js');
+
+    const ALICE = { name: 'Alice Author', email: 'alice.author@example.com' };
+    const BOB = { name: 'Bob Brancher', email: 'bob.brancher@example.com' };
+    const CAROL = { name: 'Carol Clicker', email: 'carol.clicker@example.com' };
+
+    // Commit timestamps exactly one week apart, so each lands in its own ISO week.
+    const at = (daysAgo: number): string => {
+      const d = new Date(Date.now() - daysAgo * 86_400_000);
+      d.setUTCHours(12, 0, 0, 0);
+      return d.toISOString();
+    };
+    const who = (a: { name: string; email: string }, iso: string) => ({
+      GIT_AUTHOR_NAME: a.name,
+      GIT_AUTHOR_EMAIL: a.email,
+      GIT_COMMITTER_NAME: a.name,
+      GIT_COMMITTER_EMAIL: a.email,
+      GIT_AUTHOR_DATE: iso,
+      GIT_COMMITTER_DATE: iso,
+    });
+
+    const repoPath = join(tempHome, 'repos', 'merge-fixture');
+    await mkdir(join(repoPath, 'src'), { recursive: true });
+    git(repoPath, ['init', '-q', '-b', 'main']);
+    git(repoPath, ['config', 'user.email', 'fixture@example.com']);
+    git(repoPath, ['config', 'user.name', 'Fixture']);
+    git(repoPath, ['config', 'commit.gpgsign', 'false']);
+
+    // Alice writes five lines.
+    await writeFile(join(repoPath, 'src/index.ts'), lines(5), 'utf-8');
+    git(repoPath, ['add', '-A']);
+    git(repoPath, ['commit', '-q', '-m', 'feat: seed'], who(ALICE, at(15)));
+
+    // Bob deletes the last one on a branch, one week later.
+    git(repoPath, ['checkout', '-q', '-b', 'feature/trim']);
+    await writeFile(join(repoPath, 'src/index.ts'), lines(4), 'utf-8');
+    git(repoPath, ['add', '-A']);
+    git(repoPath, ['commit', '-q', '-m', 'refactor: trim'], who(BOB, at(8)));
+
+    // Carol clicks merge a week after that — the PR must land on Bob, not Carol.
+    git(repoPath, ['checkout', '-q', 'main']);
+    git(
+      repoPath,
+      ['merge', '--no-ff', '-m', 'Merge pull request #7 from acme/feature-trim', 'feature/trim'],
+      who(CAROL, at(1)),
+    );
+
+    const { allNewRecords, stats } = await scanAllRepos(
+      {
+        repos: [{ path: repoPath, name: 'merge-fixture', group: 'SkoolScout' }],
+        orgs: [],
+        groups: {},
+        tags: {},
+        settings: { ...DEFAULT_SETTINGS, weeks_back: 12, staleness_minutes: 0 },
+      },
+      { version: 1, repos: {} },
+      { forceScan: true },
+    );
+
+    expect(stats.totalPrs).toBe(1);
+
+    // ── The merged PR is Bob's, in the week it merged ──
+    const bobPr = allNewRecords.find((r) => r.member === BOB.name && (r.prsMergedGit ?? 0) > 0);
+    expect(bobPr).toBeDefined();
+    expect(bobPr!.prsMergedGit).toBe(1);
+    expect(bobPr!.prSizes).toHaveLength(1);
+    // Merges are excluded from the commit scan, so this is a holder record.
+    expect(bobPr!.commits).toBe(0);
+    // Carol authored the merge commit; she gets no record at all.
+    expect(allNewRecords.some((r) => r.member === CAROL.name)).toBe(false);
+
+    const bobCommit = allNewRecords.find((r) => r.member === BOB.name && r.commits > 0);
+    expect(bobCommit).toBeDefined();
+    expect(bobCommit!.commits).toBe(1);
+    // The PR is charged to the merge week, a week after Bob's branch commit.
+    expect(bobPr!.week).not.toBe(bobCommit!.week);
+
+    // ── The deleted line is Alice's, in the week Bob deleted it ──
+    const aliceRework = allNewRecords.find(
+      (r) => r.member === ALICE.name && (r.reworkLines ?? 0) > 0,
+    );
+    expect(aliceRework).toBeDefined();
+    expect(aliceRework!.reworkLines).toBe(1);
+    expect(aliceRework!.reworkSelfLines).toBe(0); // Bob deleted it, not Alice
+    expect(aliceRework!.week).toBe(bobCommit!.week);
+    expect(aliceRework!.commits).toBe(0);
+
+    // Alice's own commit is a separate record, in her own week.
+    const aliceCommit = allNewRecords.find((r) => r.member === ALICE.name && r.commits > 0);
+    expect(aliceCommit).toBeDefined();
+    expect(aliceCommit!.week).not.toBe(aliceRework!.week);
+
+    console.log(
+      `  Merge fixture: PR → ${bobPr!.member} (${bobPr!.week}, size ${bobPr!.prSizes![0]}), ` +
+        `rework → ${aliceRework!.member} (${aliceRework!.week})`,
+    );
+  });
 });
