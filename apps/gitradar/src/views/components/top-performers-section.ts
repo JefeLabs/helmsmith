@@ -28,7 +28,7 @@ export function renderLeaderboard(
   const lines: string[] = [];
   lines.push(
     chalk.bold(
-      `Top Performers (${weekShort(weeks[0])} \u2192 ${weekShort(weeks[weeks.length - 1])})`,
+      `Top Performers (by lines touched \u2014 see Scorecard [K] for normalised metrics) \u00b7 ${weekShort(weeks[0])} \u2192 ${weekShort(weeks[weeks.length - 1])}`,
     ) +
       '  ' +
       legend,

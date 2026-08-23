@@ -171,6 +171,8 @@ Strong indicators (colored background) appear when a value exceeds both its own 
 - Each entry shows: rank, name, value, team, and a mini stacked bar
 - Time windows: `1` (4 weeks), `2` (8 weeks), `3` (3 months)
 
+Rankings here are raw lines touched, not normalised for effort or team size — use this tab for a quick pulse on who's most active by volume, and switch to the Scorecard (Tab K) when you need metrics normalised by cohort, trend, and role.
+
 ### Tab K: Scorecard
 
 **Per-member scorecard** across four metric families, built so no single number is treated as a ranking by default: every metric is shown against the member's own preceding window (a trend, not a comparison) and against the visible cohort (a percentile, not a score).

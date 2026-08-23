@@ -300,6 +300,10 @@ describe('ConfigSchema', () => {
     expect(DEFAULT_SETTINGS.scorecard_min_n).toBe(8);
   });
 
+  it('settings default object is DEFAULT_SETTINGS itself', () => {
+    expect(ConfigSchema.parse({}).settings).toEqual(DEFAULT_SETTINGS);
+  });
+
   it('accepts scorecard_weights only for known metric keys with positive weights', () => {
     expect(
       ConfigSchema.parse({ settings: { scorecard_weights: { commitsPerWeek: 2, reworkPct: 1 } } })

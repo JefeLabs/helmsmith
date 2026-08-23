@@ -1,12 +1,18 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Config, UserWeekRepoRecord } from '../types/schema.js';
+import type { Segment } from '../aggregator/segments.js';
+import type { AuthorRegistry, Config, UserWeekRepoRecord } from '../types/schema.js';
 import { DEFAULT_SETTINGS } from '../types/schema.js';
 import { stripAnsi } from '../ui/format.js';
 import type { KeyEvent } from '../ui/keypress.js';
 import { renderTopPerformersTab } from '../views/components/top-performers-section.js';
-import { computeWeeksToShow, mapKey } from '../views/dashboard.js';
+import {
+  buildSegmentMenuLines,
+  computeWeeksToShow,
+  initialHideUnassigned,
+  mapKey,
+} from '../views/dashboard.js';
 import type { NavigationAction, ViewContext, ViewFn } from '../views/types.js';
 
 // ── Mock readKey (replaces @inquirer/prompts select) ────────────────────────
@@ -213,6 +219,28 @@ function makeSampleContext(): ViewContext {
   };
 }
 
+/** Helper for `initialHideUnassigned` tests: a ViewContext with only orgs + an author registry set. */
+function ctxWith(configOverrides: Partial<Config>, registry: AuthorRegistry): ViewContext {
+  return {
+    config: { ...makeSampleConfig(), orgs: [], ...configOverrides },
+    records: [],
+    currentWeek: '2026-W12',
+    authorRegistry: registry,
+  };
+}
+
+const orgWithOneMember: Config['orgs'][number] = {
+  name: 'Team X',
+  type: 'core',
+  teams: [
+    {
+      name: 'Squad',
+      tag: 'default',
+      members: [{ name: 'Zoe Test', email: 'zoe@test.com', aliases: [] }],
+    },
+  ],
+};
+
 // ── Utility to suppress screen clear and console.log in tests ───────────────
 let screenClearCount: number;
 let stdoutWriteSpy: ReturnType<typeof vi.spyOn>;
@@ -271,6 +299,68 @@ describe('computeWeeksToShow', () => {
   it('handles typical terminal heights', () => {
     // 40 rows, 2 bars/group: floor((40-30)/(2+1)) = floor(10/3) = 3
     expect(computeWeeksToShow(40, 2)).toBe(3);
+  });
+});
+
+describe('buildSegmentMenuLines', () => {
+  it('segment menu reflects configured thresholds', () => {
+    const lines = buildSegmentMenuLines(new Set(), 10, 30).map(stripAnsi).join('\n');
+    expect(lines).toMatch(/High \(top 10%\)/);
+    expect(lines).toMatch(/Middle \(60%\)/);
+    expect(lines).toMatch(/Low \(bottom 30%\)/);
+  });
+
+  it('marks excluded segments as struck-through (hidden)', () => {
+    const excluded = new Set<Segment>(['high']);
+    const lines = buildSegmentMenuLines(excluded, 20, 20).map(stripAnsi).join('\n');
+    // Struck-through segments no longer read "Hide X" — the strike marks them as already hidden.
+    expect(lines).not.toMatch(/Hide High/);
+    expect(lines).toMatch(/Hide Middle/);
+    expect(lines).toMatch(/Hide Low/);
+  });
+});
+
+describe('initialHideUnassigned', () => {
+  it('hide-unassigned defaults off when nobody is assigned', () => {
+    expect(initialHideUnassigned(ctxWith({ orgs: [] }, { version: 1, authors: {} }))).toBe(false);
+    expect(
+      initialHideUnassigned(ctxWith({ orgs: [orgWithOneMember] }, { version: 1, authors: {} })),
+    ).toBe(true);
+  });
+
+  it('defaults on when a registry author has an org assigned', () => {
+    const registry: AuthorRegistry = {
+      version: 1,
+      authors: {
+        'zoe@test.com': {
+          email: 'zoe@test.com',
+          name: 'Zoe Test',
+          org: 'Team X',
+          firstSeen: '2026-W01',
+          lastSeen: '2026-W12',
+          reposSeenIn: [],
+          commitCount: 5,
+        },
+      },
+    };
+    expect(initialHideUnassigned(ctxWith({ orgs: [] }, registry))).toBe(true);
+  });
+
+  it('stays off when registry authors exist but none have an org assigned', () => {
+    const registry: AuthorRegistry = {
+      version: 1,
+      authors: {
+        'zoe@test.com': {
+          email: 'zoe@test.com',
+          name: 'Zoe Test',
+          firstSeen: '2026-W01',
+          lastSeen: '2026-W12',
+          reposSeenIn: [],
+          commitCount: 5,
+        },
+      },
+    };
+    expect(initialHideUnassigned(ctxWith({ orgs: [] }, registry))).toBe(false);
   });
 });
 

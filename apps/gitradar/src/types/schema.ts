@@ -51,6 +51,66 @@ export const RepoSchema = z.object({
   group: z.string().optional().default('default'),
 });
 
+/** Settings sub-schema, factored out of `ConfigSchema` so `DEFAULT_SETTINGS` below can be
+ *  typed from it directly (`Config['settings']` would circularly depend on this schema,
+ *  since `Config = z.infer<typeof ConfigSchema>` and `ConfigSchema` embeds this schema). */
+const SettingsSchema = z.object({
+  weeks_back: z.number().optional().default(12),
+  staleness_minutes: z.number().optional().default(60),
+  trend_threshold: z.number().optional().default(0.1),
+  /** Glob patterns for files to exclude from metrics (e.g. "package-lock.json", "*.min.js", "dist/*"). */
+  ignore_patterns: z.array(z.string()).optional(),
+  /** When true, `ignore_patterns` replaces the built-in defaults instead of extending them. */
+  ignore_patterns_replace_defaults: z.boolean().optional().default(false),
+  /** Blame window for the rework pass: a deleted line counts as rework only when it
+   *  was written within this many days of the deleting commit. Default: 21 days. */
+  churn_window_days: z.number().optional().default(21),
+  /** Maximum concurrent git processes for the rework pass. Default: 3. */
+  churn_concurrency: z.number().optional().default(3),
+  /** Percentage of contributors classified as "high" segment. Default: 20. */
+  segment_high_pct: z.number().min(1).max(50).optional().default(20),
+  /** Percentage of contributors classified as "low" segment. Default: 20. */
+  segment_low_pct: z.number().min(1).max(50).optional().default(20),
+  /** Automatically prune records older than this many weeks after each scan.
+   *  Set to 0 to disable auto-pruning. Default: 0 (disabled). */
+  auto_prune_weeks: z.number().min(0).optional().default(0),
+  /** Run the blame-based rework pass after each scan. Default: true. */
+  rework_enabled: z.boolean().optional().default(true),
+  /** Minimum cohort size before the scorecard shows percentiles. Default: 8. */
+  scorecard_min_n: z.number().int().min(1).optional().default(8),
+  /** Opt-in composite: metricKey → positive weight. Absent = no score column. */
+  scorecard_weights: z
+    .record(z.string(), z.number().positive())
+    .optional()
+    .refine(
+      (w) =>
+        !w || Object.keys(w).every((k) => (SCORECARD_METRIC_KEYS as readonly string[]).includes(k)),
+      { message: `scorecard_weights keys must be one of: ${SCORECARD_METRIC_KEYS.join(', ')}` },
+    ),
+  /** Case-insensitive substrings identifying bot authors (name or email). */
+  bot_patterns: z.array(z.string()).optional().default(DEFAULT_BOT_PATTERNS),
+  /** Minimum cohort size before high/low segment labels are assigned. Default: 8. */
+  segment_min_n: z.number().int().min(1).optional().default(8),
+});
+
+/** Default settings — use when constructing Config objects outside of Zod parsing.
+ *  Also the single source for `ConfigSchema`'s `settings` default (see below). */
+export const DEFAULT_SETTINGS: z.infer<typeof SettingsSchema> = {
+  weeks_back: 12,
+  staleness_minutes: 60,
+  trend_threshold: 0.1,
+  churn_window_days: 21,
+  churn_concurrency: 3,
+  segment_high_pct: 20,
+  segment_low_pct: 20,
+  auto_prune_weeks: 0,
+  ignore_patterns_replace_defaults: false,
+  rework_enabled: true,
+  scorecard_min_n: 8,
+  bot_patterns: DEFAULT_BOT_PATTERNS,
+  segment_min_n: 8,
+};
+
 export const ConfigSchema = z.object({
   workspace: z.string().optional(),
   repos: z.array(RepoSchema).optional().default([]),
@@ -70,80 +130,8 @@ export const ConfigSchema = z.object({
   classification: z
     .record(z.string(), z.enum(['app', 'test', 'config', 'storybook', 'doc']))
     .optional(),
-  settings: z
-    .object({
-      weeks_back: z.number().optional().default(12),
-      staleness_minutes: z.number().optional().default(60),
-      trend_threshold: z.number().optional().default(0.1),
-      /** Glob patterns for files to exclude from metrics (e.g. "package-lock.json", "*.min.js", "dist/*"). */
-      ignore_patterns: z.array(z.string()).optional(),
-      /** When true, `ignore_patterns` replaces the built-in defaults instead of extending them. */
-      ignore_patterns_replace_defaults: z.boolean().optional().default(false),
-      /** Blame window for the rework pass: a deleted line counts as rework only when it
-       *  was written within this many days of the deleting commit. Default: 21 days. */
-      churn_window_days: z.number().optional().default(21),
-      /** Maximum concurrent git processes for the rework pass. Default: 3. */
-      churn_concurrency: z.number().optional().default(3),
-      /** Percentage of contributors classified as "high" segment. Default: 20. */
-      segment_high_pct: z.number().min(1).max(50).optional().default(20),
-      /** Percentage of contributors classified as "low" segment. Default: 20. */
-      segment_low_pct: z.number().min(1).max(50).optional().default(20),
-      /** Automatically prune records older than this many weeks after each scan.
-       *  Set to 0 to disable auto-pruning. Default: 0 (disabled). */
-      auto_prune_weeks: z.number().min(0).optional().default(0),
-      /** Run the blame-based rework pass after each scan. Default: true. */
-      rework_enabled: z.boolean().optional().default(true),
-      /** Minimum cohort size before the scorecard shows percentiles. Default: 8. */
-      scorecard_min_n: z.number().int().min(1).optional().default(8),
-      /** Opt-in composite: metricKey → positive weight. Absent = no score column. */
-      scorecard_weights: z
-        .record(z.string(), z.number().positive())
-        .optional()
-        .refine(
-          (w) =>
-            !w ||
-            Object.keys(w).every((k) => (SCORECARD_METRIC_KEYS as readonly string[]).includes(k)),
-          { message: `scorecard_weights keys must be one of: ${SCORECARD_METRIC_KEYS.join(', ')}` },
-        ),
-      /** Case-insensitive substrings identifying bot authors (name or email). */
-      bot_patterns: z.array(z.string()).optional().default(DEFAULT_BOT_PATTERNS),
-      /** Minimum cohort size before high/low segment labels are assigned. Default: 8. */
-      segment_min_n: z.number().int().min(1).optional().default(8),
-    })
-    .optional()
-    .default({
-      weeks_back: 12,
-      staleness_minutes: 60,
-      trend_threshold: 0.1,
-      churn_window_days: 21,
-      churn_concurrency: 3,
-      segment_high_pct: 20,
-      segment_low_pct: 20,
-      auto_prune_weeks: 0,
-      ignore_patterns_replace_defaults: false,
-      rework_enabled: true,
-      scorecard_min_n: 8,
-      bot_patterns: DEFAULT_BOT_PATTERNS,
-      segment_min_n: 8,
-    }),
+  settings: SettingsSchema.optional().default(DEFAULT_SETTINGS),
 });
-
-/** Default settings — use when constructing Config objects outside of Zod parsing. */
-export const DEFAULT_SETTINGS: Config['settings'] = {
-  weeks_back: 12,
-  staleness_minutes: 60,
-  trend_threshold: 0.1,
-  churn_window_days: 21,
-  churn_concurrency: 3,
-  segment_high_pct: 20,
-  segment_low_pct: 20,
-  auto_prune_weeks: 0,
-  ignore_patterns_replace_defaults: false,
-  rework_enabled: true,
-  scorecard_min_n: 8,
-  bot_patterns: DEFAULT_BOT_PATTERNS,
-  segment_min_n: 8,
-};
 
 // ── Data Schemas ────────────────────────────────────────────────────────────
 

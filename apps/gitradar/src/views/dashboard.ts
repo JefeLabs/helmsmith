@@ -396,6 +396,39 @@ function buildHotkeyItems(
 // ── Dashboard view ───────────────────────────────────────────────────────────
 
 /**
+ * Build the three segment-filter menu lines (High / Middle / Low), reflecting the
+ * configured `segment_high_pct`/`segment_low_pct` thresholds instead of hard-coded
+ * percentages. Middle is derived as `100 − high − low`.
+ */
+export function buildSegmentMenuLines(excluded: Set<Segment>, high: number, low: number): string[] {
+  const middle = 100 - high - low;
+  return [
+    `  ${chalk.cyan('H')}  ${excluded.has('high') ? chalk.strikethrough(`High (top ${high}%)`) : `Hide High (top ${high}%)`}`,
+    `  ${chalk.cyan('M')}  ${excluded.has('middle') ? chalk.strikethrough(`Middle (${middle}%)`) : `Hide Middle (${middle}%)`}`,
+    `  ${chalk.cyan('L')}  ${excluded.has('low') ? chalk.strikethrough(`Low (bottom ${low}%)`) : `Hide Low (bottom ${low}%)`}`,
+  ];
+}
+
+/**
+ * Whether "hide unassigned authors" should start enabled. Defaults to `false` unless at
+ * least one author is actually assigned to an org/team — otherwise a fresh install with no
+ * org mapping yet would hide every author and the Contributions tab would look empty.
+ */
+export function initialHideUnassigned(ctx: ViewContext): boolean {
+  for (const org of ctx.config.orgs) {
+    for (const team of org.teams) {
+      if (team.members.length > 0) return true;
+    }
+  }
+  if (ctx.authorRegistry) {
+    for (const author of Object.values(ctx.authorRegistry.authors)) {
+      if (author.org) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Dashboard view — tabbed entry screen with instant hotkey navigation.
  *
  * Five tabs: Contributions, Repo Activity, Top Performers, Scorecard, Manage.
@@ -413,7 +446,7 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
   let contribTableMode = false;
   let contribPivotEntity = false;
   let contribPerUserMode = false;
-  let contribHideUnassigned = true;
+  let contribHideUnassigned = initialHideUnassigned(ctx);
   let contribExcludedSegments = new Set<Segment>();
   let repoWindowWeeks: WindowSize = initialWindow;
   let leaderboardWindowWeeks: WindowSize = initialWindow;
@@ -718,15 +751,13 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
       if (action === 'contrib_segment_menu') {
         process.stdout.write('\n');
         console.log(chalk.bold('  Segment Filter:'));
-        console.log(
-          `  ${chalk.cyan('H')}  ${contribExcludedSegments.has('high') ? chalk.strikethrough('High (top 20%)') : 'Hide High (top 20%)'}`,
-        );
-        console.log(
-          `  ${chalk.cyan('M')}  ${contribExcludedSegments.has('middle') ? chalk.strikethrough('Middle (60%)') : 'Hide Middle (60%)'}`,
-        );
-        console.log(
-          `  ${chalk.cyan('L')}  ${contribExcludedSegments.has('low') ? chalk.strikethrough('Low (bottom 20%)') : 'Hide Low (bottom 20%)'}`,
-        );
+        for (const line of buildSegmentMenuLines(
+          contribExcludedSegments,
+          ctx.config.settings.segment_high_pct,
+          ctx.config.settings.segment_low_pct,
+        )) {
+          console.log(line);
+        }
         console.log(`  ${chalk.cyan('A')}  Show All (reset)`);
         console.log(chalk.dim('  Esc  Cancel\n'));
         const segKey = await readKey();
