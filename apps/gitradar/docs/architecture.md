@@ -190,7 +190,7 @@ src/store/
 |-------|---------|
 | `records` | All `UserWeekRepoRecord` data with composite key (member, week, repo) |
 | `enrichments` | PR metrics, cycle time, reviews, churn per member/week/repo |
-| `scan_state` | Per-repo scan cursors (lastHash, lastScanDate, recentHashes) |
+| `scan_state` | Per-repo scan cursors (lastHash, lastScanDate, recentHashes, recentPrHashes) |
 | `meta` | Timestamps for change detection (commitsUpdated, enrichmentsUpdated) |
 
 Key database features:
@@ -297,7 +297,7 @@ type ViewFn = (ctx: ViewContext) => Promise<NavigationAction>
 src/views/
 ├── types.ts                 # ViewContext, NavigationAction, ViewFn type definitions
 ├── navigator.ts             # View stack manager (push/pop/replace/quit)
-├── dashboard.ts             # Main 4-tab dashboard (Contributions, Repo Activity, Top Performers, Manage)
+├── dashboard.ts             # Main 5-tab dashboard (Contributions, Repo Activity, Top Performers, Scorecard, Manage)
 ├── manage-tab.ts            # Manage tab section renderers (repos, orgs, authors, groups, tags)
 ├── repo-activity.ts         # Repo activity chart builder
 ├── team-detail.ts           # Per-team drill-down
@@ -306,18 +306,20 @@ src/views/
 └── components/
     ├── contribution-section.ts    # Contribution chart + detail table rendering
     ├── repo-activity-section.ts   # Repo activity section rendering
-    └── top-performers-section.ts  # Leaderboard section rendering
+    ├── top-performers-section.ts  # Leaderboard section rendering
+    └── scorecard-section.ts       # Scorecard table, family/mode cycling, sort state
 ```
 
 #### Dashboard Architecture
 
-The dashboard (`dashboard.ts`) manages four tabs with independent state:
+The dashboard (`dashboard.ts`) manages five tabs with independent state:
 
 | Tab | State Variables |
 |-----|----------------|
 | Contributions | `drillLevel`, `tagOverlay`, `contribGranularity`, `contribDepth`, `contribTableMode`, `contribPivotEntity`, `contribHideUnassigned`, `contribExcludedSegments`, `contribDetailLayers`, `contribPerUserMode`, `contribLabelWidth` |
 | Repo Activity | `repoWindowWeeks` |
 | Top Performers | `leaderboardWindowWeeks` |
+| Scorecard | `scorecard` (`windowWeeks`, `family`, `mode`, `sortKey`, `sortDesc`) |
 | Manage | `manageSection`, `manageRepoIdx`, `manageAuthorIdx` |
 
 The `mapKey()` function translates raw keypresses into semantic actions based on the active tab, and the main loop dispatches each action to update state or trigger side effects (author assignment, repo scanning, etc.).
@@ -414,6 +416,7 @@ src/commands/
 ├── contributions.ts    # CLI contributions report with drill-down
 ├── repo-activity.ts    # CLI repo activity report
 ├── leaderboard.ts      # CLI leaderboard report
+├── scorecard.ts        # CLI scorecard report (--family, --sort, --json)
 ├── export-data.ts      # recordsToCsv() — CSV export logic
 ├── enrich.ts           # GitHub enrichment command (PR metrics, churn)
 ├── add-org.ts          # Add organization command
@@ -583,10 +586,14 @@ src/__tests__/
 ├── author-map.test.ts          # Resolution, aliases, case sensitivity, reattribution
 ├── author-registry.test.ts     # Merge, assign, unassign, bulk-assign, prefix detection
 ├── collector-index.test.ts     # Scan coordination, staleness, state updates
+├── pr-proxy.test.ts            # Merge-commit PR detection, tip-author attribution
+├── rework.test.ts              # Blame-based rework attribution, self-rework
 ├── engine.test.ts              # Rollup aggregation
 ├── leaderboard.test.ts         # Ranking, categories
 ├── trends.test.ts              # Trend computation, running averages
 ├── segments.test.ts            # Segment calculation, thresholds, edge cases
+├── scorecard.test.ts           # 14 metrics, baselines, percentiles, composite score
+├── bots.test.ts                # Bot-author detection and exclusion
 ├── filters.test.ts             # Record filtering, time functions
 ├── table.test.ts               # Column sizing, truncation, ANSI
 ├── grouped-hbar-chart.test.ts  # Chart rendering, detail layers
@@ -597,13 +604,19 @@ src/__tests__/
 ├── banner.test.ts              # Header formatting
 ├── format.test.ts              # fmt, delta, padding, week/month/quarter labels
 ├── views.test.ts               # All view navigation and rendering
+├── scorecard-section.test.ts   # Scorecard rendering, visible columns, sort state
+├── contribution-section.test.ts # Contribution bar building per drill level
+├── dashboard-export.test.ts    # TUI Manage → Export → Data (CSV)
 ├── navigator.test.ts           # Stack push/pop/replace/quit
 ├── cli.test.ts                 # Argument parsing, subcommands, grouped commands
 ├── cli-renderer.test.ts        # Reusable CLI output renderer
+├── scorecard-command.test.ts   # view scorecard flags, --json shape
 ├── loader.test.ts              # Config loading, path resolution
 ├── schema.test.ts              # Zod schema validation
 ├── scan-state.test.ts          # State persistence, staleness
 ├── sqlite-store.test.ts        # SQLite CRUD, migrations, queries
+├── sqlite-active-days.test.ts  # Active-day mask union across repos (bun)
+├── sqlite-scorecard.test.ts    # Scorecard columns, rollup bot/holder gating (bun)
 ├── db-watcher.test.ts          # Reactive file watching
 ├── demo.test.ts                # Synthetic data generation
 ├── paths.test.ts               # Path utilities, directory creation
@@ -620,4 +633,4 @@ src/__tests__/
 └── keypress.test.ts            # Key normalization
 ```
 
-**Total: 841 tests, 40 files.** All tests are unit tests using vitest with no external dependencies (git operations are mocked via `simple-git`, GitHub API mocked via `octokit`).
+**Total: 954 tests, 50 files** — 896 under vitest plus 58 under `bun test`. Most are unit tests with no external dependencies (git operations are mocked via `simple-git`, GitHub API mocked via `octokit`); the four `bun test` suites (`sqlite-store`, `sqlite-active-days`, `sqlite-scorecard`, `functional`) open a real `bun:sqlite` database in a sandboxed `GITRADAR_HOME`, and `functional.test.ts` additionally scans throwaway git repositories it builds on the fly.
