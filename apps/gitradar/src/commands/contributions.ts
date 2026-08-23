@@ -1,4 +1,4 @@
-import { excludeBots, isBotAuthor } from '../aggregator/bots.js';
+import { excludeBots } from '../aggregator/bots.js';
 import type { RolledUp } from '../aggregator/engine.js';
 import { rollup } from '../aggregator/engine.js';
 import {
@@ -404,6 +404,11 @@ export async function contributions(options: ContributionsOptions = {}): Promise
     const sqlFilters: import('../store/sqlite-store.js').RollupFilters = {
       weeks,
       ...options.filters,
+      // Bot rows are dropped inside the query, so every grouping — member, team,
+      // org, repo — excludes them, and an email-only match is caught too (the
+      // rollup groups by member and never selects email, so a post-hoc filter
+      // on the result could not see it).
+      botPatterns,
     };
     const rolled = queryRollup(sqlFilters, groupBy as RollupGroupBy);
     if (rolled.size === 0) {
@@ -411,14 +416,7 @@ export async function contributions(options: ContributionsOptions = {}): Promise
       return;
     }
 
-    // We have everything we need from SQL. queryRollup aggregates straight from
-    // the DB, so bot exclusion can only be applied post-hoc here — safe for
-    // groupBy: 'member' since each row is one author's total, but skipped for
-    // team/org/repo grouping where a row no longer maps to a single author.
     let rows = rolledUpToRows(rolled);
-    if (groupBy === 'member') {
-      rows = rows.filter((row) => !isBotAuthor(row.name, '', botPatterns));
-    }
     if (options.json) {
       printJson(rows);
       return;

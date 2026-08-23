@@ -1,4 +1,4 @@
-import { excludeBots, isBotAuthor } from '../aggregator/bots.js';
+import { excludeBots } from '../aggregator/bots.js';
 import { rollup } from '../aggregator/engine.js';
 import {
   type Filters,
@@ -55,13 +55,9 @@ export async function leaderboard(options: LeaderboardOptions = {}): Promise<voi
           records.filter((r) => weeksForSeg.includes(r.week)),
           (r: UserWeekRepoRecord) => r.member,
         )
-      : queryRollup({ weeks: weeksForSeg, ...options.filters }, 'member');
+      : queryRollup({ weeks: weeksForSeg, ...options.filters, botPatterns }, 'member');
     const memberTotals = new Map<string, number>();
     for (const [name, agg] of rolled) {
-      // queryRollup re-aggregates straight from the DB, bypassing the
-      // excludeBots() pass above — guard here too so a bot can't leak
-      // back into the segment split when reading live from disk.
-      if (isBotAuthor(name, '', botPatterns)) continue;
       // Holder rows (commits === 0) come from the PR-proxy / rework passes:
       // attributable to the window, but not active in it. They must not be
       // labelled, nor shift the cohort size that sets the segment thresholds.

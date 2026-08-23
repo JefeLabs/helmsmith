@@ -603,6 +603,14 @@ export interface RollupFilters {
   group?: string;
   member?: string;
   repo?: string;
+  /**
+   * Case-insensitive substrings identifying bot authors. Rows whose member name
+   * OR email contains any of them are excluded from every sub-query — same
+   * semantics as `isBotAuthor()` on the record path. Post-hoc filtering of the
+   * result cannot do this: `queryRollup` groups by member and never selects
+   * `email`, so an innocuously-named bot with a bot email would survive.
+   */
+  botPatterns?: string[];
 }
 
 export interface FiletypeRollup {
@@ -699,7 +707,19 @@ export function queryRollup(filters: RollupFilters, groupBy: RollupGroupBy): Map
     clauses.push('repo = @repo');
     params.repo = filters.repo;
   }
+  if (filters.botPatterns && filters.botPatterns.length > 0) {
+    // Mirrors isBotAuthor(): case-insensitive substring on name OR email.
+    clauses.push(`NOT EXISTS (
+      SELECT 1 FROM json_each(@bot_patterns) bp
+      WHERE bp.value <> ''
+        AND (instr(lower(member), lower(bp.value)) > 0
+          OR instr(lower(email), lower(bp.value)) > 0)
+    )`);
+    params.bot_patterns = JSON.stringify(filters.botPatterns);
+  }
 
+  // Shared by all three sub-queries below (main, active-days and pr_sizes), so
+  // every filter — bot exclusion included — applies uniformly.
   const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
   const groupByClause = groupBy === 'all' ? '' : `GROUP BY ${groupCol}`;
 

@@ -246,6 +246,61 @@ describe('scorecard columns in the SQLite store', () => {
     expect(week.activeMembers).toBe(1);
   });
 
+  it('queryRollup excludes a bot matched by email only, across member/team/all', () => {
+    const BOT_EMAIL = 'github-actions[bot]@users.noreply.github.com';
+    store.upsertRecords([
+      makeRecord({ member: 'Alice', email: 'alice@example.com', team: 'FE', commits: 3 }),
+      // Innocuous display name, bot email — post-hoc name filtering cannot catch this.
+      makeRecord({
+        member: 'CI',
+        email: BOT_EMAIL,
+        team: 'FE',
+        repo: 'api',
+        commits: 7,
+        activeDays: 5,
+        prsMergedGit: 4,
+        prSizes: [500],
+      }),
+    ]);
+    const botPatterns = ['github-actions'];
+
+    // Without botPatterns the bot is included (unchanged behaviour).
+    const unfiltered = store.queryRollup({}, 'member');
+    expect(unfiltered.has('CI')).toBe(true);
+    expect(store.queryRollup({}, 'all').get('all')!.commits).toBe(10);
+
+    // With botPatterns the bot is gone from every grouping and every sub-query.
+    const members = store.queryRollup({ botPatterns }, 'member');
+    expect(members.has('CI')).toBe(false);
+    expect(members.get('Alice')!.commits).toBe(3);
+
+    const team = store.queryRollup({ botPatterns }, 'team').get('FE')!;
+    expect(team.commits).toBe(3);
+    expect(team.activeMembers).toBe(1);
+    expect(team.prsMergedGit).toBe(0);
+    expect(team.prSizes).toEqual([]);
+    expect(team.activeDays).toBe(1);
+
+    const all = store.queryRollup({ botPatterns }, 'all').get('all')!;
+    expect(all.commits).toBe(3);
+    expect(all.activeMembers).toBe(1);
+    expect(all.prSizes).toEqual([]);
+  });
+
+  it('queryRollup still matches bots by display name', () => {
+    store.upsertRecords([
+      makeRecord({ member: 'Alice', commits: 3 }),
+      makeRecord({
+        member: 'dependabot[bot]',
+        email: 'noreply@github.com',
+        repo: 'api',
+        commits: 9,
+      }),
+    ]);
+    const members = store.queryRollup({ botPatterns: ['dependabot'] }, 'member');
+    expect([...members.keys()]).toEqual(['Alice']);
+  });
+
   // ── I2: bot exclusion inside queryRollup ───────────────────────────────────
 });
 
@@ -314,6 +369,63 @@ describe('contributions SQL fast path', () => {
     expect(text).not.toContain('holderbob');
     expect(text).not.toContain('mem07');
   });
+
+  it('excludes an email-only bot from team totals on the SQL path', async () => {
+    const { getCurrentWeek } = await import('../aggregator/filters.js');
+    const { contributions } = await import('../commands/contributions.js');
+    const week = getCurrentWeek();
+
+    store.upsertRecords([
+      linesRecord('alice', 100, week),
+      makeRecord({
+        member: 'CI',
+        email: 'github-actions[bot]@users.noreply.github.com',
+        week,
+        repo: 'api',
+        commits: 50,
+        filetype: {
+          ...zeroFiletype(),
+          app: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 9000, deletions: 0 },
+        },
+      }),
+    ]);
+
+    await contributions({
+      weeks: 4,
+      groupBy: 'team',
+      json: true,
+      botPatterns: ['github-actions'],
+    });
+    const rows = JSON.parse(out.join('\n')) as Array<{ name: string; insertions: number }>;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].insertions).toBe(100);
+  });
+
+  it('excludes an email-only bot from member rows on the SQL path', async () => {
+    const { getCurrentWeek } = await import('../aggregator/filters.js');
+    const { contributions } = await import('../commands/contributions.js');
+    const week = getCurrentWeek();
+
+    store.upsertRecords([
+      linesRecord('alice', 100, week),
+      makeRecord({
+        member: 'CI',
+        email: 'github-actions[bot]@users.noreply.github.com',
+        week,
+        repo: 'api',
+        commits: 50,
+      }),
+    ]);
+
+    await contributions({
+      weeks: 4,
+      groupBy: 'member',
+      json: true,
+      botPatterns: ['github-actions'],
+    });
+    const rows = JSON.parse(out.join('\n')) as Array<{ name: string }>;
+    expect(rows.map((r) => r.name)).toEqual(['alice']);
+  });
 });
 
 describe('leaderboard SQL segment path', () => {
@@ -341,6 +453,45 @@ describe('leaderboard SQL segment path', () => {
     if (originalOverride === undefined) delete process.env.GITRADAR_HOME;
     else process.env.GITRADAR_HOME = originalOverride;
     await rm(tmpHome, { recursive: true, force: true });
+  });
+
+  it('excludes an email-only bot from the segment cohort read from SQL', async () => {
+    const { getCurrentWeek } = await import('../aggregator/filters.js');
+    const { leaderboard } = await import('../commands/leaderboard.js');
+    const week = getCurrentWeek();
+
+    const records: UserWeekRepoRecord[] = [];
+    for (let i = 1; i <= 8; i++) records.push(linesRecord(`mem0${i}`, (9 - i) * 100, week));
+    // Bot with an innocuous display name but a bot email, biggest volume of all.
+    records.push(
+      makeRecord({
+        member: 'CI',
+        email: 'github-actions[bot]@users.noreply.github.com',
+        week,
+        repo: 'api',
+        commits: 40,
+        filetype: {
+          ...zeroFiletype(),
+          app: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 9000, deletions: 0 },
+        },
+      }),
+    );
+    store.upsertRecords(records);
+
+    await leaderboard({
+      weeks: 4,
+      segment: 'high',
+      segmentMinN: 8,
+      botPatterns: ['github-actions'],
+      json: true,
+    });
+    const cols = JSON.parse(out.join('\n')) as Array<{
+      entries: Array<{ member: string }>;
+    }>;
+    const names = cols.flatMap((c) => c.entries.map((e) => e.member));
+    expect(names).not.toContain('CI');
+    // n = 8 real members → top ceil(8 × 20%) = 2 are "high".
+    expect(new Set(names)).toEqual(new Set(['mem01', 'mem02']));
   });
 
   it('leaves holder-only members out of the leaderboard segment cohort', async () => {
