@@ -99,6 +99,27 @@ describe('computeScorecard — normalisation', () => {
     expect(sc.rows[0].cells.commitsPerWeek.baseline).toBeNull();
     expect(sc.rows[0].cells.commitsPerWeek.deltaPct).toBeNull();
   });
+
+  it('takes row metadata from the latest window record, regardless of input order', () => {
+    const older = rec({ member: 'Alice', week: '2026-W10', team: 'Old' });
+    const newer = rec({ member: 'Alice', week: '2026-W12', team: 'New' });
+
+    const forward = computeScorecard({
+      records: [older, newer],
+      currentWeek: CUR,
+      windowWeeks: 4,
+      settings: SETTINGS,
+    });
+    expect(forward.rows[0].team).toBe('New');
+
+    const reversed = computeScorecard({
+      records: [newer, older],
+      currentWeek: CUR,
+      windowWeeks: 4,
+      settings: SETTINGS,
+    });
+    expect(reversed.rows[0].team).toBe('New');
+  });
 });
 
 describe('computeScorecard — metric definitions', () => {

@@ -356,7 +356,10 @@ export function computeScorecard(input: {
     if (!recs.some((r) => windowSet.has(r.week))) continue;
     const cur = windowStats(recs, windowSet, input.enrichments);
     const base = windowStats(recs, baselineSet, input.enrichments);
-    const meta = recs.find((r) => windowSet.has(r.week))!;
+    // Most recent window record (ISO week strings compare lexicographically), independent of input order.
+    const meta = recs
+      .filter((r) => windowSet.has(r.week))
+      .reduce((latest, r) => (r.week > latest.week ? r : latest));
     const cells = {} as Record<MetricKey, Cell>;
     for (const m of METRICS) {
       const value = metricValue(m.key, cur, sources);
