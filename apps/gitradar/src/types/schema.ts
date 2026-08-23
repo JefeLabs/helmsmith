@@ -1,5 +1,26 @@
 import { z } from 'zod';
 
+/** Metric keys the scorecard can compute; `settings.scorecard_weights` may only reference these. */
+export const SCORECARD_METRIC_KEYS = [
+  'commitsPerWeek',
+  'daysPerWeek',
+  'prsPerWeek',
+  'prSizeP50',
+  'prSizeP75',
+  'cycleHrs',
+  'reworkPct',
+  'fixToFeat',
+  'testPct',
+  'breaking',
+  'reviews',
+  'reviewsPerPr',
+  'repos',
+  'scopes',
+] as const;
+export type ScorecardMetricKey = (typeof SCORECARD_METRIC_KEYS)[number];
+
+const DEFAULT_BOT_PATTERNS = ['[bot]', 'dependabot', 'renovate', 'github-actions'];
+
 // ── Config Schemas ──────────────────────────────────────────────────────────
 
 export const MemberSchema = z.object({
@@ -74,6 +95,24 @@ export const ConfigSchema = z.object({
       /** Automatically prune records older than this many weeks after each scan.
        *  Set to 0 to disable auto-pruning. Default: 0 (disabled). */
       auto_prune_weeks: z.number().min(0).optional().default(0),
+      /** Run the blame-based rework pass after each scan. Default: true. */
+      rework_enabled: z.boolean().optional().default(true),
+      /** Minimum cohort size before the scorecard shows percentiles. Default: 8. */
+      scorecard_min_n: z.number().int().min(1).optional().default(8),
+      /** Opt-in composite: metricKey → positive weight. Absent = no score column. */
+      scorecard_weights: z
+        .record(z.string(), z.number().positive())
+        .optional()
+        .refine(
+          (w) =>
+            !w ||
+            Object.keys(w).every((k) => (SCORECARD_METRIC_KEYS as readonly string[]).includes(k)),
+          { message: `scorecard_weights keys must be one of: ${SCORECARD_METRIC_KEYS.join(', ')}` },
+        ),
+      /** Case-insensitive substrings identifying bot authors (name or email). */
+      bot_patterns: z.array(z.string()).optional().default(DEFAULT_BOT_PATTERNS),
+      /** Minimum cohort size before high/low segment labels are assigned. Default: 8. */
+      segment_min_n: z.number().int().min(1).optional().default(8),
     })
     .optional()
     .default({
@@ -87,6 +126,10 @@ export const ConfigSchema = z.object({
       segment_low_pct: 20,
       auto_prune_weeks: 0,
       ignore_patterns_replace_defaults: false,
+      rework_enabled: true,
+      scorecard_min_n: 8,
+      bot_patterns: DEFAULT_BOT_PATTERNS,
+      segment_min_n: 8,
     }),
 });
 
@@ -102,6 +145,10 @@ export const DEFAULT_SETTINGS: Config['settings'] = {
   segment_low_pct: 20,
   auto_prune_weeks: 0,
   ignore_patterns_replace_defaults: false,
+  rework_enabled: true,
+  scorecard_min_n: 8,
+  bot_patterns: DEFAULT_BOT_PATTERNS,
+  segment_min_n: 8,
 };
 
 // ── Data Schemas ────────────────────────────────────────────────────────────
@@ -135,6 +182,14 @@ export const UserWeekRepoRecordSchema = z.object({
    *  Lets rollups union days across repos instead of summing counts. Optional for
    *  records created before this field existed (those fall back to activeDays). */
   activeDayMask: z.number().int().min(0).max(127).optional(),
+  /** Merged PRs detected by the git-only first-parent proxy (see collector/pr-proxy.ts). */
+  prsMergedGit: z.number().int().min(0).optional(),
+  /** Size (ins+del, ignore-filtered) of each proxy-detected PR merged in this week. */
+  prSizes: z.array(z.number().int().min(0)).optional(),
+  /** Lines this member wrote within churn_window_days that were deleted this week (by anyone). */
+  reworkLines: z.number().int().min(0).optional(),
+  /** Subset of reworkLines deleted by the member themselves. */
+  reworkSelfLines: z.number().int().min(0).optional(),
 
   // Semantic intent breakdown (from conventional commit prefixes).
   // Optional for backwards compatibility with records created before this field existed.
@@ -183,6 +238,8 @@ const RepoScanStateSchema = z.object({
   lastScanDate: z.string(),
   recentHashes: z.array(z.string()),
   recordCount: z.number(),
+  /** Dedup cursor for the first-parent PR proxy pass (separate from recentHashes). */
+  recentPrHashes: z.array(z.string()).optional(),
 });
 
 export const ScanStateSchema = z.object({

@@ -288,6 +288,29 @@ describe('ConfigSchema', () => {
     });
     expect(result.workspace).toBeUndefined();
   });
+
+  it('defaults the scorecard / rework / bot settings', () => {
+    const s = ConfigSchema.parse({}).settings;
+    expect(s.rework_enabled).toBe(true);
+    expect(s.scorecard_min_n).toBe(8);
+    expect(s.segment_min_n).toBe(8);
+    expect(s.scorecard_weights).toBeUndefined();
+    expect(s.bot_patterns).toEqual(['[bot]', 'dependabot', 'renovate', 'github-actions']);
+    expect(DEFAULT_SETTINGS.scorecard_min_n).toBe(8);
+  });
+
+  it('accepts scorecard_weights only for known metric keys with positive weights', () => {
+    expect(
+      ConfigSchema.parse({ settings: { scorecard_weights: { commitsPerWeek: 2, reworkPct: 1 } } })
+        .settings.scorecard_weights,
+    ).toEqual({ commitsPerWeek: 2, reworkPct: 1 });
+    expect(() =>
+      ConfigSchema.parse({ settings: { scorecard_weights: { linesTouched: 1 } } }),
+    ).toThrow();
+    expect(() =>
+      ConfigSchema.parse({ settings: { scorecard_weights: { commitsPerWeek: 0 } } }),
+    ).toThrow();
+  });
 });
 
 // ── UserWeekRepoRecordSchema ────────────────────────────────────────────────
@@ -332,6 +355,17 @@ describe('UserWeekRepoRecordSchema', () => {
     expect(() => UserWeekRepoRecordSchema.parse(makeRecord({ activeDayMask: 128 }))).toThrow();
     expect(() => UserWeekRepoRecordSchema.parse(makeRecord({ activeDayMask: -1 }))).toThrow();
     expect(() => UserWeekRepoRecordSchema.parse(makeRecord({ activeDayMask: 1.5 }))).toThrow();
+  });
+
+  it('accepts optional PR-proxy and rework fields', () => {
+    const r = UserWeekRepoRecordSchema.parse(
+      makeRecord({ prsMergedGit: 2, prSizes: [120, 40], reworkLines: 7, reworkSelfLines: 3 }),
+    );
+    expect(r.prsMergedGit).toBe(2);
+    expect(r.prSizes).toEqual([120, 40]);
+    expect(r.reworkLines).toBe(7);
+    expect(r.reworkSelfLines).toBe(3);
+    expect(UserWeekRepoRecordSchema.parse(makeRecord()).prSizes).toBeUndefined();
   });
 });
 
@@ -417,6 +451,22 @@ describe('ScanStateSchema', () => {
         },
       }),
     ).toThrow();
+  });
+
+  it('accepts an optional recentPrHashes cursor per repo', () => {
+    const parsed = ScanStateSchema.parse({
+      version: 1,
+      repos: {
+        app: {
+          lastHash: 'abc',
+          lastScanDate: '2026-03-01T00:00:00Z',
+          recentHashes: [],
+          recordCount: 0,
+          recentPrHashes: ['m1', 'm2'],
+        },
+      },
+    });
+    expect(parsed.repos.app.recentPrHashes).toEqual(['m1', 'm2']);
   });
 });
 
