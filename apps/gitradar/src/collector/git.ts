@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { simpleGit } from 'simple-git';
 import type { UserWeekRepoRecord } from '../types/schema.js';
-import type { AuthorMap } from './author-map.js';
+import type { AuthorMap, ResolvedAuthor } from './author-map.js';
 import { resolveAuthor } from './author-map.js';
 import type { FileType } from './classifier.js';
 import { buildClassifier, buildIgnoreMatcher, classifyFile } from './classifier.js';
@@ -580,6 +580,44 @@ function emptyIntent(): NonNullable<UserWeekRepoRecord['intent']> {
   return { feat: 0, fix: 0, refactor: 0, docs: 0, test: 0, chore: 0, other: 0 };
 }
 
+/** A zero-metric record for (author, week, repo) — used by post-passes that attach PR/rework counters. */
+export function makeEmptyRecord(
+  author: ResolvedAuthor,
+  week: string,
+  repo: string,
+  group: string,
+): UserWeekRepoRecord {
+  return {
+    member: author.member,
+    email: author.email,
+    org: author.org,
+    orgType: author.orgType,
+    team: author.team,
+    tag: author.tag,
+    week,
+    repo,
+    group,
+    commits: 0,
+    activeDays: 0,
+    intent: emptyIntent(),
+    breakingChanges: 0,
+    scopes: [],
+    filetype: emptyFiletype(),
+  };
+}
+
+/** Fallback author for commits whose email/name match no configured member or identifier rule. */
+export function unassignedAuthor(name: string, email: string): ResolvedAuthor {
+  return {
+    member: name,
+    email,
+    org: 'unassigned',
+    orgType: 'core',
+    team: 'unassigned',
+    tag: 'default',
+  };
+}
+
 /**
  * A date range for chunked scanning.
  */
@@ -692,14 +730,9 @@ function processCommitBatch(
       continue;
     }
 
-    const author = resolveAuthor(authorMap, commit.email, commit.name, identifierRules) ?? {
-      member: commit.name,
-      email: commit.email,
-      org: 'unassigned',
-      orgType: 'core' as const,
-      team: 'unassigned',
-      tag: 'default',
-    };
+    const author =
+      resolveAuthor(authorMap, commit.email, commit.name, identifierRules) ??
+      unassignedAuthor(commit.name, commit.email);
 
     const week = getISOWeek(commit.date);
     const dateDay = commit.date.slice(0, 10);

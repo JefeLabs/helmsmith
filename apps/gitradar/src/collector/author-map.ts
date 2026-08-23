@@ -35,7 +35,7 @@ export type AuthorMap = Map<string, ResolvedAuthor>;
 /**
  * Identifier prefix → org/team mapping for pattern-based resolution.
  */
-interface IdentifierRule {
+export interface IdentifierRule {
   prefix: string;
   org: string;
   orgType: 'core' | 'consultant';
