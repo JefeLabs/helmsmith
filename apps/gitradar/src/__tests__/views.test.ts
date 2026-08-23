@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Config, UserWeekRepoRecord } from '../types/schema.js';
 import { DEFAULT_SETTINGS } from '../types/schema.js';
 import type { KeyEvent } from '../ui/keypress.js';
-import { computeWeeksToShow } from '../views/dashboard.js';
+import { computeWeeksToShow, mapKey } from '../views/dashboard.js';
 import type { NavigationAction, ViewContext, ViewFn } from '../views/types.js';
 
 // ── Mock readKey (replaces @inquirer/prompts select) ────────────────────────
@@ -959,5 +959,20 @@ describe('Empty data handling', () => {
     mockedReadKey.mockResolvedValueOnce(key('b'));
     const result = await memberDetailView(ctx, 'Alice Chen', 'Platform');
     expect(result).toEqual({ type: 'pop' });
+  });
+});
+
+// ── mapKey: tab hotkeys ──────────────────────────────────────────────────────
+
+describe('mapKey — tab hotkeys switch tabs from any tab', () => {
+  it('maps a tab letter to a tab switch from a different active tab', () => {
+    expect(mapKey('k', 'repo_activity', 8, 8, [])).toBe('tab:scorecard');
+    expect(mapKey('c', 'repo_activity', 8, 8, [])).toBe('tab:contributions');
+  });
+
+  it('lets an in-tab key win over the global tab-letter fallback', () => {
+    // 's' is Contributions' own segment-menu hotkey, not a tab letter — this just
+    // confirms in-tab handling still takes priority over the global fallback.
+    expect(mapKey('s', 'contributions', 8, 8, [])).toBe('contrib_segment_menu');
   });
 });

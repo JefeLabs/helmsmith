@@ -226,7 +226,7 @@ function getNumberedTeams(
 
 // ── Key mapping ──────────────────────────────────────────────────────────────
 
-function mapKey(
+export function mapKey(
   keyName: string,
   activeTab: TabId,
   repoWindowWeeks: WindowSize,
@@ -298,6 +298,12 @@ function mapKey(
       if (keyName === 'e') return 'manage_export';
       if (keyName === 'p') return 'manage_bulk_assign';
       break;
+  }
+
+  // Global fallback: switch tabs from any tab via its letter, as long as the
+  // active tab didn't already claim that key above.
+  for (const t of TABS) {
+    if (keyName === t.key) return `tab:${t.id}`;
   }
 
   return null; // unrecognized key — re-render
