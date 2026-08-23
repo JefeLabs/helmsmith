@@ -431,6 +431,7 @@ describe('scanAllRepos', () => {
   });
 
   it('runs the PR proxy and rework passes after each repo scan and merges their records', async () => {
+    const { getCurrentWeek } = await import('../aggregator/filters.js');
     mockScanRepo.mockResolvedValueOnce(
       makeScanResult({
         newRecords: [makeRecord('Alice', 'app')],
@@ -442,7 +443,9 @@ describe('scanAllRepos', () => {
             authorEmail: 'a',
             authorName: 'A',
             authorDate: '2026-03-01T00:00:00Z',
-            week: '2026-W10',
+            // Inside the analysable window (weeks_back x 2) — older inputs are
+            // filtered out before runRework is called.
+            week: getCurrentWeek(),
             files: [{ path: 'x', deletions: 1 }],
           },
         ],
@@ -485,6 +488,109 @@ describe('scanAllRepos', () => {
     expect(result.updatedScanState.repos.app.recentPrHashes).toEqual(['m1']);
     expect(result.stats.totalPrs).toBe(2);
     expect(result.stats.totalReworkCommits).toBe(1);
+  });
+
+  it('bounds the rework inputs to the analysable window (weeks_back x 2)', async () => {
+    const { getLastNWeeks, getCurrentWeek } = await import('../aggregator/filters.js');
+    // weeks_back: 4 → the scorecard only ever reads window ∪ baseline = 8 weeks.
+    const inWindow = getLastNWeeks(8, getCurrentWeek());
+    const tooOld = getLastNWeeks(20, getCurrentWeek())[0]; // 20 weeks back
+
+    const reworkInput = (hash: string, week: string) => ({
+      hash,
+      authorEmail: 'a@x',
+      authorName: 'A',
+      authorDate: '2026-03-01T00:00:00Z',
+      week,
+      files: [{ path: 'x', deletions: 1 }],
+    });
+
+    mockScanRepo.mockResolvedValueOnce(
+      makeScanResult({
+        newRecords: [makeRecord('Alice', 'app')],
+        newHashes: ['h1'],
+        commitCount: 1,
+        reworkInputs: [
+          reworkInput('recent', inWindow[inWindow.length - 1]),
+          reworkInput('edge', inWindow[0]),
+          reworkInput('ancient', tooOld),
+        ],
+      }),
+    );
+    mockRunRework.mockResolvedValueOnce({ records: [], commitsProcessed: 2, blames: 2 });
+
+    await scanAllRepos(
+      makeConfig({ settings: { ...DEFAULT_SETTINGS, weeks_back: 4 } }),
+      makeScanState(),
+    );
+
+    const passed = mockRunRework.mock.calls[0][0] as Array<{ hash: string }>;
+    expect(passed.map((i) => i.hash).sort()).toEqual(['edge', 'recent']);
+  });
+
+  it('skips the rework pass entirely when every input falls outside the window', async () => {
+    const { getLastNWeeks, getCurrentWeek } = await import('../aggregator/filters.js');
+    const tooOld = getLastNWeeks(40, getCurrentWeek())[0];
+
+    mockScanRepo.mockResolvedValueOnce(
+      makeScanResult({
+        newHashes: ['h1'],
+        reworkInputs: [
+          {
+            hash: 'ancient',
+            authorEmail: 'a@x',
+            authorName: 'A',
+            authorDate: '2020-01-01T00:00:00Z',
+            week: tooOld,
+            files: [{ path: 'x', deletions: 1 }],
+          },
+        ],
+      }),
+    );
+
+    await scanAllRepos(
+      makeConfig({ settings: { ...DEFAULT_SETTINGS, weeks_back: 4 } }),
+      makeScanState(),
+    );
+
+    expect(mockRunRework).not.toHaveBeenCalled();
+  });
+
+  it('announces the rework pass before running it', async () => {
+    const { getLastNWeeks, getCurrentWeek } = await import('../aggregator/filters.js');
+    const week = getLastNWeeks(1, getCurrentWeek())[0];
+
+    mockScanRepo.mockResolvedValueOnce(
+      makeScanResult({
+        newHashes: ['h1'],
+        reworkInputs: [
+          {
+            hash: 'r1',
+            authorEmail: 'a@x',
+            authorName: 'A',
+            authorDate: '2026-03-01T00:00:00Z',
+            week,
+            files: [{ path: 'x', deletions: 1 }],
+          },
+        ],
+      }),
+    );
+
+    const logged: string[] = [];
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => {
+      logged.push(a.map(String).join(' '));
+    });
+    mockRunRework.mockImplementationOnce(async () => {
+      // A long pass must already be visible by the time it starts.
+      expect(logged.some((l) => l.includes('rework: blaming 1 commits'))).toBe(true);
+      return { records: [], commitsProcessed: 1, blames: 1 };
+    });
+
+    await scanAllRepos(makeConfig(), makeScanState());
+    consoleSpy.mockRestore();
+
+    expect(logged.some((l) => l.includes('rework: blaming 1 commits'))).toBe(true);
+    expect(logged.some((l) => l.includes('rework: 1 commits, 1 blames'))).toBe(true);
   });
 
   it('skips the rework pass when skipRework is set or rework_enabled is false', async () => {

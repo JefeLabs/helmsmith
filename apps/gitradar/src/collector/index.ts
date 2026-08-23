@@ -1,4 +1,5 @@
 import { access } from 'node:fs/promises';
+import { getLastNWeeks } from '../aggregator/filters.js';
 import { getRepoState, isStale, rotateHashes, updateRepoState } from '../store/scan-state.js';
 import type { AuthorRegistry, Config, ScanState, UserWeekRepoRecord } from '../types/schema.js';
 import { buildAuthorMap, buildIdentifierRules } from './author-map.js';
@@ -140,8 +141,20 @@ export async function scanAllRepos(
     const extra: UserWeekRepoRecord[] = [];
     let prHashes: string[] = [];
 
-    if (reworkEnabled && result.reworkInputs.length > 0) {
-      const rw = await runRework(result.reworkInputs, {
+    // A first scan walks ten years of history, and every counted commit that
+    // deletes a line becomes a rework input — one `git diff` plus one
+    // `git blame` per file, which on a large monorepo runs for tens of minutes.
+    // Nothing reads rework outside window ∪ baseline (weeks_back × 2), so
+    // blaming anything older buys a number no view can display.
+    const analysableWeeks = new Set(getLastNWeeks(config.settings.weeks_back * 2));
+    const reworkInputs = reworkEnabled
+      ? result.reworkInputs.filter((i) => analysableWeeks.has(i.week))
+      : [];
+
+    if (reworkEnabled && reworkInputs.length > 0) {
+      // Printed before the pass: a long run must look like a long run, not a hang.
+      console.log(`  rework: blaming ${reworkInputs.length} commits…`);
+      const rw = await runRework(reworkInputs, {
         repoPath: repo.path,
         repoName,
         group: repo.group,
