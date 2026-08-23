@@ -46,13 +46,21 @@ export function isStale(repoState: RepoScanState | undefined, stalenessMinutes: 
 }
 
 /**
+ * Default capacity for dedup hashes. Must exceed the number of commits a repo
+ * can receive inside the 1-day re-scan overlap (since = lastScanDate − 1d);
+ * below that, commits beyond the cap are re-counted. 5000 × 40 chars ≈ 200 KB
+ * per repo in scan_state.
+ */
+export const MAX_RECENT_HASHES = 5000;
+
+/**
  * Prepend new hashes to the front of recentHashes, then slice to maxSize.
  * Does not mutate the input arrays.
  */
 export function rotateHashes(
   recentHashes: string[],
   newHashes: string[],
-  maxSize: number = 500,
+  maxSize: number = MAX_RECENT_HASHES,
 ): string[] {
   return [...newHashes, ...recentHashes].slice(0, maxSize);
 }

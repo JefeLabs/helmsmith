@@ -132,10 +132,26 @@ describe('rotateHashes', () => {
     expect(result[0]).toBe('new-0');
   });
 
-  it('uses default maxSize of 500', () => {
-    const recent = Array.from({ length: 600 }, (_, i) => `h-${i}`);
+  it('keeps new hashes first when below 5000 capacity', () => {
+    const recent = Array.from({ length: 4999 }, (_, i) => `old-${i}`);
+    const result = rotateHashes(recent, ['new']);
+    expect(result).toHaveLength(5000);
+    expect(result[0]).toBe('new');
+    expect(result[1]).toBe('old-0');
+  });
+
+  it('drops oldest when at 5000 capacity', () => {
+    const recent = Array.from({ length: 5000 }, (_, i) => `old-${i}`);
+    const result = rotateHashes(recent, ['new']);
+    expect(result).toHaveLength(5000);
+    expect(result[0]).toBe('new');
+    expect(result[5000 - 1]).toBe('old-4998');
+  });
+
+  it('uses default maxSize of 5000', () => {
+    const recent = Array.from({ length: 6000 }, (_, i) => `h-${i}`);
     const result = rotateHashes(recent, ['latest']);
-    expect(result).toHaveLength(500);
+    expect(result).toHaveLength(5000);
     expect(result[0]).toBe('latest');
   });
 

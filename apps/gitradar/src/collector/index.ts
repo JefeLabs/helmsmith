@@ -1,6 +1,12 @@
 import { access } from 'node:fs/promises';
 import { getLastNWeeks } from '../aggregator/filters.js';
-import { getRepoState, isStale, rotateHashes, updateRepoState } from '../store/scan-state.js';
+import {
+  getRepoState,
+  isStale,
+  MAX_RECENT_HASHES,
+  rotateHashes,
+  updateRepoState,
+} from '../store/scan-state.js';
 import type { AuthorRegistry, Config, ScanState, UserWeekRepoRecord } from '../types/schema.js';
 import { buildAuthorMap, buildIdentifierRules } from './author-map.js';
 import { buildIgnoreMatcher } from './classifier.js';
@@ -226,10 +232,10 @@ export async function scanAllRepos(
     // scan's hashes instead of rotating the old ones in, since the repo's
     // prior records and scan-state were just cleared by onRepoReset above.
     const newRecentHashes = forceScan
-      ? result.newHashes.slice(0, 5000)
+      ? result.newHashes.slice(0, MAX_RECENT_HASHES)
       : rotateHashes(repoState?.recentHashes ?? [], result.newHashes);
     const newRecentPrHashes = forceScan
-      ? prHashes.slice(0, 5000)
+      ? prHashes.slice(0, MAX_RECENT_HASHES)
       : rotateHashes(repoState?.recentPrHashes ?? [], prHashes);
     const existingRecordCount = forceScan ? 0 : (repoState?.recordCount ?? 0);
 
