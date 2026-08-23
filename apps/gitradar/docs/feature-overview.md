@@ -76,7 +76,7 @@ gitradar data export                # portable YAML export (no local paths)
 gitradar data export-csv            # CSV export to stdout
 gitradar data export-csv -o out.csv # CSV export to file
 gitradar data import backup.yml     # import workspace from YAML
-gitradar data enrich                # pull PR metrics from GitHub API
+gitradar enrich                     # pull PR metrics from GitHub API
 ```
 
 ### Filtering Flags
@@ -363,8 +363,8 @@ Additional metadata extracted:
 GitRadar can pull PR and review data from the GitHub API:
 
 ```bash
-gitradar data enrich                # enrich all repos
-gitradar data enrich -w 4           # enrich last 4 weeks only
+gitradar enrich                     # enrich all repos
+gitradar enrich -w 4                # enrich last 4 weeks only
 ```
 
 ### Enrichment Data

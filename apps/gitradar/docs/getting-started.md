@@ -10,7 +10,15 @@ about 10 minutes. Two paths:
 
 ## Prerequisites
 
-- **Node.js ≥ 20**. Check with `node --version`.
+- **Bun ≥ 1.3**. Check with `bun --version`. GitRadar's storage layer
+  uses `bun:sqlite`, so the Bun runtime is required, not optional. A
+  global `npm install -g @helmsmith/gitradar` gets the vendored `bun`
+  binary automatically via the `bun` npm dependency's postinstall
+  step — `bin/gitradar` execs that vendored binary, so a separate
+  system-wide Bun install isn't required for normal use. `npm install
+  --ignore-scripts` skips that postinstall and is unsupported. If
+  you're running from a source checkout (`bun src/cli.ts`, `bun
+  test`), you do need Bun on your `PATH`.
 - One or more local git clones to analyze. They can live anywhere on
   your filesystem.
 - (Optional) A GitHub Personal Access Token if you want PR / cycle
@@ -48,7 +56,9 @@ This creates `~/.agentx/gitradar/` with:
 - A SQLite database for storing scan results
 
 Multiple workspaces are supported (e.g., one for personal repos, one
-for work). Switch between them with `gitradar workspace use <name>`.
+for work) — create additional ones with `gitradar workspace create
+<name>`, see them all with `gitradar workspace list`, and select one
+on any command with the global `--workspace <name>` flag.
 
 ### Step 2 — Add repos
 
@@ -59,8 +69,8 @@ paths.
 # Scan a parent directory and discover all git repos under it
 gitradar repo add ~/code/
 
-# Add a single repo by path
-gitradar repo add ~/code/my-project --name my-project --group web
+# Add a single repo by path, into a named group
+gitradar repo add ~/code/my-project --group web
 ```
 
 Verify:
@@ -170,7 +180,7 @@ PR cycle time and review counts require GitHub API access:
 
 ```bash
 export GITHUB_TOKEN="ghp_..."
-gitradar data enrich
+gitradar enrich
 ```
 
 The token only needs `repo` scope. Data is cached locally so
@@ -253,6 +263,19 @@ The repos you added might not have commits in the visible time window
 gitradar -w 52
 ```
 
+### Dashboard looks empty (but you know there's data)
+
+Once at least one author is assigned to an org/team, gitradar hides
+unassigned authors by default — so if you've assigned some but not
+all of your contributors, the rest can vanish from the Contributions
+tab. Press `H` to toggle unassigned-author visibility back on, or
+assign the remaining authors:
+
+```bash
+gitradar author list --unassigned
+gitradar author assign <email> --org <org> --team <team>
+```
+
 ### "All authors are unassigned"
 
 You haven't run org/author setup yet. Either use the **Manage** tab
@@ -265,17 +288,21 @@ gitradar author assign <email> --org <org> --team <team>
 
 ### Scans are slow on large repos
 
-The first scan walks full history; this is a one-time cost. Subsequent
-scans are incremental. If the first scan is too slow:
+The first scan walks full history; this is a one-time cost (there's no
+config option to limit how far back it walks). Subsequent scans are
+incremental. If the first scan on a very large repo is too slow, skip
+the more expensive rework pass:
 
 ```bash
-# Limit scan history to recent N weeks (config option)
-# Edit ~/.agentx/gitradar/config.yml:
-#   settings:
-#     max_scan_age_weeks: 26
+gitradar scan --skip-rework
 ```
 
-Then re-scan with `gitradar scan --force-scan`.
+`--skip-rework` disables the blame-based rework pass (a `git blame`
+call per touched file per commit). With it skipped, the Scorecard's
+`rework%` column shows `—` instead of a value. Because incremental
+scans only walk new commits, backfilling rework for commits already
+scanned this way later requires a full `gitradar scan --force-scan`
+(without `--skip-rework`), not just a plain re-scan.
 
 ### TUI rendering is broken
 

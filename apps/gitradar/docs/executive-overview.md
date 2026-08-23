@@ -73,11 +73,10 @@ This grain supports rollup by any dimension: org, team, tag, repo group, week, o
 
 ## Technology
 
-- **TypeScript** on Node.js — single `npm install`, no external services required
-- **SQLite** via `better-sqlite3` — durable local storage with WAL mode for crash safety
+- **TypeScript** on **Bun** — single `npm install`, no external services required; GitRadar requires the Bun runtime (`bun:sqlite`), vendored via the `bun` npm dependency
+- **SQLite** via `bun:sqlite` — durable local storage with WAL mode for crash safety
 - **Zero cloud dependencies** — all data stays local in `~/.agentx/gitradar/`
 - **Optional GitHub API** — enrichment features use `octokit` for PR and review data
-- **841 tests** across 40 test files — full coverage of collector, aggregator, UI, views, CLI, store, and export/import
 - **Sub-second scans** for incremental updates on warm repos
 
 ## Who It's For

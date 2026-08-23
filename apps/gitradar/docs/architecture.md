@@ -523,7 +523,7 @@ config.yml + authors.json
 
 ### SQLite Over Flat Files
 
-Records are stored in a SQLite database using `better-sqlite3`. This provides:
+Records are stored in a SQLite database using `bun:sqlite` — GitRadar requires the Bun runtime; there is no Node.js fallback. This provides:
 - **Crash safety** — WAL mode ensures consistency even on unexpected termination
 - **Concurrent access** — background `--watch` scans and the TUI can run simultaneously
 - **SQL-accelerated queries** — `queryRecords()` and `queryRollup()` push predicates to the database
@@ -630,7 +630,8 @@ src/__tests__/
 ├── repos-registry.test.ts      # Repos registry operations
 ├── repos-registry-save.test.ts # Repos registry persistence
 ├── workspace-selector.test.ts  # Workspace selection logic
-└── keypress.test.ts            # Key normalization
+├── keypress.test.ts            # Key normalization
+└── docs-truth.test.ts          # README links resolve, docs match real commands/deps
 ```
 
-**Total: 954 tests, 50 files** — 896 under vitest plus 58 under `bun test`. Most are unit tests with no external dependencies (git operations are mocked via `simple-git`, GitHub API mocked via `octokit`); the four `bun test` suites (`sqlite-store`, `sqlite-active-days`, `sqlite-scorecard`, `functional`) open a real `bun:sqlite` database in a sandboxed `GITRADAR_HOME`, and `functional.test.ts` additionally scans throwaway git repositories it builds on the fly.
+Run `npm test` for current pass/fail counts. Most are unit tests with no external dependencies (git operations are mocked via `simple-git`, GitHub API mocked via `octokit`); the four `bun test` suites (`sqlite-store`, `sqlite-active-days`, `sqlite-scorecard`, `functional`) open a real `bun:sqlite` database in a sandboxed `GITRADAR_HOME`, and `functional.test.ts` additionally scans throwaway git repositories it builds on the fly.

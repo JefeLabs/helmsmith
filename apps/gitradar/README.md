@@ -50,6 +50,7 @@ gitradar
 gitradar                                # launch TUI
 gitradar --demo                         # demo with synthetic data
 gitradar -w 8 --org "Acme Corp"         # filter to 8 weeks, one org
+gitradar --prune 26                     # remove records older than 26 weeks, then launch
 
 # Scanning
 gitradar scan                           # scan and exit
@@ -78,7 +79,7 @@ gitradar view scorecard -w 8 --family quality
 gitradar data export-csv -o report.csv
 gitradar data export                    # portable YAML
 gitradar data import backup.yml
-gitradar data enrich                    # pull GitHub PR data
+gitradar enrich                         # pull GitHub PR data
 ```
 
 ## Keyboard Shortcuts
@@ -118,12 +119,10 @@ Each tab's own letter (`C`, `R`, `P`, `K`, `M`) jumps straight to that tab from 
 
 GitRadar stores data in `~/.agentx/gitradar/`. Configuration is a single YAML file:
 
-```yaml
-repos:
-  - path: ~/code/frontend-app
-    name: frontend-app
-    group: web
+Repos are managed through the workspace registry (`gitradar repo add`), never
+in `config.yml` — a `repos:` key here is ignored (with a warning) if present.
 
+```yaml
 orgs:
   - name: Acme Corp
     type: core
@@ -152,17 +151,17 @@ Or skip the YAML and configure everything from the **Manage tab** in the TUI.
 ## Documentation
 
 - [Executive Overview](docs/executive-overview.md) — What GitRadar is, who it's for, and key capabilities
-- [Feature Tour](docs/feature-tour.md) — Walkthrough of every feature, CLI command, and keyboard shortcut
+- [Feature Tour](docs/feature-overview.md) — Walkthrough of every feature, CLI command, and keyboard shortcut
 - [Architecture](docs/architecture.md) — System design, data flow, layer responsibilities, and testing strategy
 
 ## Tech Stack
 
-- **TypeScript** on Node.js
-- **SQLite** (`better-sqlite3`) — local storage with WAL mode
-- **Commander** — CLI argument parsing
+- **TypeScript** on **Bun** (`bun:sqlite`) — GitRadar requires the Bun runtime; `bin/gitradar` execs the vendored `bun` binary from the `bun` npm dependency. `npm install --ignore-scripts` is unsupported.
+- **SQLite** (`bun:sqlite`) — local storage with WAL mode
+- **Commander** — CLI argument parsing (via `@helmsmith/cli-kit`)
 - **Octokit** — optional GitHub API enrichment
 - **Zod** — schema validation
-- **Vitest** — 841 tests across 40 files
+- **Vitest** — see `npm test` for current counts
 
 ## License
 
