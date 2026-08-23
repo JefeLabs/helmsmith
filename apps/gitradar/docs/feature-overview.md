@@ -380,6 +380,13 @@ never written and never shown. The `--skip-churn` / `--deep-churn` flags and the
 `churn_max_commits` setting are gone; `churn_window_days` and
 `churn_concurrency` remain because the rework pass uses them.
 
+A member-week is stored only when GitHub actually answers for it. If there is no
+token, no GitHub remote on the repo, no resolvable handle for the member, or the
+query fails, that member-week is left unenriched rather than written as a row of
+zeros — so it is retried on the next run instead of being masked as "already
+enriched". `Enrichment complete:` reports those as `N no GitHub data` and
+`N errors`.
+
 Enrichment data appears automatically in the Contributions tab columns when available.
 
 ---

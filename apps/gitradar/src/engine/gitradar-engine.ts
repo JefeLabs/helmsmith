@@ -92,6 +92,72 @@ export interface EnrichOptions {
   skipCache?: boolean;
 }
 
+/** An authenticated client — `enrich` returns early when there is no token. */
+type Octokit = NonNullable<Awaited<ReturnType<typeof createOctokit>>>;
+
+/** Per-repo enrichment tally. `skipped` = already enriched; `noData` = GitHub had nothing to say. */
+interface EnrichRepoResult {
+  enriched: number;
+  skipped: number;
+  noData: number;
+  errors: number;
+}
+
+/**
+ * Split the pending member-weeks into the ones GitHub returned metrics for and
+ * the ones it did not.
+ *
+ * Only entries present in `ghResultMap` are persisted. An entry can be missing
+ * because the repo has no GitHub remote, because the member has no resolvable
+ * GitHub handle, or because the fetch failed — and in every one of those cases
+ * writing an all-zero row would be worse than writing nothing: it reports a
+ * member-week as enriched when it is not, and it is sticky, because
+ * `hasEnrichment(key)` then makes every later run skip that key as "already
+ * enriched" until someone passes `--force`.
+ *
+ * A fetch that legitimately returns all zeros (the member opened no PRs that
+ * week) is real data and is persisted — presence in the map, not the values, is
+ * what decides.
+ */
+export function selectPersistable(
+  entries: readonly { key: string }[],
+  ghResultMap: ReadonlyMap<string, GitHubMetrics>,
+): {
+  persist: Array<{ key: string; metrics: ProductivityExtensions }>;
+  skipped: string[];
+} {
+  const persist: Array<{ key: string; metrics: ProductivityExtensions }> = [];
+  const skipped: string[] = [];
+
+  for (const { key } of entries) {
+    const gh = ghResultMap.get(key);
+    if (!gh) {
+      skipped.push(key);
+      continue;
+    }
+    persist.push({
+      key,
+      metrics: {
+        prs_opened: gh.prs_opened,
+        prs_merged: gh.prs_merged,
+        median_cycle_hrs: gh.median_cycle_hrs,
+        prs_reviewed_touched: gh.prs_reviewed_touched,
+        // Retired: the blame-based rework metric supersedes it, and the store
+        // no longer writes this column.
+        churn_rate_pct: 0,
+        pr_feature: gh.pr_feature,
+        pr_fix: gh.pr_fix,
+        pr_bugfix: gh.pr_bugfix,
+        pr_chore: gh.pr_chore,
+        pr_hotfix: gh.pr_hotfix,
+        pr_other: gh.pr_other,
+      },
+    });
+  }
+
+  return { persist, skipped };
+}
+
 /**
  * Core engine that manages scanning, data stores, and TUI lifecycle.
  *
@@ -444,10 +510,13 @@ export class GitRadarEngine {
     if (!octokit) {
       console.log("No GitHub token found. Set GITHUB_TOKEN or run 'gh auth login'.");
       console.log('Skipping enrichment: GitHub PR metrics are its only source.');
+      return;
     }
 
     let enrichedCount = 0;
     let skippedCount = 0;
+    let noDataCount = 0;
+    let errorCount = 0;
     const cacheStats = createCacheStats();
 
     const repoTotal = repoNames.length;
@@ -467,9 +536,13 @@ export class GitRadarEngine {
       const result = await this.enrichRepo(repoName, repoLabel, repoRecords, enrichCtx);
       enrichedCount += result.enriched;
       skippedCount += result.skipped;
+      noDataCount += result.noData;
+      errorCount += result.errors;
     }
 
     const parts = [`${enrichedCount} enriched`, `${skippedCount} skipped`];
+    if (noDataCount > 0) parts.push(`${noDataCount} no GitHub data`);
+    if (errorCount > 0) parts.push(`${errorCount} ${errorCount === 1 ? 'error' : 'errors'}`);
     if (cacheStats.hits > 0 || cacheStats.misses > 0) {
       parts.push(`${cacheStats.hits} cached / ${cacheStats.misses} fetched`);
     }
@@ -483,13 +556,13 @@ export class GitRadarEngine {
     repoRecords: UserWeekRepoRecord[],
     ctx: {
       options: EnrichOptions;
-      octokit: Awaited<ReturnType<typeof createOctokit>>;
+      octokit: Octokit;
       rateLimiter: GitHubRateLimiter;
       authorMap: ReturnType<typeof buildAuthorMap>;
       identifierRules: ReturnType<typeof buildIdentifierRules>;
       cacheStats: ReturnType<typeof createCacheStats>;
     },
-  ): Promise<{ enriched: number; skipped: number }> {
+  ): Promise<EnrichRepoResult> {
     const { options, octokit, rateLimiter, authorMap, identifierRules, cacheStats } = ctx;
     let enriched = 0;
     let skipped = 0;
@@ -501,14 +574,11 @@ export class GitRadarEngine {
     );
     if (!repoConfig) {
       spinner.warn(`${repoLabel}: skipped (no config)`);
-      return { enriched, skipped: skipped + 1 };
+      return { enriched, skipped: skipped + 1, noData: 0, errors: 0 };
     }
 
-    let githubRemote: { owner: string; repo: string } | null = null;
-    if (octokit) {
-      spinner.text = `${repoLabel}: detecting GitHub remote`;
-      githubRemote = await detectGitHubRemote(repoConfig.path);
-    }
+    spinner.text = `${repoLabel}: detecting GitHub remote`;
+    const githubRemote = await detectGitHubRemote(repoConfig.path);
 
     // Group records by member+week (deduplicated)
     const memberWeekEntries: Array<{ key: string; member: string; email: string; week: string }> =
@@ -531,11 +601,11 @@ export class GitRadarEngine {
       spinner.succeed(
         `${repoLabel}: all ${memberWeekEntries.length} member-weeks already enriched`,
       );
-      return { enriched, skipped };
+      return { enriched, skipped, noData: 0, errors: 0 };
     }
 
     // Fetch GitHub metrics batched by week
-    const ghResultMap = await this.fetchGitHubForRepo(
+    const { results, failedKeys } = await this.fetchGitHubForRepo(
       repoLabel,
       toEnrich,
       octokit,
@@ -548,19 +618,36 @@ export class GitRadarEngine {
       spinner,
     );
 
-    // Merge GitHub results into final metrics and persist
-    enriched += this.mergeAndPersistEnrichments(repoLabel, toEnrich, ghResultMap, spinner);
+    // Only member-weeks GitHub actually answered for get stored — see
+    // `selectPersistable` for why an all-zero placeholder row is not an option.
+    const { persist, skipped: unfetched } = selectPersistable(toEnrich, results);
+    const errors = unfetched.filter((key) => failedKeys.has(key)).length;
+    const noData = unfetched.length - errors;
+
+    enriched += this.mergeAndPersistEnrichments(repoLabel, persist, spinner);
 
     const ghLabel = githubRemote ? ` (GitHub: ${githubRemote.owner}/${githubRemote.repo})` : '';
-    spinner.succeed(`${repoLabel}: ${toEnrich.length} member-weeks enriched${ghLabel}`);
-    return { enriched, skipped };
+    if (persist.length === 0) {
+      spinner.warn(
+        `${repoLabel}: no GitHub data for ${unfetched.length} member-weeks — nothing stored`,
+      );
+    } else {
+      const tail = unfetched.length > 0 ? `, ${unfetched.length} without GitHub data` : '';
+      spinner.succeed(`${repoLabel}: ${persist.length} member-weeks enriched${ghLabel}${tail}`);
+    }
+    return { enriched, skipped, noData, errors };
   }
 
-  /** Fetch GitHub PR metrics for all entries in a repo, batched by week. */
+  /**
+   * Fetch GitHub PR metrics for all entries in a repo, batched by week.
+   *
+   * Returns the metrics keyed by member-week, plus the keys whose fetch threw —
+   * the caller reports those as errors rather than storing them as zeros.
+   */
   private async fetchGitHubForRepo(
     repoLabel: string,
     toEnrich: Array<{ key: string; member: string; email: string; week: string }>,
-    octokit: Awaited<ReturnType<typeof createOctokit>>,
+    octokit: Octokit,
     githubRemote: { owner: string; repo: string } | null,
     rateLimiter: GitHubRateLimiter,
     authorMap: ReturnType<typeof buildAuthorMap>,
@@ -568,9 +655,10 @@ export class GitRadarEngine {
     options: EnrichOptions,
     cacheStats: ReturnType<typeof createCacheStats>,
     spinner: ReturnType<typeof ora>,
-  ): Promise<Map<string, GitHubMetrics>> {
+  ): Promise<{ results: Map<string, GitHubMetrics>; failedKeys: Set<string> }> {
     const ghResultMap = new Map<string, GitHubMetrics>();
-    if (!octokit || !githubRemote) return ghResultMap;
+    const failedKeys = new Set<string>();
+    if (!githubRemote) return { results: ghResultMap, failedKeys };
 
     // Group entries by week
     const byWeek = new Map<string, typeof toEnrich>();
@@ -649,65 +737,41 @@ export class GitRadarEngine {
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
+        for (const b of batchEntries) {
+          for (const key of b.keys) failedKeys.add(key);
+        }
         spinner.warn(`${repoLabel}: GitHub batch failed for ${week}: ${msg}`);
         spinner.start(`${repoLabel}: continuing`);
       }
     }
 
-    return ghResultMap;
+    return { results: ghResultMap, failedKeys };
   }
 
   /**
-   * Merge GitHub results into enrichment records and persist in batches.
+   * Persist already-selected enrichment rows in batches.
    * Returns the number of member-weeks written.
    */
   private mergeAndPersistEnrichments(
     repoLabel: string,
-    toEnrich: Array<{ key: string; member: string; email: string; week: string }>,
-    ghResultMap: Map<string, GitHubMetrics>,
+    persist: Array<{ key: string; metrics: ProductivityExtensions }>,
     spinner: ReturnType<typeof ora>,
   ): number {
-    let enriched = 0;
     const SAVE_BATCH_SIZE = 20;
-    const totalBatches = Math.ceil(toEnrich.length / SAVE_BATCH_SIZE);
+    const totalBatches = Math.ceil(persist.length / SAVE_BATCH_SIZE);
     let batchIdx = 0;
 
-    for (let batchStart = 0; batchStart < toEnrich.length; batchStart += SAVE_BATCH_SIZE) {
+    for (let batchStart = 0; batchStart < persist.length; batchStart += SAVE_BATCH_SIZE) {
       batchIdx++;
       spinner.text =
         totalBatches > 1
           ? `${repoLabel}: saving (batch ${batchIdx}/${totalBatches})`
           : `${repoLabel}: saving`;
 
-      const batch = toEnrich.slice(batchStart, batchStart + SAVE_BATCH_SIZE);
-
-      const fulfilled = batch.map(({ key }) => {
-        const ghMetrics = ghResultMap.get(key);
-        const metrics: ProductivityExtensions = {
-          prs_opened: ghMetrics?.prs_opened ?? 0,
-          prs_merged: ghMetrics?.prs_merged ?? 0,
-          median_cycle_hrs: ghMetrics?.median_cycle_hrs ?? 0,
-          prs_reviewed_touched: ghMetrics?.prs_reviewed_touched ?? 0,
-          // Retired: the blame-based rework metric supersedes it, and the store
-          // no longer writes this column.
-          churn_rate_pct: 0,
-          pr_feature: ghMetrics?.pr_feature ?? 0,
-          pr_fix: ghMetrics?.pr_fix ?? 0,
-          pr_bugfix: ghMetrics?.pr_bugfix ?? 0,
-          pr_chore: ghMetrics?.pr_chore ?? 0,
-          pr_hotfix: ghMetrics?.pr_hotfix ?? 0,
-          pr_other: ghMetrics?.pr_other ?? 0,
-        };
-        return { key, metrics };
-      });
-
-      enriched += fulfilled.length;
-      if (fulfilled.length > 0) {
-        saveEnrichmentBatchSQL(fulfilled);
-      }
+      saveEnrichmentBatchSQL(persist.slice(batchStart, batchStart + SAVE_BATCH_SIZE));
     }
 
-    return enriched;
+    return persist.length;
   }
 
   // ── Filtering ────────────────────────────────────────────────────────────
