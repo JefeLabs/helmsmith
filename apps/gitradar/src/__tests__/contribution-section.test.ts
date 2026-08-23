@@ -312,3 +312,54 @@ describe('renderContributionsTab — retired churn column', () => {
     expect(output).not.toContain('churn');
   });
 });
+
+// ── Footer contributor count ─────────────────────────────────────────────────
+
+describe('renderContributionsTab — footer contributor count', () => {
+  function footerLine(records: UserWeekRepoRecord[]): string {
+    const logged: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
+      logged.push(args.map(String).join(' '));
+    });
+    try {
+      const ctx: ViewContext = { config: makeConfig(), records, currentWeek: '2026-W10' };
+      renderContributionsTab(
+        ctx,
+        'user',
+        false,
+        false,
+        BUCKETS,
+        'week',
+        'range',
+        120,
+        '',
+        () => 'steady',
+        undefined,
+        records,
+      );
+    } finally {
+      spy.mockRestore();
+    }
+    return (
+      stripAnsi(logged.join('\n'))
+        .split('\n')
+        .find((l) => l.includes('contributors)')) ?? ''
+    );
+  }
+
+  it('counts only committing members, matching the cmts/days on the same line', () => {
+    const line = footerLine([
+      makeRecord({ member: 'alice', commits: 3 }),
+      // Holder: attributable to W10 by a merged PR, never active in it.
+      makeRecord({
+        member: 'holderbob',
+        commits: 0,
+        activeDays: 0,
+        filetype: zeroFiletype(),
+        prsMergedGit: 1,
+      }),
+    ]);
+
+    expect(line).toContain('(1 contributors)');
+  });
+});

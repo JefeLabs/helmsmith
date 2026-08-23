@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import { rollup } from '../aggregator/engine.js';
 import { filterRecords, getLastNWeeks } from '../aggregator/filters.js';
+import { recordTotalLines } from '../aggregator/metrics.js';
 import { computeRunningAvg } from '../aggregator/trends.js';
 import type { UserWeekRepoRecord } from '../types/schema.js';
 import { renderBanner } from '../ui/banner.js';
@@ -202,8 +203,11 @@ function buildFileTypeBreakdownBars(
 
 /**
  * Build avg output sparklines per team.
+ *
+ * Exported for testing: the per-person divisor is a holder-record trap
+ * (see the `commits > 0` filter below) and needs a direct regression test.
  */
-function buildAvgOutputSparklines(
+export function buildAvgOutputSparklines(
   records: UserWeekRepoRecord[],
   currentWeek: string,
   config: ViewContext['config'],
@@ -218,22 +222,13 @@ function buildAvgOutputSparklines(
       // Per-week avg per person
       const weeklyAvgs: number[] = [];
       for (const week of weeks) {
-        const weekRecords = teamRecords.filter((r) => r.week === week);
+        // Holder records (commits === 0) come from the PR-proxy / rework passes:
+        // they make a member *attributable* to the week, not active in it. Counting
+        // them in the divisor would depress the whole team's per-person output.
+        const weekRecords = teamRecords.filter((r) => r.week === week && r.commits > 0);
         const members = new Set(weekRecords.map((r) => r.member));
         let total = 0;
-        for (const r of weekRecords) {
-          total +=
-            r.filetype.app.insertions +
-            r.filetype.app.deletions +
-            r.filetype.test.insertions +
-            r.filetype.test.deletions +
-            r.filetype.config.insertions +
-            r.filetype.config.deletions +
-            r.filetype.storybook.insertions +
-            r.filetype.storybook.deletions +
-            (r.filetype.doc?.insertions ?? 0) +
-            (r.filetype.doc?.deletions ?? 0);
-        }
+        for (const r of weekRecords) total += recordTotalLines(r);
         weeklyAvgs.push(members.size > 0 ? total / members.size : 0);
       }
 

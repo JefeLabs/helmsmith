@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { computeRunningAvg, computeTrend } from '../aggregator/trends.js';
-import type { UserWeekRepoRecord } from '../types/schema.js';
+import type { Config, UserWeekRepoRecord } from '../types/schema.js';
+import { DEFAULT_SETTINGS } from '../types/schema.js';
+import { stripAnsi } from '../ui/format.js';
+import { buildAvgOutputSparklines } from '../views/trends.js';
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
 
@@ -368,5 +371,57 @@ describe('computeRunningAvg', () => {
 
     // doc-only record: totalLines = 40, headcount = 1, weeksActive = 1
     expect(computeRunningAvg(records, 'Platform', '2026-W08', 12)).toBe(40);
+  });
+});
+
+// ── buildAvgOutputSparklines (views/trends) ───────────────────────────────────
+
+function makeTrendsConfig(): Config {
+  return {
+    repos: [],
+    orgs: [
+      {
+        name: 'Acme',
+        type: 'core',
+        teams: [{ name: 'Platform', tag: 'infrastructure', members: [] }],
+      },
+    ],
+    groups: {},
+    tags: {},
+    settings: { ...DEFAULT_SETTINGS },
+  } as unknown as Config;
+}
+
+describe('buildAvgOutputSparklines', () => {
+  it('divides a week by its committing members only, so a holder-only member does not depress it', () => {
+    const week = '2026-W12';
+    const active = makeRecord({
+      member: 'alice',
+      team: 'Platform',
+      week,
+      commits: 5,
+      activeDays: 3,
+      filetype: {
+        ...zeroFiletype(),
+        app: { files: 3, filesAdded: 0, filesDeleted: 0, insertions: 150, deletions: 50 },
+      },
+    });
+    // Holder: attributable to the week via a PR merge / rework pass, never active in it.
+    const holder = makeRecord({
+      member: 'bob',
+      team: 'Platform',
+      week,
+      commits: 0,
+      activeDays: 0,
+      filetype: zeroFiletype(),
+    });
+
+    const config = makeTrendsConfig();
+    const withHolder = stripAnsi(buildAvgOutputSparklines([active, holder], week, config));
+    const withoutHolder = stripAnsi(buildAvgOutputSparklines([active], week, config));
+
+    // 200 lines / 1 committing member — not 200 / 2.
+    expect(withHolder).toContain('avg: 200/person/wk');
+    expect(withHolder).toBe(withoutHolder);
   });
 });

@@ -179,6 +179,11 @@ export function recordsToCsv(
   // Pre-compute segment map from total lines touched per member across all records
   const memberTotals = new Map<string, number>();
   for (const r of records) {
+    // Holder records (commits === 0) come from the PR-proxy / rework passes.
+    // They are not evidence of work, so they neither earn a segment label nor
+    // count towards the cohort size that sets the min-n and the percentile
+    // boundaries — matching the gate in `commands/contributions.ts`.
+    if (r.commits === 0) continue;
     const total = Object.values(r.filetype).reduce((s, ft) => s + ft.insertions + ft.deletions, 0);
     memberTotals.set(r.member, (memberTotals.get(r.member) ?? 0) + total);
   }

@@ -1373,7 +1373,10 @@ export function renderContributionsTab(
   const periodCount = buckets.length;
 
   if (agg) {
-    const members = new Set(windowRecords.map((r) => r.member));
+    // `rollup()` already applies the holder-record gate (commits === 0 makes a
+    // member attributable to the week, not active in it), so the contributor
+    // count agrees with the `cmts` / `days` printed on the same line.
+    const contributors = agg.activeMembers;
     const net = agg.insertions - agg.deletions;
     const netStr = net >= 0 ? `+${fmt(net)}` : `-${fmt(Math.abs(net))}`;
     const netColor = net >= 0 ? chalk.green : chalk.red;
@@ -1389,7 +1392,7 @@ export function renderContributionsTab(
         chalk.dim(' net  ') +
         chalk.dim(`${fmt(agg.commits)} cmts  `) +
         chalk.dim(`${fmt(agg.activeDays)} days  `) +
-        chalk.dim(`(${members.size} contributors)`),
+        chalk.dim(`(${contributors} contributors)`),
     );
 
     // Avg per period line

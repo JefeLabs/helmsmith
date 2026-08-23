@@ -296,3 +296,69 @@ describe('exportData', () => {
     expect(process.exitCode).toBe(1);
   });
 });
+
+// ── recordsToCsv — segment cohort excludes holder records ────────────────────
+
+function zeroFiletype(): UserWeekRepoRecord['filetype'] {
+  return {
+    app: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+    test: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+    config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+    storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+    doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+  };
+}
+
+/** Column index of `segment` in the CSV header, then the value on each data row. */
+function segmentColumn(csv: string): Map<string, string> {
+  const lines = csv.trim().split('\n');
+  const headers = lines[0].split(',');
+  const memberIdx = headers.indexOf('member');
+  const segIdx = headers.indexOf('segment');
+  const out = new Map<string, string>();
+  for (const line of lines.slice(1)) {
+    const cells = line.split(',');
+    out.set(cells[memberIdx], cells[segIdx]);
+  }
+  return out;
+}
+
+describe('recordsToCsv — segment cohort', () => {
+  const reals = [700, 600, 500, 400, 300, 200, 100].map((lines, i) =>
+    makeRecord({
+      member: `m${i}`,
+      email: `m${i}@example.com`,
+      commits: 3,
+      filetype: {
+        ...zeroFiletype(),
+        app: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: lines, deletions: 0 },
+      },
+    }),
+  );
+  // Holder: PR-proxy / rework attribution only — no commits, no lines.
+  const holder = makeRecord({
+    member: 'holder',
+    email: 'holder@example.com',
+    commits: 0,
+    activeDays: 0,
+    filetype: zeroFiletype(),
+  });
+
+  it('a holder-only member does not lift the cohort over segment_min_n', () => {
+    const segments = segmentColumn(recordsToCsv([...reals, holder], undefined, undefined, 8));
+
+    // 7 committing members is below the min-n of 8: nobody earns a label.
+    expect([...segments.values()].filter((s) => s === 'high')).toEqual([]);
+    expect([...segments.values()].filter((s) => s === 'low')).toEqual([]);
+    expect(segments.get('m0')).toBe('middle');
+  });
+
+  it('a holder-only member does not shift the percentile boundaries', () => {
+    const withHolder = segmentColumn(recordsToCsv([...reals, holder], undefined, undefined, 7));
+    const withoutHolder = segmentColumn(recordsToCsv(reals, undefined, undefined, 7));
+
+    for (const r of reals) {
+      expect(withHolder.get(r.member), r.member).toBe(withoutHolder.get(r.member));
+    }
+  });
+});

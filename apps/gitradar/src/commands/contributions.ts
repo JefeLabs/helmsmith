@@ -497,6 +497,9 @@ export async function contributions(options: ContributionsOptions = {}): Promise
   // Compute segments for flat output
   const memberTotals = new Map<string, number>();
   for (const row of rows) {
+    // Same holder-record gate as the SQL path above: a row with no commits is a
+    // PR-proxy / rework attribution, not work done in this window.
+    if (row.commits === 0) continue;
     memberTotals.set(row.name, row.insertions + row.deletions);
   }
   const segMap = calculateSegments(memberTotals, options.segmentThresholds, options.segmentMinN);
