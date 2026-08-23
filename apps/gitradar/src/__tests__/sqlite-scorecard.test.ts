@@ -302,6 +302,53 @@ describe('scorecard columns in the SQLite store', () => {
   });
 
   // ── I2: bot exclusion inside queryRollup ───────────────────────────────────
+
+  it('reattributeRecordsSQL rewrites member as well as org/team/tag', () => {
+    store.upsertRecords([
+      makeRecord({ member: 'ecruz', email: 'e@co.com', org: 'unassigned', team: 'unassigned' }),
+    ]);
+    store.reattributeRecordsSQL([
+      {
+        email: 'e@co.com',
+        member: 'Edwin Cruz',
+        org: 'Acme',
+        orgType: 'consultant',
+        team: 'FE',
+        tag: 'web',
+      },
+    ]);
+    const [row] = store.queryRecords({});
+    expect(row.member).toBe('Edwin Cruz');
+    expect(row.orgType).toBe('consultant');
+    expect(row.tag).toBe('web');
+  });
+
+  it('reattributeRecordsSQL merges counters when a rename collides with an existing (member, week, repo) row', () => {
+    store.upsertRecords([
+      makeRecord({ member: 'ecruz', email: 'e@co.com', week: '2026-W10', repo: 'web', commits: 2 }),
+      makeRecord({
+        member: 'Edwin Cruz',
+        email: 'other@co.com',
+        week: '2026-W10',
+        repo: 'web',
+        commits: 3,
+      }),
+    ]);
+    store.reattributeRecordsSQL([
+      {
+        email: 'e@co.com',
+        member: 'Edwin Cruz',
+        org: 'Acme',
+        orgType: 'consultant',
+        team: 'FE',
+        tag: 'web',
+      },
+    ]);
+    const rows = store.queryRecords({});
+    expect(rows.length).toBe(1);
+    expect(rows[0].member).toBe('Edwin Cruz');
+    expect(rows[0].commits).toBe(5);
+  });
 });
 
 // ── Command-level SQL path (contributions / leaderboard) ─────────────────────

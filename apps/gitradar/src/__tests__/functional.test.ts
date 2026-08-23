@@ -451,6 +451,7 @@ describe('Functional: Full CLI Pipeline (Engine + SQLite)', () => {
     // Build re-attribution updates from the registry
     const updates: Array<{
       email: string;
+      member: string;
       org: string;
       orgType: string;
       team: string;
@@ -459,6 +460,7 @@ describe('Functional: Full CLI Pipeline (Engine + SQLite)', () => {
     for (const email of skoolscoutEmails) {
       updates.push({
         email,
+        member: registry.authors[email].name,
         org: 'SkoolScout',
         orgType: 'core',
         team: 'developers',

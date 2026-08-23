@@ -1261,24 +1261,45 @@ export function deleteRecordsForRepo(repoName: string): void {
   db.prepare('DELETE FROM records WHERE repo = ?').run(repoName);
 }
 
-/** Bulk update org/team on all records matching email. */
+/**
+ * Bulk update org/team/tag/member on all records matching email, re-attributing them.
+ *
+ * `member` is part of the `records` primary key `(member, week, repo)`, so renaming it
+ * can collide with an existing row for the same week/repo. To handle that safely, each
+ * update's matching rows are deleted and rewritten through the same additive upsert used
+ * elsewhere (`upsertRecords`), so a colliding row merges counters instead of one row
+ * silently overwriting the other.
+ */
 export function reattributeRecordsSQL(
-  updates: Array<{ email: string; org: string; orgType: string; team: string; tag: string }>,
+  updates: Array<{
+    email: string;
+    member: string;
+    org: string;
+    orgType: string;
+    team: string;
+    tag: string;
+  }>,
 ): void {
   const db = getDB();
-  const stmt = db.prepare(
-    'UPDATE records SET org = @org, org_type = @org_type, team = @team, tag = @tag WHERE email = @email',
-  );
+  const selectByEmail = db.prepare('SELECT * FROM records WHERE email = @email');
+  const deleteByEmail = db.prepare('DELETE FROM records WHERE email = @email');
 
   const updateAll = db.transaction((items: typeof updates) => {
     for (const u of items) {
-      stmt.run({
-        email: u.email,
+      const rows = selectByEmail.all({ email: u.email }) as Record<string, unknown>[];
+      if (rows.length === 0) continue;
+
+      const renamed = rows.map(rowToRecord).map((r) => ({
+        ...r,
+        member: u.member,
         org: u.org,
-        org_type: u.orgType,
+        orgType: u.orgType as UserWeekRepoRecord['orgType'],
         team: u.team,
         tag: u.tag,
-      });
+      }));
+
+      deleteByEmail.run({ email: u.email });
+      upsertRecords(renamed);
     }
   });
 
