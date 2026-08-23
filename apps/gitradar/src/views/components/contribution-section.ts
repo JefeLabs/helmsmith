@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import { excludeBots, isBotAuthor } from '../../aggregator/bots.js';
 import { rollup } from '../../aggregator/engine.js';
 import { filterRecords } from '../../aggregator/filters.js';
 import { testPct as computeTestPctCanonical } from '../../aggregator/metrics.js';
@@ -1090,7 +1091,7 @@ export function renderContributionsTab(
   let userSegMap: Map<string, Segment> | undefined;
   if (excludedSegments && excludedSegments.size > 0 && drillLevel !== 'user' && !tagOverlay) {
     const userTotals = new Map<string, number>();
-    for (const r of recs) {
+    for (const r of excludeBots(recs, ctx.config.settings.bot_patterns ?? [])) {
       const key = r.member;
       const total =
         r.filetype.app.insertions +
@@ -1105,7 +1106,7 @@ export function renderContributionsTab(
         (r.filetype.doc?.deletions ?? 0);
       userTotals.set(key, (userTotals.get(key) ?? 0) + total);
     }
-    userSegMap = calculateSegments(userTotals, segThresholds);
+    userSegMap = calculateSegments(userTotals, segThresholds, ctx.config.settings.segment_min_n);
     filteredRecs = recs.filter((r) => {
       const seg = userSegMap!.get(r.member);
       return !seg || !excludedSegments.has(seg);
@@ -1137,13 +1138,19 @@ export function renderContributionsTab(
     // By-time mode: each group is a time bucket, bars are entities.
     if (drillLevel === 'user' || tagOverlay) {
       // At user/tag level, bars represent individuals/tags — segment them directly.
+      const botPatterns = ctx.config.settings.bot_patterns ?? [];
       const memberTotals = new Map<string, number>();
       for (const g of groups) {
         for (const bar of g.bars) {
+          if (isBotAuthor(bar.label, '', botPatterns)) continue;
           memberTotals.set(bar.label, (memberTotals.get(bar.label) ?? 0) + bar.total);
         }
       }
-      const segMap = calculateSegments(memberTotals, segThresholds);
+      const segMap = calculateSegments(
+        memberTotals,
+        segThresholds,
+        ctx.config.settings.segment_min_n,
+      );
       for (const g of groups) {
         for (const bar of g.bars) {
           bar.segment = segMap.get(bar.label);
@@ -1162,12 +1169,18 @@ export function renderContributionsTab(
     // By-entity mode: each group is an entity, bars are time buckets. No per-bar segmentation.
     if (drillLevel === 'user' || tagOverlay) {
       // Segment the entities (groups) themselves by their total across all bars.
+      const botPatterns = ctx.config.settings.bot_patterns ?? [];
       const entityTotals = new Map<string, number>();
       for (const g of groups) {
+        if (isBotAuthor(g.groupLabel, '', botPatterns)) continue;
         const total = g.bars.reduce((s, b) => s + b.total, 0);
         entityTotals.set(g.groupLabel, total);
       }
-      const segMap = calculateSegments(entityTotals, segThresholds);
+      const segMap = calculateSegments(
+        entityTotals,
+        segThresholds,
+        ctx.config.settings.segment_min_n,
+      );
       for (const g of groups) {
         const seg = segMap.get(g.groupLabel);
         if (seg) {

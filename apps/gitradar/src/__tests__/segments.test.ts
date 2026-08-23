@@ -12,56 +12,36 @@ describe('calculateSegments', () => {
     expect(result.size).toBe(0);
   });
 
-  it('assigns single member as high (non-zero)', () => {
-    const result = calculateSegments(new Map([['alice', 100]]));
-    expect(toObj(result)).toEqual({ alice: 'high' });
+  it('assigns everyone to middle when the cohort is smaller than minN (default 8)', () => {
+    const totals = new Map([
+      ['a', 100],
+      ['b', 50],
+      ['c', 10],
+      ['d', 0],
+    ]);
+    const seg = calculateSegments(totals);
+    expect([...seg.values()].every((s) => s === 'middle')).toBe(true);
   });
 
-  it('assigns single member with 0 as low', () => {
-    const result = calculateSegments(new Map([['alice', 0]]));
-    expect(toObj(result)).toEqual({ alice: 'low' });
-  });
-
-  it('handles 2 members: top=high, bottom=low', () => {
-    const result = calculateSegments(
-      new Map([
-        ['alice', 200],
-        ['bob', 50],
-      ]),
+  it('labels high/low once the cohort reaches minN', () => {
+    const totals = new Map(
+      Array.from({ length: 8 }, (_, i) => [`m${i}`, (8 - i) * 10] as [string, number]),
     );
-    expect(toObj(result)).toEqual({ alice: 'high', bob: 'low' });
+    const seg = calculateSegments(totals);
+    expect(seg.get('m0')).toBe('high');
+    expect(seg.get('m1')).toBe('high');
+    expect(seg.get('m7')).toBe('low');
+    expect(seg.get('m3')).toBe('middle');
   });
 
-  it('handles 3 members (N<5): top 1=high, bottom 1=low, rest=middle', () => {
-    const result = calculateSegments(
-      new Map([
-        ['alice', 300],
-        ['bob', 200],
-        ['charlie', 100],
-      ]),
-    );
-    expect(toObj(result)).toEqual({
-      alice: 'high',
-      bob: 'middle',
-      charlie: 'low',
-    });
-  });
-
-  it('handles 4 members (N<5): top 1=high, bottom 1=low, rest=middle', () => {
-    const result = calculateSegments(
-      new Map([
-        ['alice', 400],
-        ['bob', 300],
-        ['charlie', 200],
-        ['dave', 100],
-      ]),
-    );
-    expect(toObj(result)).toEqual({
-      alice: 'high',
-      bob: 'middle',
-      charlie: 'middle',
-      dave: 'low',
-    });
+  it('respects a custom minN', () => {
+    const totals = new Map([
+      ['a', 100],
+      ['b', 50],
+      ['c', 10],
+    ]);
+    expect(calculateSegments(totals, undefined, 3).get('a')).toBe('high');
+    expect(calculateSegments(totals, undefined, 3).get('c')).toBe('low');
   });
 
   it('handles exactly 5 members with 20/60/20 split', () => {
@@ -74,6 +54,8 @@ describe('calculateSegments', () => {
         ['d', 200],
         ['e', 100],
       ]),
+      undefined,
+      5,
     );
     expect(toObj(result)).toEqual({
       a: 'high',
@@ -122,6 +104,8 @@ describe('calculateSegments', () => {
         ['dave', 100],
         ['eve', 0],
       ]),
+      undefined,
+      5,
     );
     expect(result.get('eve')).toBe('low');
   });
@@ -135,6 +119,8 @@ describe('calculateSegments', () => {
         ['dave', 0],
         ['eve', 0],
       ]),
+      undefined,
+      5,
     );
     expect(result.get('charlie')).toBe('low');
     expect(result.get('dave')).toBe('low');
@@ -163,6 +149,8 @@ describe('calculateSegments', () => {
         ['d', 100],
         ['e', 100],
       ]),
+      undefined,
+      5,
     );
     // With equal values, positions are arbitrary but all 5 must be categorized
     const segments = [...result.values()];

@@ -4,8 +4,10 @@ import { createCli } from '@helmsmith/cli-kit';
 import { runConnect } from './commands/connect.js';
 import { runMain } from './commands/run-main.js';
 import { detectGitRoot } from './config/git-root.js';
+import { loadConfig } from './config/loader.js';
 import { getAvailableWorkspaces, loadAllRegistries } from './config/repos-registry.js';
 import { getConfigPath, getDataDir } from './store/paths.js';
+import { DEFAULT_SETTINGS } from './types/schema.js';
 
 // gitradar is read-only analytics with a TUI — no auth needed.
 // noopAuthProvider stays as the default; commands never call getToken.
@@ -39,6 +41,21 @@ function globals() {
 function globalFilters() {
   const g = globals();
   return { org: g.org, team: g.team, tag: g.tag, group: g.group };
+}
+
+/**
+ * Load settings for read-only view/export commands. These commands work
+ * directly off the SQLite store and have never required config.yml to
+ * exist — mirrors the fallback in GitRadarEngine.resolveWorkspace so a
+ * missing/invalid config doesn't crash them, it just disables segment/bot
+ * customization (defaults still apply).
+ */
+async function loadSettings(configPath?: string) {
+  try {
+    return (await loadConfig(configPath)).settings;
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
 }
 
 // name/description/version handled by createCli above.
@@ -389,6 +406,7 @@ view
   .option('--segment <tier>', 'Filter to segment: high, middle, low')
   .action(async (cmdOpts: { weeks?: number; by?: string; pivot?: string; segment?: string }) => {
     const g = globals();
+    const settings = await loadSettings(g.config);
     const { contributions } = await import('./commands/contributions.js');
     await contributions({
       weeks: cmdOpts.weeks ?? g.weeks,
@@ -397,6 +415,8 @@ view
       segment: cmdOpts.segment as 'high' | 'middle' | 'low' | undefined,
       json: g.json,
       filters: globalFilters(),
+      segmentMinN: settings.segment_min_n,
+      botPatterns: settings.bot_patterns,
     });
   });
 
@@ -408,6 +428,7 @@ view
   .option('--segment <tier>', 'Filter to segment: high, middle, low')
   .action(async (cmdOpts: { weeks?: number; top?: number; segment?: string }) => {
     const g = globals();
+    const settings = await loadSettings(g.config);
     const { leaderboard } = await import('./commands/leaderboard.js');
     await leaderboard({
       weeks: cmdOpts.weeks ?? g.weeks ?? 4,
@@ -415,6 +436,8 @@ view
       segment: cmdOpts.segment as 'high' | 'middle' | 'low' | undefined,
       json: g.json,
       filters: globalFilters(),
+      segmentMinN: settings.segment_min_n,
+      botPatterns: settings.bot_patterns,
     });
   });
 
@@ -456,8 +479,14 @@ data
   .description('Export contribution data as CSV')
   .option('-o, --output <path>', 'Write to file instead of stdout')
   .action(async (cmdOpts: { output?: string }) => {
+    const settings = await loadSettings(globals().config);
     const { exportData } = await import('./commands/export-data.js');
-    await exportData({ output: cmdOpts.output, filters: globalFilters() });
+    await exportData({
+      output: cmdOpts.output,
+      filters: globalFilters(),
+      segmentMinN: settings.segment_min_n,
+      botPatterns: settings.bot_patterns,
+    });
   });
 
 data

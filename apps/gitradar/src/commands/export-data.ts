@@ -1,4 +1,5 @@
 import { writeFile } from 'node:fs/promises';
+import { excludeBots } from '../aggregator/bots.js';
 import { type Filters, filterRecords } from '../aggregator/filters.js';
 import { testPct } from '../aggregator/metrics.js';
 import { calculateSegments, type Segment, type SegmentThresholds } from '../aggregator/segments.js';
@@ -8,6 +9,10 @@ import type { EnrichmentStore, UserWeekRepoRecord } from '../types/schema.js';
 export interface ExportDataOptions {
   output?: string;
   filters?: Filters;
+  /** Minimum cohort size before high/low segment labels are assigned. Default: 8. */
+  segmentMinN?: number;
+  /** Case-insensitive substrings identifying bot authors (name or email). Default: none excluded. */
+  botPatterns?: string[];
 }
 
 // ── Row flattening ──────────────────────────────────────────────────────────
@@ -162,6 +167,7 @@ export function recordsToCsv(
   records: UserWeekRepoRecord[],
   enrichmentStore?: EnrichmentStore,
   segmentThresholds?: SegmentThresholds,
+  segmentMinN = 8,
 ): string {
   // Pre-compute segment map from total lines touched per member across all records
   const memberTotals = new Map<string, number>();
@@ -169,7 +175,7 @@ export function recordsToCsv(
     const total = Object.values(r.filetype).reduce((s, ft) => s + ft.insertions + ft.deletions, 0);
     memberTotals.set(r.member, (memberTotals.get(r.member) ?? 0) + total);
   }
-  const segmentMap = calculateSegments(memberTotals, segmentThresholds);
+  const segmentMap = calculateSegments(memberTotals, segmentThresholds, segmentMinN);
 
   const rows = records.map((r) => {
     const flat = flattenRecord(r, enrichmentStore, segmentMap);
@@ -185,6 +191,8 @@ export async function exportData(options: ExportDataOptions): Promise<void> {
     records = filterRecords(records, options.filters);
   }
 
+  records = excludeBots(records, options.botPatterns ?? []);
+
   if (records.length === 0) {
     console.error('No records to export. Run "gitradar scan" first.');
     process.exitCode = 1;
@@ -192,7 +200,7 @@ export async function exportData(options: ExportDataOptions): Promise<void> {
   }
 
   const enrichmentStore = loadEnrichmentsSQL();
-  const csv = recordsToCsv(records, enrichmentStore);
+  const csv = recordsToCsv(records, enrichmentStore, undefined, options.segmentMinN ?? 8);
 
   if (options.output) {
     await writeFile(options.output, csv, 'utf-8');

@@ -1,3 +1,4 @@
+import { excludeBots, isBotAuthor } from '../aggregator/bots.js';
 import { rollup } from '../aggregator/engine.js';
 import {
   type Filters,
@@ -20,6 +21,10 @@ export interface LeaderboardOptions {
   json?: boolean;
   segment?: Segment;
   segmentThresholds?: SegmentThresholds;
+  /** Minimum cohort size before high/low segment labels are assigned. Default: 8. */
+  segmentMinN?: number;
+  /** Case-insensitive substrings identifying bot authors (name or email). Default: none excluded. */
+  botPatterns?: string[];
   /** Pre-loaded records (skips disk read when provided — useful for testing). */
   records?: UserWeekRepoRecord[];
 }
@@ -38,6 +43,9 @@ export async function leaderboard(options: LeaderboardOptions = {}): Promise<voi
     records = filterRecords(records, options.filters);
   }
 
+  const botPatterns = options.botPatterns ?? [];
+  records = excludeBots(records, botPatterns);
+
   // Filter by segment if requested
   if (options.segment) {
     const weeksForSeg = getLastNWeeks(options.weeks ?? 4, getCurrentWeek());
@@ -50,9 +58,13 @@ export async function leaderboard(options: LeaderboardOptions = {}): Promise<voi
       : queryRollup({ weeks: weeksForSeg, ...options.filters }, 'member');
     const memberTotals = new Map<string, number>();
     for (const [name, agg] of rolled) {
+      // queryRollup re-aggregates straight from the DB, bypassing the
+      // excludeBots() pass above — guard here too so a bot can't leak
+      // back into the segment split when reading live from disk.
+      if (isBotAuthor(name, '', botPatterns)) continue;
       memberTotals.set(name, agg.insertions + agg.deletions);
     }
-    const segMap = calculateSegments(memberTotals, options.segmentThresholds);
+    const segMap = calculateSegments(memberTotals, options.segmentThresholds, options.segmentMinN);
     const allowedMembers = new Set<string>();
     for (const [name, seg] of segMap) {
       if (seg === options.segment) allowedMembers.add(name);

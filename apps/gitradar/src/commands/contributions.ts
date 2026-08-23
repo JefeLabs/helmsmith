@@ -1,3 +1,4 @@
+import { excludeBots, isBotAuthor } from '../aggregator/bots.js';
 import type { RolledUp } from '../aggregator/engine.js';
 import { rollup } from '../aggregator/engine.js';
 import {
@@ -30,6 +31,10 @@ export interface ContributionsOptions {
   pivot?: PivotGranularity;
   segment?: Segment;
   segmentThresholds?: SegmentThresholds;
+  /** Minimum cohort size before high/low segment labels are assigned. Default: 8. */
+  segmentMinN?: number;
+  /** Case-insensitive substrings identifying bot authors (name or email). Default: none excluded. */
+  botPatterns?: string[];
   /** Pre-loaded records (skips disk read when provided — useful for testing). */
   records?: UserWeekRepoRecord[];
 }
@@ -388,6 +393,8 @@ export async function contributions(options: ContributionsOptions = {}): Promise
   const weeks = getLastNWeeks(weeksBack, currentWeek);
   const groupBy = options.groupBy ?? 'member';
 
+  const botPatterns = options.botPatterns ?? [];
+
   // SQL-accelerated path: use queryRollup when no pre-loaded records
   const useSQLPath = !options.records && !options.pivot;
 
@@ -404,8 +411,14 @@ export async function contributions(options: ContributionsOptions = {}): Promise
       return;
     }
 
-    // We have everything we need from SQL
+    // We have everything we need from SQL. queryRollup aggregates straight from
+    // the DB, so bot exclusion can only be applied post-hoc here — safe for
+    // groupBy: 'member' since each row is one author's total, but skipped for
+    // team/org/repo grouping where a row no longer maps to a single author.
     let rows = rolledUpToRows(rolled);
+    if (groupBy === 'member') {
+      rows = rows.filter((row) => !isBotAuthor(row.name, '', botPatterns));
+    }
     if (options.json) {
       printJson(rows);
       return;
@@ -416,7 +429,7 @@ export async function contributions(options: ContributionsOptions = {}): Promise
     for (const row of rows) {
       memberTotals.set(row.name, row.insertions + row.deletions);
     }
-    const segMap = calculateSegments(memberTotals, options.segmentThresholds);
+    const segMap = calculateSegments(memberTotals, options.segmentThresholds, options.segmentMinN);
 
     // Filter by segment if requested
     if (options.segment) {
@@ -445,6 +458,7 @@ export async function contributions(options: ContributionsOptions = {}): Promise
 
   const weekSet = new Set(weeks);
   records = records.filter((r) => weekSet.has(r.week));
+  records = excludeBots(records, botPatterns);
 
   if (records.length === 0) {
     printNoData();
@@ -483,7 +497,7 @@ export async function contributions(options: ContributionsOptions = {}): Promise
   for (const row of rows) {
     memberTotals.set(row.name, row.insertions + row.deletions);
   }
-  const segMap = calculateSegments(memberTotals, options.segmentThresholds);
+  const segMap = calculateSegments(memberTotals, options.segmentThresholds, options.segmentMinN);
 
   // Filter by segment if requested
   if (options.segment) {
