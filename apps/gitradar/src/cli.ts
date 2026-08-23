@@ -7,7 +7,12 @@ import { detectGitRoot } from './config/git-root.js';
 import { loadConfig } from './config/loader.js';
 import { getAvailableWorkspaces, loadAllRegistries } from './config/repos-registry.js';
 import { getConfigPath, getDataDir } from './store/paths.js';
-import { DEFAULT_SETTINGS } from './types/schema.js';
+import { DEFAULT_SETTINGS, SCORECARD_METRIC_KEYS } from './types/schema.js';
+import {
+  FAMILY_ORDER,
+  type ScorecardFamily,
+  type SortKey,
+} from './views/components/scorecard-section.js';
 
 // gitradar is read-only analytics with a TUI — no auth needed.
 // noopAuthProvider stays as the default; commands never call getToken.
@@ -443,6 +448,48 @@ view
       filters: globalFilters(),
       segmentMinN: settings.segment_min_n,
       botPatterns: settings.bot_patterns,
+    });
+  });
+
+view
+  .command('scorecard')
+  .description('Per-member scorecard: throughput, flow, quality, collaboration')
+  .option('-w, --weeks <n>', 'Window: 4, 8 or 12 weeks', parseInt)
+  .option('--family <f>', 'all | throughput | flow | quality | collab', 'all')
+  .option('--sort <metric>', 'Sort column (metric key, member, or score)', 'commitsPerWeek')
+  .option('--asc', 'Ascending sort (default: descending)')
+  .action(async (cmdOpts: { weeks?: number; family?: string; sort?: string; asc?: boolean }) => {
+    const g = globals();
+
+    const family = cmdOpts.family ?? 'all';
+    if (!(FAMILY_ORDER as string[]).includes(family)) {
+      console.error(`Error: unknown --family ${family}`);
+      process.exitCode = 1;
+      return;
+    }
+    const sort = cmdOpts.sort ?? 'commitsPerWeek';
+    const validSortKeys: string[] = [...SCORECARD_METRIC_KEYS, 'member', 'score'];
+    if (!validSortKeys.includes(sort)) {
+      console.error(`Error: unknown --sort ${sort}`);
+      process.exitCode = 1;
+      return;
+    }
+
+    const settings = await loadSettings(g.config);
+    const { scorecard } = await import('./commands/scorecard.js');
+    await scorecard({
+      weeks: cmdOpts.weeks ?? g.weeks,
+      family: family as ScorecardFamily,
+      sort: sort as SortKey,
+      asc: cmdOpts.asc,
+      json: g.json,
+      filters: globalFilters(),
+      settings: {
+        trend_threshold: settings.trend_threshold,
+        scorecard_min_n: settings.scorecard_min_n,
+        scorecard_weights: settings.scorecard_weights,
+        bot_patterns: settings.bot_patterns,
+      },
     });
   });
 
