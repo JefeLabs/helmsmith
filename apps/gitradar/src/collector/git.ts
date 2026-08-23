@@ -6,6 +6,7 @@ import type { AuthorMap, ResolvedAuthor } from './author-map.js';
 import { resolveAuthor } from './author-map.js';
 import type { FileType } from './classifier.js';
 import { buildClassifier, buildIgnoreMatcher, classifyFile } from './classifier.js';
+import type { ReworkInput } from './rework.js';
 
 // Note: spawn is used with array arguments (no shell interpretation),
 // equivalent to simple-git's internal execFile usage. All args are
@@ -125,6 +126,8 @@ export interface ScanOptions {
   ignorePatternsReplaceDefaults?: boolean;
   /** User-defined classification rules: glob pattern → filetype category. Takes priority over built-in rules. */
   classificationRules?: Record<string, FileType>;
+  /** Collect per-commit deletion info for the rework pass (default true). */
+  collectRework?: boolean;
 }
 
 /**
@@ -150,6 +153,8 @@ export interface ScanResult {
   ignoredCommitCount: number;
   /** All unique authors seen in this scan (resolved or not). */
   discoveredAuthors: RawAuthor[];
+  /** Inputs for the blame-based rework post-pass (see collector/rework.ts). */
+  reworkInputs: ReworkInput[];
 }
 
 /**
@@ -478,6 +483,7 @@ async function streamGitLog(
     identifierRules?: ScanOptions['identifierRules'];
     shouldIgnore?: (filePath: string) => boolean;
     classify?: (filePath: string) => FileType;
+    reworkInputs?: ReworkInput[];
   },
 ): Promise<{ commitCount: number; skippedCount: number; ignoredCount: number }> {
   return new Promise((resolve, reject) => {
@@ -504,6 +510,7 @@ async function streamGitLog(
         batchArgs.identifierRules,
         batchArgs.shouldIgnore,
         batchArgs.classify,
+        batchArgs.reworkInputs,
       );
       skippedCount += outcome.skipped;
       ignoredCount += outcome.ignored;
@@ -689,6 +696,7 @@ function processCommitBatch(
   identifierRules?: ScanOptions['identifierRules'],
   shouldIgnore?: (filePath: string) => boolean,
   classify?: (filePath: string) => FileType,
+  reworkInputs?: ReworkInput[],
 ): { skipped: number; ignored: number } {
   let skipped = 0;
   let ignored = 0;
@@ -789,6 +797,22 @@ function processCommitBatch(
       record.filetype[category].insertions += file.insertions;
       record.filetype[category].deletions += file.deletions;
     }
+
+    if (reworkInputs) {
+      const deleting = countedFiles
+        .filter((f) => f.deletions > 0 && f.status !== 'R' && f.status !== 'C')
+        .map((f) => ({ path: f.path, deletions: f.deletions }));
+      if (deleting.length > 0) {
+        reworkInputs.push({
+          hash: commit.hash,
+          authorEmail: commit.email,
+          authorName: commit.name,
+          authorDate: commit.date,
+          week,
+          files: deleting,
+        });
+      }
+    }
   }
 
   return { skipped, ignored };
@@ -833,6 +857,7 @@ export async function scanRepo(repoPath: string, options: ScanOptions): Promise<
     ignorePatterns,
     ignorePatternsReplaceDefaults,
     classificationRules,
+    collectRework,
   } = options;
 
   const shouldIgnore = buildIgnoreMatcher(ignorePatterns, {
@@ -847,6 +872,7 @@ export async function scanRepo(repoPath: string, options: ScanOptions): Promise<
   const activeDaysMap = new Map<string, Set<string>>();
   const rawAuthorsMap = new Map<string, RawAuthor>();
   const newHashes: string[] = [];
+  const reworkInputs: ReworkInput[] = [];
   let totalCommitCount = 0;
   let ignoredCommitCount = 0;
   let skippedCount = 0;
@@ -863,6 +889,7 @@ export async function scanRepo(repoPath: string, options: ScanOptions): Promise<
     identifierRules,
     shouldIgnore,
     classify,
+    reworkInputs: collectRework !== false ? reworkInputs : undefined,
   };
 
   for (const range of ranges) {
@@ -886,6 +913,7 @@ export async function scanRepo(repoPath: string, options: ScanOptions): Promise<
           skippedCount: 0,
           ignoredCommitCount: 0,
           discoveredAuthors: [],
+          reworkInputs: [],
         };
       }
       if (gitErr.severity === 'transient') {
@@ -900,6 +928,7 @@ export async function scanRepo(repoPath: string, options: ScanOptions): Promise<
           skippedCount: 0,
           ignoredCommitCount: 0,
           discoveredAuthors: [],
+          reworkInputs: [],
         };
       }
     }
@@ -921,6 +950,7 @@ export async function scanRepo(repoPath: string, options: ScanOptions): Promise<
     skippedCount,
     ignoredCommitCount,
     discoveredAuthors: Array.from(rawAuthorsMap.values()),
+    reworkInputs,
   };
 }
 

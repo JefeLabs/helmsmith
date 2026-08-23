@@ -65,6 +65,7 @@ function makeScanResult(overrides?: Partial<ScanResult>): ScanResult {
     skippedCount: 0,
     ignoredCommitCount: 0,
     discoveredAuthors: [],
+    reworkInputs: [],
     ...overrides,
   };
 }

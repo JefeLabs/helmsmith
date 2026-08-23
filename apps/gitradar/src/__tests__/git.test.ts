@@ -631,6 +631,46 @@ describe('scanRepo', () => {
     expect(result.newHashes).toContain('ccc333');
     consoleSpy.mockRestore();
   });
+
+  it('collects rework inputs for counted commits that delete lines', async () => {
+    spawnQueue.push(
+      [
+        'aaa111|alice@acme.com|Alice Johnson|2026-02-20T10:00:00Z|feat: x',
+        '10\t2\tsrc/index.ts',
+        '3\t0\tsrc/new.ts',
+      ].join('\n'),
+    );
+    const result = await scanRepo('/repos/frontend', {
+      repoName: 'frontend',
+      group: 'web',
+      authorMap: makeAuthorMap(),
+      recentHashes: new Set(),
+    });
+    expect(result.reworkInputs).toEqual([
+      {
+        hash: 'aaa111',
+        authorEmail: 'alice@acme.com',
+        authorName: 'Alice Johnson',
+        authorDate: '2026-02-20T10:00:00Z',
+        week: '2026-W08',
+        files: [{ path: 'src/index.ts', deletions: 2 }],
+      },
+    ]);
+  });
+
+  it('does not collect rework inputs when collectRework is false', async () => {
+    spawnQueue.push(
+      'aaa111|alice@acme.com|Alice Johnson|2026-02-20T10:00:00Z|feat: x\n10\t2\tsrc/index.ts',
+    );
+    const result = await scanRepo('/repos/frontend', {
+      repoName: 'frontend',
+      group: 'web',
+      authorMap: makeAuthorMap(),
+      recentHashes: new Set(),
+      collectRework: false,
+    });
+    expect(result.reworkInputs).toEqual([]);
+  });
 });
 
 // ── generateDateChunks ──────────────────────────────────────────────────────
