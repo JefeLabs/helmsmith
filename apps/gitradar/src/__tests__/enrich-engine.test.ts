@@ -46,7 +46,7 @@ vi.mock('../collector/github.js', () => ({
   createCacheStats: vi.fn(() => ({ hits: 0, misses: 0 })),
   createOctokit: vi.fn(async () => ({}) as unknown),
   detectGitHubRemote: vi.fn(async () => ({ owner: 'acme', repo: 'web' })),
-  fetchGitHubMetricsBatch: vi.fn(async () => []),
+  fetchGitHubMetricsBatch: vi.fn(async () => ({ results: [], failedHandles: [] })),
   GitHubRateLimiter: class {
     async acquire() {}
     updateFromGraphQL() {}
@@ -81,10 +81,10 @@ function ghMetrics(overrides: Partial<GitHubMetrics> = {}): GitHubMetrics {
   };
 }
 
-function makeRecord(week: string): UserWeekRepoRecord {
+function makeRecord(week: string, who = { member: 'Alice Chen', email: 'alice@acme.com' }) {
   return {
-    member: 'Alice Chen',
-    email: 'alice@acme.com',
+    member: who.member,
+    email: who.email,
     org: 'Acme',
     orgType: 'core',
     team: 'Platform',
@@ -101,8 +101,10 @@ function makeRecord(week: string): UserWeekRepoRecord {
       storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
       doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
     },
-  };
+  } satisfies UserWeekRepoRecord;
 }
+
+const BOB = { member: 'Bob Ray', email: 'bob@acme.com' };
 
 function makeConfig(): Config {
   return {
@@ -117,6 +119,7 @@ function makeConfig(): Config {
             tag: 'default',
             members: [
               { name: 'Alice Chen', aliases: [], email: 'alice@acme.com', githubHandle: 'alice' },
+              { name: 'Bob Ray', aliases: [], email: 'bob@acme.com', githubHandle: 'bob' },
             ],
           },
         ],
@@ -213,7 +216,7 @@ describe('GitRadarEngine.enrich — never stores rows it has no data for', () =>
     mockQueryRecords.mockReturnValue([makeRecord('2026-W10')]);
     mockCreateOctokit.mockResolvedValue({} as never);
     mockDetectRemote.mockResolvedValue({ owner: 'acme', repo: 'web' });
-    mockFetchBatch.mockResolvedValue([]);
+    mockFetchBatch.mockResolvedValue({ results: [], failedHandles: [] });
   });
 
   it('persists nothing and returns early when there is no GitHub token', async () => {
@@ -238,7 +241,7 @@ describe('GitRadarEngine.enrich — never stores rows it has no data for', () =>
   });
 
   it('skips a member-week whose GraphQL fetch produced nothing', async () => {
-    mockFetchBatch.mockResolvedValue([]);
+    mockFetchBatch.mockResolvedValue({ results: [], failedHandles: [] });
 
     const out = await runEnrich();
 
@@ -257,8 +260,31 @@ describe('GitRadarEngine.enrich — never stores rows it has no data for', () =>
     expect(out).toContain('1 error');
   });
 
+  it("counts one author's fetch failure as an error while still storing the others", async () => {
+    // The batch call resolved; alice's own page (or her REST fallback) failed.
+    // That is an error for alice alone — not "GitHub says she had no PRs", and not
+    // a reason to drop bob. Nothing may be stored for her, or `hasEnrichment`
+    // would skip her for good.
+    mockQueryRecords.mockReturnValue([makeRecord('2026-W10'), makeRecord('2026-W10', BOB)]);
+    mockFetchBatch.mockResolvedValue({
+      results: [{ handle: 'bob', metrics: ghMetrics() }],
+      failedHandles: ['alice'],
+    });
+
+    const out = await runEnrich();
+
+    const saved = mockSaveBatch.mock.calls[0][0];
+    expect(saved.map((e) => e.key)).toEqual(['Bob Ray::2026-W10::web']);
+    expect(out).toContain('1 enriched');
+    expect(out).toContain('1 error');
+    expect(out).not.toContain('no GitHub data');
+  });
+
   it('persists fetched member-weeks with their real values', async () => {
-    mockFetchBatch.mockResolvedValue([{ handle: 'alice', metrics: ghMetrics() }]);
+    mockFetchBatch.mockResolvedValue({
+      results: [{ handle: 'alice', metrics: ghMetrics() }],
+      failedHandles: [],
+    });
 
     const out = await runEnrich();
 

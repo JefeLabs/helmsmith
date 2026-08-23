@@ -733,7 +733,7 @@ export class GitRadarEngine {
       if (batchEntries.length === 0) continue;
 
       try {
-        const batchResults = await fetchGitHubMetricsBatch({
+        const { results: batchResults, failedHandles } = await fetchGitHubMetricsBatch({
           octokit,
           owner: githubRemote.owner,
           repo: githubRemote.repo,
@@ -754,6 +754,14 @@ export class GitRadarEngine {
               ghResultMap.set(key, br.metrics);
             }
           }
+        }
+
+        // An author whose own page or REST fallback failed answered nothing.
+        // Counting her member-weeks as errors keeps them out of `selectPersistable`,
+        // so no all-zero row is stored and the next run retries her.
+        for (const handle of failedHandles) {
+          const entry = batchEntries.find((b) => b.githubHandle === handle);
+          if (entry) for (const key of entry.keys) failedKeys.add(key);
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

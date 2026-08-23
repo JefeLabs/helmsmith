@@ -408,7 +408,7 @@ describe('fetchGitHubMetricsBatch', () => {
       }),
     };
 
-    const results = await fetchGitHubMetricsBatch({
+    const { results } = await fetchGitHubMetricsBatch({
       octokit: mockOctokit as any,
       owner: 'acme',
       repo: 'frontend',
@@ -471,7 +471,7 @@ describe('fetchGitHubMetricsBatch', () => {
         }),
     };
 
-    const results = await fetchGitHubMetricsBatch({
+    const { results } = await fetchGitHubMetricsBatch({
       octokit: mockOctokit as any,
       owner: 'acme',
       repo: 'frontend',
@@ -492,7 +492,7 @@ describe('fetchGitHubMetricsBatch', () => {
   it('returns empty results for empty entries array', async () => {
     const mockOctokit = { graphql: vi.fn() };
 
-    const results = await fetchGitHubMetricsBatch({
+    const { results } = await fetchGitHubMetricsBatch({
       octokit: mockOctokit as any,
       owner: 'acme',
       repo: 'frontend',
@@ -583,7 +583,7 @@ describe('fetchGitHubMetricsBatch', () => {
         }),
     };
 
-    const results = await fetchGitHubMetricsBatch({
+    const { results } = await fetchGitHubMetricsBatch({
       octokit: mockOctokit as any,
       owner: 'acme',
       repo: 'frontend',
@@ -593,6 +593,100 @@ describe('fetchGitHubMetricsBatch', () => {
 
     expect(results).toHaveLength(1);
     expect(results[0].metrics.prs_opened).toBe(150);
+  });
+
+  it('reports a per-author REST fallback failure instead of manufacturing a zero row', async () => {
+    const mockOctokit = {
+      graphql: vi
+        .fn()
+        // Batch fails, so both authors fall back to individual queries.
+        .mockRejectedValueOnce(new Error('batch failed'))
+        // alice's fallback fails too.
+        .mockRejectedValueOnce(new Error('502 Bad Gateway'))
+        // bob's fallback succeeds.
+        .mockResolvedValueOnce({
+          prs: {
+            issueCount: 1,
+            pageInfo: { hasNextPage: false, endCursor: null },
+            nodes: [
+              {
+                number: 1,
+                createdAt: '2026-03-01T00:00:00Z',
+                mergedAt: '2026-03-01T12:00:00Z',
+                state: 'MERGED',
+                headRefName: 'feature/auth',
+              },
+            ],
+          },
+          reviews: { issueCount: 2 },
+        }),
+    };
+
+    const { results, failedHandles } = await fetchGitHubMetricsBatch({
+      octokit: mockOctokit as any,
+      owner: 'acme',
+      repo: 'frontend',
+      entries: [
+        { githubHandle: 'alice', since: '2026-03-01', until: '2026-03-07' },
+        { githubHandle: 'bob', since: '2026-03-01', until: '2026-03-07' },
+      ],
+      skipCache: true,
+    });
+
+    // alice produced no data at all — an all-zero row would be a lie, and sticky.
+    expect(results.map((r) => r.handle)).toEqual(['bob']);
+    expect(failedHandles).toEqual(['alice']);
+  });
+
+  it('reports a pagination failure rather than storing an empty page', async () => {
+    const mockOctokit = {
+      graphql: vi
+        .fn()
+        // Batch says alice has >100 PRs, so she paginates individually…
+        .mockResolvedValueOnce({
+          a0_prs: {
+            issueCount: 150,
+            pageInfo: { hasNextPage: true, endCursor: 'cursor1' },
+            nodes: [],
+          },
+          a0_reviews: { issueCount: 0 },
+          rateLimit: { remaining: 4990, resetAt: new Date(Date.now() + 3600000).toISOString() },
+        })
+        // …and that paginating fetch fails.
+        .mockRejectedValueOnce(new Error('secondary rate limit')),
+    };
+
+    const { results, failedHandles } = await fetchGitHubMetricsBatch({
+      octokit: mockOctokit as any,
+      owner: 'acme',
+      repo: 'frontend',
+      entries: [{ githubHandle: 'alice', since: '2026-03-01', until: '2026-03-07' }],
+      skipCache: true,
+    });
+
+    expect(results).toEqual([]);
+    expect(failedHandles).toEqual(['alice']);
+  });
+
+  it('reports no failed handles when every author answers', async () => {
+    const mockOctokit = {
+      graphql: vi.fn().mockResolvedValueOnce({
+        a0_prs: { issueCount: 0, pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] },
+        a0_reviews: { issueCount: 0 },
+        rateLimit: { remaining: 4999, resetAt: new Date(Date.now() + 3600000).toISOString() },
+      }),
+    };
+
+    const { results, failedHandles } = await fetchGitHubMetricsBatch({
+      octokit: mockOctokit as any,
+      owner: 'acme',
+      repo: 'frontend',
+      entries: [{ githubHandle: 'alice', since: '2026-03-01', until: '2026-03-07' }],
+      skipCache: true,
+    });
+
+    expect(results).toHaveLength(1);
+    expect(failedHandles).toEqual([]);
   });
 });
 

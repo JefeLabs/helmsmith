@@ -390,6 +390,12 @@ function buildBatchQuery(count: number): string {
  *
  * If an author has >100 PRs in the date range, pagination falls back to
  * the single-author `fetchGitHubMetrics` function.
+ *
+ * Authors whose fetch failed come back in `failedHandles`, never in `results`
+ * as an all-zero row: a zero row is indistinguishable from "no PRs that week",
+ * and once stored it is sticky, because `hasEnrichment` then makes every later
+ * run skip that member-week as already enriched until someone passes `--force`.
+ * The caller reports failed handles as errors and stores nothing for them.
  */
 export async function fetchGitHubMetricsBatch(options: {
   octokit: Octokit;
@@ -399,9 +405,10 @@ export async function fetchGitHubMetricsBatch(options: {
   rateLimiter?: GitHubRateLimiter;
   skipCache?: boolean;
   cacheStats?: CacheStats;
-}): Promise<BatchResult[]> {
+}): Promise<{ results: BatchResult[]; failedHandles: string[] }> {
   const { octokit, owner, repo, entries, rateLimiter, skipCache, cacheStats } = options;
   const results: BatchResult[] = [];
+  const failedHandles: string[] = [];
 
   // Check cache for each entry; only include uncached entries in the batch
   const uncached: Array<BatchEntry & { index: number }> = [];
@@ -419,7 +426,7 @@ export async function fetchGitHubMetricsBatch(options: {
     uncached.push({ ...entry, index: uncached.length });
   }
 
-  if (uncached.length === 0) return results;
+  if (uncached.length === 0) return { results, failedHandles };
 
   // Process uncached entries in batches
   for (let batchStart = 0; batchStart < uncached.length; batchStart += BATCH_SIZE) {
@@ -452,7 +459,7 @@ export async function fetchGitHubMetricsBatch(options: {
         // If this author has >100 PRs, paginate individually
         if (prsData.pageInfo.hasNextPage) {
           try {
-            const full = await fetchGitHubMetrics({
+            const full = await fetchGitHubMetricsStrict({
               octokit,
               owner,
               repo,
@@ -465,7 +472,7 @@ export async function fetchGitHubMetricsBatch(options: {
             });
             results.push({ handle: githubHandle, metrics: full });
           } catch {
-            results.push({ handle: githubHandle, metrics: emptyMetrics() });
+            failedHandles.push(githubHandle);
           }
           continue;
         }
@@ -499,7 +506,7 @@ export async function fetchGitHubMetricsBatch(options: {
 
       for (const entry of batch) {
         try {
-          const metrics = await fetchGitHubMetrics({
+          const metrics = await fetchGitHubMetricsStrict({
             octokit,
             owner,
             repo,
@@ -514,13 +521,13 @@ export async function fetchGitHubMetricsBatch(options: {
         } catch (restErr) {
           const msg = restErr instanceof Error ? restErr.message : String(restErr);
           console.log(`  Warning: GitHub fallback failed for ${entry.githubHandle}: ${msg}`);
-          results.push({ handle: entry.githubHandle, metrics: emptyMetrics() });
+          failedHandles.push(entry.githubHandle);
         }
       }
     }
   }
 
-  return results;
+  return { results, failedHandles };
 }
 
 // ── Single-author fetch (GraphQL) ───────────────────────────────────────────
@@ -532,7 +539,17 @@ export async function fetchGitHubMetricsBatch(options: {
  * multiple authors into a single query. This function is used for
  * pagination fallback and single-author use cases.
  */
-export async function fetchGitHubMetrics(options: {
+export async function fetchGitHubMetrics(options: SingleFetchOptions): Promise<GitHubMetrics> {
+  try {
+    return await fetchGitHubMetricsStrict(options);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.log(`  Warning: GitHub GraphQL error for ${options.githubHandle}: ${msg}`);
+    return emptyMetrics();
+  }
+}
+
+interface SingleFetchOptions {
   octokit: Octokit;
   owner: string;
   repo: string;
@@ -543,7 +560,17 @@ export async function fetchGitHubMetrics(options: {
   skipCache?: boolean;
   /** Optional counter to track cache hits and misses across calls. */
   cacheStats?: CacheStats;
-}): Promise<GitHubMetrics> {
+}
+
+/**
+ * The same fetch, but a GraphQL failure throws instead of resolving to zeros.
+ *
+ * `fetchGitHubMetricsBatch`'s fallback paths must be able to tell "GitHub says
+ * this author opened no PRs that week" from "GitHub did not answer" — the first
+ * is data worth storing, the second must be reported as a failed handle. The
+ * public wrapper above keeps the tolerant contract its other callers rely on.
+ */
+async function fetchGitHubMetricsStrict(options: SingleFetchOptions): Promise<GitHubMetrics> {
   const { octokit, owner, repo, githubHandle, since, until, rateLimiter, skipCache, cacheStats } =
     options;
   const empty = emptyMetrics();
@@ -564,57 +591,51 @@ export async function fetchGitHubMetrics(options: {
 
   const result = { ...empty };
 
-  try {
-    // First query: get PRs + review count in one shot
+  // First query: get PRs + review count in one shot
+  if (rateLimiter) await rateLimiter.acquire();
+
+  const response = await octokit.graphql<{
+    prs: GraphQLSearchResult;
+    reviews: { issueCount: number };
+    rateLimit: { remaining: number; resetAt: string };
+  }>(PR_SEARCH_QUERY, { prsQuery, reviewsQuery, prsCursor: null, reviewsCursor: null });
+
+  if (rateLimiter && response.rateLimit) {
+    rateLimiter.updateFromGraphQL(response.rateLimit);
+  }
+
+  const allPRs: GraphQLPRNode[] = [...response.prs.nodes];
+  result.prs_reviewed_touched = response.reviews.issueCount;
+
+  // Paginate remaining PRs if needed
+  let pageInfo = response.prs.pageInfo;
+  while (pageInfo.hasNextPage && pageInfo.endCursor) {
     if (rateLimiter) await rateLimiter.acquire();
 
-    const response = await octokit.graphql<{
+    const nextPage = await octokit.graphql<{
       prs: GraphQLSearchResult;
-      reviews: { issueCount: number };
       rateLimit: { remaining: number; resetAt: string };
-    }>(PR_SEARCH_QUERY, { prsQuery, reviewsQuery, prsCursor: null, reviewsCursor: null });
+    }>(PR_PAGINATE_QUERY, { prsQuery, cursor: pageInfo.endCursor });
 
-    if (rateLimiter && response.rateLimit) {
-      rateLimiter.updateFromGraphQL(response.rateLimit);
+    if (rateLimiter && nextPage.rateLimit) {
+      rateLimiter.updateFromGraphQL(nextPage.rateLimit);
     }
 
-    const allPRs: GraphQLPRNode[] = [...response.prs.nodes];
-    result.prs_reviewed_touched = response.reviews.issueCount;
-
-    // Paginate remaining PRs if needed
-    let pageInfo = response.prs.pageInfo;
-    while (pageInfo.hasNextPage && pageInfo.endCursor) {
-      if (rateLimiter) await rateLimiter.acquire();
-
-      const nextPage = await octokit.graphql<{
-        prs: GraphQLSearchResult;
-        rateLimit: { remaining: number; resetAt: string };
-      }>(PR_PAGINATE_QUERY, { prsQuery, cursor: pageInfo.endCursor });
-
-      if (rateLimiter && nextPage.rateLimit) {
-        rateLimiter.updateFromGraphQL(nextPage.rateLimit);
-      }
-
-      allPRs.push(...nextPage.prs.nodes);
-      pageInfo = nextPage.prs.pageInfo;
-    }
-
-    result.prs_opened = allPRs.length;
-    result.prs_merged = allPRs.filter((pr) => pr.state === 'MERGED').length;
-
-    result.median_cycle_hrs = calculateCycleTime(
-      allPRs
-        .filter((pr) => pr.mergedAt !== null)
-        .map((pr) => ({ createdAt: pr.createdAt, mergedAt: pr.mergedAt })),
-    );
-
-    const branchCounts = countBranchTypes(allPRs);
-    Object.assign(result, branchCounts);
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.log(`  Warning: GitHub GraphQL error for ${githubHandle}: ${msg}`);
-    return empty;
+    allPRs.push(...nextPage.prs.nodes);
+    pageInfo = nextPage.prs.pageInfo;
   }
+
+  result.prs_opened = allPRs.length;
+  result.prs_merged = allPRs.filter((pr) => pr.state === 'MERGED').length;
+
+  result.median_cycle_hrs = calculateCycleTime(
+    allPRs
+      .filter((pr) => pr.mergedAt !== null)
+      .map((pr) => ({ createdAt: pr.createdAt, mergedAt: pr.mergedAt })),
+  );
+
+  const branchCounts = countBranchTypes(allPRs);
+  Object.assign(result, branchCounts);
 
   // Write to cache
   const key = cacheKey(owner, repo, githubHandle, since, until);
