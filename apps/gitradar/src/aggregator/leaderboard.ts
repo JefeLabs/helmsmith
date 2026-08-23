@@ -1,4 +1,5 @@
 import type { UserWeekRepoRecord } from '../types/schema.js';
+import { excludeBots } from './bots.js';
 import { rollup } from './engine.js';
 
 export interface LeaderboardEntry {
@@ -43,10 +44,14 @@ export function computeLeaderboard(
   records: UserWeekRepoRecord[],
   weeks: string[],
   topN: number = 5,
+  botPatterns: string[] = [],
 ): LeaderboardColumn[] {
-  // Step 1: filter to the week window
+  // Step 1: filter to the week window, then drop bot authors
   const weekSet = new Set(weeks);
-  const filtered = records.filter((r) => weekSet.has(r.week));
+  const filtered = excludeBots(
+    records.filter((r) => weekSet.has(r.week)),
+    botPatterns,
+  );
 
   if (filtered.length === 0) {
     return COLUMN_DEFS.map((def) => ({
@@ -92,22 +97,24 @@ export function computeLeaderboard(
   const summaries: MemberSummary[] = [];
   for (const [member, agg] of rolled) {
     const meta = memberMeta.get(member)!;
+    const total =
+      agg.filetype.app.insertions +
+      agg.filetype.app.deletions +
+      agg.filetype.test.insertions +
+      agg.filetype.test.deletions +
+      agg.filetype.config.insertions +
+      agg.filetype.config.deletions +
+      agg.filetype.storybook.insertions +
+      agg.filetype.storybook.deletions +
+      agg.filetype.doc.insertions +
+      agg.filetype.doc.deletions;
+    if (total === 0) continue;
     summaries.push({
       member,
       team: meta.team,
       org: meta.org,
       orgType: meta.orgType,
-      total:
-        agg.filetype.app.insertions +
-        agg.filetype.app.deletions +
-        agg.filetype.test.insertions +
-        agg.filetype.test.deletions +
-        agg.filetype.config.insertions +
-        agg.filetype.config.deletions +
-        agg.filetype.storybook.insertions +
-        agg.filetype.storybook.deletions +
-        agg.filetype.doc.insertions +
-        agg.filetype.doc.deletions,
+      total,
       app: agg.filetype.app.insertions + agg.filetype.app.deletions,
       test: agg.filetype.test.insertions + agg.filetype.test.deletions,
       config: agg.filetype.config.insertions + agg.filetype.config.deletions,

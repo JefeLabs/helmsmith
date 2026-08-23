@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Config, UserWeekRepoRecord } from '../types/schema.js';
 import { DEFAULT_SETTINGS } from '../types/schema.js';
+import { stripAnsi } from '../ui/format.js';
 import type { KeyEvent } from '../ui/keypress.js';
+import { renderTopPerformersTab } from '../views/components/top-performers-section.js';
 import { computeWeeksToShow, mapKey } from '../views/dashboard.js';
 import type { NavigationAction, ViewContext, ViewFn } from '../views/types.js';
 
@@ -984,5 +986,44 @@ describe('mapKey — tab hotkeys switch tabs from any tab', () => {
     // Manage claims neither 'c' nor 'k', so both reach the global fallback.
     expect(mapKey('c', 'manage', 8, 8, [])).toBe('tab:contributions');
     expect(mapKey('k', 'manage', 8, 8, [])).toBe('tab:scorecard');
+  });
+});
+
+// ── renderTopPerformersTab: bot exclusion ────────────────────────────────────
+
+describe('renderTopPerformersTab', () => {
+  it('excludes bot authors configured via ctx.config.settings.bot_patterns', () => {
+    const ctx = makeSampleContext();
+    ctx.config.settings.bot_patterns = ['[bot]'];
+    ctx.records = [
+      ...ctx.records,
+      {
+        member: 'dependabot[bot]',
+        email: 'dependabot[bot]@users.noreply.github.com',
+        org: 'Team A',
+        orgType: 'core',
+        team: 'Platform',
+        tag: 'infrastructure',
+        week: '2026-W12',
+        repo: 'frontend-app',
+        group: 'web',
+        commits: 3,
+        activeDays: 1,
+        filetype: {
+          app: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 99999, deletions: 0 },
+          test: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+          config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+          storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+          doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+        },
+      },
+    ];
+
+    renderTopPerformersTab(ctx, 4);
+
+    const output = stripAnsi(
+      consoleLogSpy.mock.calls.map((c: unknown[]) => String(c[0])).join('\n'),
+    );
+    expect(output).not.toContain('dependabot');
   });
 });

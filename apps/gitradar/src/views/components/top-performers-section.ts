@@ -19,9 +19,10 @@ export function renderLeaderboard(
   records: UserWeekRepoRecord[],
   currentWeek: string,
   windowWeeks: WindowSize,
+  botPatterns: string[] = [],
 ): string {
   const weeks = getLastNWeeks(windowWeeks, currentWeek);
-  const columns = computeLeaderboard(records, weeks, 5);
+  const columns = computeLeaderboard(records, weeks, 5, botPatterns);
   if (columns.length === 0) return '';
 
   const lines: string[] = [];
@@ -91,7 +92,12 @@ export function renderLeaderboard(
 }
 
 export function renderTopPerformersTab(ctx: ViewContext, windowWeeks: WindowSize): void {
-  const output = renderLeaderboard(ctx.records, ctx.currentWeek, windowWeeks);
+  const output = renderLeaderboard(
+    ctx.records,
+    ctx.currentWeek,
+    windowWeeks,
+    ctx.config.settings.bot_patterns ?? [],
+  );
   if (output) {
     console.log(output);
   } else {

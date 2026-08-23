@@ -28,6 +28,16 @@ function makeRecord(overrides: Partial<UserWeekRepoRecord> = {}): UserWeekRepoRe
   };
 }
 
+function zeroFiletype(): UserWeekRepoRecord['filetype'] {
+  return {
+    app: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+    test: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+    config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+    storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+    doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+  };
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('computeLeaderboard', () => {
@@ -270,5 +280,30 @@ describe('computeLeaderboard', () => {
     for (const col of result) {
       expect(col.entries.length).toBeLessThanOrEqual(5);
     }
+  });
+
+  it('excludes bot authors when botPatterns is given', () => {
+    const records = [
+      makeRecord({ member: 'alice', email: 'a@co.com' }),
+      makeRecord({
+        member: 'dependabot[bot]',
+        email: 'd@x',
+        filetype: {
+          ...makeRecord().filetype,
+          app: { files: 9, filesAdded: 0, filesDeleted: 0, insertions: 99999, deletions: 0 },
+        },
+      }),
+    ];
+    const [overall] = computeLeaderboard(records, ['2026-W08'], 5, ['[bot]']);
+    expect(overall.entries.map((e) => e.member)).toEqual(['alice']);
+  });
+
+  it('never seats a member whose total lines are zero', () => {
+    const records = [
+      makeRecord({ member: 'alice' }),
+      makeRecord({ member: 'holder', commits: 0, filetype: zeroFiletype() }),
+    ];
+    const [overall] = computeLeaderboard(records, ['2026-W08'], 5);
+    expect(overall.entries.map((e) => e.member)).toEqual(['alice']);
   });
 });

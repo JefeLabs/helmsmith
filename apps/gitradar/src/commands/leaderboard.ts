@@ -77,7 +77,7 @@ export async function leaderboard(options: LeaderboardOptions = {}): Promise<voi
   const weeks = getLastNWeeks(weeksBack, currentWeek);
   const topN = options.top ?? 10;
 
-  const columns = computeLeaderboard(records, weeks, topN);
+  const columns = computeLeaderboard(records, weeks, topN, botPatterns);
 
   if (columns.every((c) => c.entries.length === 0)) {
     printNoData('No data for leaderboard. Run "gitradar scan" first.');
