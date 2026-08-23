@@ -218,7 +218,13 @@ describe('scanAllRepos', () => {
         recentPrHashes: ['m1'],
       },
     });
-    mockScanRepo.mockResolvedValueOnce(makeScanResult({ newHashes: ['n1'], commitCount: 1 }));
+    mockScanRepo.mockResolvedValueOnce(
+      makeScanResult({
+        newRecords: [makeRecord('Alice', 'app')],
+        newHashes: ['n1'],
+        commitCount: 1,
+      }),
+    );
     mockRunPrProxy.mockResolvedValueOnce({
       records: [],
       newPrHashes: ['m9'],
@@ -242,6 +248,24 @@ describe('scanAllRepos', () => {
     );
     expect(result.updatedScanState.repos.app.recentHashes).toEqual(['n1']);
     expect(result.updatedScanState.repos.app.recentPrHashes).toEqual(['m9']);
+    // Replaced, not accumulated on top of the pre-reset count of 3.
+    expect(result.updatedScanState.repos.app.recordCount).toBe(1);
+  });
+
+  it('does not call onRepoReset when a forced scan finds the repo path missing', async () => {
+    mockAccess.mockRejectedValueOnce(new Error('ENOENT'));
+
+    const reset: string[] = [];
+    const result = await scanAllRepos(makeConfig(), makeScanState(), {
+      forceScan: true,
+      onRepoReset: async (n) => {
+        reset.push(n);
+      },
+    });
+
+    expect(reset).toEqual([]);
+    expect(result.stats.reposMissing).toBe(1);
+    expect(mockScanRepo).not.toHaveBeenCalled();
   });
 
   it('a normal scan keeps since and rotates cursors (regression guard)', async () => {
@@ -254,7 +278,13 @@ describe('scanAllRepos', () => {
         recentPrHashes: ['m1'],
       },
     });
-    mockScanRepo.mockResolvedValueOnce(makeScanResult({ newHashes: ['n1'], commitCount: 1 }));
+    mockScanRepo.mockResolvedValueOnce(
+      makeScanResult({
+        newRecords: [makeRecord('Alice', 'app')],
+        newHashes: ['n1'],
+        commitCount: 1,
+      }),
+    );
     mockRunPrProxy.mockResolvedValueOnce({
       records: [],
       newPrHashes: ['m9'],
@@ -279,6 +309,8 @@ describe('scanAllRepos', () => {
     // Rotated (prepended), not replaced.
     expect(result.updatedScanState.repos.app.recentHashes).toEqual(['n1', 'old1']);
     expect(result.updatedScanState.repos.app.recentPrHashes).toEqual(['m9', 'm1']);
+    // Accumulated on top of the stored count of 3, not replaced.
+    expect(result.updatedScanState.repos.app.recordCount).toBe(4);
   });
 
   it('warns and skips repos with missing paths', async () => {
