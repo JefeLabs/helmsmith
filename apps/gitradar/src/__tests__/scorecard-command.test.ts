@@ -77,4 +77,14 @@ describe('view scorecard', () => {
     await scorecard({ records: [], settings: SETTINGS });
     expect(out.join('\n')).toMatch(/No contributors|Run "gitradar scan"/);
   });
+
+  it('--json emits an empty Scorecard rather than prose on an empty window', async () => {
+    await scorecard({ records: [], settings: SETTINGS, json: true, weeks: 4 });
+    const text = out.join('\n');
+    expect(text).not.toMatch(/No contributors|Run "gitradar scan"/);
+    const parsed = JSON.parse(text);
+    expect(parsed.rows).toEqual([]);
+    expect(parsed.cohortSize).toBe(0);
+    expect(parsed.window).toHaveLength(4);
+  });
 });

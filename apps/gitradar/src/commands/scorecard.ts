@@ -50,12 +50,14 @@ export async function scorecard(options: ScorecardCommandOptions = {}): Promise<
     settings,
   });
 
-  if (sc.rows.length === 0) {
-    printNoData('No contributors in this window. Run "gitradar scan" first.');
-    return;
-  }
+  // --json always emits the Scorecard object (spec §8), empty window included:
+  // a consumer parsing stdout must not get prose back.
   if (options.json) {
     printJson(sc);
+    return;
+  }
+  if (sc.rows.length === 0) {
+    printNoData('No contributors in this window. Run "gitradar scan" first.');
     return;
   }
 
