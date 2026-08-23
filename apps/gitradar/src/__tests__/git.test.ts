@@ -671,6 +671,22 @@ describe('scanRepo', () => {
     });
     expect(result.reworkInputs).toEqual([]);
   });
+
+  it('active-day bit and week bucket agree for a commit near the UTC week boundary', async () => {
+    // Sunday 2026-02-22 23:30 in UTC-8 = Monday 2026-02-23 07:30Z → ISO week 2026-W09, Monday bit
+    spawnQueue.push(
+      'aaa111|alice@acme.com|Alice Johnson|2026-02-22T23:30:00-08:00|feat: x\n1\t0\tsrc/a.ts',
+    );
+    const result = await scanRepo('/repos/frontend', {
+      repoName: 'frontend',
+      group: 'web',
+      authorMap: makeAuthorMap(),
+      recentHashes: new Set(),
+    });
+    const [rec] = result.newRecords;
+    expect(rec.week).toBe('2026-W09');
+    expect(rec.activeDayMask).toBe(0b0000001); // Monday
+  });
 });
 
 // ── generateDateChunks ──────────────────────────────────────────────────────

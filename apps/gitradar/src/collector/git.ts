@@ -743,7 +743,12 @@ function processCommitBatch(
       unassignedAuthor(commit.name, commit.email);
 
     const week = getISOWeek(commit.date);
-    const dateDay = commit.date.slice(0, 10);
+    // dateDay must use the same UTC calendar date as week (from getISOWeek).
+    // If commit.date is in a local offset (e.g. 2026-02-22T23:30:00-08:00), extracting
+    // the date part directly would use the local date, not the UTC date. For week boundaries,
+    // this can misalign a Sunday-evening commit (which is already Monday UTC) with the wrong
+    // active-day bit for the next ISO week. Convert to UTC via toISOString() first.
+    const dateDay = new Date(commit.date).toISOString().slice(0, 10);
     const key = `${author.member}::${week}::${repoName}`;
 
     if (!activeDaysMap.has(key)) {
