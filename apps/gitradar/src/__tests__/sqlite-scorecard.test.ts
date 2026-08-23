@@ -323,12 +323,26 @@ describe('scorecard columns in the SQLite store', () => {
     expect(row.tag).toBe('web');
   });
 
-  it('reattributeRecordsSQL merges counters when a rename collides with an existing (member, week, repo) row', () => {
+  it('reattributeRecordsSQL merges counters and keeps the NEW attribution when a rename collides with an existing (member, week, repo) row', () => {
     store.upsertRecords([
-      makeRecord({ member: 'ecruz', email: 'e@co.com', week: '2026-W10', repo: 'web', commits: 2 }),
+      makeRecord({
+        member: 'ecruz',
+        email: 'e@co.com',
+        org: 'unassigned',
+        orgType: 'core',
+        team: 'unassigned',
+        tag: 'default',
+        week: '2026-W10',
+        repo: 'web',
+        commits: 2,
+      }),
       makeRecord({
         member: 'Edwin Cruz',
         email: 'other@co.com',
+        org: 'OldOrg',
+        orgType: 'core',
+        team: 'OldTeam',
+        tag: 'old',
         week: '2026-W10',
         repo: 'web',
         commits: 3,
@@ -348,6 +362,12 @@ describe('scorecard columns in the SQLite store', () => {
     expect(rows.length).toBe(1);
     expect(rows[0].member).toBe('Edwin Cruz');
     expect(rows[0].commits).toBe(5);
+    // The merged row must carry the NEW attribution, not the pre-existing colliding row's.
+    expect(rows[0].email).toBe('e@co.com');
+    expect(rows[0].org).toBe('Acme');
+    expect(rows[0].orgType).toBe('consultant');
+    expect(rows[0].team).toBe('FE');
+    expect(rows[0].tag).toBe('web');
   });
 });
 

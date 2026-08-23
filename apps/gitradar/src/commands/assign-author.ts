@@ -50,6 +50,41 @@ function resolveMemberName(config: Config, email: string, fallback: string): str
   return fallback;
 }
 
+export type ReattributionPlan =
+  | { ok: true; orgType: 'core' | 'consultant'; tag: string; member: string }
+  | { ok: false; error: string };
+
+/**
+ * Pure decision for how to re-attribute an author's records for an org/team assignment.
+ *
+ * - `config` undefined (the caller passes this when `loadConfig` threw — e.g. config.yml
+ *   is missing) → falls back to orgType `'core'` / tag `'default'` / the given
+ *   `fallbackMemberName`, since there's no config to derive anything from. This is an
+ *   environment gap, not a user mistake, so it degrades gracefully.
+ * - `config` available but the org isn't listed in it → fails (`ok: false`) rather than
+ *   falling back, since that's a distinct, actionable mistake (a typo'd or not-yet-added
+ *   org) that should stop the assignment, not silently persist made-up org metadata.
+ * - `config` available and the org is known → derives orgType/tag via `resolveAssignment`
+ *   and `member` via `resolveMemberName`.
+ */
+export function planReattribution(
+  config: Config | undefined,
+  email: string,
+  fallbackMemberName: string,
+  orgName: string,
+  teamName: string,
+): ReattributionPlan {
+  if (!config) {
+    return { ok: true, orgType: 'core', tag: 'default', member: fallbackMemberName };
+  }
+  try {
+    const { orgType, tag } = resolveAssignment(config, orgName, teamName);
+    return { ok: true, orgType, tag, member: resolveMemberName(config, email, fallbackMemberName) };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 export async function assignAuthorCmd(options: AssignAuthorOptions): Promise<void> {
   const registry = loadAuthorRegistrySQL();
   const key = options.email.toLowerCase();
@@ -62,28 +97,39 @@ export async function assignAuthorCmd(options: AssignAuthorOptions): Promise<voi
     return;
   }
 
+  // orgType/tag/member are derived from config.yml when it's available. A missing
+  // config.yml (loadConfig throws) falls back to orgType 'core' / tag 'default' / the
+  // registry name — an environment gap, not a user mistake. An org that's simply not
+  // listed in an available config is a distinct, actionable mistake: bail out before
+  // touching the registry or records at all, rather than silently persisting a made-up
+  // org. See `planReattribution` for the full decision.
+  let config: Config | undefined;
+  try {
+    config = await loadConfig(options.config);
+  } catch {
+    // config.yml unavailable — planReattribution falls back to core/default below.
+  }
+  const plan = planReattribution(config, key, author.name, options.org, options.team);
+  if (!plan.ok) {
+    console.error(`Error: Unknown org "${options.org}" — add it with "gitradar org add" first`);
+    process.exitCode = 1;
+    return;
+  }
+
   const updated = assignAuthor(registry, options.email, options.org, options.team);
   saveAuthorRegistrySQL(updated);
-
-  // orgType/tag are derived from config.yml when it's available. If config.yml is
-  // missing (loadConfig throws) or the org isn't listed there, fall back to orgType
-  // 'core' / tag 'default' — the record is still re-attributed below, just without
-  // config-derived org metadata.
-  let orgType: 'core' | 'consultant' = 'core';
-  let tag = 'default';
-  let member = author.name;
-  try {
-    const config = await loadConfig(options.config);
-    ({ orgType, tag } = resolveAssignment(config, options.org, options.team));
-    member = resolveMemberName(config, key, author.name);
-  } catch {
-    // fall back to the defaults set above
-  }
 
   // Re-attribute existing records via SQL UPDATE
   try {
     reattributeRecordsSQL([
-      { email: key, member, org: options.org, orgType, team: options.team, tag },
+      {
+        email: key,
+        member: plan.member,
+        org: options.org,
+        orgType: plan.orgType,
+        team: options.team,
+        tag: plan.tag,
+      },
     ]);
     const recordCount = queryRecords({}).length;
     console.log(`Assigned ${author.name} <${author.email}> → ${options.org} / ${options.team}`);
@@ -101,6 +147,29 @@ export interface BulkAssignOptions {
 }
 
 export async function bulkAssignCmd(options: BulkAssignOptions): Promise<void> {
+  // orgType/tag are derived from config.yml when it's available — same fallback and
+  // unknown-org handling as assignAuthorCmd (see `planReattribution`): a missing
+  // config.yml falls back to orgType 'core' / tag 'default', but an org that's simply
+  // not listed in an available config is an actionable mistake — bail out before
+  // touching the registry or records at all.
+  let orgType: 'core' | 'consultant' = 'core';
+  let tag = 'default';
+  let config: Config | undefined;
+  try {
+    config = await loadConfig(options.config);
+  } catch {
+    // config.yml unavailable — fall back to the defaults set above.
+  }
+  if (config) {
+    try {
+      ({ orgType, tag } = resolveAssignment(config, options.org, options.team));
+    } catch {
+      console.error(`Error: Unknown org "${options.org}" — add it with "gitradar org add" first`);
+      process.exitCode = 1;
+      return;
+    }
+  }
+
   const registry = loadAuthorRegistrySQL();
   const result = assignByIdentifierPrefix(registry, options.prefix, options.org, options.team);
   saveAuthorRegistrySQL(result.registry);
@@ -108,18 +177,6 @@ export async function bulkAssignCmd(options: BulkAssignOptions): Promise<void> {
   if (result.assignedCount === 0) {
     console.log(`No unassigned authors found with prefix "${options.prefix}".`);
     return;
-  }
-
-  // orgType/tag are derived from config.yml when it's available; same fallback as
-  // assignAuthorCmd applies when config.yml is missing or the org isn't listed there.
-  let orgType: 'core' | 'consultant' = 'core';
-  let tag = 'default';
-  let config: Config | undefined;
-  try {
-    config = await loadConfig(options.config);
-    ({ orgType, tag } = resolveAssignment(config, options.org, options.team));
-  } catch {
-    // fall back to the defaults set above
   }
 
   // Re-attribute existing records via SQL UPDATE for all newly assigned authors

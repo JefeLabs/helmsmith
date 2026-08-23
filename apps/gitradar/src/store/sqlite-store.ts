@@ -1265,10 +1265,13 @@ export function deleteRecordsForRepo(repoName: string): void {
  * Bulk update org/team/tag/member on all records matching email, re-attributing them.
  *
  * `member` is part of the `records` primary key `(member, week, repo)`, so renaming it
- * can collide with an existing row for the same week/repo. To handle that safely, each
- * update's matching rows are deleted and rewritten through the same additive upsert used
- * elsewhere (`upsertRecords`), so a colliding row merges counters instead of one row
- * silently overwriting the other.
+ * can collide with an existing row for the same week/repo. This uses a dedicated upsert
+ * statement — not the shared `upsertRecords` — because on conflict it must additionally
+ * overwrite `email`/`org`/`org_type`/`team`/`tag` from the incoming (new) attribution.
+ * `upsertRecords`'s `ON CONFLICT` (via `RECORD_MERGE_TAIL_SQL`) deliberately leaves those
+ * identity columns alone — a normal scan upsert must never let a later batch silently
+ * reassign an existing row's org — which would let a colliding row here keep the OLD
+ * attribution and only merge counters, dropping the reattribution entirely.
  */
 export function reattributeRecordsSQL(
   updates: Array<{
@@ -1283,6 +1286,36 @@ export function reattributeRecordsSQL(
   const db = getDB();
   const selectByEmail = db.prepare('SELECT * FROM records WHERE email = @email');
   const deleteByEmail = db.prepare('DELETE FROM records WHERE email = @email');
+  const reattributeUpsert = db.prepare(`
+    INSERT INTO records (
+      member, email, org, org_type, team, tag, week, repo, grp,
+      commits, active_days, active_day_mask,
+      intent_feat, intent_fix, intent_refactor, intent_docs, intent_test, intent_chore, intent_other,
+      app_files, app_files_added, app_files_deleted, app_ins, app_del,
+      test_files, test_files_added, test_files_deleted, test_ins, test_del,
+      config_files, config_files_added, config_files_deleted, config_ins, config_del,
+      storybook_files, storybook_files_added, storybook_files_deleted, storybook_ins, storybook_del,
+      doc_files, doc_files_added, doc_files_deleted, doc_ins, doc_del,
+      breaking_changes, scopes, prs_merged_git, pr_sizes, rework_lines, rework_self_lines
+    ) VALUES (
+      @member, @email, @org, @org_type, @team, @tag, @week, @repo, @grp,
+      @commits, @active_days, @active_day_mask,
+      @intent_feat, @intent_fix, @intent_refactor, @intent_docs, @intent_test, @intent_chore, @intent_other,
+      @app_files, @app_files_added, @app_files_deleted, @app_ins, @app_del,
+      @test_files, @test_files_added, @test_files_deleted, @test_ins, @test_del,
+      @config_files, @config_files_added, @config_files_deleted, @config_ins, @config_del,
+      @storybook_files, @storybook_files_added, @storybook_files_deleted, @storybook_ins, @storybook_del,
+      @doc_files, @doc_files_added, @doc_files_deleted, @doc_ins, @doc_del,
+      @breaking_changes, @scopes, @prs_merged_git, @pr_sizes, @rework_lines, @rework_self_lines
+    )
+    ON CONFLICT (member, week, repo) DO UPDATE SET
+      email = excluded.email,
+      org = excluded.org,
+      org_type = excluded.org_type,
+      team = excluded.team,
+      tag = excluded.tag,
+${RECORD_MERGE_TAIL_SQL}
+  `);
 
   const updateAll = db.transaction((items: typeof updates) => {
     for (const u of items) {
@@ -1292,6 +1325,7 @@ export function reattributeRecordsSQL(
       const renamed = rows.map(rowToRecord).map((r) => ({
         ...r,
         member: u.member,
+        email: u.email,
         org: u.org,
         orgType: u.orgType as UserWeekRepoRecord['orgType'],
         team: u.team,
@@ -1299,7 +1333,9 @@ export function reattributeRecordsSQL(
       }));
 
       deleteByEmail.run({ email: u.email });
-      upsertRecords(renamed);
+      for (const r of renamed) {
+        reattributeUpsert.run(recordToRow(r));
+      }
     }
   });
 
