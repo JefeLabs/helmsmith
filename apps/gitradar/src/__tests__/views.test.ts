@@ -970,9 +970,19 @@ describe('mapKey — tab hotkeys switch tabs from any tab', () => {
     expect(mapKey('c', 'repo_activity', 8, 8, [])).toBe('tab:contributions');
   });
 
-  it('lets an in-tab key win over the global tab-letter fallback', () => {
-    // 's' is Contributions' own segment-menu hotkey, not a tab letter — this just
-    // confirms in-tab handling still takes priority over the global fallback.
-    expect(mapKey('s', 'contributions', 8, 8, [])).toBe('contrib_segment_menu');
+  it('lets an in-tab key shadow the tab letter it collides with', () => {
+    // These three are real collisions: 'r' is the Repo Activity tab letter and
+    // 'p' is Top Performers', but the active tab claims both first. This is the
+    // behaviour the Task 8 ruling deliberately accepted — the tab is reachable
+    // by Tab-cycling, and the in-tab action is the more frequent one.
+    expect(mapKey('r', 'manage', 8, 8, [])).toBe('manage_repos');
+    expect(mapKey('p', 'manage', 8, 8, [])).toBe('manage_bulk_assign');
+    expect(mapKey('r', 'scorecard', 8, 8, [])).toBe('sc_reverse');
+  });
+
+  it('falls back to the tab letter when the active tab does not claim it', () => {
+    // Manage claims neither 'c' nor 'k', so both reach the global fallback.
+    expect(mapKey('c', 'manage', 8, 8, [])).toBe('tab:contributions');
+    expect(mapKey('k', 'manage', 8, 8, [])).toBe('tab:scorecard');
   });
 });
