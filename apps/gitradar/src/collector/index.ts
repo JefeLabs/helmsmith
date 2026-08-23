@@ -146,7 +146,12 @@ export async function scanAllRepos(
     // `git blame` per file, which on a large monorepo runs for tens of minutes.
     // Nothing reads rework outside window ∪ baseline (weeks_back × 2), so
     // blaming anything older buys a number no view can display.
-    const analysableWeeks = new Set(getLastNWeeks(config.settings.weeks_back * 2));
+    // The Scorecard can always reach a 12-week window + 12-week baseline
+    // regardless of weeks_back, so never blame less than 24 weeks of history.
+    const REWORK_MIN_WEEKS = 12;
+    const analysableWeeks = new Set(
+      getLastNWeeks(Math.max(config.settings.weeks_back, REWORK_MIN_WEEKS) * 2),
+    );
     const reworkInputs = reworkEnabled
       ? result.reworkInputs.filter((i) => analysableWeeks.has(i.week))
       : [];

@@ -490,11 +490,11 @@ describe('scanAllRepos', () => {
     expect(result.stats.totalReworkCommits).toBe(1);
   });
 
-  it('bounds the rework inputs to the analysable window (weeks_back x 2)', async () => {
+  it('bounds the rework inputs to the analysable window (weeks_back x 2, when weeks_back exceeds the 24-week floor)', async () => {
     const { getLastNWeeks, getCurrentWeek } = await import('../aggregator/filters.js');
-    // weeks_back: 4 → the scorecard only ever reads window ∪ baseline = 8 weeks.
-    const inWindow = getLastNWeeks(8, getCurrentWeek());
-    const tooOld = getLastNWeeks(20, getCurrentWeek())[0]; // 20 weeks back
+    // weeks_back: 20 (> the 12-week floor) → window ∪ baseline = 40 weeks.
+    const inWindow = getLastNWeeks(40, getCurrentWeek());
+    const tooOld = getLastNWeeks(50, getCurrentWeek())[0]; // 49 weeks back
 
     const reworkInput = (hash: string, week: string) => ({
       hash,
@@ -520,12 +520,56 @@ describe('scanAllRepos', () => {
     mockRunRework.mockResolvedValueOnce({ records: [], commitsProcessed: 2, blames: 2 });
 
     await scanAllRepos(
-      makeConfig({ settings: { ...DEFAULT_SETTINGS, weeks_back: 4 } }),
+      makeConfig({ settings: { ...DEFAULT_SETTINGS, weeks_back: 20 } }),
       makeScanState(),
     );
 
     const passed = mockRunRework.mock.calls[0][0] as Array<{ hash: string }>;
     expect(passed.map((i) => i.hash).sort()).toEqual(['edge', 'recent']);
+  });
+
+  it('bounds rework inputs to at least 24 weeks even when weeks_back is small', async () => {
+    const { getLastNWeeks, getCurrentWeek } = await import('../aggregator/filters.js');
+    // weeks_back: 4 → the Scorecard always reaches a 12-week window + 12-week
+    // baseline regardless of weeks_back, so the bound must floor to 24 weeks.
+    const recent = getLastNWeeks(24, getCurrentWeek());
+    const inWindow = recent[0]; // oldest week inside the 24-week floor — must still be blamed
+    const tooOld = getLastNWeeks(30, getCurrentWeek())[0]; // 29 weeks back — dropped
+
+    mockScanRepo.mockResolvedValueOnce(
+      makeScanResult({
+        newRecords: [makeRecord('Alice', 'app')],
+        newHashes: ['h1'],
+        commitCount: 2,
+        reworkInputs: [
+          {
+            hash: 'h1',
+            authorEmail: 'a',
+            authorName: 'A',
+            authorDate: '2026-01-01T00:00:00Z',
+            week: inWindow,
+            files: [{ path: 'x', deletions: 1 }],
+          },
+          {
+            hash: 'h2',
+            authorEmail: 'a',
+            authorName: 'A',
+            authorDate: '2026-01-01T00:00:00Z',
+            week: tooOld,
+            files: [{ path: 'y', deletions: 1 }],
+          },
+        ],
+      }),
+    );
+    mockRunRework.mockResolvedValueOnce({ records: [], commitsProcessed: 1, blames: 1 });
+
+    await scanAllRepos(
+      makeConfig({ settings: { ...DEFAULT_SETTINGS, weeks_back: 4 } }),
+      makeScanState(),
+    );
+
+    const passed = mockRunRework.mock.calls[0][0] as Array<{ hash: string }>;
+    expect(passed.map((i) => i.hash)).toEqual(['h1']);
   });
 
   it('skips the rework pass entirely when every input falls outside the window', async () => {

@@ -168,4 +168,23 @@ describe('TUI Manage → Export → Data (CSV)', () => {
       .map((line) => line.split(',').pop());
     expect(new Set(segments)).toEqual(new Set(['high', 'middle', 'low']));
   });
+
+  it('reports the number of rows actually written (bots excluded)', async () => {
+    const logged: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => {
+      logged.push(a.map(String).join(' '));
+    });
+
+    const records = [
+      ...cohort().slice(0, 2), // 2 humans
+      makeRecord({ member: 'dependabot[bot]', email: 'noreply@github.com' }), // 1 bot
+    ];
+    await runCsvExport({
+      config: makeConfig({ bot_patterns: ['dependabot'] }),
+      records,
+      currentWeek: '2026-W10',
+    });
+
+    expect(logged.join('\n')).toMatch(/Exported 2 records to/);
+  });
 });

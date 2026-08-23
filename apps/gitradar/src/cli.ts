@@ -499,11 +499,13 @@ view
   .option('-w, --weeks <n>', 'Weeks of history', parseInt)
   .action(async (cmdOpts: { weeks?: number }) => {
     const g = globals();
+    const settings = await loadSettings(g.config);
     const { repoActivity } = await import('./commands/repo-activity.js');
     await repoActivity({
       weeks: cmdOpts.weeks ?? g.weeks ?? 8,
       json: g.json,
       filters: globalFilters(),
+      botPatterns: settings.bot_patterns,
     });
   });
 

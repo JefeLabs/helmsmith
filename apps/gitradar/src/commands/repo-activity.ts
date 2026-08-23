@@ -1,3 +1,4 @@
+import { excludeBots } from '../aggregator/bots.js';
 import { rollup } from '../aggregator/engine.js';
 import {
   type Filters,
@@ -15,6 +16,8 @@ export interface RepoActivityOptions {
   json?: boolean;
   /** Pre-loaded records (skips disk read when provided — useful for testing). */
   records?: import('../types/schema.js').UserWeekRepoRecord[];
+  /** Case-insensitive substrings identifying bot authors, excluded from repo totals. */
+  botPatterns?: string[];
 }
 
 interface RepoRow {
@@ -69,7 +72,7 @@ export async function repoActivity(options: RepoActivityOptions = {}): Promise<v
   let rows: RepoRow[];
 
   if (useSQLPath) {
-    const sqlFilters = { weeks, ...options.filters };
+    const sqlFilters = { weeks, ...options.filters, botPatterns: options.botPatterns };
     const rolled = queryRollup(sqlFilters, 'repo');
 
     if (rolled.size === 0) {
@@ -122,6 +125,10 @@ export async function repoActivity(options: RepoActivityOptions = {}): Promise<v
   } else {
     // Fallback: pre-loaded records
     let records = options.records!;
+
+    if (options.botPatterns && options.botPatterns.length > 0) {
+      records = excludeBots(records, options.botPatterns);
+    }
 
     if (options.filters) {
       records = filterRecords(records, options.filters);

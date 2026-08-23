@@ -1,10 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type { Segment } from '../aggregator/segments.js';
 import type { Config, UserWeekRepoRecord } from '../types/schema.js';
 import { DEFAULT_SETTINGS } from '../types/schema.js';
+import { stripAnsi } from '../ui/format.js';
 import {
   buildContributionGroups,
+  renderContributionsTab,
   type TimeBucket,
 } from '../views/components/contribution-section.js';
+import type { ViewContext } from '../views/types.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -118,5 +122,89 @@ describe('buildContributionGroups — user level', () => {
 
     expect(groups[0].bars.map((b) => b.label)).toEqual(['bob']);
     expect(groups[0].bars[0].commits).toBe(3);
+  });
+});
+
+describe('renderContributionsTab — by-entity pivot segmentation', () => {
+  /** Render into a captured, ANSI-stripped line array. */
+  function renderLines(records: UserWeekRepoRecord[]): string[] {
+    const logged: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
+      logged.push(args.map(String).join(' '));
+    });
+    try {
+      const ctx: ViewContext = { config: makeConfig(), records, currentWeek: '2026-W10' };
+      renderContributionsTab(
+        ctx,
+        'user',
+        false,
+        true, // pivotEntity
+        BUCKETS,
+        'week',
+        'range',
+        120,
+        '',
+        () => 'steady',
+        undefined,
+        records,
+        new Set<Segment>(['low']),
+      );
+    } finally {
+      spy.mockRestore();
+    }
+    return stripAnsi(logged.join('\n')).split('\n');
+  }
+
+  /** The group-label prefix (segment glyph, if any) before the `┤` axis char, per entity. */
+  function visibleEntities(lines: string[]): Map<string, string> {
+    const result = new Map<string, string>();
+    for (const line of lines) {
+      const idx = line.indexOf('┤');
+      if (idx === -1) continue;
+      const label = line.slice(0, idx).trim();
+      const match = /^(?:([▲●▼])\s+)?(m\d)$/.exec(label);
+      if (match) result.set(match[2], match[1] ?? '');
+    }
+    return result;
+  }
+
+  it('by-entity pivot segmentation ignores holder-only entities', () => {
+    // 8 real members (commits > 0) with distinct totals, spread across
+    // high/middle/low once segmented (min-N of 8 is exactly cleared).
+    const totals = [800, 700, 600, 500, 400, 300, 200, 100];
+    const realMembers = totals.map((total, i) =>
+      makeRecord({
+        member: `m${i}`,
+        email: `m${i}@example.com`,
+        commits: 3,
+        filetype: {
+          ...zeroFiletype(),
+          app: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: total, deletions: 0 },
+        },
+      }),
+    );
+    // A holder-only member: commits === 0, present only via a PR-proxy/rework
+    // record. Must not enter the entity segment cohort at all.
+    const holder = makeRecord({
+      member: 'holder0',
+      email: 'holder0@example.com',
+      commits: 0,
+      activeDays: 0,
+      prsMergedGit: 1,
+      filetype: zeroFiletype(),
+    });
+
+    const withoutHolder = visibleEntities(renderLines(realMembers));
+    const withHolder = visibleEntities(renderLines([...realMembers, holder]));
+
+    // n stays 8: the same real members are visible, with the same segment glyphs.
+    expect([...withHolder.keys()].sort()).toEqual([...withoutHolder.keys()].sort());
+    for (const [member, glyph] of withoutHolder) {
+      expect(withHolder.get(member)).toBe(glyph);
+    }
+
+    // The holder itself still renders (not hidden by the 'low' exclusion).
+    const holderLines = renderLines([...realMembers, holder]);
+    expect(holderLines.some((l) => l.includes('holder0'))).toBe(true);
   });
 });

@@ -1180,6 +1180,11 @@ export function renderContributionsTab(
       const entityTotals = new Map<string, number>();
       for (const g of groups) {
         if (isBotAuthor(g.groupLabel, '', botPatterns)) continue;
+        // Holder-only entities (every bar has commits === 0) are attributable
+        // to the window but were not active in it — keep them out of the
+        // entity segment cohort, matching the by-time bot/holder gate above.
+        const active = g.bars.some((b) => (b.commits ?? 0) > 0);
+        if (!active) continue;
         const total = g.bars.reduce((s, b) => s + b.total, 0);
         entityTotals.set(g.groupLabel, total);
       }

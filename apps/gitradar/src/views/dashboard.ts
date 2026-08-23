@@ -1623,14 +1623,20 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
             try {
               // Same treatment as `gitradar data export-csv` (export-data.ts):
               // bots out, and segments computed with the configured min-N.
+              const exportRecords = excludeBots(
+                ctx.records,
+                ctx.config.settings.bot_patterns ?? [],
+              );
               const csv = recordsToCsv(
-                excludeBots(ctx.records, ctx.config.settings.bot_patterns ?? []),
+                exportRecords,
                 undefined,
                 undefined,
                 ctx.config.settings.segment_min_n,
               );
               await writeFile(outPath, csv, 'utf-8');
-              console.log(chalk.green(`\n  Exported ${ctx.records.length} records to ${outPath}`));
+              console.log(
+                chalk.green(`\n  Exported ${exportRecords.length} records to ${outPath}`),
+              );
             } catch (err) {
               console.log(chalk.red(`\n  Error: ${err instanceof Error ? err.message : err}`));
             }
