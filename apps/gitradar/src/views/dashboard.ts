@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import chalk from 'chalk';
 import yaml from 'js-yaml';
+import { excludeBots } from '../aggregator/bots.js';
 import {
   getLastNMonths,
   getLastNQuarters,
@@ -1614,7 +1615,14 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
             console.log(chalk.yellow('\n  No records to export. Collect data first.'));
           } else {
             try {
-              const csv = recordsToCsv(ctx.records);
+              // Same treatment as `gitradar data export-csv` (export-data.ts):
+              // bots out, and segments computed with the configured min-N.
+              const csv = recordsToCsv(
+                excludeBots(ctx.records, ctx.config.settings.bot_patterns ?? []),
+                undefined,
+                undefined,
+                ctx.config.settings.segment_min_n,
+              );
               await writeFile(outPath, csv, 'utf-8');
               console.log(chalk.green(`\n  Exported ${ctx.records.length} records to ${outPath}`));
             } catch (err) {
