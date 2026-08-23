@@ -166,8 +166,7 @@ The full keyboard reference is in
 
 ### Step 6 — (Optional) Enrich with GitHub data
 
-PR cycle time, review counts, and churn analysis require GitHub API
-access:
+PR cycle time and review counts require GitHub API access:
 
 ```bash
 export GITHUB_TOKEN="ghp_..."

@@ -131,8 +131,8 @@ describe('computeScorecard — metric definitions', () => {
         'Alice::2026-W12::web': {
           prs_opened: 2,
           prs_merged: 2,
-          avg_cycle_hrs: 10,
-          reviews_given: 4,
+          median_cycle_hrs: 10,
+          prs_reviewed_touched: 4,
           churn_rate_pct: 0,
           pr_feature: 0,
           pr_fix: 0,
@@ -146,8 +146,8 @@ describe('computeScorecard — metric definitions', () => {
         'Alice::2026-W11::api': {
           prs_opened: 1,
           prs_merged: 1,
-          avg_cycle_hrs: 40,
-          reviews_given: 2,
+          median_cycle_hrs: 40,
+          prs_reviewed_touched: 2,
           churn_rate_pct: 0,
           pr_feature: 0,
           pr_fix: 0,
@@ -216,6 +216,11 @@ describe('computeScorecard — metric definitions', () => {
     expect(c.reworkPct.value).toBeNull();
     expect(c.fixToFeat.value).toBe(0.5);
     expect(sc.sources).toEqual({ enrichment: false, prProxy: false, rework: false });
+  });
+
+  it('labels the reviews metric "PRs rev\'d" — it counts PRs touched, not reviews submitted', () => {
+    const reviews = METRICS.find((m) => m.key === 'reviews');
+    expect(reviews?.label).toBe("PRs rev'd");
   });
 
   it('METRICS lists 14 metrics, 10 of them core, in family order', () => {

@@ -561,12 +561,10 @@ data
 
 program
   .command('enrich')
-  .description('Enrich data with GitHub PR metrics and churn analysis')
+  .description('Enrich data with GitHub PR metrics')
   .option('-w, --weeks <n>', 'Weeks to enrich (default: 4)', parseInt)
   .option('--repo <name>', 'Enrich only this repo')
   .option('--force', 'Re-enrich even if data exists')
-  .option('--skip-churn', 'Skip churn rate calculation')
-  .option('--deep-churn', 'Use full per-file churn analysis (slower, more precise)')
   .option('--concurrency <n>', 'Max concurrent GitHub API requests (default: 5)', parseInt)
   .option('--skip-cache', 'Bypass local GitHub API response cache (force fresh fetch)')
   .option('--workspace <name>', 'Workspace to use for repo paths')
@@ -575,8 +573,6 @@ program
       weeks?: number;
       repo?: string;
       force?: boolean;
-      skipChurn?: boolean;
-      deepChurn?: boolean;
       concurrency?: number;
       skipCache?: boolean;
       workspace?: string;
@@ -586,8 +582,6 @@ program
         weeks: cmdOpts.weeks,
         repo: cmdOpts.repo,
         force: cmdOpts.force,
-        skipChurn: cmdOpts.skipChurn,
-        deepChurn: cmdOpts.deepChurn,
         concurrency: cmdOpts.concurrency,
         skipCache: cmdOpts.skipCache,
         config: globals().config,

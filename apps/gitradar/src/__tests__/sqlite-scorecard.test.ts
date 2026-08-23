@@ -220,6 +220,80 @@ describe('scorecard columns in the SQLite store', () => {
     expect(store.queryRecords({ repo: 'api' })[0].prSizes).toEqual([5]);
   });
 
+  it('renames legacy enrichment columns to median_cycle_hrs / prs_reviewed_touched', () => {
+    const legacy = new Database(join(dataDir, 'gitradar.db'), { create: true, strict: true });
+    legacy.exec(`
+      CREATE TABLE enrichments (
+        key TEXT PRIMARY KEY,
+        prs_opened INTEGER NOT NULL DEFAULT 0,
+        prs_merged INTEGER NOT NULL DEFAULT 0,
+        avg_cycle_hrs REAL NOT NULL DEFAULT 0,
+        reviews_given INTEGER NOT NULL DEFAULT 0,
+        churn_rate_pct REAL NOT NULL DEFAULT 0,
+        pr_feature INTEGER NOT NULL DEFAULT 0,
+        pr_fix INTEGER NOT NULL DEFAULT 0,
+        pr_bugfix INTEGER NOT NULL DEFAULT 0,
+        pr_chore INTEGER NOT NULL DEFAULT 0,
+        pr_hotfix INTEGER NOT NULL DEFAULT 0,
+        pr_other INTEGER NOT NULL DEFAULT 0
+      );
+      INSERT INTO enrichments (key, prs_opened, prs_merged, avg_cycle_hrs, reviews_given, churn_rate_pct)
+      VALUES ('Alice::2026-W10::web', 5, 3, 14.5, 7, 8.2);
+    `);
+    legacy.close();
+
+    const loaded = store.loadEnrichmentsSQL();
+    const row = loaded.enrichments['Alice::2026-W10::web'];
+    expect(row.prs_opened).toBe(5);
+    expect(row.prs_merged).toBe(3);
+    expect(row.median_cycle_hrs).toBe(14.5);
+    expect(row.prs_reviewed_touched).toBe(7);
+    expect((row as unknown as Record<string, unknown>).avg_cycle_hrs).toBeUndefined();
+    expect((row as unknown as Record<string, unknown>).reviews_given).toBeUndefined();
+
+    // The retired churn column survives in the DB but is no longer written.
+    expect(row.churn_rate_pct).toBe(8.2);
+
+    // And a fresh write round-trips under the new names.
+    store.saveEnrichmentSQL('Bob::2026-W10::web', {
+      prs_opened: 1,
+      prs_merged: 1,
+      median_cycle_hrs: 2.5,
+      prs_reviewed_touched: 4,
+      churn_rate_pct: 0,
+      pr_feature: 0,
+      pr_fix: 0,
+      pr_bugfix: 0,
+      pr_chore: 0,
+      pr_hotfix: 0,
+      pr_other: 0,
+    });
+    const bob = store.getEnrichmentSQL('Bob::2026-W10::web');
+    expect(bob.median_cycle_hrs).toBe(2.5);
+    expect(bob.prs_reviewed_touched).toBe(4);
+  });
+
+  it('is a no-op on a database already carrying the new enrichment names', () => {
+    store.saveEnrichmentSQL('Alice::2026-W11::web', {
+      prs_opened: 2,
+      prs_merged: 2,
+      median_cycle_hrs: 9,
+      prs_reviewed_touched: 3,
+      churn_rate_pct: 0,
+      pr_feature: 0,
+      pr_fix: 0,
+      pr_bugfix: 0,
+      pr_chore: 0,
+      pr_hotfix: 0,
+      pr_other: 0,
+    });
+    store.closeDB();
+
+    const reopened = store.getEnrichmentSQL('Alice::2026-W11::web');
+    expect(reopened.median_cycle_hrs).toBe(9);
+    expect(reopened.prs_reviewed_touched).toBe(3);
+  });
+
   // ── I1: holder records (commits === 0) are not "active" ────────────────────
 
   it('queryRollup does not count a holder-only member (commits === 0) as active', () => {

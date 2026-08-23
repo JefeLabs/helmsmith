@@ -1,7 +1,6 @@
 import { homedir } from 'node:os';
 import path from 'node:path';
 import ora from 'ora';
-import pLimit from 'p-limit';
 import { getCurrentWeek, getLastNWeeks, isoWeekToDateRange } from '../aggregator/filters.js';
 import {
   buildAuthorMap,
@@ -10,7 +9,6 @@ import {
   resolveAuthor,
 } from '../collector/author-map.js';
 import { scanDirectory } from '../collector/dir-scanner.js';
-import { calculateChurnRate, calculateFastChurnRate } from '../collector/git.js';
 import {
   createCacheStats,
   createOctokit,
@@ -90,8 +88,6 @@ export interface EnrichOptions {
   weeks?: number;
   repo?: string;
   force?: boolean;
-  skipChurn?: boolean;
-  deepChurn?: boolean;
   concurrency?: number;
   skipCache?: boolean;
 }
@@ -398,9 +394,9 @@ export class GitRadarEngine {
   // ── Enrichment ──────────────────────────────────────────────────────────
 
   /**
-   * Enrich scanned records with GitHub metrics (PRs, reviews, cycle time) and
-   * churn analysis. Uses engine state (config, records, authorRegistry) so
-   * callers don't need to reload data.
+   * Enrich scanned records with GitHub PR metrics (PRs opened/merged, median
+   * cycle time, PRs reviewed). Uses engine state (config, records,
+   * authorRegistry) so callers don't need to reload data.
    *
    * Can be called standalone (via the `enrich` CLI command) or automatically
    * after scanning. Skips already-enriched entries unless `force` is set.
@@ -447,17 +443,11 @@ export class GitRadarEngine {
 
     if (!octokit) {
       console.log("No GitHub token found. Set GITHUB_TOKEN or run 'gh auth login'.");
-      console.log('Skipping GitHub metrics. Only churn analysis will be performed.');
+      console.log('Skipping enrichment: GitHub PR metrics are its only source.');
     }
-
-    const churnConcurrency = this.config.settings.churn_concurrency ?? 3;
-    const churnWindowDays = this.config.settings.churn_window_days ?? 21;
-    const churnMaxCommits = this.config.settings.churn_max_commits ?? 50;
-    const churnLimit = pLimit(churnConcurrency);
 
     let enrichedCount = 0;
     let skippedCount = 0;
-    let errorCount = 0;
     const cacheStats = createCacheStats();
 
     const repoTotal = repoNames.length;
@@ -467,9 +457,6 @@ export class GitRadarEngine {
       rateLimiter,
       authorMap,
       identifierRules,
-      churnWindowDays,
-      churnMaxCommits,
-      churnLimit,
       cacheStats,
     };
 
@@ -480,18 +467,16 @@ export class GitRadarEngine {
       const result = await this.enrichRepo(repoName, repoLabel, repoRecords, enrichCtx);
       enrichedCount += result.enriched;
       skippedCount += result.skipped;
-      errorCount += result.errors;
     }
 
     const parts = [`${enrichedCount} enriched`, `${skippedCount} skipped`];
-    if (errorCount > 0) parts.push(`${errorCount} errors`);
     if (cacheStats.hits > 0 || cacheStats.misses > 0) {
       parts.push(`${cacheStats.hits} cached / ${cacheStats.misses} fetched`);
     }
     console.log(`\nEnrichment complete: ${parts.join(', ')}`);
   }
 
-  /** Enrich a single repo: fetch GitHub metrics + churn, persist results. */
+  /** Enrich a single repo: fetch GitHub metrics and persist results. */
   private async enrichRepo(
     repoName: string,
     repoLabel: string,
@@ -502,26 +487,12 @@ export class GitRadarEngine {
       rateLimiter: GitHubRateLimiter;
       authorMap: ReturnType<typeof buildAuthorMap>;
       identifierRules: ReturnType<typeof buildIdentifierRules>;
-      churnWindowDays: number;
-      churnMaxCommits: number;
-      churnLimit: ReturnType<typeof pLimit>;
       cacheStats: ReturnType<typeof createCacheStats>;
     },
-  ): Promise<{ enriched: number; skipped: number; errors: number }> {
-    const {
-      options,
-      octokit,
-      rateLimiter,
-      authorMap,
-      identifierRules,
-      churnWindowDays,
-      churnMaxCommits,
-      churnLimit,
-      cacheStats,
-    } = ctx;
+  ): Promise<{ enriched: number; skipped: number }> {
+    const { options, octokit, rateLimiter, authorMap, identifierRules, cacheStats } = ctx;
     let enriched = 0;
     let skipped = 0;
-    let errors = 0;
 
     const spinner = ora({ text: `${repoLabel}: preparing`, indent: 2 }).start();
 
@@ -530,7 +501,7 @@ export class GitRadarEngine {
     );
     if (!repoConfig) {
       spinner.warn(`${repoLabel}: skipped (no config)`);
-      return { enriched, skipped: skipped + 1, errors };
+      return { enriched, skipped: skipped + 1 };
     }
 
     let githubRemote: { owner: string; repo: string } | null = null;
@@ -560,7 +531,7 @@ export class GitRadarEngine {
       spinner.succeed(
         `${repoLabel}: all ${memberWeekEntries.length} member-weeks already enriched`,
       );
-      return { enriched, skipped, errors };
+      return { enriched, skipped };
     }
 
     // Fetch GitHub metrics batched by week
@@ -577,24 +548,12 @@ export class GitRadarEngine {
       spinner,
     );
 
-    // Merge GitHub results + churn into final metrics and persist
-    const mergeResult = await this.mergeAndPersistEnrichments(
-      repoLabel,
-      repoConfig.path,
-      toEnrich,
-      ghResultMap,
-      options,
-      churnLimit,
-      churnWindowDays,
-      churnMaxCommits,
-      spinner,
-    );
-    enriched += mergeResult.enriched;
-    errors += mergeResult.errors;
+    // Merge GitHub results into final metrics and persist
+    enriched += this.mergeAndPersistEnrichments(repoLabel, toEnrich, ghResultMap, spinner);
 
     const ghLabel = githubRemote ? ` (GitHub: ${githubRemote.owner}/${githubRemote.repo})` : '';
     spinner.succeed(`${repoLabel}: ${toEnrich.length} member-weeks enriched${ghLabel}`);
-    return { enriched, skipped, errors };
+    return { enriched, skipped };
   }
 
   /** Fetch GitHub PR metrics for all entries in a repo, batched by week. */
@@ -698,100 +657,57 @@ export class GitRadarEngine {
     return ghResultMap;
   }
 
-  /** Merge GitHub results with churn analysis and persist in batches. */
-  private async mergeAndPersistEnrichments(
+  /**
+   * Merge GitHub results into enrichment records and persist in batches.
+   * Returns the number of member-weeks written.
+   */
+  private mergeAndPersistEnrichments(
     repoLabel: string,
-    repoPath: string,
     toEnrich: Array<{ key: string; member: string; email: string; week: string }>,
     ghResultMap: Map<string, GitHubMetrics>,
-    options: EnrichOptions,
-    churnLimit: ReturnType<typeof pLimit>,
-    churnWindowDays: number,
-    churnMaxCommits: number,
     spinner: ReturnType<typeof ora>,
-  ): Promise<{ enriched: number; errors: number }> {
+  ): number {
     let enriched = 0;
-    let errors = 0;
     const SAVE_BATCH_SIZE = 20;
     const totalBatches = Math.ceil(toEnrich.length / SAVE_BATCH_SIZE);
     let batchIdx = 0;
 
     for (let batchStart = 0; batchStart < toEnrich.length; batchStart += SAVE_BATCH_SIZE) {
       batchIdx++;
-      const phase = options.skipChurn ? 'saving' : 'churn analysis';
       spinner.text =
         totalBatches > 1
-          ? `${repoLabel}: ${phase} (batch ${batchIdx}/${totalBatches})`
-          : `${repoLabel}: ${phase}`;
+          ? `${repoLabel}: saving (batch ${batchIdx}/${totalBatches})`
+          : `${repoLabel}: saving`;
 
       const batch = toEnrich.slice(batchStart, batchStart + SAVE_BATCH_SIZE);
 
-      const settled = await Promise.allSettled(
-        batch.map((entry) => {
-          const { key, email, week } = entry;
-          const dateRange = isoWeekToDateRange(week);
+      const fulfilled = batch.map(({ key }) => {
+        const ghMetrics = ghResultMap.get(key);
+        const metrics: ProductivityExtensions = {
+          prs_opened: ghMetrics?.prs_opened ?? 0,
+          prs_merged: ghMetrics?.prs_merged ?? 0,
+          median_cycle_hrs: ghMetrics?.median_cycle_hrs ?? 0,
+          prs_reviewed_touched: ghMetrics?.prs_reviewed_touched ?? 0,
+          // Retired: the blame-based rework metric supersedes it, and the store
+          // no longer writes this column.
+          churn_rate_pct: 0,
+          pr_feature: ghMetrics?.pr_feature ?? 0,
+          pr_fix: ghMetrics?.pr_fix ?? 0,
+          pr_bugfix: ghMetrics?.pr_bugfix ?? 0,
+          pr_chore: ghMetrics?.pr_chore ?? 0,
+          pr_hotfix: ghMetrics?.pr_hotfix ?? 0,
+          pr_other: ghMetrics?.pr_other ?? 0,
+        };
+        return { key, metrics };
+      });
 
-          return (async () => {
-            const ghMetrics = ghResultMap.get(key);
-            const metrics: ProductivityExtensions = {
-              prs_opened: ghMetrics?.prs_opened ?? 0,
-              prs_merged: ghMetrics?.prs_merged ?? 0,
-              avg_cycle_hrs: ghMetrics?.avg_cycle_hrs ?? 0,
-              reviews_given: ghMetrics?.reviews_given ?? 0,
-              churn_rate_pct: 0,
-              pr_feature: ghMetrics?.pr_feature ?? 0,
-              pr_fix: ghMetrics?.pr_fix ?? 0,
-              pr_bugfix: ghMetrics?.pr_bugfix ?? 0,
-              pr_chore: ghMetrics?.pr_chore ?? 0,
-              pr_hotfix: ghMetrics?.pr_hotfix ?? 0,
-              pr_other: ghMetrics?.pr_other ?? 0,
-            };
-
-            if (!options.skipChurn) {
-              try {
-                metrics.churn_rate_pct = await churnLimit(() =>
-                  options.deepChurn
-                    ? calculateChurnRate(
-                        repoPath,
-                        email,
-                        dateRange.since,
-                        dateRange.until,
-                        churnWindowDays,
-                        churnMaxCommits,
-                      )
-                    : calculateFastChurnRate(
-                        repoPath,
-                        email,
-                        dateRange.since,
-                        dateRange.until,
-                        churnWindowDays,
-                      ),
-                );
-              } catch {
-                errors++;
-              }
-            }
-
-            return { key, metrics };
-          })();
-        }),
-      );
-
-      const fulfilled: Array<{ key: string; metrics: ProductivityExtensions }> = [];
-      for (const s of settled) {
-        if (s.status === 'fulfilled') {
-          fulfilled.push(s.value);
-          enriched++;
-        } else {
-          errors++;
-        }
-      }
+      enriched += fulfilled.length;
       if (fulfilled.length > 0) {
         saveEnrichmentBatchSQL(fulfilled);
       }
     }
 
-    return { enriched, errors };
+    return enriched;
   }
 
   // ── Filtering ────────────────────────────────────────────────────────────

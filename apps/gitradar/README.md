@@ -36,7 +36,7 @@ gitradar
 | File classification | Categorizes changes as app, test, config, storybook, or doc |
 | Noise filtering | Lock files, dependency/build dirs, and generated files never count; lockfile-only commits are skipped |
 | Commit intent | Parses conventional commits (feat/fix/refactor/docs/test/chore) |
-| GitHub enrichment | Pulls PR metrics, cycle time, reviews, and churn via GitHub API |
+| GitHub enrichment | Pulls PR metrics, median cycle time, and PRs reviewed via GitHub API |
 | Segment filtering | Hide/show top 20%, middle 60%, or bottom 20% contributors |
 | Per-user normalization | Compare teams of different sizes fairly |
 | Org/team hierarchy | Core vs. consultant designations with full drill-down |

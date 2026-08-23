@@ -71,9 +71,8 @@ const HEADERS = [
   // Enrichment metrics (from gitradar enrich)
   'prs_opened',
   'prs_merged',
-  'avg_cycle_hrs',
-  'reviews_given',
-  'churn_rate_pct',
+  'median_cycle_hrs',
+  'prs_reviewed_touched',
   // PR-proxy and rework (from collector/pr-proxy.ts and collector/rework.ts)
   'prs_merged_git',
   'pr_size_p50',
@@ -135,22 +134,19 @@ export function flattenRecord(
     const defaultMetrics = {
       prs_opened: 0,
       prs_merged: 0,
-      avg_cycle_hrs: 0,
-      reviews_given: 0,
-      churn_rate_pct: 0,
+      median_cycle_hrs: 0,
+      prs_reviewed_touched: 0,
     };
     const e = enrichmentStore?.enrichments[key] ?? defaultMetrics;
     flat.prs_opened = e.prs_opened;
     flat.prs_merged = e.prs_merged;
-    flat.avg_cycle_hrs = e.avg_cycle_hrs;
-    flat.reviews_given = e.reviews_given;
-    flat.churn_rate_pct = e.churn_rate_pct;
+    flat.median_cycle_hrs = e.median_cycle_hrs;
+    flat.prs_reviewed_touched = e.prs_reviewed_touched;
   } else {
     flat.prs_opened = 0;
     flat.prs_merged = 0;
-    flat.avg_cycle_hrs = 0;
-    flat.reviews_given = 0;
-    flat.churn_rate_pct = 0;
+    flat.median_cycle_hrs = 0;
+    flat.prs_reviewed_touched = 0;
   }
 
   const sizes = [...(r.prSizes ?? [])].sort((a, b) => a - b);

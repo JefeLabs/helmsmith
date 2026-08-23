@@ -21,7 +21,7 @@ Existing tools require browser-based dashboards, SaaS subscriptions, or complex 
 
 1. **Configure once** — Define your orgs, teams, members, and repo paths in a single `config.yml`. Or use the built-in Manage tab to set up everything interactively.
 2. **Scan incrementally** — GitRadar runs `git log` across all repos, classifies every changed file, and stores results in a local SQLite database. Subsequent scans are incremental (only new commits).
-3. **Enrich with GitHub data** — Optionally pull PR metrics (opened, merged, cycle time, reviews) and churn analysis via the GitHub API.
+3. **Enrich with GitHub data** — Optionally pull PR metrics (opened, merged, median cycle time, PRs reviewed) via the GitHub API.
 4. **Discover authors** — Unknown git authors are captured in an author registry and can be assigned to orgs/teams from the TUI or CLI.
 5. **Explore interactively** — A keyboard-driven TUI presents four dashboard tabs with drill-down views, pivot modes, segmentation, and a full trends screen.
 
@@ -34,7 +34,7 @@ Existing tools require browser-based dashboards, SaaS subscriptions, or complex 
 | Incremental updates | Staleness-aware cursors skip recently-scanned repos |
 | File classification | Every file change is categorized as app, test, config, storybook, or doc |
 | Commit intent tracking | Conventional commits parsed into feat/fix/refactor/docs/test/chore with scope and breaking change detection |
-| GitHub enrichment | PR metrics, cycle time, review counts, and churn analysis via GitHub API |
+| GitHub enrichment | PR metrics, median cycle time, and PRs reviewed via GitHub API |
 | Org/team hierarchy | Supports multi-org structures with core and consultant designations |
 | Interactive TUI | Four dashboard tabs with instant keyboard navigation |
 | Drill-down views | Org → team → individual member drill with arrow keys |
@@ -66,8 +66,8 @@ The core data grain is **member x week x repo** — one record per person per IS
 
 Enrichment data (stored separately) adds:
 - PRs opened, merged, and branch type classification
-- Average cycle time (open to merge)
-- Reviews given and churn rate
+- Median cycle time (open to merge)
+- PRs reviewed (PRs the member reviewed that were touched in the period)
 
 This grain supports rollup by any dimension: org, team, tag, repo group, week, or individual.
 

@@ -31,8 +31,8 @@ export interface TimeBucket {
 const defaultEnrichment: ProductivityExtensions = {
   prs_opened: 0,
   prs_merged: 0,
-  avg_cycle_hrs: 0,
-  reviews_given: 0,
+  median_cycle_hrs: 0,
+  prs_reviewed_touched: 0,
   churn_rate_pct: 0,
   pr_feature: 0,
   pr_fix: 0,
@@ -61,9 +61,10 @@ export function computeTestPct(agg: {
 export interface AggregatedEnrichments {
   prsOpened: number;
   prsMerged: number;
-  reviewsGiven: number;
-  avgCycleHrs: number;
-  churnRatePct: number;
+  /** PRs reviewed by the group that were touched in the period. */
+  prsReviewedTouched: number;
+  /** PR-weighted mean of the per-member median cycle times. */
+  medianCycleHrs: number;
 }
 
 export function aggregateEnrichments(
@@ -76,11 +77,9 @@ export function aggregateEnrichments(
     {
       prsOpened: number;
       prsMerged: number;
-      reviewsGiven: number;
+      prsReviewedTouched: number;
       sumCycleWeighted: number;
       totalPrCount: number;
-      sumChurnWeighted: number;
-      totalLines: number;
     }
   >();
   const seen = new Set<string>();
@@ -93,34 +92,19 @@ export function aggregateEnrichments(
     seen.add(dedupeKey);
 
     const e = getEnrichment(enrichments, enrichKey);
-    const lines =
-      r.filetype.app.insertions +
-      r.filetype.app.deletions +
-      r.filetype.test.insertions +
-      r.filetype.test.deletions +
-      r.filetype.config.insertions +
-      r.filetype.config.deletions +
-      r.filetype.storybook.insertions +
-      r.filetype.storybook.deletions +
-      (r.filetype.doc?.insertions ?? 0) +
-      (r.filetype.doc?.deletions ?? 0);
 
     const agg = result.get(groupKey) ?? {
       prsOpened: 0,
       prsMerged: 0,
-      reviewsGiven: 0,
+      prsReviewedTouched: 0,
       sumCycleWeighted: 0,
       totalPrCount: 0,
-      sumChurnWeighted: 0,
-      totalLines: 0,
     };
     agg.prsOpened += e.prs_opened;
     agg.prsMerged += e.prs_merged;
-    agg.reviewsGiven += e.reviews_given;
-    agg.sumCycleWeighted += e.avg_cycle_hrs * e.prs_merged;
+    agg.prsReviewedTouched += e.prs_reviewed_touched;
+    agg.sumCycleWeighted += e.median_cycle_hrs * e.prs_merged;
     agg.totalPrCount += e.prs_merged;
-    agg.sumChurnWeighted += e.churn_rate_pct * lines;
-    agg.totalLines += lines;
     result.set(groupKey, agg);
   }
 
@@ -129,9 +113,8 @@ export function aggregateEnrichments(
     final.set(key, {
       prsOpened: agg.prsOpened,
       prsMerged: agg.prsMerged,
-      reviewsGiven: agg.reviewsGiven,
-      avgCycleHrs: agg.totalPrCount > 0 ? agg.sumCycleWeighted / agg.totalPrCount : 0,
-      churnRatePct: agg.totalLines > 0 ? agg.sumChurnWeighted / agg.totalLines : 0,
+      prsReviewedTouched: agg.prsReviewedTouched,
+      medianCycleHrs: agg.totalPrCount > 0 ? agg.sumCycleWeighted / agg.totalPrCount : 0,
     });
   }
   return final;
@@ -311,9 +294,8 @@ export function buildContributionGroups(
         if (e) {
           bar.prsOpened = e.prsOpened;
           bar.prsMerged = e.prsMerged;
-          bar.avgCycleHrs = Math.round(e.avgCycleHrs * 10) / 10;
-          bar.reviewsGiven = e.reviewsGiven;
-          bar.churnRatePct = Math.round(e.churnRatePct * 10) / 10;
+          bar.medianCycleHrs = Math.round(e.medianCycleHrs * 10) / 10;
+          bar.prsReviewedTouched = e.prsReviewedTouched;
         }
       }
     }
@@ -337,11 +319,10 @@ export function buildContributionGroups(
       sumActiveDays: number;
       sumHeadcount: number;
       sumTestPct: number;
-      sumChurnRatePct: number;
       sumPrsOpened: number;
       sumPrsMerged: number;
-      sumAvgCycleHrs: number;
-      sumReviewsGiven: number;
+      sumMedianCycleHrs: number;
+      sumPrsReviewedTouched: number;
       count: number;
     }
   >();
@@ -356,11 +337,10 @@ export function buildContributionGroups(
         sumActiveDays: 0,
         sumHeadcount: 0,
         sumTestPct: 0,
-        sumChurnRatePct: 0,
         sumPrsOpened: 0,
         sumPrsMerged: 0,
-        sumAvgCycleHrs: 0,
-        sumReviewsGiven: 0,
+        sumMedianCycleHrs: 0,
+        sumPrsReviewedTouched: 0,
         count: 0,
       };
       entry.sumTotal += bar.total;
@@ -371,11 +351,10 @@ export function buildContributionGroups(
       entry.sumActiveDays += bar.activeDays ?? 0;
       entry.sumHeadcount += bar.headcount ?? 0;
       entry.sumTestPct += bar.testPct ?? 0;
-      entry.sumChurnRatePct += bar.churnRatePct ?? 0;
       entry.sumPrsOpened += bar.prsOpened ?? 0;
       entry.sumPrsMerged += bar.prsMerged ?? 0;
-      entry.sumAvgCycleHrs += bar.avgCycleHrs ?? 0;
-      entry.sumReviewsGiven += bar.reviewsGiven ?? 0;
+      entry.sumMedianCycleHrs += bar.medianCycleHrs ?? 0;
+      entry.sumPrsReviewedTouched += bar.prsReviewedTouched ?? 0;
       entry.count++;
       labelTotals.set(bar.label, entry);
     }
@@ -392,11 +371,10 @@ export function buildContributionGroups(
         bar.avgActiveDays = entry.sumActiveDays / entry.count;
         bar.avgHeadcount = entry.sumHeadcount / entry.count;
         bar.avgTestPct = entry.sumTestPct / entry.count;
-        bar.avgChurnRatePct = entry.sumChurnRatePct / entry.count;
         bar.avgPrsOpened = entry.sumPrsOpened / entry.count;
         bar.avgPrsMerged = entry.sumPrsMerged / entry.count;
-        bar.avgAvgCycleHrs = entry.sumAvgCycleHrs / entry.count;
-        bar.avgReviewsGiven = entry.sumReviewsGiven / entry.count;
+        bar.avgMedianCycleHrs = entry.sumMedianCycleHrs / entry.count;
+        bar.avgPrsReviewedTouched = entry.sumPrsReviewedTouched / entry.count;
       }
     }
   }
@@ -452,11 +430,10 @@ export function buildContributionGroups(
           sumCommits: number;
           sumActiveDays: number;
           sumTestPct: number;
-          sumChurnRatePct: number;
           sumPrsOpened: number;
           sumPrsMerged: number;
-          sumAvgCycleHrs: number;
-          sumReviewsGiven: number;
+          sumMedianCycleHrs: number;
+          sumPrsReviewedTouched: number;
           memberCount: number;
         }
       >();
@@ -470,11 +447,10 @@ export function buildContributionGroups(
           sumCommits: 0,
           sumActiveDays: 0,
           sumTestPct: 0,
-          sumChurnRatePct: 0,
           sumPrsOpened: 0,
           sumPrsMerged: 0,
-          sumAvgCycleHrs: 0,
-          sumReviewsGiven: 0,
+          sumMedianCycleHrs: 0,
+          sumPrsReviewedTouched: 0,
           memberCount: 0,
         };
         e.sumIns += bar.insertions ?? 0;
@@ -483,11 +459,10 @@ export function buildContributionGroups(
         e.sumCommits += bar.commits ?? 0;
         e.sumActiveDays += bar.activeDays ?? 0;
         e.sumTestPct += bar.testPct ?? 0;
-        e.sumChurnRatePct += bar.churnRatePct ?? 0;
         e.sumPrsOpened += bar.prsOpened ?? 0;
         e.sumPrsMerged += bar.prsMerged ?? 0;
-        e.sumAvgCycleHrs += bar.avgCycleHrs ?? 0;
-        e.sumReviewsGiven += bar.reviewsGiven ?? 0;
+        e.sumMedianCycleHrs += bar.medianCycleHrs ?? 0;
+        e.sumPrsReviewedTouched += bar.prsReviewedTouched ?? 0;
         e.memberCount++;
         teamBucketTotals.set(team, e);
       }
@@ -503,11 +478,10 @@ export function buildContributionGroups(
           bar.teamAvgCommits = t.sumCommits / t.memberCount;
           bar.teamAvgActiveDays = t.sumActiveDays / t.memberCount;
           bar.teamAvgTestPct = t.sumTestPct / t.memberCount;
-          bar.teamAvgChurnRatePct = t.sumChurnRatePct / t.memberCount;
           bar.teamAvgPrsOpened = t.sumPrsOpened / t.memberCount;
           bar.teamAvgPrsMerged = t.sumPrsMerged / t.memberCount;
-          bar.teamAvgAvgCycleHrs = t.sumAvgCycleHrs / t.memberCount;
-          bar.teamAvgReviewsGiven = t.sumReviewsGiven / t.memberCount;
+          bar.teamAvgMedianCycleHrs = t.sumMedianCycleHrs / t.memberCount;
+          bar.teamAvgPrsReviewedTouched = t.sumPrsReviewedTouched / t.memberCount;
         }
       }
     }
@@ -609,9 +583,8 @@ export function buildContributionGroupsByEntity(
         if (ea) {
           bar.prsOpened = ea.prsOpened;
           bar.prsMerged = ea.prsMerged;
-          bar.avgCycleHrs = Math.round(ea.avgCycleHrs * 10) / 10;
-          bar.reviewsGiven = ea.reviewsGiven;
-          bar.churnRatePct = Math.round(ea.churnRatePct * 10) / 10;
+          bar.medianCycleHrs = Math.round(ea.medianCycleHrs * 10) / 10;
+          bar.prsReviewedTouched = ea.prsReviewedTouched;
         }
       }
 
@@ -641,8 +614,6 @@ export function buildContributionGroupsByEntity(
       sumPrsOpened: number;
       sumPrsMerged: number;
       sumReviews: number;
-      churnWeightedSum: number;
-      churnWeight: number;
       cycleWeightedSum: number;
       cycleWeight: number;
     }
@@ -662,8 +633,6 @@ export function buildContributionGroupsByEntity(
         sumPrsOpened: 0,
         sumPrsMerged: 0,
         sumReviews: 0,
-        churnWeightedSum: 0,
-        churnWeight: 0,
         cycleWeightedSum: 0,
         cycleWeight: 0,
       };
@@ -677,13 +646,9 @@ export function buildContributionGroupsByEntity(
       e.sumTestPct += bar.testPct ?? 0;
       e.sumPrsOpened += bar.prsOpened ?? 0;
       e.sumPrsMerged += bar.prsMerged ?? 0;
-      e.sumReviews += bar.reviewsGiven ?? 0;
-      if (bar.churnRatePct !== undefined) {
-        e.churnWeightedSum += bar.churnRatePct * bar.total;
-        e.churnWeight += bar.total;
-      }
-      if (bar.avgCycleHrs !== undefined && bar.prsMerged) {
-        e.cycleWeightedSum += bar.avgCycleHrs * bar.prsMerged;
+      e.sumReviews += bar.prsReviewedTouched ?? 0;
+      if (bar.medianCycleHrs !== undefined && bar.prsMerged) {
+        e.cycleWeightedSum += bar.medianCycleHrs * bar.prsMerged;
         e.cycleWeight += bar.prsMerged;
       }
       e.count++;
@@ -704,9 +669,8 @@ export function buildContributionGroupsByEntity(
         bar.avgTestPct = e.sumTestPct / e.count;
         bar.avgPrsOpened = e.sumPrsOpened / e.count;
         bar.avgPrsMerged = e.sumPrsMerged / e.count;
-        bar.avgReviewsGiven = e.sumReviews / e.count;
-        bar.avgChurnRatePct = e.churnWeight > 0 ? e.churnWeightedSum / e.churnWeight : undefined;
-        bar.avgAvgCycleHrs = e.cycleWeight > 0 ? e.cycleWeightedSum / e.cycleWeight : undefined;
+        bar.avgPrsReviewedTouched = e.sumReviews / e.count;
+        bar.avgMedianCycleHrs = e.cycleWeight > 0 ? e.cycleWeightedSum / e.cycleWeight : undefined;
       }
     }
   }
@@ -1258,15 +1222,13 @@ export function renderContributionsTab(
           commits: Math.round(bar.avgCommits ?? 0),
           activeDays: Math.round(bar.avgActiveDays ?? 0),
           headcount: Math.round(bar.avgHeadcount ?? 0),
-          churnRatePct:
-            bar.avgChurnRatePct !== undefined
-              ? Math.round(bar.avgChurnRatePct * 10) / 10
-              : undefined,
           prsOpened: bar.avgPrsOpened !== undefined ? Math.round(bar.avgPrsOpened) : undefined,
           prsMerged: bar.avgPrsMerged !== undefined ? Math.round(bar.avgPrsMerged) : undefined,
-          avgCycleHrs: bar.avgAvgCycleHrs,
-          reviewsGiven:
-            bar.avgReviewsGiven !== undefined ? Math.round(bar.avgReviewsGiven) : undefined,
+          medianCycleHrs: bar.avgMedianCycleHrs,
+          prsReviewedTouched:
+            bar.avgPrsReviewedTouched !== undefined
+              ? Math.round(bar.avgPrsReviewedTouched)
+              : undefined,
           isAverage: true,
           sparkData: labelChronTotals.get(bar.label),
         });
@@ -1298,8 +1260,6 @@ export function renderContributionsTab(
           sumPrsOpened: number;
           sumPrsMerged: number;
           sumReviews: number;
-          churnWeightedSum: number;
-          churnWeight: number;
           cycleWeightedSum: number;
           cycleWeight: number;
         }
@@ -1329,8 +1289,6 @@ export function renderContributionsTab(
             sumPrsOpened: 0,
             sumPrsMerged: 0,
             sumReviews: 0,
-            churnWeightedSum: 0,
-            churnWeight: 0,
             cycleWeightedSum: 0,
             cycleWeight: 0,
           };
@@ -1345,14 +1303,9 @@ export function renderContributionsTab(
           }
           e.sumPrsOpened += bar.prsOpened ?? 0;
           e.sumPrsMerged += bar.prsMerged ?? 0;
-          e.sumReviews += bar.reviewsGiven ?? 0;
-          if (bar.churnRatePct !== undefined) {
-            const linesWeight = bar.total;
-            e.churnWeightedSum += bar.churnRatePct * linesWeight;
-            e.churnWeight += linesWeight;
-          }
-          if (bar.avgCycleHrs !== undefined && bar.prsMerged) {
-            e.cycleWeightedSum += bar.avgCycleHrs * bar.prsMerged;
+          e.sumReviews += bar.prsReviewedTouched ?? 0;
+          if (bar.medianCycleHrs !== undefined && bar.prsMerged) {
+            e.cycleWeightedSum += bar.medianCycleHrs * bar.prsMerged;
             e.cycleWeight += bar.prsMerged;
           }
           e.memberCount = mc;
@@ -1383,9 +1336,10 @@ export function renderContributionsTab(
           headcount: data.memberCount,
           prsOpened: data.sumPrsOpened > 0 ? Math.round(data.sumPrsOpened / divisor) : undefined,
           prsMerged: data.sumPrsMerged > 0 ? Math.round(data.sumPrsMerged / divisor) : undefined,
-          reviewsGiven: data.sumReviews > 0 ? Math.round(data.sumReviews / divisor) : undefined,
-          churnRatePct: data.churnWeight > 0 ? data.churnWeightedSum / data.churnWeight : undefined,
-          avgCycleHrs: data.cycleWeight > 0 ? data.cycleWeightedSum / data.cycleWeight : undefined,
+          prsReviewedTouched:
+            data.sumReviews > 0 ? Math.round(data.sumReviews / divisor) : undefined,
+          medianCycleHrs:
+            data.cycleWeight > 0 ? data.cycleWeightedSum / data.cycleWeight : undefined,
           isAverage: true,
         });
       }
@@ -1468,23 +1422,22 @@ export function renderContributionsTab(
       for (const bar of g.bars) {
         totalPrsOpened += bar.prsOpened ?? 0;
         totalPrsMerged += bar.prsMerged ?? 0;
-        totalReviews += bar.reviewsGiven ?? 0;
-        if (bar.avgCycleHrs !== undefined && bar.prsMerged) {
-          cycleSum += bar.avgCycleHrs * bar.prsMerged;
+        totalReviews += bar.prsReviewedTouched ?? 0;
+        if (bar.medianCycleHrs !== undefined && bar.prsMerged) {
+          cycleSum += bar.medianCycleHrs * bar.prsMerged;
           cycleWeight += bar.prsMerged;
         }
       }
     }
     if (totalPrsOpened > 0 || totalPrsMerged > 0) {
-      const avgCycle = cycleWeight > 0 ? cycleSum / cycleWeight : 0;
-      const cycleStr =
-        avgCycle >= 24 ? `${(avgCycle / 24).toFixed(1)}d` : `${avgCycle.toFixed(1)}h`;
+      const cycle = cycleWeight > 0 ? cycleSum / cycleWeight : 0;
+      const cycleStr = cycle >= 24 ? `${(cycle / 24).toFixed(1)}d` : `${cycle.toFixed(1)}h`;
       console.log(
         chalk.dim('  \u03A3 ') +
           chalk.dim(`${fmt(totalPrsOpened)} PRs opened  `) +
           chalk.dim(`${fmt(totalPrsMerged)} merged  `) +
-          chalk.dim(`${cycleStr} avg cycle  `) +
-          chalk.dim(`${fmt(totalReviews)} reviews`),
+          chalk.dim(`${cycleStr} cycle  `) +
+          chalk.dim(`${fmt(totalReviews)} PRs rev'd`),
       );
     }
   }

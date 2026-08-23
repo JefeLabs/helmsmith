@@ -116,8 +116,10 @@ function ensureSchema(db: Database): void {
       key TEXT PRIMARY KEY,
       prs_opened INTEGER NOT NULL DEFAULT 0,
       prs_merged INTEGER NOT NULL DEFAULT 0,
-      avg_cycle_hrs REAL NOT NULL DEFAULT 0,
-      reviews_given INTEGER NOT NULL DEFAULT 0,
+      median_cycle_hrs REAL NOT NULL DEFAULT 0,
+      prs_reviewed_touched INTEGER NOT NULL DEFAULT 0,
+      -- Retired (superseded by the blame-based rework metric). Kept so old rows
+      -- survive; nothing writes it any more.
       churn_rate_pct REAL NOT NULL DEFAULT 0,
       pr_feature INTEGER NOT NULL DEFAULT 0,
       pr_fix INTEGER NOT NULL DEFAULT 0,
@@ -160,6 +162,29 @@ function ensureSchema(db: Database): void {
   migrateRecordsScopeColumns(db);
   migrateRecordsActiveDayMask(db);
   migrateScorecardColumns(db);
+  migrateEnrichmentRenames(db);
+}
+
+/**
+ * Rename the mislabelled enrichment columns in place (migration v6).
+ *
+ * `avg_cycle_hrs` always held a median and `reviews_given` always held a count
+ * of PRs the member reviewed that were *touched* in the window — never a count
+ * of reviews submitted. The values are correct; only the names were wrong, so a
+ * `RENAME COLUMN` preserves every stored row.
+ */
+function migrateEnrichmentRenames(db: Database): void {
+  const cols = new Set(
+    (db.prepare('PRAGMA table_info(enrichments)').all() as Array<{ name: string }>).map(
+      (c) => c.name,
+    ),
+  );
+  if (cols.has('avg_cycle_hrs') && !cols.has('median_cycle_hrs')) {
+    db.exec('ALTER TABLE enrichments RENAME COLUMN avg_cycle_hrs TO median_cycle_hrs;');
+  }
+  if (cols.has('reviews_given') && !cols.has('prs_reviewed_touched')) {
+    db.exec('ALTER TABLE enrichments RENAME COLUMN reviews_given TO prs_reviewed_touched;');
+  }
 }
 
 /** Add PR-proxy / rework columns and the PR scan cursor if missing (migration v5). */
@@ -885,8 +910,8 @@ export function loadEnrichmentsSQL(): EnrichmentStore {
     key: string;
     prs_opened: number;
     prs_merged: number;
-    avg_cycle_hrs: number;
-    reviews_given: number;
+    median_cycle_hrs: number;
+    prs_reviewed_touched: number;
     churn_rate_pct: number;
     pr_feature: number;
     pr_fix: number;
@@ -901,8 +926,9 @@ export function loadEnrichmentsSQL(): EnrichmentStore {
     enrichments[row.key] = {
       prs_opened: row.prs_opened,
       prs_merged: row.prs_merged,
-      avg_cycle_hrs: row.avg_cycle_hrs,
-      reviews_given: row.reviews_given,
+      median_cycle_hrs: row.median_cycle_hrs,
+      prs_reviewed_touched: row.prs_reviewed_touched,
+      // Retired: read back so old rows survive, never written again.
       churn_rate_pct: row.churn_rate_pct,
       pr_feature: row.pr_feature ?? 0,
       pr_fix: row.pr_fix ?? 0,
@@ -926,16 +952,15 @@ export function loadEnrichmentsSQL(): EnrichmentStore {
 export function saveEnrichmentSQL(key: string, metrics: ProductivityExtensions): void {
   const db = getDB();
   db.prepare(`
-    INSERT INTO enrichments (key, prs_opened, prs_merged, avg_cycle_hrs, reviews_given, churn_rate_pct,
+    INSERT INTO enrichments (key, prs_opened, prs_merged, median_cycle_hrs, prs_reviewed_touched,
       pr_feature, pr_fix, pr_bugfix, pr_chore, pr_hotfix, pr_other)
-    VALUES (@key, @prs_opened, @prs_merged, @avg_cycle_hrs, @reviews_given, @churn_rate_pct,
+    VALUES (@key, @prs_opened, @prs_merged, @median_cycle_hrs, @prs_reviewed_touched,
       @pr_feature, @pr_fix, @pr_bugfix, @pr_chore, @pr_hotfix, @pr_other)
     ON CONFLICT (key) DO UPDATE SET
       prs_opened = excluded.prs_opened,
       prs_merged = excluded.prs_merged,
-      avg_cycle_hrs = excluded.avg_cycle_hrs,
-      reviews_given = excluded.reviews_given,
-      churn_rate_pct = excluded.churn_rate_pct,
+      median_cycle_hrs = excluded.median_cycle_hrs,
+      prs_reviewed_touched = excluded.prs_reviewed_touched,
       pr_feature = excluded.pr_feature,
       pr_fix = excluded.pr_fix,
       pr_bugfix = excluded.pr_bugfix,
@@ -946,9 +971,8 @@ export function saveEnrichmentSQL(key: string, metrics: ProductivityExtensions):
     key,
     prs_opened: metrics.prs_opened,
     prs_merged: metrics.prs_merged,
-    avg_cycle_hrs: metrics.avg_cycle_hrs,
-    reviews_given: metrics.reviews_given,
-    churn_rate_pct: metrics.churn_rate_pct,
+    median_cycle_hrs: metrics.median_cycle_hrs,
+    prs_reviewed_touched: metrics.prs_reviewed_touched,
     pr_feature: metrics.pr_feature ?? 0,
     pr_fix: metrics.pr_fix ?? 0,
     pr_bugfix: metrics.pr_bugfix ?? 0,
@@ -969,16 +993,15 @@ export function saveEnrichmentBatchSQL(
 ): void {
   const db = getDB();
   const upsert = db.prepare(`
-    INSERT INTO enrichments (key, prs_opened, prs_merged, avg_cycle_hrs, reviews_given, churn_rate_pct,
+    INSERT INTO enrichments (key, prs_opened, prs_merged, median_cycle_hrs, prs_reviewed_touched,
       pr_feature, pr_fix, pr_bugfix, pr_chore, pr_hotfix, pr_other)
-    VALUES (@key, @prs_opened, @prs_merged, @avg_cycle_hrs, @reviews_given, @churn_rate_pct,
+    VALUES (@key, @prs_opened, @prs_merged, @median_cycle_hrs, @prs_reviewed_touched,
       @pr_feature, @pr_fix, @pr_bugfix, @pr_chore, @pr_hotfix, @pr_other)
     ON CONFLICT (key) DO UPDATE SET
       prs_opened = excluded.prs_opened,
       prs_merged = excluded.prs_merged,
-      avg_cycle_hrs = excluded.avg_cycle_hrs,
-      reviews_given = excluded.reviews_given,
-      churn_rate_pct = excluded.churn_rate_pct,
+      median_cycle_hrs = excluded.median_cycle_hrs,
+      prs_reviewed_touched = excluded.prs_reviewed_touched,
       pr_feature = excluded.pr_feature,
       pr_fix = excluded.pr_fix,
       pr_bugfix = excluded.pr_bugfix,
@@ -993,9 +1016,8 @@ export function saveEnrichmentBatchSQL(
         key,
         prs_opened: metrics.prs_opened,
         prs_merged: metrics.prs_merged,
-        avg_cycle_hrs: metrics.avg_cycle_hrs,
-        reviews_given: metrics.reviews_given,
-        churn_rate_pct: metrics.churn_rate_pct,
+        median_cycle_hrs: metrics.median_cycle_hrs,
+        prs_reviewed_touched: metrics.prs_reviewed_touched,
         pr_feature: metrics.pr_feature ?? 0,
         pr_fix: metrics.pr_fix ?? 0,
         pr_bugfix: metrics.pr_bugfix ?? 0,
@@ -1027,8 +1049,8 @@ export function getEnrichmentSQL(key: string): ProductivityExtensions {
     | {
         prs_opened: number;
         prs_merged: number;
-        avg_cycle_hrs: number;
-        reviews_given: number;
+        median_cycle_hrs: number;
+        prs_reviewed_touched: number;
         churn_rate_pct: number;
         pr_feature: number;
         pr_fix: number;
@@ -1043,8 +1065,8 @@ export function getEnrichmentSQL(key: string): ProductivityExtensions {
     row ?? {
       prs_opened: 0,
       prs_merged: 0,
-      avg_cycle_hrs: 0,
-      reviews_given: 0,
+      median_cycle_hrs: 0,
+      prs_reviewed_touched: 0,
       churn_rate_pct: 0,
       pr_feature: 0,
       pr_fix: 0,

@@ -679,7 +679,7 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
         process.stdout.write('\n');
         console.log(chalk.bold('  Detail View:'));
         console.log(
-          `  ${chalk.cyan('L')}  ${contribDetailLayers.has('lines') ? chalk.underline('Lines') : 'Lines'} ${chalk.dim('(+ins · -del · tst% · churn)')}`,
+          `  ${chalk.cyan('L')}  ${contribDetailLayers.has('lines') ? chalk.underline('Lines') : 'Lines'} ${chalk.dim('(+ins · -del · tst%)')}`,
         );
         console.log(
           `  ${chalk.cyan('T')}  ${contribTableMode ? chalk.underline('Table') : 'Table'} ${chalk.dim('(full numeric table)')}`,

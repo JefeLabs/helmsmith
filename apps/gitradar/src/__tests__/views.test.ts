@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Config, UserWeekRepoRecord } from '../types/schema.js';
 import { DEFAULT_SETTINGS } from '../types/schema.js';
@@ -1188,5 +1190,19 @@ describe('renderTopPerformersTab', () => {
       consoleLogSpy.mock.calls.map((c: unknown[]) => String(c[0])).join('\n'),
     );
     expect(output).not.toContain('dependabot');
+  });
+});
+
+// The detail-layer menu lives inside the interactive key loop, so its labels
+// are asserted against the source text rather than by driving the TUI.
+describe('Dashboard detail-layer menu — retired churn column', () => {
+  const dashboardSource = readFileSync(
+    fileURLToPath(new URL('../views/dashboard.ts', import.meta.url)),
+    'utf-8',
+  );
+
+  it('no longer advertises a churn column in the Lines layer', () => {
+    expect(dashboardSource).toContain('(+ins \u00B7 -del \u00B7 tst%)');
+    expect(dashboardSource).not.toContain('churn');
   });
 });

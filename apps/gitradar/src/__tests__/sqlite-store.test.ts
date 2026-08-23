@@ -231,7 +231,8 @@ describe('SQLite store', () => {
       CREATE TABLE enrichments (
         key TEXT PRIMARY KEY,
         prs_opened INTEGER DEFAULT 0, prs_merged INTEGER DEFAULT 0,
-        avg_cycle_hrs REAL DEFAULT 0, reviews_given INTEGER DEFAULT 0,
+        median_cycle_hrs REAL DEFAULT 0, prs_reviewed_touched INTEGER DEFAULT 0,
+        -- retired: kept so old rows survive, never written
         churn_rate_pct REAL DEFAULT 0
       )
     `).run();
@@ -249,7 +250,8 @@ describe('SQLite store', () => {
       .prepare('SELECT * FROM enrichments WHERE key = ?')
       .get('Alice::2026-W10::app') as Record<string, unknown>;
     expect(row.prs_opened).toBe(3);
-    expect(row.avg_cycle_hrs).toBe(14.5);
+    expect(row.median_cycle_hrs).toBe(14.5);
+    expect(row.prs_reviewed_touched).toBe(5);
     expect(row.churn_rate_pct).toBe(8.2);
 
     db.close();
@@ -265,24 +267,24 @@ describe('SQLite store', () => {
       CREATE TABLE enrichments (
         key TEXT PRIMARY KEY,
         prs_opened INTEGER DEFAULT 0, prs_merged INTEGER DEFAULT 0,
-        avg_cycle_hrs REAL DEFAULT 0, reviews_given INTEGER DEFAULT 0,
+        median_cycle_hrs REAL DEFAULT 0, prs_reviewed_touched INTEGER DEFAULT 0,
+        -- retired: kept so old rows survive, never written
         churn_rate_pct REAL DEFAULT 0
       )
     `).run();
 
     const upsert = db.prepare(`
-      INSERT INTO enrichments (key, prs_opened, prs_merged, avg_cycle_hrs, reviews_given, churn_rate_pct)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO enrichments (key, prs_opened, prs_merged, median_cycle_hrs, prs_reviewed_touched)
+      VALUES (?, ?, ?, ?, ?)
       ON CONFLICT (key) DO UPDATE SET
         prs_opened = prs_opened + excluded.prs_opened,
         prs_merged = prs_merged + excluded.prs_merged,
-        avg_cycle_hrs = excluded.avg_cycle_hrs,
-        reviews_given = reviews_given + excluded.reviews_given,
-        churn_rate_pct = excluded.churn_rate_pct
+        median_cycle_hrs = excluded.median_cycle_hrs,
+        prs_reviewed_touched = prs_reviewed_touched + excluded.prs_reviewed_touched
     `);
 
-    upsert.run('Alice::2026-W10::app', 3, 2, 14.5, 5, 8.2);
-    upsert.run('Alice::2026-W10::app', 1, 1, 10.0, 2, 6.0);
+    upsert.run('Alice::2026-W10::app', 3, 2, 14.5, 5);
+    upsert.run('Alice::2026-W10::app', 1, 1, 10.0, 2);
 
     const row = db
       .prepare('SELECT * FROM enrichments WHERE key = ?')
@@ -290,10 +292,11 @@ describe('SQLite store', () => {
     // Counts are summed
     expect(row.prs_opened).toBe(4);
     expect(row.prs_merged).toBe(3);
-    expect(row.reviews_given).toBe(7);
+    expect(row.prs_reviewed_touched).toBe(7);
     // Rates are replaced with latest
-    expect(row.avg_cycle_hrs).toBe(10.0);
-    expect(row.churn_rate_pct).toBe(6.0);
+    expect(row.median_cycle_hrs).toBe(10.0);
+    // The retired column is never written — it stays at its default.
+    expect(row.churn_rate_pct).toBe(0);
 
     db.close();
   });

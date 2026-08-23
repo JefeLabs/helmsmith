@@ -172,6 +172,16 @@ describe('recordsToCsv', () => {
     expect(header).toContain('app_lines');
   });
 
+  it('names the enrichment columns median_cycle_hrs / prs_reviewed_touched and drops churn', () => {
+    const headers = recordsToCsv([makeRecord()]).split('\n')[0].split(',');
+
+    expect(headers).toContain('median_cycle_hrs');
+    expect(headers).toContain('prs_reviewed_touched');
+    expect(headers).not.toContain('avg_cycle_hrs');
+    expect(headers).not.toContain('reviews_given');
+    expect(headers).not.toContain('churn_rate_pct');
+  });
+
   it('places summary columns before per-filetype detail', () => {
     const csv = recordsToCsv([makeRecord()]);
     const headers = csv.split('\n')[0].split(',');

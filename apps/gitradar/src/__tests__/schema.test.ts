@@ -5,6 +5,7 @@ import {
   DEFAULT_SETTINGS,
   MemberSchema,
   OrgSchema,
+  ProductivityExtensionsSchema,
   RepoSchema,
   ReposRegistrySchema,
   ScanStateSchema,
@@ -559,5 +560,37 @@ describe('ReposRegistrySchema', () => {
         },
       }),
     ).toThrow();
+  });
+});
+
+// ── Enrichment schema ───────────────────────────────────────────────────────
+
+describe('ProductivityExtensionsSchema', () => {
+  it('uses median_cycle_hrs and prs_reviewed_touched', () => {
+    const e = ProductivityExtensionsSchema.parse({
+      median_cycle_hrs: 4.5,
+      prs_reviewed_touched: 2,
+    });
+    expect(e.median_cycle_hrs).toBe(4.5);
+    expect(e.prs_reviewed_touched).toBe(2);
+    expect((e as Record<string, unknown>).avg_cycle_hrs).toBeUndefined();
+    expect((e as Record<string, unknown>).reviews_given).toBeUndefined();
+  });
+
+  it('keeps churn_rate_pct as a retired, always-zero column', () => {
+    const e = ProductivityExtensionsSchema.parse({});
+    expect(e.churn_rate_pct).toBe(0);
+  });
+});
+
+describe('settings — churn retirement', () => {
+  it('drops churn_max_commits but keeps the window/concurrency the rework pass uses', () => {
+    expect((DEFAULT_SETTINGS as Record<string, unknown>).churn_max_commits).toBeUndefined();
+    expect(DEFAULT_SETTINGS.churn_window_days).toBe(21);
+    expect(DEFAULT_SETTINGS.churn_concurrency).toBe(3);
+
+    const parsed = ConfigSchema.parse({ repos: [], orgs: [] });
+    expect((parsed.settings as Record<string, unknown>).churn_max_commits).toBeUndefined();
+    expect(parsed.settings.churn_window_days).toBe(21);
   });
 });

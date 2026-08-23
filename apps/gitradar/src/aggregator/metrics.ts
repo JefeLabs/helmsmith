@@ -4,8 +4,8 @@ import type { UserWeekRepoRecord } from '../types/schema.js';
 /**
  * Canonical derived-metric calculations.
  *
- * Every place that needs net_lines, test_pct, or churn should call these
- * functions rather than reimplementing the arithmetic inline.
+ * Every place that needs net_lines or test_pct should call these functions
+ * rather than reimplementing the arithmetic inline.
  */
 
 /** Sum insertions + deletions for a single filetype bucket. */

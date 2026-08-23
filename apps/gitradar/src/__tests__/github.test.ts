@@ -1,4 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Inline sanitize for testing (mirrors the private function in github.ts)
 function sanitize(s: string): string {
@@ -245,8 +248,8 @@ describe('fetchGitHubMetrics', () => {
 
     expect(result.prs_opened).toBe(3);
     expect(result.prs_merged).toBe(2);
-    expect(result.reviews_given).toBe(5);
-    expect(result.avg_cycle_hrs).toBeGreaterThan(0);
+    expect(result.prs_reviewed_touched).toBe(5);
+    expect(result.median_cycle_hrs).toBeGreaterThan(0);
   });
 
   it('paginates when hasNextPage is true', async () => {
@@ -319,8 +322,8 @@ describe('fetchGitHubMetrics', () => {
     expect(result).toEqual({
       prs_opened: 0,
       prs_merged: 0,
-      avg_cycle_hrs: 0,
-      reviews_given: 0,
+      median_cycle_hrs: 0,
+      prs_reviewed_touched: 0,
       pr_feature: 0,
       pr_fix: 0,
       pr_bugfix: 0,
@@ -421,14 +424,14 @@ describe('fetchGitHubMetricsBatch', () => {
     const alice = results.find((r) => r.handle === 'alice')!;
     expect(alice.metrics.prs_opened).toBe(2);
     expect(alice.metrics.prs_merged).toBe(1);
-    expect(alice.metrics.reviews_given).toBe(3);
-    expect(alice.metrics.avg_cycle_hrs).toBe(12);
+    expect(alice.metrics.prs_reviewed_touched).toBe(3);
+    expect(alice.metrics.median_cycle_hrs).toBe(12);
 
     const bob = results.find((r) => r.handle === 'bob')!;
     expect(bob.metrics.prs_opened).toBe(1);
     expect(bob.metrics.prs_merged).toBe(1);
-    expect(bob.metrics.reviews_given).toBe(7);
-    expect(bob.metrics.avg_cycle_hrs).toBe(6);
+    expect(bob.metrics.prs_reviewed_touched).toBe(7);
+    expect(bob.metrics.median_cycle_hrs).toBe(6);
 
     // Only one GraphQL call for both authors
     expect(mockOctokit.graphql).toHaveBeenCalledTimes(1);
@@ -590,6 +593,92 @@ describe('fetchGitHubMetricsBatch', () => {
 
     expect(results).toHaveLength(1);
     expect(results[0].metrics.prs_opened).toBe(150);
+  });
+});
+
+// ── Legacy cache normalisation ──────────────────────────────────────────────
+
+describe('cache read — legacy field names', () => {
+  let tmpHome: string;
+  const originalOverride = process.env.GITRADAR_HOME;
+
+  beforeEach(async () => {
+    tmpHome = await mkdtemp(join(tmpdir(), 'gitradar-ghcache-'));
+    await mkdir(join(tmpHome, 'cache'), { recursive: true });
+    process.env.GITRADAR_HOME = tmpHome;
+  });
+
+  afterEach(async () => {
+    if (originalOverride === undefined) delete process.env.GITRADAR_HOME;
+    else process.env.GITRADAR_HOME = originalOverride;
+    await rm(tmpHome, { recursive: true, force: true });
+  });
+
+  it('maps avg_cycle_hrs / reviews_given from a pre-rename cache entry', async () => {
+    await writeFile(
+      join(tmpHome, 'cache', 'gh_acme_frontend_jdoe_2026-03-01_2026-03-07.json'),
+      JSON.stringify({
+        prs_opened: 3,
+        prs_merged: 2,
+        avg_cycle_hrs: 12.5,
+        reviews_given: 4,
+        pr_feature: 1,
+        pr_fix: 0,
+        pr_bugfix: 0,
+        pr_chore: 0,
+        pr_hotfix: 0,
+        pr_other: 2,
+      }),
+      'utf-8',
+    );
+
+    const octokit = { graphql: vi.fn() };
+    const result = await fetchGitHubMetrics({
+      octokit: octokit as any,
+      owner: 'acme',
+      repo: 'frontend',
+      githubHandle: 'jdoe',
+      since: '2026-03-01',
+      until: '2026-03-07',
+    });
+
+    // Served from cache — no API call — and normalised to the new names.
+    expect(octokit.graphql).not.toHaveBeenCalled();
+    expect(result.median_cycle_hrs).toBe(12.5);
+    expect(result.prs_reviewed_touched).toBe(4);
+    expect((result as unknown as Record<string, unknown>).avg_cycle_hrs).toBeUndefined();
+    expect((result as unknown as Record<string, unknown>).reviews_given).toBeUndefined();
+  });
+
+  it('leaves a post-rename cache entry untouched', async () => {
+    await writeFile(
+      join(tmpHome, 'cache', 'gh_acme_frontend_jdoe_2026-03-01_2026-03-07.json'),
+      JSON.stringify({
+        prs_opened: 1,
+        prs_merged: 1,
+        median_cycle_hrs: 6,
+        prs_reviewed_touched: 9,
+        pr_feature: 0,
+        pr_fix: 0,
+        pr_bugfix: 0,
+        pr_chore: 0,
+        pr_hotfix: 0,
+        pr_other: 1,
+      }),
+      'utf-8',
+    );
+
+    const result = await fetchGitHubMetrics({
+      octokit: { graphql: vi.fn() } as any,
+      owner: 'acme',
+      repo: 'frontend',
+      githubHandle: 'jdoe',
+      since: '2026-03-01',
+      until: '2026-03-07',
+    });
+
+    expect(result.median_cycle_hrs).toBe(6);
+    expect(result.prs_reviewed_touched).toBe(9);
   });
 });
 

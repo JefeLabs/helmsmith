@@ -110,7 +110,9 @@ export const METRICS: readonly MetricDef[] = [
   {
     key: 'reviews',
     family: 'collab',
-    label: 'reviews',
+    // Counts PRs the member reviewed that were touched in the window — not a
+    // count of review submissions.
+    label: "PRs rev'd",
     betterWhen: 'high',
     core: true,
     format: 'int',
@@ -234,9 +236,9 @@ function windowStats(
     const e = enrichments?.enrichments[`${r.member}::${r.week}::${r.repo}`];
     if (e) {
       prsOpened = (prsOpened ?? 0) + e.prs_opened;
-      reviews = (reviews ?? 0) + e.reviews_given;
+      reviews = (reviews ?? 0) + e.prs_reviewed_touched;
       if (e.prs_merged > 0) {
-        cycleWeighted += e.avg_cycle_hrs * e.prs_merged;
+        cycleWeighted += e.median_cycle_hrs * e.prs_merged;
         cycleWeight += e.prs_merged;
       }
     }

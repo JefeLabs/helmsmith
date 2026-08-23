@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { Command } from 'commander';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SETTINGS } from '../types/schema.js';
@@ -504,5 +506,24 @@ describe('CLI import subcommand', () => {
     expect(() => {
       program.parse(['node', 'gitradar', 'import']);
     }).toThrow();
+  });
+});
+
+// These suites build their own Commander programs rather than importing the
+// real `cli.ts` (which has module-level side effects), so the churn flags are
+// asserted against the command definition's source text.
+describe('CLI enrich subcommand — retired churn flags', () => {
+  const cliSource = readFileSync(fileURLToPath(new URL('../cli.ts', import.meta.url)), 'utf-8');
+
+  it('no longer declares --skip-churn or --deep-churn', () => {
+    expect(cliSource).not.toContain('--skip-churn');
+    expect(cliSource).not.toContain('--deep-churn');
+    expect(cliSource).not.toContain('skipChurn');
+    expect(cliSource).not.toContain('deepChurn');
+  });
+
+  it('still declares the enrich flags that survived', () => {
+    expect(cliSource).toContain('--skip-cache');
+    expect(cliSource).toContain("'--force'");
   });
 });

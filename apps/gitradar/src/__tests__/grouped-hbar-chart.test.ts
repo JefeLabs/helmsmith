@@ -714,7 +714,7 @@ describe('renderGroupedHBarChart', () => {
     expect(plain).not.toContain('-1.8K');
   });
 
-  it('shows churn% column in lines mode when enrichment data exists', () => {
+  it('has no churn% column in lines mode — the metric is retired', () => {
     const groups: HBarGroup[] = [
       {
         groupLabel: 'W12',
@@ -723,7 +723,6 @@ describe('renderGroupedHBarChart', () => {
     ];
     groups[0].bars[0].insertions = 4200;
     groups[0].bars[0].deletions = 1800;
-    groups[0].bars[0].churnRatePct = 23.5;
     const result = renderGroupedHBarChart({
       groups,
       segmentDefs,
@@ -732,28 +731,11 @@ describe('renderGroupedHBarChart', () => {
       columnMode: 'lines',
     });
     const plain = stripAnsi(result);
-    expect(plain).toContain('churn');
-    expect(plain).toContain('23.5%');
-  });
-
-  it('hides churn% column in compact mode', () => {
-    const groups: HBarGroup[] = [
-      {
-        groupLabel: 'W12',
-        bars: [makeBar('Team A', { app: 5000, test: 1000 })],
-      },
-    ];
-    groups[0].bars[0].churnRatePct = 23.5;
-    const result = renderGroupedHBarChart({
-      groups,
-      segmentDefs,
-      maxBarWidth: 40,
-      maxWidth: 160,
-      columnMode: 'compact',
-    });
-    const plain = stripAnsi(result);
+    // The Lines layer still renders its own columns…
+    expect(plain).toContain('+ins');
+    expect(plain).toContain('-del');
+    // …but churn is retired.
     expect(plain).not.toContain('churn');
-    expect(plain).not.toContain('23.5%');
   });
 
   it('shows PR columns in prs mode when enrichment data exists', () => {
@@ -765,8 +747,8 @@ describe('renderGroupedHBarChart', () => {
     ];
     groups[0].bars[0].prsOpened = 12;
     groups[0].bars[0].prsMerged = 8;
-    groups[0].bars[0].avgCycleHrs = 36.5;
-    groups[0].bars[0].reviewsGiven = 15;
+    groups[0].bars[0].medianCycleHrs = 36.5;
+    groups[0].bars[0].prsReviewedTouched = 15;
     const result = renderGroupedHBarChart({
       groups,
       segmentDefs,
@@ -778,7 +760,7 @@ describe('renderGroupedHBarChart', () => {
     expect(plain).toContain('PRs');
     expect(plain).toContain('merged');
     expect(plain).toContain('cycle');
-    expect(plain).toContain('reviews');
+    expect(plain).toContain('PRs rev');
     expect(plain).toContain('12');
     expect(plain).toContain('8');
     expect(plain).toContain('1.5d'); // 36.5h = 1.5d
@@ -794,8 +776,8 @@ describe('renderGroupedHBarChart', () => {
     ];
     groups[0].bars[0].prsOpened = 12;
     groups[0].bars[0].prsMerged = 8;
-    groups[0].bars[0].avgCycleHrs = 36.5;
-    groups[0].bars[0].reviewsGiven = 15;
+    groups[0].bars[0].medianCycleHrs = 36.5;
+    groups[0].bars[0].prsReviewedTouched = 15;
     const result = renderGroupedHBarChart({
       groups,
       segmentDefs,
@@ -806,7 +788,7 @@ describe('renderGroupedHBarChart', () => {
     expect(plain).toContain('PRs');
     expect(plain).toContain('merged');
     expect(plain).toContain('cycle');
-    expect(plain).toContain('reviews');
+    expect(plain).toContain('PRs rev');
     expect(plain).toContain('12');
     expect(plain).toContain('8');
   });
@@ -927,8 +909,8 @@ describe('renderGroupedHBarChart', () => {
     groups[0].bars[0].deletions = 2000;
     groups[0].bars[0].prsOpened = 20;
     groups[0].bars[0].prsMerged = 16;
-    groups[0].bars[0].avgCycleHrs = 48;
-    groups[0].bars[0].reviewsGiven = 12;
+    groups[0].bars[0].medianCycleHrs = 48;
+    groups[0].bars[0].prsReviewedTouched = 12;
     groups[0].bars[0].headcount = 4;
     const result = renderGroupedHBarChart({
       groups,

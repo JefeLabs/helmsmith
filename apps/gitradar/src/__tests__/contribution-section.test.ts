@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Segment } from '../aggregator/segments.js';
-import type { Config, UserWeekRepoRecord } from '../types/schema.js';
+import type { Config, EnrichmentStore, UserWeekRepoRecord } from '../types/schema.js';
 import { DEFAULT_SETTINGS } from '../types/schema.js';
 import { stripAnsi } from '../ui/format.js';
+import type { DetailLayer } from '../ui/grouped-hbar-chart.js';
 import {
   buildContributionGroups,
   renderContributionsTab,
@@ -250,5 +251,64 @@ describe('renderContributionsTab — Avg row label', () => {
     expect(output).toContain('* trailing average incl. current period');
     // The old bare "Avg" row label is gone.
     expect(output).not.toMatch(/^Avg\s+┤/m);
+  });
+});
+
+describe('renderContributionsTab — retired churn column', () => {
+  it('omits the churn header from the Lines detail layer', () => {
+    const records = [makeRecord({ member: 'alice' })];
+    const enrichments: EnrichmentStore = {
+      version: 1,
+      lastUpdated: '',
+      enrichments: {
+        'alice::2026-W10::web': {
+          prs_opened: 3,
+          prs_merged: 2,
+          median_cycle_hrs: 12,
+          prs_reviewed_touched: 4,
+          churn_rate_pct: 0,
+          pr_feature: 0,
+          pr_fix: 0,
+          pr_bugfix: 0,
+          pr_chore: 0,
+          pr_hotfix: 0,
+          pr_other: 0,
+        },
+      },
+    };
+
+    const logged: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
+      logged.push(args.map(String).join(' '));
+    });
+    try {
+      const ctx: ViewContext = { config: makeConfig(), records, currentWeek: '2026-W10' };
+      renderContributionsTab(
+        ctx,
+        'user',
+        false,
+        false, // pivotEntity
+        BUCKETS,
+        'week',
+        'range',
+        200,
+        '',
+        () => 'steady',
+        undefined,
+        records,
+        undefined,
+        new Set<DetailLayer>(['lines']),
+        enrichments,
+      );
+    } finally {
+      spy.mockRestore();
+    }
+    const output = stripAnsi(logged.join('\n'));
+
+    // The Lines layer still carries its own columns…
+    expect(output).toContain('tst%');
+    expect(output).toContain('+ins');
+    // …but churn is retired.
+    expect(output).not.toContain('churn');
   });
 });

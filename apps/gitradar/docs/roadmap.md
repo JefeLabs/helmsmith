@@ -90,8 +90,7 @@ Delete (zero callers confirmed): `loadCommitsDataSQL`, `saveCommitsDataSQL`, `re
 Consolidate: ~90 inlined `ins + del` filetype sums while `aggregator/metrics.ts` exists and
 `calculateDerived` has zero callers; one glob compiler for `buildIgnoreMatcher`/`buildClassifier`
 (`collector/classifier.ts:73-222`); one `recordKey(member, week, repo)` helper (built in
-`aggregator/scorecard.ts`, `engine/gitradar-engine.ts`, `views/components/contribution-section.ts`);
-`calculateChurnRate` vs `calculateFastChurnRate` share one windowed-overlap core.
+`aggregator/scorecard.ts`, `engine/gitradar-engine.ts`, `views/components/contribution-section.ts`).
 
 Split: `dashboardView` (`views/dashboard.ts:405-1702`) — keep render + key dispatch; move author
 reassignment (L915-1232), org/team CRUD (L1326-1599), directory scan (L1232-1326) and export (L1599-1690)

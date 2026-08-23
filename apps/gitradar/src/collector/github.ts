@@ -14,8 +14,10 @@ const execFileAsync = promisify(execFile);
 export interface GitHubMetrics {
   prs_opened: number;
   prs_merged: number;
-  avg_cycle_hrs: number;
-  reviews_given: number;
+  /** Median hours from PR open to merge — see `calculateCycleTime`. */
+  median_cycle_hrs: number;
+  /** PRs this member reviewed that received any update in the window — not a review count. */
+  prs_reviewed_touched: number;
   /** PR branch type counts — parsed from branch naming conventions. */
   pr_feature: number;
   pr_fix: number;
@@ -62,6 +64,12 @@ export function parseGitHubUrl(url: string): GitHubRemote | null {
 
 // ── Cycle time calculation (unchanged) ──────────────────────────────────────
 
+/**
+ * Median hours from PR open to merge across the given PRs.
+ *
+ * This is a median (durations are sorted and the middle taken), which is why
+ * the field it feeds is `median_cycle_hrs`, not an average.
+ */
 export function calculateCycleTime(
   prs: Array<{ createdAt: string; mergedAt: string | null }>,
 ): number {
@@ -211,8 +219,8 @@ function emptyMetrics(): GitHubMetrics {
   return {
     prs_opened: 0,
     prs_merged: 0,
-    avg_cycle_hrs: 0,
-    reviews_given: 0,
+    median_cycle_hrs: 0,
+    prs_reviewed_touched: 0,
     pr_feature: 0,
     pr_fix: 0,
     pr_bugfix: 0,
@@ -292,11 +300,28 @@ function cacheKey(
   return `gh_${sanitize(owner)}_${sanitize(repo)}_${sanitize(handle)}_${since}_${until}.json`;
 }
 
+/**
+ * Cache entries written before the enrichment rename hold `avg_cycle_hrs` /
+ * `reviews_given`. Map them onto the current names so a warm cache is not
+ * silently read back as zeros.
+ */
+function normaliseCachedMetrics(raw: Record<string, unknown>): GitHubMetrics {
+  const { avg_cycle_hrs, reviews_given, ...rest } = raw;
+  const metrics = rest as unknown as GitHubMetrics;
+  if (metrics.median_cycle_hrs === undefined && typeof avg_cycle_hrs === 'number') {
+    metrics.median_cycle_hrs = avg_cycle_hrs;
+  }
+  if (metrics.prs_reviewed_touched === undefined && typeof reviews_given === 'number') {
+    metrics.prs_reviewed_touched = reviews_given;
+  }
+  return metrics;
+}
+
 async function readCache(key: string): Promise<GitHubMetrics | null> {
   try {
     const cachePath = join(getCacheDir(), key);
     const raw = await readFile(cachePath, 'utf-8');
-    return JSON.parse(raw) as GitHubMetrics;
+    return normaliseCachedMetrics(JSON.parse(raw) as Record<string, unknown>);
   } catch {
     return null;
   }
@@ -450,12 +475,12 @@ export async function fetchGitHubMetricsBatch(options: {
         const metrics: GitHubMetrics = {
           prs_opened: allPRs.length,
           prs_merged: allPRs.filter((pr) => pr.state === 'MERGED').length,
-          avg_cycle_hrs: calculateCycleTime(
+          median_cycle_hrs: calculateCycleTime(
             allPRs
               .filter((pr) => pr.mergedAt !== null)
               .map((pr) => ({ createdAt: pr.createdAt, mergedAt: pr.mergedAt })),
           ),
-          reviews_given: reviewsData.issueCount,
+          prs_reviewed_touched: reviewsData.issueCount,
           ...branchCounts,
         };
 
@@ -554,7 +579,7 @@ export async function fetchGitHubMetrics(options: {
     }
 
     const allPRs: GraphQLPRNode[] = [...response.prs.nodes];
-    result.reviews_given = response.reviews.issueCount;
+    result.prs_reviewed_touched = response.reviews.issueCount;
 
     // Paginate remaining PRs if needed
     let pageInfo = response.prs.pageInfo;
@@ -577,7 +602,7 @@ export async function fetchGitHubMetrics(options: {
     result.prs_opened = allPRs.length;
     result.prs_merged = allPRs.filter((pr) => pr.state === 'MERGED').length;
 
-    result.avg_cycle_hrs = calculateCycleTime(
+    result.median_cycle_hrs = calculateCycleTime(
       allPRs
         .filter((pr) => pr.mergedAt !== null)
         .map((pr) => ({ createdAt: pr.createdAt, mergedAt: pr.mergedAt })),

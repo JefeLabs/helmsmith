@@ -112,7 +112,7 @@ Each granularity has its own depth range. Weeks: 2–24, months: 2–12, quarter
 #### Modes & Toggles
 
 - **T** — Toggle tag overlay (group by tag instead of org/team)
-- **D** — Cycle detail modes: chart → lines detail (shows +ins, -del, test%, churn) → data table (tabular breakdown per group per bucket)
+- **D** — Cycle detail modes: chart → lines detail (shows +ins, -del, test%) → data table (tabular breakdown per group per bucket)
 - **V** — Pivot: toggle between "by time" (time buckets as groups, entities as bars) and "by entity" (entities as groups, time buckets as bars)
 - **U** — Toggle per-user mode: divides all metrics by headcount for fair cross-team comparison
 - **S** — Segment menu: hide/show contributors by performance tier (top 20%, middle 60%, bottom 20%). When filtering at org/team drill level, segments are computed at the individual user level and excluded users' data is removed before aggregation
@@ -134,8 +134,8 @@ Core teams are prefixed with `★`, consultants with `◆`.
 Bars are accompanied by data columns that adapt to the active detail layer:
 
 - **Compact** (default): trend, net, cmts, days, hc
-- **Lines** (D once): adds +ins, -del, tst%, churn
-- **PRs** (when enrichment data exists): PRs, merged, cycle, reviews
+- **Lines** (D once): adds +ins, -del, tst%
+- **PRs** (when enrichment data exists): PRs, merged, cycle, PRs rev
 
 Each value shows a trend indicator comparing the current period to its running average:
 - `▲` green = above average
@@ -357,14 +357,28 @@ gitradar data enrich -w 4           # enrich last 4 weeks only
 
 ### Enrichment Data
 
-| Metric | Description |
-|--------|-------------|
-| PRs opened | Count of PRs opened by the member in the period |
-| PRs merged | Count of merged PRs |
+| Field | Description |
+|-------|-------------|
+| `prs_opened` | Count of PRs opened by the member in the period |
+| `prs_merged` | Count of merged PRs |
 | PR branch types | Classification: feature, fix, bugfix, chore, hotfix, other |
-| Avg cycle time | Average hours from PR open to merge |
-| Reviews given | Count of PR reviews authored |
-| Churn rate | Percentage of lines changed that were recently added |
+| `median_cycle_hrs` | Median hours from PR open to merge |
+| `prs_reviewed_touched` | PRs the member has reviewed that were updated in the period |
+
+`prs_reviewed_touched` counts PRs the member has reviewed that received any
+update in the week — it is not a count of review submissions. It comes from a
+GitHub search for `reviewed-by:<handle> updated:<since>..<until>`, so a PR the
+member reviewed months ago still counts in any week it is touched again. Read it
+as review *surface area*, not review throughput. Likewise `median_cycle_hrs` is a
+median, not a mean: durations are sorted and the middle one is taken.
+
+**Retired:** `churn_rate_pct` measured "lines changed in files someone else
+recently touched" — a file-collision proxy, not rework. The blame-based rework
+metric (§15) supersedes it, so nothing computes or displays churn any more. The
+`churn_rate_pct` database column is kept so existing rows survive, but it is
+never written and never shown. The `--skip-churn` / `--deep-churn` flags and the
+`churn_max_commits` setting are gone; `churn_window_days` and
+`churn_concurrency` remain because the rework pass uses them.
 
 Enrichment data appears automatically in the Contributions tab columns when available.
 

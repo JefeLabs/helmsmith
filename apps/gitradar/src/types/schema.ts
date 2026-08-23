@@ -79,14 +79,10 @@ export const ConfigSchema = z.object({
       ignore_patterns: z.array(z.string()).optional(),
       /** When true, `ignore_patterns` replaces the built-in defaults instead of extending them. */
       ignore_patterns_replace_defaults: z.boolean().optional().default(false),
-      /** How many days before the analysis period to look for "recently modified" files
-       *  when computing churn rate. A longer window catches more instability but may
-       *  over-count churn on actively developed files. Default: 21 days. */
+      /** Blame window for the rework pass: a deleted line counts as rework only when it
+       *  was written within this many days of the deleting commit. Default: 21 days. */
       churn_window_days: z.number().optional().default(21),
-      /** Maximum commits to sample per author when using deep churn analysis (--deep-churn).
-       *  Higher values improve precision but increase git operations. Default: 50. */
-      churn_max_commits: z.number().optional().default(50),
-      /** Maximum concurrent git processes for churn calculations. Default: 3. */
+      /** Maximum concurrent git processes for the rework pass. Default: 3. */
       churn_concurrency: z.number().optional().default(3),
       /** Percentage of contributors classified as "high" segment. Default: 20. */
       segment_high_pct: z.number().min(1).max(50).optional().default(20),
@@ -120,7 +116,6 @@ export const ConfigSchema = z.object({
       staleness_minutes: 60,
       trend_threshold: 0.1,
       churn_window_days: 21,
-      churn_max_commits: 50,
       churn_concurrency: 3,
       segment_high_pct: 20,
       segment_low_pct: 20,
@@ -139,7 +134,6 @@ export const DEFAULT_SETTINGS: Config['settings'] = {
   staleness_minutes: 60,
   trend_threshold: 0.1,
   churn_window_days: 21,
-  churn_max_commits: 50,
   churn_concurrency: 3,
   segment_high_pct: 20,
   segment_low_pct: 20,
@@ -276,8 +270,11 @@ export const AuthorRegistrySchema = z.object({
 export const ProductivityExtensionsSchema = z.object({
   prs_opened: z.number().default(0),
   prs_merged: z.number().default(0),
-  avg_cycle_hrs: z.number().default(0),
-  reviews_given: z.number().default(0),
+  /** Median hours from PR open to merge (calculateCycleTime takes the median, not the mean). */
+  median_cycle_hrs: z.number().default(0),
+  /** PRs this member reviewed that received any update in the window — not a count of reviews submitted. */
+  prs_reviewed_touched: z.number().default(0),
+  /** Retired: the blame-based rework metric supersedes it. Always 0; the column is kept for old rows. */
   churn_rate_pct: z.number().default(0),
   /** PR branch type counts — parsed from enforced branch naming conventions. */
   pr_feature: z.number().default(0),

@@ -462,8 +462,8 @@ UserWeekRepoRecord
 ```
 ProductivityExtensions
 ├── prs_opened, prs_merged
-├── avg_cycle_hrs, reviews_given
-├── churn_rate_pct
+├── median_cycle_hrs, prs_reviewed_touched
+├── churn_rate_pct   # retired: kept for old rows, never written or shown
 └── pr_feature, pr_fix, pr_bugfix, pr_chore, pr_hotfix, pr_other
 
 EnrichmentStore

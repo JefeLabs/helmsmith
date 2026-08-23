@@ -32,21 +32,20 @@ export interface HBar {
   testPct?: number;
   avgTestPct?: number;
   /** Enrichment fields */
-  churnRatePct?: number;
   prsOpened?: number;
   prsMerged?: number;
-  avgCycleHrs?: number;
-  reviewsGiven?: number;
-  avgChurnRatePct?: number;
+  /** Median hours from PR open to merge. */
+  medianCycleHrs?: number;
+  /** PRs reviewed by this member that were touched in the period. */
+  prsReviewedTouched?: number;
   avgPrsOpened?: number;
   avgPrsMerged?: number;
-  avgAvgCycleHrs?: number;
-  avgReviewsGiven?: number;
-  teamAvgChurnRatePct?: number;
+  avgMedianCycleHrs?: number;
+  avgPrsReviewedTouched?: number;
   teamAvgPrsOpened?: number;
   teamAvgPrsMerged?: number;
-  teamAvgAvgCycleHrs?: number;
-  teamAvgReviewsGiven?: number;
+  teamAvgMedianCycleHrs?: number;
+  teamAvgPrsReviewedTouched?: number;
   isAverage?: boolean;
   sparkData?: number[];
   segment?: Segment;
@@ -108,7 +107,7 @@ export function renderGroupedHBarChart(options: GroupedHBarChartOptions): string
 
   // When detailLayers is provided, it takes precedence over columnMode.
   // Compact columns (net, cmts, days) + PRs are always shown when data exists.
-  // Lines detail layer adds +ins, -del, tst%, churn.
+  // Lines detail layer adds +ins, -del, tst%.
   const hasLineLayer = detailLayers ? detailLayers.has('lines') : columnMode === 'lines';
 
   if (groups.length === 0) {
@@ -148,7 +147,6 @@ export function renderGroupedHBarChart(options: GroupedHBarChartOptions): string
   const hasActiveDays = groups.some((g) => g.bars.some((b) => b.activeDays !== undefined));
   const _hasHeadcount = groups.some((g) => g.bars.some((b) => b.headcount !== undefined));
   const hasMultiHeadcount = groups.some((g) => g.bars.some((b) => (b.headcount ?? 0) > 1));
-  const hasChurnPct = groups.some((g) => g.bars.some((b) => b.churnRatePct !== undefined));
   const hasPrs = groups.some((g) => g.bars.some((b) => b.prsOpened !== undefined));
 
   // Derive column visibility from active layers.
@@ -158,7 +156,6 @@ export function renderGroupedHBarChart(options: GroupedHBarChartOptions): string
   const showDeletions = hasLineLayer;
   const showNet = true; // always visible (compact base)
   const showTestPct = hasTestPct && hasLineLayer;
-  const showChurnPct = hasChurnPct && hasLineLayer;
   const showCommits = hasCommits; // always visible (compact base)
   const showActiveDays = hasActiveDays; // always visible (compact base)
   const showPerception = hasPerception;
@@ -179,8 +176,7 @@ export function renderGroupedHBarChart(options: GroupedHBarChartOptions): string
     if (showTestPct) valueWidth += 8;
     if (showCommits) valueWidth += 9;
     if (showActiveDays) valueWidth += 9;
-    if (showChurnPct) valueWidth += 9;
-    if (showPrs) valueWidth += 36; // PRs + merged + cycle + reviews (4 × 9)
+    if (showPrs) valueWidth += 36; // PRs + merged + cycle + PRs rev (4 × 9)
     if (showHeadcount) valueWidth += 7; // "(hc)" column — last
   } else if (showValues) {
     valueWidth = 8;
@@ -222,14 +218,12 @@ export function renderGroupedHBarChart(options: GroupedHBarChartOptions): string
       if (showActiveDays) {
         header += ` ${padLeft(chalk.dim(pu ? 'day/u' : 'days'), 6)}${T}`;
       }
-      if (showChurnPct) {
-        header += ` ${padLeft(chalk.dim('churn'), 6)}${T}`;
-      }
       if (showPrs) {
         header += ` ${padLeft(chalk.dim(pu ? 'PRs/u' : 'PRs'), 6)}${T}`;
         header += ` ${padLeft(chalk.dim(pu ? 'mrg/u' : 'merged'), 6)}${T}`;
         header += ` ${padLeft(chalk.dim('cycle'), 6)}${T}`;
-        header += ` ${padLeft(chalk.dim(pu ? 'rev/u' : 'reviews'), 7)}${T}`;
+        // "PRs rev" — PRs reviewed that were touched in the period, not reviews submitted.
+        header += ` ${padLeft(chalk.dim(pu ? 'rev/u' : 'PRs rev'), 7)}${T}`;
       }
       if (showHeadcount) {
         header += ` ${padLeft(chalk.dim('hc'), 6)}`;
@@ -366,35 +360,27 @@ export function renderGroupedHBarChart(options: GroupedHBarChartOptions): string
             line += trendFn(days, avgDays, teamAvgDays);
           }
 
-          // churn%
-          if (showChurnPct) {
-            if (bar.churnRatePct !== undefined) {
-              line += ` ${padLeft(chalk.dim(`${bar.churnRatePct}%`), 6)}`;
-              line += trendFn(bar.churnRatePct, bar.avgChurnRatePct, bar.teamAvgChurnRatePct);
-            } else {
-              line += ` ${' '.repeat(6)}  `;
-            }
-          }
-
           // PRs columns
           if (showPrs) {
             const prsO = Math.round((bar.prsOpened ?? 0) / pu);
             const prsM = Math.round((bar.prsMerged ?? 0) / pu);
-            const revs = Math.round((bar.reviewsGiven ?? 0) / pu);
+            const revs = Math.round((bar.prsReviewedTouched ?? 0) / pu);
             const avgPrsO = bar.avgPrsOpened !== undefined ? bar.avgPrsOpened / avgPu : undefined;
             const avgPrsM = bar.avgPrsMerged !== undefined ? bar.avgPrsMerged / avgPu : undefined;
             const avgRevs =
-              bar.avgReviewsGiven !== undefined ? bar.avgReviewsGiven / avgPu : undefined;
+              bar.avgPrsReviewedTouched !== undefined
+                ? bar.avgPrsReviewedTouched / avgPu
+                : undefined;
             line += ` ${padLeft(chalk.dim(fmt(prsO)), 6)}`;
             line += trendFn(prsO, avgPrsO, bar.teamAvgPrsOpened);
             line += ` ${padLeft(chalk.dim(fmt(prsM)), 6)}`;
             line += trendFn(prsM, avgPrsM, bar.teamAvgPrsMerged);
-            const hrs = bar.avgCycleHrs ?? 0;
+            const hrs = bar.medianCycleHrs ?? 0;
             const cycleLabel = hrs >= 24 ? `${(hrs / 24).toFixed(1)}d` : `${hrs.toFixed(0)}h`;
             line += ` ${padLeft(chalk.dim(cycleLabel), 6)}`;
-            line += trendFn(hrs, bar.avgAvgCycleHrs, bar.teamAvgAvgCycleHrs);
+            line += trendFn(hrs, bar.avgMedianCycleHrs, bar.teamAvgMedianCycleHrs);
             line += ` ${padLeft(chalk.dim(fmt(revs)), 7)}`;
-            line += trendFn(revs, avgRevs, bar.teamAvgReviewsGiven);
+            line += trendFn(revs, avgRevs, bar.teamAvgPrsReviewedTouched);
           }
 
           // headcount (last column)
