@@ -336,4 +336,31 @@ describe('rollup', () => {
     expect(acme.filesChanged).toBe(7);
     expect(acme.activeMembers).toBe(1);
   });
+
+  it('sums PR-proxy and rework counters and concatenates prSizes', () => {
+    const records = [
+      makeRecord({
+        member: 'alice',
+        repo: 'web-app',
+        prsMergedGit: 1,
+        prSizes: [100],
+        reworkLines: 2,
+        reworkSelfLines: 1,
+      }),
+      makeRecord({
+        member: 'alice',
+        repo: 'api',
+        prsMergedGit: 2,
+        prSizes: [30, 70],
+        reworkLines: 5,
+        reworkSelfLines: 0,
+      }),
+      makeRecord({ member: 'bob', repo: 'api' }), // legacy record: fields absent
+    ];
+    const acme = rollup(records, (r) => r.org).get('Acme')!;
+    expect(acme.prsMergedGit).toBe(3);
+    expect(acme.prSizes).toEqual([100, 30, 70]);
+    expect(acme.reworkLines).toBe(7);
+    expect(acme.reworkSelfLines).toBe(1);
+  });
 });

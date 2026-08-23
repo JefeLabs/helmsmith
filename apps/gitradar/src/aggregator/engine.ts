@@ -26,6 +26,10 @@ function emptyRolledUp(): RolledUp {
     activeDays: 0,
     activeMembers: 0,
     breakingChanges: 0,
+    prsMergedGit: 0,
+    prSizes: [],
+    reworkLines: 0,
+    reworkSelfLines: 0,
     filetype: {
       app: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
       test: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
@@ -80,6 +84,10 @@ export function rollup(
 
     agg.commits += r.commits;
     agg.breakingChanges += r.breakingChanges ?? 0;
+    agg.prsMergedGit += r.prsMergedGit ?? 0;
+    if (r.prSizes?.length) agg.prSizes.push(...r.prSizes);
+    agg.reworkLines += r.reworkLines ?? 0;
+    agg.reworkSelfLines += r.reworkSelfLines ?? 0;
 
     for (const ft of FILETYPE_KEYS) {
       const src: FiletypeMetrics = r.filetype[ft];

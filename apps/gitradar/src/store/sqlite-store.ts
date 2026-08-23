@@ -100,6 +100,10 @@ function ensureSchema(db: Database): void {
       doc_del INTEGER NOT NULL DEFAULT 0,
       breaking_changes INTEGER NOT NULL DEFAULT 0,
       scopes TEXT NOT NULL DEFAULT '[]',
+      prs_merged_git INTEGER NOT NULL DEFAULT 0,
+      pr_sizes TEXT NOT NULL DEFAULT '[]',
+      rework_lines INTEGER NOT NULL DEFAULT 0,
+      rework_self_lines INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (member, week, repo)
     );
 
@@ -128,7 +132,8 @@ function ensureSchema(db: Database): void {
       last_hash TEXT NOT NULL,
       last_scan_date TEXT NOT NULL,
       recent_hashes TEXT NOT NULL DEFAULT '[]',
-      record_count INTEGER NOT NULL DEFAULT 0
+      record_count INTEGER NOT NULL DEFAULT 0,
+      recent_pr_hashes TEXT NOT NULL DEFAULT '[]'
     );
 
     CREATE TABLE IF NOT EXISTS authors (
@@ -154,6 +159,28 @@ function ensureSchema(db: Database): void {
   migrateEnrichmentBranchColumns(db);
   migrateRecordsScopeColumns(db);
   migrateRecordsActiveDayMask(db);
+  migrateScorecardColumns(db);
+}
+
+/** Add PR-proxy / rework columns and the PR scan cursor if missing (migration v5). */
+function migrateScorecardColumns(db: Database): void {
+  const recCols = new Set(
+    (db.prepare('PRAGMA table_info(records)').all() as Array<{ name: string }>).map((c) => c.name),
+  );
+  const add = (col: string, ddl: string) => {
+    if (!recCols.has(col)) db.exec(`ALTER TABLE records ADD COLUMN ${col} ${ddl};`);
+  };
+  add('prs_merged_git', 'INTEGER NOT NULL DEFAULT 0');
+  add('pr_sizes', "TEXT NOT NULL DEFAULT '[]'");
+  add('rework_lines', 'INTEGER NOT NULL DEFAULT 0');
+  add('rework_self_lines', 'INTEGER NOT NULL DEFAULT 0');
+
+  const ssCols = (db.prepare('PRAGMA table_info(scan_state)').all() as Array<{ name: string }>).map(
+    (c) => c.name,
+  );
+  if (!ssCols.includes('recent_pr_hashes')) {
+    db.exec("ALTER TABLE scan_state ADD COLUMN recent_pr_hashes TEXT NOT NULL DEFAULT '[]';");
+  }
 }
 
 /** Add active_day_mask to records if it doesn't exist (migration v4). */
@@ -187,6 +214,58 @@ const ACTIVE_DAYS_MERGE_SQL = `
         ELSE MIN(active_days + excluded.active_days, 7)
       END,
       active_day_mask = active_day_mask | excluded.active_day_mask,`;
+
+/**
+ * Shared ON CONFLICT SET clause for both record upserts (`saveCommitsDataSQL`
+ * and `upsertRecords`) so the merge rules cannot drift between them.
+ * `scopes` is a set union (distinct scopes only); `pr_sizes` concatenates
+ * (each proxy-detected PR's size is a distinct sample, duplicates included).
+ */
+const RECORD_MERGE_TAIL_SQL = `
+      commits = commits + excluded.commits,
+${ACTIVE_DAYS_MERGE_SQL}
+      intent_feat = intent_feat + excluded.intent_feat,
+      intent_fix = intent_fix + excluded.intent_fix,
+      intent_refactor = intent_refactor + excluded.intent_refactor,
+      intent_docs = intent_docs + excluded.intent_docs,
+      intent_test = intent_test + excluded.intent_test,
+      intent_chore = intent_chore + excluded.intent_chore,
+      intent_other = intent_other + excluded.intent_other,
+      app_files = app_files + excluded.app_files,
+      app_files_added = app_files_added + excluded.app_files_added,
+      app_files_deleted = app_files_deleted + excluded.app_files_deleted,
+      app_ins = app_ins + excluded.app_ins,
+      app_del = app_del + excluded.app_del,
+      test_files = test_files + excluded.test_files,
+      test_files_added = test_files_added + excluded.test_files_added,
+      test_files_deleted = test_files_deleted + excluded.test_files_deleted,
+      test_ins = test_ins + excluded.test_ins,
+      test_del = test_del + excluded.test_del,
+      config_files = config_files + excluded.config_files,
+      config_files_added = config_files_added + excluded.config_files_added,
+      config_files_deleted = config_files_deleted + excluded.config_files_deleted,
+      config_ins = config_ins + excluded.config_ins,
+      config_del = config_del + excluded.config_del,
+      storybook_files = storybook_files + excluded.storybook_files,
+      storybook_files_added = storybook_files_added + excluded.storybook_files_added,
+      storybook_files_deleted = storybook_files_deleted + excluded.storybook_files_deleted,
+      storybook_ins = storybook_ins + excluded.storybook_ins,
+      storybook_del = storybook_del + excluded.storybook_del,
+      doc_files = doc_files + excluded.doc_files,
+      doc_files_added = doc_files_added + excluded.doc_files_added,
+      doc_files_deleted = doc_files_deleted + excluded.doc_files_deleted,
+      doc_ins = doc_ins + excluded.doc_ins,
+      doc_del = doc_del + excluded.doc_del,
+      breaking_changes = breaking_changes + excluded.breaking_changes,
+      scopes = (SELECT json_group_array(value) FROM (
+        SELECT value FROM json_each(records.scopes)
+        UNION SELECT value FROM json_each(excluded.scopes))),
+      prs_merged_git = prs_merged_git + excluded.prs_merged_git,
+      pr_sizes = (SELECT json_group_array(value) FROM (
+        SELECT value FROM json_each(records.pr_sizes)
+        UNION ALL SELECT value FROM json_each(excluded.pr_sizes))),
+      rework_lines = rework_lines + excluded.rework_lines,
+      rework_self_lines = rework_self_lines + excluded.rework_self_lines`;
 
 /** Add pr_branch columns to enrichments if they don't exist (migration v2). */
 function migrateEnrichmentBranchColumns(db: Database): void {
@@ -268,6 +347,10 @@ function recordToRow(r: UserWeekRepoRecord): BindParams {
     doc_del: r.filetype.doc?.deletions ?? 0,
     breaking_changes: r.breakingChanges ?? 0,
     scopes: JSON.stringify(r.scopes ?? []),
+    prs_merged_git: r.prsMergedGit ?? 0,
+    pr_sizes: JSON.stringify(r.prSizes ?? []),
+    rework_lines: r.reworkLines ?? 0,
+    rework_self_lines: r.reworkSelfLines ?? 0,
   };
 }
 
@@ -334,6 +417,10 @@ function rowToRecord(row: Record<string, unknown>): UserWeekRepoRecord {
     },
     breakingChanges: (row.breaking_changes as number) ?? 0,
     scopes: JSON.parse((row.scopes as string) || '[]'),
+    prsMergedGit: (row.prs_merged_git as number) ?? 0,
+    prSizes: JSON.parse((row.pr_sizes as string) || '[]') as number[],
+    reworkLines: (row.rework_lines as number) ?? 0,
+    reworkSelfLines: (row.rework_self_lines as number) ?? 0,
   };
 }
 
@@ -397,7 +484,7 @@ export function saveCommitsDataSQL(data: CommitsByFiletype): void {
       config_files, config_files_added, config_files_deleted, config_ins, config_del,
       storybook_files, storybook_files_added, storybook_files_deleted, storybook_ins, storybook_del,
       doc_files, doc_files_added, doc_files_deleted, doc_ins, doc_del,
-      breaking_changes, scopes
+      breaking_changes, scopes, prs_merged_git, pr_sizes, rework_lines, rework_self_lines
     ) VALUES (
       @member, @email, @org, @org_type, @team, @tag, @week, @repo, @grp,
       @commits, @active_days, @active_day_mask,
@@ -407,45 +494,10 @@ export function saveCommitsDataSQL(data: CommitsByFiletype): void {
       @config_files, @config_files_added, @config_files_deleted, @config_ins, @config_del,
       @storybook_files, @storybook_files_added, @storybook_files_deleted, @storybook_ins, @storybook_del,
       @doc_files, @doc_files_added, @doc_files_deleted, @doc_ins, @doc_del,
-      @breaking_changes, @scopes
+      @breaking_changes, @scopes, @prs_merged_git, @pr_sizes, @rework_lines, @rework_self_lines
     )
     ON CONFLICT (member, week, repo) DO UPDATE SET
-      commits = commits + excluded.commits,
-${ACTIVE_DAYS_MERGE_SQL}
-      intent_feat = intent_feat + excluded.intent_feat,
-      intent_fix = intent_fix + excluded.intent_fix,
-      intent_refactor = intent_refactor + excluded.intent_refactor,
-      intent_docs = intent_docs + excluded.intent_docs,
-      intent_test = intent_test + excluded.intent_test,
-      intent_chore = intent_chore + excluded.intent_chore,
-      intent_other = intent_other + excluded.intent_other,
-      app_files = app_files + excluded.app_files,
-      app_files_added = app_files_added + excluded.app_files_added,
-      app_files_deleted = app_files_deleted + excluded.app_files_deleted,
-      app_ins = app_ins + excluded.app_ins,
-      app_del = app_del + excluded.app_del,
-      test_files = test_files + excluded.test_files,
-      test_files_added = test_files_added + excluded.test_files_added,
-      test_files_deleted = test_files_deleted + excluded.test_files_deleted,
-      test_ins = test_ins + excluded.test_ins,
-      test_del = test_del + excluded.test_del,
-      config_files = config_files + excluded.config_files,
-      config_files_added = config_files_added + excluded.config_files_added,
-      config_files_deleted = config_files_deleted + excluded.config_files_deleted,
-      config_ins = config_ins + excluded.config_ins,
-      config_del = config_del + excluded.config_del,
-      storybook_files = storybook_files + excluded.storybook_files,
-      storybook_files_added = storybook_files_added + excluded.storybook_files_added,
-      storybook_files_deleted = storybook_files_deleted + excluded.storybook_files_deleted,
-      storybook_ins = storybook_ins + excluded.storybook_ins,
-      storybook_del = storybook_del + excluded.storybook_del,
-      doc_files = doc_files + excluded.doc_files,
-      doc_files_added = doc_files_added + excluded.doc_files_added,
-      doc_files_deleted = doc_files_deleted + excluded.doc_files_deleted,
-      doc_ins = doc_ins + excluded.doc_ins,
-      doc_del = doc_del + excluded.doc_del,
-      breaking_changes = breaking_changes + excluded.breaking_changes,
-      scopes = excluded.scopes
+${RECORD_MERGE_TAIL_SQL}
   `);
 
   const insertMany = db.transaction((records: UserWeekRepoRecord[]) => {
@@ -572,6 +624,10 @@ export interface RolledUp {
   activeDays: number;
   activeMembers: number;
   breakingChanges: number;
+  prsMergedGit: number;
+  prSizes: number[];
+  reworkLines: number;
+  reworkSelfLines: number;
   filetype: {
     app: FiletypeRollup;
     test: FiletypeRollup;
@@ -677,7 +733,8 @@ export function queryRollup(filters: RollupFilters, groupBy: RollupGroupBy): Map
       SUM(doc_files_deleted) as doc_files_deleted,
       SUM(doc_ins) as doc_ins,
       SUM(doc_del) as doc_del,
-      SUM(breaking_changes) as breaking_changes
+      SUM(breaking_changes) as breaking_changes,
+      SUM(prs_merged_git) as prs_merged_git, SUM(rework_lines) as rework_lines, SUM(rework_self_lines) as rework_self_lines
     FROM records
     ${where}
     ${groupByClause}
@@ -706,6 +763,19 @@ export function queryRollup(filters: RollupFilters, groupBy: RollupGroupBy): Map
   const activeDaysByKey = new Map<string, number>();
   for (const row of db.prepare(activeDaysSql).all(params) as Array<Record<string, unknown>>) {
     activeDaysByKey.set(String(row.group_key), (row.active_days as number | null) ?? 0);
+  }
+
+  // pr_sizes is a per-row JSON array of PR sizes; concatenate across the group
+  // (not a SUM — each proxy-detected PR's size is its own sample).
+  const prSizesSql = `
+    SELECT ${groupCol} as group_key, json_group_array(je.value) as sizes
+    FROM records, json_each(records.pr_sizes) AS je
+    ${where}
+    ${groupByClause}
+  `;
+  const prSizesByKey = new Map<string, number[]>();
+  for (const row of db.prepare(prSizesSql).all(params) as Array<Record<string, unknown>>) {
+    prSizesByKey.set(String(row.group_key), JSON.parse((row.sizes as string) || '[]') as number[]);
   }
 
   const result = new Map<string, RolledUp>();
@@ -773,6 +843,10 @@ export function queryRollup(filters: RollupFilters, groupBy: RollupGroupBy): Map
       filesAdded,
       filesDeleted,
       breakingChanges: (row.breaking_changes as number) ?? 0,
+      prsMergedGit: (row.prs_merged_git as number) ?? 0,
+      prSizes: prSizesByKey.get(key) ?? [],
+      reworkLines: (row.rework_lines as number) ?? 0,
+      reworkSelfLines: (row.rework_self_lines as number) ?? 0,
       filetype: { app, test, config, storybook, doc },
     });
   }
@@ -969,6 +1043,7 @@ export function loadScanStateSQL(): ScanState {
     last_scan_date: string;
     recent_hashes: string;
     record_count: number;
+    recent_pr_hashes: string;
   }>;
 
   const repos: ScanState['repos'] = {};
@@ -978,6 +1053,7 @@ export function loadScanStateSQL(): ScanState {
       lastScanDate: row.last_scan_date,
       recentHashes: JSON.parse(row.recent_hashes) as string[],
       recordCount: row.record_count,
+      recentPrHashes: JSON.parse(row.recent_pr_hashes || '[]') as string[],
     };
   }
 
@@ -987,13 +1063,14 @@ export function loadScanStateSQL(): ScanState {
 export function saveScanStateSQL(state: ScanState): void {
   const db = getDB();
   const upsert = db.prepare(`
-    INSERT INTO scan_state (repo, last_hash, last_scan_date, recent_hashes, record_count)
-    VALUES (@repo, @last_hash, @last_scan_date, @recent_hashes, @record_count)
+    INSERT INTO scan_state (repo, last_hash, last_scan_date, recent_hashes, record_count, recent_pr_hashes)
+    VALUES (@repo, @last_hash, @last_scan_date, @recent_hashes, @record_count, @recent_pr_hashes)
     ON CONFLICT (repo) DO UPDATE SET
       last_hash = excluded.last_hash,
       last_scan_date = excluded.last_scan_date,
       recent_hashes = excluded.recent_hashes,
-      record_count = excluded.record_count
+      record_count = excluded.record_count,
+      recent_pr_hashes = excluded.recent_pr_hashes
   `);
 
   const saveAll = db.transaction((repos: Record<string, ScanState['repos'][string]>) => {
@@ -1004,6 +1081,7 @@ export function saveScanStateSQL(state: ScanState): void {
         last_scan_date: rs.lastScanDate,
         recent_hashes: JSON.stringify(rs.recentHashes),
         record_count: rs.recordCount,
+        recent_pr_hashes: JSON.stringify(rs.recentPrHashes ?? []),
       });
     }
   });
@@ -1014,19 +1092,21 @@ export function saveScanStateSQL(state: ScanState): void {
 export function updateRepoScanStateSQL(repoName: string, rs: ScanState['repos'][string]): void {
   const db = getDB();
   db.prepare(`
-    INSERT INTO scan_state (repo, last_hash, last_scan_date, recent_hashes, record_count)
-    VALUES (@repo, @last_hash, @last_scan_date, @recent_hashes, @record_count)
+    INSERT INTO scan_state (repo, last_hash, last_scan_date, recent_hashes, record_count, recent_pr_hashes)
+    VALUES (@repo, @last_hash, @last_scan_date, @recent_hashes, @record_count, @recent_pr_hashes)
     ON CONFLICT (repo) DO UPDATE SET
       last_hash = excluded.last_hash,
       last_scan_date = excluded.last_scan_date,
       recent_hashes = excluded.recent_hashes,
-      record_count = excluded.record_count
+      record_count = excluded.record_count,
+      recent_pr_hashes = excluded.recent_pr_hashes
   `).run({
     repo: repoName,
     last_hash: rs.lastHash,
     last_scan_date: rs.lastScanDate,
     recent_hashes: JSON.stringify(rs.recentHashes),
     record_count: rs.recordCount,
+    recent_pr_hashes: JSON.stringify(rs.recentPrHashes ?? []),
   });
 }
 
@@ -1123,7 +1203,7 @@ export function upsertRecords(records: UserWeekRepoRecord[]): void {
       config_files, config_files_added, config_files_deleted, config_ins, config_del,
       storybook_files, storybook_files_added, storybook_files_deleted, storybook_ins, storybook_del,
       doc_files, doc_files_added, doc_files_deleted, doc_ins, doc_del,
-      breaking_changes, scopes
+      breaking_changes, scopes, prs_merged_git, pr_sizes, rework_lines, rework_self_lines
     ) VALUES (
       @member, @email, @org, @org_type, @team, @tag, @week, @repo, @grp,
       @commits, @active_days, @active_day_mask,
@@ -1133,45 +1213,10 @@ export function upsertRecords(records: UserWeekRepoRecord[]): void {
       @config_files, @config_files_added, @config_files_deleted, @config_ins, @config_del,
       @storybook_files, @storybook_files_added, @storybook_files_deleted, @storybook_ins, @storybook_del,
       @doc_files, @doc_files_added, @doc_files_deleted, @doc_ins, @doc_del,
-      @breaking_changes, @scopes
+      @breaking_changes, @scopes, @prs_merged_git, @pr_sizes, @rework_lines, @rework_self_lines
     )
     ON CONFLICT (member, week, repo) DO UPDATE SET
-      commits = commits + excluded.commits,
-${ACTIVE_DAYS_MERGE_SQL}
-      intent_feat = intent_feat + excluded.intent_feat,
-      intent_fix = intent_fix + excluded.intent_fix,
-      intent_refactor = intent_refactor + excluded.intent_refactor,
-      intent_docs = intent_docs + excluded.intent_docs,
-      intent_test = intent_test + excluded.intent_test,
-      intent_chore = intent_chore + excluded.intent_chore,
-      intent_other = intent_other + excluded.intent_other,
-      app_files = app_files + excluded.app_files,
-      app_files_added = app_files_added + excluded.app_files_added,
-      app_files_deleted = app_files_deleted + excluded.app_files_deleted,
-      app_ins = app_ins + excluded.app_ins,
-      app_del = app_del + excluded.app_del,
-      test_files = test_files + excluded.test_files,
-      test_files_added = test_files_added + excluded.test_files_added,
-      test_files_deleted = test_files_deleted + excluded.test_files_deleted,
-      test_ins = test_ins + excluded.test_ins,
-      test_del = test_del + excluded.test_del,
-      config_files = config_files + excluded.config_files,
-      config_files_added = config_files_added + excluded.config_files_added,
-      config_files_deleted = config_files_deleted + excluded.config_files_deleted,
-      config_ins = config_ins + excluded.config_ins,
-      config_del = config_del + excluded.config_del,
-      storybook_files = storybook_files + excluded.storybook_files,
-      storybook_files_added = storybook_files_added + excluded.storybook_files_added,
-      storybook_files_deleted = storybook_files_deleted + excluded.storybook_files_deleted,
-      storybook_ins = storybook_ins + excluded.storybook_ins,
-      storybook_del = storybook_del + excluded.storybook_del,
-      doc_files = doc_files + excluded.doc_files,
-      doc_files_added = doc_files_added + excluded.doc_files_added,
-      doc_files_deleted = doc_files_deleted + excluded.doc_files_deleted,
-      doc_ins = doc_ins + excluded.doc_ins,
-      doc_del = doc_del + excluded.doc_del,
-      breaking_changes = breaking_changes + excluded.breaking_changes,
-      scopes = excluded.scopes
+${RECORD_MERGE_TAIL_SQL}
   `);
 
   const insertMany = db.transaction((recs: UserWeekRepoRecord[]) => {
