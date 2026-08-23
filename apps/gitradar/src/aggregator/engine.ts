@@ -70,7 +70,11 @@ export function rollup(
     }
 
     const members = memberSets.get(key)!;
-    members.add(r.member);
+    // "Active" means they committed. Post-pass records (PR proxy / rework) carry
+    // commits === 0: they make a member *attributable* to a week, not active in
+    // it — a merge landing after the branch week, or someone's old code deleted
+    // while they were away, must not inflate headcount.
+    if (r.commits > 0) members.add(r.member);
 
     const trackers = dayTrackers.get(key)!;
     const memberWeek = `${r.member}::${r.week}`;

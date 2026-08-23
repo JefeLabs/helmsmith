@@ -33,6 +33,31 @@ function makeRecord(overrides: Partial<UserWeekRepoRecord> = {}): UserWeekRepoRe
   };
 }
 
+/** All-zero filetype block — the shape a post-pass "holder" record carries. */
+function zeroFiletype(): UserWeekRepoRecord['filetype'] {
+  return {
+    app: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+    test: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+    config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+    storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+    doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+  };
+}
+
+/** A record with `n` app insertions and one commit, in the given week. */
+function linesRecord(member: string, insertions: number, week: string): UserWeekRepoRecord {
+  return makeRecord({
+    member,
+    email: `${member}@example.com`,
+    week,
+    commits: 1,
+    filetype: {
+      ...zeroFiletype(),
+      app: { files: 1, filesAdded: 0, filesDeleted: 0, insertions, deletions: 0 },
+    },
+  });
+}
+
 describe('scorecard columns in the SQLite store', () => {
   let tmpHome: string;
   let dataDir: string;
@@ -193,5 +218,159 @@ describe('scorecard columns in the SQLite store', () => {
     expect(store.loadScanStateSQL().repos.web.recentPrHashes).toEqual([]);
     store.upsertRecords([makeRecord({ repo: 'api', prsMergedGit: 1, prSizes: [5] })]);
     expect(store.queryRecords({ repo: 'api' })[0].prSizes).toEqual([5]);
+  });
+
+  // ── I1: holder records (commits === 0) are not "active" ────────────────────
+
+  it('queryRollup does not count a holder-only member (commits === 0) as active', () => {
+    store.upsertRecords([
+      makeRecord({ member: 'Alice', commits: 3 }),
+      makeRecord({
+        member: 'Holder',
+        email: 'holder@example.com',
+        commits: 0,
+        activeDays: 0,
+        prsMergedGit: 1,
+        prSizes: [200],
+        filetype: zeroFiletype(),
+      }),
+    ]);
+
+    const all = store.queryRollup({}, 'all').get('all')!;
+    expect(all.activeMembers).toBe(1);
+    // The holder's own counters still roll up — only headcount is gated.
+    expect(all.prsMergedGit).toBe(1);
+    expect(all.prSizes).toEqual([200]);
+
+    const week = store.queryRollup({}, 'week').get('2026-W10')!;
+    expect(week.activeMembers).toBe(1);
+  });
+
+  // ── I2: bot exclusion inside queryRollup ───────────────────────────────────
+});
+
+// ── Command-level SQL path (contributions / leaderboard) ─────────────────────
+
+describe('contributions SQL fast path', () => {
+  let tmpHome: string;
+  let dataDir: string;
+  const originalOverride = process.env.GITRADAR_HOME;
+  let out: string[] = [];
+  let originalLog: typeof console.log;
+
+  beforeEach(async () => {
+    tmpHome = await mkdtemp(join(tmpdir(), 'gitradar-contrib-'));
+    dataDir = join(tmpHome, 'data');
+    await mkdir(dataDir, { recursive: true });
+    process.env.GITRADAR_HOME = tmpHome;
+    out = [];
+    originalLog = console.log;
+    console.log = (...a: unknown[]) => {
+      out.push(a.map(String).join(' '));
+    };
+  });
+
+  afterEach(async () => {
+    console.log = originalLog;
+    store.closeDB();
+    if (originalOverride === undefined) delete process.env.GITRADAR_HOME;
+    else process.env.GITRADAR_HOME = originalOverride;
+    await rm(tmpHome, { recursive: true, force: true });
+  });
+
+  it('leaves holder-only members out of the segment cohort', async () => {
+    const { getCurrentWeek } = await import('../aggregator/filters.js');
+    const { contributions } = await import('../commands/contributions.js');
+    const week = getCurrentWeek();
+
+    // Nine real contributors, descending by lines: mem01 (900) … mem09 (100).
+    const records: UserWeekRepoRecord[] = [];
+    for (let i = 1; i <= 9; i++) {
+      records.push(linesRecord(`mem0${i}`, (10 - i) * 100, week));
+    }
+    // One holder: attributable to the week via a merged PR, but zero commits.
+    records.push(
+      makeRecord({
+        member: 'holderbob',
+        email: 'holderbob@example.com',
+        week,
+        commits: 0,
+        activeDays: 0,
+        prsMergedGit: 1,
+        prSizes: [200],
+        filetype: zeroFiletype(),
+      }),
+    );
+    store.upsertRecords(records);
+
+    await contributions({ weeks: 4, groupBy: 'member', segment: 'low', segmentMinN: 8 });
+    const text = out.join('\n');
+
+    // Cohort is the nine real contributors (n = 9 → bottom ceil(9 × 20%) = 2).
+    expect(text).toContain('mem08');
+    expect(text).toContain('mem09');
+    // The holder is neither labelled nor counted in n (which would have made
+    // the cohort 10 and pushed mem08 out of the bottom two).
+    expect(text).not.toContain('holderbob');
+    expect(text).not.toContain('mem07');
+  });
+});
+
+describe('leaderboard SQL segment path', () => {
+  let tmpHome: string;
+  let dataDir: string;
+  const originalOverride = process.env.GITRADAR_HOME;
+  let out: string[] = [];
+  let originalLog: typeof console.log;
+
+  beforeEach(async () => {
+    tmpHome = await mkdtemp(join(tmpdir(), 'gitradar-leaderboard-'));
+    dataDir = join(tmpHome, 'data');
+    await mkdir(dataDir, { recursive: true });
+    process.env.GITRADAR_HOME = tmpHome;
+    out = [];
+    originalLog = console.log;
+    console.log = (...a: unknown[]) => {
+      out.push(a.map(String).join(' '));
+    };
+  });
+
+  afterEach(async () => {
+    console.log = originalLog;
+    store.closeDB();
+    if (originalOverride === undefined) delete process.env.GITRADAR_HOME;
+    else process.env.GITRADAR_HOME = originalOverride;
+    await rm(tmpHome, { recursive: true, force: true });
+  });
+
+  it('leaves holder-only members out of the leaderboard segment cohort', async () => {
+    const { getCurrentWeek } = await import('../aggregator/filters.js');
+    const { leaderboard } = await import('../commands/leaderboard.js');
+    const week = getCurrentWeek();
+
+    const records: UserWeekRepoRecord[] = [];
+    for (let i = 1; i <= 9; i++) records.push(linesRecord(`mem0${i}`, (10 - i) * 100, week));
+    records.push(
+      makeRecord({
+        member: 'holderbob',
+        email: 'holderbob@example.com',
+        week,
+        commits: 0,
+        activeDays: 0,
+        prsMergedGit: 1,
+        prSizes: [200],
+        filetype: zeroFiletype(),
+      }),
+    );
+    store.upsertRecords(records);
+
+    await leaderboard({ weeks: 4, segment: 'low', segmentMinN: 8, json: true });
+    const cols = JSON.parse(out.join('\n')) as Array<{
+      entries: Array<{ member: string }>;
+    }>;
+    const names = new Set(cols.flatMap((c) => c.entries.map((e) => e.member)));
+    expect(names.has('holderbob')).toBe(false);
+    // n = 9 real contributors → bottom two are mem08 / mem09.
+    expect(names).toEqual(new Set(['mem08', 'mem09']));
   });
 });

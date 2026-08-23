@@ -62,6 +62,10 @@ export async function leaderboard(options: LeaderboardOptions = {}): Promise<voi
       // excludeBots() pass above — guard here too so a bot can't leak
       // back into the segment split when reading live from disk.
       if (isBotAuthor(name, '', botPatterns)) continue;
+      // Holder rows (commits === 0) come from the PR-proxy / rework passes:
+      // attributable to the window, but not active in it. They must not be
+      // labelled, nor shift the cohort size that sets the segment thresholds.
+      if (agg.commits === 0) continue;
       memberTotals.set(name, agg.insertions + agg.deletions);
     }
     const segMap = calculateSegments(memberTotals, options.segmentThresholds, options.segmentMinN);

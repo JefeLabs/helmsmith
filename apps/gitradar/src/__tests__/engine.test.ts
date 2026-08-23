@@ -190,6 +190,35 @@ describe('rollup', () => {
     expect(acme.activeMembers).toBe(2);
   });
 
+  it('does not count a holder-only member (commits === 0) as active', () => {
+    // Post-pass records (PR proxy / rework) carry commits === 0: the member is
+    // *attributable* to the week, not active in it.
+    const records = [
+      makeRecord({ member: 'alice', commits: 4 }),
+      makeRecord({
+        member: 'holder-bob',
+        commits: 0,
+        activeDays: 0,
+        prsMergedGit: 1,
+        prSizes: [200],
+        filetype: {
+          app: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+          test: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+          config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+          storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+          doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+        },
+      }),
+    ];
+
+    const acme = rollup(records, (r) => r.org).get('Acme')!;
+
+    expect(acme.activeMembers).toBe(1);
+    // The holder's own counters still roll up — only headcount is gated.
+    expect(acme.prsMergedGit).toBe(1);
+    expect(acme.prSizes).toEqual([200]);
+  });
+
   it('sums filetype breakdown across records', () => {
     const records = [
       makeRecord({

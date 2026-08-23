@@ -427,6 +427,10 @@ export async function contributions(options: ContributionsOptions = {}): Promise
     // Compute segments for display (from SQL-aggregated totals)
     const memberTotals = new Map<string, number>();
     for (const row of rows) {
+      // Holder rows (commits === 0) come from the PR-proxy / rework passes.
+      // They are not evidence of work in this window, so they neither earn a
+      // segment label nor count towards the cohort size that sets thresholds.
+      if (row.commits === 0) continue;
       memberTotals.set(row.name, row.insertions + row.deletions);
     }
     const segMap = calculateSegments(memberTotals, options.segmentThresholds, options.segmentMinN);

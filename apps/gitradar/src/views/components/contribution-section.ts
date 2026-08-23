@@ -266,6 +266,10 @@ export function buildContributionGroups(
         (a, b) => b[1].insertions + b[1].deletions - (a[1].insertions + a[1].deletions),
       );
       for (const [member, agg] of entries) {
+        // Skip holder-only members: the PR-proxy / rework passes store records
+        // with commits === 0 for weeks the member did not work in. Rendering a
+        // zero-length bar for them also drags them into the segment cohort.
+        if (agg.commits === 0) continue;
         bars.push({
           label: member,
           segments: [
@@ -1143,6 +1147,9 @@ export function renderContributionsTab(
       for (const g of groups) {
         for (const bar of g.bars) {
           if (isBotAuthor(bar.label, '', botPatterns)) continue;
+          // Holder-only entries (commits === 0) are attributable to the bucket
+          // but were not active in it — keep them out of the segment cohort.
+          if (bar.commits === 0) continue;
           memberTotals.set(bar.label, (memberTotals.get(bar.label) ?? 0) + bar.total);
         }
       }

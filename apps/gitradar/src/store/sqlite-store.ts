@@ -707,7 +707,10 @@ export function queryRollup(filters: RollupFilters, groupBy: RollupGroupBy): Map
     SELECT
       ${groupCol} as group_key,
       SUM(commits) as commits,
-      COUNT(DISTINCT member) as active_members,
+      -- Only committing members are "active": post-pass records (PR proxy /
+      -- rework) carry commits = 0 and must not inflate headcount. Mirrors the
+      -- same gate in the JS rollup().
+      COUNT(DISTINCT CASE WHEN commits > 0 THEN member END) as active_members,
       SUM(app_files) as app_files,
       SUM(app_files_added) as app_files_added,
       SUM(app_files_deleted) as app_files_deleted,
