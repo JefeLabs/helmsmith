@@ -339,6 +339,7 @@ export class GitRadarEngine {
       onRepoReset: async (name) => {
         deleteRecordsForRepo(name);
         deleteScanStateForRepo(name);
+        this.forgetRepoScanState(name);
       },
     });
 
@@ -364,6 +365,22 @@ export class GitRadarEngine {
 
     // Records are now loaded on-demand by applyFilters() or buildViewContext()
     // instead of eagerly loading all data into memory after every scan.
+  }
+
+  /**
+   * Drop a repo from the in-memory scan state, mirroring the `scan_state` row
+   * `onRepoReset` just deleted.
+   *
+   * Without this, a rescan that throws after the reset leaves the repo's stale
+   * entry in `this.scanState`: the next repo's `onScanStateUpdated` persists the
+   * *whole* state, writing the deleted cursor back. The repo then looks freshly
+   * scanned with no records, and an ordinary scan skips it as fresh or resumes
+   * from the stale cursor.
+   */
+  private forgetRepoScanState(repoName: string): void {
+    if (!this.scanState?.repos[repoName]) return;
+    const { [repoName]: _removed, ...rest } = this.scanState.repos;
+    this.scanState = { ...this.scanState, repos: rest };
   }
 
   // ── Rescan a single repo (used by ViewContext.onScanRepo) ────────────────
@@ -411,6 +428,7 @@ export class GitRadarEngine {
       onRepoReset: async (name) => {
         deleteRecordsForRepo(name);
         deleteScanStateForRepo(name);
+        this.forgetRepoScanState(name);
       },
     });
 
