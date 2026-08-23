@@ -40,6 +40,19 @@ describe('docs tell the truth', () => {
   it('package.json declares the Bun engine', () => {
     const pkg = JSON.parse(read('package.json'));
     expect(pkg.engines?.bun).toMatch(/^>=1\./);
-    expect(pkg.dependencies?.commander).toBeUndefined();
+    // `@helmsmith/cli-kit` declares commander as a *peer* dependency, so the
+    // consumer has to supply it. It is not transitive.
+    expect(pkg.dependencies?.commander).toBeDefined();
+    expect(pkg.devDependencies?.commander).toBeUndefined();
+  });
+
+  it('package.json ships the built CLI', () => {
+    const pkg = JSON.parse(read('package.json'));
+    // `.gitignore` ignores dist/, which npm honours when there is no `files`
+    // field — so the tarball shipped a `bin` launcher pointing at a missing
+    // `dist/cli.js`. The allowlist and the prepack build are what fix that.
+    expect(pkg.files).toContain('dist');
+    expect(pkg.files).toContain('bin');
+    expect(pkg.scripts?.prepack).toBeDefined();
   });
 });
