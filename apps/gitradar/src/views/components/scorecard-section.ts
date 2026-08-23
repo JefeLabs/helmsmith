@@ -52,6 +52,22 @@ export function moveSort(
   return { ...state, sortKey: next, sortDesc: next === 'member' ? false : state.sortDesc };
 }
 
+/**
+ * Keep the sort key on a column that is actually on screen.
+ *
+ * Cycling the metric family changes which columns render. A sort key carried
+ * over from the previous family leaves the table sorted by an invisible column
+ * with no `▾` marker anywhere, and `moveSort` then recovers oddly:
+ * `keys.indexOf(sortKey)` is -1, so `→` jumps to index 1 rather than continuing
+ * from where the user was. Falls back to the first metric of the new family;
+ * `sortDesc` is the user's choice and is preserved.
+ */
+export function reconcileSort(state: ScorecardViewState, hasScore: boolean): ScorecardViewState {
+  const keys = visibleMetricKeys(state, hasScore);
+  if (keys.includes(state.sortKey)) return state;
+  return { ...state, sortKey: keys.find((k) => k !== 'member') ?? keys[0] };
+}
+
 export const FAMILY_ORDER: ScorecardFamily[] = ['all', ...FAMILIES];
 export const MODE_ORDER: ScorecardMode[] = ['value', 'delta', 'pctl'];
 

@@ -48,6 +48,7 @@ import {
   FAMILY_ORDER,
   MODE_ORDER,
   moveSort,
+  reconcileSort,
   renderScorecardTab,
   type ScorecardViewState,
 } from './components/scorecard-section.js';
@@ -787,7 +788,12 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
       }
       if (action === 'sc_family') {
         const i = FAMILY_ORDER.indexOf(scorecard.family);
-        scorecard = { ...scorecard, family: FAMILY_ORDER[(i + 1) % FAMILY_ORDER.length] };
+        // The new family renders a different column set — reconcile the sort
+        // key so the table is never sorted by a column that isn't on screen.
+        scorecard = reconcileSort(
+          { ...scorecard, family: FAMILY_ORDER[(i + 1) % FAMILY_ORDER.length] },
+          !!ctx.config.settings.scorecard_weights,
+        );
         continue;
       }
       if (action === 'sc_mode') {

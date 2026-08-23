@@ -6,6 +6,7 @@ import {
   buildScorecardHotkeys,
   defaultScorecardState,
   moveSort,
+  reconcileSort,
   renderScorecard,
   visibleMetricKeys,
 } from '../views/components/scorecard-section.js';
@@ -68,6 +69,48 @@ describe('visibleMetricKeys / moveSort', () => {
     expect(s.sortKey).toBe('member');
     s = moveSort(s, -1, false);
     expect(s.sortKey).toBe('repos');
+  });
+});
+
+describe('reconcileSort', () => {
+  it('leaves a sort key that is still visible alone', () => {
+    const s = {
+      ...defaultScorecardState(4),
+      family: 'flow' as const,
+      sortKey: 'prSizeP50' as const,
+    };
+    expect(reconcileSort(s, false)).toBe(s);
+  });
+
+  it('resets to the first metric of the new family when the sort column vanished', () => {
+    // Sorted by PR p75 on "flow", then cycled to "quality": p75 is not on
+    // screen any more, so the table would be sorted by an invisible column.
+    const s = {
+      ...defaultScorecardState(4),
+      family: 'quality' as const,
+      sortKey: 'prSizeP75' as const,
+      sortDesc: false,
+    };
+    const next = reconcileSort(s, false);
+    expect(next.sortKey).toBe(visibleMetricKeys(s, false)[1]);
+    expect(next.sortKey).not.toBe('member');
+    expect(next.sortDesc).toBe(false); // direction is the user's, keep it
+    expect(next.family).toBe('quality');
+  });
+
+  it('keeps "member", which is visible on every family page', () => {
+    const s = {
+      ...defaultScorecardState(4),
+      family: 'collab' as const,
+      sortKey: 'member' as const,
+    };
+    expect(reconcileSort(s, false).sortKey).toBe('member');
+  });
+
+  it('keeps "score" only while the score column is configured', () => {
+    const s = { ...defaultScorecardState(4), family: 'flow' as const, sortKey: 'score' as const };
+    expect(reconcileSort(s, true).sortKey).toBe('score');
+    expect(reconcileSort(s, false).sortKey).toBe('prSizeP50');
   });
 });
 
