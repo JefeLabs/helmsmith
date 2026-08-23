@@ -103,11 +103,13 @@ Responsible for extracting commit data from git repositories and transforming it
 
 ```
 src/collector/
-├── index.ts        # Scan coordinator — loops repos, manages staleness
+├── index.ts        # Scan coordinator — loops repos, manages staleness, runs post-passes
 ├── git.ts          # Git log parser — runs git, parses output, extracts intent/scopes
 ├── classifier.ts   # File classifier — app/test/config/storybook/doc
 ├── author-map.ts   # Author resolver — email/name/alias → member identity
 │                   # Also: reattributeRecords() for post-assignment updates
+├── pr-proxy.ts     # Git-only merged-PR proxy — first-parent walk, merge/squash detection
+├── rework.ts       # Blame-based rework — deleted lines traced to their original author
 └── dir-scanner.ts  # Directory scanner — discovers git repos in a path
 ```
 
@@ -233,6 +235,8 @@ src/aggregator/
 ├── leaderboard.ts  # computeLeaderboard() — top N by category
 ├── trends.ts       # computeTrend(), computeRunningAvg()
 ├── segments.ts     # calculateSegments() — high/middle/low tier assignment
+├── scorecard.ts    # computeScorecard() — per-member throughput/flow/quality/collab, baseline deltas, percentiles, opt-in composite
+├── bots.ts         # excludeBots() / isBotAuthor() — bot exclusion shared by scorecard and segments
 └── metrics.ts      # Derived metric calculations (testPct, etc.)
 ```
 
@@ -259,11 +263,11 @@ Every view uses `rollup()` with different key functions. The dashboard rolls up 
 
 #### Segment Calculation
 
-`calculateSegments(memberTotals, thresholds)` assigns each entity a tier:
+`calculateSegments(memberTotals, thresholds, minN)` assigns each entity a tier:
 
-- **N ≥ 5**: top `ceil(N × high%)` = high, bottom `ceil(N × low%)` = low, rest = middle
-- **N < 5**: top 1 = high, bottom 1 = low, rest = middle
-- **Zero-value** entries are always "low"
+- **N < minN** (default `segment_min_n`: 8): a percentile split isn't statistically meaningful on a cohort this small — everyone is "middle", no labels at all
+- **N ≥ minN**: top `ceil(N × high%)` = high, bottom `ceil(N × low%)` = low, rest = middle
+- **Zero-value** entries are always "low" (once the cohort clears `minN`)
 
 Segments are computed post-filter and reflect the current view, not stored data.
 
@@ -432,7 +436,12 @@ The fundamental unit is `UserWeekRepoRecord` — one record per member per ISO w
 UserWeekRepoRecord
 ├── Identity: member, email, org, orgType, team, tag
 ├── Dimensions: week ("YYYY-Www"), repo, group
-├── Metrics: commits, activeDays
+├── Metrics: commits, activeDays, activeDayMask (optional)
+├── PR proxy / rework (optional — see collector/pr-proxy.ts, collector/rework.ts)
+│   ├── prsMergedGit: number         # merged PRs detected by the first-parent walk
+│   ├── prSizes: number[]            # size (ins+del) of each merged PR this week
+│   ├── reworkLines: number          # lines this member wrote that were deleted this week
+│   └── reworkSelfLines: number      # subset of reworkLines deleted by the member themselves
 ├── Filetype breakdown
 │   ├── app:       { files, filesAdded, filesDeleted, insertions, deletions }
 │   ├── test:      { files, filesAdded, filesDeleted, insertions, deletions }

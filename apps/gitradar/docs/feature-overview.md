@@ -87,7 +87,7 @@ All filters apply globally and can be combined:
 
 ## 2. Dashboard Tabs
 
-The dashboard is the main screen. Four tabs are accessible via single-keypress hotkeys or Tab cycling.
+The dashboard is the main screen. Five tabs are accessible via single-keypress hotkeys (`C`/`R`/`P`/`K`/`M`) or `Tab` cycling — a tab's letter works from any other tab, unless that tab already uses the letter for its own hotkey (see §14).
 
 ### Tab C: Contributions
 
@@ -160,6 +160,36 @@ Strong indicators (colored background) appear when a value exceeds both its own 
 - Top 5 contributors per category
 - Each entry shows: rank, name, value, team, and a mini stacked bar
 - Time windows: `1` (4 weeks), `2` (8 weeks), `3` (3 months)
+
+### Tab K: Scorecard
+
+**Per-member scorecard** across four metric families, built so no single number is treated as a ranking by default: every metric is shown against the member's own preceding window (a trend, not a comparison) and against the visible cohort (a percentile, not a score).
+
+#### Families (F cycles)
+
+- **all** — the overview page: one core metric per family
+- **throughput** — cmt/wk, days/wk, PRs/wk
+- **flow** — PR size (p50, p75), cycle time
+- **quality** — rework%, fix:feat ratio, test%, breaking changes
+- **collab** — reviews, reviews/PR, repos touched, scopes touched
+
+#### Modes (N cycles)
+
+- **value** — the raw metric, with a trend glyph (▲/▼/○) showing direction vs. the member's own baseline
+- **delta** — percent change vs. the member's own preceding window of equal length
+- **pctl** — percentile rank within the currently visible cohort (`p0`-`p100`)
+
+A cell with insufficient data renders as `—`. A percentile that would be computed from a cohort smaller than the minimum (`n<8` by default — `scorecard_min_n`, see §13) renders as `n<N` instead of a misleadingly precise rank.
+
+#### Sources footer
+
+Below the table, a footer line shows which data sources fed the current view (`✓`/`–` for rework, PR proxy, and GitHub enrichment) plus the cohort size and baseline window. A metric whose source is unavailable (e.g., `reworkPct` when `rework_enabled: false`) shows `—` rather than a stale or zero value.
+
+Bot authors (matched via `bot_patterns`, see §13) are excluded from the cohort entirely — they never appear as rows and never affect percentiles.
+
+#### Opt-in weighted score
+
+Setting `scorecard_weights` in config adds a `score` column: a weighted average of each metric's percentile (inverted for "lower is better" metrics), shown only for members with at least one weighted metric present. No weights configured, no score column — the scorecard never silently combines metrics into one ranking number.
 
 ### Tab M: Manage
 
@@ -398,6 +428,8 @@ When hiding a segment at the org or team drill level, segments are computed at t
 
 Thresholds are configurable via `segment_high_pct` and `segment_low_pct` in settings.
 
+Two more rules apply to segmentation everywhere it's computed (CSV export and elsewhere): a cohort smaller than `segment_min_n` (default: 8) gets no high/low labels at all — everyone reads as middle rather than assigning misleadingly precise tiers to a handful of people — and bot authors (matched via `bot_patterns`) are excluded from the cohort before segments are calculated, so a bot's output never occupies a high/low slot or skews the thresholds.
+
 ---
 
 ## 12. Demo Mode
@@ -453,6 +485,17 @@ settings:
     - "*.fixture.json"
     - "generated/*"
   ignore_patterns_replace_defaults: false   # true = use only the patterns above
+  rework_enabled: true             # run the blame-based rework pass after each scan (see §15)
+  scorecard_min_n: 8               # min cohort size before the Scorecard shows percentiles
+  scorecard_weights:                # optional: opt-in composite score (metric key -> weight)
+    reworkPct: 1
+    prsPerWeek: 1
+  bot_patterns:                     # case-insensitive substrings matched against author name/email
+    - "[bot]"
+    - "dependabot"
+    - "renovate"
+    - "github-actions"
+  segment_min_n: 8                 # min cohort size before high/low segment labels are assigned
 ```
 
 Set `GITRADAR_HOME=/some/dir` to relocate config, data, and cache together
@@ -467,10 +510,14 @@ Key configuration features:
 - **Path resolution** — Supports `~` expansion and relative paths (resolved against config location)
 - **Segment thresholds** — Customize the high/low percentile boundaries
 - **Ignore patterns** — Extend (or replace) the built-in list of lockfiles, dependency dirs, and generated files that never count as work
+- **Rework toggle** — `rework_enabled: false` (or `--skip-rework`) disables the blame-based rework pass for faster scans
+- **Scorecard tuning** — `scorecard_min_n` gates percentiles, `scorecard_weights` opts in to a composite score, `bot_patterns` excludes bot authors from every cohort (Scorecard and segments alike)
 
 ---
 
 ## 14. Keyboard Reference
+
+Every tab's own letter (`C`, `R`, `P`, `K`, `M`) switches directly to that tab from any other tab. The one exception is when the *active* tab already uses that letter for its own hotkey — e.g. on the Manage tab, `R` opens the Repos section instead of switching to Repo Activity, since Manage claims `R` for itself. `Tab` always cycles to the next tab, regardless of the active tab.
 
 ### Dashboard — Contributions Tab
 
@@ -507,6 +554,18 @@ Key configuration features:
 | `1` | 4 weeks window |
 | `2` | 8 weeks window |
 | `3` | 3 months window |
+| `Tab` | Next tab |
+| `Q` | Quit |
+
+### Dashboard — Scorecard Tab
+
+| Key | Action |
+|-----|--------|
+| `1`/`2`/`3` | Window: 4 / 8 / 12 weeks |
+| `F` | Cycle family: all → throughput → flow → quality → collab |
+| `N` | Cycle mode: value → delta → percentile |
+| `←`/`→` | Move sort column |
+| `R` | Reverse sort direction |
 | `Tab` | Next tab |
 | `Q` | Quit |
 
@@ -547,3 +606,36 @@ Key configuration features:
 |-----|--------|
 | `B` | Back to team |
 | `Q` | Quit |
+
+---
+
+## 15. PR Proxy & Rework Collection
+
+Two scan-time passes feed the Scorecard's throughput, flow, and quality metrics without requiring GitHub API access.
+
+### Merged-PR Proxy (`collector/pr-proxy.ts`)
+
+Every scan walks the repo's default branch with `git log --first-parent`. Each commit on that line is either a merge commit, a squash/rebase commit, or a direct push — a commit counts as a merged PR when:
+
+- it has two or more parents (a classic merge commit), **or**
+- its subject line carries a PR/MR reference — GitHub squash (`... (#42)`), GitHub merge subject (`Merge pull request #42`), GitLab squash (`... (!9)`), or GitLab merge body-in-subject (`See merge request ...!9`)
+
+For a merge commit, the PR's author is whoever authored the tip of the merged branch (the second parent), not whoever clicked "merge". Size is the diff against the first parent (insertions + deletions), ignore-filtered the same way as regular commits.
+
+**Blind spot**: a direct push straight to the default branch — no merge commit, no squash marker in the subject — is invisible to this proxy. It undercounts PR throughput for repos or workflows that push directly rather than merging through a PR, and it can't distinguish "no PRs happened" from "PRs happened but weren't detected." That's why `prsPerWeek` and `prSizeP50` render as `—` rather than `0` when the proxy finds nothing in a repo — see `sources.prProxy` in the Scorecard footer (§2).
+
+### Blame-Based Rework (`collector/rework.ts`)
+
+For every commit that deletes lines, GitRadar diffs against its parent (`-U0`) to find the deleted line ranges, then runs `git blame` on the parent commit for those ranges to find who wrote each deleted line and when. A deleted line counts as **rework** against its *original* author, attributed to the week of the deletion, when it was written within `churn_window_days` (default: 21) of the deleting commit. It's counted as **self-rework** when the same person who wrote the line is the one deleting it.
+
+This measures "code that didn't survive," not "files that changed a lot" — a file touched every week by design (e.g. a config file) doesn't show as rework unless the same recently-written lines keep getting deleted.
+
+`--skip-rework` (or `settings.rework_enabled: false`) skips this pass entirely — it's the more expensive of the two (a `git blame` call per touched file per commit), so large repos or fast local iteration may want to disable it. With it disabled, `reworkPct` renders as `—` (see `sources.rework` in the Scorecard footer).
+
+### Scan Output
+
+```
+  rework: 42 commits, 118 blames
+```
+
+reports how many deleting commits were processed and how many `git blame` calls that took, printed once per repo after its rework pass completes.

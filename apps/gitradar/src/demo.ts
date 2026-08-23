@@ -227,6 +227,16 @@ export function generateDemoData(weeks: number = 12): {
             const insPerFile = 10 + Math.floor(rand() * 70);
             const delPerFile = 5 + Math.floor(rand() * 25);
 
+            // PR proxy: 0-3 merged PRs, sized 20-400 lines; rework: 0-15% of inserted lines
+            const prsMergedGit = Math.floor(rand() * 4);
+            const prSizes = Array.from(
+              { length: prsMergedGit },
+              () => 20 + Math.floor(rand() * 380),
+            );
+            const insertedTotal = appFiles * insPerFile + testFiles * Math.round(insPerFile * 0.7);
+            const reworkLines = Math.round(insertedTotal * rand() * 0.15);
+            const reworkSelfLines = Math.round(reworkLines * rand());
+
             // Intent distribution: spread commits across conventional types
             const featCommits = Math.max(0, Math.round(baseCommits * (0.35 + rand() * 0.15)));
             const fixCommits = Math.max(0, Math.round(baseCommits * (0.15 + rand() * 0.1)));
@@ -270,6 +280,10 @@ export function generateDemoData(weeks: number = 12): {
               commits: baseCommits,
               activeDays,
               activeDayMask,
+              prsMergedGit,
+              prSizes,
+              reworkLines,
+              reworkSelfLines,
               intent: {
                 feat: featCommits,
                 fix: fixCommits,

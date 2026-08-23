@@ -24,6 +24,7 @@ gitradar
 - **Contributions tab** — Grouped stacked bar charts by org/team/user with drill-down, pivot, granularity, and segment filtering
 - **Repo Activity tab** — Per-repo contribution volume by organization
 - **Top Performers tab** — Leaderboards across overall, app, test, and config categories
+- **Scorecard tab** — Per-member scorecard — throughput, flow, quality, collaboration; each metric vs the member's own baseline and the cohort percentile; opt-in weighted score
 - **Manage tab** — Add repos, create orgs/teams, assign authors — all from the TUI
 - **Trends view** — 12-week sparklines, line charts, running averages, and test ratio trends
 
@@ -53,6 +54,7 @@ gitradar -w 8 --org "Acme Corp"         # filter to 8 weeks, one org
 # Scanning
 gitradar scan                           # scan and exit
 gitradar scan --force-scan              # full re-scan
+gitradar scan --skip-rework             # skip the blame-based rework pass (faster scans, no rework% on the Scorecard)
 
 # Repo management
 gitradar repo add ~/code/project        # discover repos in directory
@@ -70,6 +72,7 @@ gitradar view contributions --json
 gitradar view leaderboard -w 8
 gitradar view repo-activity
 gitradar view trends
+gitradar view scorecard -w 8 --family quality
 
 # Data management
 gitradar data export-csv -o report.csv
@@ -79,6 +82,8 @@ gitradar data enrich                    # pull GitHub PR data
 ```
 
 ## Keyboard Shortcuts
+
+Each tab's own letter (`C`, `R`, `P`, `K`, `M`) jumps straight to that tab from anywhere in the dashboard, unless the active tab already uses that letter for something else — `Tab` always cycles to the next tab regardless.
 
 ### Contributions Tab
 
@@ -94,6 +99,18 @@ gitradar data enrich                    # pull GitHub PR data
 | `T` | Toggle tag overlay |
 | `H` | Toggle unassigned visibility |
 | `1`-`9` | Drill into numbered team |
+| `Tab` | Next tab |
+| `Q` | Quit |
+
+### Scorecard Tab
+
+| Key | Action |
+|-----|--------|
+| `1`/`2`/`3` | Window: 4 / 8 / 12 weeks |
+| `F` | Cycle family (all → throughput → flow → quality → collab) |
+| `N` | Cycle mode (value → delta → percentile) |
+| `←`/`→` | Move sort column |
+| `R` | Reverse sort direction |
 | `Tab` | Next tab |
 | `Q` | Quit |
 

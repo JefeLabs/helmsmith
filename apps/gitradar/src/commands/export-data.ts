@@ -74,6 +74,11 @@ const HEADERS = [
   'avg_cycle_hrs',
   'reviews_given',
   'churn_rate_pct',
+  // PR-proxy and rework (from collector/pr-proxy.ts and collector/rework.ts)
+  'prs_merged_git',
+  'pr_size_p50',
+  'rework_lines',
+  'rework_self_lines',
   // Segmentation (computed at export time)
   'segment',
 ];
@@ -147,6 +152,12 @@ export function flattenRecord(
     flat.reviews_given = 0;
     flat.churn_rate_pct = 0;
   }
+
+  const sizes = [...(r.prSizes ?? [])].sort((a, b) => a - b);
+  flat.prs_merged_git = r.prsMergedGit ?? 0;
+  flat.pr_size_p50 = sizes.length ? sizes[Math.max(0, Math.ceil(sizes.length / 2) - 1)] : 0;
+  flat.rework_lines = r.reworkLines ?? 0;
+  flat.rework_self_lines = r.reworkSelfLines ?? 0;
 
   flat.segment = segmentMap?.get(r.member) ?? '';
 

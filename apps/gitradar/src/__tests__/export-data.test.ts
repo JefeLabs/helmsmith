@@ -125,6 +125,20 @@ describe('flattenRecord', () => {
     expect(flat.test_insertions).toBe(40);
     expect(flat.test_deletions).toBe(5);
   });
+
+  it('exports PR-proxy and rework columns', () => {
+    const csv = recordsToCsv([
+      makeRecord({ prsMergedGit: 2, prSizes: [10, 30, 50], reworkLines: 7, reworkSelfLines: 3 }),
+    ]);
+    const [header, row] = csv.trim().split('\n');
+    const h = header.split(',');
+    const r = row.split(',');
+    const col = (name: string) => r[h.indexOf(name)];
+    expect(col('prs_merged_git')).toBe('2');
+    expect(col('pr_size_p50')).toBe('30');
+    expect(col('rework_lines')).toBe('7');
+    expect(col('rework_self_lines')).toBe('3');
+  });
 });
 
 // ── recordsToCsv ─────────────────────────────────────────────────────────────

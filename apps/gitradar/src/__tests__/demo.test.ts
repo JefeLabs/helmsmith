@@ -164,4 +164,14 @@ describe('generateDemoData', () => {
     expect(Object.keys(config.groups).length).toBeGreaterThanOrEqual(3);
     expect(Object.keys(config.tags).length).toBeGreaterThanOrEqual(2);
   });
+
+  it('gives demo records PR-proxy and rework data so the Scorecard tab has something to show', () => {
+    const { records } = generateDemoData();
+    expect(records.some((r) => (r.prsMergedGit ?? 0) > 0)).toBe(true);
+    expect(records.some((r) => (r.reworkLines ?? 0) > 0)).toBe(true);
+    for (const r of records) {
+      expect(r.prSizes?.length ?? 0).toBe(r.prsMergedGit ?? 0);
+      expect(r.reworkSelfLines ?? 0).toBeLessThanOrEqual(r.reworkLines ?? 0);
+    }
+  });
 });
