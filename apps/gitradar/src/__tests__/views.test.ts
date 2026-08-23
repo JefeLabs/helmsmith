@@ -47,6 +47,16 @@ function makeRecord(overrides: Partial<UserWeekRepoRecord> = {}): UserWeekRepoRe
   };
 }
 
+function zeroFiletype(): UserWeekRepoRecord['filetype'] {
+  return {
+    app: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+    test: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+    config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+    storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+    doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+  };
+}
+
 function makeSampleConfig(): Config {
   return {
     repos: [
@@ -641,6 +651,81 @@ describe('Team Detail View', () => {
     const result = await teamDetailView(ctx, 'Platform');
     expect(result).toEqual({ type: 'pop' });
   });
+
+  it('buildReposTableData picks the doc-heavy member as Top Contributor', async () => {
+    const { buildReposTableData } = await import('../views/team-detail.js');
+    const records = [
+      makeRecord({
+        member: 'Alice Chen',
+        team: 'Platform',
+        week: '2026-W12',
+        repo: 'frontend-app',
+        commits: 5,
+        filetype: {
+          ...zeroFiletype(),
+          app: { files: 3, filesAdded: 0, filesDeleted: 0, insertions: 100, deletions: 0 },
+        },
+      }),
+      makeRecord({
+        member: 'Bob Kumar',
+        team: 'Platform',
+        week: '2026-W12',
+        repo: 'frontend-app',
+        commits: 3,
+        filetype: {
+          ...zeroFiletype(),
+          doc: { files: 5, filesAdded: 0, filesDeleted: 0, insertions: 150, deletions: 0 },
+        },
+      }),
+    ];
+
+    const rows = buildReposTableData(records, 'Platform', '2026-W12');
+    const row = rows.find((r) => r.repo === 'frontend-app');
+    expect(row?.topContributor).toBe('Bob Kumar');
+  });
+
+  it("buildMemberAvgBars: a holder-only member does not change another member's running avg marker", async () => {
+    const { buildMemberAvgBars } = await import('../views/team-detail.js');
+    const records = [
+      // Alice: one real, active week (W12) with 120 lines.
+      makeRecord({
+        member: 'Alice Chen',
+        team: 'Platform',
+        week: '2026-W12',
+        commits: 5,
+        filetype: {
+          ...zeroFiletype(),
+          app: { files: 4, filesAdded: 0, filesDeleted: 0, insertions: 120, deletions: 0 },
+        },
+      }),
+      // Alice: a holder-only week (W11) — must not dilute her own running avg.
+      makeRecord({
+        member: 'Alice Chen',
+        team: 'Platform',
+        week: '2026-W11',
+        commits: 0,
+        activeDays: 0,
+        filetype: zeroFiletype(),
+        prsMergedGit: 1,
+      }),
+      // Bob: holder-only in the current week — must not leak into Alice's marker.
+      makeRecord({
+        member: 'Bob Kumar',
+        team: 'Platform',
+        week: '2026-W12',
+        commits: 0,
+        activeDays: 0,
+        filetype: zeroFiletype(),
+        reworkLines: 3,
+      }),
+    ];
+
+    const bars = buildMemberAvgBars(records, 'Platform', '2026-W12');
+    const aliceBar = bars.find((b) => b.label === 'Alice Chen');
+    // Without the fix, Alice's holder-only W11 would count as an active week,
+    // diluting her marker to 120/2 = 60.
+    expect(aliceBar?.runningAvg).toBe(120);
+  });
 });
 
 describe('Member Detail View', () => {
@@ -704,6 +789,84 @@ describe('Member Detail View', () => {
 
     const result = await memberDetailView(ctx, 'Alice Chen', 'Platform');
     expect(result).toEqual({ type: 'pop' });
+  });
+
+  it('12w Summary shows a non-zero +lines/wk for a member with doc-only insertions', async () => {
+    const { memberDetailView } = await import('../views/member-detail.js');
+    const ctx = makeSampleContext();
+    ctx.records = [
+      makeRecord({
+        member: 'Alice Chen',
+        team: 'Platform',
+        week: '2026-W12',
+        commits: 3,
+        filetype: {
+          ...zeroFiletype(),
+          doc: { files: 2, filesAdded: 0, filesDeleted: 0, insertions: 50, deletions: 10 },
+        },
+      }),
+    ];
+
+    const loggedOutput: string[] = [];
+    consoleLogSpy.mockImplementation((...args: any[]) => {
+      loggedOutput.push(args.map(String).join(' '));
+    });
+
+    mockedReadKey.mockResolvedValueOnce(key('b'));
+    await memberDetailView(ctx, 'Alice Chen', 'Platform');
+
+    const output = loggedOutput.join('\n');
+    expect(output).toContain('50 +lines/wk');
+  });
+
+  it('computeSummary sums insertions over all five filetypes, including doc', async () => {
+    const { computeSummary } = await import('../views/member-detail.js');
+    const records = [
+      makeRecord({
+        member: 'Alice Chen',
+        team: 'Platform',
+        week: '2026-W12',
+        commits: 3,
+        filetype: {
+          ...zeroFiletype(),
+          doc: { files: 1, filesAdded: 0, filesDeleted: 0, insertions: 42, deletions: 8 },
+        },
+      }),
+    ];
+
+    const summary = computeSummary(records, 'Alice Chen', '2026-W12');
+    expect(summary.avgInsertions).toBe(42);
+  });
+
+  it('computeSummary excludes holder (commits === 0) records from active weeks', async () => {
+    const { computeSummary } = await import('../views/member-detail.js');
+    const records = [
+      makeRecord({
+        member: 'Alice Chen',
+        team: 'Platform',
+        week: '2026-W12',
+        commits: 4,
+        filetype: {
+          ...zeroFiletype(),
+          app: { files: 2, filesAdded: 0, filesDeleted: 0, insertions: 40, deletions: 0 },
+        },
+      }),
+      // Holder record: attributable to W11 via a PR merge, but not "active" there.
+      makeRecord({
+        member: 'Alice Chen',
+        team: 'Platform',
+        week: '2026-W11',
+        commits: 0,
+        activeDays: 0,
+        filetype: zeroFiletype(),
+        prsMergedGit: 1,
+      }),
+    ];
+
+    const summary = computeSummary(records, 'Alice Chen', '2026-W12');
+    // If the holder week counted, avgInsertions would be 40/2 = 20; it must
+    // instead be averaged over the single active week (W12).
+    expect(summary.avgInsertions).toBe(40);
   });
 });
 

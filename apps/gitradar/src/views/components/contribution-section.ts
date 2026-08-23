@@ -1272,7 +1272,7 @@ export function renderContributionsTab(
         });
       }
     }
-    groups.push({ groupLabel: 'Avg', bars: avgBars, isSummary: true });
+    groups.push({ groupLabel: 'avg*', bars: avgBars, isSummary: true });
 
     // At user drill level, add a "Team Avg" summary row showing the per-member
     // average within each member's team (so members can compare to their team).
@@ -1501,6 +1501,7 @@ export function renderContributionsTab(
       chalk.dim(' above avg+team  ') +
       chalk.bgRed.black('\u25BC') +
       chalk.dim(' below avg+team  ') +
-      chalk.dim(`\u25CB within ${trendPctLabel}%`),
+      chalk.dim(`\u25CB within ${trendPctLabel}%  `) +
+      chalk.dim('* trailing average incl. current period'),
   );
 }

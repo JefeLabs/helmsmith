@@ -4,6 +4,16 @@ import type { UserWeekRepoRecord } from '../types/schema.js';
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
 
+function zeroFiletype(): UserWeekRepoRecord['filetype'] {
+  return {
+    app: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+    test: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+    config: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+    storybook: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+    doc: { files: 0, filesAdded: 0, filesDeleted: 0, insertions: 0, deletions: 0 },
+  };
+}
+
 function makeRecord(overrides: Partial<UserWeekRepoRecord> = {}): UserWeekRepoRecord {
   return {
     member: 'alice',
@@ -313,5 +323,50 @@ describe('computeRunningAvg', () => {
     // Should work without specifying window (defaults to 12)
     const result = computeRunningAvg(records, 'Platform', '2026-W08');
     expect(result).toBe(120);
+  });
+
+  it('ignores holder records for headcount and active weeks', () => {
+    const records = [
+      makeRecord({ member: 'alice', team: 'Platform', week: '2026-W08', commits: 3 }), // 200 lines (fixture)
+      makeRecord({
+        member: 'bob',
+        team: 'Platform',
+        week: '2026-W08',
+        commits: 0,
+        activeDays: 0,
+        filetype: zeroFiletype(),
+        reworkLines: 5,
+      }),
+      makeRecord({
+        member: 'alice',
+        team: 'Platform',
+        week: '2026-W07',
+        commits: 0,
+        activeDays: 0,
+        filetype: zeroFiletype(),
+        prsMergedGit: 1,
+      }),
+    ];
+
+    // headcount 1 (bob is holder-only), weeksActive 1 (W07 is holder-only) → 200 / 1 / 1
+    expect(computeRunningAvg(records, 'Platform', '2026-W08', 12)).toBe(200);
+  });
+
+  it('includes doc lines', () => {
+    const records = [
+      makeRecord({
+        member: 'alice',
+        team: 'Platform',
+        week: '2026-W08',
+        commits: 1,
+        filetype: {
+          ...zeroFiletype(),
+          doc: { files: 2, filesAdded: 0, filesDeleted: 0, insertions: 30, deletions: 10 },
+        },
+      }),
+    ];
+
+    // doc-only record: totalLines = 40, headcount = 1, weeksActive = 1
+    expect(computeRunningAvg(records, 'Platform', '2026-W08', 12)).toBe(40);
   });
 });

@@ -208,3 +208,47 @@ describe('renderContributionsTab — by-entity pivot segmentation', () => {
     expect(holderLines.some((l) => l.includes('holder0'))).toBe(true);
   });
 });
+
+describe('renderContributionsTab — Avg row label', () => {
+  it('labels the trailing-average summary row "avg*" and explains it in the legend', () => {
+    const buckets: TimeBucket[] = [
+      { label: 'W09', weeks: ['2026-W09'] },
+      { label: 'W10', weeks: ['2026-W10'] },
+    ];
+    const records = [
+      makeRecord({ member: 'alice', week: '2026-W09' }),
+      makeRecord({ member: 'alice', week: '2026-W10' }),
+    ];
+
+    const logged: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
+      logged.push(args.map(String).join(' '));
+    });
+    let output = '';
+    try {
+      const ctx: ViewContext = { config: makeConfig(), records, currentWeek: '2026-W10' };
+      renderContributionsTab(
+        ctx,
+        'user',
+        false,
+        false, // pivotEntity
+        buckets,
+        'week',
+        'range',
+        120,
+        '',
+        () => 'steady',
+        undefined,
+        records,
+      );
+    } finally {
+      spy.mockRestore();
+    }
+    output = stripAnsi(logged.join('\n'));
+
+    expect(output).toContain('avg*');
+    expect(output).toContain('* trailing average incl. current period');
+    // The old bare "Avg" row label is gone.
+    expect(output).not.toMatch(/^Avg\s+┤/m);
+  });
+});

@@ -1,4 +1,5 @@
 import type { RolledUp } from '../store/sqlite-store.js';
+import type { UserWeekRepoRecord } from '../types/schema.js';
 
 /**
  * Canonical derived-metric calculations.
@@ -10,6 +11,18 @@ import type { RolledUp } from '../store/sqlite-store.js';
 /** Sum insertions + deletions for a single filetype bucket. */
 export function totalLines(ft: { insertions: number; deletions: number }): number {
   return ft.insertions + ft.deletions;
+}
+
+/** Lines touched by one record across ALL filetypes (app, test, config, storybook, doc). */
+export function recordTotalLines(r: Pick<UserWeekRepoRecord, 'filetype'>): number {
+  const ft = r.filetype;
+  return (
+    totalLines(ft.app) +
+    totalLines(ft.test) +
+    totalLines(ft.config) +
+    totalLines(ft.storybook) +
+    totalLines(ft.doc ?? { insertions: 0, deletions: 0 })
+  );
 }
 
 /** Net lines = insertions − deletions across all filetypes. */

@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import { rollup } from '../aggregator/engine.js';
 import { computeDeltas, filterRecords, getLastNWeeks } from '../aggregator/filters.js';
+import { recordTotalLines } from '../aggregator/metrics.js';
 import type { UserWeekRepoRecord } from '../types/schema.js';
 import type { AvgOutputBar } from '../ui/avg-output-chart.js';
 import { renderAvgOutputChart } from '../ui/avg-output-chart.js';
@@ -19,7 +20,7 @@ import type { NavigationAction, ViewContext } from './types.js';
 /**
  * Build per-member avg output bars for a team.
  */
-function buildMemberAvgBars(
+export function buildMemberAvgBars(
   records: UserWeekRepoRecord[],
   teamName: string,
   currentWeek: string,
@@ -32,23 +33,16 @@ function buildMemberAvgBars(
     const totalLines = agg.insertions + agg.deletions;
 
     // For individual members, running avg is per-person (headcount=1),
-    // so we compute it from all their records
+    // so we compute it from all their records. Holder records (commits === 0)
+    // make a member attributable to a week via a PR-proxy or rework pass, not
+    // active in it — they must not dilute the running average.
     const memberRecords = filterRecords(records, { member, team: teamName });
     const allWeeks = getLastNWeeks(12, currentWeek);
-    const windowRecords = memberRecords.filter((r) => allWeeks.includes(r.week));
+    const windowRecords = memberRecords.filter((r) => allWeeks.includes(r.week) && r.commits > 0);
     const activeWeeks = new Set(windowRecords.map((r) => r.week));
     let windowTotal = 0;
     for (const r of windowRecords) {
-      const ft = r.filetype;
-      windowTotal +=
-        ft.app.insertions +
-        ft.app.deletions +
-        ft.test.insertions +
-        ft.test.deletions +
-        ft.config.insertions +
-        ft.config.deletions +
-        ft.storybook.insertions +
-        ft.storybook.deletions;
+      windowTotal += recordTotalLines(r);
     }
     const runningAvg = activeWeeks.size > 0 ? windowTotal / activeWeeks.size : 0;
 
@@ -96,15 +90,7 @@ function buildMemberActivitySeries(
       const weekMemberRecords = memberRecords.filter((r) => r.week === week);
       let total = 0;
       for (const r of weekMemberRecords) {
-        total +=
-          r.filetype.app.insertions +
-          r.filetype.app.deletions +
-          r.filetype.test.insertions +
-          r.filetype.test.deletions +
-          r.filetype.config.insertions +
-          r.filetype.config.deletions +
-          r.filetype.storybook.insertions +
-          r.filetype.storybook.deletions;
+        total += recordTotalLines(r);
       }
       return total;
     });
@@ -177,7 +163,11 @@ function buildMembersTableData(
 /**
  * Build repos table data for the current week and team.
  */
-function buildReposTableData(records: UserWeekRepoRecord[], teamName: string, currentWeek: string) {
+export function buildReposTableData(
+  records: UserWeekRepoRecord[],
+  teamName: string,
+  currentWeek: string,
+) {
   const weekRecords = filterRecords(records, { weeks: [currentWeek], team: teamName });
   const repoRolled = rollup(weekRecords, (r) => r.repo);
 
@@ -189,15 +179,7 @@ function buildReposTableData(records: UserWeekRepoRecord[], teamName: string, cu
     const memberTotals = new Map<string, number>();
     let repoGroup = '';
     for (const r of repoMemberRecords) {
-      const total =
-        r.filetype.app.insertions +
-        r.filetype.app.deletions +
-        r.filetype.test.insertions +
-        r.filetype.test.deletions +
-        r.filetype.config.insertions +
-        r.filetype.config.deletions +
-        r.filetype.storybook.insertions +
-        r.filetype.storybook.deletions;
+      const total = recordTotalLines(r);
       memberTotals.set(r.member, (memberTotals.get(r.member) ?? 0) + total);
       repoGroup = r.group;
     }

@@ -155,7 +155,7 @@ function buildMemberReposTable(
 /**
  * Compute the 12-week summary line for a member.
  */
-function computeSummary(
+export function computeSummary(
   records: UserWeekRepoRecord[],
   memberName: string,
   currentWeek: string,
@@ -170,12 +170,16 @@ function computeSummary(
   const activeWeeks = new Set<string>();
 
   for (const r of memberRecords) {
+    // Holder records (commits === 0) make a member attributable to a week via
+    // a PR-proxy or rework pass, not active in it — skip for the summary too.
+    if (r.commits === 0) continue;
     totalCommits += r.commits;
     totalInsertions +=
       r.filetype.app.insertions +
       r.filetype.test.insertions +
       r.filetype.config.insertions +
-      r.filetype.storybook.insertions;
+      r.filetype.storybook.insertions +
+      (r.filetype.doc?.insertions ?? 0);
     totalApp += r.filetype.app.insertions + r.filetype.app.deletions;
     totalTest += r.filetype.test.insertions + r.filetype.test.deletions;
     activeWeeks.add(r.week);

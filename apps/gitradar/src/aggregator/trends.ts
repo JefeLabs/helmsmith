@@ -2,6 +2,7 @@ import type { UserWeekRepoRecord } from '../types/schema.js';
 import { weekLabel } from '../ui/format.js';
 import { rollup } from './engine.js';
 import { type Filters, filterRecords } from './filters.js';
+import { recordTotalLines } from './metrics.js';
 
 export interface TrendPoint {
   week: string;
@@ -89,74 +90,17 @@ export function computeRunningAvg(
     return 0;
   }
 
-  // Calculate total lines (insertions + deletions)
+  // Calculate total lines (insertions + deletions), skipping holder records
+  // (commits === 0): they make a member attributable to a week via a PR-proxy
+  // or rework pass, not active in it, and must not inflate headcount or
+  // weeksActive.
   let totalLines = 0;
   const members = new Set<string>();
   const activeWeeks = new Set<string>();
 
   for (const r of filtered) {
-    const ft = r.filetype;
-    totalLines +=
-      ft.app.insertions +
-      ft.app.deletions +
-      ft.test.insertions +
-      ft.test.deletions +
-      ft.config.insertions +
-      ft.config.deletions +
-      ft.storybook.insertions +
-      ft.storybook.deletions +
-      ft.doc.insertions +
-      ft.doc.deletions;
-    members.add(r.member);
-    activeWeeks.add(r.week);
-  }
-
-  const headcount = members.size;
-  const weeksActive = activeWeeks.size;
-
-  if (headcount === 0 || weeksActive === 0) {
-    return 0;
-  }
-
-  return totalLines / headcount / weeksActive;
-}
-
-/**
- * Compute the running average lines changed per person per week for a given org.
- *
- * Same formula as computeRunningAvg but filters by org instead of team.
- */
-export function computeRunningAvgByOrg(
-  records: UserWeekRepoRecord[],
-  org: string,
-  currentWeek: string,
-  windowWeeks: number = 12,
-): number {
-  const windowWeekSet = buildWeekWindow(currentWeek, windowWeeks);
-
-  const filtered = records.filter((r) => r.org === org && windowWeekSet.has(r.week));
-
-  if (filtered.length === 0) {
-    return 0;
-  }
-
-  let totalLines = 0;
-  const members = new Set<string>();
-  const activeWeeks = new Set<string>();
-
-  for (const r of filtered) {
-    const ft = r.filetype;
-    totalLines +=
-      ft.app.insertions +
-      ft.app.deletions +
-      ft.test.insertions +
-      ft.test.deletions +
-      ft.config.insertions +
-      ft.config.deletions +
-      ft.storybook.insertions +
-      ft.storybook.deletions +
-      ft.doc.insertions +
-      ft.doc.deletions;
+    if (r.commits === 0) continue;
+    totalLines += recordTotalLines(r);
     members.add(r.member);
     activeWeeks.add(r.week);
   }
