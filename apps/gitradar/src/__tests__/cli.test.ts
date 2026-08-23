@@ -161,7 +161,7 @@ function parseArgs(args: string[]): Record<string, unknown> {
     .option('--demo', 'Use generated demo data')
     .option('--json', 'Dump aggregated JSON to stdout')
     .option('--force-scan', 'Full re-scan, ignore cursors')
-    .option('--prune <days>', 'Remove records older than N days', parseInt)
+    .option('--prune <weeks>', 'Remove records older than N weeks', parseInt)
     .option('--store-stats', 'Print data file stats and exit')
     .option('--reset', 'Delete data files and start fresh')
     .option('--staleness <min>', 'Override staleness minutes', parseInt)
@@ -235,9 +235,9 @@ describe('CLI argument parsing', () => {
     expect(opts.forceScan).toBe(true);
   });
 
-  it('parses --prune as integer', () => {
-    const opts = parseArgs(['--prune', '90']);
-    expect(opts.prune).toBe(90);
+  it('parses --prune as integer (weeks)', () => {
+    const opts = parseArgs(['--prune', '12']);
+    expect(opts.prune).toBe(12);
   });
 
   it('parses --store-stats flag', () => {
@@ -525,5 +525,40 @@ describe('CLI enrich subcommand — retired churn flags', () => {
   it('still declares the enrich flags that survived', () => {
     expect(cliSource).toContain('--skip-cache');
     expect(cliSource).toContain("'--force'");
+  });
+});
+
+// `--prune` and `view trends` are also asserted against source text — same
+// reasoning as the churn-flags suite above (real cli.ts can't be imported here).
+describe('CLI --prune option — weeks, not days', () => {
+  const cliSource = readFileSync(fileURLToPath(new URL('../cli.ts', import.meta.url)), 'utf-8');
+
+  it('declares --prune <weeks> with a "weeks" help description', () => {
+    expect(cliSource).toContain("'--prune <weeks>', 'Remove records older than N weeks'");
+  });
+
+  it('no longer declares --prune <days>', () => {
+    expect(cliSource).not.toContain('--prune <days>');
+    expect(cliSource).not.toContain('older than N days');
+  });
+});
+
+describe('CLI "view trends" — skips scanning', () => {
+  const cliSource = readFileSync(fileURLToPath(new URL('../cli.ts', import.meta.url)), 'utf-8');
+  const trendsBlockStart = cliSource.indexOf(".command('trends')");
+  const trendsBlock = cliSource.slice(trendsBlockStart, trendsBlockStart + 300);
+
+  it('registers the trends command', () => {
+    expect(trendsBlockStart).toBeGreaterThan(-1);
+  });
+
+  it('passes skipScan: true to runMain', () => {
+    expect(trendsBlock).toContain('skipScan: true');
+  });
+
+  it('describes itself as using already-scanned data, no scan', () => {
+    expect(trendsBlock).toContain(
+      'Open the Trends screen using already-scanned data (interactive)',
+    );
   });
 });

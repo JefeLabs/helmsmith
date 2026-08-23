@@ -51,11 +51,13 @@ export async function runMain(
       if (opts.scanOnly) return;
     }
 
-    await engine.scan(opts);
+    if (!opts.skipScan) {
+      await engine.scan(opts);
 
-    // Enrich after scan unless explicitly skipped
-    if (!opts.skipEnrich) {
-      await engine.enrich({ weeks: opts.weeks });
+      // Enrich after scan unless explicitly skipped
+      if (!opts.skipEnrich) {
+        await engine.enrich({ weeks: opts.weeks });
+      }
     }
 
     if (opts.scanOnly) return;

@@ -2,6 +2,7 @@ import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import yaml from 'js-yaml';
+import { ZodError } from 'zod';
 import { expandTilde } from '../store/paths.js';
 import { type ReposRegistry, ReposRegistrySchema, type WorkspaceRepo } from '../types/schema.js';
 
@@ -47,7 +48,12 @@ export async function loadReposRegistry(registryPath: string): Promise<ReposRegi
   let registry: ReposRegistry;
   try {
     registry = ReposRegistrySchema.parse(parsed);
-  } catch {
+  } catch (err) {
+    if (err instanceof ZodError) {
+      for (const issue of err.issues) {
+        console.error(`  - '${issue.path.join('.')}': ${issue.message}`);
+      }
+    }
     throw new Error(`Invalid repos.yml format in ${resolved}`);
   }
 

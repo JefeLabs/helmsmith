@@ -82,6 +82,9 @@ export interface RunOptions {
   initialView?: 'dashboard' | 'trends';
   skipEnrich?: boolean;
   skipRework?: boolean;
+  /** Skip scan() and enrich() entirely — used by `view trends` to open the TUI
+   *  straight off already-scanned data instead of triggering a fresh scan. */
+  skipScan?: boolean;
 }
 
 export interface EnrichOptions {
@@ -295,13 +298,11 @@ export class GitRadarEngine {
 
   // ── Pruning ──────────────────────────────────────────────────────────────
 
-  async handlePrune(pruneDays: number): Promise<void> {
-    const weeksBack = Math.ceil(pruneDays / 7);
-    const cutoffWeeks = getLastNWeeks(weeksBack + 200, getCurrentWeek()); // get enough weeks
-    const oldestAllowed = cutoffWeeks[cutoffWeeks.length - 1];
+  async handlePrune(weeks: number): Promise<void> {
+    const oldestAllowed = getLastNWeeks(weeks + 1, getCurrentWeek())[0];
     if (!oldestAllowed) return;
     const removed = pruneRecordsSQL(oldestAllowed);
-    console.log(`Pruned ${removed} records older than ${pruneDays} days.`);
+    console.log(`Pruned ${removed} records older than ${weeks} weeks.`);
   }
 
   // ── Scanning ─────────────────────────────────────────────────────────────

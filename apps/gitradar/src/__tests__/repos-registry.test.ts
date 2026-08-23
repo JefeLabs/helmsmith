@@ -108,6 +108,13 @@ not_workspaces:
   - this is wrong
 `;
 
+const schemaInvalidRepoNameYaml = `
+workspaces:
+  ws:
+    repos:
+      - name: 5
+`;
+
 // ── loadReposRegistry ──────────────────────────────────────────────────────
 
 describe('loadReposRegistry', () => {
@@ -176,6 +183,19 @@ describe('loadReposRegistry', () => {
     await expect(loadReposRegistry('/some/dir/repos.yml')).rejects.toThrow(
       'Invalid repos.yml format in /some/dir/repos.yml',
     );
+  });
+
+  it('surfaces zod issue paths for an invalid repos.yml', async () => {
+    mockAccess.mockResolvedValue(undefined);
+    mockReadFile.mockResolvedValue(schemaInvalidRepoNameYaml);
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(loadReposRegistry('/some/dir/repos.yml')).rejects.toThrow(
+      'Invalid repos.yml format in /some/dir/repos.yml',
+    );
+    expect(err.mock.calls.flat().join(' ')).toMatch(/workspaces\.ws\.repos\.0\.name/);
+
+    err.mockRestore();
   });
 
   it('resolves tilde in repo paths', async () => {

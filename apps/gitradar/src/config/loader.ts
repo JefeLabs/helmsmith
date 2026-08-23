@@ -1,17 +1,17 @@
-import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import yaml from 'js-yaml';
 import { ZodError } from 'zod';
-import { expandTilde, getConfigPath } from '../store/paths.js';
+import { getConfigPath } from '../store/paths.js';
 import { Config, ConfigSchema } from '../types/schema.js';
 
 /**
  * Load, parse, and validate the YAML config file.
  *
  * - Default path: ~/.agentx/gitradar/config.yml
- * - Resolves ~ and relative repo paths against the config file directory
  * - Validates with ConfigSchema (Zod)
- * - Warns (does not crash) if a repo path doesn't exist on disk
+ * - A `repos:` key is ignored (repos come only from the workspace registry,
+ *   `gitradar repo add` / ~/.agentx/repos.yml); warns once if present.
  */
 export async function loadConfig(configPath?: string): Promise<Config> {
   const resolvedConfigPath = configPath ?? getConfigPath();
@@ -47,27 +47,15 @@ export async function loadConfig(configPath?: string): Promise<Config> {
     throw new Error('Config validation error');
   }
 
-  // Resolve repo paths
-  const configDir = path.dirname(resolvedConfigPath);
-
-  for (const repo of config.repos) {
-    // Expand ~ first
-    let repoPath = expandTilde(repo.path);
-
-    // Resolve relative paths against config file directory
-    if (!path.isAbsolute(repoPath)) {
-      repoPath = path.resolve(configDir, repoPath);
-    }
-
-    repo.path = repoPath;
-
-    // Warn if repo path doesn't exist
-    try {
-      await access(repoPath);
-    } catch {
-      console.warn(`Warning: repo path does not exist: ${repoPath}`);
-    }
+  // `repos:` in config.yml is a leftover from before the workspace registry
+  // existed — repos now come exclusively from `gitradar repo add` (~/.agentx/repos.yml).
+  // Ignore it here (never merged into the runtime repo list), warning once if present.
+  if (config.repos.length > 0) {
+    console.warn(
+      'config.yml: "repos:" is ignored — manage repos with "gitradar repo add" (workspace registry)',
+    );
   }
+  config.repos = [];
 
   return config;
 }

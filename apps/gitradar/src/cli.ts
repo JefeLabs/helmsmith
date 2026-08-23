@@ -82,7 +82,7 @@ program
     '--force-scan',
     "Full re-scan: clears each repo's records and cursors, then re-walks history",
   )
-  .option('--prune <days>', 'Remove records older than N days', parseInt)
+  .option('--prune <weeks>', 'Remove records older than N weeks', parseInt)
   .option('--store-stats', 'Print data file stats and exit')
   .option('--reset', 'Delete data files and start fresh')
   .option('--staleness <min>', 'Override staleness minutes', parseInt)
@@ -517,9 +517,9 @@ view
 
 view
   .command('trends')
-  .description('Jump directly to trends view')
+  .description('Open the Trends screen using already-scanned data (interactive)')
   .action(async () => {
-    await runMain({ ...globals(), initialView: 'trends' });
+    await runMain({ ...globals(), initialView: 'trends', skipScan: true });
   });
 
 // ── gitradar data ────────────────────────────────────────────────────────────
@@ -604,6 +604,10 @@ program
 // ── Entry point ──────────────────────────────────────────────────────────────
 
 program.parseAsync(process.argv).catch((err) => {
-  console.error('Fatal:', err);
+  const message = err instanceof Error ? err.message : String(err);
+  console.error(message);
+  if (process.env.GITRADAR_DEBUG && err instanceof Error && err.stack) {
+    console.error(err.stack);
+  }
   process.exitCode = 1;
 });

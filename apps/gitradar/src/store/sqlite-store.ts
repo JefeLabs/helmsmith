@@ -30,15 +30,34 @@ export function getSQLitePath(): string {
 let _db: Database | null = null;
 
 export function getDB(): Database {
-  if (!_db) {
+  if (_db) return _db;
+
+  const dbPath = getSQLitePath();
+  let db: Database | undefined;
+  try {
     // `strict: true` lets us bind named params with bare keys (e.g. `@member`
     // ← { member }), matching the better-sqlite3 call sites verbatim.
-    _db = new Database(getSQLitePath(), { create: true, strict: true });
-    _db.exec('PRAGMA journal_mode = WAL;');
-    _db.exec('PRAGMA synchronous = NORMAL;');
-    _db.exec('PRAGMA busy_timeout = 5000;');
-    ensureSchema(_db);
+    db = new Database(dbPath, { create: true, strict: true });
+    db.exec('PRAGMA journal_mode = WAL;');
+    db.exec('PRAGMA synchronous = NORMAL;');
+    db.exec('PRAGMA busy_timeout = 5000;');
+    ensureSchema(db);
+  } catch (err) {
+    if (db) {
+      try {
+        db.close();
+      } catch {
+        // ignore — we're already failing
+      }
+    }
+    _db = null;
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `GitRadar database could not be opened (${dbPath}): ${reason}. If it is corrupt, run "gitradar --reset".`,
+    );
   }
+
+  _db = db;
   return _db;
 }
 

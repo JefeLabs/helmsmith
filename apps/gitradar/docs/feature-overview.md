@@ -56,8 +56,18 @@ gitradar view contributions --json              # JSON output
 gitradar view contributions --group-by team     # group by team
 gitradar view leaderboard -w 8                  # top performers, 8 weeks
 gitradar view repo-activity                     # repo activity summary
-gitradar view trends                            # jump to trends screen
 ```
+
+### Interactive screens
+
+```bash
+gitradar view trends                            # open the Trends screen
+```
+
+`view trends` opens the same TUI as the default dashboard, just starting on the
+Trends screen — and unlike the default dashboard, it does **not** trigger a
+scan first. It reads whatever is already in the store, so run `gitradar scan`
+(or launch the default dashboard) beforehand if the data may be stale.
 
 ### Data Management
 
@@ -478,12 +488,10 @@ Useful for evaluation, demos, and UI development without real repositories.
 
 Single YAML file at `~/.agentx/gitradar/config.yml`:
 
-```yaml
-repos:
-  - path: ~/code/frontend-app
-    name: frontend-app
-    group: web
+Repos are managed through the workspace registry (`gitradar repo add`), never
+in `config.yml` — a `repos:` key here is ignored (with a warning) if present.
 
+```yaml
 orgs:
   - name: Acme Corp
     type: core
@@ -528,7 +536,6 @@ Key configuration features:
 - **Tags** — Cross-team categorization (infrastructure, feature, analytics)
 - **Org types** — Distinguish `core` teams from `consultant` teams
 - **Identifiers** — Auto-assign authors based on parenthesized codes in git names
-- **Path resolution** — Supports `~` expansion and relative paths (resolved against config location)
 - **Segment thresholds** — Customize the high/low percentile boundaries
 - **Ignore patterns** — Extend (or replace) the built-in list of lockfiles, dependency dirs, and generated files that never count as work
 - **Rework toggle** — `rework_enabled: false` (or `--skip-rework`) disables the blame-based rework pass for faster scans

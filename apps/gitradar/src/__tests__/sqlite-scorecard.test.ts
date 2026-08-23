@@ -1,7 +1,7 @@
 /** Real-store tests for PR-proxy / rework columns (bun:sqlite, sandboxed via GITRADAR_HOME). */
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { UserWeekRepoRecord } from '../types/schema.js';
@@ -664,5 +664,41 @@ describe('leaderboard SQL segment path', () => {
     expect(names.has('holderbob')).toBe(false);
     // n = 9 real contributors → bottom two are mem08 / mem09.
     expect(names).toEqual(new Set(['mem08', 'mem09']));
+  });
+});
+
+describe('getDB() on a corrupt database file', () => {
+  let tmpHome: string;
+  let dataDir: string;
+  const originalOverride = process.env.GITRADAR_HOME;
+
+  beforeEach(async () => {
+    tmpHome = await mkdtemp(join(tmpdir(), 'gitradar-corruptdb-'));
+    dataDir = join(tmpHome, 'data');
+    await mkdir(dataDir, { recursive: true });
+    process.env.GITRADAR_HOME = tmpHome;
+    expect(store.getSQLitePath()).toBe(join(dataDir, 'gitradar.db'));
+  });
+
+  afterEach(async () => {
+    // getDB() throws before assigning `_db`, so there is nothing open here —
+    // closeDB() must tolerate that (it already no-ops when `_db` is null).
+    store.closeDB();
+    if (originalOverride === undefined) delete process.env.GITRADAR_HOME;
+    else process.env.GITRADAR_HOME = originalOverride;
+    await rm(tmpHome, { recursive: true, force: true });
+  });
+
+  it('throws a friendly error naming the path and "gitradar --reset"', async () => {
+    await writeFile(store.getSQLitePath(), 'not a sqlite database, just garbage bytes');
+
+    expect(() => store.getDB()).toThrow(/could not be opened .*gitradar --reset/);
+  });
+
+  it('closeDB() afterwards does not throw (never-opened DB)', async () => {
+    await writeFile(store.getSQLitePath(), 'not a sqlite database, just garbage bytes');
+
+    expect(() => store.getDB()).toThrow();
+    expect(() => store.closeDB()).not.toThrow();
   });
 });
