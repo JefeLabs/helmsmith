@@ -79,8 +79,13 @@ export async function resolveDefaultBranch(repoPath: string): Promise<string | n
   }
   for (const candidate of ['main', 'master']) {
     try {
-      await git.raw(['rev-parse', '--verify', '--quiet', `refs/heads/${candidate}`]);
-      return candidate;
+      // No `--quiet`: under simple-git, a non-zero exit with empty stderr (which `--quiet`
+      // guarantees for a missing ref) does not reject the promise — it resolves with empty
+      // stdout instead. Without `--quiet`, a missing ref writes to stderr and simple-git
+      // rejects as expected; a present ref prints its SHA on stdout, which we require to be
+      // non-empty so a spurious resolve can't be mistaken for a real match.
+      const out = (await git.raw(['rev-parse', '--verify', `refs/heads/${candidate}`])).trim();
+      if (out) return candidate;
     } catch {
       // try next
     }

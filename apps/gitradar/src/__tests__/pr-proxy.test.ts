@@ -93,18 +93,29 @@ describe('resolveDefaultBranch', () => {
     mockRaw.mockRejectedValueOnce(
       new Error('fatal: ref refs/remotes/origin/HEAD is not a symbolic ref'),
     );
-    mockRaw.mockResolvedValueOnce(''); // rev-parse --verify main ok
+    mockRaw.mockResolvedValueOnce('abc123\n'); // rev-parse --verify main ok (prints the SHA)
     expect(await resolveDefaultBranch('/r')).toBe('main');
 
     mockRaw.mockRejectedValueOnce(new Error('no HEAD'));
     mockRaw.mockRejectedValueOnce(new Error('fatal: Needed a single revision')); // no main
-    mockRaw.mockResolvedValueOnce(''); // master ok
+    mockRaw.mockResolvedValueOnce('def456\n'); // master ok
     expect(await resolveDefaultBranch('/r')).toBe('master');
 
     mockRaw.mockRejectedValueOnce(new Error('no HEAD'));
     mockRaw.mockRejectedValueOnce(new Error('no main'));
     mockRaw.mockRejectedValueOnce(new Error('no master'));
     expect(await resolveDefaultBranch('/r')).toBeNull();
+  });
+
+  it('does not trust a rev-parse call that resolves with empty stdout (simple-git quirk under --quiet)', async () => {
+    // Regression: `git rev-parse --verify --quiet <missing-ref>` exits non-zero with empty
+    // stderr, and simple-git's error detection (`exitCode && stdErr.length`) treats that as a
+    // *resolved* promise with empty stdout rather than a rejection. A missing `main` must still
+    // fall through to `master`, not be mistaken for a match.
+    mockRaw.mockRejectedValueOnce(new Error('no HEAD')); // no origin/HEAD
+    mockRaw.mockResolvedValueOnce(''); // rev-parse --verify main "succeeds" with empty stdout
+    mockRaw.mockResolvedValueOnce('def456\n'); // master ok
+    expect(await resolveDefaultBranch('/r')).toBe('master');
   });
 });
 
