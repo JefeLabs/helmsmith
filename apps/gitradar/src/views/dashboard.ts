@@ -41,6 +41,15 @@ import {
   type TimeBucket,
 } from './components/contribution-section.js';
 import { renderRepoActivityTab } from './components/repo-activity-section.js';
+import {
+  buildScorecardHotkeys,
+  defaultScorecardState,
+  FAMILY_ORDER,
+  MODE_ORDER,
+  moveSort,
+  renderScorecardTab,
+  type ScorecardViewState,
+} from './components/scorecard-section.js';
 import { renderTopPerformersTab } from './components/top-performers-section.js';
 import type { ManageSection } from './manage-tab.js';
 import { buildManageHotkeyItems, renderManageTab } from './manage-tab.js';
@@ -49,7 +58,7 @@ import type { NavigationAction, ViewContext } from './types.js';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type TabId = 'contributions' | 'repo_activity' | 'top_performers' | 'manage';
+type TabId = 'contributions' | 'repo_activity' | 'top_performers' | 'scorecard' | 'manage';
 type ManageSectionId = ManageSection;
 type WindowSize = 4 | 8 | 12;
 
@@ -57,6 +66,7 @@ const TABS: TabDef[] = [
   { id: 'contributions', key: 'c', label: 'Contributions' },
   { id: 'repo_activity', key: 'r', label: 'Repo Activity' },
   { id: 'top_performers', key: 'p', label: 'Top Performers' },
+  { id: 'scorecard', key: 'k', label: 'Scorecard' },
   { id: 'manage', key: 'm', label: 'Manage' },
 ];
 
@@ -259,6 +269,16 @@ function mapKey(
       if (keyName === '2' && leaderboardWindowWeeks !== 8) return 'lb_window_8';
       if (keyName === '3' && leaderboardWindowWeeks !== 12) return 'lb_window_12';
       break;
+    case 'scorecard':
+      if (keyName === '1') return 'sc_window_4';
+      if (keyName === '2') return 'sc_window_8';
+      if (keyName === '3') return 'sc_window_12';
+      if (keyName === 'f') return 'sc_family';
+      if (keyName === 'n') return 'sc_mode';
+      if (keyName === 'left') return 'sc_sort_left';
+      if (keyName === 'right') return 'sc_sort_right';
+      if (keyName === 'r') return 'sc_reverse';
+      break;
     case 'manage':
       if (keyName === 'r') return 'manage_repos';
       if (keyName === 'o') return 'manage_orgs';
@@ -299,6 +319,7 @@ function buildHotkeyItems(
   excludedSegments: Set<Segment>,
   repoWindow: WindowSize,
   lbWindow: WindowSize,
+  scorecardState: ScorecardViewState,
 ): Array<{ key: string; label: string }> {
   const items: Array<{ key: string; label: string }> = [];
 
@@ -354,6 +375,9 @@ function buildHotkeyItems(
       if (lbWindow !== 8) items.push({ key: '2', label: '8 weeks' });
       if (lbWindow !== 12) items.push({ key: '3', label: '3 months' });
       break;
+    case 'scorecard':
+      items.push(...buildScorecardHotkeys(scorecardState));
+      break;
   }
 
   items.push({ key: 'Q', label: 'Quit' });
@@ -366,7 +390,7 @@ function buildHotkeyItems(
 /**
  * Dashboard view — tabbed entry screen with instant hotkey navigation.
  *
- * Four tabs: Contributions, Avg Output, Repo Activity, Top Performers.
+ * Five tabs: Contributions, Repo Activity, Top Performers, Scorecard, Manage.
  * Press a single key to switch tabs, toggle options, or drill down.
  * No scrollable menus — every action is one keypress away.
  */
@@ -385,6 +409,7 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
   let contribExcludedSegments = new Set<Segment>();
   let repoWindowWeeks: WindowSize = initialWindow;
   let leaderboardWindowWeeks: WindowSize = initialWindow;
+  let scorecard: ScorecardViewState = defaultScorecardState(initialWindow);
   let manageSection: ManageSectionId = 'repos';
   let manageRepoNames: string[] = [];
   let manageRepoIdx = 0;
@@ -449,6 +474,7 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
         contribExcludedSegments,
         repoWindowWeeks,
         leaderboardWindowWeeks,
+        scorecard,
       );
     }
     console.log(renderHotkeyBar(hotkeys));
@@ -528,6 +554,9 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
         break;
       case 'top_performers':
         renderTopPerformersTab(ctx, leaderboardWindowWeeks);
+        break;
+      case 'scorecard':
+        renderScorecardTab(ctx, scorecard, termCols);
         break;
       case 'manage': {
         // Clamp cursors to valid range
@@ -733,6 +762,42 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
       }
       if (action === 'lb_window_12') {
         leaderboardWindowWeeks = 12;
+        continue;
+      }
+
+      // Scorecard
+      if (action === 'sc_window_4') {
+        scorecard = { ...scorecard, windowWeeks: 4 };
+        continue;
+      }
+      if (action === 'sc_window_8') {
+        scorecard = { ...scorecard, windowWeeks: 8 };
+        continue;
+      }
+      if (action === 'sc_window_12') {
+        scorecard = { ...scorecard, windowWeeks: 12 };
+        continue;
+      }
+      if (action === 'sc_family') {
+        const i = FAMILY_ORDER.indexOf(scorecard.family);
+        scorecard = { ...scorecard, family: FAMILY_ORDER[(i + 1) % FAMILY_ORDER.length] };
+        continue;
+      }
+      if (action === 'sc_mode') {
+        const i = MODE_ORDER.indexOf(scorecard.mode);
+        scorecard = { ...scorecard, mode: MODE_ORDER[(i + 1) % MODE_ORDER.length] };
+        continue;
+      }
+      if (action === 'sc_sort_left') {
+        scorecard = moveSort(scorecard, -1, !!ctx.config.settings.scorecard_weights);
+        continue;
+      }
+      if (action === 'sc_sort_right') {
+        scorecard = moveSort(scorecard, 1, !!ctx.config.settings.scorecard_weights);
+        continue;
+      }
+      if (action === 'sc_reverse') {
+        scorecard = { ...scorecard, sortDesc: !scorecard.sortDesc };
         continue;
       }
 
