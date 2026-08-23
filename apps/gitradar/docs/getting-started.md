@@ -52,7 +52,7 @@ gitradar init
 
 This creates `~/.agentx/gitradar/` with:
 
-- `config.yml` — your workspace's config (orgs, teams, repos, settings)
+- `config.yml` — your workspace's orgs, teams, members, and settings (repos are registered separately with `gitradar repo add`, in `~/.agentx/repos.yml`)
 - A SQLite database for storing scan results
 
 Multiple workspaces are supported (e.g., one for personal repos, one

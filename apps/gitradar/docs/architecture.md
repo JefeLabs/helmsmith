@@ -77,7 +77,7 @@ In demo mode, the engine uses in-memory records from `generateDemoData()` and sk
 
 ### Config Layer (`src/config/loader.ts`)
 
-Reads `config.yml`, expands paths, and validates against Zod schemas.
+Reads `config.yml` and validates it against Zod schemas. A leftover `repos:` key is ignored with a warning — repos come from the workspace registry (`~/.agentx/repos.yml`), loaded separately by `src/config/repos-registry.ts`.
 
 ```
 config.yml (YAML)
@@ -89,13 +89,13 @@ js-yaml.load()
 Zod schema validation (src/types/schema.ts)
     │
     ▼
-Config object (typed, validated, paths resolved)
+Config object (typed, validated: orgs, teams, members, settings)
 ```
 
 Key design decisions:
-- **Warn, don't crash** on missing repo paths — allows partial configs
-- **Resolve relative paths** against the config file directory, not CWD
-- **Expand `~`** in all path fields
+- **Warn, don't crash** on a stale `repos:` key — the config still loads, with the key ignored
+- **Repo paths are the registry's job** — `src/config/repos-registry.ts` expands `~` and resolves
+  relative paths against the registry file's directory, not CWD
 
 ### Collector Layer (`src/collector/`)
 

@@ -408,7 +408,7 @@ Enrichment data appears automatically in the Contributions tab columns when avai
 GitRadar tracks scan state per repo to avoid redundant work:
 
 - **Staleness check** — Repos scanned within the staleness window (default: 60 minutes) are skipped
-- **Hash deduplication** — Recent commit hashes are stored (last 500 per repo) to prevent double-counting
+- **Hash deduplication** — Recent commit hashes are stored (the most recent 5000 per repo — `MAX_RECENT_HASHES` in `src/store/scan-state.ts`) to prevent double-counting
 - **Since-date optimization** — Incremental scans use `lastScanDate - 1 day` as the `--since` argument
 - **Force scan** — `--force-scan` clears each scanned repo's stored records and cursors, then re-walks its full history from scratch (bypassing staleness, `since`, and hash dedup)
 

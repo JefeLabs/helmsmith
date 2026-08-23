@@ -19,7 +19,7 @@ Existing tools require browser-based dashboards, SaaS subscriptions, or complex 
 
 ## How It Works
 
-1. **Configure once** — Define your orgs, teams, members, and repo paths in a single `config.yml`. Or use the built-in Manage tab to set up everything interactively.
+1. **Configure once** — Define your orgs, teams, and members in a single `config.yml`, and register repos with `gitradar repo add` (they live in the workspace registry, `~/.agentx/repos.yml`). Or use the built-in Manage tab to set up everything interactively.
 2. **Scan incrementally** — GitRadar runs `git log` across all repos, classifies every changed file, and stores results in a local SQLite database. Subsequent scans are incremental (only new commits).
 3. **Enrich with GitHub data** — Optionally pull PR metrics (opened, merged, median cycle time, PRs reviewed) via the GitHub API.
 4. **Discover authors** — Unknown git authors are captured in an author registry and can be assigned to orgs/teams from the TUI or CLI.
