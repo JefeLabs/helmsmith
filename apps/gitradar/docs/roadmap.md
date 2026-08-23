@@ -39,6 +39,10 @@ from `package.json` is the one exception, folded into this wave's packaging pass
 - [x] **`assign-author` hard-codes `orgType: 'core'`** (`commands/assign-author.ts:48,92`) — derive from
       `config.orgs`. **`reattributeRecordsSQL` never updates `member`** (`store/sqlite-store.ts:1263-1282`)
       so SQL-path rollups keep the stale name after a reassignment — extend the UPDATE (or key by email).
+      Both flows now rewrite the stored records in SQL: the `author assign` / `author bulk-assign`
+      commands, and the TUI Manage-tab assign / move / unassign / bulk-assign flows (which build the
+      same updates via `buildTuiReattribution` and the `onReattributeRecords` context callback).
+      Unifying the two into one handler stays a Tier 3 item.
 - [x] **`--force-scan` is still incremental** — `collector/index.ts:91,109-118` only bypasses the staleness
       skip; `since` and `recentHashes`/`recentPrHashes` are still applied. Either clear cursors when forced
       (matching the help text "ignore cursors") or fix the help text.

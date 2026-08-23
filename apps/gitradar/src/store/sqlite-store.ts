@@ -1314,6 +1314,15 @@ export function deleteRecordsForRepo(repoName: string): void {
  * reassign an existing row's org — which would let a colliding row here keep the OLD
  * attribution and only merge counters, dropping the reattribution entirely.
  */
+/**
+ * Rewrite the attribution (member / org / orgType / team / tag) of every record
+ * carrying each update's email.
+ *
+ * Returns the number of `records` rows rewritten — what the caller should report
+ * rather than the size of the whole store. A rename that collides with an
+ * existing `(member, week, repo)` row merges into it, so the returned count is
+ * rows *read and re-attributed*, which can exceed the resulting row count.
+ */
 export function reattributeRecordsSQL(
   updates: Array<{
     email: string;
@@ -1323,7 +1332,7 @@ export function reattributeRecordsSQL(
     team: string;
     tag: string;
   }>,
-): void {
+): number {
   const db = getDB();
   const selectByEmail = db.prepare('SELECT * FROM records WHERE email = @email');
   const deleteByEmail = db.prepare('DELETE FROM records WHERE email = @email');
@@ -1359,9 +1368,11 @@ ${RECORD_MERGE_TAIL_SQL}
   `);
 
   const updateAll = db.transaction((items: typeof updates) => {
+    let rewritten = 0;
     for (const u of items) {
       const rows = selectByEmail.all({ email: u.email }) as Record<string, unknown>[];
       if (rows.length === 0) continue;
+      rewritten += rows.length;
 
       const renamed = rows.map(rowToRecord).map((r) => ({
         ...r,
@@ -1378,9 +1389,10 @@ ${RECORD_MERGE_TAIL_SQL}
         reattributeUpsert.run(recordToRow(r));
       }
     }
+    return rewritten;
   });
 
-  updateAll(updates);
+  return updateAll(updates);
 }
 
 // ── Enhanced stats ──────────────────────────────────────────────────────────

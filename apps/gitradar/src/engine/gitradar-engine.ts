@@ -45,6 +45,7 @@ import {
   pruneRecordsSQL,
   queryRecords,
   queryRollup,
+  reattributeRecordsSQL,
   resetAllData,
   saveAuthorRegistrySQL,
   saveEnrichmentBatchSQL,
@@ -865,6 +866,7 @@ export class GitRadarEngine {
       onSaveAuthorRegistry: async (registry) => {
         saveAuthorRegistrySQL(registry);
       },
+      onReattributeRecords: async (updates) => reattributeRecordsSQL(updates),
     };
 
     return ctx;

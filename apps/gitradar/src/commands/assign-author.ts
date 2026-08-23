@@ -2,11 +2,10 @@ import { loadConfig } from '../config/loader.js';
 import { assignAuthor, assignByIdentifierPrefix } from '../store/author-registry.js';
 import {
   loadAuthorRegistrySQL,
-  queryRecords,
   reattributeRecordsSQL,
   saveAuthorRegistrySQL,
 } from '../store/sqlite-store.js';
-import type { Config } from '../types/schema.js';
+import type { AuthorRegistry, Config } from '../types/schema.js';
 
 export interface AssignAuthorOptions {
   email: string;
@@ -85,6 +84,67 @@ export function planReattribution(
   }
 }
 
+/** One row of the argument `reattributeRecordsSQL` takes. */
+export interface ReattributionUpdate {
+  email: string;
+  member: string;
+  org: string;
+  orgType: string;
+  team: string;
+  tag: string;
+}
+
+/**
+ * Build the `reattributeRecordsSQL` updates for a TUI assignment, so the TUI
+ * rewrites stored records exactly the way `author assign` does.
+ *
+ * `org`/`team` undefined means an unassign: records go to the same
+ * `unassigned` / `core` / `default` attribution the in-memory
+ * `reattributeRecords` pass writes. The display name still comes from
+ * `resolveMemberName`, because that is the name a fresh scan would produce.
+ *
+ * Emails the registry does not know, and orgs the config does not list, are
+ * skipped — the TUI only offers configured orgs, so the latter is a guard.
+ */
+export function buildTuiReattribution(
+  config: Config,
+  registry: AuthorRegistry,
+  emails: string[],
+  org: string | undefined,
+  team: string | undefined,
+): ReattributionUpdate[] {
+  const updates: ReattributionUpdate[] = [];
+  for (const raw of emails) {
+    const email = raw.toLowerCase();
+    const author = registry.authors[email];
+    if (!author) continue;
+
+    if (!org || !team) {
+      updates.push({
+        email,
+        member: resolveMemberName(config, email, author.name),
+        org: 'unassigned',
+        orgType: 'core',
+        team: 'unassigned',
+        tag: 'default',
+      });
+      continue;
+    }
+
+    const plan = planReattribution(config, email, author.name, org, team);
+    if (!plan.ok) continue;
+    updates.push({
+      email,
+      member: plan.member,
+      org,
+      orgType: plan.orgType,
+      team,
+      tag: plan.tag,
+    });
+  }
+  return updates;
+}
+
 export async function assignAuthorCmd(options: AssignAuthorOptions): Promise<void> {
   const registry = loadAuthorRegistrySQL();
   const key = options.email.toLowerCase();
@@ -118,10 +178,13 @@ export async function assignAuthorCmd(options: AssignAuthorOptions): Promise<voi
 
   const updated = assignAuthor(registry, options.email, options.org, options.team);
   saveAuthorRegistrySQL(updated);
+  console.log(`Assigned ${author.name} <${author.email}> → ${options.org} / ${options.team}`);
 
-  // Re-attribute existing records via SQL UPDATE
+  // Re-attribute existing records via SQL UPDATE. The registry is already saved,
+  // so a store failure here leaves the two out of sync — report it and exit
+  // non-zero rather than printing a bare success line the caller can't distinguish.
   try {
-    reattributeRecordsSQL([
+    const rewritten = reattributeRecordsSQL([
       {
         email: key,
         member: plan.member,
@@ -131,11 +194,13 @@ export async function assignAuthorCmd(options: AssignAuthorOptions): Promise<voi
         tag: plan.tag,
       },
     ]);
-    const recordCount = queryRecords({}).length;
-    console.log(`Assigned ${author.name} <${author.email}> → ${options.org} / ${options.team}`);
-    console.log(`Re-attributed ${recordCount} records.`);
-  } catch {
-    console.log(`Assigned ${author.name} <${author.email}> → ${options.org} / ${options.team}`);
+    console.log(`Re-attributed ${rewritten} ${rewritten === 1 ? 'record' : 'records'}.`);
+  } catch (err) {
+    console.error(
+      `Error: re-attributing stored records failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    console.error('The assignment was saved — re-run this command to retry the re-attribution.');
+    process.exitCode = 1;
   }
 }
 
@@ -171,6 +236,14 @@ export async function bulkAssignCmd(options: BulkAssignOptions): Promise<void> {
   }
 
   const registry = loadAuthorRegistrySQL();
+  // Captured before the pass so the re-attribution — and the count reported for
+  // it — cover the authors this command actually assigned, not everyone who
+  // already sat in the target org/team.
+  const alreadyAssigned = new Set(
+    Object.entries(registry.authors)
+      .filter(([, a]) => !!a.org)
+      .map(([email]) => email),
+  );
   const result = assignByIdentifierPrefix(registry, options.prefix, options.org, options.team);
   saveAuthorRegistrySQL(result.registry);
 
@@ -189,6 +262,7 @@ export async function bulkAssignCmd(options: BulkAssignOptions): Promise<void> {
     tag: string;
   }> = [];
   for (const [email, author] of Object.entries(result.registry.authors)) {
+    if (alreadyAssigned.has(email)) continue;
     if (author.org === options.org && author.team === options.team) {
       updates.push({
         email,
@@ -201,15 +275,20 @@ export async function bulkAssignCmd(options: BulkAssignOptions): Promise<void> {
     }
   }
 
+  console.log(
+    `Assigned ${result.assignedCount} authors with prefix "${options.prefix}" → ${options.org} / ${options.team}`,
+  );
+
   try {
-    if (updates.length > 0) reattributeRecordsSQL(updates);
+    const rewritten = updates.length > 0 ? reattributeRecordsSQL(updates) : 0;
     console.log(
-      `Assigned ${result.assignedCount} authors with prefix "${options.prefix}" → ${options.org} / ${options.team}`,
+      `Re-attributed ${rewritten} ${rewritten === 1 ? 'record' : 'records'} for ${updates.length} ${updates.length === 1 ? 'author' : 'authors'}.`,
     );
-    console.log(`Re-attributed records for ${updates.length} authors.`);
-  } catch {
-    console.log(
-      `Assigned ${result.assignedCount} authors with prefix "${options.prefix}" → ${options.org} / ${options.team}`,
+  } catch (err) {
+    console.error(
+      `Error: re-attributing stored records failed: ${err instanceof Error ? err.message : String(err)}`,
     );
+    console.error('The assignments were saved — re-run this command to retry the re-attribution.');
+    process.exitCode = 1;
   }
 }

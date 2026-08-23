@@ -1,3 +1,4 @@
+import type { ReattributionUpdate } from '../commands/assign-author.js';
 import type { RolledUp, RollupFilters, RollupGroupBy } from '../store/sqlite-store.js';
 import type {
   AuthorRegistry,
@@ -31,6 +32,14 @@ export interface ViewContext {
   onAddOrg?: (org: Org) => Promise<void>;
   /** Persist updated author registry to disk. */
   onSaveAuthorRegistry?: (registry: AuthorRegistry) => Promise<void>;
+  /**
+   * Rewrite the attribution of stored records after an author assignment —
+   * the same `reattributeRecordsSQL` the `author assign` CLI calls. Without it
+   * every SQL-path consumer (contributions, leaderboard, repo-activity,
+   * scorecard, CSV export) keeps reporting the pre-assignment attribution.
+   * Returns the number of rows rewritten.
+   */
+  onReattributeRecords?: (updates: ReattributionUpdate[]) => Promise<number>;
   /** Check if underlying data has changed and reload if so. Returns true if data was refreshed. */
   onRefreshData?: () => boolean;
   /** Create an AbortSignal that fires when the database file changes on disk.

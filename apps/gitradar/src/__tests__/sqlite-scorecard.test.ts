@@ -443,6 +443,47 @@ describe('scorecard columns in the SQLite store', () => {
     expect(rows[0].team).toBe('FE');
     expect(rows[0].tag).toBe('web');
   });
+
+  it('reattributeRecordsSQL returns the number of rows it rewrote', () => {
+    store.upsertRecords([
+      makeRecord({ member: 'ecruz', email: 'e@co.com', week: '2026-W10', repo: 'web' }),
+      makeRecord({ member: 'ecruz', email: 'e@co.com', week: '2026-W11', repo: 'web' }),
+      makeRecord({ member: 'ecruz', email: 'e@co.com', week: '2026-W10', repo: 'api' }),
+      makeRecord({ member: 'Someone Else', email: 'other@co.com', week: '2026-W10', repo: 'web' }),
+    ]);
+
+    const rewritten = store.reattributeRecordsSQL([
+      {
+        email: 'e@co.com',
+        member: 'Edwin Cruz',
+        org: 'Acme',
+        orgType: 'consultant',
+        team: 'FE',
+        tag: 'web',
+      },
+    ]);
+
+    // Three rows carried that email; the fourth belongs to someone else.
+    expect(rewritten).toBe(3);
+    expect(store.queryRecords({}).filter((r) => r.member === 'Edwin Cruz').length).toBe(3);
+  });
+
+  it('reattributeRecordsSQL returns 0 when no row carries the email', () => {
+    store.upsertRecords([makeRecord({ member: 'Alice', email: 'alice@example.com' })]);
+
+    const rewritten = store.reattributeRecordsSQL([
+      {
+        email: 'nobody@co.com',
+        member: 'Nobody',
+        org: 'Acme',
+        orgType: 'core',
+        team: 'FE',
+        tag: 'web',
+      },
+    ]);
+
+    expect(rewritten).toBe(0);
+  });
 });
 
 // ── Command-level SQL path (contributions / leaderboard) ─────────────────────

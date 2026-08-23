@@ -17,6 +17,7 @@ import {
 import type { Segment } from '../aggregator/segments.js';
 import { reattributeRecords } from '../collector/author-map.js';
 import { scanDirectory } from '../collector/dir-scanner.js';
+import { buildTuiReattribution } from '../commands/assign-author.js';
 import { recordsToCsv } from '../commands/export-data.js';
 import {
   assignAuthor,
@@ -227,6 +228,37 @@ function getNumberedTeams(
 }
 
 // ── Key mapping ──────────────────────────────────────────────────────────────
+
+/**
+ * Mirror a TUI author assignment into the stored records, exactly the way
+ * `gitradar author assign` does.
+ *
+ * The in-memory `reattributeRecords` call at each site keeps the live view
+ * correct for this session; this keeps the database correct for everything
+ * reading it through SQL — `view contributions`, `view leaderboard`,
+ * `view repo-activity`, `view scorecard`, `data export-csv`, and the
+ * `Store: N orgs · N teams` line. Pass `org`/`team` as undefined to unassign.
+ *
+ * Failures are reported inline rather than thrown: the registry write has
+ * already succeeded and the TUI must stay usable.
+ */
+async function persistReattribution(
+  ctx: ViewContext,
+  emails: string[],
+  org: string | undefined,
+  team: string | undefined,
+): Promise<void> {
+  if (!ctx.onReattributeRecords || !ctx.authorRegistry) return;
+  const updates = buildTuiReattribution(ctx.config, ctx.authorRegistry, emails, org, team);
+  if (updates.length === 0) return;
+  try {
+    await ctx.onReattributeRecords(updates);
+  } catch (err) {
+    console.log(
+      chalk.red(`  Stored records not re-attributed: ${err instanceof Error ? err.message : err}`),
+    );
+  }
+}
 
 export function mapKey(
   keyName: string,
@@ -1014,6 +1046,7 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
               if (ctx.onSaveAuthorRegistry) {
                 await ctx.onSaveAuthorRegistry(ctx.authorRegistry);
               }
+              await persistReattribution(ctx, emails, currentOrg.name, teamName);
               ctx.records = reattributeRecords(ctx.records, ctx.config, ctx.authorRegistry);
               const countLabel = emails.length > 1 ? ` (${emails.length} emails)` : '';
               console.log(chalk.green(`  Moved to ${currentOrg.name} → ${teamName}${countLabel}`));
@@ -1084,6 +1117,7 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
           if (ctx.onSaveAuthorRegistry) {
             await ctx.onSaveAuthorRegistry(ctx.authorRegistry);
           }
+          await persistReattribution(ctx, emails, selectedOrg.name, teamName);
           // Re-attribute existing records with updated author assignments
           ctx.records = reattributeRecords(ctx.records, ctx.config, ctx.authorRegistry);
           const countLabel = emails.length > 1 ? ` (${emails.length} emails)` : '';
@@ -1142,6 +1176,7 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
           if (ctx.onSaveAuthorRegistry) {
             await ctx.onSaveAuthorRegistry(ctx.authorRegistry);
           }
+          await persistReattribution(ctx, emails, undefined, undefined);
           ctx.records = reattributeRecords(ctx.records, ctx.config, ctx.authorRegistry);
           const countLabel = emails.length > 1 ? ` (${emails.length} emails)` : '';
           console.log(chalk.green(`  Unassigned ${firstAuthor.name}${countLabel}`));
@@ -1228,6 +1263,13 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
           teamName = selectedOrg.teams[teamIdx].name;
         }
 
+        // Captured before the pass so the SQL re-attribution covers only the
+        // authors this bulk assign actually moved, not everyone already there.
+        const alreadyAssigned = new Set(
+          Object.entries(ctx.authorRegistry.authors)
+            .filter(([, a]) => !!a.org)
+            .map(([email]) => email),
+        );
         const result = assignByIdentifierPrefix(
           ctx.authorRegistry,
           prefix.trim(),
@@ -1239,6 +1281,13 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
         if (ctx.onSaveAuthorRegistry) {
           await ctx.onSaveAuthorRegistry(ctx.authorRegistry);
         }
+        const newlyAssigned = Object.entries(result.registry.authors)
+          .filter(
+            ([email, a]) =>
+              !alreadyAssigned.has(email) && a.org === selectedOrg.name && a.team === teamName,
+          )
+          .map(([email]) => email);
+        await persistReattribution(ctx, newlyAssigned, selectedOrg.name, teamName);
         // Re-attribute existing records with updated author assignments
         ctx.records = reattributeRecords(ctx.records, ctx.config, ctx.authorRegistry);
 
