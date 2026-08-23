@@ -53,7 +53,7 @@ gitradar -w 8 --org "Acme Corp"         # filter to 8 weeks, one org
 
 # Scanning
 gitradar scan                           # scan and exit
-gitradar scan --force-scan              # full re-scan
+gitradar scan --force-scan              # clears each repo's records and cursors, then re-walks history
 gitradar scan --skip-rework             # skip the blame-based rework pass (faster scans, no rework% on the Scorecard)
 
 # Repo management

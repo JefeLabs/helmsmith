@@ -64,6 +64,11 @@ export async function scanAllRepos(
     onScanStateUpdated?: (state: ScanState) => Promise<void>;
     /** Called after each repo with newly discovered authors. Enables per-repo author persistence. */
     onAuthorsDiscovered?: (authors: RepoDiscoveredAuthor[]) => Promise<void>;
+    /**
+     * Called for each repo before scanning when forceScan is true — deletes the repo's
+     * stored records and scan state so the forced scan replaces them from a clean slate.
+     */
+    onRepoReset?: (repoName: string) => Promise<void>;
   },
 ): Promise<ScanAllResult> {
   const forceScan = options?.forceScan ?? false;
@@ -106,16 +111,23 @@ export async function scanAllRepos(
       continue;
     }
 
-    // Calculate "since" date: lastScanDate - 1 day overlap (or undefined for first scan)
+    // A forced scan replaces the repo's records and cursors instead of scanning
+    // incrementally on top of them — clear its stored records/scan-state first.
+    if (forceScan) {
+      await options?.onRepoReset?.(repoName);
+    }
+
+    // Calculate "since" date: lastScanDate - 1 day overlap (or undefined for first
+    // scan, and always undefined for a forced scan — it re-walks full history).
     let since: string | undefined;
-    if (repoState?.lastScanDate) {
+    if (!forceScan && repoState?.lastScanDate) {
       const lastScan = new Date(repoState.lastScanDate);
       lastScan.setDate(lastScan.getDate() - 1);
       since = lastScan.toISOString().slice(0, 10); // "YYYY-MM-DD"
     }
 
-    // Build the set of recent hashes for dedup
-    const recentHashes = new Set<string>(repoState?.recentHashes ?? []);
+    // Build the set of recent hashes for dedup (empty for a forced scan).
+    const recentHashes = new Set<string>(forceScan ? [] : (repoState?.recentHashes ?? []));
 
     const reworkEnabled = !options?.skipRework && config.settings.rework_enabled;
 
@@ -179,7 +191,7 @@ export async function scanAllRepos(
       group: repo.group,
       authorMap,
       identifierRules,
-      recentPrHashes: new Set(repoState?.recentPrHashes ?? []),
+      recentPrHashes: new Set(forceScan ? [] : (repoState?.recentPrHashes ?? [])),
       since,
       shouldIgnore,
     });
@@ -210,17 +222,23 @@ export async function scanAllRepos(
     totalRecords += merged.length;
     reposScanned++;
 
-    // Update scan state
-    const existingHashes = repoState?.recentHashes ?? [];
-    const rotated = rotateHashes(existingHashes, result.newHashes);
-    const existingRecordCount = repoState?.recordCount ?? 0;
+    // Update scan state — a forced scan replaces the cursors with the fresh
+    // scan's hashes instead of rotating the old ones in, since the repo's
+    // prior records and scan-state were just cleared by onRepoReset above.
+    const newRecentHashes = forceScan
+      ? result.newHashes.slice(0, 5000)
+      : rotateHashes(repoState?.recentHashes ?? [], result.newHashes);
+    const newRecentPrHashes = forceScan
+      ? prHashes.slice(0, 5000)
+      : rotateHashes(repoState?.recentPrHashes ?? [], prHashes);
+    const existingRecordCount = forceScan ? 0 : (repoState?.recordCount ?? 0);
 
     currentState = updateRepoState(currentState, repoName, {
       lastHash: result.newHashes[0] ?? repoState?.lastHash ?? '',
       lastScanDate: new Date().toISOString(),
-      recentHashes: rotated,
+      recentHashes: newRecentHashes,
       recordCount: existingRecordCount + result.newRecords.length,
-      recentPrHashes: rotateHashes(repoState?.recentPrHashes ?? [], prHashes),
+      recentPrHashes: newRecentPrHashes,
     });
 
     if (options?.onScanStateUpdated) {

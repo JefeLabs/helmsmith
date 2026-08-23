@@ -78,7 +78,10 @@ program
   .option('--group <group>', 'Filter to repo group')
   .option('--demo', 'Use generated demo data')
   .option('--json', 'Output as JSON')
-  .option('--force-scan', 'Full re-scan, ignore cursors')
+  .option(
+    '--force-scan',
+    "Full re-scan: clears each repo's records and cursors, then re-walks history",
+  )
   .option('--prune <days>', 'Remove records older than N days', parseInt)
   .option('--store-stats', 'Print data file stats and exit')
   .option('--reset', 'Delete data files and start fresh')
@@ -135,7 +138,10 @@ program
   .command('scan')
   .description('Scan repos and exit (no TUI)')
   .option('--workspace <name>', 'Select workspace by name')
-  .option('--force-scan', 'Full re-scan, ignore cursors')
+  .option(
+    '--force-scan',
+    "Full re-scan: clears each repo's records and cursors, then re-walks history",
+  )
   .option('--staleness <min>', 'Override staleness minutes', parseInt)
   .option('-w, --weeks <n>', 'Weeks of history', parseInt)
   .option('--skip-enrich', 'Skip enrichment after scan')

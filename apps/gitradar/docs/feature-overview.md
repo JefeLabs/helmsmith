@@ -18,7 +18,7 @@ gitradar --workspace my-workspace  # launch a specific workspace
 
 ```bash
 gitradar scan                      # scan repos, print results, exit (no TUI)
-gitradar scan --force-scan         # full re-scan ignoring staleness
+gitradar scan --force-scan         # clears each repo's records and cursors, then re-walks history
 ```
 
 ### Workspace Management
@@ -377,7 +377,7 @@ GitRadar tracks scan state per repo to avoid redundant work:
 - **Staleness check** — Repos scanned within the staleness window (default: 60 minutes) are skipped
 - **Hash deduplication** — Recent commit hashes are stored (last 500 per repo) to prevent double-counting
 - **Since-date optimization** — Incremental scans use `lastScanDate - 1 day` as the `--since` argument
-- **Force scan** — `--force-scan` bypasses all staleness checks
+- **Force scan** — `--force-scan` clears each scanned repo's stored records and cursors, then re-walks its full history from scratch (bypassing staleness, `since`, and hash dedup)
 
 Terminal output during scan:
 ```

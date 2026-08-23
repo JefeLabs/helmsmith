@@ -208,6 +208,79 @@ describe('scanAllRepos', () => {
     expect(mockScanRepo).toHaveBeenCalledTimes(2);
   });
 
+  it('forceScan ignores since and both hash cursors and resets the repo first', async () => {
+    const state = makeScanState({
+      app: {
+        lastHash: 'x',
+        lastScanDate: '2026-03-01T00:00:00Z',
+        recentHashes: ['old1'],
+        recordCount: 3,
+        recentPrHashes: ['m1'],
+      },
+    });
+    mockScanRepo.mockResolvedValueOnce(makeScanResult({ newHashes: ['n1'], commitCount: 1 }));
+    mockRunPrProxy.mockResolvedValueOnce({
+      records: [],
+      newPrHashes: ['m9'],
+      prCount: 1,
+      branch: 'main',
+    });
+    const reset: string[] = [];
+    const result = await scanAllRepos(makeConfig(), state, {
+      forceScan: true,
+      onRepoReset: async (n) => {
+        reset.push(n);
+      },
+    });
+    expect(reset).toEqual(['app']);
+    expect(mockScanRepo).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ since: undefined, recentHashes: new Set() }),
+    );
+    expect(mockRunPrProxy).toHaveBeenCalledWith(
+      expect.objectContaining({ since: undefined, recentPrHashes: new Set() }),
+    );
+    expect(result.updatedScanState.repos.app.recentHashes).toEqual(['n1']);
+    expect(result.updatedScanState.repos.app.recentPrHashes).toEqual(['m9']);
+  });
+
+  it('a normal scan keeps since and rotates cursors (regression guard)', async () => {
+    const state = makeScanState({
+      app: {
+        lastHash: 'x',
+        lastScanDate: '2026-03-01T00:00:00Z',
+        recentHashes: ['old1'],
+        recordCount: 3,
+        recentPrHashes: ['m1'],
+      },
+    });
+    mockScanRepo.mockResolvedValueOnce(makeScanResult({ newHashes: ['n1'], commitCount: 1 }));
+    mockRunPrProxy.mockResolvedValueOnce({
+      records: [],
+      newPrHashes: ['m9'],
+      prCount: 1,
+      branch: 'main',
+    });
+    const reset: string[] = [];
+    const result = await scanAllRepos(makeConfig(), state, {
+      onRepoReset: async (n) => {
+        reset.push(n);
+      },
+    });
+    // Not a forced scan — onRepoReset must never fire.
+    expect(reset).toEqual([]);
+    expect(mockScanRepo).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ since: '2026-02-28', recentHashes: new Set(['old1']) }),
+    );
+    expect(mockRunPrProxy).toHaveBeenCalledWith(
+      expect.objectContaining({ since: '2026-02-28', recentPrHashes: new Set(['m1']) }),
+    );
+    // Rotated (prepended), not replaced.
+    expect(result.updatedScanState.repos.app.recentHashes).toEqual(['n1', 'old1']);
+    expect(result.updatedScanState.repos.app.recentPrHashes).toEqual(['m9', 'm1']);
+  });
+
   it('warns and skips repos with missing paths', async () => {
     mockAccess
       .mockRejectedValueOnce(new Error('ENOENT')) // frontend missing
@@ -675,7 +748,9 @@ describe('scanAllRepos', () => {
         recentPrHashes: ['m1'],
       },
     });
-    const result = await scanAllRepos(makeConfig(), state, { forceScan: true });
+    // No forceScan needed — lastScanDate is already well past the default
+    // staleness window, so this exercises the normal (rotate) cursor path.
+    const result = await scanAllRepos(makeConfig(), state);
     expect(mockRunPrProxy).toHaveBeenCalledWith(
       expect.objectContaining({ recentPrHashes: new Set(['m1']) }),
     );

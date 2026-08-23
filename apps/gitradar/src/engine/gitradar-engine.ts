@@ -273,6 +273,10 @@ export class GitRadarEngine {
         );
         saveAuthorRegistrySQL(this.authorRegistry!);
       },
+      onRepoReset: async (name) => {
+        deleteRecordsForRepo(name);
+        deleteScanStateForRepo(name);
+      },
     });
 
     const newAuthors = Object.values(this.authorRegistry!.authors).filter((a) => !a.org).length;
@@ -312,10 +316,6 @@ export class GitRadarEngine {
     const singleConfig = { ...this.config, repos: [repoEntry] };
     const currentRegistry = this.authorRegistry ?? { version: 1 as const, authors: {} };
 
-    // Delete old data for this repo, then rescan
-    deleteRecordsForRepo(repoName);
-    deleteScanStateForRepo(repoName);
-
     const freshScanState: ScanState = {
       version: 1,
       repos: { ...(this.scanState ?? { version: 1 as const, repos: {} }).repos },
@@ -344,6 +344,10 @@ export class GitRadarEngine {
           })),
         );
         saveAuthorRegistrySQL(this.authorRegistry);
+      },
+      onRepoReset: async (name) => {
+        deleteRecordsForRepo(name);
+        deleteScanStateForRepo(name);
       },
     });
 
