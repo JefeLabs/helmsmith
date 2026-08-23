@@ -34,6 +34,7 @@ function globals() {
     reset?: boolean;
     staleness?: number;
     workspace?: string;
+    skipRework?: boolean;
   }>();
 }
 
@@ -77,7 +78,8 @@ program
   .option('--store-stats', 'Print data file stats and exit')
   .option('--reset', 'Delete data files and start fresh')
   .option('--staleness <min>', 'Override staleness minutes', parseInt)
-  .option('--workspace <name>', 'Select workspace by name (skips prompt)');
+  .option('--workspace <name>', 'Select workspace by name (skips prompt)')
+  .option('--skip-rework', 'Skip the blame-based rework pass');
 
 // ── Top-level commands ───────────────────────────────────────────────────────
 
@@ -132,6 +134,7 @@ program
   .option('--staleness <min>', 'Override staleness minutes', parseInt)
   .option('-w, --weeks <n>', 'Weeks of history', parseInt)
   .option('--skip-enrich', 'Skip enrichment after scan')
+  .option('--skip-rework', 'Skip the blame-based rework pass')
   .option('--watch [interval]', 'Re-scan periodically (interval in minutes, default: 30)')
   .action(
     async (cmdOpts: {
@@ -140,6 +143,7 @@ program
       staleness?: number;
       weeks?: number;
       skipEnrich?: boolean;
+      skipRework?: boolean;
       watch?: string | boolean;
     }) => {
       const g = globals();
@@ -150,6 +154,7 @@ program
         staleness: cmdOpts.staleness ?? g.staleness,
         weeks: cmdOpts.weeks ?? g.weeks,
         skipEnrich: cmdOpts.skipEnrich,
+        skipRework: cmdOpts.skipRework ?? g.skipRework,
         scanOnly: true,
       };
 

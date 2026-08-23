@@ -2,8 +2,11 @@ import { access } from 'node:fs/promises';
 import { getRepoState, isStale, rotateHashes, updateRepoState } from '../store/scan-state.js';
 import type { AuthorRegistry, Config, ScanState, UserWeekRepoRecord } from '../types/schema.js';
 import { buildAuthorMap, buildIdentifierRules } from './author-map.js';
+import { buildIgnoreMatcher } from './classifier.js';
 import type { RawAuthor } from './git.js';
 import { scanRepo } from './git.js';
+import { runPrProxy } from './pr-proxy.js';
+import { runRework } from './rework.js';
 
 /**
  * Discovered authors from a single repo scan — includes repo context.
@@ -26,6 +29,8 @@ export interface ScanAllResult {
     reposScanned: number;
     reposSkipped: number;
     reposMissing: number;
+    totalPrs: number;
+    totalReworkCommits: number;
   };
 }
 
@@ -48,6 +53,8 @@ export async function scanAllRepos(
     forceScan?: boolean;
     stalenessMinutes?: number;
     chunkMonths?: number;
+    /** Skip the blame-based rework pass even if rework_enabled is true. */
+    skipRework?: boolean;
     /** Author registry for discovery-based resolution. */
     authorRegistry?: AuthorRegistry;
     /** Called after each repo completes. Enables per-repo persistence to bound memory. */
@@ -72,6 +79,8 @@ export async function scanAllRepos(
   let reposScanned = 0;
   let reposSkipped = 0;
   let reposMissing = 0;
+  let totalPrs = 0;
+  let totalReworkCommits = 0;
 
   for (const repo of config.repos) {
     const repoName = repo.name ?? repo.path.split('/').pop() ?? repo.path;
@@ -107,6 +116,8 @@ export async function scanAllRepos(
     // Build the set of recent hashes for dedup
     const recentHashes = new Set<string>(repoState?.recentHashes ?? []);
 
+    const reworkEnabled = !options?.skipRework && config.settings.rework_enabled;
+
     // Scan
     const result = await scanRepo(repo.path, {
       repoName,
@@ -119,12 +130,52 @@ export async function scanAllRepos(
       ignorePatterns: config.settings.ignore_patterns,
       ignorePatternsReplaceDefaults: config.settings.ignore_patterns_replace_defaults,
       classificationRules: config.classification,
+      collectRework: reworkEnabled,
     });
 
+    // ── Post-passes: rework (blame) and merged-PR proxy ───────────────────
+    const shouldIgnore = buildIgnoreMatcher(config.settings.ignore_patterns, {
+      replaceDefaults: config.settings.ignore_patterns_replace_defaults,
+    });
+    const extra: UserWeekRepoRecord[] = [];
+    let prHashes: string[] = [];
+
+    if (reworkEnabled && result.reworkInputs.length > 0) {
+      const rw = await runRework(result.reworkInputs, {
+        repoPath: repo.path,
+        repoName,
+        group: repo.group,
+        authorMap,
+        identifierRules,
+        windowDays: config.settings.churn_window_days,
+        concurrency: config.settings.churn_concurrency,
+      });
+      extra.push(...rw.records);
+      totalReworkCommits += rw.commitsProcessed;
+      console.log(`  rework: ${rw.commitsProcessed} commits, ${rw.blames} blames`);
+    }
+
+    const pr = await runPrProxy({
+      repoPath: repo.path,
+      repoName,
+      group: repo.group,
+      authorMap,
+      identifierRules,
+      recentPrHashes: new Set(repoState?.recentPrHashes ?? []),
+      since,
+      shouldIgnore,
+    });
+    if (pr.branch === null) console.log(`  PR proxy: no default branch found for ${repoName}`);
+    extra.push(...pr.records);
+    prHashes = pr.newPrHashes;
+    totalPrs += pr.prCount;
+
+    const merged = mergeRecordsByKey(result.newRecords, extra);
+
     if (options?.onRepoScanned) {
-      await options.onRepoScanned(result.newRecords);
+      await options.onRepoScanned(merged);
     } else {
-      allNewRecords.push(...result.newRecords);
+      allNewRecords.push(...merged);
     }
 
     // Collect discovered authors with repo context
@@ -138,7 +189,7 @@ export async function scanAllRepos(
     }
 
     totalCommits += result.commitCount;
-    totalRecords += result.newRecords.length;
+    totalRecords += merged.length;
     reposScanned++;
 
     // Update scan state
@@ -151,6 +202,7 @@ export async function scanAllRepos(
       lastScanDate: new Date().toISOString(),
       recentHashes: rotated,
       recordCount: existingRecordCount + result.newRecords.length,
+      recentPrHashes: rotateHashes(repoState?.recentPrHashes ?? [], prHashes),
     });
 
     if (options?.onScanStateUpdated) {
@@ -174,6 +226,30 @@ export async function scanAllRepos(
       reposScanned,
       reposSkipped,
       reposMissing,
+      totalPrs,
+      totalReworkCommits,
     },
   };
+}
+
+/** Merge post-pass records into scan records by (member, week, repo), summing the additive counters. */
+function mergeRecordsByKey(
+  base: UserWeekRepoRecord[],
+  extra: UserWeekRepoRecord[],
+): UserWeekRepoRecord[] {
+  const byKey = new Map<string, UserWeekRepoRecord>();
+  for (const r of base) byKey.set(`${r.member}::${r.week}::${r.repo}`, r);
+  for (const e of extra) {
+    const key = `${e.member}::${e.week}::${e.repo}`;
+    const r = byKey.get(key);
+    if (!r) {
+      byKey.set(key, e);
+      continue;
+    }
+    r.prsMergedGit = (r.prsMergedGit ?? 0) + (e.prsMergedGit ?? 0);
+    if (e.prSizes?.length) r.prSizes = [...(r.prSizes ?? []), ...e.prSizes];
+    r.reworkLines = (r.reworkLines ?? 0) + (e.reworkLines ?? 0);
+    r.reworkSelfLines = (r.reworkSelfLines ?? 0) + (e.reworkSelfLines ?? 0);
+  }
+  return [...byKey.values()];
 }

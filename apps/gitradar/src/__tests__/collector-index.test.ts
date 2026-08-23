@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ScanResult } from '../collector/git.js';
-import type { Config, ScanState } from '../types/schema.js';
+import type { Config, ScanState, UserWeekRepoRecord } from '../types/schema.js';
 import { DEFAULT_SETTINGS } from '../types/schema.js';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
@@ -18,6 +18,18 @@ vi.mock('../collector/git.js', () => ({
 vi.mock('../collector/author-map.js', () => ({
   buildAuthorMap: vi.fn(() => new Map()),
   buildIdentifierRules: vi.fn(() => []),
+}));
+
+const mockRunPrProxy = vi.fn();
+
+vi.mock('../collector/pr-proxy.js', () => ({
+  runPrProxy: (...args: unknown[]) => mockRunPrProxy(...args),
+}));
+
+const mockRunRework = vi.fn();
+
+vi.mock('../collector/rework.js', () => ({
+  runRework: (...args: unknown[]) => mockRunRework(...args),
 }));
 
 const { access } = await import('node:fs/promises');
@@ -51,6 +63,14 @@ function makeSampleConfig(overrides?: Partial<Config>): Config {
     settings: { ...DEFAULT_SETTINGS },
     ...overrides,
   };
+}
+
+/** Single-repo config (repo named "app") used by the post-pass wiring tests. */
+function makeConfig(overrides?: Partial<Config>): Config {
+  return makeSampleConfig({
+    repos: [{ path: '/repos/app', name: 'app', group: 'web' }],
+    ...overrides,
+  });
 }
 
 function makeScanState(repos?: ScanState['repos']): ScanState {
@@ -99,6 +119,10 @@ describe('scanAllRepos', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAccess.mockResolvedValue(undefined);
+    // PR proxy always runs per repo; default to a no-op result so pre-existing
+    // tests that don't care about it aren't affected.
+    mockRunPrProxy.mockResolvedValue({ records: [], newPrHashes: [], prCount: 0, branch: 'main' });
+    mockRunRework.mockResolvedValue({ records: [], commitsProcessed: 0, blames: 0 });
   });
 
   it('scans all repos and aggregates results', async () => {
@@ -338,10 +362,11 @@ describe('scanAllRepos', () => {
       onRepoScanned,
     });
 
-    // Callback called once per repo
+    // Callback called once per repo. Records are now merged with (empty) post-pass
+    // records before the callback, so the array is a new instance — compare by value.
     expect(onRepoScanned).toHaveBeenCalledTimes(2);
-    expect(flushed[0]).toBe(frontendRecords);
-    expect(flushed[1]).toBe(backendRecords);
+    expect(flushed[0]).toEqual(frontendRecords);
+    expect(flushed[1]).toEqual(backendRecords);
 
     // allNewRecords should be empty (records were flushed via callback)
     expect(result.allNewRecords).toHaveLength(0);
@@ -403,5 +428,107 @@ describe('scanAllRepos', () => {
     for (const call of mockScanRepo.mock.calls) {
       expect(call[1].chunkMonths).toBe(6);
     }
+  });
+
+  it('runs the PR proxy and rework passes after each repo scan and merges their records', async () => {
+    mockScanRepo.mockResolvedValueOnce(
+      makeScanResult({
+        newRecords: [makeRecord('Alice', 'app')],
+        newHashes: ['h1'],
+        commitCount: 1,
+        reworkInputs: [
+          {
+            hash: 'h1',
+            authorEmail: 'a',
+            authorName: 'A',
+            authorDate: '2026-03-01T00:00:00Z',
+            week: '2026-W10',
+            files: [{ path: 'x', deletions: 1 }],
+          },
+        ],
+      }),
+    );
+    mockRunPrProxy.mockResolvedValueOnce({
+      records: [{ ...makeRecord('Alice', 'app'), commits: 0, prsMergedGit: 2, prSizes: [10, 20] }],
+      newPrHashes: ['m1'],
+      prCount: 2,
+      branch: 'main',
+    });
+    mockRunRework.mockResolvedValueOnce({
+      records: [{ ...makeRecord('Bob', 'app'), commits: 0, reworkLines: 4, reworkSelfLines: 1 }],
+      commitsProcessed: 1,
+      blames: 1,
+    });
+
+    const scanned: UserWeekRepoRecord[][] = [];
+    const result = await scanAllRepos(makeConfig(), makeScanState(), {
+      onRepoScanned: async (recs) => {
+        scanned.push(recs);
+      },
+    });
+
+    expect(mockRunRework).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ hash: 'h1' })]),
+      expect.objectContaining({ repoName: 'app', windowDays: 21, concurrency: 3 }),
+    );
+    expect(mockRunPrProxy).toHaveBeenCalledWith(
+      expect.objectContaining({ repoName: 'app', recentPrHashes: new Set() }),
+    );
+    expect(scanned).toHaveLength(1);
+    const alice = scanned[0].find((r) => r.member === 'Alice')!;
+    expect(alice.commits).toBe(makeRecord('Alice', 'app').commits); // scan record kept
+    expect(alice.prsMergedGit).toBe(2); // proxy merged into it
+    expect(alice.prSizes).toEqual([10, 20]);
+    const bob = scanned[0].find((r) => r.member === 'Bob')!;
+    expect(bob.commits).toBe(0);
+    expect(bob.reworkLines).toBe(4);
+    expect(result.updatedScanState.repos.app.recentPrHashes).toEqual(['m1']);
+    expect(result.stats.totalPrs).toBe(2);
+    expect(result.stats.totalReworkCommits).toBe(1);
+  });
+
+  it('skips the rework pass when skipRework is set or rework_enabled is false', async () => {
+    mockScanRepo.mockResolvedValue(makeScanResult({ newRecords: [makeRecord('Alice', 'app')] }));
+    mockRunPrProxy.mockResolvedValue({ records: [], newPrHashes: [], prCount: 0, branch: 'main' });
+    mockRunRework.mockClear();
+
+    await scanAllRepos(makeConfig(), makeScanState(), { skipRework: true });
+    expect(mockRunRework).not.toHaveBeenCalled();
+
+    await scanAllRepos(
+      makeConfig({ settings: { ...DEFAULT_SETTINGS, rework_enabled: false } }),
+      makeScanState(),
+      {},
+    );
+    expect(mockRunRework).not.toHaveBeenCalled();
+    expect(mockScanRepo).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.objectContaining({ collectRework: false }),
+    );
+  });
+
+  it('reuses the stored recentPrHashes cursor and rotates it', async () => {
+    mockScanRepo.mockResolvedValue(makeScanResult({}));
+    mockRunPrProxy.mockResolvedValue({
+      records: [],
+      newPrHashes: ['m2'],
+      prCount: 1,
+      branch: 'main',
+    });
+    mockRunRework.mockResolvedValue({ records: [], commitsProcessed: 0, blames: 0 });
+    const state = makeScanState({
+      app: {
+        lastHash: 'x',
+        lastScanDate: '2020-01-01T00:00:00Z',
+        recentHashes: [],
+        recordCount: 0,
+        recentPrHashes: ['m1'],
+      },
+    });
+    const result = await scanAllRepos(makeConfig(), state, { forceScan: true });
+    expect(mockRunPrProxy).toHaveBeenCalledWith(
+      expect.objectContaining({ recentPrHashes: new Set(['m1']) }),
+    );
+    expect(result.updatedScanState.repos.app.recentPrHashes).toEqual(['m2', 'm1']);
   });
 });

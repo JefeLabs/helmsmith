@@ -64,12 +64,14 @@ export function parseDeletedHunks(
   return result;
 }
 
-/** One {email,time} per line of `git blame --porcelain` output. */
-export function parseBlamePorcelain(out: string): Array<{ email: string; time: number }> {
-  const byCommit = new Map<string, { email: string; time: number }>();
-  const lines: Array<{ email: string; time: number }> = [];
+/** One {email,name,time} per line of `git blame --porcelain` output. */
+export function parseBlamePorcelain(
+  out: string,
+): Array<{ email: string; name: string; time: number }> {
+  const byCommit = new Map<string, { email: string; name: string; time: number }>();
+  const lines: Array<{ email: string; name: string; time: number }> = [];
   let current: string | null = null;
-  let pending: { email?: string; time?: number } = {};
+  let pending: { email?: string; name?: string; time?: number } = {};
   for (const line of out.split('\n')) {
     // Header: "<hash> <origLine> <finalLine> [<numLines>]". The hash is normally a 40-char
     // hex sha, but matched loosely here (alnum, any length) — metadata lines like
@@ -79,6 +81,12 @@ export function parseBlamePorcelain(out: string): Array<{ email: string; time: n
     if (header) {
       current = header[1];
       pending = {};
+      continue;
+    }
+    // Must be checked before "author-mail"/"author-time" — the space (vs. hyphen) after
+    // "author" disambiguates it from those metadata lines.
+    if (line.startsWith('author ')) {
+      pending.name = line.slice(7).trim();
       continue;
     }
     if (line.startsWith('author-mail ')) {
@@ -91,7 +99,11 @@ export function parseBlamePorcelain(out: string): Array<{ email: string; time: n
     }
     if (line.startsWith('\t') && current) {
       if (pending.email !== undefined && pending.time !== undefined) {
-        byCommit.set(current, { email: pending.email, time: pending.time });
+        byCommit.set(current, {
+          email: pending.email,
+          name: pending.name ?? '',
+          time: pending.time,
+        });
       }
       const meta = byCommit.get(current);
       if (meta) lines.push(meta);
@@ -171,10 +183,10 @@ export async function runRework(inputs: ReworkInput[], opts: ReworkOptions): Pro
             const origMember = resolveAuthor(
               opts.authorMap,
               line.email,
-              '',
+              line.name,
               opts.identifierRules,
             )?.member;
-            bump(line.email, '', c.week, origMember !== undefined && origMember === deleter);
+            bump(line.email, line.name, c.week, origMember !== undefined && origMember === deleter);
           }
         }
       }),

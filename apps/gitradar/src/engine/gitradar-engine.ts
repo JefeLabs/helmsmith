@@ -83,6 +83,7 @@ export interface RunOptions {
   scanOnly?: boolean;
   initialView?: 'dashboard' | 'trends';
   skipEnrich?: boolean;
+  skipRework?: boolean;
 }
 
 export interface EnrichOptions {
@@ -250,6 +251,7 @@ export class GitRadarEngine {
       forceScan: opts.forceScan,
       stalenessMinutes: opts.staleness,
       chunkMonths: 3,
+      skipRework: opts.skipRework,
       authorRegistry: this.authorRegistry,
       onRepoScanned: async (repoRecords) => {
         upsertRecords(repoRecords);
@@ -279,6 +281,7 @@ export class GitRadarEngine {
         `${result.stats.reposSkipped} fresh, ` +
         `${result.stats.reposMissing} missing \u2192 ` +
         `+${result.stats.totalRecords} new records` +
+        ` \u00b7 ${result.stats.totalPrs} PRs` +
         (newAuthors > 0 ? ` \u00b7 ${newAuthors} unassigned authors` : ''),
     );
 

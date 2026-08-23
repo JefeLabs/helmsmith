@@ -71,7 +71,7 @@ describe('parseDeletedHunks', () => {
 });
 
 describe('parseBlamePorcelain', () => {
-  it('yields one {email,time} per blamed line', () => {
+  it('yields one {email,name,time} per blamed line', () => {
     const out = [
       'abc123 10 10 2',
       'author Alice',
@@ -88,9 +88,9 @@ describe('parseBlamePorcelain', () => {
       '\told3',
     ].join('\n');
     expect(parseBlamePorcelain(out)).toEqual([
-      { email: 'alice@co.com', time: 1700000000 },
-      { email: 'alice@co.com', time: 1700000000 },
-      { email: 'bob@co.com', time: 1600000000 },
+      { email: 'alice@co.com', name: 'Alice', time: 1700000000 },
+      { email: 'alice@co.com', name: 'Alice', time: 1700000000 },
+      { email: 'bob@co.com', name: 'Bob', time: 1600000000 },
     ]);
   });
 });
