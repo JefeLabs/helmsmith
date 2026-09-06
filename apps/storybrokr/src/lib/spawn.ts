@@ -30,6 +30,9 @@ export const STORYBOOK_ARGS = (configDir: string, port: number): string[] => [
 function wrap(child: ChildProcess, configDir: string): SpawnedProcess {
   const log = new LogBuffer();
   const file = createWriteStream(join(configDir, 'storybook.log'), { flags: 'a' });
+  file.once('error', (err) => {
+    log.push(`log file error: ${err.message}\n`);
+  });
   const onData = (b: Buffer) => {
     const s = b.toString();
     log.push(s);
@@ -37,11 +40,18 @@ function wrap(child: ChildProcess, configDir: string): SpawnedProcess {
   };
   child.stdout?.on('data', onData);
   child.stderr?.on('data', onData);
+  let resolveExited!: (code: number | null) => void;
   const exited = new Promise<number | null>((resolve) => {
-    child.once('close', (code) => {
-      file.end();
-      resolve(code);
-    });
+    resolveExited = resolve;
+  });
+  child.once('close', (code) => {
+    file.end();
+    resolveExited(code);
+  });
+  child.once('error', (err) => {
+    log.push(`spawn failed: ${err.message}\n`);
+    file.end();
+    resolveExited(null);
   });
   return {
     pid: child.pid ?? -1,

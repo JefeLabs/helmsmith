@@ -20,4 +20,29 @@ describe('LogBuffer', () => {
     buf.push('three\n');
     expect(seen).toEqual(['one', 'two']);
   });
+
+  it('strips a trailing \\r from CRLF-terminated lines', () => {
+    const buf = new LogBuffer();
+    buf.push('a\r\nb\r\n');
+    expect(buf.lines).toEqual(['a', 'b']);
+  });
+
+  it('removes a listener that throws, leaving other listeners and later lines unaffected', () => {
+    const buf = new LogBuffer();
+    let throwingCalls = 0;
+    buf.onLine(() => {
+      throwingCalls += 1;
+      throw new Error('boom');
+    });
+    const seen: string[] = [];
+    buf.onLine((l) => seen.push(l));
+
+    buf.push('x\ny\n');
+    expect(seen).toEqual(['x', 'y']);
+    expect(buf.lines).toEqual(['x', 'y']);
+    expect(throwingCalls).toBe(1);
+
+    buf.push('z\n');
+    expect(throwingCalls).toBe(1);
+  });
 });

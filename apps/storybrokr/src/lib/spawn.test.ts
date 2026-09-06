@@ -45,4 +45,14 @@ describe('commandSpawner', () => {
     await proc.kill();
     expect(await proc.exited).toBeNull(); // killed by signal → no exit code
   });
+
+  it('survives a spawn failure: exited resolves null, the failure is logged, and kill() is a safe no-op', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'sb-spawn-'));
+    dirs.push(dir);
+    const spawner = commandSpawner('/nonexistent/storybrokr-binary', []);
+    const proc = spawner.spawn(host(dir), dir, 6100);
+    expect(await proc.exited).toBeNull();
+    expect(proc.log.lines.some((l) => l.startsWith('spawn failed:'))).toBe(true);
+    await expect(proc.kill()).resolves.toBeUndefined();
+  });
 });

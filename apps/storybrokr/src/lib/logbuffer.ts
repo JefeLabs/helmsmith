@@ -13,10 +13,17 @@ export class LogBuffer {
     const text = this.partial + chunk;
     const parts = text.split('\n');
     this.partial = parts.pop() ?? '';
-    for (const line of parts) {
+    for (const rawLine of parts) {
+      const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
       this.buf.push(line);
       if (this.buf.length > this.capacity) this.buf.shift();
-      for (const cb of this.listeners) cb(line);
+      for (const cb of [...this.listeners]) {
+        try {
+          cb(line);
+        } catch {
+          this.listeners.delete(cb);
+        }
+      }
     }
   }
 
