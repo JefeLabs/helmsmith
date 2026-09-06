@@ -1,6 +1,9 @@
 packages:
   - 'platform/*/*'
   - 'apps/*'
+  # storybrokr's e2e host: a private package so pnpm installs its Storybook
+  # and gives it its own node_modules/.bin/storybook. Never published.
+  - 'apps/storybrokr/tests/e2e/fixtures/*'
   # NOTE: platform/*/* covers the five platform categories plus
   # platform/controlplane/ui; platform/controlplane/service is Java/Maven with no
   # package.json, so the glob skips it. examples/ and workspace-template/ are scripts/scaffold, not packages.

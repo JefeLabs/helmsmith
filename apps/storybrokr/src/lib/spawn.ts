@@ -91,7 +91,9 @@ export const storybookSpawner: Spawner = {
       cwd: host.hostRoot,
       env: { ...process.env, CI: '1', FORCE_COLOR: '0' },
       stdio: ['ignore', 'pipe', 'pipe'],
+      detached: true,
     });
+    child.unref();
     return wrap(child, configDir);
   },
 };

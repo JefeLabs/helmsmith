@@ -38,6 +38,10 @@ export function runCli(
       child.kill('SIGKILL');
       reject(new Error(`cli timed out: storybrokr ${args.join(' ')}\n${stderr}`));
     }, opts.timeoutMs ?? 170_000);
+    child.on('error', (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
     child.on('exit', (code) => {
       clearTimeout(timer);
       resolve({ code, stdout, stderr });
