@@ -216,6 +216,86 @@ describe('daemon', () => {
     expect(await notFound.json()).toMatchObject({ code: 'NOT_FOUND' });
   });
 
+  it('rejects a malformed up body with BAD_REQUEST instead of a 500', async () => {
+    const { daemon } = await boot();
+    const h = { authorization: `Bearer ${daemon.token}`, 'content-type': 'application/json' };
+
+    const empty = await fetch(`${daemon.url}/v1/instances`, {
+      method: 'POST',
+      headers: h,
+      body: JSON.stringify({}),
+    });
+    expect(empty.status).toBe(400);
+    expect(await empty.json()).toMatchObject({ code: 'BAD_REQUEST' });
+
+    const badTtl = await fetch(`${daemon.url}/v1/instances`, {
+      method: 'POST',
+      headers: h,
+      body: JSON.stringify({ component: 'x', ttlMinutes: 'abc' }),
+    });
+    expect(badTtl.status).toBe(400);
+    expect(await badTtl.json()).toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  it('rejects a malformed hosts/inspect body with BAD_REQUEST', async () => {
+    const { daemon } = await boot();
+    const h = { authorization: `Bearer ${daemon.token}`, 'content-type': 'application/json' };
+
+    const res = await fetch(`${daemon.url}/v1/hosts/inspect`, {
+      method: 'POST',
+      headers: h,
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  it('ends the follow stream immediately when the instance has no live log stream', async () => {
+    const record = makeRecord();
+    const home = mkdtempSync(join(tmpdir(), 'sb-daemon-'));
+    homes.push(home);
+    const registry = new Registry({ home, config: DEFAULT_CONFIG });
+    const broker = new Broker({ registry, spawner: neverSpawner, config: DEFAULT_CONFIG });
+    vi.spyOn(broker, 'get').mockReturnValue(record);
+    vi.spyOn(broker, 'logs').mockReturnValue(['tail line']);
+    vi.spyOn(broker, 'logStream').mockReturnValue(undefined);
+    const { daemon } = await boot(broker);
+    const h = { authorization: `Bearer ${daemon.token}` };
+
+    const res = await fetch(`${daemon.url}/v1/instances/r1/logs?follow=1`, { headers: h });
+    const text = await Promise.race([
+      res.text(),
+      sleep(2000).then(() => {
+        throw new Error('follow stream did not end on its own');
+      }),
+    ]);
+    expect(text).toContain('tail line');
+  });
+
+  it('ends the follow stream once the instance stops being starting/ready', async () => {
+    const record = makeRecord();
+    const home = mkdtempSync(join(tmpdir(), 'sb-daemon-'));
+    homes.push(home);
+    const registry = new Registry({ home, config: DEFAULT_CONFIG });
+    const broker = new Broker({ registry, spawner: neverSpawner, config: DEFAULT_CONFIG });
+    vi.spyOn(broker, 'get').mockReturnValue(record);
+    vi.spyOn(broker, 'logs').mockReturnValue([]);
+    const log = new LogBuffer();
+    vi.spyOn(broker, 'logStream').mockReturnValue(log);
+    const list = vi.spyOn(broker, 'list').mockReturnValue([record]);
+    const { daemon } = await boot(broker);
+    const h = { authorization: `Bearer ${daemon.token}` };
+
+    const res = await fetch(`${daemon.url}/v1/instances/r1/logs?follow=1`, { headers: h });
+    setTimeout(() => list.mockReturnValue([]), 300);
+
+    const result = await Promise.race([
+      res.text().then(() => 'ended' as const),
+      sleep(2000).then(() => 'timeout' as const),
+    ]);
+    expect(result).toBe('ended');
+  });
+
   it('falls back to a default tail count when the query param is not a valid number', async () => {
     const home = mkdtempSync(join(tmpdir(), 'sb-daemon-'));
     homes.push(home);

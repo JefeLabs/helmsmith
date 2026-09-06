@@ -1,7 +1,28 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { z } from 'zod';
 import { type ErrorBody, httpStatusFor, StorybrokrError, toErrorBody } from '../lib/errors.js';
-import type { UpRequest } from '../types.js';
 import type { Broker } from './broker.js';
+
+const UpBody = z.object({
+  component: z.string().min(1),
+  hostRoot: z.string().min(1).optional(),
+  ttlMinutes: z.number().min(0).optional(),
+  wait: z.boolean().optional(),
+});
+
+const InspectBody = z.object({ path: z.string().min(1) });
+
+/** Validates a parsed JSON body against a zod schema, mapping a failure to BAD_REQUEST instead
+ * of letting an unvalidated shape reach the broker (e.g. `{}` → TypeError → 500). */
+function parseBody<T>(schema: z.ZodType<T>, raw: unknown): T {
+  const result = schema.safeParse(raw);
+  if (!result.success) {
+    const issue = result.error.issues[0];
+    const path = issue.path.length > 0 ? issue.path.join('.') : 'body';
+    throw new StorybrokrError('BAD_REQUEST', `invalid request body: ${path}: ${issue.message}`);
+  }
+  return result.data;
+}
 
 export interface RouteContext {
   broker: Broker;
@@ -68,7 +89,7 @@ export async function handle(
     }
     if (parts[1] === 'instances') {
       if (parts.length === 2 && method === 'POST') {
-        const body = (await readJson(req)) as unknown as UpRequest;
+        const body = parseBody(UpBody, await readJson(req));
         const { record, created } = await ctx.broker.up(body);
         return send(res, created ? 201 : 200, { record });
       }
@@ -88,6 +109,9 @@ export async function handle(
         const tail = Number.isInteger(rawTail) && rawTail > 0 ? rawTail : 200;
         if (url.searchParams.get('follow') !== '1')
           return send(res, 200, { lines: ctx.broker.logs(id, tail) });
+        // Resolved once, up front: a path-shaped `id` needs the real instance id for the
+        // liveness poll below, and this touches the record (fine for a log read).
+        const resolvedId = ctx.broker.get(id).id;
         const stream = ctx.broker.logStream(id);
         res.writeHead(200, {
           'content-type': 'text/event-stream',
@@ -100,14 +124,32 @@ export async function handle(
         res.flushHeaders();
         for (const line of ctx.broker.logs(id, tail))
           res.write(`data: ${JSON.stringify(line)}\n\n`);
-        const off = stream?.onLine((line) => res.write(`data: ${JSON.stringify(line)}\n\n`));
-        req.on('close', () => off?.());
+        if (!stream) {
+          // No live process to follow (e.g. an adopted instance with no local log stream) —
+          // the tail is everything there is; end the stream instead of hanging forever.
+          res.end();
+          return;
+        }
+        const off = stream.onLine((line) => res.write(`data: ${JSON.stringify(line)}\n\n`));
+        const ACTIVE = new Set(['starting', 'ready']);
+        const poll = setInterval(() => {
+          const record = ctx.broker.list().find((r) => r.id === resolvedId);
+          if (!record || !ACTIVE.has(record.status)) {
+            clearInterval(poll);
+            off();
+            res.end();
+          }
+        }, 500);
+        req.on('close', () => {
+          clearInterval(poll);
+          off();
+        });
         return;
       }
     }
     if (parts[1] === 'hosts' && parts[2] === 'inspect' && method === 'POST') {
-      const { path } = await readJson(req);
-      return send(res, 200, { host: ctx.broker.inspectHost(String(path)) });
+      const { path } = parseBody(InspectBody, await readJson(req));
+      return send(res, 200, { host: ctx.broker.inspectHost(path) });
     }
     if (parts[1] === 'shutdown' && method === 'POST') {
       send(res, 202, { ok: true });

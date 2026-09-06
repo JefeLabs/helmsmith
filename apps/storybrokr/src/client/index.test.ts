@@ -131,6 +131,18 @@ describe('DaemonClient', () => {
     });
   });
 
+  it('follow rejects with the mapped error when the daemon returns a non-2xx response', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'sb-client-'));
+    homes.push(home);
+    const { daemon } = fakeDaemon(home);
+    daemons.push(daemon);
+    await daemon.start(0);
+    const client = await DaemonClient.connect({ home, autoStart: false });
+    await expect(client.follow('nope', () => {})).rejects.toMatchObject({
+      code: 'INSTANCE_NOT_FOUND',
+    });
+  });
+
   it('follow calls onEnd exactly once when the stream ends (e.g. via daemon.stop())', async () => {
     const home = mkdtempSync(join(tmpdir(), 'sb-client-'));
     homes.push(home);

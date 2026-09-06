@@ -222,6 +222,14 @@ export class DaemonClient {
     const res = await this.send('GET', `/v1/instances/${encodeURIComponent(id)}/logs?follow=1`, {
       signal: controller.signal,
     });
+    if (!res.ok) {
+      const json = await this.parseBody<ErrorBody>(res);
+      throw new StorybrokrError(
+        json.code ?? 'INTERNAL',
+        json.message ?? `HTTP ${res.status}`,
+        json.logTail,
+      );
+    }
     const reader = res.body?.getReader();
     void (async () => {
       let buf = '';
@@ -234,7 +242,13 @@ export class DaemonClient {
         while (idx >= 0) {
           const frame = buf.slice(0, idx);
           buf = buf.slice(idx + 2);
-          if (frame.startsWith('data: ')) onLine(JSON.parse(frame.slice(6)) as string);
+          if (frame.startsWith('data: ')) {
+            try {
+              onLine(JSON.parse(frame.slice(6)) as string);
+            } catch {
+              // A malformed frame is not fatal to the stream; skip it and keep reading.
+            }
+          }
           idx = buf.indexOf('\n\n');
         }
       }

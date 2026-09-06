@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import {
   chmodSync,
   closeSync,
@@ -29,6 +29,15 @@ export interface DaemonOptions {
   broker: Broker;
   config: DaemonConfig;
   token?: string;
+}
+
+/** Constant-time bearer comparison over equal-length buffers; a length mismatch (which already
+ * leaks nothing useful about the token) falls back to a plain false. */
+function bearerMatches(auth: string, token: string): boolean {
+  const expected = Buffer.from(`Bearer ${token}`);
+  const actual = Buffer.from(auth);
+  if (actual.length !== expected.length) return false;
+  return timingSafeEqual(actual, expected);
 }
 
 function pidAlive(pid: number): boolean {
@@ -114,7 +123,7 @@ export function createDaemon(opts: DaemonOptions): Daemon {
       server = createServer((req, res) => {
         const isHealth = req.url === '/v1/health';
         const auth = req.headers.authorization ?? '';
-        if (!isHealth && auth !== `Bearer ${token}`) {
+        if (!isHealth && !bearerMatches(auth, token)) {
           const body: ErrorBody = {
             code: 'UNAUTHORIZED',
             message: 'missing or invalid bearer token',

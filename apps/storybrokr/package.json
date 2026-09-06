@@ -11,8 +11,12 @@
     "storybrokr": "./bin/storybrokr.mjs"
   },
   "main": "./dist/cli.js",
+  "types": "./dist/cli.d.ts",
   "exports": {
-    ".": "./dist/cli.js"
+    ".": {
+      "import": "./dist/cli.js",
+      "types": "./dist/cli.d.ts"
+    }
   },
   "files": [
     "dist",
