@@ -1,0 +1,49 @@
+{
+  "name": "@helmsmith/storybrokr",
+  "version": "0.1.0",
+  "description": "Broker ephemeral single-component Storybook instances from an existing host Storybook — daemon, CLI, and MCP server.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "bin": {
+    "storybrokr": "./bin/storybrokr.mjs"
+  },
+  "main": "./dist/cli.js",
+  "exports": {
+    ".": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "README.md",
+    "SKILL.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup && tsc -p tsconfig.json --noEmit false --emitDeclarationOnly --declaration --outDir dist",
+    "dev": "tsx src/cli.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "pnpm run build && vitest run --config vitest.e2e.config.ts",
+    "typecheck": "tsc --noEmit",
+    "prepack": "pnpm run build"
+  },
+  "dependencies": {
+    "@helmsmith/cli-kit": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "chalk": "^6.0.0",
+    "commander": "^15.0.0",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
+}

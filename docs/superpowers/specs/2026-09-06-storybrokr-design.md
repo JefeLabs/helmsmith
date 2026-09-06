@@ -299,7 +299,7 @@ Follows `docs/toolbox-conventions.md`.
 
 ```
 apps/storybrokr/
-  bin/storybrokr.mjs           #!/usr/bin/env bun → import('../dist/cli.js')
+  bin/storybrokr.mjs           #!/usr/bin/env node → import('../dist/cli.js')
   src/cli.ts                   createCli from @helmsmith/cli-kit; registers commands only
   src/commands/                up, ls, get, down, open, logs, touch, doctor, daemon, mcp
   src/server/                  daemon.ts, routes.ts, registry.ts, state.ts, reaper.ts
@@ -311,19 +311,22 @@ apps/storybrokr/
 ```
 
 `package.json`: `@helmsmith/storybrokr`, `type: module`, `publishConfig.access: public`,
-`engines.bun >= 1.3`, `bun` as a runtime dependency, `bin.storybrokr`, `files` = `dist`, `bin`,
+`engines.node >= 24` (the workspace standard; no Bun-only APIs are used, so the daemon runs
+under vitest and the vendored Bun binary is unnecessary; recorded as a deviation from the
+toolbox Bun-distribution rule), `bin.storybrokr`, `files` = `dist`, `bin`,
 `README.md`, `SKILL.md`. Scripts: `build`, `dev`, `test`, `test:watch`, `test:e2e`,
 `typecheck`, `prepack`.
 
 **Bundling decision.** `tsup.config.ts` sets `noExternal: [/^@helmsmith\//]` so
 `@helmsmith/cli-kit` is bundled into `dist/`. Reason: cli-kit has never been published, and
-a tarball that declares it as a dependency is uninstallable from npm. gitradar's config does
-not do this today; that is gitradar's problem to fix, not a pattern to copy.
+a tarball that declares it as a dependency is uninstallable from npm. Declarations are
+emitted by `tsc --emitDeclarationOnly` in the build script because TypeScript 7 ships no JS
+compiler API for tsup's dts plugin.
 
-Dependencies beyond cli-kit: `commander` and `@inquirer/prompts` (cli-kit declares them as
-peer dependencies, so the app declares them directly), `zod` for schemas shared by routes
-and MCP tools, `@modelcontextprotocol/sdk` for the stdio server, `chalk`. No Playwright, no
-Storybook.
+Dependencies beyond cli-kit: `commander` (a cli-kit peer dependency, so the app declares it
+directly; storybrokr has no prompts, so cli-kit's `inquirer` peer is not declared), `zod` for
+schemas shared by routes and MCP tools, `@modelcontextprotocol/sdk` for the stdio server,
+`chalk`. No Playwright, no Storybook.
 
 ## 9. Testing
 
