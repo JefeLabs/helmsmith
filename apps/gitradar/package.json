@@ -13,7 +13,7 @@
     "docs"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && tsc -p tsconfig.json --noEmit false --emitDeclarationOnly --declaration --outDir dist",
     "dev": "tsx src/cli.ts",
     "test": "vitest run && bun run test:bun",
     "test:bun": "bun test src/__tests__/sqlite-store.test.ts src/__tests__/functional.test.ts && bun test src/__tests__/sqlite-active-days.test.ts && bun test src/__tests__/sqlite-scorecard.test.ts",
@@ -51,7 +51,7 @@
     "@types/node": "^24.13.3",
     "tsup": "^8.5.1",
     "tsx": "^4.23.13",
-    "typescript": "^5.9.3",
+    "typescript": "^7.0.2",
     "vitest": "^5.0.0"
   },
   "publishConfig": {

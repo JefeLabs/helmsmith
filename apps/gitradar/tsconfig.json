@@ -6,7 +6,8 @@
     "rootDir": "src",
     "jsx": "react-jsx",
     "jsxImportSource": "@opentui/react",
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "types": ["node", "bun"]
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist"]

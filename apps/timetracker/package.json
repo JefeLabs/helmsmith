@@ -20,7 +20,7 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && tsc -p tsconfig.json --noEmit false --emitDeclarationOnly --declaration --outDir dist",
     "dev": "tsx src/cli.ts",
     "start": "tsx src/cli.ts start",
     "test": "vitest run",
@@ -48,7 +48,7 @@
     "@types/react": "^19.2.18",
     "tsup": "^8.5.1",
     "tsx": "^4.23.13",
-    "typescript": "^5.7.0",
+    "typescript": "^7.0.2",
     "vitest": "^5.0.0"
   },
   "engines": {

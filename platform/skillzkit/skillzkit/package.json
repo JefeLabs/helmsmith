@@ -23,7 +23,7 @@
   ],
   "scripts": {
     "catalog": "tsx scripts/generate-catalog.ts",
-    "build": "npm run catalog && tsup",
+    "build": "npm run catalog && tsup && tsc -p tsconfig.json --noEmit false --emitDeclarationOnly --declaration --outDir dist",
     "build:lambda": "npm run catalog && tsx scripts/build-lambda.ts",
     "test": "npm run catalog && vitest run",
     "test:watch": "vitest",
@@ -50,7 +50,7 @@
     "esbuild": "^0.28.2",
     "tsup": "^8.5.1",
     "tsx": "^4.23.13",
-    "typescript": "^5.7.0",
+    "typescript": "^7.0.2",
     "vitest": "^5.0.0"
   },
   "engines": {
