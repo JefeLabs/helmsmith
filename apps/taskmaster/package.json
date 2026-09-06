@@ -47,7 +47,7 @@
     "commander": "^15.0.0",
     "handlebars": "^4.7.9",
     "js-yaml": "^5.4.1",
-    "marked": "^17.0.6",
+    "marked": "^18.0.11",
     "marked-terminal": "^7.3.0",
     "proper-lockfile": "^4.1.2",
     "react": "^19.2.8",

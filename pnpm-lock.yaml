@@ -128,7 +128,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: ^5.0.0
-        version: 5.0.0(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.0(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
   apps/gittyup:
     dependencies:
@@ -355,11 +355,11 @@ importers:
         specifier: ^5.4.1
         version: 5.4.1
       marked:
-        specifier: ^17.0.6
-        version: 17.0.6
+        specifier: ^18.0.11
+        version: 18.0.11
       marked-terminal:
         specifier: ^7.3.0
-        version: 7.3.0(marked@17.0.6)
+        version: 7.3.0(marked@18.0.11)
       proper-lockfile:
         specifier: ^4.1.2
         version: 4.1.2
@@ -390,7 +390,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: ^5.0.0
-        version: 5.0.0(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.0(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
   apps/timetracker:
     dependencies:
@@ -4342,6 +4342,7 @@ packages:
 
   bun@1.4.2:
     resolution: {integrity: sha512-TrSXo6HJfIEaczpb3kjX82I2pL47vK1QUNmHRCUdz9IzaOwa9lzOXSWwu2l18YHE3sNfGRapVLd4nNm+22vVVA==}
+    cpu: [arm64, x64]
     os: [darwin, linux, android, freebsd, win32]
     hasBin: true
 
@@ -5263,8 +5264,8 @@ packages:
     engines: {node: '>= 20'}
     hasBin: true
 
-  marked@17.0.6:
-    resolution: {integrity: sha512-gB0gkNafnonOw0obSTEGZTT86IuhILt2Wfx0mWH/1Au83kybTayroZ/V6nS25mN7u8ASy+5fMhgB3XPNrOZdmA==}
+  marked@18.0.11:
+    resolution: {integrity: sha512-HnslJfsZkRPBDJRHvVtAaWlZHEpSu7u8LgQuJCELjRKuWR+hpq4A7sLq3p8HaI9ypVoXDXxV34CsQJEe1+J5Aw==}
     engines: {node: '>= 20'}
     hasBin: true
 
@@ -11416,20 +11417,20 @@ snapshots:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  marked-terminal@7.3.0(marked@17.0.6):
+  marked-terminal@7.3.0(marked@18.0.11):
     dependencies:
       ansi-escapes: 7.3.0
       ansi-regex: 6.2.2
       chalk: 5.6.2
       cli-highlight: 2.1.11
       cli-table3: 0.6.5
-      marked: 17.0.6
+      marked: 18.0.11
       node-emoji: 2.2.0
       supports-hyperlinks: 3.2.0
 
   marked@17.0.1: {}
 
-  marked@17.0.6: {}
+  marked@18.0.11: {}
 
   math-intrinsics@1.1.0: {}
 
