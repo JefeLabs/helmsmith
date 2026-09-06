@@ -30,6 +30,8 @@ Do not use it to browse a whole design system: that is what the host's full Stor
 | `storybrokr up <path> [--host <dir>] [--ttl <min>] [--no-wait] [--json]` | Boot or reuse |
 | `storybrokr ls [--json]` / `get <id> [--json]` | Inspect |
 | `storybrokr down <id \| --all>` | Stop |
+| `storybrokr open <id \| path> [--story <id>]` | Open the manager, or one story, in the browser |
+| `storybrokr touch <id>` | Reset the idle timer |
 | `storybrokr logs <id> [--follow]` | Storybook output |
 | `storybrokr doctor [<path>]` | Pre-flight a host |
 | `storybrokr daemon start\|stop\|status` | Daemon control |
