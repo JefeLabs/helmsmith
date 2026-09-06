@@ -30,13 +30,13 @@
   "dependencies": {
     "@helmsmith/cli-kit": "workspace:*",
     "@helmsmith/tui-view-components": "workspace:*",
-    "@inquirer/prompts": "^8.2.0",
+    "@inquirer/prompts": "^8.7.1",
     "@opentui/core": "^0.2.2",
     "@opentui/react": "^0.2.2",
     "commander": "^14.0.3",
     "discord.js": "^14.27.0",
     "react": "^19.2.0",
-    "zod": "^3.25.32"
+    "zod": "^3.25.76"
   },
   "optionalDependencies": {
     "@aws-sdk/client-dynamodb": "^3.1127.0",

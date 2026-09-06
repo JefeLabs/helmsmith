@@ -25,7 +25,7 @@
   "devDependencies": {
     "@types/node": "^24.13.3",
     "commander": "^14.0.3",
-    "inquirer": "^12.6.0",
+    "inquirer": "^12.11.1",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.11"
