@@ -26,16 +26,34 @@ function readInfo(home: string): DaemonInfo | null {
 async function healthy(info: DaemonInfo | null): Promise<boolean> {
   if (!info) return false;
   try {
-    const res = await fetch(`http://127.0.0.1:${info.port}/v1/health`);
+    const res = await fetch(`http://127.0.0.1:${info.port}/v1/health`, {
+      signal: AbortSignal.timeout(2_000),
+    });
     return res.ok;
   } catch {
     return false;
   }
 }
 
+/**
+ * Resolves the daemon entry point relative to this client's own file, trying the bundled
+ * layout (`dist/server/start.js` next to `dist/cli.js`) before the dev/build layout two levels
+ * up from `src/client/` (package root's `dist/server/start.js`).
+ */
+export function resolveDaemonEntry(fromDir: string): string {
+  const bundled = join(fromDir, 'server', 'start.js');
+  if (existsSync(bundled)) return bundled;
+  const dev = join(fromDir, '..', '..', 'dist', 'server', 'start.js');
+  if (existsSync(dev)) return dev;
+  throw new StorybrokrError(
+    'DAEMON_UNAVAILABLE',
+    `daemon entry not found (looked for ${bundled} and ${dev}); run \`pnpm build\` first`,
+  );
+}
+
 /** Default auto-start: run the built daemon entry detached, inheriting STORYBROKR_HOME. */
 function spawnDetachedDaemon(home: string): void {
-  const entry = join(dirname(fileURLToPath(import.meta.url)), 'server', 'start.js');
+  const entry = resolveDaemonEntry(dirname(fileURLToPath(import.meta.url)));
   const child = spawn(process.execPath, [entry], {
     detached: true,
     stdio: 'ignore',
@@ -77,22 +95,61 @@ export class DaemonClient {
     );
   }
 
-  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    let res: Response;
+  /**
+   * Sends one HTTP request, mapping connection failures to `DAEMON_UNAVAILABLE` (spec §7.2:
+   * a client holding a stale token gets 401, re-reads `daemon.json`, and retries once with the
+   * new token if it differs — otherwise the 401 is returned for normal error mapping).
+   */
+  private async send(
+    method: string,
+    path: string,
+    init: { body?: unknown; headers?: Record<string, string>; signal?: AbortSignal } = {},
+  ): Promise<Response> {
+    const attempt = async (): Promise<Response> => {
+      try {
+        return await fetch(`${this.url}${path}`, {
+          method,
+          headers: { authorization: `Bearer ${this.info.token}`, ...init.headers },
+          body: init.body === undefined ? undefined : JSON.stringify(init.body),
+          signal: init.signal,
+        });
+      } catch (err) {
+        throw new StorybrokrError(
+          'DAEMON_UNAVAILABLE',
+          `daemon at ${this.url} is not answering: ${(err as Error).message}`,
+        );
+      }
+    };
+    const res = await attempt();
+    if (res.status === 401) {
+      const fresh = readInfo(this.home);
+      if (fresh && fresh.token !== this.info.token) {
+        this.info = fresh;
+        return attempt();
+      }
+    }
+    return res;
+  }
+
+  /** Parses a JSON body, mapping a malformed response to a coded error instead of a bare SyntaxError. */
+  private async parseBody<T>(res: Response): Promise<T> {
     try {
-      res = await fetch(`${this.url}${path}`, {
-        method,
-        headers: { authorization: `Bearer ${this.info.token}`, 'content-type': 'application/json' },
-        body: body === undefined ? undefined : JSON.stringify(body),
-      });
-    } catch (err) {
+      return (await res.json()) as T;
+    } catch {
       throw new StorybrokrError(
-        'DAEMON_UNAVAILABLE',
-        `daemon at ${this.url} is not answering: ${(err as Error).message}`,
+        res.ok ? 'INTERNAL' : 'DAEMON_UNAVAILABLE',
+        `daemon returned a non-JSON ${res.status} response`,
       );
     }
+  }
+
+  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+    const res = await this.send(method, path, {
+      body,
+      headers: { 'content-type': 'application/json' },
+    });
     if (res.status === 204) return undefined as T;
-    const json = (await res.json()) as T | ErrorBody;
+    const json = await this.parseBody<T | ErrorBody>(res);
     if (!res.ok) {
       const e = json as ErrorBody;
       throw new StorybrokrError(e.code ?? 'INTERNAL', e.message ?? `HTTP ${res.status}`, e.logTail);
@@ -110,12 +167,11 @@ export class DaemonClient {
     }>('GET', '/v1/health');
   }
   async up(req: UpRequest): Promise<{ record: InstanceRecord; created: boolean }> {
-    const res = await fetch(`${this.url}/v1/instances`, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${this.info.token}`, 'content-type': 'application/json' },
-      body: JSON.stringify(req),
+    const res = await this.send('POST', '/v1/instances', {
+      body: req,
+      headers: { 'content-type': 'application/json' },
     });
-    const json = (await res.json()) as { record: InstanceRecord } | ErrorBody;
+    const json = await this.parseBody<{ record: InstanceRecord } | ErrorBody>(res);
     if (!res.ok) {
       const e = json as ErrorBody;
       throw new StorybrokrError(e.code ?? 'INTERNAL', e.message ?? `HTTP ${res.status}`, e.logTail);
@@ -155,8 +211,7 @@ export class DaemonClient {
   /** Streams log lines via SSE; resolves with a function that closes the stream. */
   async follow(id: string, onLine: (line: string) => void): Promise<() => void> {
     const controller = new AbortController();
-    const res = await fetch(`${this.url}/v1/instances/${encodeURIComponent(id)}/logs?follow=1`, {
-      headers: { authorization: `Bearer ${this.info.token}` },
+    const res = await this.send('GET', `/v1/instances/${encodeURIComponent(id)}/logs?follow=1`, {
       signal: controller.signal,
     });
     const reader = res.body?.getReader();
