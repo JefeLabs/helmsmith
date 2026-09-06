@@ -11,7 +11,7 @@ overrides:
   tsup: ^8.5.1
   typescript: ^5.9.3
   vitest: ^4.1.11
-  vite: ^6
+  vite: ^6.4.3
 
 importers:
 
@@ -623,7 +623,7 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
       vite:
-        specifier: ^6
+        specifier: ^6.4.3
         version: 6.4.3(@types/node@25.9.4)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.13)(yaml@2.9.0)
 
   platform/core/agent-adapter-langchain-lib:
@@ -772,7 +772,7 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
       vite:
-        specifier: ^6
+        specifier: ^6.4.3
         version: 6.4.3(@types/node@25.9.4)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.13)(yaml@2.9.0)
       vitest:
         specifier: ^4.1.11
@@ -1029,7 +1029,7 @@ importers:
         specifier: ^24.13.3
         version: 24.13.3
       esbuild:
-        specifier: ^0.27.0
+        specifier: ^0.27.7
         version: 0.27.7
       tsup:
         specifier: ^8.5.1
@@ -4216,7 +4216,7 @@ packages:
   '@tailwindcss/vite@4.3.3':
     resolution: {integrity: sha512-yYU8cogLeSh/ms2jh8Fj7jaba/EWa7Ja6GoUqYZaraEuCI5YS6ms6ObZgjjedm+jm6XZjdNRWBpPP6Z86oOxcw==}
     peerDependencies:
-      vite: ^6
+      vite: ^6.4.3
 
   '@tanstack/query-core@5.101.2':
     resolution: {integrity: sha512-hH5MLoJhF7KaIGd7q3xTXGXvslI+GYlM1Z/35aSHHWaCJWB7XvTSHYuV3eM7tw+aE0mT/xMro4M4Q9rCGHT0lw==}
@@ -4352,7 +4352,7 @@ packages:
     resolution: {integrity: sha512-gUu9hwfWvvEDBBmgtAowQCojwZmJ5mcLn3aufeCsitijs3+f2NsrPtlAWIR6OPiqljl96GVCUbLe0HyqIpVaoA==}
     engines: {node: ^14.18.0 || >=16.0.0}
     peerDependencies:
-      vite: ^6
+      vite: ^6.4.3
 
   '@vitest/expect@4.1.11':
     resolution: {integrity: sha512-VX2x5vNJXET47KAFzwERI+KRMtTTCSWTfSMKsW7JsUsXV4psq++e3DvZpuTDOpHcxytiDs6p2nhVb2tVDiiUYw==}
@@ -4361,7 +4361,7 @@ packages:
     resolution: {integrity: sha512-2XJVD55d1o5AZous5CCGKS74g/riOj9odEt2bQpCVZeblHyHdnMeFl4jl0XjU21stf4mbjUkew2eXQZt65g5CQ==}
     peerDependencies:
       msw: ^2.4.9
-      vite: ^6
+      vite: ^6.4.3
     peerDependenciesMeta:
       msw:
         optional: true
@@ -6574,7 +6574,7 @@ packages:
       '@vitest/ui': 4.1.11
       happy-dom: '*'
       jsdom: '*'
-      vite: ^6
+      vite: ^6.4.3
     peerDependenciesMeta:
       '@edge-runtime/vm':
         optional: true

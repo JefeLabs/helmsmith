@@ -25,7 +25,7 @@
     "react-dom": "19.2.6",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.6.0",
-    "vite": "^5.4.0",
+    "vite": "^6.4.3",
     "vitest": "^4.1.11"
   },
   "description": "Visual flow designer for @helmsmith/flow-spec catalogs — drag-and-drop canvas with the exact validator and expression evaluator the runtime uses, live on every edit. Run with npx against any harness or controlplane serving the /v1/catalog wire shape.",
