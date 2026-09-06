@@ -146,8 +146,10 @@ full tool schemas and the instance record shape.
 `STORYBROKR_HOME` overrides the home directory (`~/.storybrokr` by default) —
 the daemon's lock, token, state, and config all move with it; the e2e suite
 uses this to run against an isolated home. `STORYBROKR_PORT` pins the port
-the daemon binds when you start it in the foreground with
-`storybrokr daemon start` (default: ephemeral, whatever the OS hands back).
+the detached daemon entry (`dist/server/start.js`, used when a command
+auto-starts the daemon) binds to; the foreground `storybrokr daemon start`
+takes `--port <n>` instead (default: ephemeral). Either way, `daemon.json`
+records whichever port was actually bound.
 
 ## Limits
 

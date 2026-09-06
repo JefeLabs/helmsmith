@@ -70,7 +70,7 @@ through the Makefile `PUBLISH_PKGS` allowlist, not the weekly workflow.
 Four kinds of process:
 
 - **Daemon.** `storybrokr daemon start|stop|status`; every other command auto-starts it when
-  it is not running. A Bun HTTP server bound to `127.0.0.1` on a port recorded in
+  it is not running. A Node HTTP server bound to `127.0.0.1` on a port recorded in
   `~/.storybrokr/daemon.json`, protected by a random bearer token written to that file with
   owner-only permissions. Owns the registry, port allocation, spawning, readiness, idle
   reaping, and log capture.
