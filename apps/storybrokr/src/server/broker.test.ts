@@ -374,4 +374,84 @@ describe('Broker', () => {
     expect(r2.created).toBe(true);
     expect(r2.record.status).toBe('starting');
   });
+
+  it('a repeat up re-discovers: an unchanged tree returns the same pid, a changed one respawns', async () => {
+    const host = fakeHost();
+    dirs.push(host);
+    const { broker } = make({ portRangeStart: 6180, portRangeEnd: 6181 });
+
+    const first = await broker.up({ component: 'src/Button', hostRoot: host });
+    expect(first.created).toBe(true);
+    expect(first.record.storyFiles).toEqual([
+      'src/Button/Button.stories.tsx',
+      'src/Icon/Icon.stories.tsx',
+    ]);
+    const firstPid = first.record.pid;
+
+    // Add a new sibling reachable from Button and re-up: should be picked up and respawn.
+    mkdirSync(join(host, 'src', 'Extra'), { recursive: true });
+    writeFileSync(join(host, 'src', 'Extra', 'Extra.tsx'), 'export const Extra = 1;\n');
+    writeFileSync(join(host, 'src', 'Extra', 'Extra.stories.tsx'), '');
+    writeFileSync(
+      join(host, 'src', 'Button', 'Button.tsx'),
+      "import '../Icon/Icon';\nimport '../Extra/Extra';\nexport const Button = 1;\n",
+    );
+
+    const second = await broker.up({ component: 'src/Button', hostRoot: host });
+    expect(second.created).toBe(true);
+    expect(second.record.id).toBe(first.record.id);
+    expect(second.record.storyFiles).toEqual([
+      'src/Button/Button.stories.tsx',
+      'src/Extra/Extra.stories.tsx',
+      'src/Icon/Icon.stories.tsx',
+    ]);
+    expect(second.record.pid).not.toBe(firstPid);
+    expect(broker.list()).toHaveLength(1);
+    const secondPid = second.record.pid;
+
+    // A third up with nothing changed: no respawn, same pid.
+    const third = await broker.up({ component: 'src/Button', hostRoot: host });
+    expect(third.created).toBe(false);
+    expect(third.record.pid).toBe(secondPid);
+    expect(broker.list()).toHaveLength(1);
+  });
+
+  it('reconcile adopts more live instances than the configured cap instead of rejecting', async () => {
+    const host = fakeHost();
+    dirs.push(host);
+    const home = mkdtempSync(join(tmpdir(), 'sb-home-'));
+    dirs.push(home);
+    const setupConfig = {
+      ...DEFAULT_CONFIG,
+      portRangeStart: 6182,
+      portRangeEnd: 6189,
+      readinessTimeoutMs: 10_000,
+    };
+    const setupRegistry = new Registry({ home, config: setupConfig });
+    const setupBroker = new Broker({
+      registry: setupRegistry,
+      spawner: fakeSpawner(),
+      config: setupConfig,
+    });
+    brokers.push(setupBroker);
+    await setupBroker.up({ component: 'src/Button', hostRoot: host });
+    await setupBroker.up({ component: 'src/Icon', hostRoot: host });
+    // Deliberately do NOT down them — they must still be live for the reconcile below.
+
+    const cappedConfig = { ...setupConfig, instanceCap: 1 };
+    const reconcileRegistry = new Registry({ home, config: cappedConfig });
+    const reconcileBroker = new Broker({
+      registry: reconcileRegistry,
+      spawner: fakeSpawner(),
+      config: cappedConfig,
+    });
+    brokers.push(reconcileBroker);
+
+    await expect(reconcileBroker.reconcile()).resolves.toBeUndefined();
+    const list = reconcileBroker.list();
+    expect(list).toHaveLength(2);
+    expect(list.every((r) => r.status === 'ready')).toBe(true);
+
+    await reconcileBroker.downAll();
+  });
 });

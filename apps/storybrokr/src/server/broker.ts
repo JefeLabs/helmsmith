@@ -13,7 +13,7 @@ import {
 import type { LogBuffer } from '../lib/logbuffer.js';
 import { findFreePort } from '../lib/ports.js';
 import { fetchStories, waitForReady } from '../lib/readiness.js';
-import type { SpawnedProcess, Spawner } from '../lib/spawn.js';
+import { type SpawnedProcess, type Spawner, terminate } from '../lib/spawn.js';
 import type { DaemonConfig, HostInfo, InstanceRecord, UpRequest } from '../types.js';
 import type { Registry } from './registry.js';
 
@@ -109,12 +109,28 @@ export class Broker {
     const id = instanceId(host.hostRoot, component);
 
     const existing = this.registry.find(host.hostRoot, component);
-    if (existing && (existing.status === 'ready' || existing.status === 'starting')) {
+    if (existing?.status === 'starting') {
       this.registry.touch(existing.id);
-      if (req.wait !== false && existing.status === 'starting') await this.awaitReady(existing.id);
+      if (req.wait !== false) await this.awaitReady(existing.id);
       return { record: this.registry.get(existing.id) as InstanceRecord, created: false };
     }
-    if (existing) this.registry.remove(existing.id);
+    if (existing?.status === 'ready') {
+      // A repeat `up` re-discovers so a newly added sibling story file is picked up (spec §7.4).
+      // Unchanged story files: touch and return the existing instance untouched. Changed: stop
+      // it (full ladder, config dir + record removed) and fall through to a fresh creation —
+      // same id (deterministic from hostRoot+component), a new port allocation.
+      const discovery = discoverStories(host.hostRoot, component, host.tsconfigPaths);
+      const unchanged =
+        discovery.storyFiles.length === existing.storyFiles.length &&
+        discovery.storyFiles.every((f, i) => f === existing.storyFiles[i]);
+      if (unchanged) {
+        this.registry.touch(existing.id);
+        return { record: this.registry.get(existing.id) as InstanceRecord, created: false };
+      }
+      await this.stop(existing);
+    } else if (existing) {
+      this.registry.remove(existing.id);
+    }
 
     const running = this.inflight.get(id);
     if (running) {
@@ -242,13 +258,13 @@ export class Broker {
 
   private async stop(r: InstanceRecord): Promise<void> {
     const proc = this.procs.get(r.id);
-    if (proc) await proc.kill();
-    else if (isAlive(r.pid)) {
-      try {
-        process.kill(r.pid as number, 'SIGTERM');
-      } catch {
-        // already gone
-      }
+    if (proc) {
+      await proc.kill();
+    } else if (isAlive(r.pid)) {
+      // No SpawnedProcess handle (an adopted instance, from a previous daemon process) — apply
+      // spec §7.1's full ladder (SIGTERM, wait, SIGKILL) to the bare pid instead of one bare
+      // SIGTERM, so a slow Storybook isn't left as an unfindable orphan.
+      await terminate(r.pid as number);
     }
     this.procs.delete(r.id);
     if (this.registry.get(r.id)) this.registry.update(r.id, { status: 'stopped' });
@@ -276,11 +292,26 @@ export class Broker {
         if (!known.has(side.id)) known.set(side.id, side);
     }
     for (const r of known.values()) {
-      const alive = isAlive(r.pid) && (await fetchStories(r.port)) !== null;
-      if (alive) {
-        if (!this.registry.get(r.id)) this.registry.add(r);
-        this.registry.update(r.id, { status: 'ready' });
-      } else {
+      try {
+        const alive = isAlive(r.pid) && (await fetchStories(r.port)) !== null;
+        if (alive) {
+          // adopt(), not add(): these instances were already live before this daemon process
+          // (and its configured instanceCap) existed — asserting capacity here could reject a
+          // legitimate reconcile and leave the daemon permanently unstartable (spec §7.5).
+          if (!this.registry.get(r.id)) this.registry.adopt(r);
+          this.registry.update(r.id, { status: 'ready' });
+        } else {
+          if (this.registry.get(r.id)) this.registry.remove(r.id);
+          try {
+            removeConfigDir(configDirFor(r.hostRoot, r.id));
+          } catch {
+            // nothing to clean
+          }
+        }
+      } catch (err) {
+        // One bad record (a tampered sidecar, a filesystem error) must not abort reconcile for
+        // every other instance — drop it and keep going.
+        console.error(`storybrokr: reconcile dropped instance ${r.id}`, err);
         if (this.registry.get(r.id)) this.registry.remove(r.id);
         try {
           removeConfigDir(configDirFor(r.hostRoot, r.id));

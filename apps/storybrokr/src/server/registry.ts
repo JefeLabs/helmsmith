@@ -69,6 +69,13 @@ export class Registry {
     this.save();
   }
 
+  /** Like `add`, but skips the capacity check — for reconcile() adopting instances that were
+   * already live before this daemon process (and its configured cap) existed. */
+  adopt(record: InstanceRecord): void {
+    this.byId.set(record.id, record);
+    this.save();
+  }
+
   update(id: string, patch: Partial<InstanceRecord>): InstanceRecord {
     const current = this.byId.get(id);
     if (!current) throw new StorybrokrError('INSTANCE_NOT_FOUND', `no instance ${id}`);

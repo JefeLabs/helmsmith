@@ -61,6 +61,19 @@ describe('Registry', () => {
     expect(() => reg.add(rec('d', { port: 6103 }))).toThrow(/INSTANCE_CAP_REACHED|cap/);
   });
 
+  it('adopt bypasses the capacity check that add enforces', () => {
+    const reg = new Registry({ home: home(), config: { ...DEFAULT_CONFIG, instanceCap: 1 } });
+    reg.add(rec('a'));
+    expect(() => reg.add(rec('b', { port: 6101 }))).toThrow(/INSTANCE_CAP_REACHED|cap/);
+    expect(() => reg.adopt(rec('b', { port: 6101 }))).not.toThrow();
+    expect(
+      reg
+        .list()
+        .map((r) => r.id)
+        .sort(),
+    ).toEqual(['a', 'b']);
+  });
+
   it('reports ports in use and idle instances relative to an injected clock', () => {
     let now = new Date('2026-09-06T01:00:00.000Z');
     const reg = new Registry({ home: home(), config: DEFAULT_CONFIG, now: () => now });

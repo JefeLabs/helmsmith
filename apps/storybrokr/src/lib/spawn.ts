@@ -70,6 +70,56 @@ function wrap(child: ChildProcess, configDir: string): SpawnedProcess {
   };
 }
 
+function isAlivePid(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export interface TerminateOptions {
+  termWaitMs?: number;
+  killWaitMs?: number;
+  pollMs?: number;
+}
+
+/** Sends SIGTERM, polls for death up to `termWaitMs`, then SIGKILL and polls up to
+ * `killWaitMs`. Used for processes stop() has no ChildProcess handle for (adopted
+ * instances) — spec §7.1's ladder, applied to a bare pid. ESRCH from either signal
+ * (already gone) is not an error. */
+export async function terminate(pid: number, opts: TerminateOptions = {}): Promise<void> {
+  const termWaitMs = opts.termWaitMs ?? 5000;
+  const killWaitMs = opts.killWaitMs ?? 2000;
+  const pollMs = opts.pollMs ?? 100;
+
+  const waitUntilDead = async (waitMs: number): Promise<boolean> => {
+    const deadline = Date.now() + waitMs;
+    while (Date.now() < deadline) {
+      if (!isAlivePid(pid)) return true;
+      await new Promise((r) => setTimeout(r, pollMs));
+    }
+    return !isAlivePid(pid);
+  };
+
+  try {
+    process.kill(pid, 'SIGTERM');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ESRCH') return;
+    throw err;
+  }
+  if (await waitUntilDead(termWaitMs)) return;
+
+  try {
+    process.kill(pid, 'SIGKILL');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ESRCH') return;
+    throw err;
+  }
+  await waitUntilDead(killWaitMs);
+}
+
 /** Runs an arbitrary command in place of the host's storybook binary (tests). */
 export function commandSpawner(command: string, args: string[]): Spawner {
   return {
