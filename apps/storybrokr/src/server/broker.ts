@@ -118,23 +118,23 @@ export class Broker {
 
     const running = this.inflight.get(id);
     if (running) {
-      if (req.wait !== false) await running;
+      await running;
+      if (req.wait !== false) await this.awaitReady(id);
       return { record: this.registry.get(id) as InstanceRecord, created: false };
     }
 
     const creation = this.createInstance(host, component, id, req);
     this.inflight.set(id, creation);
-    if (req.wait === false) {
-      creation.catch(() => {});
-    } else {
-      await creation;
-    }
+    await creation;
+    if (req.wait !== false) await this.awaitReady(id);
     return { record: this.registry.get(id) as InstanceRecord, created: true };
   }
 
-  /** Cap check → discover → port → config dir → add → sidecar → spawn → readiness, as one
-   * unit tracked in `inflight` so a concurrent `up` for the same id can await it instead of
-   * repeating the work. */
+  /** Cap check → discover → port → config dir → add → sidecar → spawn, tracked in `inflight`
+   * so a concurrent `up` for the same id can await it instead of repeating the work. Resolves
+   * as soon as the record is registered and the child is spawned — it does NOT wait for
+   * readiness, so a `wait: false` caller (or one arriving while this is in flight) always gets
+   * a real record back. Readiness continues in the background via `watchReadiness`/`pending`. */
   private async createInstance(
     host: HostInfo,
     component: string,
@@ -189,7 +189,7 @@ export class Broker {
         }
       });
 
-      await this.watchReadiness(id, proc);
+      this.watchReadiness(id, proc);
       return this.registry.get(id) as InstanceRecord;
     } finally {
       this.inflight.delete(id);
@@ -224,6 +224,7 @@ export class Broker {
       })
       .finally(() => this.pending.delete(id));
     this.pending.set(id, p);
+    p.catch(() => {});
     return p;
   }
 

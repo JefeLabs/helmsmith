@@ -271,4 +271,76 @@ describe('Broker', () => {
     });
     expect(existsSync(configDirFor(host, instanceId(host, 'src/Icon')))).toBe(false);
   });
+
+  it('wait:false on a new component returns the starting record immediately, and a later up waits for readiness', async () => {
+    const host = fakeHost();
+    dirs.push(host);
+    const { broker } = make({ portRangeStart: 6174, portRangeEnd: 6175 });
+
+    const first = await broker.up({ component: 'src/Button', hostRoot: host, wait: false });
+    expect(first.created).toBe(true);
+    expect(first.record.id).toBe(instanceId(host, 'src/Button'));
+    expect(first.record.status).toBe('starting');
+
+    const second = await broker.up({ component: 'src/Button', hostRoot: host });
+    expect(second.created).toBe(false);
+    expect(second.record.status).toBe('ready');
+    expect(second.record.stories.length).toBe(1);
+  });
+
+  it('a concurrent wait:false caller during an in-flight creation gets a defined record', async () => {
+    const host = fakeHost();
+    dirs.push(host);
+    const { broker } = make({ portRangeStart: 6174, portRangeEnd: 6175 });
+
+    const [a, b] = await Promise.all([
+      broker.up({ component: 'src/Button', hostRoot: host, wait: true }),
+      broker.up({ component: 'src/Button', hostRoot: host, wait: false }),
+    ]);
+
+    expect(b.record).toBeDefined();
+    expect(b.record.id).toBe(a.record.id);
+    expect(a.record.status).toBe('ready');
+    expect([a.created, b.created].filter(Boolean)).toHaveLength(1);
+  });
+
+  it('a wait:false boot failure is recorded without an unhandled rejection', async () => {
+    const host = fakeHost();
+    dirs.push(host);
+    const home = mkdtempSync(join(tmpdir(), 'sb-home-'));
+    dirs.push(home);
+    const config = { ...DEFAULT_CONFIG, portRangeStart: 6176, portRangeEnd: 6177 };
+    const registry = new Registry({ home, config });
+    const broker = new Broker({
+      registry,
+      spawner: commandSpawner(process.execPath, [
+        '-e',
+        'console.error("Error: Failed to load config"); process.exit(1)',
+      ]),
+      config,
+    });
+    brokers.push(broker);
+
+    let unhandled: unknown;
+    const onUnhandled = (err: unknown) => {
+      unhandled = err;
+    };
+    process.once('unhandledRejection', onUnhandled);
+    try {
+      const r = await broker.up({ component: 'src/Button', hostRoot: host, wait: false });
+      expect(r.record.status).toBe('starting');
+
+      const deadline = Date.now() + 3000;
+      while (broker.list()[0]?.status === 'starting' && Date.now() < deadline) {
+        await new Promise((resolveSleep) => setTimeout(resolveSleep, 50));
+      }
+      expect(broker.list()[0]).toMatchObject({ status: 'failed', error: { code: 'BOOT_FAILED' } });
+
+      // Give a microtask/macrotask turn for a would-be unhandledRejection to surface.
+      await new Promise((resolveSleep) => setTimeout(resolveSleep, 0));
+      expect(unhandled).toBeUndefined();
+    } finally {
+      process.removeListener('unhandledRejection', onUnhandled);
+    }
+  });
 });
