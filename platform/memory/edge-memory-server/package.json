@@ -14,12 +14,12 @@
   },
   "dependencies": {
     "@helmsmith/context-loader-core": "workspace:*",
-    "better-sqlite3": "^12.11.1",
+    "better-sqlite3": "^13.0.3",
     "sqlite-vec": "^0.1.9",
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.11",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^24.13.3",
     "typescript": "^7.0.2"
   }
