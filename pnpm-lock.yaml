@@ -210,10 +210,10 @@ importers:
         version: link:../../platform/core/tui-view-components-lib
       '@opentui/core':
         specifier: ^0.2.16
-        version: 0.2.16(typescript@7.0.2)(web-tree-sitter@0.26.13)
+        version: 0.2.16(typescript@7.0.2)(web-tree-sitter@0.27.0)
       '@opentui/react':
         specifier: ^0.2.16
-        version: 0.2.16(react-devtools-core@7.0.1)(react@19.2.8)(typescript@7.0.2)(web-tree-sitter@0.26.13)(ws@8.21.3)
+        version: 0.2.16(react-devtools-core@7.0.1)(react@19.2.8)(typescript@7.0.2)(web-tree-sitter@0.27.0)(ws@8.21.3)
       bun:
         specifier: ^1.4.2
         version: 1.4.2
@@ -268,10 +268,10 @@ importers:
         version: 1.2.9(openai@7.10.0(@aws-sdk/credential-provider-node@3.972.82)(@smithy/signature-v4@5.7.3)(undici@6.28.1)(ws@8.21.3)(zod@3.25.76))(ws@8.21.3)
       '@opentui/core':
         specifier: ^0.2.16
-        version: 0.2.16(typescript@7.0.2)(web-tree-sitter@0.26.13)
+        version: 0.2.16(typescript@7.0.2)(web-tree-sitter@0.27.0)
       '@opentui/react':
         specifier: ^0.2.16
-        version: 0.2.16(react-devtools-core@7.0.1)(react@19.2.8)(typescript@7.0.2)(web-tree-sitter@0.26.13)(ws@8.21.3)
+        version: 0.2.16(react-devtools-core@7.0.1)(react@19.2.8)(typescript@7.0.2)(web-tree-sitter@0.27.0)(ws@8.21.3)
       bun:
         specifier: ^1.4.2
         version: 1.4.2
@@ -417,10 +417,10 @@ importers:
         version: 8.7.1(@types/node@24.13.3)
       '@opentui/core':
         specifier: ^0.2.16
-        version: 0.2.16(typescript@7.0.2)(web-tree-sitter@0.26.13)
+        version: 0.2.16(typescript@7.0.2)(web-tree-sitter@0.27.0)
       '@opentui/react':
         specifier: ^0.2.16
-        version: 0.2.16(react-devtools-core@7.0.1)(react@19.2.8)(typescript@7.0.2)(web-tree-sitter@0.26.13)(ws@8.21.3)
+        version: 0.2.16(react-devtools-core@7.0.1)(react@19.2.8)(typescript@7.0.2)(web-tree-sitter@0.27.0)(ws@8.21.3)
       commander:
         specifier: ^14.0.3
         version: 14.0.3
@@ -528,8 +528,8 @@ importers:
         specifier: ^6.2.0
         version: 6.2.0
       web-tree-sitter:
-        specifier: ^0.26.13
-        version: 0.26.13
+        specifier: ^0.27.0
+        version: 0.27.0
     devDependencies:
       '@types/node':
         specifier: ^24.13.3
@@ -711,10 +711,10 @@ importers:
     devDependencies:
       '@opentui/core':
         specifier: ^0.2.16
-        version: 0.2.16(typescript@7.0.2)(web-tree-sitter@0.26.13)
+        version: 0.2.16(typescript@7.0.2)(web-tree-sitter@0.27.0)
       '@opentui/react':
         specifier: ^0.2.16
-        version: 0.2.16(react-devtools-core@7.0.1)(react@19.2.8)(typescript@7.0.2)(web-tree-sitter@0.26.13)(ws@8.21.3)
+        version: 0.2.16(react-devtools-core@7.0.1)(react@19.2.8)(typescript@7.0.2)(web-tree-sitter@0.27.0)(ws@8.21.3)
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3
@@ -805,10 +805,10 @@ importers:
         version: link:../harness-server
       '@opentui/core':
         specifier: ^0.2.16
-        version: 0.2.16(typescript@7.0.2)(web-tree-sitter@0.26.13)
+        version: 0.2.16(typescript@7.0.2)(web-tree-sitter@0.27.0)
       '@opentui/react':
         specifier: ^0.2.16
-        version: 0.2.16(react-devtools-core@7.0.1)(react@19.2.8)(typescript@7.0.2)(web-tree-sitter@0.26.13)(ws@8.21.3)
+        version: 0.2.16(react-devtools-core@7.0.1)(react@19.2.8)(typescript@7.0.2)(web-tree-sitter@0.27.0)(ws@8.21.3)
       react:
         specifier: 19.2.8
         version: 19.2.8
@@ -920,10 +920,10 @@ importers:
     dependencies:
       '@opentui/core':
         specifier: ^0.2.16
-        version: 0.2.16(typescript@7.0.2)(web-tree-sitter@0.26.13)
+        version: 0.2.16(typescript@7.0.2)(web-tree-sitter@0.27.0)
       '@opentui/react':
         specifier: ^0.2.16
-        version: 0.2.16(react-devtools-core@7.0.1)(react@19.2.8)(typescript@7.0.2)(web-tree-sitter@0.26.13)(ws@8.21.3)
+        version: 0.2.16(react-devtools-core@7.0.1)(react@19.2.8)(typescript@7.0.2)(web-tree-sitter@0.27.0)(ws@8.21.3)
       react:
         specifier: 19.2.8
         version: 19.2.8
@@ -1001,10 +1001,10 @@ importers:
         version: link:../../core/tui-view-components-lib
       '@opentui/core':
         specifier: ^0.2.16
-        version: 0.2.16(typescript@7.0.2)(web-tree-sitter@0.26.13)
+        version: 0.2.16(typescript@7.0.2)(web-tree-sitter@0.27.0)
       '@opentui/react':
         specifier: ^0.2.16
-        version: 0.2.16(react-devtools-core@7.0.1)(react@19.2.8)(typescript@7.0.2)(web-tree-sitter@0.26.13)(ws@8.21.3)
+        version: 0.2.16(react-devtools-core@7.0.1)(react@19.2.8)(typescript@7.0.2)(web-tree-sitter@0.27.0)(ws@8.21.3)
       bun:
         specifier: ^1.4.2
         version: 1.4.2
@@ -6413,8 +6413,8 @@ packages:
       '@types/emscripten':
         optional: true
 
-  web-tree-sitter@0.26.13:
-    resolution: {integrity: sha512-5bUZ7vbQ1kcondet96wzP974+JfCZDeQ7bTpacICm2nnvHpa5cO0ByRsoMcAhUP+743vpkb4m0BFlVSm+Ye9VA==}
+  web-tree-sitter@0.27.0:
+    resolution: {integrity: sha512-XK08gj6RwTMQatAG7uVRP8MunqotL/XC19vHgkSPKmELgbGPBj4ECvB8haHOUnyj6ls2B8t42UTro14zxGgAHg==}
 
   which@2.0.2:
     resolution: {integrity: sha512-BLI3Tl1TW3Pvl70l3yq3Y64i+awpwXqsGBYWkkqMtnbXgrMD+yj7rhW0kuEDxzJaYXGjEW5ogapKNMEKNMjibA==}
@@ -8934,14 +8934,14 @@ snapshots:
     transitivePeerDependencies:
       - typescript
 
-  '@opentui/core@0.2.16(typescript@7.0.2)(web-tree-sitter@0.26.13)':
+  '@opentui/core@0.2.16(typescript@7.0.2)(web-tree-sitter@0.27.0)':
     dependencies:
       bun-ffi-structs: 0.2.2(typescript@7.0.2)
       diff: 9.0.0
       marked: 17.0.1
       string-width: 7.2.0
       strip-ansi: 7.1.2
-      web-tree-sitter: 0.26.13
+      web-tree-sitter: 0.27.0
       yoga-layout: 3.2.1
     optionalDependencies:
       '@opentui/core-darwin-arm64': 0.2.16
@@ -8964,9 +8964,9 @@ snapshots:
       - typescript
       - web-tree-sitter
 
-  '@opentui/react@0.2.16(react-devtools-core@7.0.1)(react@19.2.8)(typescript@7.0.2)(web-tree-sitter@0.26.13)(ws@8.21.3)':
+  '@opentui/react@0.2.16(react-devtools-core@7.0.1)(react@19.2.8)(typescript@7.0.2)(web-tree-sitter@0.27.0)(ws@8.21.3)':
     dependencies:
-      '@opentui/core': 0.2.16(typescript@7.0.2)(web-tree-sitter@0.26.13)
+      '@opentui/core': 0.2.16(typescript@7.0.2)(web-tree-sitter@0.27.0)
       react: 19.2.8
       react-devtools-core: 7.0.1
       react-reconciler: 0.33.0(react@19.2.8)
@@ -12829,7 +12829,7 @@ snapshots:
 
   web-tree-sitter@0.25.10: {}
 
-  web-tree-sitter@0.26.13: {}
+  web-tree-sitter@0.27.0: {}
 
   which@2.0.2:
     dependencies:
