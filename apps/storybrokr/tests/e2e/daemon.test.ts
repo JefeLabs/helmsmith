@@ -18,10 +18,12 @@ describe('daemon lifecycle', () => {
   });
 
   it('a new daemon adopts a still-running instance after the old daemon is killed', async () => {
+    const t0 = Date.now();
     const rec = await runJson<InstanceRecord>(
       ['up', 'src/components/Button', '--host', FIXTURE_HOST],
       { home },
     );
+    console.log(`adopt up ready in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
     const { pid } = JSON.parse(readFileSync(join(home, 'daemon.json'), 'utf8')) as { pid: number };
     process.kill(pid, 'SIGKILL'); // daemon dies; its child Storybook keeps running (detached from the daemon's fate)
     await sleep(500);
@@ -34,10 +36,12 @@ describe('daemon lifecycle', () => {
   it('reaps an idle instance when its ttl elapses', async () => {
     writeFileSync(join(home, 'config.json'), JSON.stringify({ reaperIntervalMs: 500 }));
     await runCli(['daemon', 'stop'], { home });
+    const t0 = Date.now();
     const rec = await runJson<InstanceRecord>(
       ['up', 'src/components/Icon', '--host', FIXTURE_HOST, '--ttl', '0.02'],
       { home },
     );
+    console.log(`ttl up ready in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
     expect(rec.status).toBe('ready');
     await sleep(3000); // ttl 0.02 min = 1.2 s, reaper every 0.5 s
     expect(await runJson<InstanceRecord[]>(['ls'], { home })).toEqual([]);

@@ -19,6 +19,5 @@ function findPackageJson(startDir: string): string {
 }
 
 const pkgFile = findPackageJson(dirname(fileURLToPath(import.meta.url)));
-export const VERSION: string = (
-  JSON.parse(readFileSync(pkgFile, 'utf8')) as { version: string }
-).version;
+export const VERSION: string = (JSON.parse(readFileSync(pkgFile, 'utf8')) as { version: string })
+  .version;

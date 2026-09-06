@@ -20,10 +20,12 @@ describe('MCP stdio surface', () => {
     await client.connect(transport);
     const tools = (await client.listTools()).tools.map((t) => t.name);
     expect(tools).toContain('storybrokr_up');
+    const t0 = Date.now();
     const result = await client.callTool({
       name: 'storybrokr_up',
       arguments: { component: 'src/components/Button', hostRoot: FIXTURE_HOST },
     });
+    console.log(`mcp up ready in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
     expect(result.isError).toBeFalsy();
     const body = JSON.parse((result.content as { text: string }[])[0].text) as {
       record: { status: string; stories: { iframeUrl: string }[] };
