@@ -2,7 +2,13 @@ import { resolve } from 'node:path';
 import type { Command } from 'commander';
 import type { DaemonClient } from '../client/index.js';
 import type { InstanceRecord } from '../types.js';
-import { fail, printInstance, printJson, resolveComponent } from './_shared/output.js';
+import {
+  fail,
+  parseNonNegativeNumber,
+  printInstance,
+  printJson,
+  resolveComponent,
+} from './_shared/output.js';
 
 export interface UpOptions {
   component: string;
@@ -31,8 +37,10 @@ export function registerUp(program: Command, connect: () => Promise<DaemonClient
       '--host <dir>',
       'host repo root (default: walk up from <path> to the nearest .storybook/)',
     )
-    .option('--ttl <minutes>', 'idle minutes before the instance is reaped; 0 = never', (v) =>
-      Number(v),
+    .option(
+      '--ttl <minutes>',
+      'idle minutes before the instance is reaped; 0 = never',
+      parseNonNegativeNumber,
     )
     .option(
       '--no-wait',

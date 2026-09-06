@@ -1,12 +1,33 @@
 import { existsSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import chalk from 'chalk';
+import { InvalidArgumentError } from 'commander';
 import { StorybrokrError, toErrorBody } from '../../lib/errors.js';
 import { findHostRoot } from '../../lib/host.js';
 import type { InstanceRecord } from '../../types.js';
 
 export function printJson(value: unknown): void {
   console.log(JSON.stringify(value, null, 2));
+}
+
+/** Commander option parser: a finite number >= 0 (fractions allowed, e.g. `--ttl 0.02`). */
+export function parseNonNegativeNumber(value: string): number {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) {
+    throw new InvalidArgumentError('must be a non-negative number');
+  }
+  return n;
+}
+
+/** Commander option parser factory: an integer within [min, max]. */
+export function parseIntegerInRange(min: number, max: number): (value: string) => number {
+  return (value: string): number => {
+    const n = Number(value);
+    if (!Number.isInteger(n) || n < min || n > max) {
+      throw new InvalidArgumentError(`must be an integer between ${min} and ${max}`);
+    }
+    return n;
+  };
 }
 
 const STATUS_COLOR: Record<InstanceRecord['status'], (s: string) => string> = {

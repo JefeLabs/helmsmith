@@ -208,8 +208,16 @@ export class DaemonClient {
       )
     ).lines;
   }
-  /** Streams log lines via SSE; resolves with a function that closes the stream. */
-  async follow(id: string, onLine: (line: string) => void): Promise<() => void> {
+  /**
+   * Streams log lines via SSE; resolves with a function that closes the stream. `onEnd`, if
+   * given, fires exactly once when the stream ends — whether the server closed it (daemon
+   * shutdown, instance stopped), a read error occurred, or the returned closer was called.
+   */
+  async follow(
+    id: string,
+    onLine: (line: string) => void,
+    onEnd?: () => void,
+  ): Promise<() => void> {
     const controller = new AbortController();
     const res = await this.send('GET', `/v1/instances/${encodeURIComponent(id)}/logs?follow=1`, {
       signal: controller.signal,
@@ -230,6 +238,7 @@ export class DaemonClient {
           idx = buf.indexOf('\n\n');
         }
       }
+      onEnd?.();
     })();
     return () => controller.abort();
   }

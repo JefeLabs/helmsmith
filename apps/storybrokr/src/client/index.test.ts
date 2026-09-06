@@ -5,12 +5,14 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StorybrokrError } from '../lib/errors.js';
+import { LogBuffer } from '../lib/logbuffer.js';
 import { daemonFile } from '../lib/paths.js';
 import type { Spawner } from '../lib/spawn.js';
 import { Broker } from '../server/broker.js';
 import { DEFAULT_CONFIG } from '../server/config.js';
 import { createDaemon, type Daemon } from '../server/daemon.js';
 import { Registry } from '../server/registry.js';
+import type { InstanceRecord } from '../types.js';
 import { DaemonClient, resolveDaemonEntry } from './index.js';
 
 const neverSpawner: Spawner = {
@@ -127,6 +129,47 @@ describe('DaemonClient', () => {
     await expect(client.follow('x', () => {})).rejects.toMatchObject({
       code: 'DAEMON_UNAVAILABLE',
     });
+  });
+
+  it('follow calls onEnd exactly once when the stream ends (e.g. via daemon.stop())', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'sb-client-'));
+    homes.push(home);
+    const record: InstanceRecord = {
+      id: 'r1',
+      hostRoot: '/h',
+      component: 'src/X',
+      framework: 'x',
+      port: 6100,
+      url: 'http://127.0.0.1:6100',
+      pid: 1,
+      status: 'ready',
+      createdAt: 'c',
+      lastTouchedAt: 't',
+      ttlMinutes: 30,
+      storyFiles: [],
+      stories: [],
+      configDir: '/h/node_modules/.cache/storybrokr/r1',
+    };
+    const { broker, daemon } = fakeDaemon(home);
+    vi.spyOn(broker, 'get').mockReturnValue(record);
+    vi.spyOn(broker, 'logs').mockReturnValue([]);
+    const log = new LogBuffer();
+    vi.spyOn(broker, 'logStream').mockReturnValue(log);
+    daemons.push(daemon);
+    await daemon.start(0);
+    const client = await DaemonClient.connect({ home, autoStart: false });
+    const onEnd = vi.fn();
+    await client.follow('r1', () => {}, onEnd);
+    await daemon.stop();
+    const result = await Promise.race([
+      (async () => {
+        while (onEnd.mock.calls.length === 0) await new Promise((r) => setTimeout(r, 20));
+        return 'ended' as const;
+      })(),
+      new Promise<'timeout'>((r) => setTimeout(() => r('timeout'), 3000)),
+    ]);
+    expect(result).toBe('ended');
+    expect(onEnd).toHaveBeenCalledTimes(1);
   });
 
   it('bounds the health probe so a hung daemon does not block connect()', async () => {

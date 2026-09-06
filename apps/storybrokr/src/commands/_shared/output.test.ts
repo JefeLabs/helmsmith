@@ -1,9 +1,16 @@
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { InvalidArgumentError } from 'commander';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { InstanceRecord } from '../../types.js';
-import { printInstance, printInstanceTable, resolveComponent } from './output.js';
+import {
+  parseIntegerInRange,
+  parseNonNegativeNumber,
+  printInstance,
+  printInstanceTable,
+  resolveComponent,
+} from './output.js';
 
 const rec: InstanceRecord = {
   id: 'abc',
@@ -57,6 +64,7 @@ describe('output', () => {
     const root = mkdtempSync(join(tmpdir(), 'sb-out-'));
     dirs.push(root);
     mkdirSync(join(root, '.storybook'));
+    writeFileSync(join(root, '.storybook', 'main.ts'), 'export default {};\n');
     mkdirSync(join(root, 'src', 'Button'), { recursive: true });
     expect(resolveComponent(join(root, 'src', 'Button'))).toEqual({
       component: 'src/Button',
@@ -65,5 +73,20 @@ describe('output', () => {
     const cwd = vi.spyOn(process, 'cwd').mockReturnValue(join(root, 'src'));
     expect(resolveComponent('Button')).toEqual({ component: 'src/Button', hostRoot: root });
     cwd.mockRestore();
+  });
+
+  it('parseNonNegativeNumber accepts finite numbers >= 0 (fractions allowed) and rejects the rest', () => {
+    expect(parseNonNegativeNumber('0.02')).toBe(0.02);
+    expect(parseNonNegativeNumber('5')).toBe(5);
+    expect(() => parseNonNegativeNumber('abc')).toThrow(InvalidArgumentError);
+    expect(() => parseNonNegativeNumber('-1')).toThrow(InvalidArgumentError);
+  });
+
+  it('parseIntegerInRange accepts an integer within range and rejects out-of-range, fractional, or non-numeric input', () => {
+    const parse = parseIntegerInRange(1, 2000);
+    expect(parse('200')).toBe(200);
+    expect(() => parse('0')).toThrow(InvalidArgumentError);
+    expect(() => parse('1.5')).toThrow(InvalidArgumentError);
+    expect(() => parse('abc')).toThrow(InvalidArgumentError);
   });
 });

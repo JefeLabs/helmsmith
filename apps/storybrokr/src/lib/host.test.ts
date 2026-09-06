@@ -8,8 +8,10 @@ import { detectFramework, findHostRoot, inspectHost, resolveHost } from './host.
 /** Minimal fake host: .storybook/main.ts + preview.js + storybook bin + version. */
 function makeHost(
   opts: { framework?: string; preview?: boolean; bin?: boolean; version?: string } = {},
+  dir?: string,
 ) {
-  const root = mkdtempSync(join(tmpdir(), 'sb-host-'));
+  const root = dir ?? mkdtempSync(join(tmpdir(), 'sb-host-'));
+  if (dir) mkdirSync(dir, { recursive: true });
   mkdirSync(join(root, '.storybook'));
   const framework = opts.framework ?? '@storybook/react-vite';
   writeFileSync(
@@ -49,6 +51,21 @@ describe('host', () => {
     const d = mkdtempSync(join(tmpdir(), 'sb-nohost-'));
     dirs.push(d);
     expect(findHostRoot(d)).toBeNull();
+  });
+
+  it('findHostRoot skips a .storybook directory with no main config and keeps walking', () => {
+    const root = mkdtempSync(join(tmpdir(), 'sb-stray-'));
+    dirs.push(root);
+    // Mimics Storybook CLI's global ~/.storybook/ telemetry cache: a .storybook dir with no
+    // main.* config, sitting above a real host.
+    mkdirSync(join(root, '.storybook'));
+    writeFileSync(join(root, '.storybook', 'settings.json'), '{}');
+    const proj = join(root, 'proj');
+    makeHost({}, proj);
+    mkdirSync(join(root, 'other'), { recursive: true });
+    expect(findHostRoot(join(proj, 'src', 'components', 'button'))).toBe(proj);
+    expect(findHostRoot(join(root, 'other'))).toBeNull();
+    expect(() => resolveHost(join(root, 'other', 'x'))).toThrow(/HOST_NOT_FOUND|no \.storybook/);
   });
 
   it('inspectHost reports main, preview, framework, bin, version and paths', () => {

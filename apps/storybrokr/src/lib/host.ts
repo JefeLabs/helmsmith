@@ -17,11 +17,15 @@ function firstExisting(dir: string, base: string, exts: string[]): string | null
   return null;
 }
 
-/** Walk up from startPath until a directory containing `.storybook/` is found. */
+/**
+ * Walk up from startPath until a directory containing a `.storybook/` with a `main.*` config is
+ * found. A `.storybook/` with no main config (e.g. Storybook CLI's global `~/.storybook/` cache)
+ * is not a host root — keep walking past it instead of misreporting HOST_INVALID.
+ */
 export function findHostRoot(startPath: string): string | null {
   let dir = resolve(startPath);
   for (;;) {
-    if (existsSync(join(dir, '.storybook'))) return dir;
+    if (firstExisting(join(dir, '.storybook'), 'main', MAIN_EXTS)) return dir;
     const parent = dirname(dir);
     if (parent === dir) return null;
     dir = parent;

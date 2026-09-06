@@ -1,12 +1,13 @@
 import type { Command } from 'commander';
 import { DaemonClient } from '../client/index.js';
+import { StorybrokrError } from '../lib/errors.js';
 import { homeDir } from '../lib/paths.js';
 import { storybookSpawner } from '../lib/spawn.js';
 import { Broker } from '../server/broker.js';
 import { loadConfig } from '../server/config.js';
 import { createDaemon } from '../server/daemon.js';
 import { Registry } from '../server/registry.js';
-import { fail } from './_shared/output.js';
+import { fail, parseIntegerInRange } from './_shared/output.js';
 
 export function registerDaemon(program: Command): void {
   const cmd = program.command('daemon').description('Manage the broker daemon');
@@ -16,7 +17,7 @@ export function registerDaemon(program: Command): void {
     .option(
       '--port <n>',
       'listen port (default: ephemeral, recorded in daemon.json)',
-      (v) => Number(v),
+      parseIntegerInRange(0, 65535),
       0,
     )
     .action(async (o: { port: number }) => {
@@ -59,8 +60,12 @@ export function registerDaemon(program: Command): void {
         console.log(
           `running  ${client.url}  pid ${h.pid}  up ${Math.round(h.uptimeMs / 1000)}s  instances ${h.instances}`,
         );
-      } catch {
-        console.log('not running');
+      } catch (err) {
+        if (err instanceof StorybrokrError && err.code === 'DAEMON_UNAVAILABLE') {
+          console.log('not running');
+        } else {
+          fail(err, false);
+        }
       }
     });
 }
