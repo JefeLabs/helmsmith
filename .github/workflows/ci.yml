@@ -110,6 +110,12 @@ jobs:
         # .issues/ regression, and remove it when fixed.
         run: pnpm -r --if-present test
 
+      - name: storybrokr end-to-end
+        # Spawns the built CLI against the react-vite fixture host: daemon
+        # auto-start, up/ls/down, reconcile, TTL reaping, and the MCP stdio
+        # surface. Ports 6100-6199 on the runner's loopback.
+        run: pnpm --filter @helmsmith/storybrokr test:e2e
+
   # ── Java stack — controlplane ─────────────────────────────────────────
   #
   # Spring Boot 4 + Spring Modulith + JDBI + Flyway. Tests include the

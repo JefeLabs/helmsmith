@@ -1,3 +1,7 @@
 export function Icon({ name }: { name: string }) {
-  return <span aria-label={name}>★</span>;
+  return (
+    <span role="img" aria-label={name}>
+      ★
+    </span>
+  );
 }
