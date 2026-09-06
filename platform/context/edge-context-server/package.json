@@ -15,7 +15,7 @@
   "dependencies": {
     "@helmsmith/context-loader-core": "workspace:*",
     "neo4j-driver": "^6.0.1",
-    "ws": "^8.18.0"
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@types/node": "^22.7.0",
