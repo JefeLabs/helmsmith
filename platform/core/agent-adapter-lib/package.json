@@ -29,7 +29,7 @@
     "@anthropic-ai/sdk": "^0.124.0",
     "@aws-sdk/client-bedrock-runtime": "^3.1076.0",
     "@google/genai": "^2.10.0",
-    "openai": "^6.45.0"
+    "openai": "^7.10.0"
   },
   "peerDependenciesMeta": {
     "@anthropic-ai/sdk": {
@@ -54,7 +54,7 @@
     "@aws-sdk/client-bedrock-runtime": "^3.1127.0",
     "@google/genai": "^2.21.0",
     "@types/node": "^24.13.3",
-    "openai": "^6.49.0",
+    "openai": "^7.10.0",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"
   }
