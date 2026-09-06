@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { httpStatusFor, toErrorBody } from '../lib/errors.js';
+import { type ErrorBody, httpStatusFor, StorybrokrError, toErrorBody } from '../lib/errors.js';
 import type { UpRequest } from '../types.js';
 import type { Broker } from './broker.js';
 
@@ -29,7 +29,12 @@ async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> 
   const chunks: Buffer[] = [];
   for await (const c of req) chunks.push(c as Buffer);
   const text = Buffer.concat(chunks).toString('utf8');
-  return text.length > 0 ? (JSON.parse(text) as Record<string, unknown>) : {};
+  if (text.length === 0) return {};
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    throw new StorybrokrError('BAD_REQUEST', 'invalid JSON body');
+  }
 }
 
 function sendError(res: ServerResponse, err: unknown): void {
@@ -47,7 +52,10 @@ export async function handle(
   const parts = url.pathname.split('/').filter(Boolean); // ['v1', 'instances', ':id', 'logs']
   const method = req.method ?? 'GET';
   try {
-    if (parts[0] !== 'v1') return send(res, 404, { code: 'NOT_FOUND', message: 'unknown route' });
+    if (parts[0] !== 'v1') {
+      const body: ErrorBody = { code: 'NOT_FOUND', message: 'unknown route' };
+      return send(res, httpStatusFor(body.code), body);
+    }
 
     if (method === 'GET' && parts[1] === 'health' && parts.length === 2) {
       return send(res, 200, {
@@ -76,7 +84,8 @@ export async function handle(
       if (parts.length === 4 && parts[3] === 'touch' && method === 'POST')
         return send(res, 200, { record: ctx.broker.touch(id) });
       if (parts.length === 4 && parts[3] === 'logs' && method === 'GET') {
-        const tail = Number(url.searchParams.get('tail') ?? '200');
+        const rawTail = Number(url.searchParams.get('tail') ?? '200');
+        const tail = Number.isInteger(rawTail) && rawTail > 0 ? rawTail : 200;
         if (url.searchParams.get('follow') !== '1')
           return send(res, 200, { lines: ctx.broker.logs(id, tail) });
         const stream = ctx.broker.logStream(id);
@@ -85,6 +94,10 @@ export async function handle(
           'cache-control': 'no-cache',
           connection: 'keep-alive',
         });
+        // Without an explicit flush, Node holds the headers back until the first body write —
+        // a client awaiting the response (to confirm the stream is live) would hang until a
+        // log line actually arrives.
+        res.flushHeaders();
         for (const line of ctx.broker.logs(id, tail))
           res.write(`data: ${JSON.stringify(line)}\n\n`);
         const off = stream?.onLine((line) => res.write(`data: ${JSON.stringify(line)}\n\n`));
@@ -101,7 +114,11 @@ export async function handle(
       setImmediate(ctx.shutdown);
       return;
     }
-    return send(res, 404, { code: 'NOT_FOUND', message: `no route for ${method} ${url.pathname}` });
+    const body: ErrorBody = {
+      code: 'NOT_FOUND',
+      message: `no route for ${method} ${url.pathname}`,
+    };
+    return send(res, httpStatusFor(body.code), body);
   } catch (err) {
     sendError(res, err);
   }

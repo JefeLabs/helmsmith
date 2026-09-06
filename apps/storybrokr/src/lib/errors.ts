@@ -8,6 +8,9 @@ export type ErrorCode =
   | 'BOOT_TIMEOUT'
   | 'INSTANCE_NOT_FOUND'
   | 'DAEMON_UNAVAILABLE'
+  | 'BAD_REQUEST'
+  | 'UNAUTHORIZED'
+  | 'NOT_FOUND'
   | 'INTERNAL';
 
 const STATUS: Record<ErrorCode, number> = {
@@ -20,6 +23,9 @@ const STATUS: Record<ErrorCode, number> = {
   BOOT_TIMEOUT: 504,
   INSTANCE_NOT_FOUND: 404,
   DAEMON_UNAVAILABLE: 503,
+  BAD_REQUEST: 400,
+  UNAUTHORIZED: 401,
+  NOT_FOUND: 404,
   INTERNAL: 500,
 };
 

@@ -283,6 +283,9 @@ status; MCP returns the object with `isError`.
 | `BOOT_TIMEOUT` | Readiness deadline passed; log tail attached | 504 |
 | `INSTANCE_NOT_FOUND` | Unknown id or path on `down`, `get`, `logs` | 404 |
 | `DAEMON_UNAVAILABLE` | Auto-start failed | client-side only |
+| `BAD_REQUEST` | Malformed request body or parameter | 400 |
+| `UNAUTHORIZED` | Missing or invalid bearer token | 401 |
+| `NOT_FOUND` | Unknown route | 404 |
 
 ### 7.4 Deliberately not handled
 

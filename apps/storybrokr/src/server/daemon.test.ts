@@ -1,8 +1,9 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StorybrokrError } from '../lib/errors.js';
+import { LogBuffer } from '../lib/logbuffer.js';
 import type { Spawner } from '../lib/spawn.js';
 import type { InstanceRecord } from '../types.js';
 import { Broker } from './broker.js';
@@ -15,6 +16,29 @@ const neverSpawner: Spawner = {
     throw new Error('spawn not expected');
   },
 };
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function makeRecord(id = 'r1'): InstanceRecord {
+  return {
+    id,
+    hostRoot: '/h',
+    component: 'src/X',
+    framework: 'x',
+    port: 6100,
+    url: 'http://127.0.0.1:6100',
+    pid: 1,
+    status: 'ready',
+    createdAt: 'c',
+    lastTouchedAt: 't',
+    ttlMinutes: 30,
+    storyFiles: [],
+    stories: [],
+    configDir: `/h/node_modules/.cache/storybrokr/${id}`,
+  };
+}
 
 describe('daemon', () => {
   const homes: string[] = [];
@@ -50,6 +74,7 @@ describe('daemon', () => {
     expect(await health.json()).toMatchObject({ ok: true, instances: 0 });
     const noAuth = await fetch(`${daemon.url}/v1/instances`);
     expect(noAuth.status).toBe(401);
+    expect(await noAuth.json()).toMatchObject({ code: 'UNAUTHORIZED' });
   });
 
   it('routes instances CRUD to the broker and maps error codes to statuses', async () => {
@@ -114,5 +139,108 @@ describe('daemon', () => {
       config: DEFAULT_CONFIG,
     });
     await expect(second.start(0)).rejects.toThrow(/already running/);
+  });
+
+  it("a daemon that lost the lock race never touches the live daemon's files, and stop() is idempotent", async () => {
+    const { home, daemon: daemonA } = await boot();
+    const registry = new Registry({ home, config: DEFAULT_CONFIG });
+    const daemonB = createDaemon({
+      home,
+      broker: new Broker({ registry, spawner: neverSpawner, config: DEFAULT_CONFIG }),
+      config: DEFAULT_CONFIG,
+    });
+    await expect(daemonB.start(0)).rejects.toThrow(/already running/);
+    await expect(daemonB.stop()).resolves.toBeUndefined();
+    expect(existsSync(join(home, 'daemon.json'))).toBe(true);
+    expect(existsSync(join(home, 'daemon.lock'))).toBe(true);
+    const health = await fetch(`${daemonA.url}/v1/health`);
+    expect(health.status).toBe(200);
+    await expect(daemonA.stop()).resolves.toBeUndefined();
+    await expect(daemonA.stop()).resolves.toBeUndefined();
+  });
+
+  it('reclaims a stale zero-length lock file', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'sb-daemon-'));
+    homes.push(home);
+    writeFileSync(join(home, 'daemon.lock'), '');
+    const registry = new Registry({ home, config: DEFAULT_CONFIG });
+    const daemon = createDaemon({
+      home,
+      broker: new Broker({ registry, spawner: neverSpawner, config: DEFAULT_CONFIG }),
+      config: DEFAULT_CONFIG,
+    });
+    daemons.push(daemon);
+    await expect(daemon.start(0)).resolves.toMatchObject({ pid: process.pid });
+    expect(readFileSync(join(home, 'daemon.lock'), 'utf8').trim()).toBe(String(process.pid));
+  });
+
+  it('closes idle SSE connections so shutdown does not hang', async () => {
+    const record = makeRecord();
+    const home = mkdtempSync(join(tmpdir(), 'sb-daemon-'));
+    homes.push(home);
+    const registry = new Registry({ home, config: DEFAULT_CONFIG });
+    const broker = new Broker({ registry, spawner: neverSpawner, config: DEFAULT_CONFIG });
+    vi.spyOn(broker, 'get').mockReturnValue(record);
+    vi.spyOn(broker, 'logs').mockReturnValue([]);
+    const log = new LogBuffer();
+    vi.spyOn(broker, 'logStream').mockReturnValue(log);
+    const { daemon } = await boot(broker);
+    const h = { authorization: `Bearer ${daemon.token}` };
+
+    const res = await fetch(`${daemon.url}/v1/instances/r1/logs?follow=1`, { headers: h });
+    const reader = res.body?.getReader();
+    log.push('hello\n');
+    await reader?.read();
+
+    const result = await Promise.race([
+      daemon.stop().then(() => 'stopped' as const),
+      sleep(3000).then(() => 'timeout' as const),
+    ]);
+    expect(result).toBe('stopped');
+  });
+
+  it('returns typed error bodies for malformed JSON and unknown routes', async () => {
+    const { daemon } = await boot();
+    const h = { authorization: `Bearer ${daemon.token}`, 'content-type': 'application/json' };
+
+    const badJson = await fetch(`${daemon.url}/v1/instances`, {
+      method: 'POST',
+      headers: h,
+      body: '{ not json',
+    });
+    expect(badJson.status).toBe(400);
+    expect(await badJson.json()).toMatchObject({ code: 'BAD_REQUEST' });
+
+    const notFound = await fetch(`${daemon.url}/v1/nope`, { headers: h });
+    expect(notFound.status).toBe(404);
+    expect(await notFound.json()).toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('falls back to a default tail count when the query param is not a valid number', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'sb-daemon-'));
+    homes.push(home);
+    const registry = new Registry({ home, config: DEFAULT_CONFIG });
+    const broker = new Broker({ registry, spawner: neverSpawner, config: DEFAULT_CONFIG });
+    const logs = vi.spyOn(broker, 'logs').mockReturnValue([]);
+    const { daemon } = await boot(broker);
+    const h = { authorization: `Bearer ${daemon.token}` };
+
+    await fetch(`${daemon.url}/v1/instances/r1/logs?tail=abc`, { headers: h });
+    expect(logs).toHaveBeenCalledWith('r1', 200);
+  });
+
+  it('normalizes daemon.json permissions to 0600 even if the file pre-existed with looser perms', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'sb-daemon-'));
+    homes.push(home);
+    writeFileSync(join(home, 'daemon.json'), '{}', { mode: 0o644 });
+    const registry = new Registry({ home, config: DEFAULT_CONFIG });
+    const daemon = createDaemon({
+      home,
+      broker: new Broker({ registry, spawner: neverSpawner, config: DEFAULT_CONFIG }),
+      config: DEFAULT_CONFIG,
+    });
+    daemons.push(daemon);
+    await daemon.start(0);
+    expect(statSync(join(home, 'daemon.json')).mode & 0o777).toBe(0o600);
   });
 });

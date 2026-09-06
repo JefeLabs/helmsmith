@@ -12,6 +12,9 @@ describe('StorybrokrError', () => {
     expect(httpStatusFor('BOOT_TIMEOUT')).toBe(504);
     expect(httpStatusFor('INSTANCE_NOT_FOUND')).toBe(404);
     expect(httpStatusFor('DAEMON_UNAVAILABLE')).toBe(503);
+    expect(httpStatusFor('BAD_REQUEST')).toBe(400);
+    expect(httpStatusFor('UNAUTHORIZED')).toBe(401);
+    expect(httpStatusFor('NOT_FOUND')).toBe(404);
   });
 
   it('carries code, status and an optional log tail', () => {
