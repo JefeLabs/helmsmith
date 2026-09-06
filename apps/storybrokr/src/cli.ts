@@ -6,6 +6,7 @@ import { registerDown } from './commands/down.js';
 import { registerGet } from './commands/get.js';
 import { registerLogs } from './commands/logs.js';
 import { registerLs } from './commands/ls.js';
+import { registerMcp } from './commands/mcp.js';
 import { registerOpen } from './commands/open.js';
 import { registerTouch } from './commands/touch.js';
 import { registerUp } from './commands/up.js';
@@ -28,6 +29,7 @@ registerLogs(program, connect);
 registerTouch(program, connect);
 registerDoctor(program);
 registerDaemon(program);
+registerMcp(program);
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   console.error(err instanceof Error ? err.message : String(err));
