@@ -244,9 +244,9 @@ same way; nothing extra is done.
   `get`, and log reads. A reaper tick runs every 60 seconds and stops any `ready` instance
   idle longer than its TTL. `--ttl 0` opts an instance out of reaping for the daemon's
   lifetime.
-- **Stopping.** SIGTERM, wait 5 seconds, then SIGKILL. The config dir is deleted; the record
-  becomes `stopped` for one reaper tick so a caller can read the final state, then it is
-  dropped.
+- **Stopping.** SIGTERM, wait 5 seconds, then SIGKILL. The config dir is deleted and the record
+  is removed as soon as the process is gone; the caller of `down` receives 204 and already
+  knows the final state.
 - **Crash detection.** The daemon owns the child, so exit is immediate. Exit before readiness
   is `failed` with the log tail. Exit after readiness marks the record `failed` with
   `exitCode` and keeps it until the next `up` for that component or `down` clears it, so an
