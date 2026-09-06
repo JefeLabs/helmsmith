@@ -19,12 +19,12 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "commander": "^14.0.0",
+    "commander": "^15.0.0",
     "inquirer": "^12.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
-    "commander": "^14.0.3",
+    "commander": "^15.0.0",
     "inquirer": "^12.11.1",
     "tsup": "^8.5.1",
     "typescript": "^7.0.2",

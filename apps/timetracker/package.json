@@ -33,7 +33,7 @@
     "@inquirer/prompts": "^8.7.1",
     "@opentui/core": "^0.5.10",
     "@opentui/react": "^0.5.10",
-    "commander": "^14.0.3",
+    "commander": "^15.0.0",
     "discord.js": "^14.27.0",
     "react": "^19.2.8",
     "zod": "^3.25.76"
