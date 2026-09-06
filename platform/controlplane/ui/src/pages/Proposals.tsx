@@ -1,24 +1,7 @@
-import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Chip,
-  Code,
-  Divider,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Spinner,
-  Tab,
-  Tabs,
-  useDisclosure,
-} from '@heroui/react';
+import { Button, Card, Chip, Modal, Separator, Tabs, useOverlayState } from '@heroui/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { Code, LoadingSpinner, PendingButton, TextInput } from '../components/ui';
 import { ProposalStatus, RemoteStatus, SkillProposal, skillProposals } from '../lib/api';
 
 /**
@@ -42,35 +25,46 @@ export default function ProposalsPage() {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader className="flex flex-col gap-1 items-start">
-          <p className="text-md font-semibold">Skill proposals</p>
-          <p className="text-sm text-default-500">
-            Surfaced from job reflections that flagged{' '}
-            <Code size="sm">{`{kind:"missing-skill"}`}</Code> surprises. Approve to seed a draft
-            into the catalog.
+        <Card.Header className="flex flex-col gap-1 items-start">
+          <p className="text-base font-semibold">Skill proposals</p>
+          <p className="text-sm text-muted">
+            Surfaced from job reflections that flagged <Code>{`{kind:"missing-skill"}`}</Code>{' '}
+            surprises. Approve to seed a draft into the catalog.
           </p>
-        </CardHeader>
-        <Divider />
-        <CardBody>
+        </Card.Header>
+        <Separator />
+        <Card.Content>
+          {/* The tab strip only selects the status filter; the list below renders outside the panels. */}
           <Tabs
             selectedKey={status}
-            onSelectionChange={(k) => setStatus(k as ProposalStatus)}
-            aria-label="proposal status"
+            onSelectionChange={(k) => setStatus(String(k) as ProposalStatus)}
           >
-            <Tab key="proposed" title="Proposed" />
-            <Tab key="approved" title="Approved" />
-            <Tab key="rejected" title="Rejected" />
+            <Tabs.ListContainer>
+              <Tabs.List aria-label="proposal status">
+                {(['proposed', 'approved', 'rejected'] as const).map((s) => (
+                  <Tabs.Tab key={s} id={s}>
+                    {s[0].toUpperCase() + s.slice(1)}
+                    <Tabs.Indicator />
+                  </Tabs.Tab>
+                ))}
+              </Tabs.List>
+            </Tabs.ListContainer>
+            {(['proposed', 'approved', 'rejected'] as const).map((s) => (
+              <Tabs.Panel key={s} id={s} className="hidden">
+                {null}
+              </Tabs.Panel>
+            ))}
           </Tabs>
-        </CardBody>
+        </Card.Content>
       </Card>
 
-      {isPending && <Spinner label="Loading proposals…" />}
+      {isPending && <LoadingSpinner label="Loading proposals…" />}
       {error && <Code color="danger">{String(error)}</Code>}
       {data && data.length === 0 && (
         <Card>
-          <CardBody>
-            <p className="text-default-500">No {status} proposals.</p>
-          </CardBody>
+          <Card.Content>
+            <p className="text-muted">No {status} proposals.</p>
+          </Card.Content>
         </Card>
       )}
       {data && data.length > 0 && (
@@ -86,7 +80,7 @@ export default function ProposalsPage() {
 
 function ProposalCard({ proposal }: { proposal: SkillProposal }) {
   const qc = useQueryClient();
-  const rejectModal = useDisclosure();
+  const rejectModal = useOverlayState();
   const [rejectReason, setRejectReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,7 +104,7 @@ function ProposalCard({ proposal }: { proposal: SkillProposal }) {
     setError(null);
     try {
       await skillProposals.reject(proposal.id, rejectReason);
-      rejectModal.onClose();
+      rejectModal.close();
       setRejectReason('');
       await qc.invalidateQueries({ queryKey: ['skill-proposals'] });
     } catch (e) {
@@ -145,19 +139,17 @@ function ProposalCard({ proposal }: { proposal: SkillProposal }) {
 
   return (
     <Card>
-      <CardHeader className="flex justify-between items-start gap-2">
+      <Card.Header className="flex flex-row justify-between items-start gap-2">
         <div className="flex flex-col gap-1">
-          <Code size="sm" className="font-mono">
-            {proposal.name}
-          </Code>
+          <Code className="font-mono">{proposal.name}</Code>
           <div className="flex flex-wrap gap-1">
             {proposal.category && (
-              <Chip size="sm" variant="flat">
+              <Chip size="sm" variant="soft">
                 {proposal.category}
               </Chip>
             )}
             {proposal.tags.map((t) => (
-              <Chip key={t} size="sm" variant="flat" color="default">
+              <Chip key={t} size="sm" variant="soft" color="default">
                 {t}
               </Chip>
             ))}
@@ -167,59 +159,55 @@ function ProposalCard({ proposal }: { proposal: SkillProposal }) {
             )}
           </div>
         </div>
-      </CardHeader>
-      <Divider />
-      <CardBody className="space-y-2 text-sm">
+      </Card.Header>
+      <Separator />
+      <Card.Content className="space-y-2 text-sm">
         {proposal.description && (
           <div>
-            <span className="text-default-500 text-xs">description</span>
+            <span className="text-muted text-xs">description</span>
             <p>{proposal.description}</p>
           </div>
         )}
         {proposal.rationale && (
           <div>
-            <span className="text-default-500 text-xs">rationale</span>
+            <span className="text-muted text-xs">rationale</span>
             <p>{proposal.rationale}</p>
           </div>
         )}
         {proposal.sourceJobId && (
           <div>
-            <span className="text-default-500 text-xs">source job</span>
-            <Code size="sm" className="block">
-              {proposal.sourceJobId}
-            </Code>
+            <span className="text-muted text-xs">source job</span>
+            <Code className="block">{proposal.sourceJobId}</Code>
           </div>
         )}
         {proposal.status === 'approved' && proposal.catalogItemId && (
           <div>
-            <span className="text-default-500 text-xs">catalog item</span>
-            <Code size="sm" className="block">
-              {proposal.catalogItemId}
-            </Code>
+            <span className="text-muted text-xs">catalog item</span>
+            <Code className="block">{proposal.catalogItemId}</Code>
           </div>
         )}
         {proposal.status === 'rejected' && proposal.rejectionReason && (
           <div>
-            <span className="text-default-500 text-xs">rejection reason</span>
-            <p className="text-danger-500">{proposal.rejectionReason}</p>
+            <span className="text-muted text-xs">rejection reason</span>
+            <p className="text-danger">{proposal.rejectionReason}</p>
           </div>
         )}
         {proposal.status === 'approved' && proposal.remoteError && (
           <div>
-            <span className="text-default-500 text-xs">skillzkit error</span>
-            <p className="text-danger-500 break-words">{proposal.remoteError}</p>
+            <span className="text-muted text-xs">skillzkit error</span>
+            <p className="text-danger break-words">{proposal.remoteError}</p>
           </div>
         )}
         {error && <Code color="danger">{error}</Code>}
 
         {proposal.status === 'proposed' && (
           <>
-            <Divider />
+            <Separator />
             <div className="flex gap-2">
-              <Button color="success" onPress={approve} isLoading={busy}>
+              <PendingButton variant="primary" onPress={approve} pending={busy}>
                 Approve
-              </Button>
-              <Button color="danger" variant="flat" onPress={rejectModal.onOpen}>
+              </PendingButton>
+              <Button variant="danger-soft" onPress={rejectModal.open}>
                 Reject
               </Button>
             </div>
@@ -228,12 +216,12 @@ function ProposalCard({ proposal }: { proposal: SkillProposal }) {
 
         {canResubmit && (
           <>
-            <Divider />
+            <Separator />
             <div className="flex gap-2 items-center">
-              <Button color="primary" variant="flat" onPress={resubmit} isLoading={busy}>
+              <PendingButton variant="tertiary" onPress={resubmit} pending={busy}>
                 Resubmit to skillzkit
-              </Button>
-              <span className="text-xs text-default-500">
+              </PendingButton>
+              <span className="text-xs text-muted">
                 {proposal.remoteStatus === 'failed'
                   ? 'Last submit failed — retry'
                   : 'Approved before skillzkit was wired'}
@@ -241,42 +229,53 @@ function ProposalCard({ proposal }: { proposal: SkillProposal }) {
             </div>
           </>
         )}
-      </CardBody>
+      </Card.Content>
 
-      <Modal isOpen={rejectModal.isOpen} onClose={rejectModal.onClose}>
-        <ModalContent>
-          <ModalHeader>Reject {proposal.name}</ModalHeader>
-          <ModalBody>
-            <Input
-              label="Reason"
-              placeholder="Why is this proposal being rejected?"
-              value={rejectReason}
-              onValueChange={setRejectReason}
-            />
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="flat" onPress={rejectModal.onClose}>
-              Cancel
-            </Button>
-            <Button
-              color="danger"
-              onPress={reject}
-              isLoading={busy}
-              isDisabled={!rejectReason.trim()}
-            >
-              Reject
-            </Button>
-          </ModalFooter>
-        </ModalContent>
+      <Modal state={rejectModal}>
+        <Modal.Backdrop>
+          <Modal.Container size="md">
+            <Modal.Dialog>
+              {({ close }) => (
+                <>
+                  <Modal.CloseTrigger />
+                  <Modal.Header>
+                    <Modal.Heading>Reject {proposal.name}</Modal.Heading>
+                  </Modal.Header>
+                  <Modal.Body>
+                    <TextInput
+                      label="Reason"
+                      placeholder="Why is this proposal being rejected?"
+                      value={rejectReason}
+                      onValueChange={setRejectReason}
+                    />
+                  </Modal.Body>
+                  <Modal.Footer>
+                    <Button variant="secondary" onPress={close}>
+                      Cancel
+                    </Button>
+                    <PendingButton
+                      variant="danger"
+                      onPress={reject}
+                      pending={busy}
+                      isDisabled={!rejectReason.trim()}
+                    >
+                      Reject
+                    </PendingButton>
+                  </Modal.Footer>
+                </>
+              )}
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
       </Modal>
     </Card>
   );
 }
 
 function StatusChip({ status }: { status: ProposalStatus }) {
-  const tone = status === 'approved' ? 'success' : status === 'rejected' ? 'danger' : 'primary';
+  const tone = status === 'approved' ? 'success' : status === 'rejected' ? 'danger' : 'accent';
   return (
-    <Chip size="sm" color={tone} variant="flat">
+    <Chip size="sm" color={tone} variant="soft">
       {status}
     </Chip>
   );
@@ -306,18 +305,18 @@ function SkillzkitChip({
 }) {
   if (remoteStatus == null) {
     return (
-      <Chip size="sm" color="warning" variant="flat">
+      <Chip size="sm" color="warning" variant="soft">
         skillzkit: not sent
       </Chip>
     );
   }
-  const tone: 'primary' | 'success' | 'danger' | 'warning' =
+  const tone: 'accent' | 'success' | 'danger' | 'warning' =
     remoteStatus === 'accepted' || remoteStatus === 'promoted'
       ? 'success'
       : remoteStatus === 'rejected' || remoteStatus === 'failed'
         ? 'danger'
         : remoteStatus === 'reviewing'
-          ? 'primary'
+          ? 'accent'
           : 'warning'; // 'pending'
   const label = `skillzkit: ${remoteStatus}`;
 
@@ -327,7 +326,7 @@ function SkillzkitChip({
   // route. Future: if skillzkit ships a UI per-contribution page,
   // wire that URL on its side.
   const chip = (
-    <Chip size="sm" color={tone} variant="flat">
+    <Chip size="sm" color={tone} variant="soft">
       {label}
     </Chip>
   );

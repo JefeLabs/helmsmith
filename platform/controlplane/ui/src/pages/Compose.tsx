@@ -1,20 +1,13 @@
-import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Chip,
-  Code,
-  Divider,
-  Input,
-  Radio,
-  RadioGroup,
-  Select,
-  SelectItem,
-  Spinner,
-  Textarea,
-} from '@heroui/react';
+import { Button, Card, Chip, Label, Radio, RadioGroup, Separator } from '@heroui/react';
 import { useMemo, useState } from 'react';
+import {
+  Code,
+  LoadingSpinner,
+  PendingButton,
+  SelectField,
+  TextAreaField,
+  TextInput,
+} from '../components/ui';
 import { ApiError, ComposeResponse, ContributionKind, compose, ReviewFinding } from '../lib/api';
 
 /**
@@ -71,7 +64,7 @@ export default function ComposePage() {
   // `core/tools/foo.md`.
   const filePath = useMemo(() => {
     if (kind === 'skill') return 'SKILL.md';
-    return slug.replace(/:/g, '/') + '.md';
+    return `${slug.replace(/:/g, '/')}.md`;
   }, [kind, slug]);
 
   function buildFrontmatter(): Record<string, unknown> {
@@ -148,28 +141,36 @@ export default function ComposePage() {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader className="flex flex-col gap-1 items-start">
-          <p className="text-md font-semibold">Compose a contribution</p>
-          <p className="text-sm text-default-500">
+        <Card.Header className="flex flex-col gap-1 items-start">
+          <p className="text-base font-semibold">Compose a contribution</p>
+          <p className="text-sm text-muted">
             Author a new skillzkit command, workflow, or skill and submit it directly to the
             upstream catalog. The bundle goes through structural + file + agent-review validation
             server-side; findings (if any) are shown below.
           </p>
-        </CardHeader>
-        <Divider />
-        <CardBody className="space-y-4">
+        </Card.Header>
+        <Separator />
+        <Card.Content className="space-y-4">
           <RadioGroup
-            label="Kind"
+            name="kind"
             orientation="horizontal"
             value={kind}
-            onValueChange={(v) => setKind(v as ContributionKind)}
+            onChange={(v) => setKind(v as ContributionKind)}
           >
-            <Radio value="command">command</Radio>
-            <Radio value="workflow">workflow</Radio>
-            <Radio value="skill">skill</Radio>
+            <Label>Kind</Label>
+            {(['command', 'workflow', 'skill'] as const).map((k) => (
+              <Radio key={k} value={k}>
+                <Radio.Content>
+                  <Radio.Control>
+                    <Radio.Indicator />
+                  </Radio.Control>
+                  {k}
+                </Radio.Content>
+              </Radio>
+            ))}
           </RadioGroup>
 
-          <Input
+          <TextInput
             label="Slug"
             placeholder={kind === 'skill' ? 'skillzkit-my-router' : 'core:tools:my-thing'}
             description={slugHint}
@@ -178,7 +179,7 @@ export default function ComposePage() {
             isRequired
           />
 
-          <Input
+          <TextInput
             label="Description"
             placeholder="What this artifact does, in one or two sentences"
             value={description}
@@ -186,7 +187,7 @@ export default function ComposePage() {
             isRequired
           />
 
-          <Input
+          <TextInput
             label="Tags"
             placeholder="comma-separated: research, accessibility, brand"
             description="Lowercase, hyphen-separated. See TAGS.md for the curated core list."
@@ -195,7 +196,7 @@ export default function ComposePage() {
           />
 
           {kind === 'workflow' && (
-            <Input
+            <TextInput
               label="Outcome"
               placeholder="Imperative verb + outcome, e.g. 'Apply a brand refresh'"
               description="Required for workflows - displayed as the row label in TUI/CLI listings."
@@ -205,7 +206,7 @@ export default function ComposePage() {
             />
           )}
 
-          <Textarea
+          <TextAreaField
             label="Body (markdown)"
             placeholder={`# ${slug || 'Your artifact'}\n\nThe markdown body that drives this artifact.`}
             description={
@@ -213,28 +214,25 @@ export default function ComposePage() {
                 ? "SKILL.md body - the agent-facing prompt that defines this skill's behavior."
                 : 'The slash-command body - what runs when /<slug> is invoked.'
             }
-            minRows={10}
-            maxRows={30}
+            rows={10}
             value={body}
             onValueChange={setBody}
             isRequired
           />
 
           <div className="grid grid-cols-2 gap-3">
-            <Select
+            <SelectField
               label="Version bump"
-              selectedKeys={[versionBump]}
-              onSelectionChange={(keys) => {
-                const k = Array.from(keys)[0] as 'major' | 'minor' | 'patch';
-                if (k) setVersionBump(k);
-              }}
+              value={versionBump}
+              onValueChange={(v) => setVersionBump(v as 'major' | 'minor' | 'patch')}
               description="patch by default; bump higher for breaking changes"
-            >
-              <SelectItem key="patch">patch</SelectItem>
-              <SelectItem key="minor">minor</SelectItem>
-              <SelectItem key="major">major</SelectItem>
-            </Select>
-            <Input
+              options={[
+                { id: 'patch', label: 'patch' },
+                { id: 'minor', label: 'minor' },
+                { id: 'major', label: 'major' },
+              ]}
+            />
+            <TextInput
               label="Changelog (optional)"
               placeholder="What changed in this version"
               value={changelog}
@@ -242,27 +240,32 @@ export default function ComposePage() {
             />
           </div>
 
-          <Divider />
+          <Separator />
 
           <div className="flex gap-2">
-            <Button color="primary" onPress={submit} isLoading={busy} isDisabled={!canSubmit()}>
+            <PendingButton
+              variant="primary"
+              onPress={submit}
+              pending={busy}
+              isDisabled={!canSubmit()}
+            >
               Submit to skillzkit
-            </Button>
-            <Button variant="flat" onPress={reset} isDisabled={busy}>
+            </PendingButton>
+            <Button variant="secondary" onPress={reset} isDisabled={busy}>
               Reset
             </Button>
           </div>
 
           {kind === 'skill' && (
-            <p className="text-xs text-default-500">
+            <p className="text-xs text-muted">
               Skill bundles can include companion script files (.py, .sh, .json, etc.) — adding a
               multi-file uploader is a planned v2 enhancement. For now, single-body skills only.
             </p>
           )}
-        </CardBody>
+        </Card.Content>
       </Card>
 
-      {busy && <Spinner label="Submitting…" />}
+      {busy && <LoadingSpinner label="Submitting…" />}
 
       {result && <SuccessCard result={result} />}
       {err && <ErrorCard error={err} />}
@@ -273,50 +276,48 @@ export default function ComposePage() {
 function SuccessCard({ result }: { result: ComposeResponse }) {
   return (
     <Card>
-      <CardHeader>
-        <p className="text-md font-semibold text-success">✓ Accepted by skillzkit</p>
-      </CardHeader>
-      <Divider />
-      <CardBody className="space-y-2 text-sm">
+      <Card.Header>
+        <p className="text-base font-semibold text-success">✓ Accepted by skillzkit</p>
+      </Card.Header>
+      <Separator />
+      <Card.Content className="space-y-2 text-sm">
         <div className="flex flex-wrap gap-1 items-center">
-          <Code size="sm">{result.id}</Code>
-          <Chip size="sm" color="success" variant="flat">
+          <Code>{result.id}</Code>
+          <Chip size="sm" color="success" variant="soft">
             {result.status}
           </Chip>
           {result.promoted ? (
-            <Chip size="sm" color="success" variant="flat">
+            <Chip size="sm" color="success" variant="soft">
               promoted (live)
             </Chip>
           ) : (
-            <Chip size="sm" color="warning" variant="flat">
+            <Chip size="sm" color="warning" variant="soft">
               awaiting promote
             </Chip>
           )}
         </div>
         {result.version && (
           <p>
-            <span className="text-default-500 text-xs">version</span>{' '}
-            <Code size="sm">{result.version}</Code>
+            <span className="text-muted text-xs">version</span> <Code>{result.version}</Code>
           </p>
         )}
         <p>
-          <span className="text-default-500 text-xs">author</span> {result.author.displayName}
+          <span className="text-muted text-xs">author</span> {result.author.displayName}
           {result.author.email ? ` <${result.author.email}>` : ''}
         </p>
         {result.findings.length > 0 && (
           <details>
-            <summary className="cursor-pointer text-default-500 text-xs">
+            <summary className="cursor-pointer text-muted text-xs">
               {result.findings.length} non-blocking finding(s)
             </summary>
             <FindingsList findings={result.findings} />
           </details>
         )}
-        <p className="text-xs text-default-500">
-          Stored at{' '}
-          <Code size="sm">{`v1/${result.kind}s/${result.slug}@${result.version}.json`}</Code>. A
+        <p className="text-xs text-muted">
+          Stored at <Code>{`v1/${result.kind}s/${result.slug}@${result.version}.json`}</Code>. A
           maintainer can promote this version to the catalog index from the Proposals page.
         </p>
-      </CardBody>
+      </Card.Content>
     </Card>
   );
 }
@@ -349,17 +350,17 @@ function ErrorCard({ error }: { error: ApiError | Error }) {
 
   return (
     <Card>
-      <CardHeader>
-        <p className="text-md font-semibold text-danger">✗ {title}</p>
-      </CardHeader>
-      <Divider />
-      <CardBody className="space-y-2 text-sm">
+      <Card.Header>
+        <p className="text-base font-semibold text-danger">✗ {title}</p>
+      </Card.Header>
+      <Separator />
+      <Card.Content className="space-y-2 text-sm">
         <Code color="danger" className="block whitespace-pre-wrap">
           {error.message}
         </Code>
-        {hint && <p className="text-default-700">{hint}</p>}
+        {hint && <p className="text-foreground">{hint}</p>}
         {findings && findings.length > 0 && <FindingsList findings={findings} />}
-      </CardBody>
+      </Card.Content>
     </Card>
   );
 }
@@ -381,18 +382,14 @@ function FindingsList({ findings }: { findings: ReviewFinding[] }) {
         const tone = sev === 'high' ? 'danger' : sev === 'medium' ? 'warning' : 'default';
         return (
           <div key={sev} className="space-y-1">
-            <Chip size="sm" color={tone} variant="flat">
+            <Chip size="sm" color={tone} variant="soft">
               {sev.toUpperCase()} ({items.length})
             </Chip>
             <ul className="space-y-1 ml-2">
               {items.map((f, idx) => (
                 <li key={idx} className="text-sm">
-                  <span className="text-default-500 text-xs">{f.axis}:</span> {f.message}
-                  {f.fileRef && (
-                    <Code size="sm" className="ml-1">
-                      {f.fileRef}
-                    </Code>
-                  )}
+                  <span className="text-muted text-xs">{f.axis}:</span> {f.message}
+                  {f.fileRef && <Code className="ml-1">{f.fileRef}</Code>}
                 </li>
               ))}
             </ul>

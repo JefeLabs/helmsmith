@@ -1,18 +1,8 @@
-import {
-  Accordion,
-  AccordionItem,
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Chip,
-  Code,
-  Divider,
-  Spinner,
-} from '@heroui/react';
+import { Accordion, Button, Card, Chip, Separator } from '@heroui/react';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Code, LoadingSpinner } from '../components/ui';
 import { Job, jobs } from '../lib/api';
 
 /**
@@ -23,6 +13,7 @@ import { Job, jobs } from '../lib/api';
  */
 export default function BenchmarkRunPage() {
   const { runId } = useParams<{ runId: string }>();
+  const navigate = useNavigate();
 
   const { data, isPending, error } = useQuery({
     queryKey: ['benchmark-run', runId],
@@ -32,14 +23,14 @@ export default function BenchmarkRunPage() {
   });
 
   if (!runId) return null;
-  if (isPending) return <Spinner label="Loading jobs…" />;
+  if (isPending) return <LoadingSpinner label="Loading jobs…" />;
   if (error) return <Code color="danger">{String(error)}</Code>;
   if (!data || data.length === 0) {
     return (
       <Card>
-        <CardBody>
-          <p className="text-default-500">No jobs found for run {runId}.</p>
-        </CardBody>
+        <Card.Content>
+          <p className="text-muted">No jobs found for run {runId}.</p>
+        </Card.Content>
       </Card>
     );
   }
@@ -50,33 +41,44 @@ export default function BenchmarkRunPage() {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader className="flex justify-between items-start gap-3">
+        <Card.Header className="flex flex-row justify-between items-start gap-3">
           <div className="flex flex-col gap-1">
-            <Code size="sm">{runId}</Code>
+            <Code>{runId}</Code>
             {label && <p className="text-sm font-semibold">{label}</p>}
-            <p className="text-xs text-default-500">
+            <p className="text-xs text-muted">
               {data.length} job(s) · {counts.completed} completed · {counts.failed} failed ·{' '}
               {counts.inFlight} in-flight
             </p>
           </div>
-          <Button as={Link} to={`/benchmarks?runIds=${runId}`} variant="flat" size="sm">
+          <Button
+            variant="secondary"
+            size="sm"
+            onPress={() => navigate(`/benchmarks?runIds=${runId}`)}
+          >
             ← back to compare
           </Button>
-        </CardHeader>
+        </Card.Header>
       </Card>
 
-      <Accordion variant="splitted" selectionMode="multiple">
+      {/* v2 `variant="splitted"` → default variant with a card surface per item. */}
+      <Accordion allowsMultipleExpanded className="space-y-2">
         {data.map((job, idx) => (
-          <AccordionItem
-            key={job.id}
-            aria-label={`job ${idx + 1}`}
-            title={<JobRowTitle job={job} index={idx + 1} />}
-            subtitle={
-              <span className="text-xs text-default-500 font-mono">{job.id.slice(0, 24)}…</span>
-            }
-          >
-            <JobDetail job={job} />
-          </AccordionItem>
+          <Accordion.Item key={job.id} id={job.id} className="rounded-2xl bg-surface px-4">
+            <Accordion.Heading>
+              <Accordion.Trigger aria-label={`job ${idx + 1}`}>
+                <div className="flex flex-col gap-1 items-start">
+                  <JobRowTitle job={job} index={idx + 1} />
+                  <span className="text-xs text-muted font-mono">{job.id.slice(0, 24)}…</span>
+                </div>
+                <Accordion.Indicator />
+              </Accordion.Trigger>
+            </Accordion.Heading>
+            <Accordion.Panel>
+              <Accordion.Body>
+                <JobDetail job={job} />
+              </Accordion.Body>
+            </Accordion.Panel>
+          </Accordion.Item>
         ))}
       </Accordion>
     </div>
@@ -86,14 +88,12 @@ export default function BenchmarkRunPage() {
 function JobRowTitle({ job, index }: { job: Job; index: number }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="text-default-500 text-sm w-8">#{index}</span>
-      <Chip size="sm" color={statusColor(job.status)} variant="flat">
+      <span className="text-muted text-sm w-8">#{index}</span>
+      <Chip size="sm" color={statusColor(job.status)} variant="soft">
         {job.status}
       </Chip>
       <ScoreChip score={job.evalScore} />
-      <span className="text-sm text-default-700 truncate max-w-md">
-        {summarizeInput(job.input)}
-      </span>
+      <span className="text-sm text-foreground truncate max-w-md">{summarizeInput(job.input)}</span>
     </div>
   );
 }
@@ -108,16 +108,16 @@ function JobDetail({ job }: { job: Job }) {
       {job.benchmarkLabel && <Section label="label" value={job.benchmarkLabel} />}
       {job.failureReason && <Section label="failureReason" value={job.failureReason} />}
 
-      <Divider />
+      <Separator />
 
       <div className="flex flex-col gap-1">
         <div className="flex justify-between items-center">
-          <span className="text-default-500">input</span>
-          <Button size="sm" variant="light" onPress={() => setShowFullInput((s) => !s)}>
+          <span className="text-muted">input</span>
+          <Button size="sm" variant="tertiary" onPress={() => setShowFullInput((s) => !s)}>
             {showFullInput ? 'collapse' : 'expand'}
           </Button>
         </div>
-        <pre className="text-xs bg-default-100 p-2 rounded max-h-96 overflow-auto">
+        <pre className="text-xs bg-surface-secondary p-2 rounded max-h-96 overflow-auto">
           {showFullInput
             ? JSON.stringify(job.input, null, 2)
             : truncate(JSON.stringify(job.input, null, 2), 240)}
@@ -126,12 +126,12 @@ function JobDetail({ job }: { job: Job }) {
 
       <div className="flex flex-col gap-1">
         <div className="flex justify-between items-center">
-          <span className="text-default-500">output</span>
-          <Button size="sm" variant="light" onPress={() => setShowFullOutput((s) => !s)}>
+          <span className="text-muted">output</span>
+          <Button size="sm" variant="tertiary" onPress={() => setShowFullOutput((s) => !s)}>
             {showFullOutput ? 'collapse' : 'expand'}
           </Button>
         </div>
-        <pre className="text-xs bg-default-100 p-2 rounded max-h-96 overflow-auto">
+        <pre className="text-xs bg-surface-secondary p-2 rounded max-h-96 overflow-auto">
           {job.output == null
             ? '(no output yet)'
             : showFullOutput
@@ -142,25 +142,25 @@ function JobDetail({ job }: { job: Job }) {
 
       {(job.evalScore != null || job.evalRationale) && (
         <>
-          <Divider />
+          <Separator />
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="text-default-500">score</span>
+              <span className="text-muted">score</span>
               <ScoreChip score={job.evalScore} />
               {job.evalJudge && (
-                <Chip size="sm" variant="flat">
+                <Chip size="sm" variant="soft">
                   judge: {job.evalJudge}
                 </Chip>
               )}
             </div>
-            {job.evalRationale && <p className="text-default-700 text-xs">{job.evalRationale}</p>}
+            {job.evalRationale && <p className="text-foreground text-xs">{job.evalRationale}</p>}
           </div>
         </>
       )}
 
-      <Divider />
+      <Separator />
 
-      <div className="flex gap-3 text-xs text-default-500">
+      <div className="flex gap-3 text-xs text-muted">
         <span>created {fmt(job.createdAt)}</span>
         {job.startedAt && <span>started {fmt(job.startedAt)}</span>}
         {job.completedAt && <span>completed {fmt(job.completedAt)}</span>}
@@ -172,7 +172,7 @@ function JobDetail({ job }: { job: Job }) {
 function Section({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex justify-between">
-      <span className="text-default-500">{label}</span>
+      <span className="text-muted">{label}</span>
       <span>{value}</span>
     </div>
   );
@@ -181,14 +181,14 @@ function Section({ label, value }: { label: string; value: React.ReactNode }) {
 function ScoreChip({ score }: { score?: number | null }) {
   if (score == null) {
     return (
-      <Chip size="sm" variant="flat">
+      <Chip size="sm" variant="soft">
         unscored
       </Chip>
     );
   }
   const tone = score >= 0.7 ? 'success' : score >= 0.3 ? 'warning' : 'danger';
   return (
-    <Chip size="sm" color={tone} variant="flat">
+    <Chip size="sm" color={tone} variant="soft">
       {score.toFixed(2)}
     </Chip>
   );
@@ -200,7 +200,7 @@ function statusColor(status: Job['status']) {
     : status === 'failed' || status === 'cancelled'
       ? 'danger'
       : status === 'running'
-        ? 'primary'
+        ? 'accent'
         : 'default';
 }
 

@@ -1,18 +1,8 @@
-import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Code,
-  Divider,
-  Select,
-  SelectItem,
-  Spinner,
-  Textarea,
-} from '@heroui/react';
+import { Button, Card, Separator } from '@heroui/react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Code, PendingButton, SelectField, TextAreaField } from '../components/ui';
 import { catalog, jobs, type SubmitJobRequest } from '../lib/api';
 
 /**
@@ -57,68 +47,63 @@ export default function SubmitJobPage() {
 
   return (
     <Card>
-      <CardHeader className="flex flex-col items-start gap-1">
+      <Card.Header className="flex flex-col items-start gap-1">
         <span className="text-lg font-semibold">Submit job</span>
-        <span className="text-sm text-default-500">
-          Direct submission to <Code size="sm">POST /api/jobs</Code>. For guided intent capture, use
-          the Intake page.
+        <span className="text-sm text-muted">
+          Direct submission to <Code>POST /api/jobs</Code>. For guided intent capture, use the
+          Intake page.
         </span>
-      </CardHeader>
-      <Divider />
-      <CardBody>
+      </Card.Header>
+      <Separator />
+      <Card.Content>
         <form onSubmit={onSubmit} className="flex flex-col gap-4 max-w-2xl">
-          <Select
+          <SelectField
             label="Flow"
             placeholder={flowsQ.isPending ? 'Loading flows…' : 'Pick a work flow'}
             isDisabled={flowsQ.isPending || !!flowsQ.error}
-            selectedKeys={flowId ? [flowId] : []}
-            onChange={(e) => setFlowId(e.target.value)}
-          >
-            {workFlows.map((f) => (
-              <SelectItem key={f.id} description={f.description}>
-                {f.id}
-              </SelectItem>
-            ))}
-          </Select>
+            value={flowId}
+            onValueChange={setFlowId}
+            options={workFlows.map((f) => ({ id: f.id, label: f.id, description: f.description }))}
+          />
 
-          <Select
+          <SelectField
             label="Product"
             placeholder={productsQ.isPending ? 'Loading products…' : 'Pick a product'}
             isDisabled={productsQ.isPending || !!productsQ.error}
-            selectedKeys={productId ? [productId] : []}
-            onChange={(e) => setProductId(e.target.value)}
-          >
-            {(productsQ.data ?? []).map((p) => (
-              <SelectItem key={p.id} description={p.displayName ?? undefined}>
-                {p.id}
-              </SelectItem>
-            ))}
-          </Select>
-
-          <Textarea
-            label="Change"
-            placeholder='e.g. "Bump axios to ^1.7.4 and re-run the lockfile."'
-            minRows={4}
-            value={change}
-            onChange={(e) => setChange(e.target.value)}
+            value={productId}
+            onValueChange={setProductId}
+            options={(productsQ.data ?? []).map((p) => ({
+              id: p.id,
+              label: p.id,
+              description: p.displayName ?? undefined,
+            }))}
           />
 
-          {submitM.error ? (
-            <Code color="danger" size="sm">
-              {String(submitM.error)}
-            </Code>
-          ) : null}
+          <TextAreaField
+            label="Change"
+            placeholder='e.g. "Bump axios to ^1.7.4 and re-run the lockfile."'
+            rows={4}
+            value={change}
+            onValueChange={setChange}
+          />
+
+          {submitM.error ? <Code color="danger">{String(submitM.error)}</Code> : null}
 
           <div className="flex items-center gap-3">
-            <Button color="primary" type="submit" isDisabled={disabled}>
-              {submitM.isPending ? <Spinner size="sm" color="white" /> : 'Submit'}
-            </Button>
-            <Button variant="light" onPress={() => navigate('/jobs')}>
+            <PendingButton
+              variant="primary"
+              type="submit"
+              isDisabled={disabled}
+              pending={submitM.isPending}
+            >
+              Submit
+            </PendingButton>
+            <Button variant="tertiary" onPress={() => navigate('/jobs')}>
               Cancel
             </Button>
           </div>
         </form>
-      </CardBody>
+      </Card.Content>
     </Card>
   );
 }

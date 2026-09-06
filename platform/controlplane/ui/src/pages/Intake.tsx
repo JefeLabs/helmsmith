@@ -1,17 +1,7 @@
-import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Chip,
-  Code,
-  Divider,
-  Input,
-  Spinner,
-  Textarea,
-} from '@heroui/react';
+import { Button, Card, Chip, Separator } from '@heroui/react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { Code, LoadingSpinner, PendingButton, TextAreaField, TextInput } from '../components/ui';
 import { IntentSession, intent, subscribeToSession } from '../lib/api';
 
 interface ChatLine {
@@ -166,46 +156,45 @@ export default function IntakePage() {
   if (!sessionId) {
     return (
       <Card className="max-w-xl mx-auto">
-        <CardHeader>
+        <Card.Header>
           <div className="flex flex-col">
-            <p className="text-md">Start an intake session</p>
-            <p className="text-sm text-default-500">
-              Submits a job-definition pipeline and tracks it through{' '}
-              <Code size="sm">intent-ready</Code>.
+            <p className="text-base">Start an intake session</p>
+            <p className="text-sm text-muted">
+              Submits a job-definition pipeline and tracks it through <Code>intent-ready</Code>.
             </p>
           </div>
-        </CardHeader>
-        <Divider />
-        <CardBody className="gap-3">
-          <Input
+        </Card.Header>
+        <Separator />
+        <Card.Content className="gap-3">
+          <TextInput
             label="Intake pipeline id"
             placeholder="default-intake"
             value={pipelineId}
             onValueChange={setPipelineId}
           />
-          <Input
+          <TextInput
             label="Product id"
             placeholder="demo-product"
             value={productId}
             onValueChange={setProductId}
           />
-          <Textarea
+          <TextAreaField
             label="Initial input (JSON or plain message)"
             placeholder='{"goal":"upgrade React"}'
             value={initial}
             onValueChange={setInitial}
-            minRows={3}
+            rows={3}
           />
           {error && <Code color="danger">{error}</Code>}
-          <Button
-            color="primary"
+          <PendingButton
+            variant="primary"
             onPress={startSession}
-            isLoading={pending}
+            pending={pending}
             isDisabled={!pipelineId || !productId}
           >
             Start session
-          </Button>
-        </CardBody>
+          </PendingButton>
+        </Card.Content>
       </Card>
     );
   }
@@ -213,19 +202,19 @@ export default function IntakePage() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <Card className="md:col-span-2">
-        <CardHeader className="flex justify-between items-center">
+        <Card.Header className="flex flex-row justify-between items-center">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-default-500">session</span>
-            <Code size="sm">{sessionId.slice(0, 8)}…</Code>
+            <span className="text-sm text-muted">session</span>
+            <Code>{sessionId.slice(0, 8)}…</Code>
             {session && <StatusChip status={session.status} />}
           </div>
-          <Button size="sm" variant="flat" onPress={() => navigate('/intake')}>
+          <Button size="sm" variant="secondary" onPress={() => navigate('/intake')}>
             New session
           </Button>
-        </CardHeader>
-        <Divider />
-        <CardBody>
-          {pending && !session && <Spinner label="Loading session…" />}
+        </Card.Header>
+        <Separator />
+        <Card.Content>
+          {pending && !session && <LoadingSpinner label="Loading session…" />}
           <div className="space-y-2 max-h-[60vh] overflow-y-auto">
             {lines.map((l, i) => (
               <div
@@ -233,15 +222,15 @@ export default function IntakePage() {
                 className={
                   'p-2 rounded-md text-sm ' +
                   (l.who === 'user'
-                    ? 'bg-primary-100/30 ml-12'
-                    : 'bg-default-100 mr-12 font-mono text-xs')
+                    ? 'bg-accent-soft ml-12'
+                    : 'bg-surface-secondary mr-12 font-mono text-xs')
                 }
               >
                 {l.text}
               </div>
             ))}
           </div>
-          <Divider className="my-3" />
+          <Separator className="my-3" />
           <MessageBar
             disabled={
               !session ||
@@ -251,52 +240,49 @@ export default function IntakePage() {
             }
             onSend={sendMessage}
           />
-        </CardBody>
+        </Card.Content>
       </Card>
 
       <Card>
-        <CardHeader>
-          <p className="text-md">Session detail</p>
-        </CardHeader>
-        <Divider />
-        <CardBody className="gap-3">
+        <Card.Header>
+          <p className="text-base">Session detail</p>
+        </Card.Header>
+        <Separator />
+        <Card.Content className="gap-3">
           {error && <Code color="danger">{error}</Code>}
           {session && (
             <>
               <DetailRow label="status" value={<StatusChip status={session.status} />} />
-              <DetailRow
-                label="intake job"
-                value={<Code size="sm">{session.intakeJobId ?? '—'}</Code>}
-              />
+              <DetailRow label="intake job" value={<Code>{session.intakeJobId ?? '—'}</Code>} />
               {session.workJobId && (
-                <DetailRow label="work job" value={<Code size="sm">{session.workJobId}</Code>} />
+                <DetailRow label="work job" value={<Code>{session.workJobId}</Code>} />
               )}
               {session.resolvedIntent && (
                 <div>
-                  <p className="text-xs text-default-500 mb-1">resolved intent</p>
-                  <pre className="text-xs bg-default-100 p-2 rounded overflow-x-auto">
+                  <p className="text-xs text-muted mb-1">resolved intent</p>
+                  <pre className="text-xs bg-surface-secondary p-2 rounded overflow-x-auto">
                     {JSON.stringify(session.resolvedIntent, null, 2)}
                   </pre>
                 </div>
               )}
-              <Divider />
+              <Separator />
               <div className="flex flex-col gap-2">
                 {session.status === 'intent-ready' && (
-                  <Button color="success" onPress={confirmAndRun}>
+                  <Button variant="primary" onPress={confirmAndRun}>
                     Confirm & run
                   </Button>
                 )}
                 {session.status !== 'submitted' &&
                   session.status !== 'aborted' &&
                   session.status !== 'expired' && (
-                    <Button color="danger" variant="flat" onPress={abortSession}>
+                    <Button variant="danger-soft" onPress={abortSession}>
                       Abort session
                     </Button>
                   )}
               </div>
             </>
           )}
-        </CardBody>
+        </Card.Content>
       </Card>
     </div>
   );
@@ -305,12 +291,13 @@ export default function IntakePage() {
 function MessageBar({ disabled, onSend }: { disabled: boolean; onSend: (text: string) => void }) {
   const [text, setText] = useState('');
   return (
-    <div className="flex gap-2">
-      <Input
+    <div className="flex gap-2 items-end">
+      <TextInput
         placeholder="Type a message…"
         value={text}
         onValueChange={setText}
         isDisabled={disabled}
+        className="flex-1"
         onKeyDown={(e) => {
           if (e.key === 'Enter' && text && !disabled) {
             onSend(text);
@@ -319,7 +306,7 @@ function MessageBar({ disabled, onSend }: { disabled: boolean; onSend: (text: st
         }}
       />
       <Button
-        color="primary"
+        variant="primary"
         isDisabled={disabled || !text}
         onPress={() => {
           if (text) {
@@ -337,7 +324,7 @@ function MessageBar({ disabled, onSend }: { disabled: boolean; onSend: (text: st
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex flex-col">
-      <span className="text-xs text-default-500">{label}</span>
+      <span className="text-xs text-muted">{label}</span>
       <span>{value}</span>
     </div>
   );
@@ -348,12 +335,12 @@ function StatusChip({ status }: { status: IntentSession['status'] }) {
     status === 'submitted'
       ? 'success'
       : status === 'intent-ready'
-        ? 'primary'
+        ? 'accent'
         : status === 'aborted' || status === 'failed' || status === 'expired'
           ? 'danger'
           : 'default';
   return (
-    <Chip size="sm" color={tone} variant="flat">
+    <Chip size="sm" color={tone} variant="soft">
       {status}
     </Chip>
   );

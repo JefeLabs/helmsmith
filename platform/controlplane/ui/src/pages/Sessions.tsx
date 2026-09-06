@@ -1,16 +1,7 @@
-import {
-  Chip,
-  Code,
-  Spinner,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableHeader,
-  TableRow,
-} from '@heroui/react';
+import { Chip, Table } from '@heroui/react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import { Code, LoadingSpinner } from '../components/ui';
 import { IntentSession, intent } from '../lib/api';
 
 export default function SessionsPage() {
@@ -20,45 +11,55 @@ export default function SessionsPage() {
     refetchInterval: 3_000,
   });
 
-  if (isPending) return <Spinner label="Loading sessions…" />;
+  if (isPending) return <LoadingSpinner label="Loading sessions…" />;
   if (error) return <Code color="danger">{String(error)}</Code>;
 
   return (
-    <Table aria-label="Intent sessions">
-      <TableHeader>
-        <TableColumn>session</TableColumn>
-        <TableColumn>pipeline</TableColumn>
-        <TableColumn>status</TableColumn>
-        <TableColumn>intake job</TableColumn>
-        <TableColumn>work job</TableColumn>
-        <TableColumn>created</TableColumn>
-      </TableHeader>
-      <TableBody emptyContent="No sessions yet — start one in Intake.">
-        {(data ?? []).map((s: IntentSession) => (
-          <TableRow key={s.id}>
-            <TableCell>
-              <Link to={`/intake/${s.id}`} className="text-primary text-sm">
-                {s.id.slice(0, 8)}…
-              </Link>
-            </TableCell>
-            <TableCell>
-              <Code size="sm">{s.intakePipelineId}</Code>
-            </TableCell>
-            <TableCell>
-              <Chip size="sm" variant="flat">
-                {s.status}
-              </Chip>
-            </TableCell>
-            <TableCell className="text-xs font-mono">
-              {s.intakeJobId?.slice(0, 12) ?? '—'}
-            </TableCell>
-            <TableCell className="text-xs font-mono">{s.workJobId?.slice(0, 12) ?? '—'}</TableCell>
-            <TableCell className="text-xs text-default-500">
-              {new Date(s.createdAt).toLocaleString()}
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
+    <Table>
+      <Table.ScrollContainer>
+        <Table.Content aria-label="Intent sessions">
+          <Table.Header>
+            <Table.Column isRowHeader>session</Table.Column>
+            <Table.Column>pipeline</Table.Column>
+            <Table.Column>status</Table.Column>
+            <Table.Column>intake job</Table.Column>
+            <Table.Column>work job</Table.Column>
+            <Table.Column>created</Table.Column>
+          </Table.Header>
+          <Table.Body
+            renderEmptyState={() => (
+              <p className="text-center py-4 text-muted">No sessions yet — start one in Intake.</p>
+            )}
+          >
+            {(data ?? []).map((s: IntentSession) => (
+              <Table.Row key={s.id} id={s.id}>
+                <Table.Cell>
+                  <Link to={`/intake/${s.id}`} className="text-accent text-sm">
+                    {s.id.slice(0, 8)}…
+                  </Link>
+                </Table.Cell>
+                <Table.Cell>
+                  <Code>{s.intakePipelineId}</Code>
+                </Table.Cell>
+                <Table.Cell>
+                  <Chip size="sm" variant="soft">
+                    {s.status}
+                  </Chip>
+                </Table.Cell>
+                <Table.Cell className="text-xs font-mono">
+                  {s.intakeJobId?.slice(0, 12) ?? '—'}
+                </Table.Cell>
+                <Table.Cell className="text-xs font-mono">
+                  {s.workJobId?.slice(0, 12) ?? '—'}
+                </Table.Cell>
+                <Table.Cell className="text-xs text-muted">
+                  {new Date(s.createdAt).toLocaleString()}
+                </Table.Cell>
+              </Table.Row>
+            ))}
+          </Table.Body>
+        </Table.Content>
+      </Table.ScrollContainer>
     </Table>
   );
 }
