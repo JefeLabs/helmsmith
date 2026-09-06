@@ -129,14 +129,14 @@ jobs:
         # checkout still drops everything into $GITHUB_WORKSPACE root.
         uses: actions/checkout@v7
 
-      - name: Setup JDK 21
+      - name: Setup JDK 25
         # Temurin is the Adoptium OpenJDK distribution — same one most
-        # production deployments target. Pinning to 21 matches the
+        # production deployments target. Pinning to 25 matches the
         # <java.version> in controlplane/pom.xml.
         uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: 21
+          java-version: 25
           # Built-in Maven cache: persists ~/.m2/repository keyed off
           # pom.xml hash. First run is full-download; subsequent runs
           # restore in seconds.
