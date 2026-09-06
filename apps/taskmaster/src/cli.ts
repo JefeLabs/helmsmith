@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { createCli } from '@helmsmith/cli-kit';
 import chalk from 'chalk';
 import Table from 'cli-table3';
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 import type { AIProviderName } from './auth/index.js';
 import { AI_PROVIDERS, resolveActiveAuth } from './auth/index.js';
 import { type AddCommandOpts, executeAdd } from './commands/add.js';

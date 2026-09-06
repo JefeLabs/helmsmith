@@ -2,7 +2,7 @@ import { writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import chalk from 'chalk';
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 import { excludeBots } from '../aggregator/bots.js';
 import {
   getLastNMonths,
@@ -1753,7 +1753,7 @@ export async function dashboardView(ctx: ViewContext): Promise<NavigationAction>
               indent: 2,
               lineWidth: 120,
               noRefs: true,
-              quotingType: '"',
+              quoteStyle: 'double',
             });
             await writeFile(outPath, yamlOut, 'utf-8');
             console.log(chalk.green(`\n  Workspace exported to ${outPath}`));

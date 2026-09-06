@@ -38,7 +38,7 @@
     "bun": "^1.4.2",
     "chalk": "^6.0.0",
     "commander": "^15.0.0",
-    "js-yaml": "^4.3.2",
+    "js-yaml": "^5.4.1",
     "octokit": "^5.0.5",
     "ora": "^8.2.0",
     "p-limit": "^7.3.2",
@@ -47,7 +47,6 @@
   },
   "devDependencies": {
     "@types/bun": "^1.4.1",
-    "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.13.3",
     "tsup": "^8.5.1",
     "tsx": "^4.23.13",

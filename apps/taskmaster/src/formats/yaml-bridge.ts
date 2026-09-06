@@ -1,4 +1,4 @@
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 
 /**
  * Error thrown when YAML parsing fails. Includes line/column info when available.
@@ -17,13 +17,18 @@ export class YamlParseError extends Error {
 
 /**
  * Safely load a YAML string into a JS value.
- * Uses js-yaml's DEFAULT_SCHEMA (safe) and wraps errors with line info.
+ * Uses js-yaml's CORE_SCHEMA (YAML 1.2 core, the v5 default; safe) and wraps errors with line info.
  */
 export function safeLoad(content: string): unknown {
+  // js-yaml 5 throws "expected a document, but the input is empty" where v4
+  // returned undefined. Keep the v4 contract: empty or whitespace-only input
+  // (and comment-only input, caught below) loads as undefined.
+  if (content.trim() === '') return undefined;
   try {
-    return yaml.load(content, { schema: yaml.DEFAULT_SCHEMA });
+    return yaml.load(content, { schema: yaml.CORE_SCHEMA });
   } catch (err: unknown) {
     if (err instanceof yaml.YAMLException) {
+      if (err.reason?.includes('input is empty')) return undefined;
       const mark = err.mark;
       throw new YamlParseError(
         mark
@@ -46,7 +51,7 @@ export function safeDump(data: unknown): string {
     lineWidth: -1,
     noRefs: true,
     sortKeys: false,
-    quotingType: "'",
+    quoteStyle: 'single',
     forceQuotes: false,
   });
 }

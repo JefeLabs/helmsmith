@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 import { getHomePath } from './home.js';
 
 const DEFAULTS_FILE = 'defaults.yaml';

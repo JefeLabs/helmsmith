@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 import { readDefaults } from '../utils/defaults.js';
 import { type ProjectConfig, ProjectConfigSchema } from './schema.js';
 

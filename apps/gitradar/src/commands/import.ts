@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { input, select } from '@inquirer/prompts';
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 import { detectGitRoot } from '../config/git-root.js';
 import { loadReposRegistry } from '../config/repos-registry.js';
 import { expandTilde } from '../store/paths.js';
@@ -212,7 +212,7 @@ export async function importWorkspace(filePath: string): Promise<void> {
     indent: 2,
     lineWidth: 120,
     noRefs: true,
-    quotingType: '"',
+    quoteStyle: 'double',
   });
 
   const destDir = path.dirname(destination.path);

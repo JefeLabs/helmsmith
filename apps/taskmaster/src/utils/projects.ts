@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 import type { ProjectConfig } from '../config/schema.js';
 import { getRepoTaskmasterHome } from './git.js';
 import { getHomePath, getProjectDir, scaffoldProjectDir } from './home.js';

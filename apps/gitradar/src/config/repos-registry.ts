@@ -1,7 +1,7 @@
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 import { ZodError } from 'zod';
 import { expandTilde } from '../store/paths.js';
 import { type ReposRegistry, ReposRegistrySchema, type WorkspaceRepo } from '../types/schema.js';
@@ -178,7 +178,7 @@ export async function saveReposRegistry(
   const content = yaml.dump(registry, {
     lineWidth: 120,
     noRefs: true,
-    quotingType: '"',
+    quoteStyle: 'double',
   });
   await writeFile(resolved, content, 'utf-8');
 }
