@@ -19,11 +19,19 @@ const KEYS = Object.keys(DEFAULT_CONFIG) as (keyof DaemonConfig)[];
 export function loadConfig(home: string): DaemonConfig {
   const file = configFile(home);
   if (!existsSync(file)) return { ...DEFAULT_CONFIG };
-  const raw = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(file, 'utf8'));
+  } catch (err) {
+    throw new StorybrokrError('INTERNAL', `config.json: invalid JSON (${(err as Error).message})`);
+  }
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new StorybrokrError('INTERNAL', 'config.json: expected a JSON object at the top level');
+  }
   const out: DaemonConfig = { ...DEFAULT_CONFIG };
   for (const key of KEYS) {
     if (!(key in raw)) continue;
-    const value = raw[key];
+    const value = (raw as Record<string, unknown>)[key];
     if (typeof value !== 'number' || !Number.isFinite(value)) {
       throw new StorybrokrError(
         'INTERNAL',

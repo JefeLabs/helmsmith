@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { StorybrokrError } from '../lib/errors.js';
 import { DEFAULT_CONFIG, loadConfig } from './config.js';
 
 describe('loadConfig', () => {
@@ -37,5 +38,50 @@ describe('loadConfig', () => {
     dirs.push(home);
     writeFileSync(join(home, 'config.json'), JSON.stringify({ instanceCap: 'six' }));
     expect(() => loadConfig(home)).toThrow(/instanceCap/);
+  });
+
+  it('rejects malformed JSON with a StorybrokrError', () => {
+    const home = mkdtempSync(join(tmpdir(), 'sb-cfg-'));
+    dirs.push(home);
+    writeFileSync(join(home, 'config.json'), '{ not json');
+    try {
+      loadConfig(home);
+      expect.fail('should have thrown');
+    } catch (e) {
+      const err = e as StorybrokrError;
+      expect(err).toBeInstanceOf(StorybrokrError);
+      expect(err.code).toBe('INTERNAL');
+      expect(err.message).toMatch(/invalid JSON/);
+    }
+  });
+
+  it('rejects non-object JSON with a StorybrokrError', () => {
+    const home = mkdtempSync(join(tmpdir(), 'sb-cfg-'));
+    dirs.push(home);
+    writeFileSync(join(home, 'config.json'), '"just a string"');
+    try {
+      loadConfig(home);
+      expect.fail('should have thrown');
+    } catch (e) {
+      const err = e as StorybrokrError;
+      expect(err).toBeInstanceOf(StorybrokrError);
+      expect(err.code).toBe('INTERNAL');
+      expect(err.message).toMatch(/JSON object/);
+    }
+  });
+
+  it('rejects array JSON with a StorybrokrError', () => {
+    const home = mkdtempSync(join(tmpdir(), 'sb-cfg-'));
+    dirs.push(home);
+    writeFileSync(join(home, 'config.json'), '[1, 2]');
+    try {
+      loadConfig(home);
+      expect.fail('should have thrown');
+    } catch (e) {
+      const err = e as StorybrokrError;
+      expect(err).toBeInstanceOf(StorybrokrError);
+      expect(err.code).toBe('INTERNAL');
+      expect(err.message).toMatch(/JSON object/);
+    }
   });
 });
