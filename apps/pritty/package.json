@@ -29,7 +29,7 @@
     "typecheck": "tsc --noEmit --allowImportingTsExtensions"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.30.1",
+    "@anthropic-ai/sdk": "^0.124.0",
     "@helmsmith/agent-adapter": "workspace:*",
     "@helmsmith/agent-auth": "workspace:*",
     "@helmsmith/cli-kit": "workspace:*",
