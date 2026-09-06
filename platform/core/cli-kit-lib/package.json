@@ -20,12 +20,12 @@
   },
   "peerDependencies": {
     "commander": "^15.0.0",
-    "inquirer": "^12.0.0"
+    "inquirer": "^14.2.1"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
     "commander": "^15.0.0",
-    "inquirer": "^12.11.1",
+    "inquirer": "^14.2.1",
     "tsup": "^8.5.1",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"
