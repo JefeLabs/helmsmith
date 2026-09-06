@@ -1,8 +1,9 @@
 // src/server/broker.test.ts
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { configDirFor, instanceId } from '../lib/instance.js';
 import { commandSpawner, type Spawner } from '../lib/spawn.js';
 import type { HostInfo } from '../types.js';
 import { Broker } from './broker.js';
@@ -48,6 +49,29 @@ function fakeSpawner(): Spawner {
   return {
     spawn(host: HostInfo, configDir: string, port: number) {
       const inner = commandSpawner(process.execPath, ['-e', FAKE_SB]);
+      process.env.SB_PORT = String(port);
+      return inner.spawn(host, configDir, port);
+    },
+  };
+}
+
+/** Like FAKE_SB, but only starts listening (and printing the banner) after 1500 ms. */
+const SLOW_FAKE_SB = `
+const http = require('node:http');
+const port = Number(process.env.SB_PORT);
+setTimeout(() => {
+  http.createServer((req, res) => {
+    if (req.url === '/index.json') { res.writeHead(200, {'content-type': 'application/json'}); res.end(JSON.stringify({ v: 5, entries: {} })); }
+    else { res.writeHead(200); res.end('<html></html>'); }
+  }).listen(port, '127.0.0.1', () => console.log('  - Local:   http://localhost:' + port + '/'));
+}, 1500);
+setInterval(() => {}, 1000);
+`;
+
+function slowFakeSpawner(): Spawner {
+  return {
+    spawn(host: HostInfo, configDir: string, port: number) {
+      const inner = commandSpawner(process.execPath, ['-e', SLOW_FAKE_SB]);
       process.env.SB_PORT = String(port);
       return inner.spawn(host, configDir, port);
     },
@@ -140,5 +164,111 @@ describe('Broker', () => {
       code: 'BOOT_FAILED',
     });
     expect(broker.list()[0]).toMatchObject({ status: 'failed', error: { code: 'BOOT_FAILED' } });
+  });
+
+  it('serializes two concurrent up() calls for the same new component into one spawn', async () => {
+    const host = fakeHost();
+    dirs.push(host);
+    const home = mkdtempSync(join(tmpdir(), 'sb-home-'));
+    dirs.push(home);
+    const config = {
+      ...DEFAULT_CONFIG,
+      portRangeStart: 6162,
+      portRangeEnd: 6163,
+      readinessTimeoutMs: 10_000,
+    };
+    const registry = new Registry({ home, config });
+    let spawnCount = 0;
+    const base = fakeSpawner();
+    const countingSpawner: Spawner = {
+      spawn(hostInfo: HostInfo, configDir: string, port: number) {
+        spawnCount += 1;
+        return base.spawn(hostInfo, configDir, port);
+      },
+    };
+    const broker = new Broker({ registry, spawner: countingSpawner, config });
+    brokers.push(broker);
+
+    const [first, second] = await Promise.all([
+      broker.up({ component: 'src/Button', hostRoot: host }),
+      broker.up({ component: 'src/Button', hostRoot: host }),
+    ]);
+
+    expect(spawnCount).toBe(1);
+    expect(first.record.id).toBe(second.record.id);
+    expect([first.created, second.created].filter(Boolean)).toHaveLength(1);
+    expect(broker.list()).toHaveLength(1);
+    expect(registry.portsInUse().size).toBe(1);
+  });
+
+  it('touch resolves a component path to its record and returns it by id', async () => {
+    const host = fakeHost();
+    dirs.push(host);
+    const { broker } = make({ portRangeStart: 6164, portRangeEnd: 6165 });
+    const { record } = await broker.up({ component: 'src/Button', hostRoot: host });
+    const touched = broker.touch('src/Button');
+    expect(touched.id).toBe(record.id);
+  });
+
+  it('reading logs refreshes lastTouchedAt', async () => {
+    const host = fakeHost();
+    dirs.push(host);
+    let now = new Date();
+    const { broker } = make({ portRangeStart: 6166, portRangeEnd: 6167 }, () => now);
+    const { record } = await broker.up({ component: 'src/Button', hostRoot: host });
+    now = new Date(now.getTime() + 5 * 60_000);
+    broker.logs(record.id);
+    expect(broker.get(record.id).lastTouchedAt).toBe(now.toISOString());
+  });
+
+  it('normalizes component paths (./ prefix, absolute) and rejects paths outside the host', async () => {
+    const host = fakeHost();
+    dirs.push(host);
+    const { broker } = make({ portRangeStart: 6168, portRangeEnd: 6169 });
+    const first = await broker.up({ component: 'src/Button', hostRoot: host });
+    const second = await broker.up({ component: './src/Button/', hostRoot: host });
+    const third = await broker.up({ component: join(host, 'src/Button'), hostRoot: host });
+    expect(second.created).toBe(false);
+    expect(second.record.id).toBe(first.record.id);
+    expect(third.created).toBe(false);
+    expect(third.record.id).toBe(first.record.id);
+    await expect(broker.up({ component: '../outside', hostRoot: host })).rejects.toMatchObject({
+      code: 'COMPONENT_NOT_FOUND',
+    });
+  });
+
+  it('down before readiness reports BOOT_FAILED rather than INSTANCE_NOT_FOUND', async () => {
+    const host = fakeHost();
+    dirs.push(host);
+    const home = mkdtempSync(join(tmpdir(), 'sb-home-'));
+    dirs.push(home);
+    const config = {
+      ...DEFAULT_CONFIG,
+      portRangeStart: 6170,
+      portRangeEnd: 6171,
+      readinessTimeoutMs: 10_000,
+    };
+    const registry = new Registry({ home, config });
+    const broker = new Broker({ registry, spawner: slowFakeSpawner(), config });
+    brokers.push(broker);
+
+    const id = instanceId(host, 'src/Button');
+    const p = broker.up({ component: 'src/Button', hostRoot: host });
+    await new Promise((r) => setTimeout(r, 200));
+    await broker.down(id);
+
+    await expect(p).rejects.toMatchObject({ code: 'BOOT_FAILED' });
+    expect(broker.list()).toEqual([]);
+  });
+
+  it('enforces the instance cap before writing any config dir for the request that would exceed it', async () => {
+    const host = fakeHost();
+    dirs.push(host);
+    const { broker } = make({ instanceCap: 1, portRangeStart: 6172, portRangeEnd: 6173 });
+    await broker.up({ component: 'src/Button', hostRoot: host });
+    await expect(broker.up({ component: 'src/Icon', hostRoot: host })).rejects.toMatchObject({
+      code: 'INSTANCE_CAP_REACHED',
+    });
+    expect(existsSync(configDirFor(host, instanceId(host, 'src/Icon')))).toBe(false);
   });
 });

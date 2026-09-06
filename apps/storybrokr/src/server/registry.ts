@@ -52,14 +52,19 @@ export class Registry {
     throw new StorybrokrError('INSTANCE_NOT_FOUND', `no instance matches ${idOrPath}`);
   }
 
-  add(record: InstanceRecord): void {
+  /** Throws INSTANCE_CAP_REACHED when active (starting+ready) count is already at the cap. */
+  assertCapacity(): void {
     const active = this.list().filter((r) => ACTIVE.has(r.status)).length;
-    if (ACTIVE.has(record.status) && active >= this.config.instanceCap) {
+    if (active >= this.config.instanceCap) {
       throw new StorybrokrError(
         'INSTANCE_CAP_REACHED',
         `instance cap of ${this.config.instanceCap} reached; run \`storybrokr down\` on one first`,
       );
     }
+  }
+
+  add(record: InstanceRecord): void {
+    if (ACTIVE.has(record.status)) this.assertCapacity();
     this.byId.set(record.id, record);
     this.save();
   }

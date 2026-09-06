@@ -1,3 +1,4 @@
+import { isAbsolute, relative, resolve } from 'node:path';
 import { discoverStories } from '../lib/discover.js';
 import { StorybrokrError, toErrorBody } from '../lib/errors.js';
 import { inspectHost as defaultInspect, resolveHost } from '../lib/host.js';
@@ -34,6 +35,22 @@ function isAlive(pid: number | null): boolean {
   }
 }
 
+/** Resolve `component` (relative, `./`-prefixed, or absolute) to a path relative to hostRoot. */
+function normalizeComponent(hostRoot: string, component: string): string {
+  const abs = isAbsolute(component) ? component : resolve(hostRoot, component);
+  const rel = relative(hostRoot, abs).split('\\').join('/');
+  if (rel === '' || rel === '.') {
+    throw new StorybrokrError(
+      'COMPONENT_NOT_FOUND',
+      'component must name a path inside the host root',
+    );
+  }
+  if (rel.startsWith('..')) {
+    throw new StorybrokrError('COMPONENT_NOT_FOUND', `${component} is outside ${hostRoot}`);
+  }
+  return rel;
+}
+
 export class Broker {
   private readonly registry: Registry;
   private readonly spawner: Spawner;
@@ -41,6 +58,10 @@ export class Broker {
   private now: () => Date;
   private readonly inspect: typeof defaultInspect;
   private readonly procs = new Map<string, SpawnedProcess>();
+  private readonly pending = new Map<string, Promise<void>>();
+  /** In-flight `up` creations, keyed by instance id — closes the race between two concurrent
+   * `up` calls for the same new component before either has written a registry record. */
+  private readonly inflight = new Map<string, Promise<InstanceRecord>>();
 
   constructor(opts: BrokerOptions) {
     this.registry = opts.registry;
@@ -61,17 +82,21 @@ export class Broker {
   }
 
   touch(id: string): InstanceRecord {
-    this.registry.touch(this.registry.resolve(id).id);
-    return this.registry.get(id) as InstanceRecord;
+    const r = this.registry.resolve(id);
+    this.registry.touch(r.id);
+    return this.registry.get(r.id) as InstanceRecord;
   }
 
   logs(idOrPath: string, tail = 200): string[] {
     const r = this.registry.resolve(idOrPath);
+    this.registry.touch(r.id);
     return this.procs.get(r.id)?.log.tail(tail) ?? [];
   }
 
   logStream(idOrPath: string): LogBuffer | undefined {
-    return this.procs.get(this.registry.resolve(idOrPath).id)?.log;
+    const r = this.registry.resolve(idOrPath);
+    this.registry.touch(r.id);
+    return this.procs.get(r.id)?.log;
   }
 
   inspectHost(path: string): HostInfo {
@@ -79,8 +104,10 @@ export class Broker {
   }
 
   async up(req: UpRequest): Promise<{ record: InstanceRecord; created: boolean }> {
-    const host = req.hostRoot ? this.inspect(req.hostRoot) : resolveHost(req.component);
-    const component = req.component.replace(/\/+$/, '');
+    const host = req.hostRoot ? this.inspect(resolve(req.hostRoot)) : resolveHost(req.component);
+    const component = normalizeComponent(host.hostRoot, req.component);
+    const id = instanceId(host.hostRoot, component);
+
     const existing = this.registry.find(host.hostRoot, component);
     if (existing && (existing.status === 'ready' || existing.status === 'starting')) {
       this.registry.touch(existing.id);
@@ -89,58 +116,85 @@ export class Broker {
     }
     if (existing) this.registry.remove(existing.id);
 
-    const discovery = discoverStories(host.hostRoot, component, host.tsconfigPaths);
-    const id = instanceId(host.hostRoot, component);
-    const port = await findFreePort(
-      this.config.portRangeStart,
-      this.config.portRangeEnd,
-      this.registry.portsInUse(),
-    );
-    const configDir = generateConfigDir(host, id, discovery.storyFiles);
-    const nowIso = this.now().toISOString();
-    const record: InstanceRecord = {
-      id,
-      hostRoot: host.hostRoot,
-      component,
-      framework: host.framework,
-      port,
-      url: `http://127.0.0.1:${port}`,
-      pid: null,
-      status: 'starting',
-      createdAt: nowIso,
-      lastTouchedAt: nowIso,
-      ttlMinutes: req.ttlMinutes ?? this.config.ttlMinutes,
-      storyFiles: discovery.storyFiles,
-      stories: [],
-      configDir,
-    };
-    this.registry.add(record);
-    writeSidecar(configDir, record);
-
-    const proc = this.spawner.spawn(host, configDir, port);
-    this.procs.set(id, proc);
-    this.registry.update(id, { pid: proc.pid });
-    proc.exited.then((code) => {
-      const current = this.registry.get(id);
-      if (current && current.status === 'ready') {
-        this.registry.update(id, {
-          status: 'failed',
-          exitCode: code,
-          error: { code: 'BOOT_FAILED', message: `storybook exited with code ${code}` },
-        });
-      }
-    });
-
-    const readiness = this.watchReadiness(id, proc);
-    if (req.wait === false) {
-      readiness.catch(() => {});
-      return { record: this.registry.get(id) as InstanceRecord, created: true };
+    const running = this.inflight.get(id);
+    if (running) {
+      if (req.wait !== false) await running;
+      return { record: this.registry.get(id) as InstanceRecord, created: false };
     }
-    await readiness;
+
+    const creation = this.createInstance(host, component, id, req);
+    this.inflight.set(id, creation);
+    if (req.wait === false) {
+      creation.catch(() => {});
+    } else {
+      await creation;
+    }
     return { record: this.registry.get(id) as InstanceRecord, created: true };
   }
 
-  private readonly pending = new Map<string, Promise<void>>();
+  /** Cap check → discover → port → config dir → add → sidecar → spawn → readiness, as one
+   * unit tracked in `inflight` so a concurrent `up` for the same id can await it instead of
+   * repeating the work. */
+  private async createInstance(
+    host: HostInfo,
+    component: string,
+    id: string,
+    req: UpRequest,
+  ): Promise<InstanceRecord> {
+    try {
+      const activeCount = this.registry
+        .list()
+        .filter((r) => r.status === 'starting' || r.status === 'ready').length;
+      if (activeCount >= this.config.instanceCap) await this.reapIdle();
+      this.registry.assertCapacity();
+
+      const discovery = discoverStories(host.hostRoot, component, host.tsconfigPaths);
+      const port = await findFreePort(
+        this.config.portRangeStart,
+        this.config.portRangeEnd,
+        this.registry.portsInUse(),
+      );
+      const configDir = generateConfigDir(host, id, discovery.storyFiles);
+      const nowIso = this.now().toISOString();
+      const record: InstanceRecord = {
+        id,
+        hostRoot: host.hostRoot,
+        component,
+        framework: host.framework,
+        port,
+        url: `http://127.0.0.1:${port}`,
+        pid: null,
+        status: 'starting',
+        createdAt: nowIso,
+        lastTouchedAt: nowIso,
+        ttlMinutes: req.ttlMinutes ?? this.config.ttlMinutes,
+        storyFiles: discovery.storyFiles,
+        stories: [],
+        configDir,
+      };
+      this.registry.add(record);
+      writeSidecar(configDir, record);
+
+      const proc = this.spawner.spawn(host, configDir, port);
+      this.procs.set(id, proc);
+      this.registry.update(id, { pid: proc.pid });
+      proc.exited.then((code) => {
+        const current = this.registry.get(id);
+        if (current && current.status === 'ready') {
+          this.registry.update(id, {
+            status: 'failed',
+            exitCode: code,
+            error: { code: 'BOOT_FAILED', message: `storybook exited with code ${code}` },
+          });
+        }
+      });
+
+      await this.watchReadiness(id, proc);
+      return this.registry.get(id) as InstanceRecord;
+    } finally {
+      this.inflight.delete(id);
+    }
+  }
 
   private watchReadiness(id: string, proc: SpawnedProcess): Promise<void> {
     const record = this.registry.get(id) as InstanceRecord;
@@ -151,16 +205,20 @@ export class Broker {
       timeoutMs: this.config.readinessTimeoutMs,
     })
       .then((stories) => {
-        const updated = this.registry.update(id, {
-          status: 'ready',
-          stories,
-          lastTouchedAt: this.now().toISOString(),
-        });
-        writeSidecar(record.configDir, updated);
+        if (this.registry.get(id)) {
+          const updated = this.registry.update(id, {
+            status: 'ready',
+            stories,
+            lastTouchedAt: this.now().toISOString(),
+          });
+          writeSidecar(record.configDir, updated);
+        }
       })
       .catch((err: unknown) => {
         const body = toErrorBody(err);
-        this.registry.update(id, { status: 'failed', error: body });
+        if (this.registry.get(id)) {
+          this.registry.update(id, { status: 'failed', error: body });
+        }
         void proc.kill();
         throw err;
       })
@@ -194,13 +252,13 @@ export class Broker {
       }
     }
     this.procs.delete(r.id);
-    this.registry.update(r.id, { status: 'stopped' });
+    if (this.registry.get(r.id)) this.registry.update(r.id, { status: 'stopped' });
     try {
       removeConfigDir(r.configDir);
     } catch {
       // the host may have been deleted; nothing to clean
     }
-    this.registry.remove(r.id);
+    if (this.registry.get(r.id)) this.registry.remove(r.id);
   }
 
   /** Stop ready instances idle past their TTL; returns what was stopped. */
