@@ -36,7 +36,7 @@
     "commander": "^15.0.0",
     "discord.js": "^14.27.0",
     "react": "^19.2.8",
-    "zod": "^3.25.76"
+    "zod": "^4.5.4"
   },
   "optionalDependencies": {
     "@aws-sdk/client-dynamodb": "^3.1127.0",
