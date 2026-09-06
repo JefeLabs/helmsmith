@@ -1,10 +1,12 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { basename, extname, join, relative } from 'node:path';
+import { basename, dirname, extname, join, relative } from 'node:path';
 import type { HostInfo, InstanceRecord } from '../types.js';
 import { StorybrokrError } from './errors.js';
 
 export const SIDECAR = 'storybrokr.json';
+
+const ID_RE = /^[0-9a-f]{12}$/;
 
 export function instanceId(hostRoot: string, component: string): string {
   return createHash('sha256').update(`${hostRoot}\n${component}`).digest('hex').slice(0, 12);
@@ -59,7 +61,19 @@ export { default } from ${JSON.stringify(target)};
 `;
 }
 
+function isCacheConfigDir(dir: string): boolean {
+  return (
+    ID_RE.test(basename(dir)) &&
+    basename(dirname(dir)) === 'storybrokr' &&
+    basename(dirname(dirname(dir))) === '.cache' &&
+    basename(dirname(dirname(dirname(dir)))) === 'node_modules'
+  );
+}
+
 export function generateConfigDir(host: HostInfo, id: string, storyFiles: string[]): string {
+  if (!ID_RE.test(id)) {
+    throw new StorybrokrError('INTERNAL', `invalid instance id ${JSON.stringify(id)}`);
+  }
   const dir = configDirFor(host.hostRoot, id);
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
@@ -101,10 +115,10 @@ export function readSidecars(hostRoot: string): InstanceRecord[] {
 }
 
 export function removeConfigDir(configDir: string): void {
-  if (basename(join(configDir, '..')) !== 'storybrokr') {
+  if (!isCacheConfigDir(configDir)) {
     throw new StorybrokrError(
       'INTERNAL',
-      `refusing to remove ${configDir}: not under a storybrokr cache dir`,
+      `refusing to remove ${configDir}: not a storybrokr cache dir`,
     );
   }
   rmSync(configDir, { recursive: true, force: true });

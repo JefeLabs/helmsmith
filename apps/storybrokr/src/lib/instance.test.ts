@@ -104,4 +104,35 @@ describe('instance config dir', () => {
     expect(existsSync(dir)).toBe(false);
     expect(readSidecars(host.hostRoot)).toEqual([]);
   });
+
+  it('rejects path-traversal ids in generateConfigDir and creates nothing', () => {
+    const host = fakeHost();
+    roots.push(host.hostRoot);
+    const cacheDir = join(host.hostRoot, 'node_modules', '.cache', 'storybrokr');
+    try {
+      generateConfigDir(host, '../../evil', ['src/A.stories.tsx']);
+      expect.fail('should throw StorybrokrError');
+    } catch (err: unknown) {
+      expect(err).toBeInstanceOf(Error);
+      expect((err as Error & { code?: string }).code).toBe('INTERNAL');
+      expect((err as Error).message).toMatch(/invalid instance id/);
+    }
+    expect(existsSync(cacheDir)).toBe(false);
+  });
+
+  it('rejects removal outside node_modules/.cache/storybrokr structure', () => {
+    const fakeRoot = mkdtempSync(join(tmpdir(), 'sb-rmtest-'));
+    roots.push(fakeRoot);
+    const fakeCacheDir = join(fakeRoot, 'storybrokr', 'abc123abc123');
+    mkdirSync(fakeCacheDir, { recursive: true });
+    try {
+      removeConfigDir(fakeCacheDir);
+      expect.fail('should throw StorybrokrError');
+    } catch (err: unknown) {
+      expect(err).toBeInstanceOf(Error);
+      expect((err as Error & { code?: string }).code).toBe('INTERNAL');
+      expect((err as Error).message).toMatch(/not a storybrokr cache dir/);
+    }
+    expect(existsSync(fakeCacheDir)).toBe(true);
+  });
 });
