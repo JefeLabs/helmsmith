@@ -36,14 +36,14 @@
     "@helmsmith/cli-kit": "workspace:*",
     "@helmsmith/skillzkit-types": "workspace:*",
     "@helmsmith/tui-view-components": "workspace:*",
-    "@opentui/core": "^0.2.16",
-    "@opentui/react": "^0.2.16",
+    "@opentui/core": "^0.5.10",
+    "@opentui/react": "^0.5.10",
     "bun": "^1.4.2",
     "commander": "^14.0.3",
     "gray-matter": "^4.0.3",
     "hono": "^4.13.7",
     "react": "^19.2.8",
-    "react-reconciler": "^0.32.0"
+    "react-reconciler": "^0.33.0"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
