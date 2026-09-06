@@ -1,8 +1,7 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  // src/server/start.ts joins this list once it exists (Task 12).
-  entry: ['src/cli.ts'],
+  entry: ['src/cli.ts', 'src/server/start.ts'],
   format: ['esm'],
   target: 'es2022',
   clean: true,
