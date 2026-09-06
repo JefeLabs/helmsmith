@@ -15,7 +15,7 @@
 # Use node:24 as the base because we need both pnpm (via corepack, for
 # workspace install) AND bun (for the bundle step). oven/bun:1 ships
 # only bun; node:24 ships node + corepack + apt for installing bun.
-FROM node:24-bookworm-slim AS bun-bundler
+FROM node:24-trixie-slim AS bun-bundler
 
 WORKDIR /repo
 

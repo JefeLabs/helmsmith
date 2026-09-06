@@ -16,7 +16,7 @@
 #                        resource handler); API at /api/.
 
 # ── Stage 1: build UI ────────────────────────────────────────────────
-FROM node:24-bookworm-slim AS ui-builder
+FROM node:24-trixie-slim AS ui-builder
 
 WORKDIR /repo
 

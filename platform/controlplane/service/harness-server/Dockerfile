@@ -15,7 +15,7 @@
 # has no neo4j requirement, so we don't carry the neo4j base.
 
 # ── Stage 1: bun bundler ─────────────────────────────────────────────
-FROM node:24-bookworm-slim AS bun-bundler
+FROM node:24-trixie-slim AS bun-bundler
 
 WORKDIR /repo
 
@@ -30,13 +30,14 @@ ENV PATH="/root/.bun/bin:${PATH}"
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 # Workspace dep graph for the launcher:
 #   harness-server
-#     ├ harness-core
+#     ├ harness-core (→ flow-spec, in platform/harness/flow-spec/)
 #     ├ harness-pipeline (lives in platform/harness/harness-pipeline-cli/)
 #     ├ agent-adapter (in platform/core/agent-adapter-lib/)
 #     └ agent-auth     (in platform/core/agent-auth-lib/)
 COPY platform/harness/harness-server/package.json       ./platform/harness/harness-server/
 COPY platform/harness/harness-core/package.json         ./platform/harness/harness-core/
 COPY platform/harness/harness-pipeline-cli/package.json ./platform/harness/harness-pipeline-cli/
+COPY platform/harness/flow-spec/package.json            ./platform/harness/flow-spec/
 COPY platform/core/agent-adapter-lib/package.json    ./platform/core/agent-adapter-lib/
 COPY platform/core/agent-auth-lib/package.json       ./platform/core/agent-auth-lib/
 
@@ -50,6 +51,7 @@ RUN pnpm install \
 COPY platform/harness/harness-server       ./platform/harness/harness-server
 COPY platform/harness/harness-core         ./platform/harness/harness-core
 COPY platform/harness/harness-pipeline-cli ./platform/harness/harness-pipeline-cli
+COPY platform/harness/flow-spec            ./platform/harness/flow-spec
 COPY platform/core/agent-adapter-lib    ./platform/core/agent-adapter-lib
 COPY platform/core/agent-auth-lib       ./platform/core/agent-auth-lib
 
@@ -65,7 +67,7 @@ FROM oven/bun:1 AS bun-bin
 # ── Stage 3: runtime ─────────────────────────────────────────────────
 # Debian slim + tini + bun + the launcher bundle. Smaller than neo4j:5
 # since the harness has no graph-DB requirement.
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         tini ca-certificates wget \
