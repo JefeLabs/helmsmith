@@ -70,12 +70,12 @@ jobs:
         # packages — that resolves from pnpm-workspace.yaml alone, so no
         # `pnpm install` is needed here. Keeps the gate under a minute.
         # Third-party action: SHA-pinned (supply chain) — bump via Dependabot.
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
 
       - name: Detect changed packages
         id: check
@@ -103,12 +103,12 @@ jobs:
       - name: Setup pnpm
         # Pins to the packageManager field via corepack — same as ci.yml.
         # Third-party action: SHA-pinned (supply chain) — bump via Dependabot.
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
           # Writes an .npmrc wired to NODE_AUTH_TOKEN — this is what lets
           # `changeset publish` authenticate as the org automation token.
@@ -118,7 +118,7 @@ jobs:
         # Some workspace build scripts compile via bun (same reason CI
         # installs it); `pnpm -r run build` needs it on PATH.
         # Third-party action: SHA-pinned (supply chain) — bump via Dependabot.
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

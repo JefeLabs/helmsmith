@@ -13,7 +13,7 @@
     "docs"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && tsc -p tsconfig.json --noEmit false --emitDeclarationOnly --declaration --outDir dist",
     "dev": "tsx src/cli.ts",
     "test": "vitest run && bun run test:bun",
     "test:bun": "bun test src/__tests__/sqlite-store.test.ts src/__tests__/functional.test.ts && bun test src/__tests__/sqlite-active-days.test.ts && bun test src/__tests__/sqlite-scorecard.test.ts",
@@ -34,25 +34,24 @@
   "dependencies": {
     "@helmsmith/cli-kit": "workspace:*",
     "@helmsmith/tui-view-components": "workspace:*",
-    "@inquirer/prompts": "^8.2.0",
-    "bun": "^1.3.13",
-    "chalk": "^5.6.2",
-    "commander": "^14.0.3",
-    "js-yaml": "^4.1.1",
-    "octokit": "^4.0.2",
-    "ora": "^8.1.0",
-    "p-limit": "^7.3.0",
-    "simple-git": "^3.27.0",
-    "zod": "^4.3.6"
+    "@inquirer/prompts": "^8.7.1",
+    "bun": "^1.4.2",
+    "chalk": "^6.0.0",
+    "commander": "^15.0.0",
+    "js-yaml": "^5.4.1",
+    "octokit": "^5.0.5",
+    "ora": "^9.4.1",
+    "p-limit": "^7.3.2",
+    "simple-git": "^3.36.0",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
-    "@types/bun": "^1.3.13",
-    "@types/js-yaml": "^4.0.9",
-    "@types/node": "^25.2.3",
+    "@types/bun": "^1.4.1",
+    "@types/node": "^24.13.3",
     "tsup": "^8.5.1",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.18"
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
   },
   "publishConfig": {
     "access": "public"

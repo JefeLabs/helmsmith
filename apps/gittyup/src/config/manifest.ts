@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 import { detectGitRoot, getRepoConfigHome } from '../utils/git.js';
 import type { ConfigLocation, ResolvedConfig } from '../utils/location.js';
 import { APP_CONFIG_DIR, APP_NAME, APP_REPO_URL, MANIFEST_FILENAME } from './branding.js';

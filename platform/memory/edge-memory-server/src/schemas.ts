@@ -187,12 +187,12 @@ export const InspectResultSchema = z.object({
     unconfirmed: z.number(),
   }),
   byScope: z.object({
-    jobIds: z.record(z.number()),
-    productIds: z.record(z.number()),
-    userIds: z.record(z.number()),
-    sessionIds: z.record(z.number()),
-    organizationIds: z.record(z.number()),
-    topics: z.record(z.number()),
+    jobIds: z.record(z.string(), z.number()),
+    productIds: z.record(z.string(), z.number()),
+    userIds: z.record(z.string(), z.number()),
+    sessionIds: z.record(z.string(), z.number()),
+    organizationIds: z.record(z.string(), z.number()),
+    topics: z.record(z.string(), z.number()),
   }),
   lineage: z.array(z.any()).optional(),
 });

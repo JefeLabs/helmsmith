@@ -1,22 +1,7 @@
-import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Code,
-  Divider,
-  Input,
-  Spinner,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableHeader,
-  TableRow,
-} from '@heroui/react';
+import { Button, Card, Separator, Table } from '@heroui/react';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Bar,
   BarChart,
@@ -27,6 +12,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { Code, LoadingSpinner, TextInput } from '../components/ui';
 import { BenchmarkRunSummary, benchmarks } from '../lib/api';
 
 /**
@@ -63,41 +49,42 @@ export default function BenchmarksPage() {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader className="flex flex-col gap-1 items-start">
-          <p className="text-md font-semibold">Benchmark compare</p>
-          <p className="text-sm text-default-500">
-            Paste comma-separated run IDs (returned by <Code size="sm">workspace bench run</Code>);
+        <Card.Header className="flex flex-col gap-1 items-start">
+          <p className="text-base font-semibold">Benchmark compare</p>
+          <p className="text-sm text-muted">
+            Paste comma-separated run IDs (returned by <Code>workspace bench run</Code>);
             auto-refresh every 5s.
           </p>
-        </CardHeader>
-        <Divider />
-        <CardBody className="flex flex-row gap-2 items-end">
-          <Input
+        </Card.Header>
+        <Separator />
+        <Card.Content className="flex flex-row gap-2 items-end">
+          <TextInput
             label="Run IDs"
             placeholder="run-abc,run-def"
             value={draft}
             onValueChange={setDraft}
+            className="flex-1"
             onKeyDown={(e) => {
               if (e.key === 'Enter') applyDraft();
             }}
           />
-          <Button color="primary" onPress={applyDraft} isDisabled={!draft.trim()}>
+          <Button variant="primary" onPress={applyDraft} isDisabled={!draft.trim()}>
             Compare
           </Button>
-          <Button variant="flat" onPress={() => refetch()} isDisabled={runIds.length === 0}>
+          <Button variant="secondary" onPress={() => refetch()} isDisabled={runIds.length === 0}>
             Refresh
           </Button>
-        </CardBody>
+        </Card.Content>
       </Card>
 
-      {isPending && runIds.length > 0 && <Spinner label="Loading benchmark data…" />}
+      {isPending && runIds.length > 0 && <LoadingSpinner label="Loading benchmark data…" />}
       {error && <Code color="danger">{String(error)}</Code>}
       {data && data.length > 0 && <CompareView rows={data} />}
       {data && data.length === 0 && (
         <Card>
-          <CardBody>
-            <p className="text-default-500">No matching runs found.</p>
-          </CardBody>
+          <Card.Content>
+            <p className="text-muted">No matching runs found.</p>
+          </Card.Content>
         </Card>
       )}
     </div>
@@ -105,6 +92,7 @@ export default function BenchmarksPage() {
 }
 
 function CompareView({ rows }: { rows: BenchmarkRunSummary[] }) {
+  const navigate = useNavigate();
   // Color cycle for the bars per run — Hero UI's Tailwind palette.
   const colors = ['#6366f1', '#22c55e', '#f59e0b', '#ec4899', '#0ea5e9'];
 
@@ -151,9 +139,9 @@ function CompareView({ rows }: { rows: BenchmarkRunSummary[] }) {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {rows.map((r, idx) => (
           <Card key={r.runId}>
-            <CardHeader className="flex justify-between items-start gap-2">
+            <Card.Header className="flex flex-row justify-between items-start gap-2">
               <div className="flex flex-col items-start gap-0">
-                <Code size="sm" className="text-xs">
+                <Code className="text-xs">
                   {r.runId.length > 24 ? `${r.runId.slice(0, 24)}…` : r.runId}
                 </Code>
                 <p
@@ -164,16 +152,15 @@ function CompareView({ rows }: { rows: BenchmarkRunSummary[] }) {
                 </p>
               </div>
               <Button
-                as={Link}
-                to={`/benchmarks/${encodeURIComponent(r.runId)}`}
                 size="sm"
-                variant="flat"
+                variant="secondary"
+                onPress={() => navigate(`/benchmarks/${encodeURIComponent(r.runId)}`)}
               >
                 View jobs →
               </Button>
-            </CardHeader>
-            <Divider />
-            <CardBody className="space-y-1 text-sm">
+            </Card.Header>
+            <Separator />
+            <Card.Content className="space-y-1 text-sm">
               <Row label="total" value={r.total} />
               <Row
                 label="completed"
@@ -181,15 +168,15 @@ function CompareView({ rows }: { rows: BenchmarkRunSummary[] }) {
               />
               <Row label="failed" value={r.failed} />
               <Row label="in-flight" value={r.inFlight} />
-              <Divider className="my-1" />
+              <Separator className="my-1" />
               <Row label="p50 latency" value={`${r.p50LatencyMs} ms`} />
               <Row label="p95 latency" value={`${r.p95LatencyMs} ms`} />
-              <Divider className="my-1" />
+              <Separator className="my-1" />
               <Row label="scored" value={`${r.scored} / ${r.total}`} />
               <Row label="avg score" value={r.avgScore != null ? r.avgScore.toFixed(3) : '—'} />
               {r.estimated > 0 && (
                 <>
-                  <Divider className="my-1" />
+                  <Separator className="my-1" />
                   <Row label="estimated" value={`${r.estimated} / ${r.total}`} />
                   <Row
                     label="MAE (pts)"
@@ -198,18 +185,18 @@ function CompareView({ rows }: { rows: BenchmarkRunSummary[] }) {
                   <Row label="bias (pts)" value={r.bias != null ? formatBias(r.bias) : '—'} />
                 </>
               )}
-            </CardBody>
+            </Card.Content>
           </Card>
         ))}
       </div>
 
       {/* Quality chart */}
       <Card>
-        <CardHeader>
-          <p className="text-md">Quality</p>
-        </CardHeader>
-        <Divider />
-        <CardBody style={{ height: 280 }}>
+        <Card.Header>
+          <p className="text-base">Quality</p>
+        </Card.Header>
+        <Separator />
+        <Card.Content style={{ height: 280 }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={metricChart}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
@@ -222,16 +209,16 @@ function CompareView({ rows }: { rows: BenchmarkRunSummary[] }) {
               ))}
             </BarChart>
           </ResponsiveContainer>
-        </CardBody>
+        </Card.Content>
       </Card>
 
       {/* Latency chart */}
       <Card>
-        <CardHeader>
-          <p className="text-md">Latency</p>
-        </CardHeader>
-        <Divider />
-        <CardBody style={{ height: 280 }}>
+        <Card.Header>
+          <p className="text-base">Latency</p>
+        </Card.Header>
+        <Separator />
+        <Card.Content style={{ height: 280 }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={latencyChart}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
@@ -244,23 +231,22 @@ function CompareView({ rows }: { rows: BenchmarkRunSummary[] }) {
               ))}
             </BarChart>
           </ResponsiveContainer>
-        </CardBody>
+        </Card.Content>
       </Card>
 
       {/* Estimation chart — only when there's something to plot. */}
       {anyEstimated && (
         <Card>
-          <CardHeader className="flex flex-col gap-1 items-start">
-            <p className="text-md">Estimation accuracy</p>
-            <p className="text-xs text-default-500">
-              <Code size="sm">MAE</Code> = mean(|actual − estimated|) — lower is better.{' '}
-              <Code size="sm">bias</Code> = mean(actual − estimated) — positive means consistently
-              under-estimating; negative means over-estimating; near zero means estimates are
-              well-calibrated.
+          <Card.Header className="flex flex-col gap-1 items-start">
+            <p className="text-base">Estimation accuracy</p>
+            <p className="text-xs text-muted">
+              <Code>MAE</Code> = mean(|actual − estimated|) — lower is better. <Code>bias</Code> =
+              mean(actual − estimated) — positive means consistently under-estimating; negative
+              means over-estimating; near zero means estimates are well-calibrated.
             </p>
-          </CardHeader>
-          <Divider />
-          <CardBody style={{ height: 280 }}>
+          </Card.Header>
+          <Separator />
+          <Card.Content style={{ height: 280 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={estimationChart}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
@@ -273,58 +259,64 @@ function CompareView({ rows }: { rows: BenchmarkRunSummary[] }) {
                 ))}
               </BarChart>
             </ResponsiveContainer>
-          </CardBody>
+          </Card.Content>
         </Card>
       )}
 
       {/* Detail table */}
       <Card>
-        <CardHeader>
-          <p className="text-md">All metrics</p>
-        </CardHeader>
-        <Divider />
-        <CardBody>
-          <Table aria-label="Benchmark runs">
-            <TableHeader>
-              <TableColumn>runId</TableColumn>
-              <TableColumn>label</TableColumn>
-              <TableColumn>total</TableColumn>
-              <TableColumn>completed</TableColumn>
-              <TableColumn>failed</TableColumn>
-              <TableColumn>in-flight</TableColumn>
-              <TableColumn>p50ms</TableColumn>
-              <TableColumn>p95ms</TableColumn>
-              <TableColumn>success</TableColumn>
-              <TableColumn>scored</TableColumn>
-              <TableColumn>avgScore</TableColumn>
-              <TableColumn>est</TableColumn>
-              <TableColumn>MAE</TableColumn>
-              <TableColumn>bias</TableColumn>
-            </TableHeader>
-            <TableBody>
-              {rows.map((r) => (
-                <TableRow key={r.runId}>
-                  <TableCell>
-                    <Code size="sm">{r.runId.slice(0, 12)}…</Code>
-                  </TableCell>
-                  <TableCell>{r.label ?? '—'}</TableCell>
-                  <TableCell>{r.total}</TableCell>
-                  <TableCell>{r.completed}</TableCell>
-                  <TableCell>{r.failed}</TableCell>
-                  <TableCell>{r.inFlight}</TableCell>
-                  <TableCell>{r.p50LatencyMs}</TableCell>
-                  <TableCell>{r.p95LatencyMs}</TableCell>
-                  <TableCell>{(r.successRate * 100).toFixed(1)}%</TableCell>
-                  <TableCell>{r.scored}</TableCell>
-                  <TableCell>{r.avgScore != null ? r.avgScore.toFixed(3) : '—'}</TableCell>
-                  <TableCell>{r.estimated}</TableCell>
-                  <TableCell>{r.meanAbsError != null ? r.meanAbsError.toFixed(2) : '—'}</TableCell>
-                  <TableCell>{r.bias != null ? formatBias(r.bias) : '—'}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
+        <Card.Header>
+          <p className="text-base">All metrics</p>
+        </Card.Header>
+        <Separator />
+        <Card.Content>
+          <Table>
+            <Table.ScrollContainer>
+              <Table.Content aria-label="Benchmark runs">
+                <Table.Header>
+                  <Table.Column isRowHeader>runId</Table.Column>
+                  <Table.Column>label</Table.Column>
+                  <Table.Column>total</Table.Column>
+                  <Table.Column>completed</Table.Column>
+                  <Table.Column>failed</Table.Column>
+                  <Table.Column>in-flight</Table.Column>
+                  <Table.Column>p50ms</Table.Column>
+                  <Table.Column>p95ms</Table.Column>
+                  <Table.Column>success</Table.Column>
+                  <Table.Column>scored</Table.Column>
+                  <Table.Column>avgScore</Table.Column>
+                  <Table.Column>est</Table.Column>
+                  <Table.Column>MAE</Table.Column>
+                  <Table.Column>bias</Table.Column>
+                </Table.Header>
+                <Table.Body>
+                  {rows.map((r) => (
+                    <Table.Row key={r.runId} id={r.runId}>
+                      <Table.Cell>
+                        <Code>{r.runId.slice(0, 12)}…</Code>
+                      </Table.Cell>
+                      <Table.Cell>{r.label ?? '—'}</Table.Cell>
+                      <Table.Cell>{r.total}</Table.Cell>
+                      <Table.Cell>{r.completed}</Table.Cell>
+                      <Table.Cell>{r.failed}</Table.Cell>
+                      <Table.Cell>{r.inFlight}</Table.Cell>
+                      <Table.Cell>{r.p50LatencyMs}</Table.Cell>
+                      <Table.Cell>{r.p95LatencyMs}</Table.Cell>
+                      <Table.Cell>{(r.successRate * 100).toFixed(1)}%</Table.Cell>
+                      <Table.Cell>{r.scored}</Table.Cell>
+                      <Table.Cell>{r.avgScore != null ? r.avgScore.toFixed(3) : '—'}</Table.Cell>
+                      <Table.Cell>{r.estimated}</Table.Cell>
+                      <Table.Cell>
+                        {r.meanAbsError != null ? r.meanAbsError.toFixed(2) : '—'}
+                      </Table.Cell>
+                      <Table.Cell>{r.bias != null ? formatBias(r.bias) : '—'}</Table.Cell>
+                    </Table.Row>
+                  ))}
+                </Table.Body>
+              </Table.Content>
+            </Table.ScrollContainer>
           </Table>
-        </CardBody>
+        </Card.Content>
       </Card>
     </div>
   );
@@ -343,7 +335,7 @@ function formatBias(b: number): string {
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex justify-between">
-      <span className="text-default-500">{label}</span>
+      <span className="text-muted">{label}</span>
       <span>{value}</span>
     </div>
   );
@@ -366,5 +358,5 @@ function rowsByLabel(
 }
 
 function labelKey(r: BenchmarkRunSummary): string {
-  return r.label && r.label.trim() ? r.label : r.runId.slice(0, 8);
+  return r.label?.trim() ? r.label : r.runId.slice(0, 8);
 }

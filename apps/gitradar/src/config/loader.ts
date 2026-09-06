@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 import { ZodError } from 'zod';
 import { getConfigPath } from '../store/paths.js';
 import { Config, ConfigSchema } from '../types/schema.js';
@@ -92,7 +92,7 @@ export async function saveConfig(
   const content = yaml.dump(existing, {
     lineWidth: 120,
     noRefs: true,
-    quotingType: '"',
+    quoteStyle: 'double',
   });
   await writeFile(resolvedPath, content, 'utf-8');
 }

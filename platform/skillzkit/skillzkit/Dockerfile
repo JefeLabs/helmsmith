@@ -12,7 +12,7 @@
 #
 # Bun runs the TypeScript directly — no compile step, smaller image.
 
-FROM oven/bun:1.3-alpine
+FROM oven/bun:1.4-alpine
 
 WORKDIR /app
 

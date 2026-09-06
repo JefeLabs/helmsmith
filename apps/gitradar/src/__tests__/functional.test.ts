@@ -194,7 +194,7 @@ async function setupTempTree() {
 
   await writeFile(configPath, 'orgs: []\n', 'utf-8');
 
-  const yaml = (await import('js-yaml')).default;
+  const yaml = await import('js-yaml');
   const registry = {
     workspaces: {
       functional: {

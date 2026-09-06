@@ -5,18 +5,18 @@
 # pnpm-workspace lockfile. compose.yaml passes context: .. to match.
 #
 # Three stages:
-#   1. ui-builder      — node:20 + pnpm; runs `pnpm --filter ... build`
+#   1. ui-builder      — node:24 + pnpm; runs `pnpm --filter ... build`
 #                        on the controlplane-ui workspace member; emits
 #                        dist/ ready to drop into Spring's static dir.
-#   2. jar-builder     — maven:3.9-eclipse-temurin-21; copies UI dist
+#   2. jar-builder     — maven:3.9-eclipse-temurin-25; copies UI dist
 #                        into src/main/resources/static, runs `mvn package`
 #                        producing a Spring Boot fat jar.
-#   3. runtime         — eclipse-temurin:21-jre; copies the jar; exposes
+#   3. runtime         — eclipse-temurin:25-jre; copies the jar; exposes
 #                        8080. UI served at / (Spring's default static
 #                        resource handler); API at /api/.
 
 # ── Stage 1: build UI ────────────────────────────────────────────────
-FROM node:20-bookworm-slim AS ui-builder
+FROM node:24-trixie-slim AS ui-builder
 
 WORKDIR /repo
 
@@ -40,7 +40,7 @@ COPY platform/controlplane/ui ./platform/controlplane/ui
 RUN pnpm --filter @helmsmith/controlplane-ui build
 
 # ── Stage 2: build Spring fat jar with UI bundled ────────────────────
-FROM maven:3.9-eclipse-temurin-21 AS jar-builder
+FROM maven:3.9-eclipse-temurin-25 AS jar-builder
 
 WORKDIR /repo
 
@@ -60,7 +60,7 @@ WORKDIR /repo/platform/controlplane/service
 RUN mvn -B -DskipTests package
 
 # ── Stage 3: runtime ─────────────────────────────────────────────────
-FROM eclipse-temurin:21-jre AS runtime
+FROM eclipse-temurin:25-jre AS runtime
 
 WORKDIR /app
 

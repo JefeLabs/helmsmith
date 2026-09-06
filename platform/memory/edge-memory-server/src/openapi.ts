@@ -17,7 +17,7 @@
  * change, the spec changes — no separate doc to update.
  */
 
-import { type ZodTypeAny, z } from 'zod';
+import { z } from 'zod';
 import {
   ConsolidateInputSchema,
   ConsolidateResultSchema,
@@ -49,7 +49,7 @@ interface OpenApiOperation {
   response: { schemaName?: string; status?: number };
 }
 
-const COMPONENT_SCHEMAS: Record<string, ZodTypeAny> = {
+const COMPONENT_SCHEMAS: Record<string, z.ZodType> = {
   MemoryScope: MemoryScopeSchema,
   MemoryEntry: MemoryEntrySchema,
   MemoryQuery: MemoryQuerySchema,
@@ -232,38 +232,49 @@ export function buildOpenApiSpec(): JsonSchema {
  * Intentionally limited — we only emit shapes our schemas use, not
  * the full Zod surface. If a new construct shows up, add the case.
  */
-export function zodToJsonSchema(schema: ZodTypeAny): JsonSchema {
-  const def = schema._def;
-  const typeName = def.typeName as string;
+export function zodToJsonSchema(schema: z.ZodType): JsonSchema {
+  // Zod 4 keeps a schema's definition under `_zod.def`, and `def.type` is the
+  // lowercase kind that replaced Zod 3's `_def.typeName`. The per-kind fields
+  // are read through a loose record because the public `$ZodTypeDef` type
+  // only carries `type`.
+  const def = schema._zod.def as Record<string, unknown> & { type: string };
 
-  switch (typeName) {
-    case 'ZodString':
+  switch (def.type) {
+    case 'string':
       return { type: 'string' };
-    case 'ZodNumber':
+    case 'number':
       return { type: 'number' };
-    case 'ZodBoolean':
+    case 'boolean':
       return { type: 'boolean' };
-    case 'ZodLiteral':
-      return { const: def.value };
-    case 'ZodEnum':
-      return { type: 'string', enum: def.values };
-    case 'ZodArray':
-      return { type: 'array', items: zodToJsonSchema(def.type) };
-    case 'ZodOptional':
+    case 'literal': {
+      // Zod 4 literals carry an array of accepted values (usually one).
+      const values = def.values as unknown[];
+      return values.length === 1 ? { const: values[0] } : { enum: values };
+    }
+    case 'enum':
+      // `entries` is a { name: value } record; our enums are string-valued.
+      return { type: 'string', enum: Object.values(def.entries as Record<string, unknown>) };
+    case 'array':
+      return { type: 'array', items: zodToJsonSchema(def.element as z.ZodType) };
+    case 'optional':
       // Optional fields are handled at the parent z.object level by
       // omitting from `required`. When optional shows up at top-level,
       // surface its inner type (the optional-ness is documented but
       // not modelable in standalone JSON Schema).
-      return zodToJsonSchema(def.innerType);
-    case 'ZodNullable':
-      return { ...zodToJsonSchema(def.innerType), nullable: true };
-    case 'ZodAny':
-    case 'ZodUnknown':
+      return zodToJsonSchema(def.innerType as z.ZodType);
+    case 'nullable':
+      return { ...zodToJsonSchema(def.innerType as z.ZodType), nullable: true };
+    case 'any':
+    case 'unknown':
       return {};
-    case 'ZodRecord':
-      return { type: 'object', additionalProperties: zodToJsonSchema(def.valueType) };
-    case 'ZodObject': {
-      const shape = (def.shape as () => Record<string, ZodTypeAny>)();
+    case 'record':
+      return {
+        type: 'object',
+        additionalProperties: zodToJsonSchema(def.valueType as z.ZodType),
+      };
+    case 'object': {
+      // Zod 4 exposes the shape as a plain object (Zod 3 used a getter fn).
+      const shape = def.shape as Record<string, z.ZodType>;
       const properties: JsonSchema = {};
       const required: string[] = [];
       for (const [key, child] of Object.entries(shape)) {
@@ -274,14 +285,14 @@ export function zodToJsonSchema(schema: ZodTypeAny): JsonSchema {
       if (required.length > 0) out.required = required;
       return out;
     }
-    case 'ZodUnion':
-    case 'ZodDiscriminatedUnion': {
-      const options = def.options as ZodTypeAny[];
+    case 'union': {
+      // Discriminated unions are plain unions with a `discriminator` in Zod 4.
+      const options = def.options as z.ZodType[];
       return { oneOf: options.map((o) => zodToJsonSchema(o)) };
     }
-    case 'ZodIntersection':
+    case 'intersection':
       return {
-        allOf: [zodToJsonSchema(def.left), zodToJsonSchema(def.right)],
+        allOf: [zodToJsonSchema(def.left as z.ZodType), zodToJsonSchema(def.right as z.ZodType)],
       };
     default:
       // Unhandled — surface a loose `any` rather than throwing so
@@ -290,8 +301,8 @@ export function zodToJsonSchema(schema: ZodTypeAny): JsonSchema {
   }
 }
 
-function isOptional(schema: ZodTypeAny): boolean {
-  return schema._def.typeName === 'ZodOptional';
+function isOptional(schema: z.ZodType): boolean {
+  return schema._zod.def.type === 'optional';
 }
 
 // Re-export z for callers that want to extend our schemas.

@@ -47,7 +47,7 @@ describe('zodToJsonSchema — vocabulary coverage', () => {
   });
 
   it('z.record', () => {
-    expect(zodToJsonSchema(z.record(z.number()))).toEqual({
+    expect(zodToJsonSchema(z.record(z.string(), z.number()))).toEqual({
       type: 'object',
       additionalProperties: { type: 'number' },
     });

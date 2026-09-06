@@ -53,7 +53,7 @@ export const EndOfDaySchema = z
     // Restrict to Monday–Friday (no weekend posts).
     weekdaysOnly: z.boolean().default(true),
   })
-  .default({});
+  .prefault({});
 
 export const ScheduleSchema = z
   .object({
@@ -67,7 +67,7 @@ export const ScheduleSchema = z
     // Only fires when the figma block is configured; a no-op otherwise.
     figmaSummary: z.boolean().default(true),
   })
-  .default({});
+  .prefault({});
 
 export const CaptureSchema = z
   .object({
@@ -76,7 +76,7 @@ export const CaptureSchema = z
     // Last summary post of the day marks end-of-day.
     endOfDayLastWins: z.boolean().default(true),
   })
-  .default({});
+  .prefault({});
 
 /**
  * Automatic catch-up on `start`: replay tracked-channel history through the
@@ -89,7 +89,7 @@ export const StartupBackfillSchema = z
     enabled: z.boolean().default(true),
     maxDays: z.number().int().min(1).max(30).default(7),
   })
-  .default({});
+  .prefault({});
 
 /**
  * Figma webhook receiver. Requires a Professional+ team plan and a public
@@ -109,7 +109,7 @@ export const FigmaWebhookSchema = z
      */
     publicUrl: z.string().url().optional(),
   })
-  .default({});
+  .prefault({});
 
 /**
  * Sentinel presence: a machine keeps monitored files open in Figma desktop and
@@ -127,7 +127,7 @@ export const FigmaPresenceSchema = z
     /** Heartbeat age beyond which presence data is ⚠ STALE and intervals force-close. */
     staleAfterSec: z.number().int().min(30).default(180),
   })
-  .default({});
+  .prefault({});
 
 /**
  * Figma activity tracking (optional — absent block disables the whole feature).
@@ -138,10 +138,10 @@ export const FigmaSchema = z
   .object({
     /** Personal access token — sourced from FIGMA_TOKEN, never the config file. */
     token: z
-      .string({ required_error: 'FIGMA_TOKEN is required when figma tracking is configured' })
+      .string({ error: 'FIGMA_TOKEN is required when figma tracking is configured' })
       .min(1, 'FIGMA_TOKEN is required when figma tracking is configured'),
     teamId: z
-      .string({ required_error: 'FIGMA_TEAM_ID is required when figma tracking is configured' })
+      .string({ error: 'FIGMA_TEAM_ID is required when figma tracking is configured' })
       .min(1, 'FIGMA_TEAM_ID is required when figma tracking is configured'),
     /** Seed tracked file keys; `figma sync-files` discovers more, webhooks auto-add. */
     fileKeys: z.array(z.string().min(1)).default([]),
@@ -199,7 +199,7 @@ export const ConfigSchema = z.object({
   timezone: z
     .string()
     .default('America/New_York')
-    .refine(isValidTimeZone, (tz) => ({ message: `unknown IANA timezone: ${tz}` })),
+    .refine(isValidTimeZone, { error: (iss) => `unknown IANA timezone: ${String(iss.input)}` }),
   /** Week boundary for weekly reports. */
   weekStartsOn: z.enum(['monday', 'sunday']).default('monday'),
   schedule: ScheduleSchema,

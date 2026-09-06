@@ -62,7 +62,7 @@ Resources:
     Properties:
       CodeUri: ../../dist/lambda/      # populated by `npm run build:lambda`
       Handler: index.handler
-      Runtime: nodejs20.x
+      Runtime: nodejs24.x
       Architectures:
         - arm64                        # ~20% cheaper than x86_64
       MemorySize: 512                  # tune for cold-start vs cost

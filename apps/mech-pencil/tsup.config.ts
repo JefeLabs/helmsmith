@@ -10,7 +10,9 @@ export default defineConfig({
   format: ['esm'],
   target: 'es2022',
   clean: true,
-  dts: true,
+  // TypeScript 7 ships no JS compiler API, so tsup's bundled dts plugin cannot run.
+  // Declarations come from `tsc --emitDeclarationOnly` in the build script instead.
+  dts: false,
   sourcemap: true,
   splitting: false,
   shims: false,

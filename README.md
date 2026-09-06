@@ -20,7 +20,7 @@ alongside the Java/Maven control plane.
 ## Toolchain
 
 - **Node** ≥ 20, **Bun** ≥ 1.3, **pnpm** 9.15.9 (TS workspace)
-- **JDK 21** + Maven (`platform/controlplane/service/`)
+- **JDK 25** + Maven (`platform/controlplane/service/`)
 - Lint/format: Biome · Versioning: Changesets
 
 ## Common commands

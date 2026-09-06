@@ -8,7 +8,7 @@
 #                                    → /workspace/<repo>/    (per-repo worktree)
 #   - sets JOB_ID, SUBAGENT_ID, PRODUCT_ID, PIPELINE in containerEnv
 #   - labels harness-worker=true + harness-job-id=<id> for reaping
-FROM node:22-bookworm-slim
+FROM node:24-trixie-slim
 
 RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 

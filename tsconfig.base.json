@@ -12,6 +12,7 @@
     "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": false,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node"]
   }
 }

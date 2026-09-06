@@ -1,5 +1,5 @@
 import { select } from '@inquirer/prompts';
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 import { detectGitRoot } from '../config/git-root.js';
 import type { LoadedWorkspace } from '../config/repos-registry.js';
 import { getAvailableWorkspaces, loadAllRegistries } from '../config/repos-registry.js';
@@ -70,7 +70,7 @@ export async function exportWorkspace(): Promise<void> {
     indent: 2,
     lineWidth: 120,
     noRefs: true,
-    quotingType: '"',
+    quoteStyle: 'double',
   });
 
   process.stdout.write(yamlOutput);

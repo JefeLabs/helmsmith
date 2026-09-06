@@ -19,13 +19,13 @@
     "verify:schema": "ts-json-schema-generator --path src/index.ts --type Catalog --tsconfig tsconfig.json --no-type-check | diff -u ../skillzkit/schema/catalog.schema.json - && echo 'schema is up to date'"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
-    "ts-json-schema-generator": "^2.4.0",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.5"
+    "@types/node": "^24.13.3",
+    "ts-json-schema-generator": "^2.9.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "repository": {
     "type": "git",

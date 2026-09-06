@@ -1,13 +1,13 @@
 @import "tailwindcss";
 
-/* Hero UI v3 plugin — wires the component theme into Tailwind v4. */
-@plugin "./hero.ts";
+/* HeroUI v3 is CSS-first: the styles package replaces the v2 Tailwind plugin
+   (hero.ts) and the @source scan of node_modules/@heroui. Import order matters:
+   tailwindcss first. */
+@import "@heroui/styles";
 
-/* Hero UI dark theme reads from the `.dark` class on <html>. The
+/* HeroUI dark theme reads from the `.dark` class on <html>. The
    index.html ships with class="dark" by default — desktop-admin-UI
    convention favors dark for long-look monitoring views. */
-
-@source "../node_modules/@heroui";
 
 html,
 body,

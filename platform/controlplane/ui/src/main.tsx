@@ -1,4 +1,3 @@
-import { HeroUIProvider } from '@heroui/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
@@ -15,16 +14,16 @@ const queryClient = new QueryClient({
   },
 });
 
+// HeroUI v3 needs no provider: components read theme variables from <html>,
+// which index.html ships with class="dark".
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <HeroUIProvider>
-        <QueryClientProvider client={queryClient}>
-          <main className="dark text-foreground bg-background min-h-screen">
-            <App />
-          </main>
-        </QueryClientProvider>
-      </HeroUIProvider>
+      <QueryClientProvider client={queryClient}>
+        <main className="text-foreground bg-background min-h-screen">
+          <App />
+        </main>
+      </QueryClientProvider>
     </BrowserRouter>
   </React.StrictMode>,
 );
