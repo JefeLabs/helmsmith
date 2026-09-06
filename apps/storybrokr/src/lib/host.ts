@@ -7,6 +7,8 @@ import { readTsconfigPaths } from './tsconfig.js';
 const MAIN_EXTS = ['ts', 'mts', 'js', 'mjs', 'cjs'];
 const PREVIEW_EXTS = ['tsx', 'ts', 'jsx', 'js', 'mjs'];
 
+export const MIN_STORYBOOK_MAJOR = 7;
+
 function firstExisting(dir: string, base: string, exts: string[]): string | null {
   for (const ext of exts) {
     const file = join(dir, `${base}.${ext}`);
@@ -33,7 +35,9 @@ export function detectFramework(mainSource: string): string {
   const stringForm = mainSource.match(/framework\s*:\s*['"`]([^'"`]+)['"`]/);
   if (stringForm) return stringForm[1];
   // getAbsolutePath('@storybook/nextjs') style
-  const helperForm = mainSource.match(/framework[\s\S]{0,80}?\(\s*['"`](@storybook\/[a-z-]+)['"`]/);
+  const helperForm = mainSource.match(
+    /framework[\s\S]{0,80}?\(\s*['"`](@storybook\/[a-z0-9-]+)['"`]/,
+  );
   return helperForm ? helperForm[1] : 'unknown';
 }
 
@@ -57,6 +61,15 @@ export function inspectHost(hostRoot: string): HostInfo {
   const storybookVersion = existsSync(pkgFile)
     ? (JSON.parse(readFileSync(pkgFile, 'utf8')) as { version: string }).version
     : 'unknown';
+  if (storybookVersion !== 'unknown') {
+    const major = Number.parseInt(storybookVersion, 10);
+    if (Number.isFinite(major) && major < MIN_STORYBOOK_MAJOR) {
+      throw new StorybrokrError(
+        'HOST_INVALID',
+        `${hostRoot} runs storybook ${storybookVersion}; storybrokr needs ${MIN_STORYBOOK_MAJOR} or newer`,
+      );
+    }
+  }
   return {
     hostRoot,
     storybookDir,

@@ -275,7 +275,7 @@ status; MCP returns the object with `isError`.
 | Code | When | HTTP |
 |---|---|---|
 | `HOST_NOT_FOUND` | No `.storybook/` above the path | 404 |
-| `HOST_INVALID` | Storybook binary missing, main unreadable, unsupported version | 422 |
+| `HOST_INVALID` | Storybook binary missing, main unreadable, unsupported version (Storybook older than 7), unparseable tsconfig.json | 422 |
 | `COMPONENT_NOT_FOUND` | Path missing, or no story files reachable from it | 404 |
 | `INSTANCE_CAP_REACHED` | Cap hit and nothing idle to reap | 429 |
 | `NO_FREE_PORT` | Range exhausted | 503 |

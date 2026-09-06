@@ -3,10 +3,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { StorybrokrError } from './errors.js';
-import { findHostRoot, inspectHost, resolveHost } from './host.js';
+import { detectFramework, findHostRoot, inspectHost, resolveHost } from './host.js';
 
 /** Minimal fake host: .storybook/main.ts + preview.js + storybook bin + version. */
-function makeHost(opts: { framework?: string; preview?: boolean; bin?: boolean } = {}) {
+function makeHost(
+  opts: { framework?: string; preview?: boolean; bin?: boolean; version?: string } = {},
+) {
   const root = mkdtempSync(join(tmpdir(), 'sb-host-'));
   mkdirSync(join(root, '.storybook'));
   const framework = opts.framework ?? '@storybook/react-vite';
@@ -23,7 +25,7 @@ function makeHost(opts: { framework?: string; preview?: boolean; bin?: boolean }
     mkdirSync(join(root, 'node_modules', 'storybook'), { recursive: true });
     writeFileSync(
       join(root, 'node_modules', 'storybook', 'package.json'),
-      JSON.stringify({ version: '10.6.0' }),
+      JSON.stringify({ version: opts.version ?? '10.6.0' }),
     );
   }
   mkdirSync(join(root, 'src', 'components', 'button'), { recursive: true });
@@ -86,5 +88,27 @@ describe('host', () => {
     const root = makeHost();
     dirs.push(root);
     expect(resolveHost('components/button', root).hostRoot).toBe(root);
+  });
+
+  it('inspectHost throws HOST_INVALID for storybook version below 7', () => {
+    const root = makeHost({ version: '6.5.16' });
+    dirs.push(root);
+    expect(() => inspectHost(root)).toThrow(StorybrokrError);
+    try {
+      inspectHost(root);
+    } catch (e) {
+      expect((e as StorybrokrError).code).toBe('HOST_INVALID');
+      expect((e as StorybrokrError).message).toMatch(/6\.5\.16/);
+      expect((e as StorybrokrError).message).toMatch(/7 or newer/);
+    }
+  });
+
+  it('detectFramework handles string form and helper form with digits', () => {
+    expect(detectFramework("framework: '@storybook/react-vite'")).toBe('@storybook/react-vite');
+    expect(
+      detectFramework(
+        "framework: { name: getAbsolutePath('@storybook/react-webpack5'), options: {} }",
+      ),
+    ).toBe('@storybook/react-webpack5');
   });
 });

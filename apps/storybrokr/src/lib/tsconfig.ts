@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { StorybrokrError } from './errors.js';
 
 // Parse JSONC: strip // and /* */ comments and trailing commas so JSON parses.
 export function parseJsonc(text: string): unknown {
@@ -40,8 +41,17 @@ export function parseJsonc(text: string): unknown {
 export function readTsconfigPaths(hostRoot: string): Record<string, string[]> {
   const file = join(hostRoot, 'tsconfig.json');
   if (!existsSync(file)) return {};
-  const parsed = parseJsonc(readFileSync(file, 'utf8')) as {
-    compilerOptions?: { paths?: Record<string, string[]> };
-  };
-  return parsed.compilerOptions?.paths ?? {};
+  try {
+    const parsed = parseJsonc(readFileSync(file, 'utf8'));
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      return {};
+    }
+    const obj = parsed as { compilerOptions?: { paths?: Record<string, string[]> } };
+    return obj.compilerOptions?.paths ?? {};
+  } catch (err) {
+    throw new StorybrokrError(
+      'HOST_INVALID',
+      `${file} is not valid JSONC (${(err as Error).message})`,
+    );
+  }
 }

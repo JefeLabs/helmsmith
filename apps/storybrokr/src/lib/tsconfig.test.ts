@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { StorybrokrError } from './errors.js';
 import { readTsconfigPaths } from './tsconfig.js';
 
 describe('readTsconfigPaths', () => {
@@ -36,5 +37,16 @@ describe('readTsconfigPaths', () => {
       '@/*': ['./src/*', './*'],
       '@core/*': ['./components/core/*'],
     });
+  });
+
+  it('throws StorybrokrError for malformed tsconfig.json', () => {
+    const d = make('{ not json');
+    expect(() => readTsconfigPaths(d)).toThrow(StorybrokrError);
+    try {
+      readTsconfigPaths(d);
+    } catch (e) {
+      expect((e as StorybrokrError).code).toBe('HOST_INVALID');
+      expect((e as StorybrokrError).message).toMatch(/tsconfig\.json/);
+    }
   });
 });
