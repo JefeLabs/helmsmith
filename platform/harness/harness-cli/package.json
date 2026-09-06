@@ -17,9 +17,9 @@
     "@helmsmith/agent-auth": "workspace:*",
     "@helmsmith/harness-core": "workspace:*",
     "@helmsmith/harness-server": "workspace:*",
-    "@opentui/core": "^0.2.2",
-    "@opentui/react": "^0.2.2",
-    "react": "^19.0.0",
+    "@opentui/core": "^0.2.16",
+    "@opentui/react": "^0.2.16",
+    "react": "^19.2.8",
     "react-devtools-core": "^7.0.1",
     "ws": "^8.21.3",
     "yaml": "^2.9.0"
