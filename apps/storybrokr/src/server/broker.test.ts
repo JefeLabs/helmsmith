@@ -343,4 +343,35 @@ describe('Broker', () => {
       process.removeListener('unhandledRejection', onUnhandled);
     }
   });
+
+  it('a failed discovery does not poison later up() calls for the same component', async () => {
+    const host = fakeHost();
+    dirs.push(host);
+    const { broker } = make({ portRangeStart: 6178, portRangeEnd: 6179 });
+
+    await expect(broker.up({ component: 'src/Later', hostRoot: host })).rejects.toMatchObject({
+      code: 'COMPONENT_NOT_FOUND',
+    });
+
+    mkdirSync(join(host, 'src', 'Later'), { recursive: true });
+    writeFileSync(join(host, 'src', 'Later', 'Later.tsx'), 'export const Later = 1;\n');
+    writeFileSync(join(host, 'src', 'Later', 'Later.stories.tsx'), '');
+
+    const r = await broker.up({ component: 'src/Later', hostRoot: host });
+    expect(r.created).toBe(true);
+    expect(r.record.status).toBe('ready');
+
+    // Same sequence again for a different component, with wait: false on the retry.
+    await expect(broker.up({ component: 'src/Deferred', hostRoot: host })).rejects.toMatchObject({
+      code: 'COMPONENT_NOT_FOUND',
+    });
+
+    mkdirSync(join(host, 'src', 'Deferred'), { recursive: true });
+    writeFileSync(join(host, 'src', 'Deferred', 'Deferred.tsx'), 'export const Deferred = 1;\n');
+    writeFileSync(join(host, 'src', 'Deferred', 'Deferred.stories.tsx'), '');
+
+    const r2 = await broker.up({ component: 'src/Deferred', hostRoot: host, wait: false });
+    expect(r2.created).toBe(true);
+    expect(r2.record.status).toBe('starting');
+  });
 });

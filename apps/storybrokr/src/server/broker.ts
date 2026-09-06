@@ -123,7 +123,9 @@ export class Broker {
       return { record: this.registry.get(id) as InstanceRecord, created: false };
     }
 
-    const creation = this.createInstance(host, component, id, req);
+    const creation = this.createInstance(host, component, id, req).finally(() => {
+      this.inflight.delete(id);
+    });
     this.inflight.set(id, creation);
     await creation;
     if (req.wait !== false) await this.awaitReady(id);
@@ -141,59 +143,55 @@ export class Broker {
     id: string,
     req: UpRequest,
   ): Promise<InstanceRecord> {
-    try {
-      const activeCount = this.registry
-        .list()
-        .filter((r) => r.status === 'starting' || r.status === 'ready').length;
-      if (activeCount >= this.config.instanceCap) await this.reapIdle();
-      this.registry.assertCapacity();
+    const activeCount = this.registry
+      .list()
+      .filter((r) => r.status === 'starting' || r.status === 'ready').length;
+    if (activeCount >= this.config.instanceCap) await this.reapIdle();
+    this.registry.assertCapacity();
 
-      const discovery = discoverStories(host.hostRoot, component, host.tsconfigPaths);
-      const port = await findFreePort(
-        this.config.portRangeStart,
-        this.config.portRangeEnd,
-        this.registry.portsInUse(),
-      );
-      const configDir = generateConfigDir(host, id, discovery.storyFiles);
-      const nowIso = this.now().toISOString();
-      const record: InstanceRecord = {
-        id,
-        hostRoot: host.hostRoot,
-        component,
-        framework: host.framework,
-        port,
-        url: `http://127.0.0.1:${port}`,
-        pid: null,
-        status: 'starting',
-        createdAt: nowIso,
-        lastTouchedAt: nowIso,
-        ttlMinutes: req.ttlMinutes ?? this.config.ttlMinutes,
-        storyFiles: discovery.storyFiles,
-        stories: [],
-        configDir,
-      };
-      this.registry.add(record);
-      writeSidecar(configDir, record);
+    const discovery = discoverStories(host.hostRoot, component, host.tsconfigPaths);
+    const port = await findFreePort(
+      this.config.portRangeStart,
+      this.config.portRangeEnd,
+      this.registry.portsInUse(),
+    );
+    const configDir = generateConfigDir(host, id, discovery.storyFiles);
+    const nowIso = this.now().toISOString();
+    const record: InstanceRecord = {
+      id,
+      hostRoot: host.hostRoot,
+      component,
+      framework: host.framework,
+      port,
+      url: `http://127.0.0.1:${port}`,
+      pid: null,
+      status: 'starting',
+      createdAt: nowIso,
+      lastTouchedAt: nowIso,
+      ttlMinutes: req.ttlMinutes ?? this.config.ttlMinutes,
+      storyFiles: discovery.storyFiles,
+      stories: [],
+      configDir,
+    };
+    this.registry.add(record);
+    writeSidecar(configDir, record);
 
-      const proc = this.spawner.spawn(host, configDir, port);
-      this.procs.set(id, proc);
-      this.registry.update(id, { pid: proc.pid });
-      proc.exited.then((code) => {
-        const current = this.registry.get(id);
-        if (current && current.status === 'ready') {
-          this.registry.update(id, {
-            status: 'failed',
-            exitCode: code,
-            error: { code: 'BOOT_FAILED', message: `storybook exited with code ${code}` },
-          });
-        }
-      });
+    const proc = this.spawner.spawn(host, configDir, port);
+    this.procs.set(id, proc);
+    this.registry.update(id, { pid: proc.pid });
+    proc.exited.then((code) => {
+      const current = this.registry.get(id);
+      if (current && current.status === 'ready') {
+        this.registry.update(id, {
+          status: 'failed',
+          exitCode: code,
+          error: { code: 'BOOT_FAILED', message: `storybook exited with code ${code}` },
+        });
+      }
+    });
 
-      this.watchReadiness(id, proc);
-      return this.registry.get(id) as InstanceRecord;
-    } finally {
-      this.inflight.delete(id);
-    }
+    this.watchReadiness(id, proc);
+    return this.registry.get(id) as InstanceRecord;
   }
 
   private watchReadiness(id: string, proc: SpawnedProcess): Promise<void> {
