@@ -45,7 +45,7 @@
     "@opentui/core": "^0.5.10",
     "@opentui/react": "^0.5.10",
     "bun": "^1.4.2",
-    "chalk": "^5.6.2",
+    "chalk": "^6.0.0",
     "commander": "^15.0.0",
     "react": "^19.2.8"
   },
