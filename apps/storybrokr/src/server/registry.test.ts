@@ -91,4 +91,39 @@ describe('Registry', () => {
     reg.remove('a');
     expect(reg.list()).toEqual([]);
   });
+
+  it('discards malformed JSON in state.json', () => {
+    const h = home();
+    const stateFile = join(h, 'state.json');
+    const fs = require('node:fs');
+    fs.writeFileSync(stateFile, '{ not json');
+    const reg = new Registry({ home: h, config: DEFAULT_CONFIG });
+    expect(() => reg.load()).not.toThrow();
+    expect(reg.list()).toEqual([]);
+  });
+
+  it('discards null in state.json', () => {
+    const h = home();
+    const stateFile = join(h, 'state.json');
+    const fs = require('node:fs');
+    fs.writeFileSync(stateFile, 'null');
+    const reg = new Registry({ home: h, config: DEFAULT_CONFIG });
+    expect(() => reg.load()).not.toThrow();
+    expect(reg.list()).toEqual([]);
+  });
+
+  it('skips invalid entries when loading mixed valid and invalid records', () => {
+    const h = home();
+    const stateFile = join(h, 'state.json');
+    const fs = require('node:fs');
+    const validRecord = rec('ok');
+    const state = {
+      version: 1,
+      instances: [validRecord, 'garbage', { noId: true }],
+    };
+    fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
+    const reg = new Registry({ home: h, config: DEFAULT_CONFIG });
+    reg.load();
+    expect(reg.list().map((r) => r.id)).toEqual(['ok']);
+  });
 });

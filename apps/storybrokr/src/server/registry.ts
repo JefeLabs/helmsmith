@@ -102,10 +102,22 @@ export class Registry {
   }
 
   load(): void {
-    if (!existsSync(this.file)) return;
-    const parsed = JSON.parse(readFileSync(this.file, 'utf8')) as StateFile;
     this.byId.clear();
-    for (const r of parsed.instances ?? []) this.byId.set(r.id, r);
+    if (!existsSync(this.file)) return;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(readFileSync(this.file, 'utf8'));
+    } catch {
+      return; // a corrupt cache is discarded; reconcile rebuilds from the sidecars
+    }
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+    const instances = (parsed as { instances?: unknown }).instances;
+    if (!Array.isArray(instances)) return;
+    for (const r of instances) {
+      if (r !== null && typeof r === 'object' && typeof (r as { id?: unknown }).id === 'string') {
+        this.byId.set((r as InstanceRecord).id, r as InstanceRecord);
+      }
+    }
   }
 
   save(): void {
