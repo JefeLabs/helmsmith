@@ -5,7 +5,7 @@
 # pnpm-workspace lockfile. compose.yaml passes context: .. to match.
 #
 # Three stages:
-#   1. ui-builder      — node:20 + pnpm; runs `pnpm --filter ... build`
+#   1. ui-builder      — node:24 + pnpm; runs `pnpm --filter ... build`
 #                        on the controlplane-ui workspace member; emits
 #                        dist/ ready to drop into Spring's static dir.
 #   2. jar-builder     — maven:3.9-eclipse-temurin-21; copies UI dist
@@ -16,7 +16,7 @@
 #                        resource handler); API at /api/.
 
 # ── Stage 1: build UI ────────────────────────────────────────────────
-FROM node:20-bookworm-slim AS ui-builder
+FROM node:24-bookworm-slim AS ui-builder
 
 WORKDIR /repo
 

@@ -23,7 +23,7 @@ All three produce the same architecture:
             └────────┬─────────┘
                      │
             ┌────────▼─────────┐
-            │  Lambda function │   nodejs20.x, ESM, arm64
+            │  Lambda function │   nodejs24.x, ESM, arm64
             │  index.handler   │
             └────────┬─────────┘
                      │
@@ -257,7 +257,7 @@ resource "aws_lambda_function" "api" {
   source_code_hash = data.archive_file.lambda.output_base64sha256
   role          = aws_iam_role.lambda.arn
   handler       = "index.handler"
-  runtime       = "nodejs20.x"
+  runtime       = "nodejs24.x"
   architectures = ["arm64"]
   memory_size   = 512
   timeout       = 15

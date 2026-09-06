@@ -10,12 +10,12 @@
 # context: ..) so the bun bundler stage can reach the workspace +
 # lockfile.
 #
-# Same 3-stage shape as edge-server — bundler (node:20 + corepack +
+# Same 3-stage shape as edge-server — bundler (node:24 + corepack +
 # bun) → bun-bin → runtime (debian-slim + bun + bundle). harness-server
 # has no neo4j requirement, so we don't carry the neo4j base.
 
 # ── Stage 1: bun bundler ─────────────────────────────────────────────
-FROM node:20-bookworm-slim AS bun-bundler
+FROM node:24-bookworm-slim AS bun-bundler
 
 WORKDIR /repo
 

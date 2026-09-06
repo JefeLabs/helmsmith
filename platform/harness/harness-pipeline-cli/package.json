@@ -21,7 +21,7 @@
     "@helmsmith/harness-core": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^22.7.0",
+    "@types/node": "^24.13.3",
     "typescript": "^5.6.0"
   }
 }

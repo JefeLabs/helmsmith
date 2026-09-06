@@ -23,7 +23,7 @@
     "inquirer": "^12.0.0"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
+    "@types/node": "^24.13.3",
     "commander": "^14.0.3",
     "inquirer": "^12.6.0",
     "tsup": "^8.5.1",
@@ -31,7 +31,7 @@
     "vitest": "^4.1.5"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "publishConfig": {
     "access": "public",

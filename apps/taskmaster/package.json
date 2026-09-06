@@ -14,7 +14,7 @@
     "src/context/"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "scripts": {
     "prepublishOnly": "npm run build",
@@ -57,7 +57,7 @@
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
-    "@types/node": "^25.2.3",
+    "@types/node": "^24.13.3",
     "@types/proper-lockfile": "^4.1.4",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
