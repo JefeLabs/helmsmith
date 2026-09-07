@@ -66,14 +66,29 @@ describe('reduceSettle', () => {
 });
 
 /** A scripted page: each evaluate() call returns the next events snapshot. */
-function fakePage(snapshots: SettleEvent[][], opts: { networkIdleRejects?: boolean; waitForFails?: boolean } = {}) {
+function fakePage(
+  snapshots: SettleEvent[][],
+  opts: {
+    networkIdleRejects?: boolean;
+    waitForFails?: boolean;
+    gotoRejects?: Error;
+    evaluateRejectsAt?: number;
+  } = {},
+) {
   const calls: string[] = [];
   let i = 0;
   const page: SettlePage = {
     goto: async (url) => {
       calls.push(`goto ${url}`);
+      if (opts.gotoRejects) throw opts.gotoRejects;
     },
-    evaluate: async () => snapshots[Math.min(i++, snapshots.length - 1)] ?? [],
+    evaluate: async () => {
+      const at = i++;
+      if (opts.evaluateRejectsAt !== undefined && at === opts.evaluateRejectsAt) {
+        throw new Error('Execution context was destroyed');
+      }
+      return snapshots[Math.min(at, snapshots.length - 1)] ?? [];
+    },
     waitForLoadState: async (state) => {
       calls.push(`load ${state}`);
       if (opts.networkIdleRejects) throw new Error('Timeout');
@@ -143,6 +158,26 @@ describe('settleStory', () => {
     expect(
       await settleStory(b.page, { iframeUrl: 'u', timeoutMs: 5000, waitFor: { text: 'never' }, ...fast }),
     ).toEqual({ kind: 'timeout', lastPhase: 'completed' });
+  });
+
+  it('reports a goto rejection as a driver failure instead of throwing', async () => {
+    const { page } = fakePage([[]], { gotoRejects: new Error('net::ERR_CONNECTION_REFUSED') });
+    const out = await settleStory(page, { iframeUrl: 'u', timeoutMs: 5000, ...fast });
+    expect(out).toEqual({
+      kind: 'fail',
+      reason: 'driver error: net::ERR_CONNECTION_REFUSED',
+      event: 'driver',
+    });
+  });
+
+  it('reports an evaluate rejection mid-poll as a driver failure instead of throwing', async () => {
+    const { page } = fakePage([[phase('loading')], [phase('rendering')]], { evaluateRejectsAt: 1 });
+    const out = await settleStory(page, { iframeUrl: 'u', timeoutMs: 5000, ...fast });
+    expect(out).toMatchObject({
+      kind: 'fail',
+      event: 'driver',
+      reason: 'driver error: Execution context was destroyed',
+    });
   });
 });
 

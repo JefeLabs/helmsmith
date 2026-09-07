@@ -105,6 +105,9 @@ const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
  * Navigates to the story and waits until it settles: a terminal reducer state, then (on pass)
  * network idle and the optional waitFor. The whole thing shares one `timeoutMs` budget.
  * The caller must have installed RECORDER_SCRIPT on the page's context.
+ * Driver failures (navigation or evaluation errors, e.g. the page navigating away or its frame
+ * being detached mid-poll) are reported as `fail` with event `driver` rather than thrown, so a
+ * single story's transient driver error surfaces as a result row, not a request-level exception.
  */
 export async function settleStory(page: SettlePage, opts: SettleOptions): Promise<SettleOutcome> {
   const now = opts.now ?? Date.now;
@@ -114,10 +117,19 @@ export async function settleStory(page: SettlePage, opts: SettleOptions): Promis
   const remaining = () => Math.max(1, deadline - now());
   let lastPhase: string | undefined;
 
-  await page.goto(opts.iframeUrl);
+  try {
+    await page.goto(opts.iframeUrl);
+  } catch (err) {
+    return { kind: 'fail', reason: `driver error: ${(err as Error).message}`, event: 'driver' };
+  }
   let state: SettleState = { kind: 'pending' };
   for (;;) {
-    const events = (await page.evaluate(EVENTS_EXPRESSION)) as SettleEvent[];
+    let events: SettleEvent[];
+    try {
+      events = (await page.evaluate(EVENTS_EXPRESSION)) as SettleEvent[];
+    } catch (err) {
+      return { kind: 'fail', reason: `driver error: ${(err as Error).message}`, event: 'driver' };
+    }
     for (const e of events) if (e.kind === 'phase') lastPhase = e.phase;
     state = reduceSettle(events);
     if (state.kind !== 'pending') break;
