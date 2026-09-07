@@ -5,6 +5,8 @@
  * is unit-tested without a browser.
  */
 
+import type { WaitFor } from '../types.js';
+
 export type SettleEvent =
   | { kind: 'phase'; phase: string; storyId?: string }
   | { kind: 'error'; event: string; message: string; stack?: string };
@@ -76,3 +78,63 @@ export const RECORDER_SCRIPT = `(() => {
   };
   tick();
 })();`;
+
+/** The slice of a Playwright Page the driver needs; a fake satisfies it in unit tests. */
+export interface SettlePage {
+  goto(url: string): Promise<unknown>;
+  evaluate(expression: string): Promise<unknown>;
+  waitForLoadState(state: 'networkidle', opts: { timeout: number }): Promise<void>;
+  waitForSelector(selector: string, opts: { timeout: number }): Promise<unknown>;
+  getByText(text: string): { waitFor(opts: { timeout: number }): Promise<void> };
+}
+
+export type SettleOutcome = SettleState | { kind: 'timeout'; lastPhase?: string };
+
+export interface SettleOptions {
+  iframeUrl: string;
+  timeoutMs: number;
+  waitFor?: WaitFor;
+  pollMs?: number;
+  now?: () => number;
+  sleep?: (ms: number) => Promise<void>;
+}
+
+const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/**
+ * Navigates to the story and waits until it settles: a terminal reducer state, then (on pass)
+ * network idle and the optional waitFor. The whole thing shares one `timeoutMs` budget.
+ * The caller must have installed RECORDER_SCRIPT on the page's context.
+ */
+export async function settleStory(page: SettlePage, opts: SettleOptions): Promise<SettleOutcome> {
+  const now = opts.now ?? Date.now;
+  const sleep = opts.sleep ?? defaultSleep;
+  const pollMs = opts.pollMs ?? 100;
+  const deadline = now() + opts.timeoutMs;
+  const remaining = () => Math.max(1, deadline - now());
+  let lastPhase: string | undefined;
+
+  await page.goto(opts.iframeUrl);
+  let state: SettleState = { kind: 'pending' };
+  for (;;) {
+    const events = (await page.evaluate(EVENTS_EXPRESSION)) as SettleEvent[];
+    for (const e of events) if (e.kind === 'phase') lastPhase = e.phase;
+    state = reduceSettle(events);
+    if (state.kind !== 'pending') break;
+    if (now() >= deadline) return lastPhase === undefined ? { kind: 'timeout' } : { kind: 'timeout', lastPhase };
+    await sleep(pollMs);
+  }
+  if (state.kind === 'fail') return state;
+
+  try {
+    await page.waitForLoadState('networkidle', { timeout: remaining() });
+    if (opts.waitFor && 'selector' in opts.waitFor) {
+      await page.waitForSelector(opts.waitFor.selector, { timeout: remaining() });
+    } else if (opts.waitFor) {
+      await page.getByText(opts.waitFor.text).waitFor({ timeout: remaining() });
+    }
+  } catch {
+    return { kind: 'timeout', lastPhase: 'completed' };
+  }
+  return state;
+}
