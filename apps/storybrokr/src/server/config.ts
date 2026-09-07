@@ -11,6 +11,7 @@ export const DEFAULT_CONFIG: DaemonConfig = {
   readinessTimeoutMs: 120_000,
   reaperIntervalMs: 60_000,
   autoStartWaitMs: 10_000,
+  browserIdleMinutes: 10,
 };
 
 const KEYS = Object.keys(DEFAULT_CONFIG) as (keyof DaemonConfig)[];

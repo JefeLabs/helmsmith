@@ -15,6 +15,12 @@ describe('StorybrokrError', () => {
     expect(httpStatusFor('BAD_REQUEST')).toBe(400);
     expect(httpStatusFor('UNAUTHORIZED')).toBe(401);
     expect(httpStatusFor('NOT_FOUND')).toBe(404);
+    expect(httpStatusFor('BROWSER_UNAVAILABLE')).toBe(503);
+    expect(httpStatusFor('STORY_NOT_FOUND')).toBe(404);
+    expect(httpStatusFor('STORY_FAILED')).toBe(422);
+    expect(httpStatusFor('STORY_TIMEOUT')).toBe(504);
+    expect(httpStatusFor('SCREENSHOT_WRITE_FAILED')).toBe(500);
+    expect(httpStatusFor('INSTANCE_NOT_READY')).toBe(409);
   });
 
   it('carries code, status and an optional log tail', () => {

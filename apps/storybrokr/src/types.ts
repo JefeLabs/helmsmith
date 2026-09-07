@@ -61,6 +61,7 @@ export interface DaemonConfig {
   readinessTimeoutMs: number;
   reaperIntervalMs: number;
   autoStartWaitMs: number;
+  browserIdleMinutes: number; // 0 = never close the idle browser
 }
 
 export interface DaemonInfo {
@@ -68,4 +69,54 @@ export interface DaemonInfo {
   token: string;
   pid: number;
   startedAt: string;
+}
+
+/** Extra readiness condition after Storybook reports the story rendered (Suspense fallbacks). */
+export type WaitFor = { selector: string } | { text: string };
+
+export interface Viewport {
+  width: number;
+  height: number;
+}
+
+export interface CheckRequest {
+  storyIds?: string[]; // default: every story in the instance
+  waitFor?: WaitFor;
+  timeoutMs?: number; // per story; default 30000
+}
+
+export type CheckStatus = 'pass' | 'fail' | 'timeout';
+
+export interface CheckResult {
+  storyId: string;
+  status: CheckStatus;
+  played: boolean; // a `playing` phase was observed before completion
+  durationMs: number;
+  error?: { message: string; event: string; stack?: string };
+}
+
+export interface CheckResponse {
+  instanceId: string;
+  results: CheckResult[];
+  summary: { pass: number; fail: number; timeout: number };
+}
+
+export type ScreenshotClip = 'root' | 'viewport' | 'page';
+
+export interface ScreenshotRequest {
+  storyId: string;
+  outPath?: string; // absolute; default <configDir>/screenshots/<storyId>-<w>x<h>.png
+  viewport?: Viewport; // default 1280x720
+  clip?: ScreenshotClip; // default 'root'
+  waitFor?: WaitFor;
+  timeoutMs?: number; // default 30000
+}
+
+export interface ScreenshotResponse {
+  instanceId: string;
+  storyId: string;
+  path: string;
+  width: number;
+  height: number;
+  durationMs: number;
 }
