@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import type { Command } from 'commander';
 import { resolveHost } from '../lib/host.js';
+import { browserStatus } from '../server/browser.js';
 import { fail, printJson } from './_shared/output.js';
 
 /** Runs in-process (no daemon) so it works even when the daemon cannot start. */
@@ -14,7 +15,8 @@ export function registerDoctor(program: Command): void {
     .action((path: string | undefined, o: { json?: boolean }) => {
       try {
         const host = resolveHost(path ?? process.cwd());
-        if (o.json) return printJson(host);
+        const browser = browserStatus();
+        if (o.json) return printJson({ ...host, browser });
         console.log(`${chalk.green('ok')}  host       ${host.hostRoot}`);
         console.log(`${chalk.green('ok')}  main       ${host.mainFile}`);
         console.log(
@@ -28,6 +30,13 @@ export function registerDoctor(program: Command): void {
         );
         console.log(
           `${chalk.green('ok')}  aliases    ${Object.keys(host.tsconfigPaths).join(', ') || 'none'}`,
+        );
+        console.log(
+          `${browser.installed ? chalk.green('ok') : chalk.yellow('--')}  browser    ${
+            browser.installed
+              ? `chromium at ${browser.executablePath}`
+              : 'chromium not installed; fetched on first check/screenshot'
+          }`,
         );
       } catch (err) {
         fail(err, Boolean(o.json));
