@@ -46,14 +46,22 @@ describe('reduceSettle', () => {
       reason: 'story render errored',
       event: 'storyRenderPhaseChanged',
     });
-    expect(reduceSettle([phase('aborted')])).toMatchObject({ kind: 'fail', reason: 'story render aborted' });
+    expect(reduceSettle([phase('aborted')])).toMatchObject({
+      kind: 'fail',
+      reason: 'story render aborted',
+    });
   });
 
   it('surfaces the exception message when Storybook emits the errored phase before the exception event (Storybook 10.6 order)', () => {
     const events: SettleEvent[] = [
       phase('playing'),
       phase('errored'),
-      { kind: 'error', event: 'playFunctionThrewException', message: 'expected heading to have text', stack: 's' },
+      {
+        kind: 'error',
+        event: 'playFunctionThrewException',
+        message: 'expected heading to have text',
+        stack: 's',
+      },
     ];
     expect(reduceSettle(events)).toEqual({
       kind: 'fail',
@@ -78,7 +86,9 @@ describe('reduceSettle', () => {
 
   it('treats storyMissing as a failure', () => {
     expect(
-      reduceSettle([{ kind: 'error', event: 'storyMissing', message: 'story x is not in this preview' }]),
+      reduceSettle([
+        { kind: 'error', event: 'storyMissing', message: 'story x is not in this preview' },
+      ]),
     ).toMatchObject({ kind: 'fail', event: 'storyMissing' });
   });
 
@@ -138,18 +148,36 @@ const fast = { pollMs: 0, sleep: async () => {} };
 
 describe('settleStory', () => {
   it('navigates, polls until a terminal state, then waits for network idle', async () => {
-    const { page, calls } = fakePage([[], [phase('rendering')], [phase('rendering'), phase('completed')]]);
-    const out = await settleStory(page, { iframeUrl: 'http://x/iframe.html?id=a', timeoutMs: 5000, ...fast });
+    const { page, calls } = fakePage([
+      [],
+      [phase('rendering')],
+      [phase('rendering'), phase('completed')],
+    ]);
+    const out = await settleStory(page, {
+      iframeUrl: 'http://x/iframe.html?id=a',
+      timeoutMs: 5000,
+      ...fast,
+    });
     expect(out).toEqual({ kind: 'pass', played: false });
     expect(calls).toEqual(['goto http://x/iframe.html?id=a', 'load networkidle']);
   });
 
   it('honours waitFor text and selector after the render completes', async () => {
     const a = fakePage([[phase('completed')]]);
-    await settleStory(a.page, { iframeUrl: 'u', timeoutMs: 5000, waitFor: { text: 'Go' }, ...fast });
+    await settleStory(a.page, {
+      iframeUrl: 'u',
+      timeoutMs: 5000,
+      waitFor: { text: 'Go' },
+      ...fast,
+    });
     expect(a.calls).toContain('text Go');
     const b = fakePage([[phase('completed')]]);
-    await settleStory(b.page, { iframeUrl: 'u', timeoutMs: 5000, waitFor: { selector: 'h2' }, ...fast });
+    await settleStory(b.page, {
+      iframeUrl: 'u',
+      timeoutMs: 5000,
+      waitFor: { selector: 'h2' },
+      ...fast,
+    });
     expect(b.calls).toContain('selector h2');
   });
 
@@ -183,7 +211,12 @@ describe('settleStory', () => {
     });
     const b = fakePage([[phase('completed')]], { waitForFails: true });
     expect(
-      await settleStory(b.page, { iframeUrl: 'u', timeoutMs: 5000, waitFor: { text: 'never' }, ...fast }),
+      await settleStory(b.page, {
+        iframeUrl: 'u',
+        timeoutMs: 5000,
+        waitFor: { text: 'never' },
+        ...fast,
+      }),
     ).toEqual({ kind: 'timeout', lastPhase: 'completed' });
   });
 

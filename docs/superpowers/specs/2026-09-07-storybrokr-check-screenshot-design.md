@@ -2,6 +2,7 @@
 
 **Date:** 2026-09-07
 **Status:** approved design, pending implementation plan
+**Amended:** 2026-09-07 during implementation — reducer precedence (§2), `INSTANCE_NOT_READY` (§4).
 **Package:** `@helmsmith/storybrokr` 0.1.0 → 0.2.0 (minor)
 **Predecessor:** `2026-09-06-storybrokr-design.md`
 
@@ -95,8 +96,11 @@ one of:
 - `{ kind: 'pending' }` — no terminal signal yet
 - `{ kind: 'pass', phase: 'completed', played: boolean }` — `played` is true
   when a `playing` phase was observed before `completed`
-- `{ kind: 'fail', reason: string, event: string, stack?: string }` — first
-  exception event, or phase `errored` / `aborted`, or `storyMissing`
+- `{ kind: 'fail', reason: string, event: string, stack?: string }` — any
+  exception event anywhere in the list (Storybook 10.6 emits the `errored`
+  phase before `playFunctionThrewException`, so exceptions take precedence
+  over phases); otherwise the first terminal phase `errored` / `aborted`;
+  `storyMissing` is an exception event
 
 Being pure, it is unit-tested against recorded event lists with no browser.
 
@@ -173,6 +177,7 @@ New `ErrorCode` members and HTTP mappings:
 
 | Code | HTTP | When |
 |---|---|---|
+| `INSTANCE_NOT_READY` | 409 | check/screenshot targeted an instance whose status is not `ready` |
 | `BROWSER_UNAVAILABLE` | 503 | Chromium launch or lazy install failed; `logTail` carries installer output |
 | `STORY_NOT_FOUND` | 404 | A requested story id is not in the instance |
 | `STORY_FAILED` | 422 | Screenshot only: story errored before capture; `message` is the reducer's reason |

@@ -90,6 +90,8 @@ resets the clock); a `0` TTL disables reaping.
 | `storybrokr down <id \| --all>` | Stop |
 | `storybrokr open <id \| path> [--story <id>]` | Open the manager, or one story, in the browser |
 | `storybrokr touch <id>` | Reset the idle timer |
+| `storybrokr check <id> [--story <id>]... [--wait-for-text <t> \| --wait-for-selector <s>] [--timeout <ms>] [--json]` | Run stories headlessly; pass/fail per story, exit 1 on any failure |
+| `storybrokr screenshot <id> <story-id> [--out <path>] [--viewport <WxH>] [--clip root\|viewport\|page] [--wait-for-text <t> \| --wait-for-selector <s>] [--timeout <ms>] [--json]` | Write a PNG of one story |
 | `storybrokr logs <id> [--follow]` | Storybook output |
 | `storybrokr doctor [<path>]` | Pre-flight a host |
 | `storybrokr daemon start\|stop\|status` | Daemon control |
@@ -106,6 +108,30 @@ A few behaviors worth knowing:
 - `daemon status` prints `not running` only when no daemon answers on the
   configured home; any other failure is reported as an error, not silently
   treated as "not running".
+
+## Check and screenshot
+
+Both drive a headless Chromium that the daemon owns. `playwright` is a
+regular dependency; the browser itself is fetched on the first
+`check`/`screenshot` (`playwright install chromium`, logged by the daemon)
+and reused afterwards. `storybrokr doctor` shows whether it is present.
+
+A story **settles** when Storybook's preview reports its render phase
+`completed` (play functions run before that), network activity goes quiet,
+and, if given, `--wait-for-text` / `--wait-for-selector` matches. Hosts that
+show a Suspense fallback first ("Loading translations…") need the wait flag.
+
+- `check` runs every story in the instance (or `--story` ids) one after
+  another in a single browser context and prints one line per story. A
+  failing or timed-out story is a result row, not an error; the exit code
+  is 1 when any story is not `pass`. `played` is true when a play function
+  actually ran.
+- `screenshot` captures `#storybook-root`'s bounding box by default
+  (`--clip viewport` or `page` for the alternatives) at `--viewport`
+  (default `1280x720`). A relative `--out` resolves against your cwd; the
+  default is `<instance configDir>/screenshots/<story>-<WxH>.png`. It refuses
+  to capture a story that failed or timed out (`STORY_FAILED`,
+  `STORY_TIMEOUT`).
 
 ## MCP
 
@@ -124,10 +150,13 @@ claude mcp add storybrokr -- node apps/storybrokr/bin/storybrokr.mjs mcp
 
 The MCP server is a thin client of the same daemon the CLI talks to — tools
 are `storybrokr_up`, `storybrokr_list`, `storybrokr_get`, `storybrokr_down`,
-`storybrokr_logs`, `storybrokr_touch`, and `storybrokr_inspect_host`. `up`'s
-`ttlMinutes` is an integer over MCP (the CLI's `--ttl` is the one that takes
-fractions), and `wait: false` mirrors `--no-wait`. See `SKILL.md` for the
-full tool schemas and the instance record shape.
+`storybrokr_logs`, `storybrokr_touch`, `storybrokr_inspect_host`,
+`storybrokr_check`, and `storybrokr_screenshot`. `up`'s `ttlMinutes` is an
+integer over MCP (the CLI's `--ttl` is the one that takes fractions), and
+`wait: false` mirrors `--no-wait`. `storybrokr_screenshot` returns the
+written path, not the image; pass an absolute `outPath` to save outside the
+host repo. See `SKILL.md` for the full tool schemas and the instance record
+shape.
 
 ## Configuration
 
@@ -142,6 +171,7 @@ full tool schemas and the instance record shape.
 | `readinessTimeoutMs` | 120000 | How long to wait for an instance to report ready before `BOOT_TIMEOUT` |
 | `reaperIntervalMs` | 60000 | How often the daemon checks for idle instances |
 | `autoStartWaitMs` | 10000 | How long a client waits for an auto-started daemon to come up |
+| `browserIdleMinutes` | 10 | Minutes with no open check/screenshot before the daemon closes its Chromium; `0` keeps it open |
 
 `STORYBROKR_HOME` overrides the home directory (`~/.storybrokr` by default) —
 the daemon's lock, token, state, and config all move with it; the e2e suite
@@ -159,6 +189,12 @@ records whichever port was actually bound.
 - Exercised frameworks: `react-vite` runs in CI against a checked-in
   fixture; `@storybook/nextjs` is exercised opt-in (see Contributing) and
   isn't part of the CI gate.
+- The per-instance config dir lives under `node_modules/.cache/storybrokr/`,
+  which is the Vite config root Storybook's builder uses — so aliases or
+  plugins declared only in the host's `vite.config.ts` are not picked up,
+  and tsconfig `paths` are not forwarded. Declare them in
+  `.storybook/main.ts`'s `viteFinal` for now; forwarding the host Vite
+  config is a tracked follow-up.
 - The daemon only rediscovers instances still running from a previous
   session for hosts it already has a record of in `~/.storybrokr/state.json`.
   If that file is ever lost, instances left running in other hosts aren't

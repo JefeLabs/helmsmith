@@ -156,7 +156,8 @@ export async function settleStory(page: SettlePage, opts: SettleOptions): Promis
     for (const e of events) if (e.kind === 'phase') lastPhase = e.phase;
     state = reduceSettle(events);
     if (state.kind !== 'pending') break;
-    if (now() >= deadline) return lastPhase === undefined ? { kind: 'timeout' } : { kind: 'timeout', lastPhase };
+    if (now() >= deadline)
+      return lastPhase === undefined ? { kind: 'timeout' } : { kind: 'timeout', lastPhase };
     await sleep(pollMs);
   }
   if (state.kind === 'fail') return state;
