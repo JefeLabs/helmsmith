@@ -30,6 +30,8 @@ describe('storybrokr up / ls / get / logs / down against the fixture host', () =
       'atoms-button--secondary',
       'atoms-icon--star',
       'organisms-panel--default',
+      'organisms-panel--play-fails',
+      'organisms-panel--with-play',
     ]);
     expect(record.stories[0].iframeUrl).toMatch(
       /^http:\/\/127\.0\.0\.1:\d+\/iframe\.html\?id=.*&viewMode=story$/,
@@ -50,7 +52,7 @@ describe('storybrokr up / ls / get / logs / down against the fixture host', () =
     expect(list).toHaveLength(1);
     expect(list[0].id).toBe(again.id);
     const got = await runJson<InstanceRecord>(['get', again.id], { home });
-    expect(got.stories.length).toBe(4);
+    expect(got.stories.length).toBe(6);
     const logs = await runCli(['logs', again.id, '--tail', '500'], { home });
     expect(logs.stdout).toMatch(/Local:/);
   });
