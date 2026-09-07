@@ -5,7 +5,16 @@ import { fileURLToPath } from 'node:url';
 import { type ErrorBody, StorybrokrError } from '../lib/errors.js';
 import { daemonFile, homeDir } from '../lib/paths.js';
 import { loadConfig } from '../server/config.js';
-import type { DaemonInfo, HostInfo, InstanceRecord, UpRequest } from '../types.js';
+import type {
+  CheckRequest,
+  CheckResponse,
+  DaemonInfo,
+  HostInfo,
+  InstanceRecord,
+  ScreenshotRequest,
+  ScreenshotResponse,
+  UpRequest,
+} from '../types.js';
 
 export interface ConnectOptions {
   home?: string;
@@ -199,6 +208,20 @@ export class DaemonClient {
         `/v1/instances/${encodeURIComponent(id)}/touch`,
       )
     ).record;
+  }
+  check(id: string, req: CheckRequest = {}): Promise<CheckResponse> {
+    return this.request<CheckResponse>(
+      'POST',
+      `/v1/instances/${encodeURIComponent(id)}/check`,
+      req,
+    );
+  }
+  screenshot(id: string, req: ScreenshotRequest): Promise<ScreenshotResponse> {
+    return this.request<ScreenshotResponse>(
+      'POST',
+      `/v1/instances/${encodeURIComponent(id)}/screenshot`,
+      req,
+    );
   }
   async logs(id: string, tail = 200): Promise<string[]> {
     return (

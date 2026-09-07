@@ -11,6 +11,7 @@ import type { Spawner } from '../lib/spawn.js';
 import { Broker } from '../server/broker.js';
 import { DEFAULT_CONFIG } from '../server/config.js';
 import { createDaemon, type Daemon } from '../server/daemon.js';
+import type { Inspector } from '../server/inspector.js';
 import { Registry } from '../server/registry.js';
 import type { InstanceRecord } from '../types.js';
 import { DaemonClient, resolveDaemonEntry } from './index.js';
@@ -21,10 +22,37 @@ const neverSpawner: Spawner = {
   },
 };
 
-function fakeDaemon(home: string): { registry: Registry; broker: Broker; daemon: Daemon } {
+function makeRecord(id = 'r1'): InstanceRecord {
+  return {
+    id,
+    hostRoot: '/h',
+    component: 'src/X',
+    framework: 'x',
+    port: 6100,
+    url: 'http://127.0.0.1:6100',
+    pid: 1,
+    status: 'ready',
+    createdAt: 'c',
+    lastTouchedAt: 't',
+    ttlMinutes: 30,
+    storyFiles: [],
+    stories: [],
+    configDir: `/h/node_modules/.cache/storybrokr/${id}`,
+  };
+}
+
+function fakeDaemon(
+  home: string,
+  inspector?: Partial<Inspector>,
+): { registry: Registry; broker: Broker; daemon: Daemon } {
   const registry = new Registry({ home, config: DEFAULT_CONFIG });
   const broker = new Broker({ registry, spawner: neverSpawner, config: DEFAULT_CONFIG });
-  const daemon = createDaemon({ home, broker, config: DEFAULT_CONFIG });
+  const daemon = createDaemon({
+    home,
+    broker,
+    config: DEFAULT_CONFIG,
+    inspector: inspector as Inspector,
+  });
   return { registry, broker, daemon };
 }
 
@@ -209,6 +237,31 @@ describe('DaemonClient', () => {
       code: 'DAEMON_UNAVAILABLE',
     });
     expect(Date.now() - start).toBeLessThan(5_000);
+  });
+
+  it('check and screenshot post JSON bodies and unwrap responses or coded errors', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'sb-client-'));
+    homes.push(home);
+    const seen: unknown[] = [];
+    const { daemon, registry } = fakeDaemon(home, {
+      check: async (record, req) => {
+        seen.push(req);
+        return { instanceId: record.id, results: [], summary: { pass: 0, fail: 0, timeout: 0 } };
+      },
+      screenshot: async () => {
+        throw new StorybrokrError('STORY_FAILED', 'nope');
+      },
+    });
+    daemons.push(daemon);
+    await daemon.start(0);
+    registry.add(makeRecord('r1'));
+    const client = await DaemonClient.connect({ home, autoStart: false });
+    const res = await client.check('r1', { storyIds: ['a--b'], timeoutMs: 2000 });
+    expect(res.instanceId).toBe('r1');
+    expect(seen[0]).toEqual({ storyIds: ['a--b'], timeoutMs: 2000 });
+    await expect(client.screenshot('r1', { storyId: 'a--b' })).rejects.toMatchObject({
+      code: 'STORY_FAILED',
+    });
   });
 });
 
