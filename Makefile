@@ -3,19 +3,25 @@
 # Why a Makefile and not `pnpm release`: the root `release` script runs
 # `changeset publish`, which does NOT publish only what has changesets. It
 # publishes every non-private package whose local version is absent from the
-# registry — currently ten @helmsmith/* names that have never been released
-# (gitradar, gittyup, mech-pencil, pritty, taskmaster, timetracker, toolz,
-# cli-kit, workspace, skillzkit). Claiming a name on npm is irreversible, so
-# publishing goes through an explicit allowlist instead.
+# registry — including @helmsmith/* names that have never been released and
+# would not even install: gitradar, gittyup, mech-pencil, pritty, taskmaster,
+# timetracker, toolz, and skillzkit all depend on the private
+# tui-view-components (`pnpm release:plan` prints the current BLOCKED list).
+# Claiming a name on npm is irreversible, so publishing goes through an
+# explicit allowlist instead. @helmsmith/workspace has no blockers but stays
+# off the list until it is meant to ship.
 #
 #   make status                 what would publish, local vs npm
 #   make version                apply changesets + build (pre-publish)
 #   make publish-dry            pack and inspect, no upload
 #   make publish OTP=123456     publish the allowlist, in order
 
-# Order matters: flow-spec first — flow-designer pins it at an exact version,
-# so publishing the dependent first leaves it briefly unresolvable.
-PUBLISH_PKGS ?= @helmsmith/flow-spec @helmsmith/flow-designer
+# Order matters: a dependency before its dependents. pnpm rewrites
+# `workspace:*` to the exact local version at pack time, so publishing the
+# dependent first leaves it briefly unresolvable.
+#   flow-spec → flow-designer
+#   cli-kit   → storybrokr
+PUBLISH_PKGS ?= @helmsmith/flow-spec @helmsmith/flow-designer @helmsmith/cli-kit @helmsmith/storybrokr
 
 PACK_DIR ?= /tmp/helmsmith-pack
 
@@ -106,10 +112,19 @@ publish-web: build
 	@echo
 	@$(MAKE) --no-print-directory status
 
-publish: require-otp build
+# A release rarely bumps every package on the allowlist, and npm refuses to
+# publish over an existing version — so a package whose local version is
+# already on the registry is skipped rather than aborting the whole loop.
+publish: build
 	@for p in $(PUBLISH_PKGS); do \
-		echo "==> publish $$p"; \
-		pnpm --filter $$p publish --access public --no-git-checks --otp=$(OTP) || exit 1; \
+		local_v=$$(pnpm --filter $$p exec node -p "require('./package.json').version" 2>/dev/null | tail -1); \
+		npm_v=$$(npm view $$p version 2>/dev/null || echo "-"); \
+		if [ "$$local_v" = "$$npm_v" ]; then \
+			echo "==> skip $$p ($$local_v is already on npm)"; \
+			continue; \
+		fi; \
+		echo "==> publish $$p $$local_v"; \
+		pnpm --filter $$p publish --access public --no-git-checks || exit 1; \
 	done
 	@echo
 	@$(MAKE) --no-print-directory status

@@ -46,8 +46,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ecruz165/agentx-toolbox.git",
+    "url": "https://github.com/JefeLabs/helmsmith.git",
     "directory": "platform/core/cli-kit-lib"
   },
-  "license": "UNLICENSED"
+  "license": "Apache-2.0"
 }
