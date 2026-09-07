@@ -15,6 +15,8 @@ import { daemonFile, lockFile } from '../lib/paths.js';
 import type { DaemonConfig, DaemonInfo } from '../types.js';
 import { VERSION } from '../version.js';
 import type { Broker } from './broker.js';
+import { BrowserPool } from './browser.js';
+import { createInspector, type Inspector, type InspectorContext } from './inspector.js';
 import { handle } from './routes.js';
 
 export interface Daemon {
@@ -29,6 +31,7 @@ export interface DaemonOptions {
   broker: Broker;
   config: DaemonConfig;
   token?: string;
+  inspector?: Inspector;
 }
 
 /** Constant-time bearer comparison over equal-length buffers; a length mismatch (which already
@@ -87,6 +90,16 @@ export function createDaemon(opts: DaemonOptions): Daemon {
   let reaper: NodeJS.Timeout | null = null;
   let started = false;
   const startedAt = Date.now();
+  const pool = new BrowserPool({
+    idleMinutes: opts.config.browserIdleMinutes,
+    log: (line) => console.error(`storybrokr: browser: ${line}`),
+  });
+  const inspector =
+    opts.inspector ??
+    createInspector({
+      // Playwright's BrowserContext satisfies InspectorContext structurally; the cast only narrows overloads.
+      pool: { acquire: (v) => pool.acquire(v) as unknown as Promise<InspectorContext> },
+    });
 
   const stop = async (): Promise<void> => {
     if (reaper) clearInterval(reaper);
@@ -96,6 +109,9 @@ export function createDaemon(opts: DaemonOptions): Daemon {
     if (!started) return;
     started = false;
     await opts.broker.downAll();
+    await pool
+      .close()
+      .catch((err: unknown) => console.error('storybrokr: browser close failed', err));
     // An open ?follow=1 SSE response otherwise keeps this connection (and server.close) pending.
     server?.closeAllConnections();
     if (server) await new Promise<void>((r) => server?.close(() => r()));
@@ -113,6 +129,7 @@ export function createDaemon(opts: DaemonOptions): Daemon {
       acquireLock(opts.home);
       const ctx = {
         broker: opts.broker,
+        inspector,
         version: VERSION,
         startedAt,
         pid: process.pid,

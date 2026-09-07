@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { z } from 'zod';
 import { type ErrorBody, httpStatusFor, StorybrokrError, toErrorBody } from '../lib/errors.js';
 import type { Broker } from './broker.js';
+import type { Inspector } from './inspector.js';
 
 const UpBody = z.object({
   component: z.string().min(1),
@@ -11,6 +12,32 @@ const UpBody = z.object({
 });
 
 const InspectBody = z.object({ path: z.string().min(1) });
+
+const WaitForBody = z.union([
+  z.object({ selector: z.string().min(1) }),
+  z.object({ text: z.string().min(1) }),
+]);
+const TimeoutMs = z.number().int().min(1000).max(300_000).optional();
+
+const CheckBody = z.object({
+  storyIds: z.array(z.string().min(1)).min(1).optional(),
+  waitFor: WaitForBody.optional(),
+  timeoutMs: TimeoutMs,
+});
+
+const ScreenshotBody = z.object({
+  storyId: z.string().min(1),
+  outPath: z.string().min(1).optional(),
+  viewport: z
+    .object({
+      width: z.number().int().min(1).max(10_000),
+      height: z.number().int().min(1).max(10_000),
+    })
+    .optional(),
+  clip: z.enum(['root', 'viewport', 'page']).optional(),
+  waitFor: WaitForBody.optional(),
+  timeoutMs: TimeoutMs,
+});
 
 /** Validates a parsed JSON body against a zod schema, mapping a failure to BAD_REQUEST instead
  * of letting an unvalidated shape reach the broker (e.g. `{}` → TypeError → 500). */
@@ -26,6 +53,7 @@ function parseBody<T>(schema: z.ZodType<T>, raw: unknown): T {
 
 export interface RouteContext {
   broker: Broker;
+  inspector: Inspector;
   version: string;
   startedAt: number;
   pid: number;
@@ -104,6 +132,16 @@ export async function handle(
       }
       if (parts.length === 4 && parts[3] === 'touch' && method === 'POST')
         return send(res, 200, { record: ctx.broker.touch(id) });
+      if (parts.length === 4 && parts[3] === 'check' && method === 'POST') {
+        const body = parseBody(CheckBody, await readJson(req));
+        const record = ctx.broker.get(id); // touches the instance
+        return send(res, 200, await ctx.inspector.check(record, body));
+      }
+      if (parts.length === 4 && parts[3] === 'screenshot' && method === 'POST') {
+        const body = parseBody(ScreenshotBody, await readJson(req));
+        const record = ctx.broker.get(id);
+        return send(res, 200, await ctx.inspector.screenshot(record, body));
+      }
       if (parts.length === 4 && parts[3] === 'logs' && method === 'GET') {
         const rawTail = Number(url.searchParams.get('tail') ?? '200');
         const tail = Number.isInteger(rawTail) && rawTail > 0 ? rawTail : 200;

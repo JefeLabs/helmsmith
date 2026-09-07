@@ -9,6 +9,7 @@ import type { InstanceRecord } from '../types.js';
 import { Broker } from './broker.js';
 import { DEFAULT_CONFIG } from './config.js';
 import { createDaemon, type Daemon } from './daemon.js';
+import type { Inspector } from './inspector.js';
 import { Registry } from './registry.js';
 
 const neverSpawner: Spawner = {
@@ -49,15 +50,15 @@ describe('daemon', () => {
     for (const h of homes) rmSync(h, { recursive: true, force: true });
   });
 
-  async function boot(broker?: Broker) {
+  async function boot(broker?: Broker, inspector?: Inspector) {
     const home = mkdtempSync(join(tmpdir(), 'sb-daemon-'));
     homes.push(home);
     const registry = new Registry({ home, config: DEFAULT_CONFIG });
     const b = broker ?? new Broker({ registry, spawner: neverSpawner, config: DEFAULT_CONFIG });
-    const daemon = createDaemon({ home, broker: b, config: DEFAULT_CONFIG });
+    const daemon = createDaemon({ home, broker: b, config: DEFAULT_CONFIG, inspector });
     daemons.push(daemon);
     const info = await daemon.start(0);
-    return { home, daemon, info, broker: b };
+    return { home, daemon, info, broker: b, registry };
   }
 
   it('writes daemon.json (0600) and the lock, serves health without a token, and rejects others without it', async () => {
@@ -307,6 +308,87 @@ describe('daemon', () => {
 
     await fetch(`${daemon.url}/v1/instances/r1/logs?tail=abc`, { headers: h });
     expect(logs).toHaveBeenCalledWith('r1', 200);
+  });
+
+  it('routes check and screenshot to the inspector with validated bodies, touching the instance', async () => {
+    const calls: unknown[] = [];
+    const inspector: Inspector = {
+      check: async (record, req) => {
+        calls.push(['check', record.id, req]);
+        return { instanceId: record.id, results: [], summary: { pass: 0, fail: 0, timeout: 0 } };
+      },
+      screenshot: async (record, req) => {
+        calls.push(['screenshot', record.id, req]);
+        return {
+          instanceId: record.id,
+          storyId: req.storyId,
+          path: '/p.png',
+          width: 1,
+          height: 1,
+          durationMs: 5,
+        };
+      },
+    };
+    const { daemon, registry } = await boot(undefined, inspector);
+    registry.add({ ...makeRecord('r1'), lastTouchedAt: '2000-01-01T00:00:00.000Z' });
+    const auth = { authorization: `Bearer ${daemon.token}`, 'content-type': 'application/json' };
+
+    const check = await fetch(`${daemon.url}/v1/instances/r1/check`, {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ storyIds: ['x--a'], waitFor: { text: 'Go' }, timeoutMs: 5000 }),
+    });
+    expect(check.status).toBe(200);
+    expect(await check.json()).toMatchObject({ instanceId: 'r1', summary: { pass: 0 } });
+    expect(calls[0]).toEqual([
+      'check',
+      'r1',
+      { storyIds: ['x--a'], waitFor: { text: 'Go' }, timeoutMs: 5000 },
+    ]);
+    expect(registry.get('r1')?.lastTouchedAt).not.toBe('2000-01-01T00:00:00.000Z');
+
+    const shot = await fetch(`${daemon.url}/v1/instances/r1/screenshot`, {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({
+        storyId: 'x--a',
+        viewport: { width: 640, height: 480 },
+        clip: 'page',
+      }),
+    });
+    expect(shot.status).toBe(200);
+    expect(await shot.json()).toMatchObject({ path: '/p.png' });
+    expect(calls[1]).toEqual([
+      'screenshot',
+      'r1',
+      { storyId: 'x--a', viewport: { width: 640, height: 480 }, clip: 'page' },
+    ]);
+
+    const bad = await fetch(`${daemon.url}/v1/instances/r1/screenshot`, {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ storyId: 'x--a', clip: 'sideways' }),
+    });
+    expect(bad.status).toBe(400);
+    expect(await bad.json()).toMatchObject({
+      code: 'BAD_REQUEST',
+      message: expect.stringMatching(/clip/),
+    });
+
+    const tooLong = await fetch(`${daemon.url}/v1/instances/r1/check`, {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ timeoutMs: 999 }),
+    });
+    expect(tooLong.status).toBe(400);
+
+    const missing = await fetch(`${daemon.url}/v1/instances/nope/check`, {
+      method: 'POST',
+      headers: auth,
+      body: '{}',
+    });
+    expect(missing.status).toBe(404);
+    expect(await missing.json()).toMatchObject({ code: 'INSTANCE_NOT_FOUND' });
   });
 
   it('normalizes daemon.json permissions to 0600 even if the file pre-existed with looser perms', async () => {
