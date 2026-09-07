@@ -52,7 +52,13 @@ function harness(
     waitForLoadState: async () => {},
     waitForSelector: async () => ({}),
     getByText: () => ({ waitFor: async () => {} }),
-    locator: () => ({ boundingBox: async () => box }),
+    locator: () => ({
+      boundingBox: async () => box,
+      screenshot: async () => {
+        shots.push('element');
+        return png(300, 200);
+      },
+    }),
     screenshot: async (o: unknown) => {
       shots.push(o);
       return png(300, 200);
@@ -145,7 +151,7 @@ describe('inspector.screenshot', () => {
     const h = harness({});
     const res = await h.inspector.screenshot(record, { storyId: 'panel--a' });
     expect(h.acquire).toHaveBeenCalledWith({ width: 1280, height: 720 });
-    expect(h.shots[0]).toEqual({ fullPage: true, clip: { x: 1, y: 2, width: 300, height: 200 } });
+    expect(h.shots[0]).toEqual('element');
     expect(h.writes[0].path).toBe(
       '/h/node_modules/.cache/storybrokr/inst1/screenshots/panel--a-1280x720.png',
     );

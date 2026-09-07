@@ -17,6 +17,7 @@ import type {
 export interface InspectorPage extends SettlePage {
   locator(selector: string): {
     boundingBox(): Promise<{ x: number; y: number; width: number; height: number } | null>;
+    screenshot(): Promise<Buffer>;
   };
   screenshot(opts?: {
     fullPage?: boolean;
@@ -177,18 +178,16 @@ export function createInspector(deps: InspectorDeps): Inspector {
         if (clip === 'page') png = await page.screenshot({ fullPage: true });
         else if (clip === 'viewport') png = await page.screenshot({});
         else {
-          const box = await page.locator('#storybook-root').boundingBox();
+          // Capture #storybook-root as an element screenshot rather than computing a clip box:
+          // locator.boundingBox() is viewport-relative, but Playwright's `clip` under
+          // `fullPage: true` is document-relative, so combining them silently screenshots the
+          // wrong region once the page is scrolled. locator.screenshot() lets Playwright convert
+          // coordinates itself.
+          const root = page.locator('#storybook-root');
+          const box = await root.boundingBox();
           png =
             box && box.width > 0 && box.height > 0
-              ? await page.screenshot({
-                  fullPage: true,
-                  clip: {
-                    x: box.x,
-                    y: box.y,
-                    width: Math.ceil(box.width),
-                    height: Math.ceil(box.height),
-                  },
-                })
+              ? await root.screenshot()
               : await page.screenshot({});
         }
       } finally {
