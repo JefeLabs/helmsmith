@@ -211,11 +211,14 @@ pnpm --filter @helmsmith/storybrokr test:e2e   # builds, then drives the built C
 
 `test:e2e` builds the package and runs it against the checked-in
 `tests/e2e/fixtures/host-react-vite` fixture, using ports 6100–6199 on an
-isolated `STORYBROKR_HOME`. Two more suites are opt-in, off by default:
+isolated `STORYBROKR_HOME`. One more suite is opt-in, off by default:
 
 - `STORYBROKR_E2E_HOST=<path>` (optionally with `STORYBROKR_E2E_COMPONENT=<path>`)
   points the e2e suite at a real external host instead of the fixture —
   useful for exercising a framework other than react-vite, like Next.js.
-- `STORYBROKR_E2E_RENDER=1` additionally runs a headless render check; it
-  needs a resolvable `playwright` (set `STORYBROKR_PLAYWRIGHT_DIR` if it
-  isn't hoisted to somewhere Node can resolve it from).
+
+The e2e suite drives a headless Chromium for the render, check, and
+screenshot tests, so it needs Playwright's browser installed once per
+machine:
+`pnpm --filter @helmsmith/storybrokr exec playwright install chromium`.
+CI runs the same install step before `test:e2e`.
