@@ -26,7 +26,9 @@ export interface InspectorPage extends SettlePage {
 }
 
 export interface InspectorContext {
-  addInitScript(script: string): Promise<void>;
+  // Playwright's BrowserContext#addInitScript resolves to a Disposable, not void; widened to
+  // Promise<unknown> so a real BrowserContext satisfies this interface without a cast.
+  addInitScript(script: string): Promise<unknown>;
   newPage(): Promise<InspectorPage>;
   close(): Promise<void>;
 }

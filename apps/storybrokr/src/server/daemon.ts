@@ -16,7 +16,7 @@ import type { DaemonConfig, DaemonInfo } from '../types.js';
 import { VERSION } from '../version.js';
 import type { Broker } from './broker.js';
 import { BrowserPool } from './browser.js';
-import { createInspector, type Inspector, type InspectorContext } from './inspector.js';
+import { createInspector, type Inspector } from './inspector.js';
 import { handle } from './routes.js';
 
 export interface Daemon {
@@ -97,8 +97,7 @@ export function createDaemon(opts: DaemonOptions): Daemon {
   const inspector =
     opts.inspector ??
     createInspector({
-      // Playwright's BrowserContext satisfies InspectorContext structurally; the cast only narrows overloads.
-      pool: { acquire: (v) => pool.acquire(v) as unknown as Promise<InspectorContext> },
+      pool,
     });
 
   const stop = async (): Promise<void> => {

@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { isAbsolute } from 'node:path';
 import { z } from 'zod';
 import { type ErrorBody, httpStatusFor, StorybrokrError, toErrorBody } from '../lib/errors.js';
 import type { Broker } from './broker.js';
@@ -27,7 +28,7 @@ const CheckBody = z.object({
 
 const ScreenshotBody = z.object({
   storyId: z.string().min(1),
-  outPath: z.string().min(1).optional(),
+  outPath: z.string().min(1).refine(isAbsolute, { message: 'must be an absolute path' }).optional(),
   viewport: z
     .object({
       width: z.number().int().min(1).max(10_000),

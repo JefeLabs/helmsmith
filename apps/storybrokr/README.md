@@ -125,7 +125,9 @@ show a Suspense fallback first ("Loading translations…") need the wait flag.
   another in a single browser context and prints one line per story. A
   failing or timed-out story is a result row, not an error; the exit code
   is 1 when any story is not `pass`. `played` is true when a play function
-  actually ran.
+  actually ran. `check` runs every story sequentially, so a whole-instance
+  run can take story-count × timeout; the client waits as long as the
+  daemon does.
 - `screenshot` captures `#storybook-root`'s bounding box by default
   (`--clip viewport` or `page` for the alternatives) at `--viewport`
   (default `1280x720`). A relative `--out` resolves against your cwd; the

@@ -146,7 +146,7 @@ export function buildMcpServer(connect: () => Promise<DaemonClient>): McpServer 
           .string()
           .optional()
           .describe(
-            'Absolute output path; default <instance configDir>/screenshots/<story>-<WxH>.png',
+            'Absolute output path (relative paths are rejected); default <instance configDir>/screenshots/<story>-<WxH>.png',
           ),
         viewport: z
           .object({

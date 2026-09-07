@@ -184,4 +184,12 @@ describe('BrowserPool', () => {
     await p.close();
     await p.close();
   });
+
+  it('resets openContexts to 0 when the browser disconnects without its contexts closing', async () => {
+    const { p, browser } = pool();
+    await p.acquire();
+    expect(p.openContexts).toBe(1);
+    await browser.close(); // fires 'disconnected' without the context's 'close' event firing
+    expect(p.openContexts).toBe(0);
+  });
 });

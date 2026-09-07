@@ -375,6 +375,17 @@ describe('daemon', () => {
       message: expect.stringMatching(/clip/),
     });
 
+    const relativeOutPath = await fetch(`${daemon.url}/v1/instances/r1/screenshot`, {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ storyId: 'x--a', outPath: 'shots/a.png' }),
+    });
+    expect(relativeOutPath.status).toBe(400);
+    expect(await relativeOutPath.json()).toMatchObject({
+      code: 'BAD_REQUEST',
+      message: expect.stringMatching(/outPath/),
+    });
+
     const tooLong = await fetch(`${daemon.url}/v1/instances/r1/check`, {
       method: 'POST',
       headers: auth,

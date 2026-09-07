@@ -20,6 +20,13 @@ function isError(e: SettleEvent): e is Extract<SettleEvent, { kind: 'error' }> {
   return e.kind === 'error';
 }
 
+/** True for a Playwright `TimeoutError` rejection (an object with `name === 'TimeoutError'`). */
+function isTimeoutError(err: unknown): boolean {
+  return (
+    typeof err === 'object' && err !== null && (err as { name?: unknown }).name === 'TimeoutError'
+  );
+}
+
 /**
  * Precedence: any exception event anywhere in the array is fail, full stop — otherwise the first
  * terminal phase (`completed`/`errored`/`aborted`) wins.
@@ -104,7 +111,7 @@ export const RECORDER_SCRIPT = `(() => {
 
 /** The slice of a Playwright Page the driver needs; a fake satisfies it in unit tests. */
 export interface SettlePage {
-  goto(url: string): Promise<unknown>;
+  goto(url: string, opts: { timeout: number }): Promise<unknown>;
   evaluate(expression: string): Promise<unknown>;
   waitForLoadState(state: 'networkidle', opts: { timeout: number }): Promise<void>;
   waitForSelector(selector: string, opts: { timeout: number }): Promise<unknown>;
@@ -126,11 +133,15 @@ const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
 /**
  * Navigates to the story and waits until it settles: a terminal reducer state, then (on pass)
- * network idle and the optional waitFor. The whole thing shares one `timeoutMs` budget.
+ * network idle and the optional waitFor. The whole thing shares one `timeoutMs` budget,
+ * including the initial navigation, which is passed `remaining()` as its own timeout rather than
+ * relying on Playwright's 30s default.
  * The caller must have installed RECORDER_SCRIPT on the page's context.
  * Driver failures (navigation or evaluation errors, e.g. the page navigating away or its frame
  * being detached mid-poll) are reported as `fail` with event `driver` rather than thrown, so a
  * single story's transient driver error surfaces as a result row, not a request-level exception.
+ * A navigation or evaluation rejection whose `name` is `'TimeoutError'` is reported as `timeout`
+ * instead, so a slow first load is not misreported as a story failure.
  */
 export async function settleStory(page: SettlePage, opts: SettleOptions): Promise<SettleOutcome> {
   const now = opts.now ?? Date.now;
@@ -141,9 +152,16 @@ export async function settleStory(page: SettlePage, opts: SettleOptions): Promis
   let lastPhase: string | undefined;
 
   try {
-    await page.goto(opts.iframeUrl);
+    await page.goto(opts.iframeUrl, { timeout: remaining() });
   } catch (err) {
-    return { kind: 'fail', reason: `driver error: ${(err as Error).message}`, event: 'driver' };
+    if (isTimeoutError(err)) {
+      return lastPhase === undefined ? { kind: 'timeout' } : { kind: 'timeout', lastPhase };
+    }
+    return {
+      kind: 'fail',
+      reason: `driver error: ${err instanceof Error ? err.message : String(err)}`,
+      event: 'driver',
+    };
   }
   let state: SettleState = { kind: 'pending' };
   for (;;) {
@@ -151,7 +169,14 @@ export async function settleStory(page: SettlePage, opts: SettleOptions): Promis
     try {
       events = (await page.evaluate(EVENTS_EXPRESSION)) as SettleEvent[];
     } catch (err) {
-      return { kind: 'fail', reason: `driver error: ${(err as Error).message}`, event: 'driver' };
+      if (isTimeoutError(err)) {
+        return lastPhase === undefined ? { kind: 'timeout' } : { kind: 'timeout', lastPhase };
+      }
+      return {
+        kind: 'fail',
+        reason: `driver error: ${err instanceof Error ? err.message : String(err)}`,
+        event: 'driver',
+      };
     }
     for (const e of events) if (e.kind === 'phase') lastPhase = e.phase;
     state = reduceSettle(events);

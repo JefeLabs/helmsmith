@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-07
 **Status:** approved design, pending implementation plan
-**Amended:** 2026-09-07 during implementation — reducer precedence (§2), `INSTANCE_NOT_READY` (§4).
+**Amended:** 2026-09-07 during implementation — reducer precedence (§2), `INSTANCE_NOT_READY` (§4), doctor row wording (§1).
 **Package:** `@helmsmith/storybrokr` 0.1.0 → 0.2.0 (minor)
 **Predecessor:** `2026-09-06-storybrokr-design.md`
 
@@ -70,9 +70,9 @@ await the same install promise. On non-zero exit the pool throws
 install is a one-time cost per machine; Playwright caches the browser in its
 default location.
 
-**Doctor.** `storybrokr doctor` gains a `browser` row: `chromium <version>
-at <path>` when present, `not installed; fetched on first check/screenshot`
-when absent. Never triggers the install itself.
+**Doctor.** `storybrokr doctor` gains a `browser` row: `chromium at <path>`
+when present, `not installed; fetched on first check/screenshot` when
+absent. Never triggers the install itself.
 
 ## 2. Story settle protocol
 

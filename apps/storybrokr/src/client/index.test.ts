@@ -118,6 +118,30 @@ describe('DaemonClient', () => {
     expect(await client.list()).toEqual([]);
   });
 
+  it('re-reads daemon.json and retries once on the long (check/screenshot) path when the token has rotated (401)', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'sb-client-'));
+    homes.push(home);
+    const { daemon: daemonA } = fakeDaemon(home);
+    daemons.push(daemonA);
+    const infoA = await daemonA.start(0);
+    const client = await DaemonClient.connect({ home, autoStart: false });
+    await daemonA.stop();
+    const { daemon: daemonB, registry } = fakeDaemon(home, {
+      check: async (record) => ({
+        instanceId: record.id,
+        results: [],
+        summary: { pass: 0, fail: 0, timeout: 0 },
+      }),
+    });
+    daemons.push(daemonB);
+    // Rebind to A's now-freed port so the client's stored URL is still valid — only the token
+    // (written fresh into daemon.json by daemonB.start) differs.
+    await daemonB.start(infoA.port);
+    registry.add(makeRecord('r1'));
+    const res = await client.check('r1');
+    expect(res.instanceId).toBe('r1');
+  });
+
   it('maps a non-JSON error response to DAEMON_UNAVAILABLE instead of a bare SyntaxError', async () => {
     const home = mkdtempSync(join(tmpdir(), 'sb-client-'));
     homes.push(home);

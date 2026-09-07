@@ -108,15 +108,17 @@ function fakePage(
   opts: {
     networkIdleRejects?: boolean;
     waitForFails?: boolean;
-    gotoRejects?: Error;
+    gotoRejects?: unknown;
     evaluateRejectsAt?: number;
   } = {},
 ) {
   const calls: string[] = [];
+  const gotoOpts: { timeout: number }[] = [];
   let i = 0;
   const page: SettlePage = {
-    goto: async (url) => {
+    goto: async (url, gotoOptsArg) => {
       calls.push(`goto ${url}`);
+      gotoOpts.push(gotoOptsArg);
       if (opts.gotoRejects) throw opts.gotoRejects;
     },
     evaluate: async () => {
@@ -141,7 +143,7 @@ function fakePage(
       },
     }),
   };
-  return { page, calls };
+  return { page, calls, gotoOpts };
 }
 
 const fast = { pollMs: 0, sleep: async () => {} };
@@ -195,7 +197,7 @@ describe('settleStory', () => {
     const { page } = fakePage([[phase('loading')], [phase('rendering')]]);
     const out = await settleStory(page, {
       iframeUrl: 'u',
-      timeoutMs: 100,
+      timeoutMs: 140,
       pollMs: 0,
       sleep: async () => {},
       now: () => (t += 60),
@@ -238,6 +240,26 @@ describe('settleStory', () => {
       event: 'driver',
       reason: 'driver error: Execution context was destroyed',
     });
+  });
+
+  it('reports a driver rejection with a non-Error reason instead of "undefined"', async () => {
+    const { page } = fakePage([[]], { gotoRejects: 'boom' });
+    const out = await settleStory(page, { iframeUrl: 'u', timeoutMs: 5000, ...fast });
+    expect(out).toEqual({ kind: 'fail', reason: 'driver error: boom', event: 'driver' });
+  });
+
+  it('reports a goto TimeoutError as a timeout rather than a driver failure', async () => {
+    const err = new Error('Timeout 30000ms exceeded');
+    err.name = 'TimeoutError';
+    const { page } = fakePage([[]], { gotoRejects: err });
+    const out = await settleStory(page, { iframeUrl: 'u', timeoutMs: 5000, ...fast });
+    expect(out).toEqual({ kind: 'timeout' });
+  });
+
+  it('bounds goto by the remaining story budget', async () => {
+    const { page, gotoOpts } = fakePage([[phase('completed')]]);
+    await settleStory(page, { iframeUrl: 'u', timeoutMs: 12_345, now: () => 1_000, ...fast });
+    expect(gotoOpts).toEqual([{ timeout: 12_345 }]);
   });
 });
 

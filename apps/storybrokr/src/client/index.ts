@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
+import { request as httpRequest } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { type ErrorBody, StorybrokrError } from '../lib/errors.js';
@@ -166,6 +167,95 @@ export class DaemonClient {
     return json as T;
   }
 
+  /**
+   * One attempt of a `node:http` request with no timeout of its own, unlike `fetch`'s undying
+   * 300s default header timeout. Used for `check`/`screenshot`, which can legitimately run
+   * story-count × timeoutMs.
+   */
+  private attemptLong(
+    method: string,
+    path: string,
+    payload: string | undefined,
+  ): Promise<{ status: number; text: string }> {
+    const token = this.info.token;
+    return new Promise((resolve, reject) => {
+      const req = httpRequest(
+        `${this.url}${path}`,
+        {
+          method,
+          headers: {
+            authorization: `Bearer ${token}`,
+            'content-type': 'application/json',
+          },
+        },
+        (res) => {
+          const chunks: Buffer[] = [];
+          res.on('data', (c: Buffer) => chunks.push(c));
+          res.on('end', () => {
+            resolve({ status: res.statusCode ?? 0, text: Buffer.concat(chunks).toString('utf8') });
+          });
+          res.on('error', (err) => {
+            reject(
+              new StorybrokrError(
+                'DAEMON_UNAVAILABLE',
+                `daemon at ${this.url} is not answering: ${err.message}`,
+              ),
+            );
+          });
+        },
+      );
+      req.on('error', (err) => {
+        reject(
+          new StorybrokrError(
+            'DAEMON_UNAVAILABLE',
+            `daemon at ${this.url} is not answering: ${err.message}`,
+          ),
+        );
+      });
+      if (payload !== undefined) req.write(payload);
+      req.end();
+    });
+  }
+
+  /**
+   * Same request/response mapping as `request()` (204 → undefined, non-JSON → coded error,
+   * non-2xx JSON → StorybrokrError, stale-token 401 retried once) but over `node:http` with no
+   * timeout, so a whole-instance `check`/`screenshot` that legitimately runs past `fetch`'s 300s
+   * header-timeout ceiling still gets its real response instead of a misleading
+   * `DAEMON_UNAVAILABLE`.
+   */
+  private async requestLong<T>(method: string, path: string, body?: unknown): Promise<T> {
+    const payload = body === undefined ? undefined : JSON.stringify(body);
+    let res = await this.attemptLong(method, path, payload);
+    if (res.status === 401) {
+      const fresh = readInfo(this.home);
+      if (fresh && fresh.token !== this.info.token) {
+        this.info = fresh;
+        res = await this.attemptLong(method, path, payload);
+      }
+    }
+    if (res.status === 204) return undefined as T;
+    const ok = res.status >= 200 && res.status < 300;
+    let json: unknown;
+    try {
+      json = JSON.parse(res.text);
+    } catch {
+      throw new StorybrokrError(
+        ok ? 'INTERNAL' : 'DAEMON_UNAVAILABLE',
+        `daemon returned a non-JSON ${res.status} response`,
+      );
+    }
+    if (!ok) {
+      const e = json as ErrorBody;
+      throw new StorybrokrError(
+        e?.code ?? 'INTERNAL',
+        e?.message ?? `HTTP ${res.status}`,
+        e?.logTail,
+      );
+    }
+    return json as T;
+  }
+
   health() {
     return this.request<{
       ok: boolean;
@@ -210,14 +300,14 @@ export class DaemonClient {
     ).record;
   }
   check(id: string, req: CheckRequest = {}): Promise<CheckResponse> {
-    return this.request<CheckResponse>(
+    return this.requestLong<CheckResponse>(
       'POST',
       `/v1/instances/${encodeURIComponent(id)}/check`,
       req,
     );
   }
   screenshot(id: string, req: ScreenshotRequest): Promise<ScreenshotResponse> {
-    return this.request<ScreenshotResponse>(
+    return this.requestLong<ScreenshotResponse>(
       'POST',
       `/v1/instances/${encodeURIComponent(id)}/screenshot`,
       req,

@@ -159,7 +159,14 @@ export class BrowserPool {
           );
         }
         b.on('disconnected', () => {
-          if (this.browser === b) this.browser = null;
+          if (this.browser === b) {
+            this.browser = null;
+            this.open = 0;
+            if (this.idleTimer !== null) {
+              this.opts.clearTimer(this.idleTimer);
+              this.idleTimer = null;
+            }
+          }
         });
         this.browser = b;
         return b;
