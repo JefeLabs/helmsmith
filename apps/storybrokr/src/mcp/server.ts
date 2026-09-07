@@ -100,6 +100,82 @@ export function buildMcpServer(connect: () => Promise<DaemonClient>): McpServer 
     async ({ id }) => guard(async () => (await connect()).touch(id)),
   );
 
+  const waitFor = z
+    .union([z.object({ selector: z.string() }), z.object({ text: z.string() })])
+    .optional()
+    .describe(
+      'After Storybook reports the story rendered, also wait for a selector or visible text (hosts with Suspense fallbacks such as "Loading translations…")',
+    );
+  const timeoutMs = z
+    .number()
+    .int()
+    .min(1000)
+    .max(300_000)
+    .optional()
+    .describe('Settle budget in ms per story (default 30000)');
+
+  server.registerTool(
+    'storybrokr_check',
+    {
+      description:
+        'Run stories headlessly in Chromium and report pass/fail per story. Play functions are executed; a story passes when Storybook reports its render (and play) completed. Failing stories are rows in the result, not tool errors.',
+      inputSchema: {
+        id: z.string().describe('Instance id or component path'),
+        storyIds: z
+          .array(z.string())
+          .min(1)
+          .optional()
+          .describe('Default: every story in the instance'),
+        waitFor,
+        timeoutMs,
+      },
+    },
+    async ({ id, storyIds, waitFor: wf, timeoutMs: t }) =>
+      guard(async () => (await connect()).check(id, { storyIds, waitFor: wf, timeoutMs: t })),
+  );
+
+  server.registerTool(
+    'storybrokr_screenshot',
+    {
+      description:
+        'Write a PNG of one story at a viewport you choose and return its absolute path. Use an absolute outPath to save anywhere (e.g. a scratchpad). Refuses to capture a story that errored or timed out.',
+      inputSchema: {
+        id: z.string().describe('Instance id or component path'),
+        storyId: z.string(),
+        outPath: z
+          .string()
+          .optional()
+          .describe(
+            'Absolute output path; default <instance configDir>/screenshots/<story>-<WxH>.png',
+          ),
+        viewport: z
+          .object({
+            width: z.number().int().min(1).max(10_000),
+            height: z.number().int().min(1).max(10_000),
+          })
+          .optional()
+          .describe('Default 1280x720'),
+        clip: z
+          .enum(['root', 'viewport', 'page'])
+          .optional()
+          .describe('root = #storybook-root bounds (default); viewport; page = full page'),
+        waitFor,
+        timeoutMs,
+      },
+    },
+    async ({ id, storyId, outPath, viewport, clip, waitFor: wf, timeoutMs: t }) =>
+      guard(async () =>
+        (await connect()).screenshot(id, {
+          storyId,
+          outPath,
+          viewport,
+          clip,
+          waitFor: wf,
+          timeoutMs: t,
+        }),
+      ),
+  );
+
   server.registerTool(
     'storybrokr_inspect_host',
     {

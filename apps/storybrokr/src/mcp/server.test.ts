@@ -29,15 +29,17 @@ async function connected(fake: Partial<DaemonClient>) {
 }
 
 describe('MCP server', () => {
-  it('exposes the seven tools', async () => {
+  it('exposes the nine tools', async () => {
     const client = await connected({});
     const names = (await client.listTools()).tools.map((t) => t.name).sort();
     expect(names).toEqual([
+      'storybrokr_check',
       'storybrokr_down',
       'storybrokr_get',
       'storybrokr_inspect_host',
       'storybrokr_list',
       'storybrokr_logs',
+      'storybrokr_screenshot',
       'storybrokr_touch',
       'storybrokr_up',
     ]);
@@ -71,6 +73,55 @@ describe('MCP server', () => {
     expect(JSON.parse((result.content as { text: string }[])[0].text)).toEqual({
       code: 'INSTANCE_NOT_FOUND',
       message: 'no instance zz',
+    });
+  });
+
+  it('check and screenshot forward their arguments and surface failing stories as normal results', async () => {
+    const check = vi.fn(async () => ({
+      instanceId: 'abc',
+      results: [
+        {
+          storyId: 's',
+          status: 'fail',
+          played: false,
+          durationMs: 1,
+          error: { message: 'x', event: 'e' },
+        },
+      ],
+      summary: { pass: 0, fail: 1, timeout: 0 },
+    }));
+    const screenshot = vi.fn(async () => {
+      throw new StorybrokrError('STORY_TIMEOUT', 'slow');
+    });
+    const client = await connected({ check, screenshot } as unknown as Partial<DaemonClient>);
+    const r = await client.callTool({
+      name: 'storybrokr_check',
+      arguments: { id: 'abc', storyIds: ['s'], waitFor: { text: 'Go' }, timeoutMs: 5000 },
+    });
+    expect(r.isError).toBeFalsy();
+    expect(check).toHaveBeenCalledWith('abc', {
+      storyIds: ['s'],
+      waitFor: { text: 'Go' },
+      timeoutMs: 5000,
+    });
+    const s = await client.callTool({
+      name: 'storybrokr_screenshot',
+      arguments: {
+        id: 'abc',
+        storyId: 's',
+        outPath: '/tmp/s.png',
+        viewport: { width: 640, height: 480 },
+        clip: 'page',
+      },
+    });
+    expect(s.isError).toBe(true);
+    expect(screenshot).toHaveBeenCalledWith('abc', {
+      storyId: 's',
+      outPath: '/tmp/s.png',
+      viewport: { width: 640, height: 480 },
+      clip: 'page',
+      waitFor: undefined,
+      timeoutMs: undefined,
     });
   });
 
