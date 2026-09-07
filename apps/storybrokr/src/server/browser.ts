@@ -60,6 +60,12 @@ export class BrowserPool {
   private installing: Promise<void> | null = null;
   private open = 0;
   private idleTimer: unknown = null;
+  /**
+   * Bumped by close(). A launch in flight captures the epoch it started with; if that no longer
+   * matches when the launch resolves, close() ran meanwhile, so the freshly launched browser is
+   * closed immediately instead of being handed to any acquire() waiting on it.
+   */
+  private launchEpoch = 0;
   private readonly opts: Required<BrowserPoolOptions>;
 
   constructor(opts: BrowserPoolOptions) {
@@ -83,13 +89,15 @@ export class BrowserPool {
   }
 
   async acquire(viewport?: Viewport): Promise<BrowserContext> {
-    const browser = await this.ensureBrowser();
-    const context = await browser.newContext(viewport ? { viewport } : {});
-    this.open++;
+    // Disarm the idle timer before any await: otherwise it can fire while we're mid-launch or
+    // mid-newContext and close the browser out from under this call.
     if (this.idleTimer !== null) {
       this.opts.clearTimer(this.idleTimer);
       this.idleTimer = null;
     }
+    const browser = await this.ensureBrowser();
+    const context = await browser.newContext(viewport ? { viewport } : {});
+    this.open++;
     context.on('close', () => this.release());
     return context;
   }
@@ -99,23 +107,37 @@ export class BrowserPool {
       this.opts.clearTimer(this.idleTimer);
       this.idleTimer = null;
     }
-    const b = this.browser;
+    this.launchEpoch++; // invalidate any launch currently in flight
+    let b = this.browser;
+    if (!b && this.launching) {
+      try {
+        b = await this.launching;
+      } catch {
+        b = null;
+      }
+    }
     this.browser = null;
+    this.open = 0;
     if (b) await b.close().catch(() => {});
   }
 
   private release(): void {
     this.open = Math.max(0, this.open - 1);
     if (this.open > 0 || this.opts.idleMinutes <= 0 || !this.browser) return;
-    this.idleTimer = this.opts.setTimer(() => {
+    const handle = this.opts.setTimer(() => {
+      // Ignore a callback that fired after we were cleared or superseded (e.g. by another
+      // acquire() disarming us, or by a newer idle timer replacing us).
+      if (this.idleTimer !== handle) return;
       this.idleTimer = null;
       if (this.open === 0) void this.close();
     }, this.opts.idleMinutes * 60_000);
+    this.idleTimer = handle;
   }
 
   private async ensureBrowser(): Promise<Browser> {
     if (this.browser) return this.browser;
     if (!this.launching) {
+      const epoch = this.launchEpoch;
       this.launching = (async () => {
         await this.ensureInstalled();
         let b: Browser;
@@ -125,6 +147,15 @@ export class BrowserPool {
           throw new StorybrokrError(
             'BROWSER_UNAVAILABLE',
             `could not launch chromium: ${(err as Error).message}`,
+          );
+        }
+        if (epoch !== this.launchEpoch) {
+          // close() ran while we were launching; don't hand this browser to anyone, and don't
+          // leave the process orphaned.
+          await b.close().catch(() => {});
+          throw new StorybrokrError(
+            'BROWSER_UNAVAILABLE',
+            'browser pool was closed while chromium was launching',
           );
         }
         b.on('disconnected', () => {

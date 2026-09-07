@@ -4,6 +4,14 @@ import { BrowserPool } from './browser.js';
 
 type Listener = () => void;
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+
 function fakeBrowser() {
   const contexts: { close: () => Promise<void> }[] = [];
   let disconnected: Listener | undefined;
@@ -101,10 +109,51 @@ describe('BrowserPool', () => {
         throw new Error('no display');
       },
     });
-    await expect(p.acquire()).rejects.toMatchObject({
-      code: 'BROWSER_UNAVAILABLE',
-      message: /no display/,
+    const err = await p.acquire().catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(StorybrokrError);
+    expect((err as StorybrokrError).code).toBe('BROWSER_UNAVAILABLE');
+    expect((err as StorybrokrError).message).toMatch(/no display/);
+  });
+
+  it('does not let the idle timer kill the browser while a second acquire() is in flight', async () => {
+    const { p, browser, contexts, timers } = pool({ idleMinutes: 2 });
+    await p.acquire();
+    await contexts[0].close(); // arms the idle timer
+    expect(timers).toHaveLength(1);
+
+    const contextDeferred = deferred<{
+      on: (event: string, cb: Listener) => void;
+      close: () => Promise<void>;
+    }>();
+    browser.newContext.mockImplementationOnce(() => contextDeferred.promise);
+
+    const acquirePromise = p.acquire();
+    timers[0].cb(); // the idle timer fires while newContext() is still pending
+    await new Promise((r) => setImmediate(r));
+    expect(browser.close).not.toHaveBeenCalled();
+
+    let onClose: Listener | undefined;
+    contextDeferred.resolve({
+      on: (event, cb) => {
+        if (event === 'close') onClose = cb;
+      },
+      close: async () => onClose?.(),
     });
+
+    await expect(acquirePromise).resolves.toBeDefined();
+  });
+
+  it('does not orphan the browser process when close() runs during an in-flight launch', async () => {
+    const launchDeferred = deferred<never>();
+    const { p, browser } = pool({ launch: vi.fn(() => launchDeferred.promise) });
+
+    const acquirePromise = p.acquire().catch((e: unknown) => e);
+    const closePromise = p.close();
+    launchDeferred.resolve(browser as never);
+
+    await Promise.all([acquirePromise, closePromise]);
+    expect(browser.close).toHaveBeenCalledTimes(1);
+    expect(p.openContexts).toBe(0);
   });
 
   it('arms the idle timer when the last context closes and closes the browser when it fires', async () => {
