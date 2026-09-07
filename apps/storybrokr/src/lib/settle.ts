@@ -21,13 +21,17 @@ function isError(e: SettleEvent): e is Extract<SettleEvent, { kind: 'error' }> {
 }
 
 /**
- * First terminal signal wins, with an exception event always outranking a bare phase transition:
- * Storybook fires `storyRenderPhaseChanged` (newPhase: 'errored') and the specific exception
- * event (e.g. `playFunctionThrewException`) for the same failure, but not in a fixed order — a
- * single top-to-bottom scan would sometimes return the generic phase message purely because it
- * happened to land earlier in the array. Scanning for an exception event first means whichever
- * one exists always wins over a same-render phase transition, matching the pass-after-a-failure
- * test below: an exception event is terminal regardless of what phases surround it.
+ * Precedence: any exception event anywhere in the array is fail, full stop — otherwise the first
+ * terminal phase (`completed`/`errored`/`aborted`) wins.
+ *
+ * An exception event always outranks a bare phase transition because Storybook fires
+ * `storyRenderPhaseChanged` (newPhase: 'errored') and the specific exception event (e.g.
+ * `playFunctionThrewException`) for the same failure, but not in a fixed order — Storybook 10.6
+ * emits the phase transition first. A single top-to-bottom scan would then return the generic
+ * phase message purely because it happened to land earlier in the array. Scanning for an
+ * exception event first means whichever one exists always wins over a same-render phase
+ * transition, matching the pass-after-a-failure test below: an exception event is terminal
+ * regardless of what phases surround it.
  */
 export function reduceSettle(events: SettleEvent[]): SettleState {
   const errorEvent = events.find(isError);

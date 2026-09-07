@@ -49,6 +49,33 @@ describe('reduceSettle', () => {
     expect(reduceSettle([phase('aborted')])).toMatchObject({ kind: 'fail', reason: 'story render aborted' });
   });
 
+  it('surfaces the exception message when Storybook emits the errored phase before the exception event (Storybook 10.6 order)', () => {
+    const events: SettleEvent[] = [
+      phase('playing'),
+      phase('errored'),
+      { kind: 'error', event: 'playFunctionThrewException', message: 'expected heading to have text', stack: 's' },
+    ];
+    expect(reduceSettle(events)).toEqual({
+      kind: 'fail',
+      reason: 'expected heading to have text',
+      event: 'playFunctionThrewException',
+      stack: 's',
+    });
+  });
+
+  it('an exception event after completed still fails the story', () => {
+    const events: SettleEvent[] = [
+      phase('rendering'),
+      phase('completed'),
+      { kind: 'error', event: 'unhandledErrorsWhilePlaying', message: 'late boom' },
+    ];
+    expect(reduceSettle(events)).toEqual({
+      kind: 'fail',
+      reason: 'late boom',
+      event: 'unhandledErrorsWhilePlaying',
+    });
+  });
+
   it('treats storyMissing as a failure', () => {
     expect(
       reduceSettle([{ kind: 'error', event: 'storyMissing', message: 'story x is not in this preview' }]),
