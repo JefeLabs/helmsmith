@@ -13,10 +13,12 @@
  * Output:
  *   - Each top-level section produces one Section node + Doc edge.
  *   - The document itself produces one Doc node.
- *   - LinkedFrom edges are extracted from inline markdown links.
+ *   - Wikilinks + markdown links are reported as unresolved `links`;
+ *     ingest() resolves them against the whole corpus into LinkedFrom edges.
  */
 
 import type { GraphEdge, GraphNode } from '../../types.ts';
+import { extractLinks, type LinkRef } from '../links.ts';
 
 const APPROX_CHARS_PER_TOKEN = 4;
 const DEFAULT_MAX_TOKENS = 2048;
@@ -50,6 +52,9 @@ export interface ChunkOutput {
   edges: GraphEdge[];
   /** Per-chunk text, in declaration order. The embedder vectorizes these. */
   chunks: Array<{ nodeId: string; text: string }>;
+  /** Links to other docs, unresolved — only a corpus-wide view can say
+   *  which doc `[[Note]]` means. Absent for chunkers without links. */
+  links?: LinkRef[];
 }
 
 /**
@@ -120,18 +125,7 @@ export function chunkHeadingBased(input: ChunkInput): ChunkOutput {
     }
   }
 
-  // Inline links → LinkedFrom edges (best-effort; targets may not yet exist
-  // in the graph, but content-hash dedup handles both orders).
-  for (const target of extractMarkdownLinks(input.content)) {
-    edges.push({
-      from: input.docId,
-      to: target,
-      label: 'LinkedFrom',
-      sourceTypeId: input.sourceTypeId,
-    });
-  }
-
-  return { nodes, edges, chunks };
+  return { nodes, edges, chunks, links: extractLinks(input.content) };
 }
 
 // ─── pure helpers ────────────────────────────────────────────────────────
@@ -177,13 +171,4 @@ function splitWithOverlap(text: string, maxChars: number, overlapChars: number):
 function extractFirstH1(md: string): string | null {
   const m = /^#\s+(.+?)\s*$/m.exec(md);
   return m ? m[1]! : null;
-}
-
-function extractMarkdownLinks(md: string): string[] {
-  const out: string[] = [];
-  const re = /\[[^\]]*\]\(([^)\s]+)/g;
-  for (const m of md.matchAll(re)) {
-    if (m[1]) out.push(m[1]);
-  }
-  return out;
 }

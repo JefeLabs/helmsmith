@@ -81,7 +81,8 @@ const ossCode: SourceType = {
 
 const proseMarkdown: SourceType = {
   id: 'prose-markdown',
-  description: 'Local markdown docs — heading-based chunking; extracts links as LinkedFrom edges.',
+  description:
+    'Local markdown docs — heading-based chunking; resolves [[wikilinks]] and relative links into LinkedFrom edges.',
   matcher: {
     include: ['**/*.{md,mdx,rst,txt}', '**/README*'],
     // Skip dependency / build / VCS trees by default — users rarely want

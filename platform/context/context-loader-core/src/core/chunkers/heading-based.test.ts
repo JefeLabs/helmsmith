@@ -54,16 +54,16 @@ content of second
     }
   });
 
-  it('extracts inline markdown links as LinkedFrom edges', () => {
-    const md = `# A\n\nSee [other](other.md) and [external](https://example.com).\n`;
+  it('reports links for ingest to resolve instead of edges to raw targets', () => {
+    const md = `# A\n\nSee [[Beta]].\n`;
     const out = chunkHeadingBased({
       docId: 'a.md',
       content: md,
       sourceTypeId: 'prose-markdown',
       sourceId: 'ws',
     });
-    const linkedFrom = out.edges.filter((e) => e.label === 'LinkedFrom');
-    expect(linkedFrom.map((e) => e.to)).toEqual(['other.md', 'https://example.com']);
+    expect(out.links).toEqual([{ kind: 'wiki', target: 'Beta' }]);
+    expect(out.edges.filter((e) => e.label === 'LinkedFrom')).toEqual([]);
   });
 
   it('produces one chunk text per section node, in order', () => {

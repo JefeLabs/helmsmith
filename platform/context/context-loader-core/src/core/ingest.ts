@@ -21,12 +21,13 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
 import { BUILTIN_SOURCE_TYPES } from '../catalog/index.ts';
-import type { IngestionSummary, IngestSpec, SourceType } from '../types.ts';
+import type { GraphEdge, IngestionSummary, IngestSpec, SourceType } from '../types.ts';
 import { type ChunkOutput, chunkHeadingBased } from './chunkers/heading-based.ts';
 import { chunkCodeFull } from './chunkers/tree-sitter.ts';
 import { chunkWholeFile } from './chunkers/whole-file.ts';
 import { classifyDomain } from './domain.ts';
 import { createHttpEmbedderClient, type EmbedderClient } from './embedder-client.ts';
+import { createLinkResolver, type LinkRef } from './links.ts';
 import { compileMatcher } from './matcher.ts';
 import { buildProvenanceGraph, readOssPackageMeta } from './oss-meta.ts';
 import { walk } from './walk.ts';
@@ -121,6 +122,11 @@ export async function ingest(spec: IngestSpecExt): Promise<IngestionSummary> {
     }
   }
 
+  // Every chunked doc and the links it holds — including unchanged files,
+  // since chunking runs before the hash gate. Resolved after the walk.
+  const linkTargets: string[] = [];
+  const linkSources: Array<{ from: string; links: LinkRef[] }> = [];
+
   // Per-file processing
   for await (const item of walk({
     root,
@@ -177,6 +183,9 @@ export async function ingest(spec: IngestSpecExt): Promise<IngestionSummary> {
         0,
       ),
     });
+
+    linkTargets.push(item.relativePath);
+    if (chunked.links?.length) linkSources.push({ from: item.relativePath, links: chunked.links });
 
     // Tier 2: tag every node of this file with a coarse semantic domain
     // (deterministic, path-based) so workers can scope retrieval by domain.
@@ -266,6 +275,27 @@ export async function ingest(spec: IngestSpecExt): Promise<IngestionSummary> {
 
     summary.filesIngested += 1;
     summary.chunksWritten += chunked.chunks.length;
+  }
+
+  // Note-to-note links. Resolved after the walk because `[[Note]]` is a
+  // corpus-wide lookup, and written after it because Neo4jBackend MATCHes
+  // both endpoints — an edge to a doc not yet written would be dropped.
+  // Unchanged files contribute too, so a link lands once its target exists.
+  // Skipped on abort: a partial index can resolve a link to a namesake of
+  // its real target, and MERGE never removes that edge afterwards.
+  const resolver = createLinkResolver(linkTargets);
+  const linkEdges: GraphEdge[] = [];
+  for (const { from, links } of spec.signal?.aborted ? [] : linkSources) {
+    for (const link of links) {
+      const to = resolver.resolve(from, link);
+      if (to && to !== from) {
+        linkEdges.push({ from, to, label: 'LinkedFrom', sourceTypeId: sourceType.id });
+      }
+    }
+  }
+  await spec.backend.upsertEdgesBulk(linkEdges);
+  for (const edge of linkEdges) {
+    spec.onEvent?.({ kind: 'edge-written', from: edge.from, to: edge.to, type: edge.label });
   }
 
   // Cross-source-type linking (Phase C.7). After EITHER oss-code or
