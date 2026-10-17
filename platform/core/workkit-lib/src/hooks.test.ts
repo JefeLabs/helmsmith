@@ -1,0 +1,22 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { afterEach, describe, expect, it } from 'vitest';
+import { Git } from './git.js';
+import { installHooks } from './hooks.js';
+import { makeRepo } from './testing/fixture-repo.js';
+
+describe('installHooks', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('writes executable hooks and points core.hooksPath at them', () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const out = installHooks(f.main);
+    expect(out.files.map((p) => p.split('/').pop())).toEqual(['pre-commit', 'pre-push']);
+    for (const p of out.files) {
+      expect(existsSync(p)).toBe(true);
+      expect(readFileSync(p, 'utf8')).toMatch(/workbrokr hook/);
+    }
+    expect(new Git(f.main).run(['config', 'core.hooksPath']).trim()).toBe('.helmsmith/hooks');
+  });
+});
