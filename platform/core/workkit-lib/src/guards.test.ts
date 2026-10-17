@@ -90,7 +90,7 @@ describe('guards', () => {
         registry,
         git: new Git(f.main),
         project: 'demo',
-        branch: 'stage',
+        branch: 'develop',
         changedPaths: [],
       }).refusals[0],
     ).toMatch(/protected/);
