@@ -2,6 +2,7 @@ import { createCli } from '@helmsmith/cli-kit';
 import { registerAudit } from './commands/audit.js';
 import { registerEnv } from './commands/env.js';
 import { registerFinish } from './commands/finish.js';
+import { registerHook } from './commands/hook.js';
 import { registerInit } from './commands/init.js';
 import { registerReap } from './commands/reap.js';
 import { registerRetire } from './commands/retire.js';
@@ -23,6 +24,7 @@ registerFinish(program);
 registerReap(program);
 registerRetire(program);
 registerAudit(program);
+registerHook(program);
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   console.error(err instanceof Error ? err.message : String(err));
