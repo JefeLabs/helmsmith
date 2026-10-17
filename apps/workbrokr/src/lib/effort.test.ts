@@ -4,7 +4,15 @@ import { join } from 'node:path';
 import { currentOwner, Git, Registry, validateManifest } from '@helmsmith/workkit';
 import { commitFile, makeRepo } from '@helmsmith/workkit/testing';
 import { afterEach, describe, expect, it } from 'vitest';
-import { type Ctx, type ServiceRunner, type StorybrokrClient, startEffort } from './effort.js';
+import {
+  type Ctx,
+  effortEnv,
+  type ServiceRunner,
+  type StorybrokrClient,
+  slotEnv,
+  startEffort,
+  statusFor,
+} from './effort.js';
 
 const manifest = validateManifest({
   project: 'demo',
@@ -55,7 +63,7 @@ const fakeSb = (): StorybrokrClient & { downs: string[] } => {
   return s;
 };
 
-export function ctxFor(
+function ctxFor(
   f: { main: string },
   runner: FakeRunner = fakeRunner(),
   storybrokr = fakeSb(),
@@ -202,6 +210,36 @@ describe('startEffort', () => {
       story: 'components/cart/Cart.stories.tsx',
     });
     expect(r.leases.map((l) => `${l.kind}:${l.value}`)).toEqual(['storybook:sb_1']);
+  });
+});
+
+describe('statusFor / effortEnv', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('reports every area, the open effort with its leases, how far behind the base it is, and the env', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const ctx = ctxFor(f);
+    await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'fullstack' });
+    const s = statusFor(ctx);
+    expect(s.project).toBe('demo');
+    expect(s.areas.map((a) => a.area)).toEqual(['platform/auth', 'shop/cart', 'shop/team']);
+    const cart = s.areas.find((a) => a.area === 'shop/cart');
+    expect(cart?.effort?.mode).toBe('fullstack');
+    expect(cart?.leases.map((l) => l.kind)).toEqual(['slot']);
+    expect(cart?.behindBase).toBe(0);
+    expect(s.areas.find((a) => a.area === 'shop/team')?.effort).toBeUndefined();
+    commitFile(f.main, 'z.txt', '1', 'z');
+    new Git(f.main).push('develop');
+    expect(statusFor(ctx, 'shop/cart').areas[0].behindBase).toBe(1);
+    const env = effortEnv(ctx, 'shop/cart');
+    expect(env.PORT_BACKEND).toBe('43101');
+    expect(env.SLOT).toBe('1');
+    expect(env.MODE).toBe('fullstack');
+    expect(env.WORKTREE).toBe(cart?.effort?.worktree);
+    expect(slotEnv(ctx.manifest, 3).PORT_FRONTEND).toBe('43003');
+    expect(() => effortEnv(ctx, 'shop/team')).toThrow(/no open effort/);
   });
 });
 

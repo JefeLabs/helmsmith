@@ -11,11 +11,14 @@ import {
   type Lease,
   type Manifest,
   type Mode,
+  type Notice,
   newId,
   type Owner,
+  portsForSlot,
   type Registry,
   runRefresh,
   selectRefresh,
+  slotVars,
   WorkkitError,
 } from '@helmsmith/workkit';
 import type { StorybrokrClient } from './storybrokr.js';
@@ -302,4 +305,85 @@ export async function startEffort(ctx: Ctx, o: StartOptions): Promise<StartResul
     joined: false,
     warnings,
   };
+}
+
+// ── status / env ─────────────────────────────────────────────────────────────
+
+export interface AreaStatus {
+  area: string;
+  effort?: Effort;
+  leases: Lease[];
+  /** commits on origin/<base> the area's branch does not have (0 without a worktree) */
+  behindBase: number;
+  notices: Notice[];
+  worktree?: string;
+}
+
+export interface StatusReport {
+  project: string;
+  areas: AreaStatus[];
+  leases: Lease[];
+}
+
+function latestEffortFor(ctx: Ctx, area: string): Effort | undefined {
+  const all = ctx.registry.efforts({ project: ctx.manifest.project, area });
+  return all.sort((a, b) => b.started.localeCompare(a.started))[0];
+}
+
+function behindBase(ctx: Ctx, worktree: string): number {
+  if (!existsSync(worktree)) return 0;
+  const g = new Git(worktree);
+  g.tryRun(['fetch', '-q', 'origin', ctx.manifest.baseBranch]);
+  const r = g.tryRun(['rev-list', '--count', `HEAD..origin/${ctx.manifest.baseBranch}`]);
+  return r.code === 0 ? Number(r.out.trim()) || 0 : 0;
+}
+
+/** Every area of the project (or one), with its open effort, leases, drift from the base branch and notices. */
+export function statusFor(ctx: Ctx, area?: string): StatusReport {
+  const m = ctx.manifest;
+  const names = (area ? [area] : Object.keys(m.areas)).sort();
+  const areas: AreaStatus[] = names.map((name) => {
+    const effort = ctx.registry.activeEffortFor(m.project, name);
+    const latest = latestEffortFor(ctx, name);
+    const worktree = worktreePathFor(ctx, name);
+    const out: AreaStatus = {
+      area: name,
+      leases: effort ? ctx.registry.leases({ effort: effort.id }) : [],
+      behindBase: behindBase(ctx, worktree),
+      notices: latest?.notices ?? [],
+    };
+    if (effort) out.effort = effort;
+    if (existsSync(worktree)) out.worktree = worktree;
+    return out;
+  });
+  return { project: m.project, areas, leases: ctx.registry.leases({ project: m.project }) };
+}
+
+/** The slot-derived variables for a slot number alone: what a Makefile asks before any effort exists. */
+export function slotEnv(m: Manifest, slot: number): Record<string, string> {
+  return slotVars(m, { slot, ports: portsForSlot(m, slot) });
+}
+
+/** The variables the open effort's config was emitted with, plus MODE. */
+export function effortEnv(ctx: Ctx, area: string): Record<string, string> {
+  const m = ctx.manifest;
+  const effort = ctx.registry.activeEffortFor(m.project, area);
+  if (!effort)
+    throw new WorkkitError(
+      'EFFORT_NOT_FOUND',
+      `no open effort on ${area}; \`work start --area ${area} …\` first`,
+      { area },
+    );
+  const slot = ctx.registry.leases({ effort: effort.id, kind: 'slot' })[0];
+  const sb = ctx.registry.leases({ effort: effort.id, kind: 'storybook' })[0];
+  const vars = slotVars(m, {
+    slot: slot ? (slot.value as number) : undefined,
+    ports: slot?.ports ?? {},
+    storybookPort: sb?.ports?.storybook,
+    area,
+    branch: effort.branch,
+    worktree: effort.worktree,
+    logDir: join(effort.worktree, m.logs.dir),
+  });
+  return { ...vars, MODE: effort.mode };
 }
