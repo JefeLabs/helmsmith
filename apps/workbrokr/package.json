@@ -1,0 +1,35 @@
+{
+  "name": "@helmsmith/workbrokr",
+  "version": "0.0.1",
+  "description": "Start, run, finish, reap and audit area-based work: one worktree per area, <type>/<area> branches, slots and leases from one registry, storybrokr for frontend work. CLI, MCP server and skill.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "engines": { "node": ">=24" },
+  "bin": { "workbrokr": "./bin/workbrokr.mjs", "work": "./bin/work.mjs" },
+  "main": "./dist/cli.js",
+  "files": ["dist", "bin", "README.md", "SKILL.md"],
+  "publishConfig": { "access": "public" },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx src/cli.ts",
+    "test": "vitest run",
+    "test:e2e": "pnpm run build && vitest run --config vitest.e2e.config.ts",
+    "typecheck": "tsc --noEmit",
+    "prepack": "pnpm run build"
+  },
+  "dependencies": {
+    "@helmsmith/cli-kit": "workspace:*",
+    "@helmsmith/workkit": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "chalk": "^6.0.0",
+    "commander": "^15.0.0",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
+}
