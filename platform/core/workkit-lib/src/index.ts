@@ -1,4 +1,5 @@
 export * from './errors.js';
+export * from './git.js';
 export * from './manifest.js';
 export * from './paths.js';
 export * from './ports.js';
