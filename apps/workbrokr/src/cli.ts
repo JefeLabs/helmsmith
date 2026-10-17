@@ -4,6 +4,7 @@ import { registerEnv } from './commands/env.js';
 import { registerFinish } from './commands/finish.js';
 import { registerHook } from './commands/hook.js';
 import { registerInit } from './commands/init.js';
+import { registerMcp } from './commands/mcp.js';
 import { registerReap } from './commands/reap.js';
 import { registerRetire } from './commands/retire.js';
 import { registerStart } from './commands/start.js';
@@ -25,6 +26,7 @@ registerReap(program);
 registerRetire(program);
 registerAudit(program);
 registerHook(program);
+registerMcp(program);
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   console.error(err instanceof Error ? err.message : String(err));
