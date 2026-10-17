@@ -1,8 +1,9 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { appendFileSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { validateManifest } from './manifest.js';
+import { registryFile } from './paths.js';
 import { Registry } from './registry.js';
 import { minimal } from './testing/manifests.js';
 
@@ -97,5 +98,52 @@ describe('Registry', () => {
     r.updateEffort('e1', { state: 'finished' });
     expect(r.activeEffortFor('demo', 'shop/cart')).toBeUndefined();
     expect(() => r.updateEffort('nope', {})).toThrow(/nope/);
+  });
+
+  it('refuses to touch a corrupt registry instead of replacing it', () => {
+    const h = home();
+    const r = Registry.open(h);
+    r.upsertProject('keep-me', { root: '/k', ranges: {} });
+    appendFileSync(registryFile(h), '{{{ junk');
+    const before = readFileSync(registryFile(h), 'utf8');
+    expect(() => r.upsertProject('other', { root: '/o', ranges: {} })).toThrow(
+      /corrupt|registry\.json/,
+    );
+    expect(readFileSync(registryFile(h), 'utf8')).toBe(before);
+    expect(() => r.read()).toThrow(/corrupt|registry\.json/);
+  });
+
+  it('keeps notices per area across efforts', () => {
+    const r = Registry.open(home());
+    r.addNotice('demo', 'shop/cart', {
+      from: 'fix/platform/auth',
+      text: 'commons auth changed',
+      at: 'x',
+    });
+    expect(r.notices('demo', 'shop/cart')).toHaveLength(1);
+    expect(r.notices('demo', 'shop/team')).toEqual([]);
+  });
+
+  it('treats a starting effort as open', () => {
+    const r = Registry.open(home());
+    r.addEffort({
+      id: 'e1',
+      project: 'demo',
+      area: 'shop/cart',
+      type: 'feature',
+      mode: 'frontend',
+      branch: 'b',
+      worktree: '/w',
+      owner,
+      state: 'starting',
+      scopes: [],
+      commons: [],
+      leases: [],
+      notices: [],
+      started: 'x',
+      lastActivity: 'x',
+    });
+    expect(r.openEffortFor('demo', 'shop/cart')?.id).toBe('e1');
+    expect(r.activeEffortFor('demo', 'shop/cart')).toBeUndefined();
   });
 });

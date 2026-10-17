@@ -64,4 +64,4 @@ Exit codes: 0 ok, 2 refused (first stderr line is the reason; `--json` prints `{
 
 ## Security note
 
-The hooks under `.helmsmith/hooks` are tracked files that run on every committer's machine, exactly like husky's. They are four fixed lines that `exec workbrokr hook <name>`; review changes to that directory as you would any executable.
+The hooks under `.helmsmith/hooks` are tracked files that run on every committer's machine, exactly like husky's. The protected-branch rule is enforced by the scripts themselves (the list is baked in at install time), so it holds in a GUI client or a shell without `workbrokr`; only the commons and scope checks need the binary and are skipped with a warning without it. Review changes to that directory as you would any executable.

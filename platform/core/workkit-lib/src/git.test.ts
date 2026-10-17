@@ -1,4 +1,5 @@
-import { realpathSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Git } from './git.js';
@@ -75,5 +76,32 @@ describe('Git', () => {
     g.worktreeRemove(wt);
     g.deleteLocalBranch('fix/shop/cart');
     expect(g.branchExists('fix/shop/cart')).toBe(false);
+  });
+
+  it("changedSince lists only this branch's own changes, and new branches do not track the base", () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const g = new Git(f.main);
+    const wt = join(f.main, '.claude/worktrees/shop/cart');
+    g.worktreeAdd(wt, 'feature/shop/cart', 'origin/develop');
+    const w = new Git(wt);
+    expect(w.hasUpstream()).toBe(false);
+    commitFile(wt, 'mine.txt', '1', 'mine');
+    commitFile(f.main, 'theirs.txt', '1', 'theirs');
+    g.push('develop');
+    w.fetch('develop');
+    expect(w.changedPaths('origin/develop', 'HEAD').sort()).toEqual(['mine.txt', 'theirs.txt']);
+    expect(w.changedSince('develop')).toEqual(['mine.txt']);
+    w.checkout('fix/shop/cart', 'origin/develop');
+    expect(w.hasUpstream()).toBe(false);
+  });
+
+  it('knows a main checkout whose path contains /worktrees/', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'wk-git-'));
+    const main = join(dir, 'worktrees', 'main');
+    mkdirSync(main, { recursive: true });
+    cleanup = () => rmSync(dir, { recursive: true, force: true });
+    new Git(dir).run(['init', '-q', '-b', 'develop', main]);
+    expect(new Git(main).isMainCheckout()).toBe(true);
   });
 });

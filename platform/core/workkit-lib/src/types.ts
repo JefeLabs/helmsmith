@@ -1,5 +1,5 @@
 export type Mode = 'frontend' | 'fullstack';
-export type EffortState = 'active' | 'parked' | 'finished';
+export type EffortState = 'starting' | 'active' | 'parked' | 'finished';
 export type LeaseKind = 'slot' | 'storybook' | 'commons';
 
 export interface ServiceSpec {
@@ -74,6 +74,8 @@ export interface Lease {
   ports?: Record<string, number>;
   /** service → pid this lease started (fullstack): the only processes reap/finish may stop */
   pids?: Record<string, number>;
+  /** service → start-time signature of that pid, checked before any signal (pid reuse) */
+  signatures?: Record<string, string>;
   owner: Owner;
   effort: string;
   created: string;
@@ -106,9 +108,17 @@ export interface ProjectEntry {
   ranges: Record<string, { base: number; count: number }>;
 }
 
+export interface AreaNotice {
+  project: string;
+  area: string;
+  notice: Notice;
+}
+
 export interface RegistryFile {
   version: 1;
   projects: Record<string, ProjectEntry>;
   leases: Lease[];
   efforts: Effort[];
+  /** informational, per area, kept until the area is retired */
+  notices?: AreaNotice[];
 }

@@ -1,13 +1,14 @@
 import { hostname, userInfo } from 'node:os';
 import type { Owner } from './types.js';
 
-/** Who holds a lease: a named session when the shell says so, else user@host:ppid. */
+/**
+ * Who holds a lease. `WORK_SESSION` when the shell says so, else Claude Code's session id, else
+ * `user@host`. No pid or ppid: a git hook runs as a child of git and must agree with the shell
+ * that started the effort.
+ */
 export function currentOwner(env: NodeJS.ProcessEnv = process.env): Owner {
-  const session =
-    env.WORK_SESSION && env.WORK_SESSION.length > 0
-      ? env.WORK_SESSION
-      : env.CLAUDE_SESSION_NAME && env.CLAUDE_SESSION_NAME.length > 0
-        ? env.CLAUDE_SESSION_NAME
-        : `${userInfo().username}@${hostname()}:${process.ppid}`;
-  return { session, pid: process.pid };
+  const named = [env.WORK_SESSION, env.CLAUDE_SESSION_NAME, env.CLAUDE_CODE_SESSION_ID].find(
+    (v) => v !== undefined && v.length > 0,
+  );
+  return { session: named ?? `${userInfo().username}@${hostname()}`, pid: process.pid };
 }

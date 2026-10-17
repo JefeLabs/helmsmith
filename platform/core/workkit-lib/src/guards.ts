@@ -1,3 +1,4 @@
+import { existsSync, realpathSync } from 'node:fs';
 import { WorkkitError } from './errors.js';
 import type { Git } from './git.js';
 import type { Registry } from './registry.js';
@@ -24,6 +25,14 @@ export function assertNotMainCheckout(git: Git): void {
   }
 }
 
+const same = (a: string, b: string) => {
+  try {
+    return realpathSync(a) === realpathSync(b);
+  } catch {
+    return a === b;
+  }
+};
+
 export interface CommitCheck {
   m: Manifest;
   registry: Registry;
@@ -32,6 +41,8 @@ export interface CommitCheck {
   branch: string;
   stagedPaths: string[];
   ownerSession: string;
+  /** the committing checkout's top level: a lock held by the effort living there is the committer's own */
+  checkoutRoot?: string;
 }
 
 /** What a pre-commit hook asks: may this commit be made? Refusals are sentences for stderr. */
@@ -42,8 +53,17 @@ export function checkCommit(c: CommitCheck): { refusals: string[] } {
       `branch "${c.branch}" is protected (${c.m.protectedBranches.join(', ')}): work happens on <type>/<area> branches, never here`,
     );
   }
+  const efforts = new Map(c.registry.efforts({ project: c.project }).map((e) => [e.id, e]));
   for (const lease of c.registry.leases({ project: c.project, kind: 'commons' })) {
     if (lease.owner.session === c.ownerSession) continue;
+    const holder = efforts.get(lease.effort);
+    if (
+      holder &&
+      c.checkoutRoot &&
+      existsSync(holder.worktree) &&
+      same(holder.worktree, c.checkoutRoot)
+    )
+      continue;
     const globs = c.m.commons[String(lease.value)] ?? [];
     const hit = pathsMatching(c.stagedPaths, globs);
     if (hit.length > 0) {
@@ -60,20 +80,28 @@ export interface PushCheck {
   registry: Registry;
   git: Git;
   project: string;
+  /** the local branch being pushed ('' for a delete) */
   branch: string;
+  /** the destination ref (`refs/heads/<name>`); absent = same name as the local branch */
+  remoteRef?: string;
+  isDelete?: boolean;
   changedPaths: string[];
 }
 
-/** What a pre-push hook asks: protected → refusal; leaving the scope or touching commons → warnings. */
+/** What a pre-push hook asks: a protected destination → refusal; leaving the scope or touching commons → warnings. */
 export function checkPush(c: PushCheck): { refusals: string[]; warnings: string[] } {
   const refusals: string[] = [];
   const warnings: string[] = [];
-  if (c.m.protectedBranches.includes(c.branch)) {
+  const destination = (c.remoteRef ?? `refs/heads/${c.branch}`).replace(/^refs\/heads\//, '');
+  if (c.m.protectedBranches.includes(destination)) {
     refusals.push(
-      `branch "${c.branch}" is protected (${c.m.protectedBranches.join(', ')}): nothing is pushed to it directly`,
+      c.isDelete
+        ? `refusing to delete protected branch "${destination}"`
+        : `"${destination}" is protected (${c.m.protectedBranches.join(', ')}): nothing is pushed to it directly, open a PR from ${c.branch || 'an area branch'}`,
     );
     return { refusals, warnings };
   }
+  if (c.isDelete) return { refusals, warnings };
   const effort = c.registry
     .efforts({ project: c.project, state: 'active' })
     .find((e) => e.branch === c.branch);
@@ -88,8 +116,7 @@ export function checkPush(c: PushCheck): { refusals: string[]; warnings: string[
       );
     }
   }
-  for (const name of commons) {
+  for (const name of commons)
     warnings.push(`commons ${name} touched: the other areas are told at \`work finish\``);
-  }
   return { refusals, warnings };
 }

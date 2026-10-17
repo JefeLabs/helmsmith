@@ -23,6 +23,7 @@ export function printStart(r: StartResult): void {
     console.log(`  lease     ${l.kind} ${l.value}${ports}  expires ${l.expires}`);
   }
   for (const w of r.warnings) warn(w);
+  for (const n of r.notices) console.log(chalk.yellow(`  notice    ${n.text} (${n.at})`));
 }
 
 export function registerStart(program: Command): void {

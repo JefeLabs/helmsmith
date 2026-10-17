@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { currentOwner, ensureExcluded, Git, Registry, validateManifest } from '@helmsmith/workkit';
@@ -356,6 +357,190 @@ describe('retireArea / auditProject', () => {
     const findings = await auditProject(ctx);
     expect(findings.map((x) => x.kind).sort()).toEqual(['dirty', 'foreign-branch']);
     expect(findings.find((x) => x.kind === 'dirty')?.area).toBe('shop/cart');
+  });
+});
+
+describe('fix pass', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('C1: a leftover directory at the area path is refused, and the main checkout is untouched', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const ctx = ctxFor(f);
+    mkdirSync(join(f.main, '.claude/worktrees/shop/cart'), { recursive: true });
+    writeFileSync(join(f.main, '.claude/worktrees/shop/cart/.DS_Store'), '');
+    const statusBefore = new Git(f.main).run(['status', '--porcelain']);
+    await expect(
+      startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'frontend' }),
+    ).rejects.toMatchObject({ code: 'WORKTREE_INVALID' });
+    expect(new Git(f.main).currentBranch()).toBe('develop');
+    expect(new Git(f.main).run(['status', '--porcelain'])).toBe(statusBefore);
+    expect(existsSync(join(f.main, '.env.slot'))).toBe(false);
+    expect(ctx.registry.efforts()).toEqual([]);
+  });
+
+  it('I3: two concurrent starts on one area admit exactly one', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const ctx = ctxFor(f);
+    const results = await Promise.allSettled([
+      startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'fullstack' }),
+      startEffort(
+        { ...ctx, owner: { session: 's2', pid: 2 } },
+        { area: 'shop/cart', type: 'feature', mode: 'fullstack' },
+      ),
+    ]);
+    const ok = results.filter((r) => r.status === 'fulfilled');
+    const refused = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+    expect(ok).toHaveLength(1);
+    expect(refused).toHaveLength(1);
+    expect((refused[0].reason as { code: string }).code).toBe('EFFORT_OPEN');
+    expect(ctx.registry.leases({ kind: 'slot' })).toHaveLength(1);
+  });
+
+  it('I4: the effort is recorded before services start, pids land on the lease as they spawn, and reap leaves a starting effort alone', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    let seenDuringStart: string | undefined;
+    let pidsDuringStart: Record<string, number> | undefined;
+    const runner: FakeRunner = {
+      calls: [],
+      stopped: [],
+      start: async (a) => {
+        seenDuringStart = ctx.registry.openEffortFor('demo', 'shop/cart')?.state;
+        a.onSpawn?.('backend', 4242, 'sig');
+        pidsDuringStart = ctx.registry.leases({ kind: 'slot' })[0]?.pids;
+        const reaped = await reapLeases(ctx, { now: new Date(Date.now() + 100 * 3_600_000) });
+        expect(reaped.reaped).toEqual([]);
+        return { pids: { backend: 4242 }, signatures: { backend: 'sig' } };
+      },
+      stop: async () => {},
+    };
+    const ctx = ctxFor(f, runner);
+    const r = await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'fullstack' });
+    expect(seenDuringStart).toBe('starting');
+    expect(pidsDuringStart).toEqual({ backend: 4242 });
+    expect(r.effort.state).toBe('active');
+    expect(r.leases[0].signatures).toEqual({ backend: 'sig' });
+  });
+
+  it('I5: a slot whose port is busy is skipped, and a lease whose port still answers is not garbage even without its worktree', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const ctx = ctxFor(f);
+    const busy = createServer().listen(43101, '127.0.0.1');
+    await new Promise((res) => busy.once('listening', res));
+    try {
+      const r = await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'fullstack' });
+      expect(r.leases[0].value).toBe(2);
+      ctx.registry.updateEffort(r.effort.id, { worktree: '/nonexistent/worktree' });
+      ctx.registry.patchLease(r.leases[0].id, { ports: { frontend: 43002, backend: 43101 } });
+      const kept = await reapLeases(ctx, { now: new Date() });
+      expect(kept.reaped).toEqual([]);
+    } finally {
+      busy.close();
+    }
+  });
+
+  it('I5b: releasing a lease whose worktree is gone still signals its pids, skipping the stop commands', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const ctx = ctxFor(f);
+    const r = await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'fullstack' });
+    ctx.registry.updateEffort(r.effort.id, { worktree: '/nonexistent/worktree' });
+    const late = new Date(Date.parse(r.leases[0].expires) + 1000);
+    await reapLeases(ctx, { now: late });
+    expect(ctx.runner.calls).toEqual(['start', 'stop']);
+    expect(ctx.runner.stopped).toEqual([{ backend: process.pid }]);
+  });
+
+  it('I6: when one lease of an effort expires the whole effort is released and parked once; finish accepts the parked effort', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const ctx = ctxFor(f);
+    const cross = validateManifest({
+      ...manifestRaw(),
+      areas: { ...manifestRaw().areas, 'platform/auth': { module: 'auth', commons: ['auth'] } },
+    });
+    const c = { ...ctx, manifest: cross };
+    const r = await startEffort(c, { area: 'platform/auth', type: 'fix', mode: 'fullstack' });
+    expect(r.leases.map((l) => l.kind).sort()).toEqual(['commons', 'slot']);
+    const fiveHours = new Date(Date.now() + 5 * 3_600_000);
+    const out = await reapLeases(c, { now: fiveHours });
+    expect(out.reaped).toHaveLength(2);
+    expect(c.registry.leases()).toEqual([]);
+    expect(c.registry.efforts({ area: 'platform/auth' })[0].state).toBe('parked');
+    const done = await finishEffort(c, { area: 'platform/auth' });
+    expect(done.effort.state).toBe('finished');
+  });
+
+  it('I7: status and env touch the leases, so idle expiry is measured from use', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const ctx = ctxFor(f);
+    const r = await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'fullstack' });
+    const before = r.leases[0].expires;
+    await new Promise((res) => setTimeout(res, 1100));
+    statusFor(ctx, 'shop/cart');
+    const afterStatus = ctx.registry.leases({ kind: 'slot' })[0].expires;
+    expect(Date.parse(afterStatus)).toBeGreaterThan(Date.parse(before));
+    await new Promise((res) => setTimeout(res, 1100));
+    effortEnv(ctx, 'shop/cart');
+    expect(Date.parse(ctx.registry.leases({ kind: 'slot' })[0].expires)).toBeGreaterThan(
+      Date.parse(afterStatus),
+    );
+  });
+
+  it("I11: notices come only from the branch's own changes, persist across starts, and start reports them", async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const ctx = ctxFor(f);
+    const first = await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'frontend' });
+    commitFile(first.effort.worktree, 'app-ui/app/shop/cart/page.tsx', '1', 'cart only');
+    commitFile(f.main, 'api/auth/login.ts', '1', 'develop changes auth');
+    new Git(f.main).push('develop');
+    await finishEffort(ctx, { area: 'shop/cart' });
+    expect(statusFor(ctx, 'shop/team').areas[0].notices).toEqual([]);
+    const auth = await startEffort(ctx, { area: 'platform/auth', type: 'fix', mode: 'frontend' });
+    commitFile(auth.effort.worktree, 'api/auth/x.ts', '2', 'auth change');
+    await finishEffort(ctx, { area: 'platform/auth' });
+    expect(statusFor(ctx, 'shop/team').areas[0].notices).toHaveLength(1);
+    const again = await startEffort(ctx, { area: 'shop/team', type: 'feature', mode: 'frontend' });
+    expect(again.notices).toHaveLength(1);
+    expect(statusFor(ctx, 'shop/team').areas[0].notices).toHaveLength(1);
+  });
+
+  it('I12: archives nest per area with second resolution, retention never touches a sibling area, and a file path archives', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const m = validateManifest({
+      ...manifestRaw(),
+      areas: { ...manifestRaw().areas, 'shop/cart-v2': { module: 'cart2' } },
+      archive: { paths: ['evidence', 'trace.log'], keepDays: 30, keepPerArea: 2 },
+    });
+    const ctx = { ...ctxFor(f), manifest: m };
+    const root = join(f.main, '.slot-archive');
+    for (const d of [
+      'shop/cart/20200101-000001',
+      'shop/cart/20200101-000002',
+      'shop/cart/20200101-000003',
+      'shop/cart-v2/20200101-000001',
+    ]) {
+      mkdirSync(join(root, d), { recursive: true });
+    }
+    const r = await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'frontend' });
+    await finishEffort(ctx, { area: 'shop/cart' });
+    ensureExcluded(r.effort.worktree, ['evidence/', 'trace.log']);
+    mkdirSync(join(r.effort.worktree, 'evidence'));
+    writeFileSync(join(r.effort.worktree, 'evidence/run.txt'), 'x');
+    writeFileSync(join(r.effort.worktree, 'trace.log'), 'trace');
+    const out = await retireArea(ctx, { area: 'shop/cart' });
+    expect(out.archived).toHaveLength(2);
+    expect(out.archived[1].endsWith('trace.log')).toBe(true);
+    expect(existsSync(join(root, 'shop/cart-v2/20200101-000001'))).toBe(true);
+    const { readdirSync } = await import('node:fs');
+    expect(readdirSync(join(root, 'shop/cart')).length).toBeLessThanOrEqual(2);
   });
 });
 

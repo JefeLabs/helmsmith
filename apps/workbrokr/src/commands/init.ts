@@ -107,7 +107,7 @@ export function runInit(o: InitOptions): { manifestPath: string; hooks: string[]
   const manifestPath = join(repoRoot, 'helmsmith.config.mjs');
   writeFileSync(manifestPath, `${HEADER}export default ${JSON.stringify(manifest, null, 2)};\n`);
   claimRanges(Registry.open(o.home), validateManifest(manifest), repoRoot);
-  const hooks = o.hooks ? installHooks(repoRoot).files : [];
+  const hooks = o.hooks ? installHooks(repoRoot, { protectedBranches: [o.baseBranch] }).files : [];
   return { manifestPath, hooks };
 }
 

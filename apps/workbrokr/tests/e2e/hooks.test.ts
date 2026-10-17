@@ -54,7 +54,8 @@ describe('git hooks through the bin', () => {
     // The hooks must live on develop so area worktrees carry them; this one commit bypasses them.
     gitIn(repo.main, 'add', '-A');
     gitIn(repo.main, '-c', 'core.hooksPath=/nonexistent', 'commit', '-q', '-m', 'tooling');
-    gitIn(repo.main, 'push', '-q', 'origin', 'develop');
+    // The bootstrap push of the hooks themselves bypasses them explicitly: the pre-push script refuses develop.
+    gitIn(repo.main, '-c', 'core.hooksPath=/nonexistent', 'push', '-q', 'origin', 'develop');
   });
   afterAll(() => {
     cleanHome();
@@ -127,5 +128,64 @@ describe('git hooks through the bin', () => {
     commitFile(worktree, 'svc/other/thing.ts', '1', 'outside');
     const out = git(worktree, ['push', '-u', 'origin', 'feature/shop/cart']);
     expect(typeof out).toBe('string');
+  });
+
+  it('C2: without WORK_SESSION the holder of a commons lock can still commit under it', async () => {
+    const noSession = {
+      PATH: env.PATH,
+      WORK_SESSION: '',
+      CLAUDE_SESSION_NAME: '',
+      CLAUDE_CODE_SESSION_ID: '',
+    };
+    await runCli(['finish', '--area', 'platform/auth', '--project-root', repo.main], {
+      home,
+      env: { ...env, WORK_SESSION: 'other' },
+    });
+    const started = await runCli(
+      [
+        'start',
+        '--area',
+        'platform/auth',
+        '--type',
+        'fix',
+        '--mode',
+        'frontend',
+        '--project-root',
+        repo.main,
+        '--json',
+      ],
+      { home, cwd: repo.main, env: noSession },
+    );
+    expect(started.code, started.stderr).toBe(0);
+    const worktree = (JSON.parse(started.stdout) as { effort: { worktree: string } }).effort
+      .worktree;
+    mkdirSync(join(worktree, 'api/auth'), { recursive: true });
+    writeFileSync(join(worktree, 'api/auth/mine.ts'), 'x');
+    git(worktree, ['add', 'api/auth/mine.ts'], noSession);
+    expect(() => git(worktree, ['commit', '-m', 'my own commons'], noSession)).not.toThrow();
+  });
+
+  it('I1: a push whose destination is develop is refused even from an area branch', () => {
+    const worktree = join(repo.main, '.claude/worktrees/shop/cart');
+    let error = '';
+    try {
+      git(worktree, ['push', 'origin', 'HEAD:develop']);
+    } catch (e) {
+      error = (e as { stderr?: string }).stderr ?? String(e);
+    }
+    expect(error).toMatch(/develop.*protected/);
+    expect(gitIn(repo.main, 'ls-remote', 'origin', 'refs/heads/develop')).not.toContain(
+      gitIn(worktree, 'rev-parse', 'HEAD').trim(),
+    );
+  });
+
+  it('I2: a commit on develop is refused even when workbrokr is not on PATH', () => {
+    let error = '';
+    try {
+      git(repo.main, ['commit', '--allow-empty', '-m', 'no binary'], { PATH: '/usr/bin:/bin' });
+    } catch (e) {
+      error = (e as { stderr?: string }).stderr ?? String(e);
+    }
+    expect(error).toMatch(/protected/);
   });
 });

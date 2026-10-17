@@ -54,9 +54,15 @@ export class Git {
     return dirname(common);
   }
 
-  /** A linked worktree's git dir is always <common>/worktrees/<name>. */
+  /** The main checkout is the one whose git dir IS the common dir (compared as absolute realpaths). */
   isMainCheckout(): boolean {
-    return !this.run(['rev-parse', '--absolute-git-dir']).trim().includes('/worktrees/');
+    const gitDir = realpathSync(
+      this.run(['rev-parse', '--path-format=absolute', '--git-dir']).trim(),
+    );
+    const common = realpathSync(
+      this.run(['rev-parse', '--path-format=absolute', '--git-common-dir']).trim(),
+    );
+    return gitDir === common;
   }
 
   currentBranch(): string {
@@ -96,7 +102,12 @@ export class Git {
   }
 
   changedPaths(from: string, to: string): string[] {
-    return this.lines(['diff', '--name-only', from, to]);
+    return this.lines(['diff', '--name-only', '--no-renames', from, to]);
+  }
+
+  /** Paths this branch changed since it diverged from origin/<base> (three-dot), without the base's own changes. */
+  changedSince(base: string): string[] {
+    return this.lines(['diff', '--name-only', '--no-renames', `origin/${base}...HEAD`]);
   }
 
   commitsNotOn(base: string): string[] {
@@ -130,7 +141,8 @@ export class Git {
   worktreeAdd(path: string, branch: string, startPoint?: string): void {
     mkdirSync(dirname(path), { recursive: true });
     if (this.branchExists(branch)) this.run(['worktree', 'add', '-q', path, branch]);
-    else this.run(['worktree', 'add', '-q', '-b', branch, path, startPoint ?? 'HEAD']);
+    else
+      this.run(['worktree', 'add', '-q', '--no-track', '-b', branch, path, startPoint ?? 'HEAD']);
   }
 
   worktreeRemove(path: string): void {
@@ -139,7 +151,7 @@ export class Git {
 
   checkout(branch: string, createFrom?: string): void {
     if (this.branchExists(branch)) this.run(['checkout', '-q', branch]);
-    else this.run(['checkout', '-q', '-b', branch, createFrom ?? 'HEAD']);
+    else this.run(['checkout', '-q', '--no-track', '-b', branch, createFrom ?? 'HEAD']);
   }
 
   push(branch: string): void {

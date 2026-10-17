@@ -16,6 +16,7 @@ import type {
   Lease,
   LeaseKind,
   Manifest,
+  Notice,
   Owner,
   ProjectEntry,
   RegistryFile,
@@ -43,14 +44,35 @@ export class Registry {
     return new Registry(home, now);
   }
 
+  /** The registry as it is on disk. A file that does not parse is refused, never replaced. */
   read(): RegistryFile {
     const file = registryFile(this.home);
     if (!existsSync(file)) return structuredClone(EMPTY);
+    let parsed: unknown;
     try {
-      return JSON.parse(readFileSync(file, 'utf8')) as RegistryFile;
-    } catch {
-      return structuredClone(EMPTY);
+      parsed = JSON.parse(readFileSync(file, 'utf8'));
+    } catch (err) {
+      throw new WorkkitError(
+        'INTERNAL',
+        `${file} is corrupt (${err instanceof Error ? err.message : String(err)}); nothing was changed. Move it aside (mv ${file} ${file}.corrupt-$(date +%s)) to start fresh, knowing its leases and running pids are lost`,
+        { file },
+      );
     }
+    const r = parsed as Partial<RegistryFile> | null;
+    if (!r || typeof r !== 'object' || r.version !== 1) {
+      throw new WorkkitError(
+        'INTERNAL',
+        `${file} has an unknown registry version (${String(r?.version)}); this build reads version 1`,
+        { file },
+      );
+    }
+    return {
+      version: 1,
+      projects: r.projects ?? {},
+      leases: r.leases ?? [],
+      efforts: r.efforts ?? [],
+      notices: r.notices ?? [],
+    };
   }
 
   /** Lock, re-read, mutate, write atomically, unlock. The only way state changes. */
@@ -118,7 +140,38 @@ export class Registry {
     return this.efforts({ project, area, state: 'active' })[0];
   }
 
-  allocateSlot(project: string, m: Manifest, owner: Owner, effort: string): Lease {
+  /** An effort that is being started counts as open: nobody else may start on the area meanwhile. */
+  openEffortFor(project: string, area: string): Effort | undefined {
+    return this.efforts({ project, area }).find(
+      (e) => e.state === 'starting' || e.state === 'active',
+    );
+  }
+
+  addNotice(project: string, area: string, notice: Notice): void {
+    this.update((r) => {
+      r.notices = [...(r.notices ?? []), { project, area, notice }];
+    });
+  }
+
+  notices(project: string, area: string): Notice[] {
+    return (this.read().notices ?? [])
+      .filter((n) => n.project === project && n.area === area)
+      .map((n) => n.notice);
+  }
+
+  clearNotices(project: string, area: string): void {
+    this.update((r) => {
+      r.notices = (r.notices ?? []).filter((n) => !(n.project === project && n.area === area));
+    });
+  }
+
+  allocateSlot(
+    project: string,
+    m: Manifest,
+    owner: Owner,
+    effort: string,
+    exclude: Set<number> = new Set(),
+  ): Lease {
     return this.update((r) => {
       const taken = new Set(
         r.leases
@@ -128,7 +181,7 @@ export class Registry {
       const reserved = new Set(m.slots.reserved);
       let slot = -1;
       for (let n = 0; n < m.slots.count; n++) {
-        if (!taken.has(n) && !reserved.has(n)) {
+        if (!taken.has(n) && !reserved.has(n) && !exclude.has(n)) {
           slot = n;
           break;
         }
