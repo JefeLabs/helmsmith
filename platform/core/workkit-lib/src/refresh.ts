@@ -3,6 +3,11 @@ import picomatch from 'picomatch';
 import { WorkkitError } from './errors.js';
 import type { RefreshEntry } from './types.js';
 
+function matchesWhen(glob: string): (p: string) => boolean {
+  const isMatch = picomatch(glob, { dot: true });
+  return (p) => isMatch(p);
+}
+
 /** Which refresh commands and marks a sync's changed paths call for, in manifest order. */
 export function selectRefresh(
   entries: RefreshEntry[],
@@ -12,8 +17,7 @@ export function selectRefresh(
   const marks: string[] = [];
   for (const e of entries) {
     const hit =
-      e.always === true ||
-      (e.when !== undefined && changedPaths.some(picomatch(e.when, { dot: true })));
+      e.always === true || (e.when !== undefined && changedPaths.some(matchesWhen(e.when)));
     if (!hit) continue;
     if (e.run) runs.push(e.run);
     if (e.mark) marks.push(e.mark);
