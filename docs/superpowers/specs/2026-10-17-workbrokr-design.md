@@ -346,6 +346,10 @@ The weekly list of what would otherwise be forgotten: areas with uncommitted or 
 7. Locks: resources hard; section scopes hard, mode-aware (frontend set, or frontend + backend); commons write-locked briefly by cross-cutting efforts, never blocking a start; no global freeze; no automatic rebase.
 8. Impact notices are informational only.
 9. `finish` keeps the worktree and branch; `retire` is the only destructive verb and archives first; `finish --park` commits rather than discards.
+10. (phase 1 execution) Ports are per-service ranges `[base, base + slots.count)` claimed per project; the single `ports.block` of §5.2 is dropped.
+11. (phase 1 execution) Frontend mode leases no Storybook port: `storybrokr up` has no `--port`, so the lease records the instance id and the port storybrokr chose. Phase 3 unifies this.
+12. (phase 1 execution) Impact notices are commons-based ("commons X changed on branch Y"); the import-graph version stays in "later, optional".
+13. (phase 1 execution) The emitted `.slot`, env file, log dir and the worktree root are excluded from git through the clone's `info/exclude`, not `.gitignore`, so `finish --park` never commits them.
 
 ## 17. Open questions
 

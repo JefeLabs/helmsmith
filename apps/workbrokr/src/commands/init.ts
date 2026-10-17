@@ -87,7 +87,8 @@ export function buildStarterManifest(o: InitOptions): Record<string, unknown> {
   return manifest;
 }
 
-const HEADER = `// helmsmith.config.mjs — read by \`work\` (@helmsmith/workbrokr). Written by \`work init\`.
+const HEADER = `// biome-ignore-all lint/suspicious/noTemplateCurlyInString: \${PORT_*} are the manifest's own placeholders
+// helmsmith.config.mjs — read by \`work\` (@helmsmith/workbrokr). Written by \`work init\`.
 // Edit: the services' start/stop/health commands, the scope templates, the areas (leaves only,
 // each with its backend module) and the commons. Nothing here is read by the application.
 `;

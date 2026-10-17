@@ -1,3 +1,4 @@
+// biome-ignore-all lint/suspicious/noTemplateCurlyInString: ${PORT_*} are the manifest's own placeholders
 // e2e fixture: two tiny HTTP services stand in for a backend and a frontend.
 export default {
   project: 'fixture',
