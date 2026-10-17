@@ -76,9 +76,9 @@ export function slotVars(
  * `info/exclude` (one per clone, applies to every worktree), so no .gitignore edit is needed.
  */
 export function ensureExcluded(worktree: string, patterns: string[]): void {
-  const common = realpathSync(
-    new Git(worktree).run(['rev-parse', '--path-format=absolute', '--git-common-dir']).trim(),
-  );
+  const r = new Git(worktree).tryRun(['rev-parse', '--path-format=absolute', '--git-common-dir']);
+  if (r.code !== 0) return; // not a git checkout (tests, scratch dirs): nothing to exclude from
+  const common = realpathSync(r.out.trim());
   const file = join(common, 'info', 'exclude');
   mkdirSync(join(common, 'info'), { recursive: true });
   const present = new Set(
@@ -98,7 +98,12 @@ export function ensureExcluded(worktree: string, patterns: string[]): void {
 
 /** Write `.slot`, the env file and the log dir into the worktree; nothing is tracked by git. */
 export function emitWorktreeConfig(a: EmitConfigArgs): EmittedConfig {
-  ensureExcluded(a.worktree, ['.slot', a.m.env.file, `${a.m.logs.dir.replace(/\/+$/, '')}/`]);
+  ensureExcluded(a.worktree, [
+    '.slot',
+    a.m.env.file,
+    `${a.m.logs.dir.replace(/\/+$/, '')}/`,
+    `${a.m.worktreeRoot.replace(/\/+$/, '')}/`,
+  ]);
   const logDir = join(a.worktree, a.m.logs.dir);
   mkdirSync(logDir, { recursive: true });
   const vars = slotVars(a.m, { ...a, logDir });
