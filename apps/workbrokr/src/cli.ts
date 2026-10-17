@@ -1,5 +1,6 @@
 import { createCli } from '@helmsmith/cli-kit';
 import { registerInit } from './commands/init.js';
+import { registerStart } from './commands/start.js';
 import { VERSION } from './version.js';
 
 const { program } = createCli({
@@ -9,6 +10,7 @@ const { program } = createCli({
 });
 
 registerInit(program);
+registerStart(program);
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   console.error(err instanceof Error ? err.message : String(err));

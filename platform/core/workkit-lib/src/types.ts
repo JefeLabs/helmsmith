@@ -72,8 +72,8 @@ export interface Lease {
   /** slot number, storybrokr instance id, or commons name */
   value: string | number;
   ports?: Record<string, number>;
-  /** pids this lease started (fullstack services): the only processes reap/finish may stop */
-  pids?: number[];
+  /** service → pid this lease started (fullstack): the only processes reap/finish may stop */
+  pids?: Record<string, number>;
   owner: Owner;
   effort: string;
   created: string;
