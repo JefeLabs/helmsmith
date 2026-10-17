@@ -25,6 +25,11 @@ export function makeRepo(base = 'develop'): { origin: string; main: string; clea
   const main = join(dir, 'main');
   gitIn(dir, 'init', '-q', '--bare', '-b', base, origin);
   gitIn(dir, 'clone', '-q', origin, main);
+  // Production code and raw `git` calls in tests run without IDENTITY in their env; a CI runner has
+  // no global identity either, so the clone carries its own (shared by every worktree of it).
+  gitIn(main, 'config', 'user.name', IDENTITY.GIT_AUTHOR_NAME);
+  gitIn(main, 'config', 'user.email', IDENTITY.GIT_AUTHOR_EMAIL);
+  gitIn(main, 'config', 'commit.gpgsign', 'false');
   gitIn(main, 'checkout', '-q', '-B', base);
   commitFile(main, 'README.md', 'hello', 'init');
   gitIn(main, 'push', '-q', '-u', 'origin', base);
