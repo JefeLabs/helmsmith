@@ -1,4 +1,4 @@
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { currentOwner, Git, Registry, validateManifest } from '@helmsmith/workkit';
@@ -7,6 +7,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   type Ctx,
   effortEnv,
+  finishEffort,
+  reapLeases,
   type ServiceRunner,
   type StorybrokrClient,
   slotEnv,
@@ -240,6 +242,69 @@ describe('statusFor / effortEnv', () => {
     expect(env.WORKTREE).toBe(cart?.effort?.worktree);
     expect(slotEnv(ctx.manifest, 3).PORT_FRONTEND).toBe('43003');
     expect(() => effortEnv(ctx, 'shop/team')).toThrow(/no open effort/);
+  });
+});
+
+describe('finishEffort / reapLeases', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('finish refuses a dirty worktree, parks with --park, stops the recorded pids, releases leases, pushes', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const ctx = ctxFor(f);
+    const r = await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'fullstack' });
+    writeFileSync(join(r.effort.worktree, 'dirty.txt'), 'x');
+    await expect(finishEffort(ctx, { area: 'shop/cart' })).rejects.toMatchObject({
+      code: 'DIRTY_WORKTREE',
+    });
+    const done = await finishEffort(ctx, { area: 'shop/cart', park: true });
+    expect(done.pushed).toBe(true);
+    expect(done.parked).toBe(true);
+    expect(new Git(f.main).remoteBranchExists('feature/shop/cart')).toBe(true);
+    expect(ctx.registry.leases()).toEqual([]);
+    expect(ctx.runner.calls).toEqual(['start', 'stop']);
+    expect(ctx.runner.stopped).toEqual([{ backend: process.pid }]);
+    expect(ctx.registry.activeEffortFor('demo', 'shop/cart')).toBeUndefined();
+    expect(ctx.registry.efforts({ area: 'shop/cart' })[0].state).toBe('finished');
+  });
+
+  it('finish brings a storybrokr instance down and leaves notices on other areas when commons changed', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const sb = fakeSb();
+    const ctx = ctxFor(f, fakeRunner(), sb);
+    const r = await startEffort(ctx, {
+      area: 'platform/auth',
+      type: 'fix',
+      mode: 'frontend',
+      story: 'x.stories.tsx',
+    });
+    commitFile(r.effort.worktree, 'api/auth/x.ts', '1', 'auth change');
+    const done = await finishEffort(ctx, { area: 'platform/auth' });
+    expect(sb.downs).toEqual(['sb_1']);
+    expect(done.notices).toBe(2);
+    const s = statusFor(ctx, 'shop/cart');
+    expect(s.areas[0].notices[0].text).toMatch(/commons auth changed on fix\/platform\/auth/);
+  });
+
+  it('reap stops only the recorded pids of an expired lease and parks the effort', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const ctx = ctxFor(f);
+    const r = await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'fullstack' });
+    const lease = r.leases[0];
+    expect((await reapLeases(ctx, { now: new Date() })).reaped).toEqual([]);
+    const late = new Date(Date.parse(lease.expires) + 60_000);
+    const dry = await reapLeases(ctx, { now: late, dryRun: true });
+    expect(dry.reaped.map((l) => l.id)).toEqual([lease.id]);
+    expect(ctx.registry.leases()).toHaveLength(1);
+    const out = await reapLeases(ctx, { now: late });
+    expect(out.reaped.map((l) => l.id)).toEqual([lease.id]);
+    expect(ctx.registry.leases()).toEqual([]);
+    expect(ctx.registry.efforts({ area: 'shop/cart' })[0].state).toBe('parked');
+    expect(ctx.registry.efforts({ area: 'shop/cart' })[0].parkedReason).toMatch(/idle/);
+    expect(ctx.runner.stopped).toEqual([{ backend: process.pid }]);
   });
 });
 

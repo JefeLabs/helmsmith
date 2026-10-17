@@ -3,7 +3,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { emitWorktreeConfig, renderTemplate } from './config.js';
+import { Git } from './git.js';
 import { validateManifest } from './manifest.js';
+import { makeRepo } from './testing/fixture-repo.js';
 import { minimal } from './testing/manifests.js';
 
 describe('config', () => {
@@ -45,5 +47,26 @@ describe('config', () => {
     expect(existsSync(join(wt, '.slot'))).toBe(false);
     expect(readFileSync(out.envFile, 'utf8')).toContain('SLOT=\n');
     expect(out.vars.PORT_STORYBOOK).toBe('6103');
+  });
+
+  it('keeps the emitted files out of git status through the repo-wide exclude file', () => {
+    const f = makeRepo();
+    try {
+      const g = new Git(f.main);
+      const wt = join(f.main, '.claude/worktrees/shop/cart');
+      g.worktreeAdd(wt, 'feature/shop/cart', 'origin/develop');
+      emitWorktreeConfig({
+        m: validateManifest(minimal),
+        worktree: wt,
+        slot: 2,
+        ports: { frontend: 3002, backend: 8445 },
+        area: 'shop/cart',
+        branch: 'feature/shop/cart',
+      });
+      expect(new Git(wt).isDirty()).toBe(false);
+      expect(g.isDirty()).toBe(false);
+    } finally {
+      f.cleanup();
+    }
   });
 });

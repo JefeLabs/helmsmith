@@ -387,3 +387,147 @@ export function effortEnv(ctx: Ctx, area: string): Record<string, string> {
   });
   return { ...vars, MODE: effort.mode };
 }
+
+// ── finish / reap ────────────────────────────────────────────────────────────
+
+function leaseEnv(ctx: Ctx, effort: Effort, lease: Lease): NodeJS.ProcessEnv {
+  const vars = slotVars(ctx.manifest, {
+    slot: lease.kind === 'slot' ? (lease.value as number) : undefined,
+    ports: lease.ports ?? {},
+    area: effort.area,
+    branch: effort.branch,
+    worktree: effort.worktree,
+    logDir: join(effort.worktree, ctx.manifest.logs.dir),
+  });
+  return { ...process.env, ...vars };
+}
+
+/** Stop what a lease started (and only that), bring its Storybook down, release it. */
+async function releaseLease(ctx: Ctx, effort: Effort | undefined, lease: Lease): Promise<void> {
+  try {
+    if (lease.kind === 'slot' && lease.pids && effort && existsSync(effort.worktree)) {
+      await ctx.runner.stop({
+        m: ctx.manifest,
+        cwd: effort.worktree,
+        env: leaseEnv(ctx, effort, lease),
+        pids: lease.pids,
+        onLog: ctx.log,
+      });
+    } else if (lease.kind === 'storybook') {
+      await ctx.storybrokr.down(String(lease.value));
+    }
+  } catch (err) {
+    ctx.log(
+      `while releasing ${lease.kind} ${lease.value}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+  ctx.registry.release(lease.id);
+}
+
+/** Tell every other area that a commons set changed on this branch (informational only). */
+function leaveNotices(ctx: Ctx, effort: Effort, commons: string[]): number {
+  if (commons.length === 0) return 0;
+  const m = ctx.manifest;
+  const notice: Notice = {
+    from: effort.branch,
+    text: `commons ${commons.join(', ')} changed on ${effort.branch}: sync and re-verify`,
+    at: now(),
+  };
+  let count = 0;
+  for (const area of Object.keys(m.areas)) {
+    if (area === effort.area) continue;
+    const latest = latestEffortFor(ctx, area);
+    if (latest) ctx.registry.updateEffort(latest.id, { notices: [...latest.notices, notice] });
+    else {
+      ctx.registry.addEffort({
+        id: newId('eff'),
+        project: m.project,
+        area,
+        type: '-',
+        mode: 'frontend',
+        branch: '',
+        worktree: worktreePathFor(ctx, area),
+        owner: ctx.owner,
+        state: 'finished',
+        scopes: [],
+        commons: [],
+        leases: [],
+        notices: [notice],
+        started: now(),
+        lastActivity: now(),
+      });
+    }
+    count++;
+  }
+  return count;
+}
+
+export interface FinishResult {
+  effort: Effort;
+  pushed: boolean;
+  parked: boolean;
+  notices: number;
+}
+
+/** Stop the runner, release every lease, push the branch, leave notices; the worktree and branch stay. */
+export async function finishEffort(
+  ctx: Ctx,
+  o: { area: string; park?: boolean },
+): Promise<FinishResult> {
+  const m = ctx.manifest;
+  const effort = ctx.registry.activeEffortFor(m.project, o.area);
+  if (!effort)
+    throw new WorkkitError('EFFORT_NOT_FOUND', `no open effort on ${o.area}`, { area: o.area });
+  const g = new Git(effort.worktree);
+  let parked = false;
+  if (g.isDirty()) {
+    if (!o.park) {
+      throw new WorkkitError(
+        'DIRTY_WORKTREE',
+        `${effort.worktree} has uncommitted changes: commit them, or \`work finish --park\` to commit them as wip(${effort.area}) and push`,
+        { worktree: effort.worktree },
+      );
+    }
+    g.run(['add', '-A']);
+    g.run(['commit', '-q', '-m', `wip(${effort.area}): parked ${now()}`]);
+    parked = true;
+  }
+  for (const lease of ctx.registry.leases({ effort: effort.id }))
+    await releaseLease(ctx, effort, lease);
+  g.push(effort.branch);
+  const changed = g.changedPaths(`origin/${m.baseBranch}`, 'HEAD');
+  const notices = leaveNotices(ctx, effort, commonsTouched(m, changed));
+  const finished = ctx.registry.updateEffort(effort.id, { state: 'finished', lastActivity: now() });
+  return { effort: finished, pushed: true, parked, notices };
+}
+
+/** Expire idle leases: stop only what they started, release them, park their efforts. */
+export async function reapLeases(
+  ctx: Ctx,
+  o: { dryRun?: boolean; now?: Date } = {},
+): Promise<{ reaped: Lease[] }> {
+  const m = ctx.manifest;
+  const at = o.now ?? new Date();
+  const efforts = new Map(ctx.registry.efforts({ project: m.project }).map((e) => [e.id, e]));
+  const reaped = ctx.registry
+    .leases({ project: m.project })
+    .filter(
+      (l) =>
+        Date.parse(l.expires) < at.getTime() ||
+        !existsSync(efforts.get(l.effort)?.worktree ?? '/nonexistent'),
+    );
+  if (o.dryRun) return { reaped };
+  for (const lease of reaped) {
+    const effort = efforts.get(lease.effort);
+    await releaseLease(ctx, effort, lease);
+    if (effort && effort.state === 'active') {
+      ctx.registry.updateEffort(effort.id, {
+        state: 'parked',
+        parkedReason: `idle: ${lease.kind} lease expired ${lease.expires}`,
+        lastActivity: now(),
+      });
+      efforts.set(effort.id, { ...effort, state: 'parked' });
+    }
+  }
+  return { reaped };
+}

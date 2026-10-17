@@ -1,6 +1,14 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { WorkkitError } from './errors.js';
+import { Git } from './git.js';
 import type { Manifest } from './types.js';
 
 /** Substitute `${NAME}` placeholders; an unknown name is a manifest error, never an empty string. */
@@ -63,8 +71,34 @@ export function slotVars(
   return vars;
 }
 
+/**
+ * Make sure git never sees the emitted files: patterns go into the repo's shared
+ * `info/exclude` (one per clone, applies to every worktree), so no .gitignore edit is needed.
+ */
+export function ensureExcluded(worktree: string, patterns: string[]): void {
+  const common = realpathSync(
+    new Git(worktree).run(['rev-parse', '--path-format=absolute', '--git-common-dir']).trim(),
+  );
+  const file = join(common, 'info', 'exclude');
+  mkdirSync(join(common, 'info'), { recursive: true });
+  const present = new Set(
+    existsSync(file)
+      ? readFileSync(file, 'utf8')
+          .split('\n')
+          .map((l) => l.trim())
+      : [],
+  );
+  const missing = patterns.filter((p) => !present.has(p));
+  if (missing.length === 0) return;
+  appendFileSync(
+    file,
+    `${present.size ? '\n' : ''}# written by @helmsmith/workkit: per-worktree config and logs\n${missing.join('\n')}\n`,
+  );
+}
+
 /** Write `.slot`, the env file and the log dir into the worktree; nothing is tracked by git. */
 export function emitWorktreeConfig(a: EmitConfigArgs): EmittedConfig {
+  ensureExcluded(a.worktree, ['.slot', a.m.env.file, `${a.m.logs.dir.replace(/\/+$/, '')}/`]);
   const logDir = join(a.worktree, a.m.logs.dir);
   mkdirSync(logDir, { recursive: true });
   const vars = slotVars(a.m, { ...a, logDir });
