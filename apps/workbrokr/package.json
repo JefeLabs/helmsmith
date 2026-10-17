@@ -4,11 +4,23 @@
   "description": "Start, run, finish, reap and audit area-based work: one worktree per area, <type>/<area> branches, slots and leases from one registry, storybrokr for frontend work. CLI, MCP server and skill.",
   "type": "module",
   "license": "Apache-2.0",
-  "engines": { "node": ">=24" },
-  "bin": { "workbrokr": "./bin/workbrokr.mjs", "work": "./bin/work.mjs" },
+  "engines": {
+    "node": ">=24"
+  },
+  "bin": {
+    "workbrokr": "./bin/workbrokr.mjs",
+    "work": "./bin/work.mjs"
+  },
   "main": "./dist/cli.js",
-  "files": ["dist", "bin", "README.md", "SKILL.md"],
-  "publishConfig": { "access": "public" },
+  "files": [
+    "dist",
+    "bin",
+    "README.md",
+    "SKILL.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup",
     "dev": "tsx src/cli.ts",
