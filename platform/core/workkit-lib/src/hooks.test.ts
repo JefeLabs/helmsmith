@@ -49,3 +49,17 @@ describe('installHooks', () => {
     expect(new Git(f.main).run(['log', '--oneline']).trim().split('\n')).toHaveLength(1);
   });
 });
+
+describe('installHooks branch names', () => {
+  it('refuses a protected branch name that could break out of the shell string', () => {
+    const f = makeRepo();
+    try {
+      expect(() => installHooks(f.main, { protectedBranches: ['develop', 'x"; id; "'] })).toThrow(
+        /protected branch/,
+      );
+      expect(existsSync(join(f.main, '.helmsmith/hooks/pre-commit'))).toBe(false);
+    } finally {
+      f.cleanup();
+    }
+  });
+});

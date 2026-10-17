@@ -65,3 +65,15 @@ describe('loadManifest', () => {
     await expect(loadManifest(dir())).rejects.toMatchObject({ code: 'MANIFEST_NOT_FOUND' });
   });
 });
+
+describe('branch names', () => {
+  it('rejects a protected branch or base branch that is not a plain ref name', () => {
+    expect(() =>
+      validateManifest({ ...minimal, protectedBranches: ['develop', '"; rm -rf /; "'] }),
+    ).toThrow(/protectedBranches/);
+    expect(() => validateManifest({ ...minimal, baseBranch: 'dev $(id)' })).toThrow(/baseBranch/);
+    expect(validateManifest({ ...minimal, baseBranch: 'release/v1.2' }).baseBranch).toBe(
+      'release/v1.2',
+    );
+  });
+});

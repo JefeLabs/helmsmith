@@ -2,6 +2,7 @@ import { chmodSync, lstatSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { WorkkitError } from './errors.js';
 import { Git } from './git.js';
+import { BRANCH_NAME } from './manifest.js';
 
 export const HOOKS_DIR = '.helmsmith/hooks';
 
@@ -56,6 +57,10 @@ export function installHooks(
   repoRoot: string,
   opts: { protectedBranches: string[] },
 ): { hooksDir: string; files: string[] } {
+  for (const b of opts.protectedBranches) {
+    if (!BRANCH_NAME.test(b))
+      throw new WorkkitError('MANIFEST_INVALID', `protected branch "${b}" is not a plain ref name`);
+  }
   const hooksDir = join(repoRoot, HOOKS_DIR);
   mkdirSync(hooksDir, { recursive: true });
   const files: string[] = [];

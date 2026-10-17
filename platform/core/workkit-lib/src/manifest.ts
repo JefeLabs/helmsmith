@@ -11,6 +11,13 @@ export const MANIFEST_FILES = [
   'helmsmith.config.json',
 ] as const;
 
+/**
+ * Branch names the manifest may protect or base on. Git allows more (`$`, `"`, `;`, backticks), but
+ * these names are baked into the installed hook scripts, so only shell-inert characters pass.
+ */
+export const BRANCH_NAME = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
+const BRANCH_NAME_HINT = 'must be a plain ref name: letters, digits, ".", "_", "/", "-"';
+
 const Service = z.object({
   start: z.string().min(1),
   stop: z.string().min(1),
@@ -22,8 +29,8 @@ const Service = z.object({
 
 const Schema = z.object({
   project: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
-  baseBranch: z.string().min(1),
-  protectedBranches: z.array(z.string()).optional(),
+  baseBranch: z.string().regex(BRANCH_NAME, BRANCH_NAME_HINT),
+  protectedBranches: z.array(z.string().regex(BRANCH_NAME, BRANCH_NAME_HINT)).optional(),
   worktreeRoot: z.string().default('.claude/worktrees'),
   branch: z
     .object({ types: z.array(z.string().regex(/^[a-z]+$/)).min(1) })
