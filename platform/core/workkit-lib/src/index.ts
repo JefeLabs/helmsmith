@@ -3,4 +3,5 @@ export * from './manifest.js';
 export * from './paths.js';
 export * from './ports.js';
 export * from './registry.js';
+export * from './scopes.js';
 export * from './types.js';
