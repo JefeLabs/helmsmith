@@ -1,14 +1,16 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { currentOwner, Git, Registry, validateManifest } from '@helmsmith/workkit';
+import { currentOwner, ensureExcluded, Git, Registry, validateManifest } from '@helmsmith/workkit';
 import { commitFile, makeRepo } from '@helmsmith/workkit/testing';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  auditProject,
   type Ctx,
   effortEnv,
   finishEffort,
   reapLeases,
+  retireArea,
   type ServiceRunner,
   type StorybrokrClient,
   slotEnv,
@@ -305,6 +307,55 @@ describe('finishEffort / reapLeases', () => {
     expect(ctx.registry.efforts({ area: 'shop/cart' })[0].state).toBe('parked');
     expect(ctx.registry.efforts({ area: 'shop/cart' })[0].parkedReason).toMatch(/idle/);
     expect(ctx.runner.stopped).toEqual([{ backend: process.pid }]);
+  });
+});
+
+describe('retireArea / auditProject', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('retire refuses while open or unpushed, then archives, removes the worktree and the local branch', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const ctx = {
+      ...ctxFor(f),
+      manifest: validateManifest({
+        ...manifestRaw(),
+        archive: { paths: ['evidence'], keepDays: 30, keepPerArea: 5 },
+      }),
+    };
+    const r = await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'frontend' });
+    await expect(retireArea(ctx, { area: 'shop/cart' })).rejects.toMatchObject({
+      code: 'EFFORT_OPEN',
+    });
+    await finishEffort(ctx, { area: 'shop/cart' });
+    commitFile(r.effort.worktree, 'w2.txt', '2', 'after finish');
+    await expect(retireArea(ctx, { area: 'shop/cart' })).rejects.toMatchObject({
+      code: 'UNPUSHED',
+    });
+    new Git(r.effort.worktree).push('feature/shop/cart');
+    ensureExcluded(r.effort.worktree, ['evidence/']);
+    mkdirSync(join(r.effort.worktree, 'evidence'));
+    writeFileSync(join(r.effort.worktree, 'evidence/run.txt'), 'x');
+    const out = await retireArea(ctx, { area: 'shop/cart' });
+    expect(existsSync(r.effort.worktree)).toBe(false);
+    expect(new Git(f.main).branchExists('feature/shop/cart')).toBe(false);
+    expect(out.archived).toHaveLength(1);
+    expect(existsSync(join(out.archived[0], 'run.txt'))).toBe(true);
+    expect(ctx.registry.efforts({ area: 'shop/cart' })).toEqual([]);
+  });
+
+  it('audit is empty when clean, then lists a dirty area and a foreign worktree', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const ctx = ctxFor(f);
+    expect(await auditProject(ctx)).toEqual([]);
+    const r = await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'frontend' });
+    writeFileSync(join(r.effort.worktree, 'dirty.txt'), 'x');
+    new Git(f.main).worktreeAdd(join(f.main, '.claude/worktrees/tmp/x'), 'tmp/x', 'origin/develop');
+    const findings = await auditProject(ctx);
+    expect(findings.map((x) => x.kind).sort()).toEqual(['dirty', 'foreign-branch']);
+    expect(findings.find((x) => x.kind === 'dirty')?.area).toBe('shop/cart');
   });
 });
 

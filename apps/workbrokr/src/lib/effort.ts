@@ -1,10 +1,20 @@
-import { appendFileSync, existsSync, mkdirSync } from 'node:fs';
+import {
+  appendFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  statSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import {
   assertNotProtected,
   commonsTouched,
   type Effort,
   emitWorktreeConfig,
+  ensureExcluded,
   expandScopes,
   Git,
   globsOverlap,
@@ -21,6 +31,7 @@ import {
   slotVars,
   WorkkitError,
 } from '@helmsmith/workkit';
+
 import type { StorybrokrClient } from './storybrokr.js';
 
 export interface ServiceRunner {
@@ -530,4 +541,209 @@ export async function reapLeases(
     }
   }
   return { reaped };
+}
+
+// ── retire / audit ───────────────────────────────────────────────────────────
+
+export const ARCHIVE_DIR = '.slot-archive';
+const areaSlug = (area: string) => area.replace(/\//g, '-');
+
+function dirSize(path: string): number {
+  if (!existsSync(path)) return 0;
+  let total = 0;
+  for (const entry of readdirSync(path, { withFileTypes: true })) {
+    const p = join(path, entry.name);
+    total += entry.isDirectory() ? dirSize(p) : statSync(p).size;
+  }
+  return total;
+}
+
+/** Copy the manifest's evidence paths out of the worktree, then apply the retention rule for this area. */
+function archiveWorktree(ctx: Ctx, area: string, worktree: string): string[] {
+  const m = ctx.manifest;
+  const root = join(ctx.repoRoot, ARCHIVE_DIR);
+  const stamp = now().replace(/[:.]/g, '').replace('T', '-').slice(0, 15);
+  const target = join(root, `${areaSlug(area)}-${stamp}`);
+  const archived: string[] = [];
+  for (const rel of m.archive.paths) {
+    const src = join(worktree, rel);
+    if (!existsSync(src)) continue;
+    const dst = join(target, rel);
+    mkdirSync(dst, { recursive: true });
+    cpSync(src, dst, { recursive: true });
+    archived.push(dst);
+  }
+  if (archived.length > 0) ensureExcluded(ctx.repoRoot, [`${ARCHIVE_DIR}/`]);
+  if (existsSync(root)) {
+    const mine = readdirSync(root)
+      .filter((d) => d.startsWith(`${areaSlug(area)}-`))
+      .sort()
+      .reverse();
+    const cutoff = Date.now() - m.archive.keepDays * 86_400_000;
+    mine.forEach((d, i) => {
+      const t = statSync(join(root, d)).mtimeMs;
+      if (i >= m.archive.keepPerArea || t < cutoff)
+        rmSync(join(root, d), { recursive: true, force: true });
+    });
+  }
+  return archived;
+}
+
+export interface RetireResult {
+  archived: string[];
+  removed: string;
+  branchesDeleted: string[];
+  branchesKept: string[];
+}
+
+/** The only destructive verb: archive, remove the worktree, delete the local branches that are fully on origin. */
+export async function retireArea(ctx: Ctx, o: { area: string }): Promise<RetireResult> {
+  const m = ctx.manifest;
+  if (!m.areas[o.area])
+    throw new WorkkitError('AREA_UNKNOWN', `unknown area "${o.area}"`, { area: o.area });
+  const active = ctx.registry.activeEffortFor(m.project, o.area);
+  if (active)
+    throw new WorkkitError(
+      'EFFORT_OPEN',
+      `an effort is open on ${o.area} (${active.owner.session}); \`work finish\` it first`,
+      { owner: active.owner.session },
+    );
+  const worktree = worktreePathFor(ctx, o.area);
+  const main = new Git(ctx.repoRoot);
+  let archived: string[] = [];
+  if (existsSync(worktree)) {
+    const g = new Git(worktree);
+    if (g.isDirty())
+      throw new WorkkitError(
+        'UNPUSHED',
+        `${worktree} has uncommitted changes; commit and push them (or \`work finish --park\`) before retiring`,
+        { worktree },
+      );
+    const unpushed = g.unpushedCount(m.baseBranch);
+    if (unpushed > 0)
+      throw new WorkkitError(
+        'UNPUSHED',
+        `${g.currentBranch()} has ${unpushed} commit(s) not on origin; push before retiring`,
+        { worktree, unpushed },
+      );
+    archived = archiveWorktree(ctx, o.area, worktree);
+    main.worktreeRemove(worktree);
+  }
+  const branchesDeleted: string[] = [];
+  const branchesKept: string[] = [];
+  for (const type of m.branch.types) {
+    const branch = `${type}/${o.area}`;
+    if (!main.branchExists(branch)) continue;
+    const onOrigin =
+      main.remoteBranchExists(branch) &&
+      main.tryRun(['rev-list', '--count', `origin/${branch}..${branch}`]).out.trim() === '0';
+    if (onOrigin) {
+      main.deleteLocalBranch(branch);
+      branchesDeleted.push(branch);
+    } else branchesKept.push(branch);
+  }
+  ctx.registry.removeEfforts((e) => e.project === m.project && e.area === o.area);
+  return { archived, removed: worktree, branchesDeleted, branchesKept };
+}
+
+export type FindingKind =
+  | 'dirty'
+  | 'unpushed'
+  | 'foreign-branch'
+  | 'lease-aging'
+  | 'behind-base'
+  | 'notice-stale'
+  | 'archive-size';
+export interface Finding {
+  kind: FindingKind;
+  area?: string;
+  detail: string;
+}
+
+const BEHIND_LIMIT = 20;
+const NOTICE_STALE_MS = 7 * 86_400_000;
+const ARCHIVE_LIMIT_BYTES = 5 * 1024 ** 3;
+
+function registeredWorktrees(ctx: Ctx): { path: string; branch: string }[] {
+  const out: { path: string; branch: string }[] = [];
+  const porcelain = new Git(ctx.repoRoot).run(['worktree', 'list', '--porcelain']);
+  let current: { path: string; branch: string } | null = null;
+  for (const line of porcelain.split('\n')) {
+    if (line.startsWith('worktree ')) current = { path: line.slice(9), branch: '' };
+    else if (line.startsWith('branch ') && current)
+      current.branch = line.slice(7).replace(/^refs\/heads\//, '');
+    else if (line === '' && current) {
+      out.push(current);
+      current = null;
+    }
+  }
+  if (current) out.push(current);
+  const root = realpathSync(ctx.repoRoot);
+  const wtRoot = join(root, ctx.manifest.worktreeRoot);
+  return out.filter((w) => existsSync(w.path) && realpathSync(w.path).startsWith(wtRoot));
+}
+
+/** What would otherwise be forgotten: unsaved work, stray checkouts, aging leases, drift, stale notices, archive bulk. */
+export async function auditProject(ctx: Ctx): Promise<Finding[]> {
+  const m = ctx.manifest;
+  const findings: Finding[] = [];
+  const types = m.branch.types.join('|');
+  const areaOf = (branch: string): string | null => {
+    const match = new RegExp(`^(${types})/(.+)$`).exec(branch);
+    return match && m.areas[match[2]] ? match[2] : null;
+  };
+  for (const w of registeredWorktrees(ctx)) {
+    const area = areaOf(w.branch);
+    if (!area) {
+      findings.push({
+        kind: 'foreign-branch',
+        detail: `${w.path} is on "${w.branch || 'detached HEAD'}", not a <type>/<area> branch of a declared area`,
+      });
+      continue;
+    }
+    const g = new Git(w.path);
+    if (g.isDirty())
+      findings.push({
+        kind: 'dirty',
+        area,
+        detail: `${w.path} has uncommitted changes on ${w.branch}`,
+      });
+    const unpushed = g.unpushedCount(m.baseBranch);
+    if (unpushed > 0)
+      findings.push({
+        kind: 'unpushed',
+        area,
+        detail: `${w.branch} has ${unpushed} commit(s) not on origin`,
+      });
+    const behind = behindBase(ctx, w.path);
+    if (behind > BEHIND_LIMIT)
+      findings.push({
+        kind: 'behind-base',
+        area,
+        detail: `${w.branch} is ${behind} commits behind ${m.baseBranch}`,
+      });
+  }
+  const nowMs = Date.now();
+  for (const l of ctx.registry.leases({ project: m.project })) {
+    const half = (Date.parse(l.created) + Date.parse(l.expires)) / 2;
+    if (nowMs > half)
+      findings.push({
+        kind: 'lease-aging',
+        detail: `${l.kind} ${l.value} held by ${l.owner.session} since ${l.created}, expires ${l.expires}`,
+      });
+  }
+  for (const area of Object.keys(m.areas)) {
+    const latest = latestEffortFor(ctx, area);
+    for (const n of latest?.notices ?? []) {
+      if (nowMs - Date.parse(n.at) > NOTICE_STALE_MS)
+        findings.push({ kind: 'notice-stale', area, detail: `${n.text} (since ${n.at})` });
+    }
+  }
+  const bytes = dirSize(join(ctx.repoRoot, ARCHIVE_DIR));
+  if (bytes > ARCHIVE_LIMIT_BYTES)
+    findings.push({
+      kind: 'archive-size',
+      detail: `${ARCHIVE_DIR} holds ${(bytes / 1024 ** 3).toFixed(1)} GB`,
+    });
+  return findings;
 }
