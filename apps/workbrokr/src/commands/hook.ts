@@ -93,6 +93,8 @@ export function registerHook(program: Command): void {
     .description(
       'Refuse pushes to protected branches; warn when paths leave the effort scope or touch commons',
     )
+    .argument('[remote]', 'passed by git, unused')
+    .argument('[url]', 'passed by git, unused')
     .action(async () => {
       try {
         const stdin = process.stdin.isTTY ? '' : readFileSync(0, 'utf8');
