@@ -78,13 +78,24 @@ const Schema = z.object({
 });
 
 /** Variables the env template may reference. */
-export function templateVariables(m: { ports: { services: Record<string, unknown> } }): Set<string> {
-  const vars = new Set(['SLOT', 'LOG_DIR', 'PROJECT', 'AREA', 'BRANCH', 'WORKTREE', 'PORT_STORYBOOK']);
+export function templateVariables(m: {
+  ports: { services: Record<string, unknown> };
+}): Set<string> {
+  const vars = new Set([
+    'SLOT',
+    'LOG_DIR',
+    'PROJECT',
+    'AREA',
+    'BRANCH',
+    'WORKTREE',
+    'PORT_STORYBOOK',
+  ]);
   for (const s of Object.keys(m.ports.services)) vars.add(`PORT_${s.toUpperCase()}`);
   return vars;
 }
 
 function defaultEnv(services: string[]): Manifest['env'] {
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: these ARE the manifest's template placeholders
   const template: Record<string, string> = { SLOT: '${SLOT}', LOG_DIR: '${LOG_DIR}' };
   for (const s of services) template[`PORT_${s.toUpperCase()}`] = `\${PORT_${s.toUpperCase()}}`;
   return { file: '.env.slot', template };
@@ -130,7 +141,8 @@ export function validateManifest(raw: unknown): Manifest {
   }
   for (const [area, spec] of Object.entries(m.areas)) {
     for (const c of spec.commons ?? []) {
-      if (!m.commons[c]) problems.push(`area "${area}" names commons "${c}", which is not declared`);
+      if (!m.commons[c])
+        problems.push(`area "${area}" names commons "${c}", which is not declared`);
     }
   }
   if (problems.length) throw new WorkkitError('MANIFEST_INVALID', problems.join('; '));

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { WorkkitError, exitCodeFor, toErrorBody } from './errors.js';
+import { exitCodeFor, toErrorBody, WorkkitError } from './errors.js';
 
 describe('WorkkitError', () => {
   it('maps refusals to exit 2 and faults to exit 1', () => {

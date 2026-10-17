@@ -30,6 +30,7 @@ describe('validateManifest', () => {
   });
   it('rejects a template variable the env cannot resolve', () => {
     expect(() =>
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: a manifest placeholder, on purpose
       validateManifest({ ...minimal, env: { file: '.env', template: { X: '${PORT_NOPE}' } } }),
     ).toThrow(/PORT_NOPE/);
   });
