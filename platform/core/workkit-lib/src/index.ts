@@ -8,5 +8,6 @@ export * from './paths.js';
 export * from './ports.js';
 export * from './refresh.js';
 export * from './registry.js';
+export * from './runner.js';
 export * from './scopes.js';
 export * from './types.js';
