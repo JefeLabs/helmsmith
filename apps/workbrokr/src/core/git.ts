@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, realpathSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { existsSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { WorkkitError } from './errors.js';
 
 export interface SyncResult {
@@ -160,5 +160,60 @@ export class Git {
 
   deleteLocalBranch(branch: string): void {
     this.run(['branch', '-q', '-D', branch]);
+  }
+
+  isAncestor(ancestor: string, descendant: string): boolean {
+    return this.tryRun(['merge-base', '--is-ancestor', ancestor, descendant]).code === 0;
+  }
+
+  /** True when HEAD's tree matches origin/<base>, or every commit on HEAD is patch-equivalent to origin/<base> (squash-merged). */
+  isEquivalentToBase(base: string): boolean {
+    const target = `origin/${base}`;
+    if (this.tryRun(['diff', '--quiet', target, 'HEAD']).code === 0) return true;
+    const cherry = this.tryRun(['cherry', target, 'HEAD']);
+    if (cherry.code !== 0) return false;
+    const lines = cherry.out
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+    return lines.length > 0 && lines.every((l) => l.startsWith('- '));
+  }
+
+  /** Repair broken submodule .git pointers inside a linked worktree before git merge/syncFrom runs. */
+  repairSubmodules(mainRoot: string): void {
+    const gitmodules = join(this.cwd, '.gitmodules');
+    if (!existsSync(gitmodules)) return;
+    const cfg = this.tryRun([
+      'config',
+      '-f',
+      '.gitmodules',
+      '--get-regexp',
+      '^submodule\\..*\\.path$',
+    ]);
+    if (cfg.code !== 0) return;
+    for (const line of cfg.out.split('\n').filter(Boolean)) {
+      const parts = line.trim().split(/\s+/);
+      const subPath = parts[1];
+      if (!subPath) continue;
+      const wtSub = join(this.cwd, subPath);
+      const wtGit = join(wtSub, '.git');
+      if (existsSync(wtGit) && new Git(wtSub).tryRun(['rev-parse', '--git-dir']).code === 0) {
+        continue;
+      }
+      const mainSub = join(mainRoot, subPath);
+      if (existsSync(join(mainSub, '.git'))) {
+        const subGitDir = new Git(mainSub).tryRun([
+          'rev-parse',
+          '--path-format=absolute',
+          '--git-dir',
+        ]);
+        if (subGitDir.code === 0 && subGitDir.out.trim()) {
+          mkdirSync(wtSub, { recursive: true });
+          rmSync(wtGit, { recursive: true, force: true });
+          writeFileSync(wtGit, `gitdir: ${subGitDir.out.trim()}\n`);
+          new Git(wtSub).tryRun(['checkout', '-f', '-q']);
+        }
+      }
+    }
   }
 }

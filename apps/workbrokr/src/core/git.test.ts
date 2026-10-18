@@ -104,4 +104,23 @@ describe('Git', () => {
     new Git(dir).run(['init', '-q', '-b', 'develop', main]);
     expect(new Git(main).isMainCheckout()).toBe(true);
   });
+
+  it('detects squash-merged equivalence to base and ancestor relationships', () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const main = new Git(f.main);
+    const wt = join(f.main, '.claude/worktrees/shop/cart');
+    main.worktreeAdd(wt, 'feature/shop/cart', 'origin/develop');
+    const w = new Git(wt);
+    commitFile(wt, 'cart1.txt', '1', 'c1');
+    commitFile(wt, 'cart2.txt', '2', 'c2');
+    expect(w.isEquivalentToBase('develop')).toBe(false);
+    commitFile(f.main, 'cart1.txt', '1', 'squash');
+    commitFile(f.main, 'cart2.txt', '2', 'squash-2');
+    main.push('develop');
+    w.fetch('develop');
+    expect(w.commitsNotOn('develop').length).toBeGreaterThan(0);
+    expect(w.isEquivalentToBase('develop')).toBe(true);
+    expect(w.isAncestor('origin/develop', 'origin/develop')).toBe(true);
+  });
 });
