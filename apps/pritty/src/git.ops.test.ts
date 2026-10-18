@@ -229,3 +229,31 @@ describe('GitOps.rebaseWithPlan with a rendered multi-line message', () => {
     expect(gitIn(r.dir, 'log', '-1', '--format=%B').trimEnd()).toBe(message);
   });
 });
+
+describe('GitOps and staged renames', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('getStaged lists both sides of a staged rename', async () => {
+    const r = makeRepo();
+    cleanup = r.cleanup;
+    commitFile(r.dir, 'old.txt', 'same\n', 'old');
+    gitIn(r.dir, 'mv', 'old.txt', 'new.txt');
+
+    expect((await createGit(r.dir).getStaged()).sort()).toEqual(['new.txt', 'old.txt']);
+    expect((await createGit(r.dir).getAllChanged()).sort()).toEqual(['new.txt', 'old.txt']);
+  });
+
+  it('commit with both sides of a rename records the rename and leaves the tree clean', async () => {
+    const r = makeRepo();
+    cleanup = r.cleanup;
+    commitFile(r.dir, 'old.txt', 'same\n', 'old');
+    gitIn(r.dir, 'mv', 'old.txt', 'new.txt');
+
+    await createGit(r.dir).commit('refactor: rename', ['old.txt', 'new.txt']);
+
+    expect(headFile(r.dir, 'new.txt')).toBe('same\n');
+    expect(headFile(r.dir, 'old.txt')).toBeNull();
+    expect(gitIn(r.dir, 'status', '--porcelain').trim()).toBe('');
+  });
+});

@@ -73,14 +73,16 @@ export function createGit(cwd: string = process.cwd()): GitOps {
 
   return {
     async getStaged(): Promise<string[]> {
-      const status = await git.status();
-      return [...status.staged];
+      // --no-renames so a staged rename shows as its old and new path; simple-git's
+      // status.staged omits renames entirely.
+      return zList(runGit(cwd, ['diff', '--cached', '--name-only', '--no-renames', '-z']));
     },
 
     async getAllChanged(): Promise<string[]> {
-      const status = await git.status();
-      // Dedupe in case a file is staged AND modified
-      return Array.from(new Set([...status.staged, ...status.modified, ...status.not_added]));
+      const staged = zList(runGit(cwd, ['diff', '--cached', '--name-only', '--no-renames', '-z']));
+      const modified = zList(runGit(cwd, ['diff', '--name-only', '--no-renames', '-z']));
+      const untracked = zList(runGit(cwd, ['ls-files', '--others', '--exclude-standard', '-z']));
+      return Array.from(new Set([...staged, ...modified, ...untracked]));
     },
 
     async getCurrentBranch(): Promise<string> {
@@ -201,6 +203,11 @@ export function createGit(cwd: string = process.cwd()): GitOps {
   };
 }
 
+/** Split NUL-separated git output into paths. */
+function zList(out: string): string[] {
+  return out.split('\0').filter(Boolean);
+}
+
 function runGit(
   cwd: string,
   args: string[],
@@ -240,17 +247,19 @@ function commitIndexSubset(cwd: string, message: string, files: string[]): void 
     const entries = runGit(cwd, ['ls-files', '-s', '-z', '--', ...files]);
     if (entries.length > 0)
       runGit(cwd, ['update-index', '-z', '--index-info'], { env, input: entries });
-    const deleted = runGit(cwd, [
-      'diff',
-      '--cached',
-      '--name-only',
-      '-z',
-      '--diff-filter=D',
-      '--',
-      ...files,
-    ])
-      .split('\0')
-      .filter(Boolean);
+    // --no-renames so the old side of a staged rename counts as a deletion here.
+    const deleted = zList(
+      runGit(cwd, [
+        'diff',
+        '--cached',
+        '--name-only',
+        '--no-renames',
+        '-z',
+        '--diff-filter=D',
+        '--',
+        ...files,
+      ]),
+    );
     if (deleted.length > 0)
       runGit(cwd, ['update-index', '--force-remove', '--', ...deleted], { env });
     const changed = hasHead
