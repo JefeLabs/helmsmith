@@ -373,6 +373,24 @@ describe('Broker', () => {
     expect(r2.record.status).toBe('starting');
   });
 
+  it('a repeat up applies an explicit ttlMinutes to the reused instance (the lease decides the TTL)', async () => {
+    const host = fakeHost();
+    dirs.push(host);
+    const { broker } = make({ portRangeStart: 6186, portRangeEnd: 6187 });
+
+    const first = await broker.up({ component: 'src/Button', hostRoot: host });
+    expect(first.record.ttlMinutes).toBe(DEFAULT_CONFIG.ttlMinutes);
+
+    const second = await broker.up({ component: 'src/Button', hostRoot: host, ttlMinutes: 120 });
+    expect(second.created).toBe(false);
+    expect(second.record.pid).toBe(first.record.pid);
+    expect(second.record.ttlMinutes).toBe(120);
+
+    // no ttl given: keep what was set, do not fall back to the default
+    const third = await broker.up({ component: 'src/Button', hostRoot: host });
+    expect(third.record.ttlMinutes).toBe(120);
+  });
+
   it('a repeat up re-discovers: an unchanged tree returns the same pid, a changed one respawns, and includeChildren is inherited unless explicitly flipped', async () => {
     const host = fakeHost();
     dirs.push(host);

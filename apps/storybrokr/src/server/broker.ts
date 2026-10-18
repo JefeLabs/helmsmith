@@ -116,7 +116,13 @@ export class Broker {
     let effectiveIncludeChildren = req.includeChildren;
 
     const existing = this.registry.find(host.hostRoot, component);
+    // An explicit TTL on a repeat up applies to the reused instance: the caller's
+    // lease decides how long it lives (spec: TTL equals the lease).
+    const applyTtl = (id: string): void => {
+      if (req.ttlMinutes !== undefined) this.registry.update(id, { ttlMinutes: req.ttlMinutes });
+    };
     if (existing?.status === 'starting') {
+      applyTtl(existing.id);
       this.registry.touch(existing.id);
       if (req.wait !== false) await this.awaitReady(existing.id);
       return { record: this.registry.get(existing.id) as InstanceRecord, created: false };
@@ -133,6 +139,7 @@ export class Broker {
         discovery.storyFiles.length === existing.storyFiles.length &&
         discovery.storyFiles.every((f, i) => f === existing.storyFiles[i]);
       if (unchanged) {
+        applyTtl(existing.id);
         this.registry.touch(existing.id);
         return { record: this.registry.get(existing.id) as InstanceRecord, created: false };
       }
@@ -144,6 +151,7 @@ export class Broker {
     const running = this.inflight.get(id);
     if (running) {
       await running;
+      applyTtl(id);
       if (req.wait !== false) await this.awaitReady(id);
       return { record: this.registry.get(id) as InstanceRecord, created: false };
     }
@@ -269,9 +277,7 @@ export class Broker {
 
   async downByHost(host: string): Promise<InstanceRecord[]> {
     const target = realpathOrResolve(host);
-    const matching = this.registry
-      .list()
-      .filter((r) => realpathOrResolve(r.hostRoot) === target);
+    const matching = this.registry.list().filter((r) => realpathOrResolve(r.hostRoot) === target);
     for (const r of matching) await this.stop(r);
     return matching;
   }
