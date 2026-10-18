@@ -294,3 +294,32 @@ describe('runPr §18.2: --draft, given title/body, existing-PR update, --no-push
     expect(result?.created).toBe(true);
   });
 });
+
+describe('runPr prFooter', () => {
+  const FOOTER = '🤖 Generated with [Claude Code](https://claude.com/claude-code)';
+
+  it('appends the configured footer to a given body and to an in-place update, once', async () => {
+    const f = fakes({ config: { baseBranch: 'main', prFooter: FOOTER } });
+    await runPr({ autoApprove: true, title: 't', body: `Given.\n\n${FOOTER}` }, f.deps);
+    expect(f.createArgs[0]).toMatchObject({ body: `Given.\n\n${FOOTER}` });
+
+    const g = fakes({
+      config: { baseBranch: 'main', prFooter: FOOTER },
+      openPRs: [
+        { number: 7, url: 'u', title: 'old', head: 'feature/x', base: 'main', draft: false },
+      ],
+    });
+    const updates: unknown[] = [];
+    g.deps.github.updatePR = async (_o, _r, _n, patch) => {
+      updates.push(patch);
+    };
+    await runPr({ autoApprove: true, title: 't', body: 'New.' }, g.deps);
+    expect(updates).toEqual([{ title: 't', body: `New.\n\n${FOOTER}` }]);
+  });
+
+  it("appends the footer to the model's body too", async () => {
+    const f = fakes({ config: { baseBranch: 'main', prFooter: FOOTER } });
+    await runPr({ autoApprove: true }, f.deps);
+    expect(f.createArgs[0]).toMatchObject({ body: `body\n\n${FOOTER}` });
+  });
+});

@@ -80,6 +80,10 @@ export const ConfigSchema = z.object({
   categories: z.record(z.string(), z.array(z.string())).optional(),
   ticket: TicketSchema.optional(),
   rebaseStrategy: z.enum(['interactive', 'squash', 'fixup', 'auto']).default('interactive'),
+  /** Lines appended to every commit `pritty commit` makes (e.g. Co-Authored-By). */
+  commitTrailers: z.array(z.string()).default([]),
+  /** Paragraph appended to every PR body, idempotently. */
+  prFooter: z.string().optional(),
   /** Give up on a model call after this long. */
   aiTimeoutMs: z.number().int().positive().default(60_000),
   /** Per-repository GitHub identity: the `gh` login whose token opens PRs here. */

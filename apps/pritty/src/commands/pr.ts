@@ -19,6 +19,7 @@ import {
   updatePR,
 } from '../github.js';
 import { findPullRequestTemplate, type PullRequestTemplate } from '../pr-template.js';
+import { applyFooter } from './_shared/attribution.js';
 import { resolveBaseBranch } from './_shared/base.js';
 import { splitTitleBody } from './_shared/format.js';
 import { inferLabels } from './_shared/labels.js';
@@ -205,7 +206,7 @@ export async function runPr(
     if (given) {
       const patch: PRPatch = {
         ...(given.title !== undefined ? { title: given.title } : {}),
-        ...(given.body !== undefined ? { body: given.body } : {}),
+        ...(given.body !== undefined ? { body: applyFooter(given.body, config.prFooter) } : {}),
       };
       await deps.github.updatePR(repo.owner, repo.repo, existing.number, patch);
       say(chalk.dim('  Updated its title/body in place.'));
@@ -267,6 +268,8 @@ export async function runPr(
     }
   }
 
+  draft = { ...draft, body: applyFooter(draft.body, config.prFooter) };
+
   // 7. Preview
   say('');
   say(chalk.bold.cyan(draft.title));
@@ -295,7 +298,7 @@ export async function runPr(
       if (nextTitle.length === 0) {
         say(chalk.yellow('⚠ Empty title — keeping original.'));
       } else {
-        draft = { ...draft, title: nextTitle, body: nextBody };
+        draft = { ...draft, title: nextTitle, body: applyFooter(nextBody, config.prFooter) };
       }
     }
   }

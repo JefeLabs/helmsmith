@@ -5,7 +5,7 @@ import { categorize, mergeCategories, UNKNOWN_CATEGORY } from '../categorizer.js
 import { loadConfig } from '../config.js';
 import { createGit } from '../git.js';
 import { splitTitleBody } from './_shared/format.js';
-import { reconcileCommitPlan } from './_shared/plan.js';
+import { composeCommitMessage, reconcileCommitPlan } from './_shared/plan.js';
 import { confirm, editor } from './_shared/prompts.js';
 import { resolveTicketContext } from './_shared/ticket-context.js';
 
@@ -141,8 +141,7 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
   let committed = 0;
   for (const c of plan) {
     try {
-      const fullMessage = c.body ? `${c.message}\n\n${c.body}` : c.message;
-      await git.commit(fullMessage, c.files);
+      await git.commit(composeCommitMessage(c, config.commitTrailers), c.files);
       committed++;
       console.log(chalk.green(`✓ committed ${c.category}: ${c.message}`));
     } catch (err) {

@@ -62,3 +62,19 @@ describe('reconcileCommitPlan', () => {
     expect(plan.map((p) => p.category)).toEqual(['app', 'test']);
   });
 });
+
+describe('composeCommitMessage', () => {
+  it('joins subject, body and configured trailers', async () => {
+    const { composeCommitMessage } = await import('./plan.js');
+    const t = 'Co-Authored-By: a <a@x>';
+    expect(composeCommitMessage({ category: 'app', message: 'feat: x', files: [] }, [t])).toBe(
+      `feat: x\n\n${t}`,
+    );
+    expect(
+      composeCommitMessage({ category: 'app', message: 'feat: x', body: 'why', files: [] }, [t]),
+    ).toBe(`feat: x\n\nwhy\n\n${t}`);
+    expect(composeCommitMessage({ category: 'app', message: 'feat: x', files: [] }, [])).toBe(
+      'feat: x',
+    );
+  });
+});

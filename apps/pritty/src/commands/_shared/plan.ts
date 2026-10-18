@@ -1,5 +1,6 @@
 import type { CommitMessage } from '../../ai.js';
 import type { CategorizedFiles } from '../../categorizer.js';
+import { applyTrailers } from './attribution.js';
 
 /**
  * The model writes the messages; the categorizer decides the files. Whatever
@@ -33,4 +34,10 @@ export function reconcileCommitPlan(
     throw new Error(`AI plan omits categories with staged files: ${missing.join(', ')}`);
   }
   return out;
+}
+
+/** Subject, optional body, then the configured trailers. */
+export function composeCommitMessage(c: CommitMessage, trailers: readonly string[]): string {
+  const base = c.body ? `${c.message}\n\n${c.body}` : c.message;
+  return applyTrailers(base, trailers);
 }

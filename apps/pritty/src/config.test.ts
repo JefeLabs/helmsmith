@@ -89,3 +89,21 @@ describe('inert config keys are gone', () => {
     }
   });
 });
+
+describe('attribution config', () => {
+  it('defaults to no trailers and no footer, and accepts both', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pritty-cfg-'));
+    try {
+      expect(loadConfig(dir).commitTrailers).toEqual([]);
+      expect(loadConfig(dir).prFooter).toBeUndefined();
+      writeFileSync(
+        join(dir, '.pritty.json'),
+        JSON.stringify({ commitTrailers: ['Co-Authored-By: a <a@x>'], prFooter: 'footer' }),
+      );
+      expect(loadConfig(dir).commitTrailers).toEqual(['Co-Authored-By: a <a@x>']);
+      expect(loadConfig(dir).prFooter).toBe('footer');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
