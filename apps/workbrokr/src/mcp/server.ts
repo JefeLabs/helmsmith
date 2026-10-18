@@ -47,7 +47,9 @@ export function buildMcpServer(ctxFactory: (projectRoot?: string) => Promise<Ctx
         task: z
           .string()
           .optional()
-          .describe('optional intra-area task slug for parallel sub-efforts (<type>/<area>--<task>)'),
+          .describe(
+            'optional intra-area task slug for parallel sub-efforts (<type>/<area>--<task>)',
+          ),
         type: z.string().describe('feature | chore | fix'),
         mode: z.enum(['frontend', 'backend', 'fullstack']),
         scopes: z
@@ -95,12 +97,11 @@ export function buildMcpServer(ctxFactory: (projectRoot?: string) => Promise<Ctx
         area: z.string().describe('the area of the open effort'),
         task: z.string().optional().describe('optional intra-area task slug'),
         mode: z.enum(['backend', 'fullstack']).describe('target mode to promote into'),
-        story: z.string().optional().describe('optional story path'),
         projectRoot: z.string().optional().describe('optional repository root path override'),
       },
     },
-    async ({ area, task, mode, story, projectRoot }) =>
-      guard(async () => promoteEffort(await ctxFactory(projectRoot), { area, task, mode, story })),
+    async ({ area, task, mode, projectRoot }) =>
+      guard(async () => promoteEffort(await ctxFactory(projectRoot), { area, task, mode })),
   );
 
   server.registerTool(

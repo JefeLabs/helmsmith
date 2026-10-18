@@ -11,7 +11,6 @@ export function registerPromote(program: Command): void {
     .requiredOption('--area <area>', 'the area of the open effort')
     .option('--task <slug>', 'intra-area task slug if promoting a task sub-effort')
     .requiredOption('--mode <mode>', 'target mode: backend | fullstack')
-    .option('--story <path>', 'optional story path to attach via storybrokr')
     .option('--project-root <dir>', 'repository root (default: the main checkout of the cwd)')
     .option('--json', 'print the result as JSON')
     .action(
@@ -19,7 +18,6 @@ export function registerPromote(program: Command): void {
         area: string;
         task?: string;
         mode: 'backend' | 'fullstack';
-        story?: string;
         projectRoot?: string;
         json?: boolean;
       }) => {
@@ -29,7 +27,6 @@ export function registerPromote(program: Command): void {
             area: o.area,
             task: o.task,
             mode: o.mode,
-            story: o.story,
           });
           if (o.json) printJson(r);
           else {

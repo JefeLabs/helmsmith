@@ -4,9 +4,11 @@ import {
   existsSync,
   mkdirSync,
   readdirSync,
+  readFileSync,
   realpathSync,
   rmSync,
   statSync,
+  writeFileSync,
 } from 'node:fs';
 import { connect, createServer } from 'node:net';
 import { dirname, join } from 'node:path';
@@ -334,6 +336,17 @@ function reserveEffort(
   return effort;
 }
 
+/** The area branch a task converges into: the one that exists (locally or on origin), the task's own type first; a new area gets the task's type. */
+function areaBranchFor(ctx: Ctx, area: string, preferredType: string): string {
+  const main = new Git(ctx.repoRoot);
+  const types = [preferredType, ...ctx.manifest.branch.types.filter((t) => t !== preferredType)];
+  for (const type of types) {
+    const b = branchFor(type, area);
+    if (main.branchExists(b) || main.remoteRef(b)) return b;
+  }
+  return branchFor(preferredType, area);
+}
+
 /** The directory at the worktree path must be THIS repo's registered worktree, never the main checkout seen through a bare directory. */
 function ensureWorktree(
   ctx: Ctx,
@@ -409,8 +422,27 @@ function appendLog(file: string, line: string): void {
   appendFileSync(file, `${new Date().toISOString()} ${line}\n`);
 }
 
+/** Refresh marks (e.g. db-reset) a start saw but could not act on, per worktree, until one can (spec §8.1 step 5). */
+const PENDING_MARKS = '.pending-marks.json';
+function readPendingMarks(logDir: string): string[] {
+  try {
+    const raw = JSON.parse(readFileSync(join(logDir, PENDING_MARKS), 'utf8')) as unknown;
+    return Array.isArray(raw) ? raw.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+function writePendingMarks(logDir: string, marks: string[]): void {
+  mkdirSync(logDir, { recursive: true });
+  writeFileSync(join(logDir, PENDING_MARKS), `${JSON.stringify(marks)}\n`);
+}
+
 export async function startEffort(ctx: Ctx, o: StartOptions): Promise<StartResult> {
   const m = ctx.manifest;
+  // pre-flight (spec §8.4): expired leases and dead starts must not hold slots or areas
+  await reapLeases(ctx).catch((err) =>
+    ctx.log(`pre-flight reap: ${err instanceof Error ? err.message : String(err)}`),
+  );
   fetchBaseOnce(ctx);
   const { branch, scopes, commons, warnings } = guardStart(ctx, o);
   const notices = ctx.registry.notices(m.project, o.area);
@@ -564,6 +596,10 @@ export async function startEffort(ctx: Ctx, o: StartOptions): Promise<StartResul
     );
 
     const baseSha = wg.rev('HEAD');
+    if (o.mode === 'frontend' && sel.marks.length > 0) {
+      // no database in this mode: the marks stay owed until a start or promote that has one
+      writePendingMarks(logDir, [...new Set([...readPendingMarks(logDir), ...sel.marks])]);
+    }
 
     for (const name of commons)
       leases.push(
@@ -589,8 +625,13 @@ export async function startEffort(ctx: Ctx, o: StartOptions): Promise<StartResul
         branch,
       });
       const env = { ...process.env, ...cfg.vars };
-      if (sel.marks.includes('db-reset') && m.services.postgres?.reset) {
+      const owedMarks = [...new Set([...sel.marks, ...readPendingMarks(logDir)])];
+      if (owedMarks.includes('db-reset') && m.services.postgres?.reset) {
         runRefresh([m.services.postgres.reset], worktree, (l) => appendLog(refreshLog, l), env);
+        writePendingMarks(
+          logDir,
+          owedMarks.filter((x) => x !== 'db-reset'),
+        );
       }
       const pids: Record<string, number> = {};
       const signatures: Record<string, string> = {};
@@ -665,7 +706,6 @@ export interface PromoteOptions {
   area: string;
   task?: string;
   mode: 'backend' | 'fullstack';
-  story?: string;
 }
 
 export interface PromoteResult {
@@ -700,8 +740,7 @@ export async function promoteEffort(ctx: Ctx, o: PromoteOptions): Promise<Promot
   }
   const modeScopes = expandScopes(m, o.area, o.mode);
   const nextScopes = open.task ? [...new Set([...open.scopes, ...modeScopes])] : modeScopes;
-
-  ctx.registry.update((r) => {
+  const refuseOverlap = (r: { efforts: Effort[] }): void => {
     const others = r.efforts.filter(
       (e) =>
         e.project === m.project &&
@@ -719,18 +758,52 @@ export async function promoteEffort(ctx: Ctx, o: PromoteOptions): Promise<Promot
         );
       }
     }
-    const idx = r.efforts.findIndex((e) => e.id === open.id);
-    if (idx >= 0) {
-      r.efforts[idx] = { ...r.efforts[idx], mode: o.mode, scopes: nextScopes, lastActivity: now() };
-    }
-  });
+  };
+  ctx.registry.update(refuseOverlap);
 
+  // Claim the slot BEFORE the effort changes mode: a failed claim leaves it exactly as it was.
   const warnings: string[] = [];
   let slot = ctx.registry.leases({ effort: open.id, kind: 'slot' })[0];
   const sb = ctx.registry.leases({ effort: open.id, kind: 'storybook' })[0];
-  if (!slot) {
-    slot = await claimFreeSlot(ctx, open.id, warnings);
-    ctx.registry.updateEffort(open.id, { leases: [...open.leases, slot.id] });
+  const claimed = !slot;
+  if (!slot) slot = await claimFreeSlot(ctx, open.id, warnings);
+  try {
+    ctx.registry.update((r) => {
+      refuseOverlap(r);
+      const idx = r.efforts.findIndex((e) => e.id === open.id);
+      if (idx >= 0) {
+        r.efforts[idx] = {
+          ...r.efforts[idx],
+          mode: o.mode,
+          scopes: nextScopes,
+          leases: claimed ? [...open.leases, slot.id] : r.efforts[idx].leases,
+          lastActivity: now(),
+        };
+      }
+    });
+  } catch (err) {
+    if (claimed) ctx.registry.release(slot.id);
+    throw err;
+  }
+  // a database reset owed since a start without a database (W10)
+  const owed = readPendingMarks(join(open.worktree, m.logs.dir));
+  if (owed.includes('db-reset') && m.services.postgres?.reset) {
+    const cfgForReset = emitWorktreeConfig({
+      m,
+      worktree: open.worktree,
+      slot: slot.value as number,
+      ports: slot.ports ?? {},
+      area: o.area,
+      branch: open.branch,
+    });
+    runRefresh([m.services.postgres.reset], open.worktree, ctx.log, {
+      ...process.env,
+      ...cfgForReset.vars,
+    });
+    writePendingMarks(
+      join(open.worktree, m.logs.dir),
+      owed.filter((x) => x !== 'db-reset'),
+    );
   }
   const cfg = emitWorktreeConfig({
     m,
@@ -901,6 +974,17 @@ async function releaseLease(ctx: Ctx, effort: Effort | undefined, lease: Lease):
   ctx.registry.release(lease.id);
 }
 
+/** Bring every storybrokr instance of the worktree's host down: never for a backend effort (no Storybook, and the CLI would start a daemon), and a failure is logged, not swallowed. */
+async function sweepStorybook(ctx: Ctx, effort: Pick<Effort, 'worktree' | 'mode'>): Promise<void> {
+  if (effort.mode === 'backend' || !ctx.storybrokr.downHost) return;
+  try {
+    const stopped = await ctx.storybrokr.downHost(storybookHostFor(ctx.manifest, effort.worktree));
+    if (stopped.length > 0) ctx.log(`storybrokr: stopped ${stopped.join(', ')}`);
+  } catch (err) {
+    ctx.log(`storybrokr sweep failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
 /** Tell every other area that a commons set changed on this branch (informational only, kept until the area is retired or synced). */
 function leaveNotices(ctx: Ctx, effort: Effort, commons: string[]): number {
   if (commons.length === 0) return 0;
@@ -997,7 +1081,7 @@ export async function finishEffort(ctx: Ctx, o: FinishOptions): Promise<FinishRe
       );
     }
     fetchBaseOnce(ctx);
-    const parentBranch = branchFor(effort.type, effort.area);
+    const parentBranch = areaBranchFor(ctx, effort.area, effort.type);
     const { wg: areaGit } = ensureWorktree(ctx, effort.area, parentBranch);
     if (areaGit.isDirty()) {
       throw new WorkkitError(
@@ -1038,9 +1122,7 @@ export async function finishEffort(ctx: Ctx, o: FinishOptions): Promise<FinishRe
 
   for (const lease of ctx.registry.leases({ effort: effort.id }))
     await releaseLease(ctx, effort, lease);
-  await Promise.resolve(ctx.storybrokr.downHost?.(storybookHostFor(m, effort.worktree))).catch(
-    () => undefined,
-  );
+  await sweepStorybook(ctx, effort);
 
   let notices = 0;
   if (!o.intoArea) {
@@ -1110,9 +1192,7 @@ export async function reapLeases(
   for (const id of doomed) {
     const effort = efforts.get(id);
     if (effort) {
-      await Promise.resolve(ctx.storybrokr.downHost?.(storybookHostFor(m, effort.worktree))).catch(
-        () => undefined,
-      );
+      await sweepStorybook(ctx, effort);
       if (effort.state === 'active' || effort.state === 'starting') {
         const hadLease = leases.some((l) => l.effort === effort.id);
         ctx.registry.updateEffort(effort.id, {
@@ -1198,9 +1278,6 @@ export async function retireArea(ctx: Ctx, o: { area: string }): Promise<RetireR
   const worktree = realpathOr(worktreePathFor(ctx, o.area));
   const main = new Git(ctx.repoRoot);
   let archived: string[] = [];
-  await Promise.resolve(ctx.storybrokr.downHost?.(storybookHostFor(m, worktree))).catch(
-    () => undefined,
-  );
   if (existsSync(worktree)) {
     const g = new Git(worktree);
     if (g.isDirty())
@@ -1216,6 +1293,11 @@ export async function retireArea(ctx: Ctx, o: { area: string }): Promise<RetireR
         `${g.currentBranch()} has ${unpushed} commit(s) not on origin; push before retiring`,
         { worktree, unpushed },
       );
+    // only now, after every refusal: sweep Storybook if any effort of the area could have had one
+    const hadStorybook = ctx.registry
+      .efforts({ project: m.project, area: o.area })
+      .some((e) => e.mode !== 'backend');
+    if (hadStorybook) await sweepStorybook(ctx, { worktree, mode: 'frontend' });
     archived = archiveWorktree(ctx, o.area, worktree);
     main.worktreeRemove(worktree);
   }

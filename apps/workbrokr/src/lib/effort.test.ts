@@ -850,3 +850,168 @@ describe('W5: a slot whose port is held on a wildcard address is not free', () =
     });
   }
 });
+
+const manifestSource = {
+  project: 'demo',
+  baseBranch: 'develop',
+  worktreeRoot: '.claude/worktrees',
+  ports: { services: { frontend: { base: 43000 }, backend: { base: 43100 } } },
+  services: {
+    backend: { start: 'true', stop: 'true', health: 'true' },
+    frontend: { start: 'true', stop: 'true', health: 'true' },
+  },
+  scopes: { frontend: ['app-ui/app/{group}/{section}/**'], backend: ['svc/{module}/**'] },
+  areas: {
+    'shop/cart': { module: 'cart' },
+    'shop/team': { module: 'team' },
+    'platform/auth': { commons: ['auth'] },
+  },
+  commons: { auth: ['api/auth/**'] },
+  refresh: [{ when: 'lock.json', run: 'touch refreshed.marker' }],
+};
+
+describe('W6: expired leases do not hold slots', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('start reaps expired leases first, and a genuine shortage names the way out', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const one = validateManifest({ ...manifestSource, slots: { count: 2, reserved: [0] } });
+    const ctx = { ...ctxFor(f), manifest: one };
+    const a = await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'fullstack' });
+    const lease = ctx.registry.leases({ effort: a.effort.id, kind: 'slot' })[0]!;
+    ctx.registry.patchLease(lease.id, { expires: new Date(Date.now() - 60_000).toISOString() });
+
+    const b = await startEffort(ctx, { area: 'shop/team', type: 'feature', mode: 'fullstack' });
+    expect(b.leases[0]?.value).toBe(1);
+    expect(
+      ctx.registry.efforts({ project: 'demo', area: 'shop/cart', state: 'parked' }),
+    ).toHaveLength(1);
+
+    await expect(
+      startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'fullstack' }),
+    ).rejects.toThrow(/work status|work finish|work reap/);
+  });
+});
+
+describe('W9: promote claims its slot before it changes the effort', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('leaves mode and scopes untouched when no slot is free', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const one = validateManifest({ ...manifestSource, slots: { count: 2, reserved: [0] } });
+    const ctx = { ...ctxFor(f), manifest: one };
+    await startEffort(ctx, { area: 'shop/team', type: 'feature', mode: 'fullstack' });
+    const fe = await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'frontend' });
+
+    await expect(promoteEffort(ctx, { area: 'shop/cart', mode: 'fullstack' })).rejects.toThrow(
+      /slot/i,
+    );
+    const after = ctx.registry.openEffortFor('demo', 'shop/cart');
+    expect(after?.mode).toBe('frontend');
+    expect(after?.scopes).toEqual(fe.effort.scopes);
+    expect(ctx.registry.leases({ effort: fe.effort.id, kind: 'slot' })).toEqual([]);
+  });
+});
+
+describe('W10: the database reset is owed until a start with a database runs it', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('a frontend start after a migration change does not consume the reset; the next fullstack start runs it', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const m = validateManifest({
+      ...manifestSource,
+      ports: {
+        services: {
+          frontend: { base: 43000 },
+          backend: { base: 43100 },
+          postgres: { base: 45400 },
+        },
+      },
+      services: {
+        ...manifestSource.services,
+        postgres: { start: 'true', stop: 'true', health: 'true', reset: 'touch reset.marker' },
+      },
+      refresh: [{ when: 'migrations/**', mark: 'db-reset' }],
+    });
+    const ctx = { ...ctxFor(f), manifest: m };
+    // a migration lands on develop before any effort on the area
+    commitFile(f.main, 'migrations/V1.sql', 'create table t();', 'migration');
+    new Git(f.main).push('develop');
+
+    const fe = await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'frontend' });
+    expect(existsSync(join(fe.effort.worktree, 'reset.marker'))).toBe(false);
+    await finishEffort(ctx, { area: 'shop/cart' });
+
+    const fs = await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'fullstack' });
+    expect(existsSync(join(fs.effort.worktree, 'reset.marker'))).toBe(true);
+  });
+});
+
+describe('W11: a refused retire changes nothing', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('does not bring Storybook down before the dirty/unpushed checks', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const sb = fakeSb();
+    const ctx = ctxFor(f, fakeRunner(), sb);
+    const r = await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'fullstack' });
+    await finishEffort(ctx, { area: 'shop/cart' });
+    sb.downHosts.length = 0;
+    writeFileSync(join(r.effort.worktree, 'dirty.txt'), 'x');
+
+    await expect(retireArea(ctx, { area: 'shop/cart' })).rejects.toThrow(/uncommitted/);
+    expect(sb.downHosts).toEqual([]);
+  });
+});
+
+describe('W12: finish --into-area targets the area branch that exists', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('merges a fix task into the feature area branch instead of inventing fix/<area>', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const ctx = ctxFor(f);
+    const area = await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'frontend' });
+    commitFile(area.effort.worktree, 'app-ui/app/shop/cart/a.tsx', 'a', 'area work');
+    await finishEffort(ctx, { area: 'shop/cart' });
+
+    const task = await startEffort(ctx, {
+      area: 'shop/cart',
+      task: 'hotfix',
+      type: 'fix',
+      mode: 'backend',
+    });
+    commitFile(task.effort.worktree, 'svc/cart/fix.ts', 'f', 'the fix');
+    const done = await finishEffort(ctx, { area: 'shop/cart', task: 'hotfix', intoArea: true });
+    expect(done.mergedIntoArea).toBe(true);
+
+    const main = new Git(f.main);
+    expect(main.branchExists('fix/shop/cart')).toBe(false);
+    expect(main.run(['log', '--format=%s', 'feature/shop/cart', '-n', '5'])).toContain('the fix');
+  });
+});
+
+describe('§3.5: storybrokr sweeps', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('a backend effort never calls downHost at finish, reap or retire', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const sb = fakeSb();
+    const ctx = ctxFor(f, fakeRunner(), sb);
+    await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'backend' });
+    await finishEffort(ctx, { area: 'shop/cart' });
+    await retireArea(ctx, { area: 'shop/cart' });
+    expect(sb.downHosts).toEqual([]);
+  });
+});
