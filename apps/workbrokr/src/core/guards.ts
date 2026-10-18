@@ -67,6 +67,12 @@ export function checkCommit(c: CommitCheck): { refusals: string[]; warnings: str
   const ownPaths = c.stagedPaths.filter((p) => authored.has(p));
   const allEfforts = c.registry.efforts({ project: c.project });
   const efforts = new Map(allEfforts.map((e) => [e.id, e]));
+  const openEfforts = allEfforts.filter((e) => e.state === 'active' || e.state === 'starting');
+  const mine = openEfforts.find((e) =>
+    c.checkoutRoot && existsSync(e.worktree)
+      ? same(e.worktree, c.checkoutRoot)
+      : e.branch === c.branch,
+  );
   for (const lease of c.registry.leases({ project: c.project, kind: 'commons' })) {
     const holder = efforts.get(lease.effort);
     const holderHasWorktree = Boolean(holder && existsSync(holder.worktree));
@@ -75,6 +81,8 @@ export function checkCommit(c: CommitCheck): { refusals: string[]; warnings: str
     } else if (lease.owner.session === c.ownerSession) {
       continue;
     }
+    // every effort of the area that owns the commons holds the same lease: its tasks share it
+    if (holder && mine && holder.area === mine.area) continue;
     const globs = c.m.commons[String(lease.value)] ?? [];
     const hit = pathsMatching(ownPaths, globs);
     if (hit.length > 0) {
@@ -83,7 +91,6 @@ export function checkCommit(c: CommitCheck): { refusals: string[]; warnings: str
       );
     }
   }
-  const openEfforts = allEfforts.filter((e) => e.state === 'active' || e.state === 'starting');
   for (const other of openEfforts) {
     if (c.checkoutRoot && existsSync(other.worktree) && same(other.worktree, c.checkoutRoot)) {
       continue;
@@ -96,11 +103,6 @@ export function checkCommit(c: CommitCheck): { refusals: string[]; warnings: str
       );
     }
   }
-  const mine = openEfforts.find((e) =>
-    c.checkoutRoot && existsSync(e.worktree)
-      ? same(e.worktree, c.checkoutRoot)
-      : e.branch === c.branch,
-  );
   if (mine && ownPaths.length > 0) {
     const allowed = allowedScopesForEffort(c.m, mine);
     const inScope = new Set(pathsMatching(ownPaths, allowed));

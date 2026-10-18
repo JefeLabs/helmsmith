@@ -315,3 +315,68 @@ describe("W4: resolving a merge is not writing into another effort's scope", () 
     expect(r.refusals.join('\n')).not.toMatch(/t\.tsx/);
   });
 });
+
+describe('W8: tasks of one area share its commons', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('does not lock two efforts of the same area out of each other, still locks another area out', async () => {
+    const { mkdtempSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const registry = reg();
+    const wa = mkdtempSync(join(tmpdir(), 'wk-wa-'));
+    const wb = mkdtempSync(join(tmpdir(), 'wk-wb-'));
+    const wc = mkdtempSync(join(tmpdir(), 'wk-wc-'));
+    const effort = (
+      id: string,
+      area: string,
+      task: string | undefined,
+      worktree: string,
+      session: string,
+    ) => ({
+      id,
+      project: 'demo',
+      area,
+      task,
+      type: 'feature' as const,
+      mode: 'backend' as const,
+      branch: task ? `feature/${area}--${task}` : `feature/${area}`,
+      worktree,
+      owner: { session, pid: 1 },
+      state: 'active' as const,
+      scopes: [],
+      commons: area === 'platform/auth' ? ['auth'] : [],
+      leases: [],
+      notices: [],
+      started: 'x',
+      lastActivity: 'x',
+    });
+    registry.addEffort(effort('ea', 'platform/auth', 'a', wa, 'sa'));
+    registry.addEffort(effort('eb', 'platform/auth', 'b', wb, 'sb'));
+    registry.addEffort(effort('ec', 'shop/cart', undefined, wc, 'sc'));
+    registry.addLease('commons', 'demo', 'auth', { session: 'sa', pid: 1 }, 'ea', 4);
+    registry.addLease('commons', 'demo', 'auth', { session: 'sb', pid: 1 }, 'eb', 4);
+    const base = {
+      m,
+      registry,
+      git: new Git(f.main),
+      project: 'demo',
+      stagedPaths: ['api/auth/x.ts'],
+    };
+
+    expect(
+      checkCommit({
+        ...base,
+        branch: 'feature/platform/auth--b',
+        ownerSession: 'sb',
+        checkoutRoot: wb,
+      }).refusals,
+    ).toEqual([]);
+    expect(
+      checkCommit({ ...base, branch: 'feature/shop/cart', ownerSession: 'sc', checkoutRoot: wc })
+        .refusals[0],
+    ).toMatch(/auth.*locked/);
+  });
+});
