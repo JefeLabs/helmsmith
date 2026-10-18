@@ -9,7 +9,9 @@ export default defineConfig({
   // Declarations come from `tsc --emitDeclarationOnly` in the build script instead.
   dts: false,
   sourcemap: true,
-  splitting: false,
+  // Code splitting: `connect` (OpenTUI, Bun-only) becomes its own chunk that
+  // cli.ts imports lazily, so every other command loads under plain Node.
+  splitting: true,
   shims: false,
   // Bundle ONLY @helmsmith/agent-* (consumed via npm link from
   // agentx-platform until those packages are published). Their
@@ -29,6 +31,6 @@ export default defineConfig({
     // Any unscoped npm package (`octokit`, `commander`, `ora`, etc.)
     /^[^@./]/,
     // Any scoped package that isn't @helmsmith/* (excluded via lookahead)
-    /^@(?!ecruz165\/)/,
+    /^@(?!helmsmith\/)/,
   ],
 });

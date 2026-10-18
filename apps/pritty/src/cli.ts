@@ -19,7 +19,6 @@ import { runCacheClear } from './commands/cache-clear.js';
 import { runCachePath } from './commands/cache-path.js';
 import { runCategorize } from './commands/categorize.js';
 import { runCommit } from './commands/commit.js';
-import { runConnect } from './commands/connect.js';
 import { runInit } from './commands/init.js';
 import { runPr } from './commands/pr.js';
 import { runRebase } from './commands/rebase.js';
@@ -58,7 +57,11 @@ authCmd
 program
   .command('connect')
   .description('Open the interactive connections view (TUI)')
-  .action(() => runConnect());
+  .action(async () => {
+    // Loaded on demand: the TUI needs Bun's FFI, and nothing else in pritty does.
+    const { runConnect } = await import('./commands/connect.js');
+    await runConnect();
+  });
 
 // ─── init ─────────────────────────────────────────────────────────────
 

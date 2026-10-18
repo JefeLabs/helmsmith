@@ -243,24 +243,12 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.124.0
         version: 0.124.0(zod@4.5.4)
-      '@helmsmith/agent-adapter':
-        specifier: workspace:*
-        version: link:../../platform/core/agent-adapter-lib
-      '@helmsmith/agent-auth':
-        specifier: workspace:*
-        version: link:../../platform/core/agent-auth-lib
       '@helmsmith/cli-kit':
         specifier: workspace:*
         version: link:../../platform/core/cli-kit-lib
-      '@helmsmith/tui-view-components':
-        specifier: workspace:*
-        version: link:../../platform/core/tui-view-components-lib
       '@inquirer/prompts':
         specifier: ^8.7.1
         version: 8.7.1(@types/node@24.13.3)
-      '@langchain/core':
-        specifier: ^1.2.9
-        version: 1.2.9(openai@7.10.0(@aws-sdk/credential-provider-node@3.972.82)(@smithy/signature-v4@5.7.3)(undici@6.28.1)(ws@8.21.3)(zod@4.5.4))(ws@8.21.3)
       '@opentui/core':
         specifier: ^0.5.10
         version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.0)
@@ -273,9 +261,6 @@ importers:
       chalk:
         specifier: ^6.0.0
         version: 6.0.0
-      cli-table3:
-        specifier: ^0.6.5
-        version: 0.6.5
       commander:
         specifier: ^15.0.0
         version: 15.0.0
@@ -288,6 +273,9 @@ importers:
       octokit:
         specifier: ^5.0.5
         version: 5.0.5
+      openai:
+        specifier: ^7.10.0
+        version: 7.10.0(@aws-sdk/credential-provider-node@3.972.82)(@smithy/signature-v4@5.7.3)(undici@6.28.1)(ws@8.21.3)(zod@4.5.4)
       ora:
         specifier: ^9.4.1
         version: 9.4.1
@@ -301,6 +289,15 @@ importers:
         specifier: ^4.5.4
         version: 4.5.4
     devDependencies:
+      '@helmsmith/agent-adapter':
+        specifier: workspace:*
+        version: link:../../platform/core/agent-adapter-lib
+      '@helmsmith/agent-auth':
+        specifier: workspace:*
+        version: link:../../platform/core/agent-auth-lib
+      '@helmsmith/tui-view-components':
+        specifier: workspace:*
+        version: link:../../platform/core/tui-view-components-lib
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3
