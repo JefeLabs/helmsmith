@@ -31,10 +31,13 @@ import {
   selectRefresh,
   serviceModes,
   slotVars,
+  storybookHostFor,
   TASK_SLUG,
   WorkkitError,
 } from '../core/index.js';
 import type { StorybrokrClient } from './storybrokr.js';
+
+export type { StorybrokrClient } from './storybrokr.js';
 
 export interface ServiceRunner {
   start(a: {
@@ -129,10 +132,19 @@ function modeCovers(existing: Mode, requested: Mode): boolean {
   return existing === requested;
 }
 
+const STORYBROKR_TOUCH_THROTTLE_MS = 60_000;
+
 /** Activity on an effort extends every lease it holds (spec §8.4: idle is measured from the last touch). */
 export function touchEffort(ctx: Ctx, effort: Effort): void {
-  for (const l of ctx.registry.leases({ effort: effort.id }))
+  const prevMs = Date.parse(effort.lastActivity);
+  const shouldTouchStorybrokr =
+    Number.isNaN(prevMs) || Date.now() - prevMs >= STORYBROKR_TOUCH_THROTTLE_MS;
+  for (const l of ctx.registry.leases({ effort: effort.id })) {
     ctx.registry.touch(l.id, hoursFor(ctx.manifest, l.kind));
+    if (l.kind === 'storybook' && shouldTouchStorybrokr) {
+      void Promise.resolve(ctx.storybrokr.touch?.(String(l.value))).catch(() => {});
+    }
+  }
   ctx.registry.updateEffort(effort.id, { lastActivity: now() });
 }
 
@@ -414,8 +426,10 @@ export async function startEffort(ctx: Ctx, o: StartOptions): Promise<StartResul
     }
     const currentLeases = ctx.registry.leases({ effort: open.id });
     if (o.story && !currentLeases.some((l) => l.kind === 'storybook')) {
-      const hostRoot = m.storybook ? join(open.worktree, m.storybook.hostRoot) : open.worktree;
-      const inst = await ctx.storybrokr.up(o.story, hostRoot);
+      const hostRoot = storybookHostFor(m, open.worktree);
+      const inst = await ctx.storybrokr.up(o.story, hostRoot, {
+        ttlMinutes: Math.ceil(m.expiry.storybookHours * 60),
+      });
       const sbLease = ctx.registry.addLease(
         'storybook',
         m.project,
@@ -466,6 +480,8 @@ export async function startEffort(ctx: Ctx, o: StartOptions): Promise<StartResul
             onLog: ctx.log,
           })
           .catch(() => undefined);
+      } else if (stopPids && l.kind === 'storybook') {
+        await ctx.storybrokr.down(String(l.value)).catch(() => undefined);
       }
       ctx.registry.release(l.id);
     }
@@ -585,8 +601,10 @@ export async function startEffort(ctx: Ctx, o: StartOptions): Promise<StartResul
     } else {
       let storybookPort: number | undefined;
       if (o.story) {
-        const hostRoot = m.storybook ? join(worktree, m.storybook.hostRoot) : worktree;
-        const inst = await ctx.storybrokr.up(o.story, hostRoot);
+        const hostRoot = storybookHostFor(m, worktree);
+        const inst = await ctx.storybrokr.up(o.story, hostRoot, {
+          ttlMinutes: Math.ceil(m.expiry.storybookHours * 60),
+        });
         storybookPort = inst.port;
         leases.push(
           ctx.registry.addLease(
@@ -993,6 +1011,9 @@ export async function finishEffort(ctx: Ctx, o: FinishOptions): Promise<FinishRe
 
   for (const lease of ctx.registry.leases({ effort: effort.id }))
     await releaseLease(ctx, effort, lease);
+  await Promise.resolve(ctx.storybrokr.downHost?.(storybookHostFor(m, effort.worktree))).catch(
+    () => undefined,
+  );
 
   let notices = 0;
   if (!o.intoArea) {
@@ -1054,12 +1075,17 @@ export async function reapLeases(
   for (const lease of reaped) await releaseLease(ctx, efforts.get(lease.effort), lease);
   for (const id of doomed) {
     const effort = efforts.get(id);
-    if (effort && (effort.state === 'active' || effort.state === 'starting')) {
-      ctx.registry.updateEffort(effort.id, {
-        state: 'parked',
-        parkedReason: `idle: a lease expired by ${at.toISOString()}`,
-        lastActivity: now(),
-      });
+    if (effort) {
+      await Promise.resolve(ctx.storybrokr.downHost?.(storybookHostFor(m, effort.worktree))).catch(
+        () => undefined,
+      );
+      if (effort.state === 'active' || effort.state === 'starting') {
+        ctx.registry.updateEffort(effort.id, {
+          state: 'parked',
+          parkedReason: `idle: a lease expired by ${at.toISOString()}`,
+          lastActivity: now(),
+        });
+      }
     }
   }
   return { reaped };
@@ -1132,9 +1158,12 @@ export async function retireArea(ctx: Ctx, o: { area: string }): Promise<RetireR
       `an effort is open on ${effortLabel(open.area, open.task)} (${open.owner.session}); \`work finish\` it first`,
       { owner: open.owner.session },
     );
-  const worktree = worktreePathFor(ctx, o.area);
+  const worktree = realpathOr(worktreePathFor(ctx, o.area));
   const main = new Git(ctx.repoRoot);
   let archived: string[] = [];
+  await Promise.resolve(ctx.storybrokr.downHost?.(storybookHostFor(m, worktree))).catch(
+    () => undefined,
+  );
   if (existsSync(worktree)) {
     const g = new Git(worktree);
     if (g.isDirty())

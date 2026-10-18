@@ -58,12 +58,29 @@ const fakeRunner = (): FakeRunner => {
   };
   return r;
 };
-const fakeSb = (): StorybrokrClient & { downs: string[] } => {
+const fakeSb = (): StorybrokrClient & {
+  ups: Array<{ story: string; hostRoot: string; ttlMinutes?: number }>;
+  downs: string[];
+  downHosts: string[];
+  touches: string[];
+} => {
   const s = {
+    ups: [] as Array<{ story: string; hostRoot: string; ttlMinutes?: number }>,
     downs: [] as string[],
-    up: async () => ({ id: 'sb_1', port: 6101, url: 'http://x' }),
+    downHosts: [] as string[],
+    touches: [] as string[],
+    up: async (story: string, hostRoot: string, opts?: { ttlMinutes?: number }) => {
+      s.ups.push({ story, hostRoot, ttlMinutes: opts?.ttlMinutes });
+      return { id: 'sb_1', port: 6101, url: 'http://x' };
+    },
     down: async (id: string) => {
       s.downs.push(id);
+    },
+    downHost: async (hostRoot: string) => {
+      s.downHosts.push(hostRoot);
+    },
+    touch: async (id: string) => {
+      s.touches.push(id);
     },
   };
   return s;
@@ -691,5 +708,49 @@ describe('parallel waves, promote, join ref-counting & squash-merge recovery', (
     expect(r.effort.baseSha).toBeDefined();
     const done = await finishEffort(ctx, { area: 'platform/auth' });
     expect(done.notices).toBe(0);
+  });
+
+  it('passes ttlMinutes from expiry.storybookHours to storybrokr.up, throttles storybrokr.touch to 60s, and sweeps downHost on finish/reap/retire', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const sb = fakeSb();
+    const customManifest = validateManifest({
+      ...manifestRaw(),
+      storybook: { hostRoot: 'app-ui' },
+      expiry: { slotHours: 12, commonsHours: 4, storybookHours: 2.5 },
+    });
+    const ctx = { ...ctxFor(f, fakeRunner(), sb), manifest: customManifest };
+    const r = await startEffort(ctx, {
+      area: 'shop/cart',
+      type: 'feature',
+      mode: 'frontend',
+      story: 'components/cart/Cart.stories.tsx',
+    });
+    const expectedHost = join(r.effort.worktree, 'app-ui');
+    expect(sb.ups).toEqual([
+      {
+        story: 'components/cart/Cart.stories.tsx',
+        hostRoot: expectedHost,
+        ttlMinutes: 150,
+      },
+    ]);
+    expect(effortEnv(ctx, 'shop/cart').STORYBROKR_HOST).toBe(expectedHost);
+    // Immediate status/env within 60s of start should NOT call storybrokr.touch
+    statusFor(ctx, 'shop/cart');
+    expect(sb.touches).toEqual([]);
+
+    // Backdate lastActivity by > 60s so next touchEffort forwards to storybrokr.touch
+    ctx.registry.updateEffort(r.effort.id, {
+      lastActivity: new Date(Date.now() - 65_000).toISOString(),
+    });
+    statusFor(ctx, 'shop/cart');
+    expect(sb.touches).toEqual(['sb_1']);
+
+    await finishEffort(ctx, { area: 'shop/cart' });
+    expect(sb.downs).toEqual(['sb_1']);
+    expect(sb.downHosts).toEqual([expectedHost]);
+
+    await retireArea(ctx, { area: 'shop/cart' });
+    expect(sb.downHosts).toEqual([expectedHost, expectedHost]);
   });
 });

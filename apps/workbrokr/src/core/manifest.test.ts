@@ -14,6 +14,8 @@ describe('validateManifest', () => {
     expect(m.expiry).toEqual({ slotHours: 12, commonsHours: 4, storybookHours: 2 });
     expect(m.worktreeRoot).toBe('.claude/worktrees');
     expect(m.env.file).toBe('.env.slot');
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: manifest template placeholder
+    expect(m.env.template.STORYBROKR_HOST).toBe('${STORYBROKR_HOST}');
   });
   it('rejects an area that is an ancestor of another', () => {
     expect(() => validateManifest({ ...minimal, areas: { shop: {}, 'shop/cart': {} } })).toThrow(

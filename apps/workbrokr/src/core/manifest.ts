@@ -109,6 +109,7 @@ export function templateVariables(m: {
     'BRANCH',
     'WORKTREE',
     'PORT_STORYBOOK',
+    'STORYBROKR_HOST',
   ]);
   for (const s of Object.keys(m.ports.services)) vars.add(`PORT_${s.toUpperCase()}`);
   return vars;
@@ -116,7 +117,14 @@ export function templateVariables(m: {
 
 function defaultEnv(services: string[]): Manifest['env'] {
   // biome-ignore lint/suspicious/noTemplateCurlyInString: these ARE the manifest's template placeholders
-  const template: Record<string, string> = { SLOT: '${SLOT}', LOG_DIR: '${LOG_DIR}' };
+  const template: Record<string, string> = {
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: manifest template placeholder
+    SLOT: '${SLOT}',
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: manifest template placeholder
+    LOG_DIR: '${LOG_DIR}',
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: manifest template placeholder
+    STORYBROKR_HOST: '${STORYBROKR_HOST}',
+  };
   for (const s of services) template[`PORT_${s.toUpperCase()}`] = `\${PORT_${s.toUpperCase()}}`;
   return { file: '.env.slot', template };
 }

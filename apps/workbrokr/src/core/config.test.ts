@@ -32,12 +32,14 @@ describe('config', () => {
     expect(out.logDir).toBe(join(wt, '.logs'));
     expect(existsSync(out.logDir)).toBe(true);
     expect(out.vars.AREA).toBe('shop/cart');
+    expect(out.vars.STORYBROKR_HOST).toBe(wt);
+    expect(readFileSync(out.envFile, 'utf8')).toContain(`STORYBROKR_HOST=${wt}`);
   });
 
-  it('writes no .slot and an empty SLOT for a frontend effort', () => {
+  it('writes no .slot, an empty SLOT, and resolves STORYBROKR_HOST with storybook.hostRoot when configured', () => {
     const wt = mkdtempSync(join(tmpdir(), 'wk-cfg-'));
     const out = emitWorktreeConfig({
-      m: validateManifest(minimal),
+      m: validateManifest({ ...minimal, storybook: { hostRoot: 'app-ui' } }),
       worktree: wt,
       ports: {},
       storybookPort: 6103,
@@ -47,6 +49,8 @@ describe('config', () => {
     expect(existsSync(join(wt, '.slot'))).toBe(false);
     expect(readFileSync(out.envFile, 'utf8')).toContain('SLOT=\n');
     expect(out.vars.PORT_STORYBOOK).toBe('6103');
+    expect(out.vars.STORYBROKR_HOST).toBe(join(wt, 'app-ui'));
+    expect(readFileSync(out.envFile, 'utf8')).toContain(`STORYBROKR_HOST=${join(wt, 'app-ui')}`);
   });
 
   it('keeps the emitted files out of git status through the repo-wide exclude file', () => {

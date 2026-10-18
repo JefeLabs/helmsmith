@@ -9,8 +9,35 @@ export interface StorybrokrInstance {
 
 /** The frontend runner: the installed `storybrokr` CLI, which owns its daemon, ports and instances. */
 export interface StorybrokrClient {
-  up(story: string, hostRoot: string): Promise<StorybrokrInstance>;
+  up(
+    story: string,
+    hostRoot: string,
+    opts?: { ttlMinutes?: number },
+  ): Promise<StorybrokrInstance>;
   down(id: string): Promise<void>;
+  downHost?(hostRoot: string): Promise<void>;
+  touch?(id: string): Promise<void>;
+}
+
+const MIN_STORYBROKR_VERSION = '0.3.0';
+let versionChecked = false;
+
+export function compareSemver(a: string, b: string): number {
+  const pa = a
+    .trim()
+    .replace(/^v/, '')
+    .split('.')
+    .map((n) => Number.parseInt(n, 10) || 0);
+  const pb = b
+    .trim()
+    .replace(/^v/, '')
+    .split('.')
+    .map((n) => Number.parseInt(n, 10) || 0);
+  for (let i = 0; i < 3; i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
 }
 
 function run(args: string[]): { code: number; out: string; err: string } {
@@ -24,9 +51,25 @@ function run(args: string[]): { code: number; out: string; err: string } {
   return { code: r.status ?? 1, out: r.stdout ?? '', err: r.stderr ?? '' };
 }
 
+function assertStorybrokrVersion(): void {
+  if (versionChecked) return;
+  const r = run(['--version']);
+  const found = r.out.trim();
+  if (r.code !== 0 || compareSemver(found, MIN_STORYBROKR_VERSION) < 0) {
+    throw new WorkkitError(
+      'STORYBROKR_FAILED',
+      `storybrokr >= ${MIN_STORYBROKR_VERSION} required (found ${found || 'unknown'}); upgrade @helmsmith/storybrokr`,
+    );
+  }
+  versionChecked = true;
+}
+
 export const storybrokrCli: StorybrokrClient = {
-  async up(story, hostRoot) {
-    const r = run(['up', story, '--host', hostRoot, '--json']);
+  async up(story, hostRoot, opts) {
+    assertStorybrokrVersion();
+    const args = ['up', story, '--host', hostRoot, '--json'];
+    if (opts?.ttlMinutes !== undefined) args.push('--ttl', String(opts.ttlMinutes));
+    const r = run(args);
     if (r.code !== 0) {
       throw new WorkkitError(
         'STORYBROKR_FAILED',
@@ -40,5 +83,15 @@ export const storybrokrCli: StorybrokrClient = {
     const r = run(['down', id]);
     if (r.code !== 0)
       throw new WorkkitError('STORYBROKR_FAILED', `storybrokr down ${id} failed: ${r.err.trim()}`);
+  },
+  async downHost(hostRoot) {
+    // Best-effort sweep of all instances in this worktree's hostRoot; ignore when storybrokr isn't installed.
+    const r = spawnSync('storybrokr', ['down', '--host', hostRoot, '--json'], { encoding: 'utf8' });
+    void r;
+  },
+  async touch(id) {
+    // Best-effort touch; ignore errors if the instance was already stopped.
+    const r = spawnSync('storybrokr', ['touch', id], { encoding: 'utf8' });
+    void r;
   },
 };

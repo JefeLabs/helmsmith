@@ -42,6 +42,12 @@ export interface EmittedConfig {
   vars: Record<string, string>;
 }
 
+/** Resolves the Storybook host root inside a worktree (`worktree/<storybook.hostRoot>` or `worktree`). */
+export function storybookHostFor(m: Manifest, worktree?: string): string {
+  if (!worktree) return '';
+  return m.storybook?.hostRoot ? join(worktree, m.storybook.hostRoot) : worktree;
+}
+
 /** The variables a slot derives, in the shape templates and `work env` expose. */
 export function slotVars(
   m: Manifest,
@@ -63,6 +69,7 @@ export function slotVars(
     WORKTREE: o.worktree ?? '',
     LOG_DIR: o.logDir ?? '',
     PORT_STORYBOOK: o.storybookPort === undefined ? '' : String(o.storybookPort),
+    STORYBROKR_HOST: storybookHostFor(m, o.worktree),
   };
   for (const service of Object.keys(m.ports.services)) {
     const p = o.ports[service];

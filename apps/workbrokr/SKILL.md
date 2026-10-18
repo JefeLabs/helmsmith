@@ -24,9 +24,9 @@ description: Start, run, finish and audit area-based work with `work` (@helmsmit
 ## The loop
 
 1. `work status --json` → what is open, by whom, and which areas exist.
-2. `work start --area <area> --type <type> --mode <fullstack|frontend> [--story <path>] --json` → the effort record, the worktree path, the leases (ports under `leases[].ports`). `cd` into `effort.worktree`.
-3. Work there. `work env --area <area>` prints `PORT_*`, `SLOT`, `LOG_DIR`, `MODE` when a tool needs them. Service logs are in `<worktree>/.logs/<service>.log`.
-4. `work finish --area <area>` (or `--park`) when done: the runner stops, leases are released, the branch is pushed; the worktree and branch stay for the next effort. Open the PR from the branch.
+2. `work start --area <area> [--task <slug>] --type <type> --mode <fullstack|backend|frontend> [--scopes <glob>...] [--story <path>] --json` → the effort record, the worktree path, the leases (ports under `leases[].ports`). `cd` into `effort.worktree`.
+3. Work there. `work env --area <area>` prints `PORT_*`, `SLOT`, `LOG_DIR`, `STORYBROKR_HOST`, `MODE` when a tool needs them (also written to `.env.slot`). Service logs are in `<worktree>/.logs/<service>.log`.
+4. `work finish --area <area> [--task <slug>] [--into-area]` (or `--park`) when done: the runner stops, leases and any worktree `storybrokr` instances are released, the branch is pushed (or merged into the parent area branch with `--into-area`); area worktrees stay, task worktrees are cleaned up. Open the PR from the branch.
 5. `work retire --area <area>` only when an area is being removed for good (archives evidence first; refuses unpushed work).
 6. `work reap` expires idle leases; `work audit --json` lists unsaved or unpushed work, stray worktrees, aging leases, drift and stale notices.
 
@@ -36,10 +36,11 @@ description: Start, run, finish and audit area-based work with `work` (@helmsmit
 |---|---|
 | `work init --project <name> --service name=port… [--base-branch b] [--storybook-host dir] [--no-hooks] [--force]` | Write a starter manifest, claim the port ranges, install the hooks |
 | `work hooks install [--project-root dir]` | Install the hooks in a clone whose manifest already exists |
-| `work start --area a --type t --mode m [--story p] [--join] [--no-sync] [--json]` | Begin (or join) an effort |
-| `work status [--area a] [--json]` | Efforts, leases, drift, notices |
-| `work env (--area a \| --slot n) [--json]` | Slot-derived variables |
-| `work finish --area a [--park] [--json]` | Stop, release, push |
+| `work start --area a [--task slug] --type t --mode m [--scopes g...] [--story p] [--join] [--no-sync] [--json]` | Begin (or join) an effort |
+| `work promote --area a [--task slug] --mode <backend\|fullstack> [--json]` | Promote an open effort's mode and lease a slot |
+| `work status [--area a] [--task slug] [--json]` | Efforts, leases, drift, notices |
+| `work env (--area a [--task slug] \| --slot n) [--json]` | Slot-derived variables (`SLOT`, `PORT_*`, `LOG_DIR`, `STORYBROKR_HOST`, `MODE`) |
+| `work finish --area a [--task slug] [--into-area] [--park] [--force] [--json]` | Stop, release, push (or merge task into area) |
 | `work reap [--dry-run] [--json]` | Expire idle leases |
 | `work retire --area a [--json]` | Archive and remove an area's worktree (destructive) |
 | `work audit [--json]` | What would otherwise be forgotten |
@@ -49,7 +50,7 @@ Every command takes `--project-root <dir>`; without it the repo is the main chec
 
 ## MCP tools
 
-`work_start { area, type, mode, story?, join?, sync? }`, `work_status { area? }`, `work_finish { area, park? }`, `work_reap { dryRun? }`, `work_audit {}`, `work_env { area }`. Results are the same JSON the CLI's `--json` prints; failures set `isError` with `{ code, message, details? }`.
+`work_start { area, task?, type, mode, scopes?, story?, join?, sync? }`, `work_promote { area, task?, mode }`, `work_status { area?, task? }`, `work_finish { area, task?, intoArea?, park?, force? }`, `work_reap { dryRun? }`, `work_audit {}`, `work_env { area, task? }`. Results are the same JSON the CLI's `--json` prints; failures set `isError` with `{ code, message, details? }`.
 
 ## Error codes
 
