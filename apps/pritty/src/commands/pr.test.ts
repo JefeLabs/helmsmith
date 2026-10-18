@@ -130,3 +130,20 @@ describe('runPr ordering', () => {
     expect(f.calls).not.toContain('createPR');
   });
 });
+
+describe('runPr honours config autoApprove', () => {
+  it('asks no questions when the config says autoApprove', async () => {
+    const f = fakes({ config: { autoApprove: true } });
+    const asked: string[] = [];
+    f.deps.prompts = {
+      confirm: async (o) => {
+        asked.push(o.message);
+        return true;
+      },
+      editor: async (d) => d.default ?? '',
+    };
+    const result = await runPr({}, f.deps);
+    expect(result?.created).toBe(true);
+    expect(asked).toEqual([]);
+  });
+});

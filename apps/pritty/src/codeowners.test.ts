@@ -145,3 +145,18 @@ src/ @src-user
     expect(result.teams).toEqual(['api-team']);
   });
 });
+
+describe('findCodeowners from a subdirectory', () => {
+  it('finds the repository root CODEOWNERS', async () => {
+    const { makeRepo, write } = await import('./testing/repo.js');
+    const r = makeRepo();
+    try {
+      write(r.dir, '.github/CODEOWNERS', '* @acme/core\n');
+      write(r.dir, 'app-ui/src/keep', '');
+      const { join } = await import('node:path');
+      expect(findCodeowners(join(r.dir, 'app-ui/src'))).toBe('* @acme/core\n');
+    } finally {
+      r.cleanup();
+    }
+  });
+});

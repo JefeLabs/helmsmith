@@ -22,6 +22,8 @@ export interface CommitOptions {
  */
 export async function runCommit(options: CommitOptions = {}): Promise<void> {
   const config = loadConfig();
+  const auto = options.autoApprove ?? config.autoApprove;
+  const dryRun = options.dryRun ?? config.dryRun;
   // CLI flags override config
   if (options.commitStyle) {
     const valid = ['conventional', 'gitmoji', 'angular', 'simple'];
@@ -91,7 +93,7 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
 
   // 4.5. Optional per-commit editing — default N so the wrap-up
   // stays fast. Skipped under --auto-approve and --dry-run.
-  if (!options.autoApprove && !options.dryRun) {
+  if (!auto && !dryRun) {
     for (let i = 0; i < plan.length; i++) {
       const c = plan[i]!;
       const wantEdit = await confirm({
@@ -118,13 +120,13 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
   }
 
   // 5. Dry-run exits here
-  if (options.dryRun) {
+  if (dryRun) {
     console.log(chalk.yellow('Dry-run — no commits made. Re-run without --dry-run to apply.'));
     return;
   }
 
   // 6. Confirm (skippable)
-  if (!options.autoApprove) {
+  if (!auto) {
     const ok = await confirm({
       message: `Create ${plan.length} commit(s) above?`,
       default: true,

@@ -22,6 +22,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { minimatch } from 'minimatch';
+import { searchDirs } from './repo-root.js';
 
 const CODEOWNERS_PATHS: ReadonlyArray<string> = [
   '.github/CODEOWNERS',
@@ -49,13 +50,14 @@ export interface ResolvedReviewers {
  * — pritty falls back to creating PRs without auto-assigning reviewers.
  */
 export function findCodeowners(cwd: string = process.cwd()): string | null {
-  for (const rel of CODEOWNERS_PATHS) {
-    const full = join(cwd, rel);
-    if (!existsSync(full)) continue;
-    try {
-      return readFileSync(full, 'utf8');
-    } catch {}
-  }
+  for (const dir of searchDirs(cwd))
+    for (const rel of CODEOWNERS_PATHS) {
+      const full = join(dir, rel);
+      if (!existsSync(full)) continue;
+      try {
+        return readFileSync(full, 'utf8');
+      } catch {}
+    }
   return null;
 }
 

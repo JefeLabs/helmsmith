@@ -21,15 +21,12 @@ This is a **phased build** following the
 | Categorizer (default + custom glob categories) | ✅ |
 | `pritty init` starter config | ✅ |
 | `pritty categorize` (read-only file bucketing) | ✅ |
-| AI client (multi-provider via `@helmsmith/agent-adapter`) | ⏳ |
-| `pritty commit` (per-category AI commit messages) | ⏳ |
-| `pritty pr` (AI-generated PR title + body) | ⏳ |
-| `pritty rebase` (AI-planned rebase) | ⏳ |
-| Pre-commit / pre-push hook runner | ⏳ |
+| AI client (multi-provider via `@helmsmith/agent-adapter`) | ✅ |
+| `pritty commit` (per-category AI commit messages, index-only commits) | ✅ |
+| `pritty pr` (AI-generated PR title + body, existing-PR reuse) | ✅ |
+| `pritty rebase` (AI-planned rebase; a last resort — prefer a merge commit) | ✅ |
+| Pre-commit / pre-push hook runner | removed — git hooks belong to the repository |
 | Outlier detection + interactive resolution | ⏳ |
-
-The unimplemented commands are wired as CLI stubs — they print a
-"coming soon" message so users learn the surface exists.
 
 ## Quick start
 
@@ -59,15 +56,13 @@ const buckets = categorize(["src/index.ts", "test/foo.test.ts"]);
 ## Configuration
 
 `.pritty.json` (or `.prittyrc.yaml`, `pritty.config.json`, etc.) at
-your repo root:
+your repo root (found from any subdirectory; a nearer one wins):
 
 ```json
 {
   "model": "gpt-4o",
   "baseBranch": "main",
   "commitStyle": "conventional",
-  "preCommit": ["eslint", "prettier"],
-  "prePush": ["test"],
   "categories": {
     "test": ["**/*.test.*", "**/*.spec.*"],
     "app": ["src/**", "lib/**"],

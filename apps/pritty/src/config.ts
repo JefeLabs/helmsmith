@@ -8,6 +8,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { load as parseYaml } from 'js-yaml';
 import { z } from 'zod';
+import { searchDirs } from './repo-root.js';
 
 // ── Per-adapter validation configs (discriminated union by `type`)
 const JiraRestValidationSchema = z.object({
@@ -61,7 +62,6 @@ export const ConfigSchema = z.object({
   baseBranch: z.string().optional(),
   autoApprove: z.boolean().default(false),
   dryRun: z.boolean().default(false),
-  verbose: z.boolean().default(false),
   commitStyle: z.enum(['conventional', 'gitmoji', 'angular', 'simple']).default('conventional'),
   /**
    * Primary AI provider. `copilot` (default) uses the OAuth Device
@@ -77,9 +77,6 @@ export const ConfigSchema = z.object({
   fallback: z.array(ProviderSchema).default([]),
   anthropicKeyEnv: z.string().default('ANTHROPIC_API_KEY'),
   openaiKeyEnv: z.string().default('OPENAI_API_KEY'),
-  preCommit: z.array(z.string()).default([]),
-  prePush: z.array(z.string()).default([]),
-  skipHooks: z.boolean().default(false),
   categories: z.record(z.string(), z.array(z.string())).optional(),
   ticket: TicketSchema.optional(),
   rebaseStrategy: z.enum(['interactive', 'squash', 'fixup', 'auto']).default('interactive'),
@@ -102,19 +99,24 @@ const CONFIG_FILES = [
 ];
 
 /**
- * Load and validate config from cwd. Falls back to schema defaults
- * when no file exists. Throws ZodError when a file exists but is
- * invalid.
+ * Load and validate config, searching cwd and then each parent up to the
+ * repository root (nearest wins), so running from a package directory still
+ * finds the repository's config. Falls back to schema defaults when no file
+ * exists. Throws ZodError when a file exists but is invalid. Keys the schema
+ * no longer knows (the old preCommit / prePush / skipHooks / verbose) are
+ * dropped silently.
  */
 export function loadConfig(cwd: string = process.cwd()): Config {
-  for (const filename of CONFIG_FILES) {
-    const path = join(cwd, filename);
-    if (!existsSync(path)) continue;
+  for (const dir of searchDirs(cwd)) {
+    for (const filename of CONFIG_FILES) {
+      const path = join(dir, filename);
+      if (!existsSync(path)) continue;
 
-    const raw = readFileSync(path, 'utf8');
-    const isYaml = filename.endsWith('.yaml') || filename.endsWith('.yml');
-    const parsed = isYaml ? parseYaml(raw) : JSON.parse(raw);
-    return ConfigSchema.parse(parsed ?? {});
+      const raw = readFileSync(path, 'utf8');
+      const isYaml = filename.endsWith('.yaml') || filename.endsWith('.yml');
+      const parsed = isYaml ? parseYaml(raw) : JSON.parse(raw);
+      return ConfigSchema.parse(parsed ?? {});
+    }
   }
   return ConfigSchema.parse({});
 }
@@ -124,7 +126,5 @@ export function defaultStarterConfig(): unknown {
   return {
     model: 'gpt-4o',
     commitStyle: 'conventional',
-    preCommit: ['eslint', 'prettier'],
-    prePush: ['test'],
   };
 }

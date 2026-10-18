@@ -93,3 +93,18 @@ describe('templatePromptGuidance', () => {
     expect(guidance).toContain('Drop sections');
   });
 });
+
+describe('findPullRequestTemplate from a subdirectory', () => {
+  it('finds the repository root template', async () => {
+    const { makeRepo, write } = await import('./testing/repo.js');
+    const r = makeRepo();
+    try {
+      write(r.dir, '.github/pull_request_template.md', '## Summary\n');
+      write(r.dir, 'app-ui/src/keep', '');
+      const { join } = await import('node:path');
+      expect(findPullRequestTemplate(join(r.dir, 'app-ui/src'))?.content).toBe('## Summary\n');
+    } finally {
+      r.cleanup();
+    }
+  });
+});

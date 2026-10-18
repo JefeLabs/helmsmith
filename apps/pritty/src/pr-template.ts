@@ -20,6 +20,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { searchDirs } from './repo-root.js';
 
 /** Hard cap so a runaway template doesn't dominate the AI context window. */
 const MAX_TEMPLATE_BYTES = 8_000;
@@ -50,16 +51,17 @@ export interface PullRequestTemplate {
  * structure.
  */
 export function findPullRequestTemplate(cwd: string = process.cwd()): PullRequestTemplate | null {
-  for (const rel of TEMPLATE_PATHS) {
-    const full = join(cwd, rel);
-    if (!existsSync(full)) continue;
-    try {
-      const raw = readFileSync(full, 'utf8');
-      const truncated = raw.length > MAX_TEMPLATE_BYTES;
-      const content = truncated ? raw.slice(0, MAX_TEMPLATE_BYTES) : raw;
-      return { path: rel, content, truncated };
-    } catch {}
-  }
+  for (const dir of searchDirs(cwd))
+    for (const rel of TEMPLATE_PATHS) {
+      const full = join(dir, rel);
+      if (!existsSync(full)) continue;
+      try {
+        const raw = readFileSync(full, 'utf8');
+        const truncated = raw.length > MAX_TEMPLATE_BYTES;
+        const content = truncated ? raw.slice(0, MAX_TEMPLATE_BYTES) : raw;
+        return { path: rel, content, truncated };
+      } catch {}
+    }
   return null;
 }
 

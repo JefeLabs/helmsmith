@@ -93,6 +93,8 @@ export async function runPr(
   deps: PrDeps = defaultDeps(),
 ): Promise<PrOutcome | undefined> {
   const { git, config } = deps;
+  const auto = options.autoApprove ?? config.autoApprove;
+  const dryRun = options.dryRun ?? config.dryRun;
 
   // 1. Branch + remote → owner/repo
   const branch = await git.getCurrentBranch();
@@ -211,7 +213,7 @@ export async function runPr(
   console.log('');
 
   // 7.5 Optional editor pass — default N so the wrap-up stays fast.
-  if (!options.autoApprove && !options.dryRun) {
+  if (!auto && !dryRun) {
     const wantEdit = await deps.prompts.confirm({
       message: 'Edit PR title or body?',
       default: false,
@@ -231,7 +233,7 @@ export async function runPr(
   }
 
   // 8. Dry-run stops here
-  if (options.dryRun) {
+  if (dryRun) {
     console.log(
       chalk.yellow('Dry-run — no push, no PR created. Re-run without --dry-run to apply.'),
     );
@@ -239,7 +241,7 @@ export async function runPr(
   }
 
   // 9. Confirm
-  if (!options.autoApprove) {
+  if (!auto) {
     const ok = await deps.prompts.confirm({
       message: `Push ${branch} and open this PR?`,
       default: true,
