@@ -23,6 +23,7 @@ import { getAuthStore, readAuth } from './auth.js';
 import type { CategorizedFiles } from './categorizer.js';
 import type { Config } from './config.js';
 import { type PullRequestTemplate, templatePromptGuidance } from './pr-template.js';
+import { redactDiff, withTimeout } from './redact.js';
 import { ticketPromptGuidance } from './ticket.js';
 
 // pritty is a composition root: @helmsmith/agent-adapter registers nothing on
@@ -214,16 +215,20 @@ export async function generateCommitMessages(
     'Here are the categorized files:',
     filesByCategory,
     '',
-    'Here is the staged diff:',
+    'Here is the staged diff (secrets redacted):',
     '```diff',
-    diff.length > 12000 ? `${diff.slice(0, 12000)}\n... (truncated)` : diff,
+    (() => {
+      const safe = redactDiff(diff);
+      return safe.length > 12000 ? `${safe.slice(0, 12000)}\n... (truncated)` : safe;
+    })(),
     '```',
   ].join('\n');
 
-  const result = await adapter.invoke({
-    messages: [{ role: 'user', content: user }],
-    systemPrompt: system,
-  });
+  const result = await withTimeout(
+    adapter.invoke({ messages: [{ role: 'user', content: user }], systemPrompt: system }),
+    config.aiTimeoutMs,
+    'AI request',
+  );
   const raw = result.content;
   const cleaned = unwrapJson(raw);
 
@@ -307,10 +312,11 @@ export async function generatePR(
     commitList,
   ].join('\n');
 
-  const result = await adapter.invoke({
-    messages: [{ role: 'user', content: user }],
-    systemPrompt: system,
-  });
+  const result = await withTimeout(
+    adapter.invoke({ messages: [{ role: 'user', content: user }], systemPrompt: system }),
+    config.aiTimeoutMs,
+    'AI request',
+  );
   const raw = result.content;
   const cleaned = unwrapJson(raw);
 
@@ -411,10 +417,11 @@ export async function generateRebasePlan(
 
   const user = [`Rebase plan needed for ${commits.length} commit(s):`, commitList].join('\n');
 
-  const result = await adapter.invoke({
-    messages: [{ role: 'user', content: user }],
-    systemPrompt: system,
-  });
+  const result = await withTimeout(
+    adapter.invoke({ messages: [{ role: 'user', content: user }], systemPrompt: system }),
+    config.aiTimeoutMs,
+    'AI request',
+  );
   const raw = result.content;
   const cleaned = unwrapJson(raw);
 

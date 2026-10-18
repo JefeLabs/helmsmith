@@ -80,6 +80,10 @@ export const ConfigSchema = z.object({
   categories: z.record(z.string(), z.array(z.string())).optional(),
   ticket: TicketSchema.optional(),
   rebaseStrategy: z.enum(['interactive', 'squash', 'fixup', 'auto']).default('interactive'),
+  /** Give up on a model call after this long. */
+  aiTimeoutMs: z.number().int().positive().default(60_000),
+  /** Per-repository GitHub identity: the `gh` login whose token opens PRs here. */
+  github: z.object({ account: z.string().optional() }).optional(),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
