@@ -35,7 +35,7 @@ export async function runPreCommit(cwd: string): Promise<number> {
   if (!c) return 0;
   const root = c.git.root();
   touchByWorktree(c.registry, c.manifest, root);
-  const { refusals } = checkCommit({
+  const { refusals, warnings } = checkCommit({
     m: c.manifest,
     registry: c.registry,
     git: c.git,
@@ -45,6 +45,7 @@ export async function runPreCommit(cwd: string): Promise<number> {
     ownerSession: currentOwner().session,
     checkoutRoot: root,
   });
+  for (const w of warnings) console.error(chalk.yellow(`work: ${w}`));
   for (const r of refusals) console.error(chalk.red(`work: ${r}`));
   return refusals.length ? 2 : 0;
 }

@@ -154,4 +154,110 @@ describe('guards', () => {
         .refusals[0],
     ).toMatch(/delete.*develop/);
   });
+
+  it('refuses commons write from another worktree even when both efforts share the same session id', () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const registry = reg();
+    const wtA = join(f.main, '.claude/worktrees/platform/auth');
+    const wtB = join(f.main, '.claude/worktrees/shop/cart');
+    new Git(f.main).worktreeAdd(wtA, 'fix/platform/auth', 'origin/develop');
+    new Git(f.main).worktreeAdd(wtB, 'feature/shop/cart', 'origin/develop');
+    registry.addEffort({
+      id: 'eff_a',
+      project: 'demo',
+      area: 'platform/auth',
+      type: 'fix',
+      mode: 'frontend',
+      branch: 'fix/platform/auth',
+      worktree: wtA,
+      owner: { session: 'same-user@host', pid: 1 },
+      state: 'active',
+      scopes: ['app-ui/app/platform/auth/**'],
+      commons: ['auth'],
+      leases: [],
+      notices: [],
+      started: 'x',
+      lastActivity: 'x',
+    });
+    registry.addLease('commons', 'demo', 'auth', { session: 'same-user@host', pid: 1 }, 'eff_a', 4);
+    const refused = checkCommit({
+      m,
+      registry,
+      git: new Git(wtB),
+      project: 'demo',
+      branch: 'feature/shop/cart',
+      stagedPaths: ['api/auth/login.ts'],
+      ownerSession: 'same-user@host',
+      checkoutRoot: wtB,
+    });
+    expect(refused.refusals[0]).toMatch(/auth.*write-locked/);
+    const allowed = checkCommit({
+      m,
+      registry,
+      git: new Git(wtA),
+      project: 'demo',
+      branch: 'fix/platform/auth',
+      stagedPaths: ['api/auth/login.ts'],
+      ownerSession: 'same-user@host',
+      checkoutRoot: wtA,
+    });
+    expect(allowed.refusals).toEqual([]);
+  });
+
+  it('refuses a commit touching another open effort exclusive scope and warns on out-of-scope paths', () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const registry = reg();
+    const wtA = join(f.main, '.claude/worktrees/shop/cart');
+    const wtB = join(f.main, '.claude/worktrees/platform/auth');
+    new Git(f.main).worktreeAdd(wtA, 'feature/shop/cart', 'origin/develop');
+    new Git(f.main).worktreeAdd(wtB, 'fix/platform/auth', 'origin/develop');
+    registry.addEffort({
+      id: 'eff_cart',
+      project: 'demo',
+      area: 'shop/cart',
+      type: 'feature',
+      mode: 'frontend',
+      branch: 'feature/shop/cart',
+      worktree: wtA,
+      owner: { session: 's1', pid: 1 },
+      state: 'active',
+      scopes: ['app-ui/app/shop/cart/**'],
+      commons: [],
+      leases: [],
+      notices: [],
+      started: 'x',
+      lastActivity: 'x',
+    });
+    registry.addEffort({
+      id: 'eff_auth',
+      project: 'demo',
+      area: 'platform/auth',
+      type: 'fix',
+      mode: 'frontend',
+      branch: 'fix/platform/auth',
+      worktree: wtB,
+      owner: { session: 's2', pid: 2 },
+      state: 'active',
+      scopes: ['app-ui/app/platform/auth/**'],
+      commons: [],
+      leases: [],
+      notices: [],
+      started: 'x',
+      lastActivity: 'x',
+    });
+    const r = checkCommit({
+      m,
+      registry,
+      git: new Git(wtB),
+      project: 'demo',
+      branch: 'fix/platform/auth',
+      stagedPaths: ['app-ui/app/shop/cart/page.tsx', 'unscoped/file.ts'],
+      ownerSession: 's2',
+      checkoutRoot: wtB,
+    });
+    expect(r.refusals[0]).toMatch(/active scope of shop\/cart/);
+    expect(r.warnings[0]).toMatch(/outside the effort's scope.*unscoped\/file\.ts/);
+  });
 });

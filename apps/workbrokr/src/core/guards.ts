@@ -2,8 +2,8 @@ import { existsSync, realpathSync } from 'node:fs';
 import { WorkkitError } from './errors.js';
 import type { Git } from './git.js';
 import type { Registry } from './registry.js';
-import { commonsTouched, pathsMatching } from './scopes.js';
-import type { Manifest } from './types.js';
+import { allowedScopesForEffort, commonsTouched, pathsMatching } from './scopes.js';
+import type { Effort, Manifest } from './types.js';
 
 export function assertNotProtected(m: Manifest, branch: string): void {
   if (m.protectedBranches.includes(branch)) {
@@ -33,6 +33,9 @@ const same = (a: string, b: string) => {
   }
 };
 
+const effortLabel = (e: Pick<Effort, 'area' | 'task'>) =>
+  e.task ? `${e.area}--${e.task}` : e.area;
+
 export interface CommitCheck {
   m: Manifest;
   registry: Registry;
@@ -46,24 +49,24 @@ export interface CommitCheck {
 }
 
 /** What a pre-commit hook asks: may this commit be made? Refusals are sentences for stderr. */
-export function checkCommit(c: CommitCheck): { refusals: string[] } {
+export function checkCommit(c: CommitCheck): { refusals: string[]; warnings: string[] } {
   const refusals: string[] = [];
+  const warnings: string[] = [];
   if (c.m.protectedBranches.includes(c.branch)) {
     refusals.push(
       `branch "${c.branch}" is protected (${c.m.protectedBranches.join(', ')}): work happens on <type>/<area> branches, never here`,
     );
   }
-  const efforts = new Map(c.registry.efforts({ project: c.project }).map((e) => [e.id, e]));
+  const allEfforts = c.registry.efforts({ project: c.project });
+  const efforts = new Map(allEfforts.map((e) => [e.id, e]));
   for (const lease of c.registry.leases({ project: c.project, kind: 'commons' })) {
-    if (lease.owner.session === c.ownerSession) continue;
     const holder = efforts.get(lease.effort);
-    if (
-      holder &&
-      c.checkoutRoot &&
-      existsSync(holder.worktree) &&
-      same(holder.worktree, c.checkoutRoot)
-    )
+    const holderHasWorktree = Boolean(holder && existsSync(holder.worktree));
+    if (holder && holderHasWorktree && c.checkoutRoot) {
+      if (same(holder.worktree, c.checkoutRoot)) continue;
+    } else if (lease.owner.session === c.ownerSession) {
       continue;
+    }
     const globs = c.m.commons[String(lease.value)] ?? [];
     const hit = pathsMatching(c.stagedPaths, globs);
     if (hit.length > 0) {
@@ -72,7 +75,35 @@ export function checkCommit(c: CommitCheck): { refusals: string[] } {
       );
     }
   }
-  return { refusals };
+  const openEfforts = allEfforts.filter((e) => e.state === 'active' || e.state === 'starting');
+  for (const other of openEfforts) {
+    if (c.checkoutRoot && existsSync(other.worktree) && same(other.worktree, c.checkoutRoot)) {
+      continue;
+    }
+    if (!c.checkoutRoot && other.branch === c.branch) continue;
+    const hit = pathsMatching(c.stagedPaths, other.scopes);
+    if (hit.length > 0) {
+      refusals.push(
+        `path(s) ${hit.join(', ')} are inside the active scope of ${effortLabel(other)} (${other.branch}, owned by ${other.owner.session})`,
+      );
+    }
+  }
+  const mine = openEfforts.find((e) =>
+    c.checkoutRoot && existsSync(e.worktree)
+      ? same(e.worktree, c.checkoutRoot)
+      : e.branch === c.branch,
+  );
+  if (mine && c.stagedPaths.length > 0) {
+    const allowed = allowedScopesForEffort(c.m, mine);
+    const inScope = new Set(pathsMatching(c.stagedPaths, allowed));
+    const outside = c.stagedPaths.filter((p) => !inScope.has(p));
+    if (outside.length > 0) {
+      warnings.push(
+        `${outside.length} staged path(s) are outside the effort's scope (${effortLabel(mine)}): ${outside.join(', ')}`,
+      );
+    }
+  }
+  return { refusals, warnings };
 }
 
 export interface PushCheck {
@@ -103,16 +134,16 @@ export function checkPush(c: PushCheck): { refusals: string[]; warnings: string[
   }
   if (c.isDelete) return { refusals, warnings };
   const effort = c.registry
-    .efforts({ project: c.project, state: 'active' })
-    .find((e) => e.branch === c.branch);
+    .efforts({ project: c.project })
+    .find((e) => (e.state === 'active' || e.state === 'parked') && e.branch === c.branch);
   const commons = commonsTouched(c.m, c.changedPaths);
   if (effort) {
-    const allCommonsGlobs = Object.values(c.m.commons).flat();
-    const inScope = new Set(pathsMatching(c.changedPaths, [...effort.scopes, ...allCommonsGlobs]));
+    const allowed = allowedScopesForEffort(c.m, effort);
+    const inScope = new Set(pathsMatching(c.changedPaths, allowed));
     const outside = c.changedPaths.filter((p) => !inScope.has(p));
     if (outside.length > 0) {
       warnings.push(
-        `${outside.length} changed path(s) are outside the effort's scope (${effort.area}): ${outside.join(', ')} — add a scope template or expect a merge collision`,
+        `${outside.length} changed path(s) are outside the effort's scope (${effortLabel(effort)}): ${outside.join(', ')} — add a scope template or expect a merge collision`,
       );
     }
   }

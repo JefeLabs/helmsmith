@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, symlinkSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Git } from './git.js';
@@ -47,6 +47,28 @@ describe('installHooks', () => {
     }
     expect(error).toMatch(/develop.*protected/);
     expect(new Git(f.main).run(['log', '--oneline']).trim().split('\n')).toHaveLength(1);
+  });
+
+  it('chains to an executable .git/hooks/pre-commit script when present', () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const legacyHook = join(f.main, '.git/hooks/pre-commit');
+    mkdirSync(join(f.main, '.git/hooks'), { recursive: true });
+    writeFileSync(legacyHook, '#!/bin/sh\necho "legacy-pre-commit-ran" >&2\nexit 3\n');
+    chmodSync(legacyHook, 0o755);
+    installHooks(f.main, { protectedBranches: ['develop'] });
+    new Git(f.main).checkout('feature/shop/cart', 'origin/develop');
+    let stderr = '';
+    try {
+      execFileSync('git', ['commit', '--allow-empty', '-m', 'test'], {
+        cwd: f.main,
+        env: { ...process.env, PATH: '/usr/bin:/bin' },
+        stdio: 'pipe',
+      });
+    } catch (e) {
+      stderr = (e as { stderr?: Buffer }).stderr?.toString() ?? String(e);
+    }
+    expect(stderr).toMatch(/legacy-pre-commit-ran/);
   });
 });
 

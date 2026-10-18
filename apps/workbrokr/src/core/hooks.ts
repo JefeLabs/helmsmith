@@ -22,11 +22,21 @@ for p in $PROTECTED; do
     exit 2
   fi
 done
-if ! command -v workbrokr >/dev/null 2>&1; then
+if command -v workbrokr >/dev/null 2>&1; then
+  workbrokr hook pre-commit "$@" || exit $?
+else
   echo "work: workbrokr is not on PATH; commons and scope checks skipped (npm i -g @helmsmith/workbrokr)" >&2
-  exit 0
 fi
-exec workbrokr hook pre-commit "$@"
+COMMON_DIR=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+LEGACY="$COMMON_DIR/hooks/pre-commit"
+if [ -n "$COMMON_DIR" ] && [ -x "$LEGACY" ]; then
+  SELF_DIR=$(cd "$(dirname "$0")" && pwd)
+  LEGACY_DIR=$(cd "$(dirname "$LEGACY")" && pwd)
+  if [ "$SELF_DIR" != "$LEGACY_DIR" ]; then
+    exec "$LEGACY" "$@"
+  fi
+fi
+exit 0
 `;
 }
 
@@ -45,11 +55,21 @@ printf '%s\\n' "$input" | while read -r lref lsha rref rsha; do
     fi
   done
 done || exit 2
-if ! command -v workbrokr >/dev/null 2>&1; then
+if command -v workbrokr >/dev/null 2>&1; then
+  printf '%s\\n' "$input" | workbrokr hook pre-push "$@" || exit $?
+else
   echo "work: workbrokr is not on PATH; scope and commons warnings skipped" >&2
-  exit 0
 fi
-printf '%s\\n' "$input" | exec workbrokr hook pre-push "$@"
+COMMON_DIR=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+LEGACY="$COMMON_DIR/hooks/pre-push"
+if [ -n "$COMMON_DIR" ] && [ -x "$LEGACY" ]; then
+  SELF_DIR=$(cd "$(dirname "$0")" && pwd)
+  LEGACY_DIR=$(cd "$(dirname "$LEGACY")" && pwd)
+  if [ "$SELF_DIR" != "$LEGACY_DIR" ]; then
+    printf '%s\\n' "$input" | exec "$LEGACY" "$@"
+  fi
+fi
+exit 0
 `;
 }
 
