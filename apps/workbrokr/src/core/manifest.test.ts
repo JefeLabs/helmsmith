@@ -34,6 +34,32 @@ describe('validateManifest', () => {
       validateManifest({ ...minimal, env: { file: '.env', template: { X: '${PORT_NOPE}' } } }),
     ).toThrow(/PORT_NOPE/);
   });
+  it('accepts seed, service modes, structured extraScopes, and sharedScopes', () => {
+    const m = validateManifest({
+      ...minimal,
+      seed: ['.scripts-tools/worktree-seed.sh .'],
+      services: {
+        ...minimal.services,
+        backend: { ...minimal.services.backend, modes: ['backend', 'fullstack'] },
+      },
+      areas: {
+        'org/dashboard': {
+          module: 'dashboard',
+          extraScopes: { frontend: ['app-ui/widgets/**'], backend: ['svc/shared/**'] },
+          sharedScopes: ['app-ui/components/discover-schools/dashboards/**'],
+        },
+      },
+    });
+    expect(m.seed).toEqual(['.scripts-tools/worktree-seed.sh .']);
+    expect(m.areas['org/dashboard'].sharedScopes).toEqual([
+      'app-ui/components/discover-schools/dashboards/**',
+    ]);
+  });
+  it('rejects area names containing double-dash (--)', () => {
+    expect(() =>
+      validateManifest({ ...minimal, areas: { 'org/my--area': { module: 'x' } } }),
+    ).toThrow(/areas/);
+  });
 });
 
 describe('loadManifest', () => {

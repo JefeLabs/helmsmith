@@ -17,6 +17,7 @@ export const MANIFEST_FILES = [
  */
 export const BRANCH_NAME = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
 const BRANCH_NAME_HINT = 'must be a plain ref name: letters, digits, ".", "_", "/", "-"';
+export const TASK_SLUG = /^(?!.*--)[a-z0-9][a-z0-9_-]{0,47}$/;
 
 const Service = z.object({
   start: z.string().min(1),
@@ -25,7 +26,16 @@ const Service = z.object({
   healthyCodes: z.array(z.number().int()).optional(),
   reset: z.string().optional(),
   healthTimeoutMs: z.number().int().positive().optional(),
+  modes: z.array(z.enum(['backend', 'fullstack'])).optional(),
 });
+
+const ExtraScopes = z.union([
+  z.array(z.string()),
+  z.object({
+    frontend: z.array(z.string()).optional(),
+    backend: z.array(z.string()).optional(),
+  }),
+]);
 
 const Schema = z.object({
   project: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
@@ -48,6 +58,7 @@ const Schema = z.object({
   storybook: z.object({ hostRoot: z.string() }).optional(),
   logs: z.object({ dir: z.string() }).default({ dir: '.logs' }),
   env: z.object({ file: z.string(), template: z.record(z.string(), z.string()) }).optional(),
+  seed: z.array(z.string().min(1)).optional(),
   refresh: z
     .array(
       z.object({
@@ -55,16 +66,18 @@ const Schema = z.object({
         always: z.boolean().optional(),
         run: z.string().optional(),
         mark: z.string().optional(),
+        restoreWhenIfClean: z.boolean().optional(),
       }),
     )
     .default([]),
   scopes: z.object({ frontend: z.array(z.string()), backend: z.array(z.string()) }),
   areas: z.record(
-    z.string().regex(/^[a-z0-9-]+(\/[a-z0-9-]+)*$/),
+    z.string().regex(/^(?!.*--)[a-z0-9-]+(\/[a-z0-9-]+)*$/),
     z.object({
       module: z.string().optional(),
       commons: z.array(z.string()).optional(),
-      extraScopes: z.array(z.string()).optional(),
+      extraScopes: ExtraScopes.optional(),
+      sharedScopes: z.array(z.string()).optional(),
     }),
   ),
   commons: z.record(z.string(), z.array(z.string())).default({}),

@@ -12,6 +12,10 @@
     "work": "./bin/work.mjs"
   },
   "main": "./dist/cli.js",
+  "exports": {
+    ".": "./dist/cli.js",
+    "./core": "./dist/core/index.js"
+  },
   "files": [
     "dist",
     "bin",

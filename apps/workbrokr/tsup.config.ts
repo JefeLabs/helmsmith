@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/cli.ts'],
+  entry: ['src/cli.ts', 'src/core/index.ts'],
   format: ['esm'],
   target: 'es2022',
   clean: true,

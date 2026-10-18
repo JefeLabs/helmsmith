@@ -1,4 +1,4 @@
-export type Mode = 'frontend' | 'fullstack';
+export type Mode = 'frontend' | 'backend' | 'fullstack';
 export type EffortState = 'starting' | 'active' | 'parked' | 'finished';
 export type LeaseKind = 'slot' | 'storybook' | 'commons';
 
@@ -11,6 +11,8 @@ export interface ServiceSpec {
   reset?: string;
   /** default 180_000 */
   healthTimeoutMs?: number;
+  /** Which slot-bearing modes start this service. Default: ['fullstack'] for 'frontend', else ['backend', 'fullstack']. */
+  modes?: ('backend' | 'fullstack')[];
 }
 
 export interface RefreshEntry {
@@ -18,12 +20,22 @@ export interface RefreshEntry {
   always?: boolean;
   run?: string;
   mark?: string;
+  /** Restore clean `when`-matched files if the refresh command dirties them (default true when `when` is set). */
+  restoreWhenIfClean?: boolean;
 }
+
+export type ExtraScopesSpec =
+  | string[]
+  | {
+      frontend?: string[];
+      backend?: string[];
+    };
 
 export interface AreaSpec {
   module?: string;
   commons?: string[];
-  extraScopes?: string[];
+  extraScopes?: ExtraScopesSpec;
+  sharedScopes?: string[];
 }
 
 export interface ArchiveSpec {
@@ -46,6 +58,7 @@ export interface Manifest {
   storybook?: { hostRoot: string };
   logs: { dir: string };
   env: { file: string; template: Record<string, string> };
+  seed?: string[];
   refresh: RefreshEntry[];
   scopes: { frontend: string[]; backend: string[] };
   areas: Record<string, AreaSpec>;
@@ -87,11 +100,14 @@ export interface Effort {
   id: string;
   project: string;
   area: string;
+  task?: string;
   type: string;
   mode: Mode;
   branch: string;
   worktree: string;
   owner: Owner;
+  participants?: Owner[];
+  baseSha?: string;
   state: EffortState;
   scopes: string[];
   commons: string[];
