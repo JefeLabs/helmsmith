@@ -127,7 +127,9 @@ program
   .option('--base <branch>', "Base branch (default: repo's default branch)")
   .option('--auto-approve', 'Skip the confirmation prompt before pushing/creating')
   .option('--dry-run', 'Show the plan without pushing or creating the PR')
-  .action((options: { base?: string; autoApprove?: boolean; dryRun?: boolean }) => runPr(options));
+  .action(async (options: { base?: string; autoApprove?: boolean; dryRun?: boolean }) => {
+    await runPr(options);
+  });
 
 program
   .command('rebase')

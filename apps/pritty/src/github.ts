@@ -31,6 +31,7 @@ export interface OpenPRSummary {
   url: string;
   title: string;
   head: string;
+  base: string;
 }
 
 /**
@@ -55,6 +56,11 @@ async function octokit(): Promise<Octokit> {
     throw new Error('No GitHub token available. Run `pritty auth login` or set GITHUB_TOKEN.');
   }
   return new Octokit({ auth: token });
+}
+
+/** Resolve the token now, so a missing or unusable one fails before anything is pushed. */
+export async function assertGitHubToken(): Promise<void> {
+  await octokit();
 }
 
 /** Create a pull request. Returns its number + URL. */
@@ -116,14 +122,15 @@ export async function requestReviewers(
 }
 
 /**
- * List open PRs whose head matches `<owner>:<branch>`. Used to warn
- * about duplicate PR creation before the workflow proceeds. Empty
- * array if none are open.
+ * List open PRs whose head is `<owner>:<branch>`, optionally only those
+ * targeting `base`. Used before anything is generated or pushed: an existing
+ * PR for the same head and base is returned instead of creating a second one.
  */
-export async function listOpenPRsForHead(
+export async function listOpenPRs(
   owner: string,
   repo: string,
   branch: string,
+  base?: string,
 ): Promise<OpenPRSummary[]> {
   const client = await octokit();
   const result = await client.rest.pulls.list({
@@ -131,13 +138,24 @@ export async function listOpenPRsForHead(
     repo,
     state: 'open',
     head: `${owner}:${branch}`,
+    ...(base ? { base } : {}),
   });
   return result.data.map((pr) => ({
     number: pr.number,
     url: pr.html_url,
     title: pr.title,
     head: pr.head.ref,
+    base: pr.base.ref,
   }));
+}
+
+/** @deprecated use listOpenPRs; kept for the programmatic API. */
+export function listOpenPRsForHead(
+  owner: string,
+  repo: string,
+  branch: string,
+): Promise<OpenPRSummary[]> {
+  return listOpenPRs(owner, repo, branch);
 }
 
 /** Get the repository's default branch (used when --base isn't supplied). */

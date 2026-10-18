@@ -61,9 +61,11 @@ export {
 export { createGit, type GitOps, parseGitHubRemote } from './git.js';
 export {
   addLabels,
+  assertGitHubToken,
   type CreatePROptions,
   createPR,
   getDefaultBranch,
+  listOpenPRs,
   listOpenPRsForHead,
   type OpenPRSummary,
   type PRResult,

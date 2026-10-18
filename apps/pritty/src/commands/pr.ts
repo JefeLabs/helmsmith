@@ -1,18 +1,22 @@
 import { confirm, editor } from '@inquirer/prompts';
 import chalk from 'chalk';
 import ora from 'ora';
-import { generatePR } from '../ai.js';
+import { generatePR, type PRDraft, type TicketContext } from '../ai.js';
 import { findCodeowners, parseCodeowners, resolveReviewers } from '../codeowners.js';
-import { loadConfig } from '../config.js';
-import { createGit, parseGitHubRemote } from '../git.js';
+import { type Config, loadConfig } from '../config.js';
+import { createGit, type GitOps, parseGitHubRemote } from '../git.js';
 import {
   addLabels,
+  assertGitHubToken,
+  type CreatePROptions,
   createPR,
   getDefaultBranch,
-  listOpenPRsForHead,
+  listOpenPRs,
+  type OpenPRSummary,
+  type PRResult,
   requestReviewers,
 } from '../github.js';
-import { findPullRequestTemplate } from '../pr-template.js';
+import { findPullRequestTemplate, type PullRequestTemplate } from '../pr-template.js';
 import { resolveBaseBranch } from './_shared/base.js';
 import { splitTitleBody } from './_shared/format.js';
 import { resolveTicketContext } from './_shared/ticket-context.js';
@@ -23,36 +27,96 @@ export interface PrOptions {
   dryRun?: boolean;
 }
 
-/**
- * Generate a pull request title + body via AI and open it on GitHub.
- * Auto-detects base branch, PR template, and CODEOWNERS reviewers.
- */
-export async function runPr(options: PrOptions = {}): Promise<void> {
-  const config = loadConfig();
-  const git = createGit();
+export interface PrOutcome {
+  number: number;
+  url: string;
+  /** false when an open PR for this head and base already existed and was returned instead. */
+  created: boolean;
+}
 
-  // 1. Resolve branch + remote → owner/repo
+/** Everything `runPr` touches outside its own logic, so tests can assert the order of operations. */
+export interface PrDeps {
+  git: GitOps;
+  config: Config;
+  github: {
+    assertToken(): Promise<void>;
+    getDefaultBranch(owner: string, repo: string): Promise<string>;
+    listOpenPRs(owner: string, repo: string, head: string, base?: string): Promise<OpenPRSummary[]>;
+    createPR(o: CreatePROptions): Promise<PRResult>;
+    addLabels(owner: string, repo: string, n: number, labels: readonly string[]): Promise<void>;
+    requestReviewers(
+      owner: string,
+      repo: string,
+      n: number,
+      users: readonly string[],
+      teams: readonly string[],
+    ): Promise<void>;
+  };
+  ai: { generatePR: typeof generatePR };
+  ticket: (config: Config, branch: string, git: GitOps) => Promise<TicketContext | undefined>;
+  template: () => PullRequestTemplate | null;
+  codeowners: () => string | null;
+  prompts: {
+    confirm(o: { message: string; default?: boolean }): Promise<boolean>;
+    editor(o: { message: string; default?: string }): Promise<string>;
+  };
+}
+
+function defaultDeps(): PrDeps {
+  return {
+    git: createGit(),
+    config: loadConfig(),
+    github: {
+      assertToken: assertGitHubToken,
+      getDefaultBranch,
+      listOpenPRs,
+      createPR,
+      addLabels,
+      requestReviewers,
+    },
+    ai: { generatePR },
+    ticket: resolveTicketContext,
+    template: findPullRequestTemplate,
+    codeowners: findCodeowners,
+    prompts: { confirm, editor },
+  };
+}
+
+/**
+ * Open a pull request for the current branch. Order matters: the token and
+ * the open-PR check come first, so nothing is generated or pushed when the
+ * PR cannot be created or already exists; then commits and the AI draft;
+ * push and create last. Errors are thrown (the CLI prints them and exits 1).
+ */
+export async function runPr(
+  options: PrOptions = {},
+  deps: PrDeps = defaultDeps(),
+): Promise<PrOutcome | undefined> {
+  const { git, config } = deps;
+
+  // 1. Branch + remote → owner/repo
   const branch = await git.getCurrentBranch();
-  const ticketCtx = await resolveTicketContext(config, branch, git);
+  if (!branch || branch === 'HEAD' || /^[0-9a-f]{7,40}$/.test(branch)) {
+    throw new Error('Not on a branch (detached HEAD). Check out a branch before opening a PR.');
+  }
   const remoteUrl = await git.getRemoteUrl();
   if (!remoteUrl) {
-    console.error(
-      chalk.red('✗ No `origin` remote configured. Add one with `git remote add origin ...`.'),
-    );
-    process.exit(1);
+    throw new Error('No `origin` remote configured. Add one with `git remote add origin ...`.');
   }
   const repo = parseGitHubRemote(remoteUrl);
   if (!repo) {
-    console.error(chalk.red(`✗ Remote URL doesn't look like GitHub: ${remoteUrl}`));
-    process.exit(1);
+    throw new Error('The `origin` remote is not a GitHub URL pritty understands.');
   }
 
-  // Base: --base, else an explicit config value, else the repository's default
-  // branch (queried only when neither is set), else main.
+  // 2. Token first: a missing or unusable one must fail before any push.
+  await deps.github.assertToken();
+
+  // 3. Base: --base, else an explicit config value, else the repository's default
+  //    branch (queried only when neither is set), else main.
   let remoteDefault: string | undefined;
   if (!options.base && !config.baseBranch) {
     try {
-      remoteDefault = await getDefaultBranch(repo.owner, repo.repo);
+      remoteDefault = await deps.github.getDefaultBranch(repo.owner, repo.repo);
     } catch (err) {
       console.error(
         chalk.yellow(
@@ -73,32 +137,32 @@ export async function runPr(options: PrOptions = {}): Promise<void> {
       ),
     );
   }
-
   console.log(
     chalk.cyan(
       `Repository: ${repo.owner}/${repo.repo}  ${chalk.dim(`(${branch} → ${effectiveBase})`)}`,
     ),
   );
 
-  // 2. Warn about existing open PRs from this branch
-  try {
-    const open = await listOpenPRsForHead(repo.owner, repo.repo, branch);
-    if (open.length > 0) {
-      console.log(chalk.yellow(`⚠ ${open.length} open PR(s) already exist for ${branch}:`));
-      for (const pr of open) {
-        console.log(`    ${chalk.dim(`#${pr.number}`)} ${pr.title} — ${pr.url}`);
-      }
-    }
-  } catch (err) {
-    console.error(chalk.yellow(`⚠ Couldn't list existing PRs: ${(err as Error).message}`));
+  // 4. An open PR for this head and base already exists: return it, create nothing.
+  //    A failed lookup is fatal; pushing without knowing would be worse.
+  const open = await deps.github.listOpenPRs(repo.owner, repo.repo, branch, effectiveBase);
+  if (open.length > 0) {
+    const existing = open[0]!;
+    console.log(
+      chalk.yellow(
+        `An open PR already exists for ${branch} → ${effectiveBase}: #${existing.number}`,
+      ),
+    );
+    console.log(chalk.green(`✓ ${existing.url}`));
+    return { number: existing.number, url: existing.url, created: false };
   }
 
-  // 3. Get commits between base and HEAD (against origin/<base> when the remote has it)
+  // 5. Commits since the base (against origin/<base> when the remote has it)
   const baseRef = await git.resolveBaseRef(effectiveBase);
   const commits = await git.log(baseRef);
   if (commits.length === 0) {
     console.log(chalk.dim(`No commits between ${effectiveBase} and ${branch}. Nothing to PR.`));
-    return;
+    return undefined;
   }
   console.log(chalk.cyan(`Commits in PR (${commits.length}):`));
   for (const c of commits) {
@@ -106,8 +170,9 @@ export async function runPr(options: PrOptions = {}): Promise<void> {
   }
   console.log('');
 
-  // 4. AI-generate title + body + labels.
-  const template = findPullRequestTemplate();
+  // 6. Ticket context (may prompt), template, AI draft
+  const ticketCtx = await deps.ticket(config, branch, git);
+  const template = deps.template();
   if (template) {
     console.log(
       chalk.dim(
@@ -116,14 +181,10 @@ export async function runPr(options: PrOptions = {}): Promise<void> {
     );
   }
 
-  const spinner = ora({
-    text: 'Generating PR description...',
-    color: 'cyan',
-  }).start();
-  // biome-ignore lint/suspicious/noImplicitAnyLet: assigned in try/catch below
-  let draft;
+  const spinner = ora({ text: 'Generating PR description...', color: 'cyan' }).start();
+  let draft: PRDraft;
   try {
-    draft = await generatePR(
+    draft = await deps.ai.generatePR(
       commits,
       { branch, base: effectiveBase, owner: repo.owner, repo: repo.repo },
       config,
@@ -133,10 +194,10 @@ export async function runPr(options: PrOptions = {}): Promise<void> {
     spinner.succeed('PR description ready');
   } catch (err) {
     spinner.fail((err as Error).message);
-    process.exit(1);
+    throw err;
   }
 
-  // 5. Show preview
+  // 7. Preview
   console.log('');
   console.log(chalk.bold.cyan(draft.title));
   console.log('');
@@ -149,17 +210,16 @@ export async function runPr(options: PrOptions = {}): Promise<void> {
   }
   console.log('');
 
-  // 5.5. Optional editor pass — default N so the wrap-up stays fast.
+  // 7.5 Optional editor pass — default N so the wrap-up stays fast.
   if (!options.autoApprove && !options.dryRun) {
-    const wantEdit = await confirm({
+    const wantEdit = await deps.prompts.confirm({
       message: 'Edit PR title or body?',
       default: false,
     });
     if (wantEdit) {
-      const combined = `${draft.title}\n\n${draft.body}`;
-      const edited = await editor({
+      const edited = await deps.prompts.editor({
         message: 'Editing PR (first line = title, blank line, then body)',
-        default: combined,
+        default: `${draft.title}\n\n${draft.body}`,
       });
       const { title: nextTitle, body: nextBody } = splitTitleBody(edited);
       if (nextTitle.length === 0) {
@@ -170,45 +230,41 @@ export async function runPr(options: PrOptions = {}): Promise<void> {
     }
   }
 
-  // 6. Dry-run exits here
+  // 8. Dry-run stops here
   if (options.dryRun) {
     console.log(
       chalk.yellow('Dry-run — no push, no PR created. Re-run without --dry-run to apply.'),
     );
-    return;
+    return undefined;
   }
 
-  // 7. Confirm
+  // 9. Confirm
   if (!options.autoApprove) {
-    const ok = await confirm({
+    const ok = await deps.prompts.confirm({
       message: `Push ${branch} and open this PR?`,
       default: true,
     });
     if (!ok) {
       console.log(chalk.dim('Aborted.'));
-      return;
+      return undefined;
     }
   }
 
-  // 8. Push (set upstream — assume first push for the branch)
-  const pushSpinner = ora({
-    text: `Pushing ${branch} to origin...`,
-    color: 'cyan',
-  }).start();
+  // 10. Push (set upstream)
+  const pushSpinner = ora({ text: `Pushing ${branch} to origin...`, color: 'cyan' }).start();
   try {
     await git.push(branch, { setUpstream: true });
     pushSpinner.succeed('Pushed');
   } catch (err) {
     pushSpinner.fail((err as Error).message);
-    process.exit(1);
+    throw err;
   }
 
-  // 9. Create PR
+  // 11. Create PR
   const prSpinner = ora({ text: 'Creating PR...', color: 'cyan' }).start();
-  // biome-ignore lint/suspicious/noImplicitAnyLet: assigned in try/catch below
-  let result;
+  let result: PRResult;
   try {
-    result = await createPR({
+    result = await deps.github.createPR({
       owner: repo.owner,
       repo: repo.repo,
       head: branch,
@@ -219,28 +275,28 @@ export async function runPr(options: PrOptions = {}): Promise<void> {
     prSpinner.succeed(`PR #${result.number} created`);
   } catch (err) {
     prSpinner.fail((err as Error).message);
-    process.exit(1);
+    throw err;
   }
 
-  // 10. Apply labels (optional, non-fatal on failure)
+  // 12. Labels (non-fatal)
   if (draft.labels.length > 0) {
     try {
-      await addLabels(repo.owner, repo.repo, result.number, draft.labels);
+      await deps.github.addLabels(repo.owner, repo.repo, result.number, draft.labels);
       console.log(chalk.dim(`  Applied labels: ${draft.labels.join(', ')}`));
     } catch (err) {
       console.error(chalk.yellow(`⚠ Couldn't apply labels: ${(err as Error).message}`));
     }
   }
 
-  // 11. Auto-request reviewers from CODEOWNERS, if present
-  const codeownersContent = findCodeowners();
+  // 13. Reviewers from CODEOWNERS (non-fatal)
+  const codeownersContent = deps.codeowners();
   if (codeownersContent) {
     const rules = parseCodeowners(codeownersContent);
     const changedFiles = await git.changedFilesBetween(baseRef);
     const reviewers = resolveReviewers(changedFiles, rules);
     if (reviewers.users.length > 0 || reviewers.teams.length > 0) {
       try {
-        await requestReviewers(
+        await deps.github.requestReviewers(
           repo.owner,
           repo.repo,
           result.number,
@@ -260,4 +316,5 @@ export async function runPr(options: PrOptions = {}): Promise<void> {
 
   console.log('');
   console.log(chalk.green(`✓ ${result.url}`));
+  return { number: result.number, url: result.url, created: true };
 }
