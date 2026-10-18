@@ -33,10 +33,16 @@ export interface GitOps {
   commit(message: string, files?: string[]): Promise<void>;
   /** Push the current branch. setUpstream=true on first push. */
   push(branch: string, opts?: { setUpstream?: boolean }): Promise<void>;
-  /** Commits reachable from `head` but not from `base`. Newest first. */
+  /** Commits reachable from `head` (default HEAD) but not from `base`: `base..head`. Newest first. */
   log(base: string, head?: string): Promise<Array<{ hash: string; subject: string }>>;
-  /** Files changed between base..head (defaults to base..HEAD). */
+  /** Files `head` (default HEAD) changed since its merge base with `base`: `base...head`. */
   changedFilesBetween(base: string, head?: string): Promise<string[]>;
+  /**
+   * The ref to compare against for `base`: `origin/<base>` when the remote
+   * has it (the local branch can sit stale, especially in a worktree that
+   * never checks it out), otherwise `base` itself.
+   */
+  resolveBaseRef(base: string): Promise<string>;
   /** URL of the `origin` remote, or null if not set. */
   getRemoteUrl(): Promise<string | null>;
   /** Working tree is clean (no staged or unstaged changes, no untracked files). */
@@ -110,13 +116,18 @@ export function createGit(cwd: string = process.cwd()): GitOps {
     },
 
     async log(base: string, head?: string): Promise<Array<{ hash: string; subject: string }>> {
-      const range = head ? `${base}..${head}` : `${base}..HEAD`;
-      const result = await git.log({ from: base, to: head ?? 'HEAD' }).catch(async () => {
-        // Fall back to raw range syntax — some repos don't have the
-        // upstream-tracking config simple-git's .log() expects.
-        return await git.log([range]);
-      });
+      // Two dots on purpose: simple-git's { from, to } form emits `base...head`,
+      // which for `git log` is the symmetric difference and includes base-only commits.
+      const result = await git.log([`${base}..${head ?? 'HEAD'}`]);
       return result.all.map((c) => ({ hash: c.hash, subject: c.message }));
+    },
+
+    async resolveBaseRef(base: string): Promise<string> {
+      const r = spawnSync('git', ['rev-parse', '--verify', '-q', `refs/remotes/origin/${base}`], {
+        cwd,
+        stdio: 'ignore',
+      });
+      return r.status === 0 ? `origin/${base}` : base;
     },
 
     async getRemoteUrl(): Promise<string | null> {
@@ -129,7 +140,9 @@ export function createGit(cwd: string = process.cwd()): GitOps {
     },
 
     async changedFilesBetween(base: string, head?: string): Promise<string[]> {
-      const range = head ? `${base}..${head}` : `${base}..HEAD`;
+      // Three dots on purpose: for `git diff` that means "since the merge base",
+      // so files changed only on the base do not count as this branch's.
+      const range = `${base}...${head ?? 'HEAD'}`;
       try {
         const result = await git.diff(['--name-only', range]);
         return result

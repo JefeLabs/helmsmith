@@ -171,3 +171,41 @@ describe('GitOps.rebaseWithPlan', () => {
     gitIn(r.dir, 'rebase', '--abort');
   });
 });
+
+describe('GitOps ranges against a base that moved after the branch point', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  function diverged(): string {
+    const r = makeRepo();
+    cleanup = r.cleanup;
+    gitIn(r.dir, 'checkout', '-q', '-b', 'feat');
+    commitFile(r.dir, 'feat.txt', 'f\n', 'feat: mine');
+    gitIn(r.dir, 'checkout', '-q', 'main');
+    commitFile(r.dir, 'main-only.txt', 'm\n', 'chore: landed on main meanwhile');
+    gitIn(r.dir, 'checkout', '-q', 'feat');
+    return r.dir;
+  }
+
+  it('log lists only commits reachable from head and not from base', async () => {
+    const dir = diverged();
+    const commits = await createGit(dir).log('main');
+    expect(commits.map((c) => c.subject)).toEqual(['feat: mine']);
+  });
+
+  it('changedFilesBetween lists only files the branch changed since the merge base', async () => {
+    const dir = diverged();
+    expect(await createGit(dir).changedFilesBetween('main')).toEqual(['feat.txt']);
+  });
+
+  it('resolveBaseRef prefers the remote-tracking ref when origin has the base', async () => {
+    const dir = diverged();
+    expect(await createGit(dir).resolveBaseRef('main')).toBe('main');
+    const origin = `${dir}-origin.git`;
+    gitIn(dir, 'init', '-q', '--bare', origin);
+    gitIn(dir, 'remote', 'add', 'origin', origin);
+    gitIn(dir, 'push', '-q', 'origin', 'main');
+    expect(await createGit(dir).resolveBaseRef('main')).toBe('origin/main');
+    expect(await createGit(dir).resolveBaseRef('nope')).toBe('nope');
+  });
+});

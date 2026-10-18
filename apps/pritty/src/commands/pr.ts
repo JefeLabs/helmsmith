@@ -84,8 +84,9 @@ export async function runPr(options: PrOptions = {}): Promise<void> {
     console.error(chalk.yellow(`⚠ Couldn't list existing PRs: ${(err as Error).message}`));
   }
 
-  // 3. Get commits between base and HEAD
-  const commits = await git.log(effectiveBase);
+  // 3. Get commits between base and HEAD (against origin/<base> when the remote has it)
+  const baseRef = await git.resolveBaseRef(effectiveBase);
+  const commits = await git.log(baseRef);
   if (commits.length === 0) {
     console.log(chalk.dim(`No commits between ${effectiveBase} and ${branch}. Nothing to PR.`));
     return;
@@ -226,7 +227,7 @@ export async function runPr(options: PrOptions = {}): Promise<void> {
   const codeownersContent = findCodeowners();
   if (codeownersContent) {
     const rules = parseCodeowners(codeownersContent);
-    const changedFiles = await git.changedFilesBetween(effectiveBase);
+    const changedFiles = await git.changedFilesBetween(baseRef);
     const reviewers = resolveReviewers(changedFiles, rules);
     if (reviewers.users.length > 0 || reviewers.teams.length > 0) {
       try {

@@ -53,7 +53,7 @@ export async function runRebase(options: RebaseOptions = {}): Promise<void> {
     process.exit(1);
   }
 
-  const base = options.base ?? config.baseBranch;
+  const base = await git.resolveBaseRef(options.base ?? config.baseBranch);
   const commits = await git.log(base);
   if (commits.length === 0) {
     console.log(chalk.dim(`No commits between ${base} and ${branch}. Nothing to rebase.`));
