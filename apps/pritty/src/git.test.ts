@@ -70,5 +70,7 @@ describe('describeRemote', () => {
       'https://***@github.com/o/r.git',
     );
     expect(describeRemote('git@github.com:o/r.git')).toBe('git@github.com:o/r.git');
+    expect(describeRemote('https://github.com/o/r.git?access_token=abc')).not.toContain('abc');
+    expect(describeRemote('https://user:pw@github.com/o/r')).not.toContain('pw');
   });
 });

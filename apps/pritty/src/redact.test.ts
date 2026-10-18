@@ -67,3 +67,28 @@ describe('withTimeout', () => {
     await expect(withTimeout(Promise.resolve(7), 1000, 'x')).resolves.toBe(7);
   });
 });
+
+describe('redactDiff hardening', () => {
+  it('scans context lines too, not only added and removed ones', () => {
+    const out = redactDiff(' TOKEN=abcdef123456\n+x = 1');
+    expect(out).not.toContain('abcdef123456');
+    expect(out).toContain('+x = 1');
+  });
+
+  it('omits secret files whose header paths are quoted, renamed from, or combined diffs', () => {
+    const diff = [
+      'diff --git "a/.env" "b/.env"',
+      '+A=1secret',
+      'diff --git a/.env b/renamed.txt',
+      'similarity index 100%',
+      '+B=2secret',
+      'diff --cc .env.local',
+      '+C=3secret',
+      'diff --git a/src/ok.ts b/src/ok.ts',
+      '+export const ok = true;',
+    ].join('\n');
+    const out = redactDiff(diff);
+    expect(out).not.toMatch(/[123]secret/);
+    expect(out).toContain('+export const ok = true;');
+  });
+});

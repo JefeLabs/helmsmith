@@ -8,23 +8,33 @@
 const SECRET_FILE =
   /(^|\/)(\.env(\..*)?|.*\.pem|.*\.key|.*\.p12|.*\.pfx|id_(rsa|dsa|ecdsa|ed25519)(\.pub)?|.*credentials.*|.*secrets?\.(json|ya?ml|toml))$/i;
 const ASSIGNMENT =
-  /^([+-]\s*(?:export\s+)?["']?[\w.-]*(?:secret|token|password|passwd|pwd|api[_-]?key|access[_-]?key|private[_-]?key|auth|credential|client[_-]?secret)[\w.-]*["']?\s*[:=]\s*)(.+)$/i;
+  /^([ +-]?\s*(?:export\s+)?["']?[\w.-]*(?:secret|token|password|passwd|pwd|api[_-]?key|access[_-]?key|private[_-]?key|auth|credential|client[_-]?secret)[\w.-]*["']?\s*[:=]\s*)(.+)$/i;
 const BEARER = /((?:bearer|basic)\s+)[A-Za-z0-9._~+/=-]{8,}/gi;
 const KNOWN_TOKENS =
   /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|npm_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9_-]{16,}|xox[baprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35}|glpat-[A-Za-z0-9_-]{20,})\b/g;
 const PEM_BEGIN = /-----BEGIN [A-Z ]*PRIVATE KEY-----/;
 const PEM_END = /-----END [A-Z ]*PRIVATE KEY-----/;
 
+/** Old and new path from a diff header, with git's optional quoting removed; null for non-header lines. */
+function headerPaths(line: string): string[] | null {
+  const unq = (p: string): string => p.replace(/^"(.*)"$/, '$1').replace(/^[ab]\//, '');
+  const git = line.match(/^diff --git ("(?:[^"\\]|\\.)*"|\S+) ("(?:[^"\\]|\\.)*"|\S+)$/);
+  if (git) return [unq(git[1]!), unq(git[2]!)];
+  const combined = line.match(/^diff --(?:cc|combined) (.+)$/);
+  if (combined) return [unq(combined[1]!)];
+  return null;
+}
+
 export function redactDiff(diff: string): string {
   const out: string[] = [];
   let omitting = false;
   let inPem = false;
   for (const line of diff.split('\n')) {
-    const header = line.match(/^diff --git a\/(.+?) b\/(.+)$/);
-    if (header) {
-      omitting = SECRET_FILE.test(header[2]!);
+    const paths = headerPaths(line);
+    if (paths) {
+      omitting = paths.some((p) => SECRET_FILE.test(p));
       inPem = false;
-      out.push(omitting ? `[diff for ${header[2]} omitted]` : line);
+      out.push(omitting ? `[diff for ${paths[paths.length - 1]} omitted]` : line);
       continue;
     }
     if (omitting) continue;

@@ -299,7 +299,23 @@ export function parseGitHubRemote(url: string): { owner: string; repo: string } 
   return null;
 }
 
-/** A remote URL safe to print: any credentials in the userinfo are replaced by `***`. */
+/**
+ * A remote URL safe to print: credentials in the userinfo become `***` and
+ * token-like query parameters are masked. Falls back to a regex for URLs
+ * the URL parser rejects (scp-like `git@host:path` has no userinfo to leak).
+ */
 export function describeRemote(url: string): string {
-  return url.replace(/^([a-z+]+:\/\/)[^@/]+@/i, '$1***@');
+  try {
+    const u = new URL(url);
+    if (u.username || u.password) {
+      u.username = '***';
+      u.password = '';
+    }
+    for (const key of [...u.searchParams.keys()]) {
+      if (/token|secret|key|password|auth/i.test(key)) u.searchParams.set(key, '***');
+    }
+    return u.toString().replace('***:@', '***@');
+  } catch {
+    return url.replace(/^([a-z+]+:\/\/)[^@/]+@/i, '$1***@');
+  }
 }
