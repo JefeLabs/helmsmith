@@ -13,7 +13,6 @@
  *   4. Otherwise return whatever ticket was resolved (possibly null)
  */
 
-import { confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
 import { getCachedTicket, setCachedTicket } from '../../adapters/cache.js';
 import { buildAdapter, deriveLinkTemplate, type ValidationResult } from '../../adapters/index.js';
@@ -21,11 +20,20 @@ import type { TicketContext } from '../../ai.js';
 import { type loadConfig } from '../../config.js';
 import { type createGit } from '../../git.js';
 import { detectTicket, findRecentTicket, ticketLink } from '../../ticket.js';
+import { confirm } from './prompts.js';
+
+export interface TicketContextOptions {
+  /** false when running unattended: the stale-ticket question is skipped (answer: no). */
+  interactive?: boolean;
+  /** The yes/no prompt to use; tests inject one. */
+  ask?: (o: { message: string; default?: boolean }) => Promise<boolean>;
+}
 
 export async function resolveTicketContext(
   config: ReturnType<typeof loadConfig>,
   branch: string,
   git: ReturnType<typeof createGit>,
+  opts: TicketContextOptions = {},
 ): Promise<TicketContext | undefined> {
   if (!config.ticket) return undefined;
 
@@ -45,8 +53,15 @@ export async function resolveTicketContext(
             `  (using ${ticket} from recent commit "${recent.fromSubject}", ${formatAge(recent.ageHours)} ago)`,
           ),
         );
+      } else if (opts.interactive === false) {
+        console.error(
+          chalk.dim(
+            `  (not reusing ${recent.ticket} from a commit ${formatAge(recent.ageHours)} ago: unattended run)`,
+          ),
+        );
       } else {
-        const useIt = await confirm({
+        const ask = opts.ask ?? confirm;
+        const useIt = await ask({
           message: `Reuse ticket ${recent.ticket} from commit ${formatAge(recent.ageHours)} ago ("${truncateSubject(recent.fromSubject, 50)}")?`,
           default: false,
         });

@@ -1,4 +1,3 @@
-import { confirm, editor } from '@inquirer/prompts';
 import chalk from 'chalk';
 import ora from 'ora';
 import { generatePR, type PRDraft, type TicketContext } from '../ai.js';
@@ -19,12 +18,15 @@ import {
 import { findPullRequestTemplate, type PullRequestTemplate } from '../pr-template.js';
 import { resolveBaseBranch } from './_shared/base.js';
 import { splitTitleBody } from './_shared/format.js';
-import { resolveTicketContext } from './_shared/ticket-context.js';
+import { confirm, editor } from './_shared/prompts.js';
+import { resolveTicketContext, type TicketContextOptions } from './_shared/ticket-context.js';
 
 export interface PrOptions {
   base?: string;
   autoApprove?: boolean;
   dryRun?: boolean;
+  /** One JSON line on stdout, everything else on stderr; implies autoApprove. */
+  json?: boolean;
 }
 
 export interface PrOutcome {
@@ -32,6 +34,8 @@ export interface PrOutcome {
   url: string;
   /** false when an open PR for this head and base already existed and was returned instead. */
   created: boolean;
+  head: string;
+  base: string;
 }
 
 /** Everything `runPr` touches outside its own logic, so tests can assert the order of operations. */
@@ -53,7 +57,14 @@ export interface PrDeps {
     ): Promise<void>;
   };
   ai: { generatePR: typeof generatePR };
-  ticket: (config: Config, branch: string, git: GitOps) => Promise<TicketContext | undefined>;
+  ticket: (
+    config: Config,
+    branch: string,
+    git: GitOps,
+    opts?: TicketContextOptions,
+  ) => Promise<TicketContext | undefined>;
+  /** Where human output goes; under --json everything but the JSON line goes to err. */
+  io?: { out: (line: string) => void; err: (line: string) => void };
   template: () => PullRequestTemplate | null;
   codeowners: () => string | null;
   prompts: {
@@ -93,8 +104,17 @@ export async function runPr(
   deps: PrDeps = defaultDeps(),
 ): Promise<PrOutcome | undefined> {
   const { git, config } = deps;
-  const auto = options.autoApprove ?? config.autoApprove;
+  const io = deps.io ?? {
+    out: (l: string) => console.log(l),
+    err: (l: string) => console.error(l),
+  };
+  const say = options.json ? io.err : io.out;
+  const auto = Boolean(options.json) || (options.autoApprove ?? config.autoApprove);
   const dryRun = options.dryRun ?? config.dryRun;
+  const finish = (o: PrOutcome): PrOutcome => {
+    if (options.json) io.out(JSON.stringify(o));
+    return o;
+  };
 
   // 1. Branch + remote → owner/repo
   const branch = await git.getCurrentBranch();
@@ -122,7 +142,7 @@ export async function runPr(
     try {
       remoteDefault = await deps.github.getDefaultBranch(repo.owner, repo.repo);
     } catch (err) {
-      console.error(
+      io.err(
         chalk.yellow(
           `⚠ Couldn't query the repository's default branch (${(err as Error).message}); assuming main. Pass --base or set baseBranch in .pritty.json.`,
         ),
@@ -134,14 +154,19 @@ export async function runPr(
     config: config.baseBranch,
     remoteDefault,
   });
+  if (options.json && baseSource !== 'flag' && baseSource !== 'config') {
+    throw new Error(
+      '--json needs --base <branch> (or baseBranch in .pritty.json) so an unattended run never inherits the repository default branch.',
+    );
+  }
   if (baseSource === 'remote') {
-    console.log(
+    say(
       chalk.dim(
         `Base ${effectiveBase} is the repository's default branch; set baseBranch in .pritty.json or pass --base to override.`,
       ),
     );
   }
-  console.log(
+  say(
     chalk.cyan(
       `Repository: ${repo.owner}/${repo.repo}  ${chalk.dim(`(${branch} → ${effectiveBase})`)}`,
     ),
@@ -152,33 +177,39 @@ export async function runPr(
   const open = await deps.github.listOpenPRs(repo.owner, repo.repo, branch, effectiveBase);
   if (open.length > 0) {
     const existing = open[0]!;
-    console.log(
+    say(
       chalk.yellow(
         `An open PR already exists for ${branch} → ${effectiveBase}: #${existing.number}`,
       ),
     );
-    console.log(chalk.green(`✓ ${existing.url}`));
-    return { number: existing.number, url: existing.url, created: false };
+    say(chalk.green(`✓ ${existing.url}`));
+    return finish({
+      number: existing.number,
+      url: existing.url,
+      created: false,
+      head: branch,
+      base: effectiveBase,
+    });
   }
 
   // 5. Commits since the base (against origin/<base> when the remote has it)
   const baseRef = await git.resolveBaseRef(effectiveBase);
   const commits = await git.log(baseRef);
   if (commits.length === 0) {
-    console.log(chalk.dim(`No commits between ${effectiveBase} and ${branch}. Nothing to PR.`));
+    say(chalk.dim(`No commits between ${effectiveBase} and ${branch}. Nothing to PR.`));
     return undefined;
   }
-  console.log(chalk.cyan(`Commits in PR (${commits.length}):`));
+  say(chalk.cyan(`Commits in PR (${commits.length}):`));
   for (const c of commits) {
-    console.log(`  ${chalk.dim(c.hash.slice(0, 7))}  ${c.subject}`);
+    say(`  ${chalk.dim(c.hash.slice(0, 7))}  ${c.subject}`);
   }
-  console.log('');
+  say('');
 
   // 6. Ticket context (may prompt), template, AI draft
-  const ticketCtx = await deps.ticket(config, branch, git);
+  const ticketCtx = await deps.ticket(config, branch, git, { interactive: !auto });
   const template = deps.template();
   if (template) {
-    console.log(
+    say(
       chalk.dim(
         `  (using PR template: ${template.path}${template.truncated ? ' — truncated' : ''})`,
       ),
@@ -202,17 +233,17 @@ export async function runPr(
   }
 
   // 7. Preview
-  console.log('');
-  console.log(chalk.bold.cyan(draft.title));
-  console.log('');
+  say('');
+  say(chalk.bold.cyan(draft.title));
+  say('');
   for (const line of draft.body.split('\n')) {
-    console.log(`  ${chalk.dim(line)}`);
+    say(`  ${chalk.dim(line)}`);
   }
   if (draft.labels.length > 0) {
-    console.log('');
-    console.log(`  ${chalk.dim('Labels: ')}${draft.labels.join(', ')}`);
+    say('');
+    say(`  ${chalk.dim('Labels: ')}${draft.labels.join(', ')}`);
   }
-  console.log('');
+  say('');
 
   // 7.5 Optional editor pass — default N so the wrap-up stays fast.
   if (!auto && !dryRun) {
@@ -227,7 +258,7 @@ export async function runPr(
       });
       const { title: nextTitle, body: nextBody } = splitTitleBody(edited);
       if (nextTitle.length === 0) {
-        console.log(chalk.yellow('⚠ Empty title — keeping original.'));
+        say(chalk.yellow('⚠ Empty title — keeping original.'));
       } else {
         draft = { ...draft, title: nextTitle, body: nextBody };
       }
@@ -236,9 +267,7 @@ export async function runPr(
 
   // 8. Dry-run stops here
   if (dryRun) {
-    console.log(
-      chalk.yellow('Dry-run — no push, no PR created. Re-run without --dry-run to apply.'),
-    );
+    say(chalk.yellow('Dry-run — no push, no PR created. Re-run without --dry-run to apply.'));
     return undefined;
   }
 
@@ -249,7 +278,7 @@ export async function runPr(
       default: true,
     });
     if (!ok) {
-      console.log(chalk.dim('Aborted.'));
+      say(chalk.dim('Aborted.'));
       return undefined;
     }
   }
@@ -286,9 +315,9 @@ export async function runPr(
   if (draft.labels.length > 0) {
     try {
       await deps.github.addLabels(repo.owner, repo.repo, result.number, draft.labels);
-      console.log(chalk.dim(`  Applied labels: ${draft.labels.join(', ')}`));
+      say(chalk.dim(`  Applied labels: ${draft.labels.join(', ')}`));
     } catch (err) {
-      console.error(chalk.yellow(`⚠ Couldn't apply labels: ${(err as Error).message}`));
+      io.err(chalk.yellow(`⚠ Couldn't apply labels: ${(err as Error).message}`));
     }
   }
 
@@ -311,14 +340,20 @@ export async function runPr(
           ...reviewers.users.map((u) => `@${u}`),
           ...reviewers.teams.map((t) => `@${repo.owner}/${t}`),
         ].join(', ');
-        console.log(chalk.dim(`  Requested reviewers: ${summary}`));
+        say(chalk.dim(`  Requested reviewers: ${summary}`));
       } catch (err) {
-        console.error(chalk.yellow(`⚠ Couldn't request reviewers: ${(err as Error).message}`));
+        io.err(chalk.yellow(`⚠ Couldn't request reviewers: ${(err as Error).message}`));
       }
     }
   }
 
-  console.log('');
-  console.log(chalk.green(`✓ ${result.url}`));
-  return { number: result.number, url: result.url, created: true };
+  say('');
+  say(chalk.green(`✓ ${result.url}`));
+  return finish({
+    number: result.number,
+    url: result.url,
+    created: true,
+    head: branch,
+    base: effectiveBase,
+  });
 }

@@ -1,4 +1,3 @@
-import { confirm, editor } from '@inquirer/prompts';
 import chalk from 'chalk';
 import ora from 'ora';
 import { type CommitMessage, generateCommitMessages } from '../ai.js';
@@ -7,6 +6,7 @@ import { loadConfig } from '../config.js';
 import { createGit } from '../git.js';
 import { splitTitleBody } from './_shared/format.js';
 import { reconcileCommitPlan } from './_shared/plan.js';
+import { confirm, editor } from './_shared/prompts.js';
 import { resolveTicketContext } from './_shared/ticket-context.js';
 
 export interface CommitOptions {
@@ -40,7 +40,7 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
   // any AI call when validate: true and branch lacks a ticket. Saves
   // an API roundtrip and gives instant feedback.
   const branch = await git.getCurrentBranch();
-  const ticketCtx = await resolveTicketContext(config, branch, git);
+  const ticketCtx = await resolveTicketContext(config, branch, git, { interactive: !auto });
 
   // 1. Find staged files
   const staged = await git.getStaged();

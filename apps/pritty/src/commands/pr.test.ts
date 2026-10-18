@@ -82,7 +82,13 @@ describe('runPr ordering', () => {
       openPRs: [{ number: 7, url: 'u', title: 't', head: 'feature/x', base: 'main' }],
     });
     const result = await runPr({ autoApprove: true }, f.deps);
-    expect(result).toEqual({ number: 7, url: 'u', created: false });
+    expect(result).toEqual({
+      number: 7,
+      url: 'u',
+      created: false,
+      head: 'feature/x',
+      base: 'main',
+    });
     expect(f.calls).not.toContain('generatePR');
     expect(f.calls).not.toContain('push');
     expect(f.calls).not.toContain('createPR');
@@ -108,6 +114,8 @@ describe('runPr ordering', () => {
       number: 42,
       url: 'https://github.com/acme/app/pull/42',
       created: true,
+      head: 'feature/x',
+      base: 'main',
     });
     const order = f.calls.filter((c) =>
       ['assertToken', 'listOpenPRs', 'generatePR', 'push', 'createPR'].includes(c),
@@ -145,5 +153,47 @@ describe('runPr honours config autoApprove', () => {
     const result = await runPr({}, f.deps);
     expect(result?.created).toBe(true);
     expect(asked).toEqual([]);
+  });
+});
+
+describe('runPr --json', () => {
+  it('writes exactly one JSON line to stdout and everything else to stderr', async () => {
+    const f = fakes({ config: { baseBranch: 'develop' } });
+    const out: string[] = [];
+    const err: string[] = [];
+    f.deps.io = { out: (s) => out.push(s), err: (s) => err.push(s) };
+    const result = await runPr({ json: true }, f.deps);
+    expect(out).toHaveLength(1);
+    expect(JSON.parse(out[0]!)).toEqual({
+      number: 42,
+      url: 'https://github.com/acme/app/pull/42',
+      created: true,
+      head: 'feature/x',
+      base: 'develop',
+    });
+    expect(err.length).toBeGreaterThan(0);
+    expect(result?.created).toBe(true);
+  });
+
+  it('implies auto-approve', async () => {
+    const f = fakes({ config: { baseBranch: 'develop' } });
+    const asked: string[] = [];
+    f.deps.io = { out: () => {}, err: () => {} };
+    f.deps.prompts = {
+      confirm: async (o) => {
+        asked.push(o.message);
+        return true;
+      },
+      editor: async (d) => d.default ?? '',
+    };
+    await runPr({ json: true }, f.deps);
+    expect(asked).toEqual([]);
+  });
+
+  it("refuses to inherit GitHub's default branch: --json needs --base or a configured baseBranch", async () => {
+    const f = fakes({ remoteDefault: 'main' });
+    f.deps.io = { out: () => {}, err: () => {} };
+    await expect(runPr({ json: true }, f.deps)).rejects.toThrow(/--base/);
+    expect(f.calls).not.toContain('push');
   });
 });

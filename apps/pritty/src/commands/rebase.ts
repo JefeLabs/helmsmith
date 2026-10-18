@@ -1,4 +1,3 @@
-import { confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
 import ora from 'ora';
 import { generateRebasePlan, type RebasePlan } from '../ai.js';
@@ -6,6 +5,7 @@ import { loadConfig } from '../config.js';
 import { createGit } from '../git.js';
 import { resolveBaseBranch } from './_shared/base.js';
 import { colorAction, renderRebaseTodo } from './_shared/format.js';
+import { confirm } from './_shared/prompts.js';
 
 export interface RebaseOptions {
   strategy?: string;
