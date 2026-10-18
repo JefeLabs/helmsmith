@@ -54,9 +54,30 @@ describe('renderRebaseTodo', () => {
     ).toBe('pick aaaa\nfixup bbbb\n');
   });
 
-  it('shell-quotes messages with quotes and newlines', () => {
-    expect(
-      renderRebaseTodo([{ hash: 'aaaa', action: 'reword', message: "fix: don't\n\nbody $x" }]),
-    ).toBe("pick aaaa\nexec git commit --amend -m 'fix: don'\\''t\n\nbody $x'\n");
+  it('shell-quotes a one-line message', () => {
+    expect(renderRebaseTodo([{ hash: 'aaaa', action: 'reword', message: "fix: don't $x" }])).toBe(
+      "pick aaaa\nexec git commit --amend -m 'fix: don'\\''t $x'\n",
+    );
+  });
+
+  it('keeps a multi-line message on one todo line, decoded by printf at run time', () => {
+    const out = renderRebaseTodo([
+      { hash: 'aaaa', action: 'reword', message: 'fix: subject\n\nbody with \\ and %s' },
+    ]);
+    expect(out.split('\n').filter(Boolean)).toHaveLength(2);
+    expect(out).toBe(
+      "pick aaaa\nexec git commit --amend -m \"$(printf '%b' 'fix: subject\\n\\nbody with \\\\ and %s')\"\n",
+    );
+  });
+
+  it('never lets a message or hash break out of its todo line', () => {
+    const out = renderRebaseTodo([
+      { hash: 'aaaa', action: 'reword', message: "x'\nexec rm -rf /" },
+      { hash: 'bbbb', action: 'pick' },
+    ]);
+    const lines = out.split('\n').filter(Boolean);
+    expect(lines).toHaveLength(3);
+    expect(lines.filter((l) => l.startsWith('exec'))).toHaveLength(1);
+    expect(lines[2]).toBe('pick bbbb');
   });
 });

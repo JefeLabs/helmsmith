@@ -209,3 +209,23 @@ describe('GitOps ranges against a base that moved after the branch point', () =>
     expect(await createGit(dir).resolveBaseRef('nope')).toBe('nope');
   });
 });
+
+describe('GitOps.rebaseWithPlan with a rendered multi-line message', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('applies the whole message, body included', async () => {
+    const r = makeRepo();
+    cleanup = r.cleanup;
+    commitFile(r.dir, 'f1', '1\n', 'c1');
+    const hash = gitIn(r.dir, 'rev-parse', 'HEAD').trim();
+    const { renderRebaseTodo } = await import('./commands/_shared/format.js');
+    const message = "fix: don't break\n\nSecond paragraph with 100% and a \\ backslash.";
+    const todo = renderRebaseTodo([{ hash, action: 'reword', message }]);
+
+    const result = await createGit(r.dir).rebaseWithPlan('HEAD~1', todo);
+
+    expect(result).toMatchObject({ ok: true });
+    expect(gitIn(r.dir, 'log', '-1', '--format=%B').trimEnd()).toBe(message);
+  });
+});

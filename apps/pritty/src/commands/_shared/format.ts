@@ -1,9 +1,20 @@
 import chalk from 'chalk';
 import type { RebaseStep } from '../../ai.js';
 
-/** POSIX single-quote: safe for any text, newlines included. */
+/** POSIX single-quote: safe for any text. */
 function shQuote(text: string): string {
   return `'${text.replace(/'/g, `'\\''`)}'`;
+}
+
+/**
+ * The `-m <message>` argument for an exec line. A todo file is line-based, so
+ * the message must never contain a newline: a multi-line message is encoded
+ * with backslash escapes and decoded by `printf '%b'` when the line runs.
+ */
+function execMessageArg(message: string): string {
+  if (!/[\r\n]/.test(message)) return shQuote(message);
+  const encoded = message.replace(/\\/g, '\\\\').replace(/\r/g, '\\r').replace(/\n/g, '\\n');
+  return `"$(printf '%b' ${shQuote(encoded)})"`;
 }
 
 /**
@@ -19,7 +30,8 @@ export function renderRebaseTodo(steps: readonly RebaseStep[]): string {
   const lines: string[] = [];
   let runMessage: string | undefined;
   const closeRun = (): void => {
-    if (runMessage !== undefined) lines.push(`exec git commit --amend -m ${shQuote(runMessage)}`);
+    if (runMessage !== undefined)
+      lines.push(`exec git commit --amend -m ${execMessageArg(runMessage)}`);
     runMessage = undefined;
   };
   for (const step of steps) {

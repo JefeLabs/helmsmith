@@ -431,13 +431,13 @@ export async function generateRebasePlan(
     throw new Error(`AI returned malformed rebase plan: missing steps[]`);
   }
 
-  validateRebasePlan(
-    plan.steps as RebaseStep[],
+  const steps = validateRebasePlan(
+    plan.steps as { hash?: string; action?: string; message?: string; rationale?: string }[],
     ordered.map((c) => c.hash),
   );
 
   return {
-    steps: plan.steps as RebaseStep[],
+    steps,
     summary: typeof plan.summary === 'string' ? plan.summary : '',
   };
 }
@@ -446,30 +446,42 @@ const REBASE_ACTIONS: readonly RebaseAction[] = ['pick', 'reword', 'squash', 'fi
 
 /**
  * A plan must use every input commit exactly once (a step may abbreviate the
- * hash), in any order, with a valid action, and open with `pick`. Length and
- * membership alone would accept a plan that repeats one commit and silently
- * drops another.
+ * hash to a hex prefix of at least four characters), in any order, with a
+ * valid action, and open with `pick`. Returns the steps with canonical full
+ * hashes, so nothing the model wrote reaches the todo file except the message,
+ * which the renderer quotes. Length and membership alone would accept a plan
+ * that repeats one commit and silently drops another.
  */
 export function validateRebasePlan(
-  steps: readonly { hash?: string; action?: string }[],
+  steps: readonly { hash?: string; action?: string; message?: string; rationale?: string }[],
   inputHashes: readonly string[],
-): void {
+): RebaseStep[] {
   if (steps.length !== inputHashes.length) {
     throw new Error(
       `Plan has ${steps.length} steps but rebase covers ${inputHashes.length} commits.`,
     );
   }
   const used = new Map<string, number>();
+  const out: RebaseStep[] = [];
   for (let i = 0; i < steps.length; i++) {
     const s = steps[i]!;
-    const full = s.hash
-      ? inputHashes.find((h) => h.startsWith(s.hash as string) || (s.hash as string).startsWith(h))
-      : undefined;
-    if (!full) throw new Error(`Plan step ${i + 1} references unknown hash: ${s.hash}`);
+    const prefix =
+      typeof s.hash === 'string' && /^[0-9a-f]{4,40}$/.test(s.hash) ? s.hash : undefined;
+    const matches = prefix ? inputHashes.filter((h) => h.startsWith(prefix)) : [];
+    if (matches.length !== 1) {
+      throw new Error(`Plan step ${i + 1} references unknown hash: ${JSON.stringify(s.hash)}`);
+    }
+    const full = matches[0]!;
     used.set(full, (used.get(full) ?? 0) + 1);
     if (!REBASE_ACTIONS.includes(s.action as RebaseAction)) {
       throw new Error(`Plan step ${i + 1} has invalid action: ${s.action}`);
     }
+    out.push({
+      hash: full,
+      action: s.action as RebaseAction,
+      ...(typeof s.message === 'string' ? { message: s.message } : {}),
+      ...(typeof s.rationale === 'string' ? { rationale: s.rationale } : {}),
+    });
   }
   const missing = inputHashes.filter((h) => !used.has(h));
   const repeated = [...used.entries()].filter(([, n]) => n > 1).map(([h]) => h);
@@ -478,9 +490,10 @@ export function validateRebasePlan(
       `Plan must use every commit exactly once: missing ${missing.map((h) => h.slice(0, 7)).join(', ') || 'none'}; repeated ${repeated.map((h) => h.slice(0, 7)).join(', ') || 'none'}.`,
     );
   }
-  if (steps[0]!.action !== 'pick') {
+  if (out[0]!.action !== 'pick') {
     throw new Error(
-      `Plan's first step must be 'pick' (got '${steps[0]!.action}'). git rebase rejects squash/fixup with no parent.`,
+      `Plan's first step must be 'pick' (got '${out[0]!.action}'). git rebase rejects squash/fixup with no parent.`,
     );
   }
+  return out;
 }
