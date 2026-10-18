@@ -1,3 +1,4 @@
+import chalk from 'chalk';
 import {
   claimRanges,
   currentOwner,
@@ -7,8 +8,7 @@ import {
   Registry,
   startServices,
   stopServices,
-} from '@helmsmith/workkit';
-import chalk from 'chalk';
+} from '../core/index.js';
 import type { Ctx } from './effort.js';
 import { storybrokrCli } from './storybrokr.js';
 

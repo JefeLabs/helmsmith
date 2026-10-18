@@ -2,9 +2,9 @@ import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { currentOwner, ensureExcluded, Git, Registry, validateManifest } from '@helmsmith/workkit';
-import { commitFile, makeRepo } from '@helmsmith/workkit/testing';
 import { afterEach, describe, expect, it } from 'vitest';
+import { currentOwner, ensureExcluded, Git, Registry, validateManifest } from '../core/index.js';
+import { commitFile, makeRepo } from '../core/testing/index.js';
 import {
   auditProject,
   type Ctx,

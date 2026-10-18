@@ -1,11 +1,11 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { currentOwner, Registry, validateManifest } from '@helmsmith/workkit';
-import { makeRepo } from '@helmsmith/workkit/testing';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { afterEach, describe, expect, it } from 'vitest';
+import { currentOwner, Registry, validateManifest } from '../core/index.js';
+import { makeRepo } from '../core/testing/index.js';
 import type { Ctx } from '../lib/effort.js';
 import { buildMcpServer } from './server.js';
 

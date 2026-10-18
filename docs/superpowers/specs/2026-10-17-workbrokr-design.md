@@ -1,7 +1,7 @@
 # workbrokr — area-based work initiation, slots and lifecycle (design)
 
 **Status:** approved in conversation 2026-10-17, written for planning.
-**Home:** this monorepo. Packages: `platform/core/workkit-lib` publishes `@helmsmith/workkit` (the shared core; the conventions drop the `-lib` suffix from the package name) and `apps/workbrokr` publishes `@helmsmith/workbrokr` with bins `workbrokr` and `work`. The first adopter is skoolscout-com, which holds the tooling being extracted (`slot.mk`, `stackbrokr.config.ts`, its `docs/superpowers/specs/2026-09-20-parallel-slots-design.md`); a copy of this spec sits there untracked.
+**Home:** this monorepo. Package: `apps/workbrokr` publishes `@helmsmith/workbrokr` with bins `workbrokr` and `work`; the core described below as `workkit` lives inside it at `apps/workbrokr/src/core` (amendment 14: it was briefly a separate `@helmsmith/workkit` package, folded back on 2026-10-18 before its first publish). The first adopter is skoolscout-com, which holds the tooling being extracted (`slot.mk`, `stackbrokr.config.ts`, its `docs/superpowers/specs/2026-09-20-parallel-slots-design.md`); a copy of this spec sits there untracked.
 **Owner's rules this design encodes:** no work is ever done on `develop`; one worktree per area; branch names are `<type>/<area>`; every effort starts from the latest `develop`; cross-cutting work never stops section work; impact notices are informational only.
 
 ---
@@ -350,6 +350,7 @@ The weekly list of what would otherwise be forgotten: areas with uncommitted or 
 11. (phase 1 execution) Frontend mode leases no Storybook port: `storybrokr up` has no `--port`, so the lease records the instance id and the port storybrokr chose. Phase 3 unifies this.
 12. (phase 1 execution) Impact notices are commons-based ("commons X changed on branch Y"); the import-graph version stays in "later, optional".
 13. (phase 1 execution) The emitted `.slot`, env file, log dir and the worktree root are excluded from git through the clone's `info/exclude`, not `.gitignore`, so `finish --park` never commits them.
+14. **No separate workkit package (owner, 2026-10-18).** storybrokr stays independent (phase 3 as written is dropped; `work audit` should instead warn when storybrokr's port range overlaps a claimed project range), so workbrokr is workkit's only consumer. The core is folded into `apps/workbrokr/src/core`; one package, one publish. A second consumer would be the trigger to extract it again.
 
 ## 17. Open questions
 

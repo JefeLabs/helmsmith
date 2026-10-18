@@ -92,7 +92,7 @@ export function ensureExcluded(worktree: string, patterns: string[]): void {
   if (missing.length === 0) return;
   appendFileSync(
     file,
-    `${present.size ? '\n' : ''}# written by @helmsmith/workkit: per-worktree config and logs\n${missing.join('\n')}\n`,
+    `${present.size ? '\n' : ''}# written by @helmsmith/workbrokr: per-worktree config and logs\n${missing.join('\n')}\n`,
   );
 }
 

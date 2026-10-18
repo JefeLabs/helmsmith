@@ -1,6 +1,6 @@
-import type { Lease } from '@helmsmith/workkit';
 import chalk from 'chalk';
 import type { Command } from 'commander';
+import type { Lease } from '../core/index.js';
 import { buildCtx } from '../lib/context.js';
 import { type StatusReport, statusFor } from '../lib/effort.js';
 import { fail, printJson } from './_shared/output.js';

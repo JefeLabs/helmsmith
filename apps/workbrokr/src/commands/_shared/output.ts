@@ -1,5 +1,5 @@
-import { exitCodeFor, toErrorBody } from '@helmsmith/workkit';
 import chalk from 'chalk';
+import { exitCodeFor, toErrorBody } from '../../core/index.js';
 
 export function printJson(value: unknown): void {
   console.log(JSON.stringify(value, null, 2));

@@ -2,8 +2,8 @@ import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { commitFile, gitIn, makeRepo } from '@helmsmith/workkit/testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { commitFile, gitIn, makeRepo } from '../../src/core/testing/index.js';
 import { APP_ROOT, makeHome, runCli } from './helpers.js';
 
 /** The hook scripts exec `workbrokr` from PATH; point it at this checkout's bin. */

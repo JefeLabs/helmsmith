@@ -1,5 +1,5 @@
-import { WorkkitError } from '@helmsmith/workkit';
 import type { Command } from 'commander';
+import { WorkkitError } from '../core/index.js';
 import { buildCtx } from '../lib/context.js';
 import { effortEnv, slotEnv } from '../lib/effort.js';
 import { fail, printJson } from './_shared/output.js';

@@ -1,5 +1,7 @@
 import { readFileSync, realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
+import chalk from 'chalk';
+import type { Command } from 'commander';
 import {
   checkCommit,
   checkPush,
@@ -10,9 +12,7 @@ import {
   loadManifest,
   Registry,
   WorkkitError,
-} from '@helmsmith/workkit';
-import chalk from 'chalk';
-import type { Command } from 'commander';
+} from '../core/index.js';
 import { fail, printJson } from './_shared/output.js';
 
 const ZEROS = /^0+$/;
