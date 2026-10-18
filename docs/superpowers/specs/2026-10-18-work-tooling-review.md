@@ -10,7 +10,7 @@ The three tools are in very different states.
 
 - **workbrokr** works for the happy path that was proven live on skoolscout, but one bug is a silent data-loss defect that fires on every `work start` there: the submodule repair runs `git checkout -f` against the **main checkout's** submodules (W1). Four more high-severity defects leave efforts stuck or slots double-leased when a start is killed, a push is rejected, a sync conflict is resolved, or a stack is running on a wildcard address (W2–W5). The reaper the spec relies on never runs on its own (W6).
 - **storybrokr** implements Spec 2 mostly as written, but two scoping holes defeat its purpose: `down --all --host` stops every instance on the machine, and `up` ignores `STORYBROKR_HOST` in both the CLI and the MCP server (S1–S2). A repeat `up` never applies the lease's TTL, so "TTL equals the lease" does not hold (S3). Daemon-restart adoption is unreliable (S4).
-- **pritty** cannot run from its built output (`openai` is imported but not declared), `commit` commits working-tree content instead of the index, `rebase` never reaches git because simple-git blocks the editor variable, and `pr` lists the wrong commit range (P1–P4). None of its three commands has a test.
+- **pritty** could not run from its built output (`openai` imported but not declared), `commit` committed working-tree content instead of the index, `rebase` never reached git because simple-git blocks the editor variable, and `pr` listed the wrong commit range (P1–P4). None of its three commands had a test. **P1–P6 are fixed on `main` as of 2026-10-18 (§5.1a), unpublished.**
 - **§18 Amendment A** names four functions that do not exist, prescribes a `git log` range that reproduces P4, specifies a closed-PR check that cannot be implemented without creating a PR, and omits the packaging facts (Bun runtime, undeclared and unpublished dependencies) that gate "publish 0.1.0".
 
 The pattern across all three is the same one the flow-spec review found in August: the surface (flags, config keys, spec sections) is wider than what the code does, and the gaps sit exactly where no test runs.
@@ -127,6 +127,19 @@ The pattern across all three is the same one the flow-spec review found in Augus
 | P10 | Medium | `src/config.ts:108-119`, `src/pr-template.ts:52`, `src/codeowners.ts:51` | Config, template and CODEOWNERS are read from `cwd`, not the repo root; from a subdirectory pritty silently uses defaults. `preCommit`, `prePush`, `skipHooks`, `autoApprove`, `dryRun`, `verbose` are parsed and **never read** (`pritty init` writes hooks that never run; README row says ⏳). | grep |
 | P11 | Medium | `src/ai.ts:219` | The first 12,000 chars of the staged diff go to the provider unredacted (a staged `.env` reaches it); no timeout or abort signal on `adapter.invoke`. | reviewer traced |
 | P12 | Low | `src/categorizer.ts:24`; `src/git.ts:75-78` | Default category order puts `src/**` first, so `src/foo.test.ts` and `src/x.stories.tsx` land in `app`. On a detached HEAD `getCurrentBranch` returns a short SHA: `pr` pushes it; `rebase` passes the protected-branch check. | reviewer ran |
+
+### 5.1a Fixed 2026-10-18 (commits on `main`, unpublished)
+
+| # | Commit | What changed |
+|---|---|---|
+| P1 | 32e8a52 | `openai` declared; private workspace packages moved to devDependencies; unused `@langchain/core` and `cli-table3` dropped; build code-split so the TUI is a lazily loaded chunk and `dist/cli.js` loads under plain Node; the bin re-execs under Bun only for `connect`. `src/packaging.test.ts` builds once and checks imports, private deps and Node startup with `NODE_PATH` scrubbed (pnpm's hoisted store on `NODE_PATH` had hidden the missing dependency inside the test runner). |
+| P2 | 72a6287 | `git.commit(message, files)` commits index content through a temporary index with `GIT_INDEX_FILE`, so hooks still run, other staged paths stay staged, and an empty subset is refused. `reconcileCommitPlan` replaces the model's file lists with the categorizer's and rejects unknown, repeated or missing categories. |
+| P3 | 43143cb, 3f85982 | `rebaseWithPlan` runs git directly with `GIT_SEQUENCE_EDITOR` and `GIT_EDITOR=true`; messages are applied with one-line `exec git commit --amend` steps (multi-line messages encoded for `printf '%b'`); `validateRebasePlan` requires every commit exactly once, accepts only hex prefixes, and returns canonical hashes. **Owner's rule the same day: rebase is a last resort, prefer a merge commit; no further investment in `pritty rebase` beyond keeping it honest and safe.** |
+| P4 | cca606c | `log` uses `base..head`, `changedFilesBetween` uses `base...head`; new `resolveBaseRef` prefers `origin/<base>` when the remote has it; `pr` and `rebase` compare against it. |
+| P5 | 6697942 | `baseBranch` is optional in the schema and absent from the starter config; `resolveBaseBranch` orders flag, config, repository default, `main`; `pr` queries GitHub for the default only when neither flag nor config names a base. |
+| P6 | 406f527 | `runPr` resolves the token first, then returns an existing open PR for the same head and base instead of creating another (a failed lookup is fatal), then lists commits, drafts, confirms, pushes and creates; detached HEAD refused; `process.exit` replaced by thrown errors; dependencies injectable, order asserted with recording fakes. |
+
+Still open from §5.1: P7 (token order and the `read:user` Copilot scope, token in a remote URL printed to stderr), P8 renames, P9 `--json` and non-interactive gaps, P10 repo-root config lookup and dead config keys, P11 unredacted diff and no timeout, P12 default category order. These are the §18.2 prerequisites' remaining ground.
 
 ### 5.2 Tests
 
