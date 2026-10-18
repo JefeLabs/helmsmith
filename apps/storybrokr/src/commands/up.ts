@@ -31,23 +31,38 @@ export async function runUp(
   });
 }
 
+/**
+ * Where the component lives: `--host` wins, then `STORYBROKR_HOST` (set by
+ * `work env` inside a worktree, so an MCP server or shell whose cwd is the
+ * main checkout still targets the worktree), then the walk up from the path
+ * to the nearest `.storybook/`.
+ */
+export function resolveUpTarget(
+  path: string,
+  host: string | undefined,
+  env: Record<string, string | undefined> = process.env,
+): { component: string; hostRoot: string } {
+  const component = path.replace(/\/+$/, '');
+  if (host) return { component, hostRoot: resolve(host) };
+  const envHost = env.STORYBROKR_HOST?.trim();
+  if (envHost) return { component, hostRoot: resolve(envHost) };
+  return resolveComponent(path);
+}
+
 export function registerUp(program: Command, connect: () => Promise<DaemonClient>): void {
   program
     .command('up <path>')
     .description('Boot (or reuse) a single-component Storybook for the component at <path>')
     .option(
       '--host <dir>',
-      'host repo root (default: walk up from <path> to the nearest .storybook/)',
+      'host repo root (default: $STORYBROKR_HOST, else walk up from <path> to the nearest .storybook/)',
     )
     .option(
       '--ttl <minutes>',
       'idle minutes before the instance is reaped; 0 = never',
       parseNonNegativeNumber,
     )
-    .option(
-      '--include-children',
-      'also include stories of transitively imported child components',
-    )
+    .option('--include-children', 'also include stories of transitively imported child components')
     .option(
       '--no-wait',
       'return as soon as the instance is registered instead of waiting for ready',
@@ -65,9 +80,7 @@ export function registerUp(program: Command, connect: () => Promise<DaemonClient
         },
       ) => {
         try {
-          const target = o.host
-            ? { component: path.replace(/\/+$/, ''), hostRoot: resolve(o.host) }
-            : resolveComponent(path);
+          const target = resolveUpTarget(path, o.host);
           const client = await connect();
           const { record } = await runUp(client, {
             ...target,

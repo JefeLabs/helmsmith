@@ -48,11 +48,7 @@ export function buildMcpServer(connect: () => Promise<DaemonClient>): McpServer 
           .string()
           .optional()
           .describe('Host repo root; default walks up from component to the nearest .storybook/'),
-        ttlMinutes: z
-          .number()
-          .min(0)
-          .optional()
-          .describe('Idle minutes before reaping; 0 = never'),
+        ttlMinutes: z.number().min(0).optional().describe('Idle minutes before reaping; 0 = never'),
         includeChildren: z
           .boolean()
           .optional()
@@ -64,8 +60,13 @@ export function buildMcpServer(connect: () => Promise<DaemonClient>): McpServer 
     },
     async ({ component, hostRoot, ttlMinutes, includeChildren, wait }) =>
       guard(async () => {
+        const envHost = process.env.STORYBROKR_HOST?.trim();
         const target =
-          hostRoot === undefined ? resolveComponent(component) : { component, hostRoot };
+          hostRoot !== undefined
+            ? { component, hostRoot }
+            : envHost
+              ? { component, hostRoot: envHost }
+              : resolveComponent(component);
         return (await connect()).up({
           ...target,
           ttlMinutes,

@@ -185,3 +185,21 @@ describe('MCP server', () => {
     });
   });
 });
+
+describe('storybrokr_up and STORYBROKR_HOST', () => {
+  const saved = process.env.STORYBROKR_HOST;
+  afterEach(() => {
+    if (saved === undefined) delete process.env.STORYBROKR_HOST;
+    else process.env.STORYBROKR_HOST = saved;
+  });
+
+  it('uses STORYBROKR_HOST when the call gives no hostRoot', async () => {
+    process.env.STORYBROKR_HOST = '/env-host';
+    const up = vi.fn(async () => ({ record: rec, created: true }));
+    const client = await connected({ up } as unknown as Partial<DaemonClient>);
+    await client.callTool({ name: 'storybrokr_up', arguments: { component: 'src/Button' } });
+    expect(up).toHaveBeenCalledWith(
+      expect.objectContaining({ component: 'src/Button', hostRoot: '/env-host' }),
+    );
+  });
+});

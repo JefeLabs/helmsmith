@@ -34,3 +34,21 @@ describe('runUp', () => {
     expect(out).toEqual({ record: rec, created: true });
   });
 });
+
+describe('resolveUpTarget', () => {
+  it('prefers --host, then STORYBROKR_HOST, then the cwd walk', async () => {
+    const { resolveUpTarget } = await import('./up.js');
+    const { resolve } = await import('node:path');
+    expect(resolveUpTarget('src/Button', '/explicit', { STORYBROKR_HOST: '/env' })).toEqual({
+      component: 'src/Button',
+      hostRoot: resolve('/explicit'),
+    });
+    expect(resolveUpTarget('src/Button/', undefined, { STORYBROKR_HOST: '/env' })).toEqual({
+      component: 'src/Button',
+      hostRoot: resolve('/env'),
+    });
+    expect(() => resolveUpTarget('/nonexistent/path/x', undefined, {})).toThrow(
+      /HOST_NOT_FOUND|no \.storybook/,
+    );
+  });
+});
