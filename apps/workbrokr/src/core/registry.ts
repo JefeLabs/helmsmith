@@ -25,8 +25,10 @@ import type {
 export const newId = (prefix: string) => `${prefix}_${randomBytes(4).toString('hex')}`;
 
 const EMPTY: RegistryFile = { version: 1, projects: {}, leases: [], efforts: [] };
-const LOCK_STALE_MS = 30_000;
-const LOCK_WAIT_MS = 5_000;
+// The lock is held for microseconds, so anything older than the stale threshold belongs to a
+// dead process; the wait must exceed it, or every command fails for the gap between the two.
+const LOCK_STALE_MS = 10_000;
+const LOCK_WAIT_MS = 15_000;
 
 /** Synchronous sleep: the lock is held for microseconds, so a busy wait with a pause is fine. */
 function sleep(ms: number): void {
@@ -86,7 +88,11 @@ export class Registry {
       } catch {
         try {
           if (Date.now() - statSync(lock).mtimeMs > LOCK_STALE_MS) {
-            rmSync(lock, { recursive: true, force: true });
+            // claim the stale lock by renaming it: two waiters cannot both win the rename,
+            // so neither deletes a fresh lock the other just took
+            const claimed = `${lock}.stale.${process.pid}.${Date.now()}`;
+            renameSync(lock, claimed);
+            rmSync(claimed, { recursive: true, force: true });
             continue;
           }
         } catch {
@@ -223,7 +229,7 @@ export class Registry {
       if (slot < 0) {
         throw new WorkkitError(
           'NO_FREE_SLOT',
-          `no free slot in ${project} (0..${m.slots.count - 1}, reserved ${[...reserved].join(',')})`,
+          `no free slot in ${project} (0..${m.slots.count - 1}, reserved ${[...reserved].join(',')}): \`work status\` lists the efforts holding them; \`work finish\` or \`work reap\` frees one`,
         );
       }
       const lease = this.lease(

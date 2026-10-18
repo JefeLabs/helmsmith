@@ -193,3 +193,23 @@ describe('Registry', () => {
     expect(r.notices('demo', 'shop/team')).toEqual([]);
   });
 });
+
+describe('W13: registry lock liveness', () => {
+  it('reclaims a stale lock within the wait instead of failing every command for longer than it waits', async () => {
+    const { mkdirSync, mkdtempSync, utimesSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { lockDir } = await import('./paths.js');
+    const home = mkdtempSync(join(tmpdir(), 'wk-lock-'));
+    const r = Registry.open(home);
+    r.upsertProject('p', { root: '/p', ranges: {} });
+    const lock = lockDir(home);
+    mkdirSync(lock, { recursive: true });
+    const old = new Date(Date.now() - 12_000);
+    utimesSync(lock, old, old);
+    const started = Date.now();
+    r.upsertProject('p', { root: '/p2', ranges: {} });
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(r.project('p')?.root).toBe('/p2');
+  });
+});
