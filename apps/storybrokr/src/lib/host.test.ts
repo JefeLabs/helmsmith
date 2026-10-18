@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -31,7 +31,7 @@ function makeHost(
     );
   }
   mkdirSync(join(root, 'src', 'components', 'button'), { recursive: true });
-  return root;
+  return realpathSync(root);
 }
 
 describe('host', () => {
@@ -60,8 +60,7 @@ describe('host', () => {
     // main.* config, sitting above a real host.
     mkdirSync(join(root, '.storybook'));
     writeFileSync(join(root, '.storybook', 'settings.json'), '{}');
-    const proj = join(root, 'proj');
-    makeHost({}, proj);
+    const proj = makeHost({}, join(root, 'proj'));
     mkdirSync(join(root, 'other'), { recursive: true });
     expect(findHostRoot(join(proj, 'src', 'components', 'button'))).toBe(proj);
     expect(findHostRoot(join(root, 'other'))).toBeNull();
@@ -127,5 +126,19 @@ describe('host', () => {
         "framework: { name: getAbsolutePath('@storybook/react-webpack5'), options: {} }",
       ),
     ).toBe('@storybook/react-webpack5');
+  });
+
+  it('normalizes symlinked host roots to realpathSync in findHostRoot and inspectHost', () => {
+    const fs = require('node:fs') as typeof import('node:fs');
+    const root = makeHost();
+    dirs.push(root);
+    const linkParent = mkdtempSync(join(tmpdir(), 'sb-link-'));
+    dirs.push(linkParent);
+    const linkPath = join(linkParent, 'linked-host');
+    fs.symlinkSync(root, linkPath, 'dir');
+
+    const expectedReal = fs.realpathSync(root);
+    expect(findHostRoot(join(linkPath, 'src', 'components', 'button'))).toBe(expectedReal);
+    expect(inspectHost(linkPath).hostRoot).toBe(expectedReal);
   });
 });

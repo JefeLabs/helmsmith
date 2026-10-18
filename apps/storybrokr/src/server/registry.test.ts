@@ -139,4 +139,31 @@ describe('Registry', () => {
     reg.load();
     expect(reg.list().map((r) => r.id)).toEqual(['ok']);
   });
+
+  it('resolves across multiple hosts using explicit host, hint, or throws INSTANCE_AMBIGUOUS on ties', () => {
+    const reg = new Registry({ home: home(), config: DEFAULT_CONFIG });
+    reg.add(rec('a1', { hostRoot: '/wt-a/app-ui', component: 'src/Button', port: 6100 }));
+    reg.add(rec('b1', { hostRoot: '/wt-b/app-ui', component: 'src/Button', port: 6101 }));
+    reg.add(rec('u1', { hostRoot: '/wt-a/app-ui', component: 'src/Unique', port: 6102 }));
+
+    // 1. Explicit host is authoritative
+    expect(reg.resolve('src/Button', { host: '/wt-b/app-ui' }).id).toBe('b1');
+    expect(() => reg.resolve('src/Button', { host: '/wt-c/app-ui' })).toThrow(/INSTANCE_NOT_FOUND|no instance/);
+
+    // 2. Hint prefers matching host, but falls back to unique global match when hint misses
+    expect(reg.resolve('src/Button', { hint: '/wt-b/app-ui' }).id).toBe('b1');
+    expect(reg.resolve('src/Unique', { hint: '/wt-c/app-ui' }).id).toBe('u1');
+
+    // 3. Unscoped (or missed hint) with multiple matches throws INSTANCE_AMBIGUOUS
+    try {
+      reg.resolve('src/Button');
+      expect.fail('expected INSTANCE_AMBIGUOUS');
+    } catch (e) {
+      const err = e as StorybrokrError;
+      expect(err.code).toBe('INSTANCE_AMBIGUOUS');
+      expect(err.status).toBe(409);
+      expect(err.message).toContain('a1 @ /wt-a/app-ui');
+      expect(err.message).toContain('b1 @ /wt-b/app-ui');
+    }
+  });
 });

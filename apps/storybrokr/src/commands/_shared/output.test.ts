@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { InvalidArgumentError } from 'commander';
@@ -10,6 +10,7 @@ import {
   printInstance,
   printInstanceTable,
   resolveComponent,
+  resolveTarget,
 } from './output.js';
 
 const rec: InstanceRecord = {
@@ -42,6 +43,7 @@ describe('output', () => {
   const dirs: string[] = [];
   afterEach(() => {
     vi.restoreAllMocks();
+    delete process.env.STORYBROKR_HOST;
     for (const d of dirs) rmSync(d, { recursive: true, force: true });
   });
 
@@ -66,13 +68,63 @@ describe('output', () => {
     mkdirSync(join(root, '.storybook'));
     writeFileSync(join(root, '.storybook', 'main.ts'), 'export default {};\n');
     mkdirSync(join(root, 'src', 'Button'), { recursive: true });
+    const realRoot = realpathSync(root);
     expect(resolveComponent(join(root, 'src', 'Button'))).toEqual({
       component: 'src/Button',
-      hostRoot: root,
+      hostRoot: realRoot,
     });
     const cwd = vi.spyOn(process, 'cwd').mockReturnValue(join(root, 'src'));
-    expect(resolveComponent('Button')).toEqual({ component: 'src/Button', hostRoot: root });
+    expect(resolveComponent('Button')).toEqual({ component: 'src/Button', hostRoot: realRoot });
     cwd.mockRestore();
+  });
+
+  it('resolveTarget handles 12-hex id, explicit --host, STORYBROKR_HOST, cwd inside host, and bare string outside host', () => {
+    const root = mkdtempSync(join(tmpdir(), 'sb-target-'));
+    dirs.push(root);
+    mkdirSync(join(root, '.storybook'));
+    writeFileSync(join(root, '.storybook', 'main.ts'), 'export default {};\n');
+    mkdirSync(join(root, 'src', 'Button'), { recursive: true });
+    const realRoot = realpathSync(root);
+
+    // 1. 12-hex id
+    expect(resolveTarget('a1b2c3d4e5f6')).toEqual({ idOrPath: 'a1b2c3d4e5f6' });
+    expect(resolveTarget('a1b2c3d4e5f6', root)).toEqual({
+      idOrPath: 'a1b2c3d4e5f6',
+      host: realRoot,
+    });
+
+    // 2. explicit --host
+    expect(resolveTarget('./src/Button/', root)).toEqual({
+      idOrPath: 'src/Button',
+      host: realRoot,
+    });
+    expect(resolveTarget(join(root, 'src', 'Button'), root)).toEqual({
+      idOrPath: 'src/Button',
+      host: realRoot,
+    });
+
+    // 3. STORYBROKR_HOST env
+    process.env.STORYBROKR_HOST = root;
+    expect(resolveTarget('src/Button/')).toEqual({
+      idOrPath: 'src/Button',
+      hint: realRoot,
+    });
+    delete process.env.STORYBROKR_HOST;
+
+    // 4. cwd inside host
+    const cwd = vi.spyOn(process, 'cwd').mockReturnValue(join(root, 'src'));
+    expect(resolveTarget('Button')).toEqual({
+      idOrPath: 'src/Button',
+      hint: realRoot,
+    });
+
+    // 5. cwd outside any host
+    const outside = mkdtempSync(join(tmpdir(), 'sb-outside-'));
+    dirs.push(outside);
+    cwd.mockReturnValue(outside);
+    expect(resolveTarget('./src/Button/')).toEqual({
+      idOrPath: 'src/Button',
+    });
   });
 
   it('parseNonNegativeNumber accepts finite numbers >= 0 (fractions allowed) and rejects the rest', () => {

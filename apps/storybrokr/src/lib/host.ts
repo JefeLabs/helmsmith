@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import type { HostInfo } from '../types.js';
 import { StorybrokrError } from './errors.js';
@@ -8,6 +8,16 @@ const MAIN_EXTS = ['ts', 'mts', 'js', 'mjs', 'cjs'];
 const PREVIEW_EXTS = ['tsx', 'ts', 'jsx', 'js', 'mjs'];
 
 export const MIN_STORYBOOK_MAJOR = 7;
+
+/** Resolve symlinks when the path exists on disk; fall back to path.resolve otherwise. */
+export function realpathOrResolve(p: string): string {
+  const abs = resolve(p);
+  try {
+    return realpathSync(abs);
+  } catch {
+    return abs;
+  }
+}
 
 function firstExisting(dir: string, base: string, exts: string[]): string | null {
   for (const ext of exts) {
@@ -23,9 +33,9 @@ function firstExisting(dir: string, base: string, exts: string[]): string | null
  * is not a host root — keep walking past it instead of misreporting HOST_INVALID.
  */
 export function findHostRoot(startPath: string): string | null {
-  let dir = resolve(startPath);
+  let dir = realpathOrResolve(startPath);
   for (;;) {
-    if (firstExisting(join(dir, '.storybook'), 'main', MAIN_EXTS)) return dir;
+    if (firstExisting(join(dir, '.storybook'), 'main', MAIN_EXTS)) return realpathOrResolve(dir);
     const parent = dirname(dir);
     if (parent === dir) return null;
     dir = parent;
@@ -45,7 +55,8 @@ export function detectFramework(mainSource: string): string {
   return helperForm ? helperForm[1] : 'unknown';
 }
 
-export function inspectHost(hostRoot: string): HostInfo {
+export function inspectHost(rawHostRoot: string): HostInfo {
+  const hostRoot = realpathOrResolve(rawHostRoot);
   const storybookDir = join(hostRoot, '.storybook');
   const mainFile = firstExisting(storybookDir, 'main', MAIN_EXTS);
   if (!mainFile) {
@@ -89,7 +100,7 @@ export function inspectHost(hostRoot: string): HostInfo {
 
 /** Resolve the host for a component path; an explicit root wins over walking up. */
 export function resolveHost(pathArg: string, explicitHostRoot?: string): HostInfo {
-  if (explicitHostRoot) return inspectHost(resolve(explicitHostRoot));
+  if (explicitHostRoot) return inspectHost(realpathOrResolve(explicitHostRoot));
   const start = isAbsolute(pathArg) ? pathArg : resolve(process.cwd(), pathArg);
   const root = findHostRoot(existsSync(start) ? start : dirname(start));
   if (!root) {

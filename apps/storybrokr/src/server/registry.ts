@@ -1,8 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { StorybrokrError } from '../lib/errors.js';
+import { realpathOrResolve } from '../lib/host.js';
 import { stateFile } from '../lib/paths.js';
-import type { DaemonConfig, InstanceRecord } from '../types.js';
+import type { DaemonConfig, InstanceRecord, ResolveScope } from '../types.js';
 
 interface StateFile {
   version: 1;
@@ -38,17 +39,45 @@ export class Registry {
   }
 
   find(hostRoot: string, component: string): InstanceRecord | undefined {
-    return this.list().find((r) => r.hostRoot === hostRoot && r.component === component);
+    const targetHost = realpathOrResolve(hostRoot);
+    return this.list().find(
+      (r) => realpathOrResolve(r.hostRoot) === targetHost && r.component === component,
+    );
   }
 
-  /** Accepts an instance id, or a component path (optionally scoped to a host). */
-  resolve(idOrPath: string, hostRoot?: string): InstanceRecord {
+  /** Accepts an instance id, or a component path (optionally scoped to a host or hint). */
+  resolve(idOrPath: string, scope?: ResolveScope | string): InstanceRecord {
     const byId = this.byId.get(idOrPath);
     if (byId) return byId;
-    const byPath = this.list().find(
-      (r) => r.component === idOrPath && (hostRoot === undefined || r.hostRoot === hostRoot),
-    );
-    if (byPath) return byPath;
+    const normScope: ResolveScope =
+      typeof scope === 'string' ? { host: scope } : (scope ?? {});
+    const all = this.list();
+    if (normScope.host !== undefined) {
+      const targetHost = realpathOrResolve(normScope.host);
+      const match = all.find(
+        (r) => r.component === idOrPath && realpathOrResolve(r.hostRoot) === targetHost,
+      );
+      if (match) return match;
+      throw new StorybrokrError(
+        'INSTANCE_NOT_FOUND',
+        `no instance matches ${idOrPath} in host ${targetHost}`,
+      );
+    }
+    if (normScope.hint !== undefined) {
+      const hintHost = realpathOrResolve(normScope.hint);
+      const hinted = all.find(
+        (r) => r.component === idOrPath && realpathOrResolve(r.hostRoot) === hintHost,
+      );
+      if (hinted) return hinted;
+    }
+    const matches = all.filter((r) => r.component === idOrPath);
+    if (matches.length === 1) return matches[0];
+    if (matches.length > 1) {
+      throw new StorybrokrError(
+        'INSTANCE_AMBIGUOUS',
+        `${idOrPath} is running in ${matches.length} hosts: ${matches.map((m) => `${m.id} @ ${m.hostRoot}`).join(', ')}; pass --host <dir> or an instance id`,
+      );
+    }
     throw new StorybrokrError('INSTANCE_NOT_FOUND', `no instance matches ${idOrPath}`);
   }
 

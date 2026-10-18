@@ -1,9 +1,9 @@
 import { existsSync } from 'node:fs';
-import { dirname, isAbsolute, relative, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import chalk from 'chalk';
 import { InvalidArgumentError } from 'commander';
 import { StorybrokrError, toErrorBody } from '../../lib/errors.js';
-import { findHostRoot } from '../../lib/host.js';
+import { findHostRoot, realpathOrResolve } from '../../lib/host.js';
 import type { InstanceRecord } from '../../types.js';
 
 export function printJson(value: unknown): void {
@@ -73,7 +73,9 @@ export function printInstance(r: InstanceRecord): void {
   console.log(`${chalk.bold(r.id)}  ${STATUS_COLOR[r.status](r.status)}  ${r.framework}`);
   console.log(`  url        ${chalk.cyan(r.url)}`);
   console.log(`  component  ${r.component}  (${r.hostRoot})`);
-  console.log(`  stories    ${r.stories.length} from ${r.storyFiles.length} files`);
+  console.log(
+    `  stories    ${r.stories.length} from ${r.storyFiles.length} files (children: ${r.includeChildren ? 'yes' : 'no'})`,
+  );
   for (const s of r.stories) console.log(`    ${s.id.padEnd(48)} ${chalk.gray(s.iframeUrl)}`);
   if (r.error) {
     console.log(chalk.red(`  error      ${r.error.code}: ${r.error.message}`));
@@ -93,10 +95,63 @@ export function fail(err: unknown, json: boolean): never {
 
 /** User path (absolute, cwd-relative, or host-relative) → host root + host-relative component. */
 export function resolveComponent(pathArg: string): { component: string; hostRoot: string } {
-  const abs = isAbsolute(pathArg) ? pathArg : resolve(process.cwd(), pathArg);
+  const rawAbs = isAbsolute(pathArg) ? pathArg : resolve(process.cwd(), pathArg);
+  const abs = existsSync(rawAbs)
+    ? realpathOrResolve(rawAbs)
+    : join(realpathOrResolve(dirname(rawAbs)), basename(rawAbs));
   const start = existsSync(abs) ? abs : dirname(abs);
   const hostRoot = findHostRoot(start);
   if (!hostRoot)
     throw new StorybrokrError('HOST_NOT_FOUND', `no .storybook/ directory above ${abs}`);
   return { component: relative(hostRoot, abs).split('\\').join('/'), hostRoot };
+}
+
+const ID_RE = /^[0-9a-f]{12}$/;
+
+function normalizeAgainstHost(idOrPath: string, hostDir: string): string {
+  const hostRoot = realpathOrResolve(hostDir);
+  if (isAbsolute(idOrPath)) {
+    const abs = existsSync(idOrPath)
+      ? realpathOrResolve(idOrPath)
+      : join(realpathOrResolve(dirname(idOrPath)), basename(idOrPath));
+    const rel = relative(hostRoot, abs).split('\\').join('/');
+    if (rel && !rel.startsWith('..')) return rel.replace(/\/+$/, '');
+  }
+  return idOrPath.replace(/^\.\//, '').replace(/\/+$/, '');
+}
+
+/**
+ * Normalize an id-or-path argument for `get`, `down`, `touch`, `check`, `screenshot`, `logs`, `open`.
+ * Precedence:
+ * 1. 12-hex instance id → pass through unchanged
+ * 2. explicit `--host` → authoritative `host`
+ * 3. `STORYBROKR_HOST` env → preferred `hint`
+ * 4. `process.cwd()` inside a host repo → preferred `hint`
+ * 5. bare component string outside any host → unscoped
+ */
+export function resolveTarget(
+  idOrPath: string,
+  explicitHost?: string,
+): { idOrPath: string; host?: string; hint?: string } {
+  const host = explicitHost ? realpathOrResolve(explicitHost) : undefined;
+  if (ID_RE.test(idOrPath)) {
+    return host ? { idOrPath, host } : { idOrPath };
+  }
+  if (host) {
+    return { idOrPath: normalizeAgainstHost(idOrPath, host), host };
+  }
+  const envHost = process.env.STORYBROKR_HOST?.trim();
+  if (envHost) {
+    const hint = realpathOrResolve(envHost);
+    return { idOrPath: normalizeAgainstHost(idOrPath, hint), hint };
+  }
+  try {
+    const { component, hostRoot } = resolveComponent(idOrPath);
+    if (component && component !== '.' && !component.startsWith('..')) {
+      return { idOrPath: component.replace(/\/+$/, ''), hint: hostRoot };
+    }
+  } catch {
+    // Fall through to bare component string when cwd is outside any host repo
+  }
+  return { idOrPath: idOrPath.replace(/^\.\//, '').replace(/\/+$/, '') };
 }
