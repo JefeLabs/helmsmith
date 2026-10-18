@@ -118,3 +118,71 @@ describe('packaging', () => {
     expect(out.trim()).toBe(pkg.version);
   });
 });
+
+describe('@helmsmith/pritty/core', () => {
+  const heavy = [
+    '@opentui/core',
+    '@opentui/react',
+    'openai',
+    '@anthropic-ai/sdk',
+    '@inquirer/prompts',
+    'ora',
+    'react',
+  ];
+
+  it('is a built entry that loads under node and exports the deterministic pieces', () => {
+    const out = execFileSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        "import('./dist/core.js').then((m) => console.log(Object.keys(m).sort().join(',')))",
+      ],
+      { cwd: root, encoding: 'utf8', env: { ...process.env, NODE_PATH: '' } },
+    );
+    const names = out.trim().split(',');
+    for (const n of [
+      'createGit',
+      'parseGitHubRemote',
+      'describeRemote',
+      'createPR',
+      'updatePR',
+      'listOpenPRs',
+      'resolveGitHubToken',
+      'findPullRequestTemplate',
+      'findCodeowners',
+      'loadConfig',
+      'ConfigSchema',
+      'resolveBaseBranch',
+      'applyFooter',
+      'applyTrailers',
+      'inferLabels',
+      'redactDiff',
+    ]) {
+      expect(names, `core export ${n}`).toContain(n);
+    }
+    expect(names).not.toContain('generatePR');
+  });
+
+  it('pulls in neither the AI adapters nor the TUI', () => {
+    const seen = new Set<string>();
+    const visit = (file: string): void => {
+      if (seen.has(file)) return;
+      seen.add(file);
+      const src = readFileSync(file, 'utf8');
+      for (const m of src.matchAll(/\bfrom\s*"(\.\/[^"]+)"|\bimport\s*\(\s*"(\.\/[^"]+)"\s*\)/g)) {
+        visit(join(root, 'dist', (m[1] ?? m[2])!));
+      }
+    };
+    visit(join(root, 'dist', 'core.js'));
+    const imported = new Set<string>();
+    for (const f of seen) for (const n of bareImports(f)) imported.add(n);
+    expect([...imported].filter((n) => heavy.includes(n))).toEqual([]);
+  });
+
+  it('is declared in package.json exports', () => {
+    const exportsField = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+      .exports as Record<string, unknown>;
+    expect(exportsField['./core']).toBeDefined();
+  });
+});

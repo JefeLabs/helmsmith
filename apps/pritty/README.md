@@ -61,8 +61,12 @@ your repo root (found from any subdirectory; a nearer one wins):
 ```json
 {
   "model": "gpt-4o",
-  "baseBranch": "main",
+  "baseBranch": "develop",
   "commitStyle": "conventional",
+  "github": { "account": "my-gh-login" },
+  "commitTrailers": ["Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"],
+  "prFooter": "🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+  "aiTimeoutMs": 60000,
   "categories": {
     "test": ["**/*.test.*", "**/*.spec.*"],
     "app": ["src/**", "lib/**"],
@@ -153,3 +157,48 @@ npm run build --workspace=@helmsmith/pritty
 npm test
 npm run dev -- categorize --all   # tsx-driven dev mode
 ```
+
+## Base branch
+
+`--base <branch>` wins; otherwise `baseBranch` from `.pritty.json`; otherwise
+the repository's default branch as GitHub reports it; otherwise `main`. An
+explicit `baseBranch` is never overridden. `pr` and `rebase` compare against
+`origin/<base>` when the remote has it, so a stale local base branch (common
+in worktrees) does not change the commit list.
+
+## GitHub identity
+
+The token for the GitHub API is resolved in this order: `GH_TOKEN`,
+`GITHUB_TOKEN`, `gh auth token --user <github.account>` when `.pritty.json`
+names an account, `gh auth token`, and only then the Copilot device-flow token
+from `pritty auth login` (its `read:user` scope cannot open pull requests, so
+pritty warns when it has to use it). Pushing uses git's own credentials.
+
+## Unattended use
+
+```bash
+pritty pr --json --base develop --draft --no-push \
+  --title "feat(area): what changed" --body-file /tmp/pr-body.md
+```
+
+`--json` prints one line `{ number, url, created, draft, head, base }` on
+stdout and everything else on stderr, implies `--auto-approve`, and requires
+`--base` or a configured `baseBranch`. `--title` with `--body`/`--body-file`
+uses the words verbatim: no model call, no ticket flow; labels come from
+conventional commit types. An open PR for the same head and base is returned
+(`created: false`) and, when a title or body was given, updated in place.
+`--no-push` is for callers that already pushed with upstream tracking.
+Every prompt fails with instructions when stdin is not a terminal.
+
+`pritty commit` commits only the index content of each category's files
+(never the working tree) and appends `commitTrailers`; `pritty pr` appends
+`prFooter` to every body, once. The diff sent to the model is redacted
+(secret files omitted, keys and tokens masked) and every model call is
+bounded by `aiTimeoutMs`.
+
+## Programmatic use
+
+`@helmsmith/pritty` exports the whole surface; `@helmsmith/pritty/core`
+exports only the deterministic pieces (git, GitHub, token resolution, PR
+template, CODEOWNERS, config, attribution, redaction) and loads without the
+AI adapters, OpenTUI or inquirer.

@@ -1,6 +1,6 @@
 {
   "name": "@helmsmith/pritty",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Pretty PRs, zero effort. AI-powered CLI that categorizes staged files, generates conventional commits, and creates pull requests with human-in-the-loop approval.",
   "type": "module",
   "bin": {
@@ -12,6 +12,10 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./core": {
+      "import": "./dist/core.js",
+      "types": "./dist/core.d.ts"
     }
   },
   "files": [
