@@ -46,7 +46,7 @@ describe('MCP server', () => {
   let cleanup = () => {};
   afterEach(() => cleanup());
 
-  it('exposes the six tools', async () => {
+  it('exposes the seven tools including work_promote', async () => {
     const f = makeRepo();
     cleanup = f.cleanup;
     const client = await connected(f.main);
@@ -55,6 +55,7 @@ describe('MCP server', () => {
       'work_audit',
       'work_env',
       'work_finish',
+      'work_promote',
       'work_reap',
       'work_start',
       'work_status',
@@ -101,5 +102,41 @@ describe('MCP server', () => {
       text(await client.callTool({ name: 'work_audit', arguments: {} })),
     ) as unknown[];
     expect(audit).toEqual([]);
+  });
+
+  it('supports task sub-efforts, work_promote, and intoArea convergence via MCP', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const client = await connected(f.main);
+    const started = JSON.parse(
+      text(
+        await client.callTool({
+          name: 'work_start',
+          arguments: { area: 'shop/cart', task: 'api', type: 'feature', mode: 'backend' },
+        }),
+      ),
+    ) as { effort: { branch: string; mode: string } };
+    expect(started.effort.branch).toBe('feature/shop/cart--api');
+    expect(started.effort.mode).toBe('backend');
+
+    const promoted = JSON.parse(
+      text(
+        await client.callTool({
+          name: 'work_promote',
+          arguments: { area: 'shop/cart', task: 'api', mode: 'fullstack' },
+        }),
+      ),
+    ) as { effort: { mode: string } };
+    expect(promoted.effort.mode).toBe('fullstack');
+
+    const finished = JSON.parse(
+      text(
+        await client.callTool({
+          name: 'work_finish',
+          arguments: { area: 'shop/cart', task: 'api', intoArea: true },
+        }),
+      ),
+    ) as { mergedIntoArea: boolean };
+    expect(finished.mergedIntoArea).toBe(true);
   });
 });

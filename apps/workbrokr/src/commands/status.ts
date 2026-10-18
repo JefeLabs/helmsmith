@@ -54,12 +54,13 @@ export function registerStatus(program: Command): void {
     .command('status')
     .description('Open efforts, leases, drift from the base branch and notices, per area')
     .option('--area <area>', 'one area only')
+    .option('--task <slug>', 'intra-area task slug')
     .option('--project-root <dir>', 'repository root (default: the main checkout of the cwd)')
     .option('--json', 'print the report as JSON')
-    .action(async (o: { area?: string; projectRoot?: string; json?: boolean }) => {
+    .action(async (o: { area?: string; task?: string; projectRoot?: string; json?: boolean }) => {
       try {
         const ctx = await buildCtx({ projectRoot: o.projectRoot, quiet: true });
-        const r = statusFor(ctx, o.area);
+        const r = statusFor(ctx, o.area, o.task);
         if (o.json) printJson(r);
         else printStatus(r);
       } catch (err) {

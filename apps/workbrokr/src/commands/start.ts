@@ -7,8 +7,9 @@ import { fail, printJson, warn } from './_shared/output.js';
 
 export function printStart(r: StartResult): void {
   const e = r.effort;
+  const label = e.task ? `${e.area}--${e.task}` : e.area;
   console.log(
-    `${chalk.bold(e.area)}  ${e.type}/${e.mode}  ${e.branch}${r.joined ? chalk.yellow('  (joined)') : ''}`,
+    `${chalk.bold(label)}  ${e.type}/${e.mode}  ${e.branch}${r.joined ? chalk.yellow('  (joined)') : ''}`,
   );
   console.log(`  worktree  ${e.worktree}`);
   console.log(
@@ -30,11 +31,13 @@ export function registerStart(program: Command): void {
   program
     .command('start')
     .description(
-      "Start an effort: the area's worktree on <type>/<area>, synced from the base branch, leased and running",
+      "Start an effort: the area's worktree on <type>/<area> (or <type>/<area>--<task>), synced from the base branch, leased and running",
     )
     .requiredOption('--area <area>', 'a leaf area from helmsmith.config (e.g. org/applications)')
+    .option('--task <slug>', 'intra-area task slug for parallel sub-efforts (<type>/<area>--<slug>)')
     .requiredOption('--type <type>', 'feature | chore | fix (as the manifest allows)')
-    .requiredOption('--mode <mode>', 'fullstack (a slot) | frontend (storybrokr)')
+    .requiredOption('--mode <mode>', 'fullstack | backend (a slot) | frontend (storybrokr)')
+    .option('--scope <glob...>', 'narrow exclusive scope globs for this task sub-effort')
     .option(
       '--story <path>',
       'frontend: the story file or component folder storybrokr boots, relative to the Storybook host',
@@ -46,8 +49,10 @@ export function registerStart(program: Command): void {
     .action(
       async (o: {
         area: string;
+        task?: string;
         type: string;
         mode: string;
+        scope?: string[];
         story?: string;
         join?: boolean;
         sync: boolean;
@@ -58,8 +63,10 @@ export function registerStart(program: Command): void {
           const ctx = await buildCtx({ projectRoot: o.projectRoot, quiet: Boolean(o.json) });
           const r = await startEffort(ctx, {
             area: o.area,
+            task: o.task,
             type: o.type,
             mode: o.mode as Mode,
+            scopes: o.scope,
             story: o.story,
             join: o.join,
             sync: o.sync,
