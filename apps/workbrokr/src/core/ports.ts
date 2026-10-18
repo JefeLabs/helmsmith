@@ -32,8 +32,29 @@ export function rangesOverlap(a: PortRange, b: PortRange): boolean {
  * Record the project's ranges in the registry. Idempotent for the same project; refuses when
  * another project already holds an overlapping range, naming it and the service.
  */
+/**
+ * Every command: refuse when this project's ranges overlap another project's, and
+ * (re-)register them when the manifest's ranges differ from what the registry holds.
+ */
+export function ensureRanges(registry: Registry, m: Manifest, repoRoot: string): void {
+  const mine = rangesFor(m);
+  assertNoOverlap(registry, m, mine);
+  const current = registry.project(m.project);
+  if (current && JSON.stringify(current.ranges) === JSON.stringify(mine)) return;
+  registry.upsertProject(m.project, { root: repoRoot, ranges: mine });
+}
+
 export function claimRanges(registry: Registry, m: Manifest, repoRoot: string): void {
   const mine = rangesFor(m);
+  assertNoOverlap(registry, m, mine);
+  registry.upsertProject(m.project, { root: repoRoot, ranges: mine });
+}
+
+function assertNoOverlap(
+  registry: Registry,
+  m: Manifest,
+  mine: ReturnType<typeof rangesFor>,
+): void {
   const others = Object.entries(registry.read().projects).filter(([name]) => name !== m.project);
   for (const [service, range] of Object.entries(mine)) {
     for (const [name, entry] of others) {
@@ -48,5 +69,4 @@ export function claimRanges(registry: Registry, m: Manifest, repoRoot: string): 
       }
     }
   }
-  registry.upsertProject(m.project, { root: repoRoot, ranges: mine });
 }

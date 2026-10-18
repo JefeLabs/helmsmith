@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import {
-  claimRanges,
   currentOwner,
+  ensureRanges,
   Git,
   homeDir,
   loadManifest,
@@ -18,7 +18,7 @@ export function resolveRepoRoot(cwd: string, override?: string): string {
   return new Git(cwd).mainRoot();
 }
 
-/** Build the context every verb shares; the project's port ranges are claimed on first use. */
+/** Build the context every verb shares; the project's port ranges are claimed on first use and re-checked when the manifest changes them. */
 export async function buildCtx(
   opts: { cwd?: string; projectRoot?: string; quiet?: boolean } = {},
 ): Promise<Ctx> {
@@ -26,7 +26,7 @@ export async function buildCtx(
   const manifest = await loadManifest(repoRoot);
   const home = homeDir();
   const registry = Registry.open(home);
-  if (!registry.project(manifest.project)) claimRanges(registry, manifest, repoRoot);
+  ensureRanges(registry, manifest, repoRoot);
   return {
     home,
     repoRoot,
