@@ -29,3 +29,17 @@ describe('selectDownTargets', () => {
     expect(stopped).toEqual(['a1', 'a2']);
   });
 });
+
+describe('runDown with --all and --host', () => {
+  it('stops only the instances in that host, never every instance on the machine', async () => {
+    const downByHost = vi.fn(async () => ['a1']);
+    const list = vi.fn(async () => [rec('a1'), rec('b1')]);
+    const down = vi.fn(async () => undefined);
+    const client = { downByHost, list, down } as unknown as DaemonClient;
+    const stopped = await runDown(client, undefined, { all: true, host: '/wt-a/app-ui' });
+    expect(downByHost).toHaveBeenCalledWith('/wt-a/app-ui');
+    expect(list).not.toHaveBeenCalled();
+    expect(down).not.toHaveBeenCalled();
+    expect(stopped).toEqual(['a1']);
+  });
+});

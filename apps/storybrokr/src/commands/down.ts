@@ -22,6 +22,8 @@ export async function runDown(
   opts: { all?: boolean; host?: string },
 ): Promise<string[]> {
   if (opts.all) {
+    // --all scoped by --host means "everything in that host", never everything on the machine
+    if (opts.host) return client.downByHost(realpathOrResolve(opts.host));
     const list = await client.list();
     const targets = selectDownTargets(list, undefined, true);
     for (const t of targets) await client.down(t);
@@ -40,14 +42,14 @@ export function registerDown(program: Command, connect: () => Promise<DaemonClie
   program
     .command('down [id-or-path]')
     .description('Stop an instance (or all instances for --host) and remove its config dir')
-    .option('--host <dir>', 'host repo root (or stop all instances in <dir> when id-or-path is omitted)')
-    .option('--all', 'stop every instance')
+    .option(
+      '--host <dir>',
+      'host repo root (or stop all instances in <dir> when id-or-path is omitted)',
+    )
+    .option('--all', 'stop every instance (every instance in <dir> when combined with --host)')
     .option('--json', 'print JSON')
     .action(
-      async (
-        idOrPath: string | undefined,
-        o: { host?: string; all?: boolean; json?: boolean },
-      ) => {
+      async (idOrPath: string | undefined, o: { host?: string; all?: boolean; json?: boolean }) => {
         try {
           const client = await connect();
           const stopped = await runDown(client, idOrPath, o);
