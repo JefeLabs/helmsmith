@@ -1,8 +1,8 @@
 /**
- * GitHub PR operations — thin Octokit wrapper. Token resolution:
- * the GitHub OAuth token from `~/.pritty/auth.json` (which the
- * device-flow login wrote there) is reused for the GitHub API. If
- * that's missing, fall back to GITHUB_TOKEN / GH_TOKEN env vars.
+ * GitHub PR operations — thin Octokit wrapper. Token resolution lives in
+ * github-token.ts: GH_TOKEN, GITHUB_TOKEN, `gh auth token` (for the
+ * configured account first), then the Copilot device-flow token as a
+ * last resort.
  *
  * Lives separate from src/git.ts because Octokit is a heavier
  * dependency and only the PR flow needs it; commit and rebase work
@@ -11,6 +11,8 @@
 
 import { Octokit } from 'octokit';
 import { readAuth } from './auth.js';
+import { loadConfig } from './config.js';
+import { defaultTokenResolveOptions, resolveGitHubToken } from './github-token.js';
 
 export interface CreatePROptions {
   owner: string;
@@ -34,26 +36,27 @@ export interface OpenPRSummary {
   base: string;
 }
 
-/**
- * Resolve a GitHub token suitable for the REST API. Priority:
- *   1. ~/.pritty/auth.json's github-copilot apiKey (the device-flow
- *      OAuth token — works for the REST API too)
- *   2. $GITHUB_TOKEN
- *   3. $GH_TOKEN
- * Returns null when no token is available — caller should print
- * actionable next steps (`pritty auth login` or set GITHUB_TOKEN).
- */
-async function resolveGitHubToken(): Promise<string | null> {
-  const auth = await readAuth();
-  const fromAuth = auth.providers['github-copilot']?.apiKey;
-  if (fromAuth) return fromAuth;
-  return process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN ?? null;
+let warned = false;
+
+/** See github-token.ts for the order. Prints the weak-source warning once per process. */
+async function resolveToken(): Promise<string | null> {
+  const resolved = await resolveGitHubToken(
+    defaultTokenResolveOptions(readAuth, loadConfig().github?.account),
+  );
+  if (!resolved) return null;
+  if (resolved.warning && !warned) {
+    warned = true;
+    console.error(`⚠ ${resolved.warning}`);
+  }
+  return resolved.token;
 }
 
 async function octokit(): Promise<Octokit> {
-  const token = await resolveGitHubToken();
+  const token = await resolveToken();
   if (!token) {
-    throw new Error('No GitHub token available. Run `pritty auth login` or set GITHUB_TOKEN.');
+    throw new Error(
+      'No GitHub token available. Set GH_TOKEN, run `gh auth login`, or `pritty auth login`.',
+    );
   }
   return new Octokit({ auth: token });
 }

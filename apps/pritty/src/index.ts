@@ -58,7 +58,7 @@ export {
   defaultStarterConfig,
   loadConfig,
 } from './config.js';
-export { createGit, type GitOps, parseGitHubRemote } from './git.js';
+export { createGit, describeRemote, type GitOps, parseGitHubRemote } from './git.js';
 export {
   addLabels,
   assertGitHubToken,
@@ -71,6 +71,7 @@ export {
   type PRResult,
   requestReviewers,
 } from './github.js';
+export { type ResolvedToken, resolveGitHubToken } from './github-token.js';
 export {
   findPullRequestTemplate,
   type PullRequestTemplate,

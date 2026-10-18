@@ -4,7 +4,7 @@ import ora from 'ora';
 import { generatePR, type PRDraft, type TicketContext } from '../ai.js';
 import { findCodeowners, parseCodeowners, resolveReviewers } from '../codeowners.js';
 import { type Config, loadConfig } from '../config.js';
-import { createGit, type GitOps, parseGitHubRemote } from '../git.js';
+import { createGit, describeRemote, type GitOps, parseGitHubRemote } from '../git.js';
 import {
   addLabels,
   assertGitHubToken,
@@ -107,7 +107,9 @@ export async function runPr(
   }
   const repo = parseGitHubRemote(remoteUrl);
   if (!repo) {
-    throw new Error('The `origin` remote is not a GitHub URL pritty understands.');
+    throw new Error(
+      `The \`origin\` remote is not a GitHub URL pritty understands: ${describeRemote(remoteUrl)}`,
+    );
   }
 
   // 2. Token first: a missing or unusable one must fail before any push.

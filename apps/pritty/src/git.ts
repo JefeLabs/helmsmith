@@ -275,16 +275,31 @@ function commitIndexSubset(cwd: string, message: string, files: string[]): void 
 }
 
 /**
- * Parse owner/repo out of a GitHub remote URL. Handles both
- * https://github.com/owner/repo(.git) and git@github.com:owner/repo(.git)
- * forms. Returns null when the URL doesn't look like GitHub.
+ * Parse owner/repo out of a GitHub remote URL. Handles
+ * https://[user[:token]@]github.com/owner/repo[.git], ssh://git@github.com[:port]/owner/repo[.git]
+ * and git@github.com[-alias]:owner/repo[.git] (SSH host aliases). Returns null
+ * when the URL does not point at github.com.
  */
 export function parseGitHubRemote(url: string): { owner: string; repo: string } | null {
-  const httpsMatch = url.match(/https:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/);
-  if (httpsMatch) return { owner: httpsMatch[1], repo: httpsMatch[2] };
+  const httpsMatch = url.match(
+    /^https:\/\/(?:[^@/]+@)?github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/,
+  );
+  if (httpsMatch) return { owner: httpsMatch[1]!, repo: httpsMatch[2]! };
 
-  const sshMatch = url.match(/git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/);
-  if (sshMatch) return { owner: sshMatch[1], repo: sshMatch[2] };
+  const sshUrlMatch = url.match(
+    /^ssh:\/\/(?:[^@/]+@)?github\.com(?::\d+)?\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/,
+  );
+  if (sshUrlMatch) return { owner: sshUrlMatch[1]!, repo: sshUrlMatch[2]! };
+
+  const scpMatch = url.match(
+    /^(?:[^@]+@)?github\.com(?:-[A-Za-z0-9_.-]+)?:([^/]+)\/([^/]+?)(?:\.git)?$/,
+  );
+  if (scpMatch) return { owner: scpMatch[1]!, repo: scpMatch[2]! };
 
   return null;
+}
+
+/** A remote URL safe to print: any credentials in the userinfo are replaced by `***`. */
+export function describeRemote(url: string): string {
+  return url.replace(/^([a-z+]+:\/\/)[^@/]+@/i, '$1***@');
 }

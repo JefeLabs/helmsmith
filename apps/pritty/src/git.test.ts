@@ -50,3 +50,25 @@ describe('parseGitHubRemote', () => {
     });
   });
 });
+
+describe('parseGitHubRemote on the URL shapes real checkouts use', () => {
+  it('accepts a token in the URL userinfo, ssh:// URLs and SSH host aliases', () => {
+    expect(parseGitHubRemote('https://x-access-token:ghs_abc@github.com/o/r.git')).toEqual({
+      owner: 'o',
+      repo: 'r',
+    });
+    expect(parseGitHubRemote('ssh://git@github.com/o/r.git')).toEqual({ owner: 'o', repo: 'r' });
+    expect(parseGitHubRemote('ssh://git@github.com:22/o/r')).toEqual({ owner: 'o', repo: 'r' });
+    expect(parseGitHubRemote('git@github.com-work:o/r.git')).toEqual({ owner: 'o', repo: 'r' });
+  });
+});
+
+describe('describeRemote', () => {
+  it('never shows credentials embedded in a remote URL', async () => {
+    const { describeRemote } = await import('./git.js');
+    expect(describeRemote('https://x-access-token:ghs_abc@github.com/o/r.git')).toBe(
+      'https://***@github.com/o/r.git',
+    );
+    expect(describeRemote('git@github.com:o/r.git')).toBe('git@github.com:o/r.git');
+  });
+});
