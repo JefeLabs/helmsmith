@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import chalk from 'chalk';
 import ora from 'ora';
 import { generatePR, type PRDraft, type TicketContext } from '../ai.js';
@@ -12,12 +13,15 @@ import {
   getDefaultBranch,
   listOpenPRs,
   type OpenPRSummary,
+  type PRPatch,
   type PRResult,
   requestReviewers,
+  updatePR,
 } from '../github.js';
 import { findPullRequestTemplate, type PullRequestTemplate } from '../pr-template.js';
 import { resolveBaseBranch } from './_shared/base.js';
 import { splitTitleBody } from './_shared/format.js';
+import { inferLabels } from './_shared/labels.js';
 import { confirm, editor } from './_shared/prompts.js';
 import { resolveTicketContext, type TicketContextOptions } from './_shared/ticket-context.js';
 
@@ -27,6 +31,16 @@ export interface PrOptions {
   dryRun?: boolean;
   /** One JSON line on stdout, everything else on stderr; implies autoApprove. */
   json?: boolean;
+  /** Open the PR as a draft. */
+  draft?: boolean;
+  /** Use this title verbatim: no model, no ticket flow. */
+  title?: string;
+  /** Use this body verbatim (with --title). */
+  body?: string;
+  /** Read the body from this file (with --title). */
+  bodyFile?: string;
+  /** The caller already pushed the branch with upstream tracking. */
+  noPush?: boolean;
 }
 
 export interface PrOutcome {
@@ -34,6 +48,7 @@ export interface PrOutcome {
   url: string;
   /** false when an open PR for this head and base already existed and was returned instead. */
   created: boolean;
+  draft: boolean;
   head: string;
   base: string;
 }
@@ -47,6 +62,7 @@ export interface PrDeps {
     getDefaultBranch(owner: string, repo: string): Promise<string>;
     listOpenPRs(owner: string, repo: string, head: string, base?: string): Promise<OpenPRSummary[]>;
     createPR(o: CreatePROptions): Promise<PRResult>;
+    updatePR(owner: string, repo: string, n: number, patch: PRPatch): Promise<void>;
     addLabels(owner: string, repo: string, n: number, labels: readonly string[]): Promise<void>;
     requestReviewers(
       owner: string,
@@ -63,14 +79,14 @@ export interface PrDeps {
     git: GitOps,
     opts?: TicketContextOptions,
   ) => Promise<TicketContext | undefined>;
-  /** Where human output goes; under --json everything but the JSON line goes to err. */
-  io?: { out: (line: string) => void; err: (line: string) => void };
   template: () => PullRequestTemplate | null;
   codeowners: () => string | null;
   prompts: {
     confirm(o: { message: string; default?: boolean }): Promise<boolean>;
     editor(o: { message: string; default?: string }): Promise<string>;
   };
+  /** Where human output goes; under --json everything but the JSON line goes to err. */
+  io?: { out: (line: string) => void; err: (line: string) => void };
 }
 
 function defaultDeps(): PrDeps {
@@ -82,6 +98,7 @@ function defaultDeps(): PrDeps {
       getDefaultBranch,
       listOpenPRs,
       createPR,
+      updatePR,
       addLabels,
       requestReviewers,
     },
@@ -96,8 +113,9 @@ function defaultDeps(): PrDeps {
 /**
  * Open a pull request for the current branch. Order matters: the token and
  * the open-PR check come first, so nothing is generated or pushed when the
- * PR cannot be created or already exists; then commits and the AI draft;
- * push and create last. Errors are thrown (the CLI prints them and exits 1).
+ * PR cannot be created or already exists; then commits and the words (given
+ * verbatim, or drafted by the model); push and create last. Errors are
+ * thrown (the CLI prints them and exits 1).
  */
 export async function runPr(
   options: PrOptions = {},
@@ -115,6 +133,7 @@ export async function runPr(
     if (options.json) io.out(JSON.stringify(o));
     return o;
   };
+  const given = resolveGivenText(options);
 
   // 1. Branch + remote → owner/repo
   const branch = await git.getCurrentBranch();
@@ -172,8 +191,9 @@ export async function runPr(
     ),
   );
 
-  // 4. An open PR for this head and base already exists: return it, create nothing.
-  //    A failed lookup is fatal; pushing without knowing would be worse.
+  // 4. An open PR for this head and base already exists: return it (updating its
+  //    title/body when they were given explicitly), create nothing. A failed
+  //    lookup is fatal; pushing without knowing would be worse.
   const open = await deps.github.listOpenPRs(repo.owner, repo.repo, branch, effectiveBase);
   if (open.length > 0) {
     const existing = open[0]!;
@@ -182,11 +202,20 @@ export async function runPr(
         `An open PR already exists for ${branch} → ${effectiveBase}: #${existing.number}`,
       ),
     );
+    if (given) {
+      const patch: PRPatch = {
+        ...(given.title !== undefined ? { title: given.title } : {}),
+        ...(given.body !== undefined ? { body: given.body } : {}),
+      };
+      await deps.github.updatePR(repo.owner, repo.repo, existing.number, patch);
+      say(chalk.dim('  Updated its title/body in place.'));
+    }
     say(chalk.green(`✓ ${existing.url}`));
     return finish({
       number: existing.number,
       url: existing.url,
       created: false,
+      draft: existing.draft,
       head: branch,
       base: effectiveBase,
     });
@@ -205,31 +234,37 @@ export async function runPr(
   }
   say('');
 
-  // 6. Ticket context (may prompt), template, AI draft
-  const ticketCtx = await deps.ticket(config, branch, git, { interactive: !auto });
-  const template = deps.template();
-  if (template) {
-    say(
-      chalk.dim(
-        `  (using PR template: ${template.path}${template.truncated ? ' — truncated' : ''})`,
-      ),
-    );
-  }
-
-  const spinner = ora({ text: 'Generating PR description...', color: 'cyan' }).start();
+  // 6. The words: given verbatim (no model, no ticket flow), or drafted by the model
   let draft: PRDraft;
-  try {
-    draft = await deps.ai.generatePR(
-      commits,
-      { branch, base: effectiveBase, owner: repo.owner, repo: repo.repo },
-      config,
-      ticketCtx,
-      template,
-    );
-    spinner.succeed('PR description ready');
-  } catch (err) {
-    spinner.fail((err as Error).message);
-    throw err;
+  if (given) {
+    draft = { title: given.title ?? '', body: given.body ?? '', labels: inferLabels(commits) };
+    if (draft.title.length === 0) {
+      throw new Error('--title is required when --body/--body-file is given.');
+    }
+  } else {
+    const ticketCtx = await deps.ticket(config, branch, git, { interactive: !auto });
+    const template = deps.template();
+    if (template) {
+      say(
+        chalk.dim(
+          `  (using PR template: ${template.path}${template.truncated ? ' — truncated' : ''})`,
+        ),
+      );
+    }
+    const spinner = ora({ text: 'Generating PR description...', color: 'cyan' }).start();
+    try {
+      draft = await deps.ai.generatePR(
+        commits,
+        { branch, base: effectiveBase, owner: repo.owner, repo: repo.repo },
+        config,
+        ticketCtx,
+        template,
+      );
+      spinner.succeed('PR description ready');
+    } catch (err) {
+      spinner.fail((err as Error).message);
+      throw err;
+    }
   }
 
   // 7. Preview
@@ -245,8 +280,8 @@ export async function runPr(
   }
   say('');
 
-  // 7.5 Optional editor pass — default N so the wrap-up stays fast.
-  if (!auto && !dryRun) {
+  // 7.5 Optional editor pass on the model's draft — default N so the wrap-up stays fast.
+  if (!auto && !dryRun && !given) {
     const wantEdit = await deps.prompts.confirm({
       message: 'Edit PR title or body?',
       default: false,
@@ -283,14 +318,18 @@ export async function runPr(
     }
   }
 
-  // 10. Push (set upstream)
-  const pushSpinner = ora({ text: `Pushing ${branch} to origin...`, color: 'cyan' }).start();
-  try {
-    await git.push(branch, { setUpstream: true });
-    pushSpinner.succeed('Pushed');
-  } catch (err) {
-    pushSpinner.fail((err as Error).message);
-    throw err;
+  // 10. Push (set upstream), unless the caller already did
+  if (options.noPush) {
+    say(chalk.dim(`  (--no-push: assuming ${branch} is already on origin)`));
+  } else {
+    const pushSpinner = ora({ text: `Pushing ${branch} to origin...`, color: 'cyan' }).start();
+    try {
+      await git.push(branch, { setUpstream: true });
+      pushSpinner.succeed('Pushed');
+    } catch (err) {
+      pushSpinner.fail((err as Error).message);
+      throw err;
+    }
   }
 
   // 11. Create PR
@@ -304,8 +343,9 @@ export async function runPr(
       base: effectiveBase,
       title: draft.title,
       body: draft.body,
+      ...(options.draft ? { draft: true } : {}),
     });
-    prSpinner.succeed(`PR #${result.number} created`);
+    prSpinner.succeed(`${options.draft ? 'Draft PR' : 'PR'} #${result.number} created`);
   } catch (err) {
     prSpinner.fail((err as Error).message);
     throw err;
@@ -353,7 +393,21 @@ export async function runPr(
     number: result.number,
     url: result.url,
     created: true,
+    draft: result.draft,
     head: branch,
     base: effectiveBase,
   });
+}
+
+/** `--title` / `--body` / `--body-file` as given; null when none was passed. */
+function resolveGivenText(o: PrOptions): { title?: string; body?: string } | null {
+  if (o.title === undefined && o.body === undefined && o.bodyFile === undefined) return null;
+  if (o.body !== undefined && o.bodyFile !== undefined) {
+    throw new Error('Pass --body or --body-file, not both.');
+  }
+  const body = o.bodyFile !== undefined ? readFileSync(o.bodyFile, 'utf8') : o.body;
+  return {
+    ...(o.title !== undefined ? { title: o.title } : {}),
+    ...(body !== undefined ? { body } : {}),
+  };
 }

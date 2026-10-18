@@ -9,7 +9,14 @@ import { type PrDeps, runPr } from './pr.js';
  * every call so the tests can assert on the sequence, not just the outcome.
  */
 function fakes(o: {
-  openPRs?: { number: number; url: string; title: string; head: string; base: string }[];
+  openPRs?: {
+    number: number;
+    url: string;
+    title: string;
+    head: string;
+    base: string;
+    draft: boolean;
+  }[];
   token?: boolean;
   listFails?: boolean;
   remoteDefault?: string;
@@ -50,7 +57,14 @@ function fakes(o: {
       createPR: async (args) => {
         calls.push('createPR');
         createArgs.push(args);
-        return { number: 42, url: 'https://github.com/acme/app/pull/42' };
+        return {
+          number: 42,
+          url: 'https://github.com/acme/app/pull/42',
+          draft: Boolean(args.draft),
+        };
+      },
+      updatePR: async () => {
+        calls.push('updatePR');
       },
       addLabels: async () => {
         calls.push('addLabels');
@@ -79,13 +93,14 @@ function fakes(o: {
 describe('runPr ordering', () => {
   it('returns the existing open PR without generating, pushing or creating', async () => {
     const f = fakes({
-      openPRs: [{ number: 7, url: 'u', title: 't', head: 'feature/x', base: 'main' }],
+      openPRs: [{ number: 7, url: 'u', title: 't', head: 'feature/x', base: 'main', draft: false }],
     });
     const result = await runPr({ autoApprove: true }, f.deps);
     expect(result).toEqual({
       number: 7,
       url: 'u',
       created: false,
+      draft: false,
       head: 'feature/x',
       base: 'main',
     });
@@ -114,6 +129,7 @@ describe('runPr ordering', () => {
       number: 42,
       url: 'https://github.com/acme/app/pull/42',
       created: true,
+      draft: false,
       head: 'feature/x',
       base: 'main',
     });
@@ -168,6 +184,7 @@ describe('runPr --json', () => {
       number: 42,
       url: 'https://github.com/acme/app/pull/42',
       created: true,
+      draft: false,
       head: 'feature/x',
       base: 'develop',
     });
@@ -195,5 +212,85 @@ describe('runPr --json', () => {
     f.deps.io = { out: () => {}, err: () => {} };
     await expect(runPr({ json: true }, f.deps)).rejects.toThrow(/--base/);
     expect(f.calls).not.toContain('push');
+  });
+});
+
+describe('runPr §18.2: --draft, given title/body, existing-PR update, --no-push', () => {
+  it('creates a draft PR when asked and reports draft in the outcome', async () => {
+    const f = fakes({ config: { baseBranch: 'main' } });
+    const result = await runPr({ autoApprove: true, draft: true }, f.deps);
+    expect(f.createArgs[0]).toMatchObject({ draft: true });
+    expect(result).toMatchObject({ created: true, draft: true });
+  });
+
+  it('uses a given title and body verbatim, never calling the model or the ticket flow', async () => {
+    const f = fakes({ config: { baseBranch: 'main' } });
+    let ticketCalls = 0;
+    f.deps.ticket = async () => {
+      ticketCalls++;
+      return undefined;
+    };
+    const result = await runPr(
+      { autoApprove: true, title: 'feat: given', body: 'Given body.' },
+      f.deps,
+    );
+    expect(f.calls).not.toContain('generatePR');
+    expect(ticketCalls).toBe(0);
+    expect(f.createArgs[0]).toMatchObject({ title: 'feat: given', body: 'Given body.' });
+    expect(result?.created).toBe(true);
+  });
+
+  it('reads the body from --body-file', async () => {
+    const { mkdtempSync, writeFileSync, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const dir = mkdtempSync(join(tmpdir(), 'pritty-body-'));
+    try {
+      writeFileSync(join(dir, 'body.md'), '## Summary\n\nFrom a file.\n');
+      const f = fakes({ config: { baseBranch: 'main' } });
+      await runPr({ autoApprove: true, title: 't', bodyFile: join(dir, 'body.md') }, f.deps);
+      expect(f.createArgs[0]).toMatchObject({ body: '## Summary\n\nFrom a file.\n' });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('infers labels from conventional commit types on the no-AI path', async () => {
+    const f = fakes({ config: { baseBranch: 'main' } });
+    f.deps.git.log = async () => [
+      { hash: 'a'.repeat(40), subject: 'feat(x): add' },
+      { hash: 'b'.repeat(40), subject: 'fix: broken' },
+    ];
+    const labelled: unknown[] = [];
+    f.deps.github.addLabels = async (_o, _r, _n, labels) => {
+      labelled.push([...labels]);
+    };
+    await runPr({ autoApprove: true, title: 't', body: 'b' }, f.deps);
+    expect(labelled).toEqual([['enhancement', 'bug']]);
+  });
+
+  it('updates the existing open PR in place when a title or body is given explicitly', async () => {
+    const f = fakes({
+      config: { baseBranch: 'main' },
+      openPRs: [
+        { number: 7, url: 'u', title: 'old', head: 'feature/x', base: 'main', draft: false },
+      ],
+    });
+    const updates: unknown[] = [];
+    f.deps.github.updatePR = async (_o, _r, n, patch) => {
+      updates.push([n, patch]);
+    };
+    const result = await runPr({ autoApprove: true, title: 'new title', body: 'new body' }, f.deps);
+    expect(updates).toEqual([[7, { title: 'new title', body: 'new body' }]]);
+    expect(f.calls).not.toContain('createPR');
+    expect(result).toMatchObject({ number: 7, created: false });
+  });
+
+  it('skips the push under --no-push and still creates the PR', async () => {
+    const f = fakes({ config: { baseBranch: 'main' } });
+    const result = await runPr({ autoApprove: true, noPush: true }, f.deps);
+    expect(f.calls).not.toContain('push');
+    expect(f.calls).toContain('createPR');
+    expect(result?.created).toBe(true);
   });
 });

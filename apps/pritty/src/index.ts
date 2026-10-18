@@ -68,8 +68,10 @@ export {
   listOpenPRs,
   listOpenPRsForHead,
   type OpenPRSummary,
+  type PRPatch,
   type PRResult,
   requestReviewers,
+  updatePR,
 } from './github.js';
 export { type ResolvedToken, resolveGitHubToken } from './github-token.js';
 export {

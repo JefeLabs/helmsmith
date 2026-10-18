@@ -21,11 +21,13 @@ export interface CreatePROptions {
   base: string;
   title: string;
   body: string;
+  draft?: boolean;
 }
 
 export interface PRResult {
   number: number;
   url: string;
+  draft: boolean;
 }
 
 export interface OpenPRSummary {
@@ -34,6 +36,12 @@ export interface OpenPRSummary {
   title: string;
   head: string;
   base: string;
+  draft: boolean;
+}
+
+export interface PRPatch {
+  title?: string;
+  body?: string;
 }
 
 let warned = false;
@@ -76,11 +84,31 @@ export async function createPR(options: CreatePROptions): Promise<PRResult> {
     base: options.base,
     title: options.title,
     body: options.body,
+    ...(options.draft ? { draft: true } : {}),
   });
   return {
     number: result.data.number,
     url: result.data.html_url,
+    draft: Boolean(result.data.draft),
   };
+}
+
+/** Change an existing PR's title and/or body in place. No-op for an empty patch. */
+export async function updatePR(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  patch: PRPatch,
+): Promise<void> {
+  if (patch.title === undefined && patch.body === undefined) return;
+  const client = await octokit();
+  await client.rest.pulls.update({
+    owner,
+    repo,
+    pull_number: prNumber,
+    ...(patch.title !== undefined ? { title: patch.title } : {}),
+    ...(patch.body !== undefined ? { body: patch.body } : {}),
+  });
 }
 
 /** Apply labels to an existing PR (no-op when labels is empty). */
@@ -149,6 +177,7 @@ export async function listOpenPRs(
     title: pr.title,
     head: pr.head.ref,
     base: pr.base.ref,
+    draft: Boolean(pr.draft),
   }));
 }
 

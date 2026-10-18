@@ -129,11 +129,27 @@ program
   .option('--dry-run', 'Show the plan without pushing or creating the PR')
   .option(
     '--json',
-    'Print one JSON line { number, url, created, head, base } on stdout; implies --auto-approve; needs --base or a configured baseBranch',
+    'Print one JSON line { number, url, created, draft, head, base } on stdout; implies --auto-approve; needs --base or a configured baseBranch',
   )
+  .option('--draft', 'Open the PR as a draft')
+  .option('--title <title>', 'Use this title verbatim (no AI, no ticket flow)')
+  .option('--body <text>', 'Use this body verbatim (with --title)')
+  .option('--body-file <path>', 'Read the body from a file (with --title)')
+  .option('--no-push', 'Do not push: the branch is already on origin')
   .action(
-    async (options: { base?: string; autoApprove?: boolean; dryRun?: boolean; json?: boolean }) => {
-      await runPr(options);
+    async (options: {
+      base?: string;
+      autoApprove?: boolean;
+      dryRun?: boolean;
+      json?: boolean;
+      draft?: boolean;
+      title?: string;
+      body?: string;
+      bodyFile?: string;
+      push: boolean;
+    }) => {
+      const { push, ...rest } = options;
+      await runPr({ ...rest, noPush: push === false });
     },
   );
 
