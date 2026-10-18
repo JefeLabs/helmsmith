@@ -6,6 +6,7 @@ import { categorize, mergeCategories, UNKNOWN_CATEGORY } from '../categorizer.js
 import { loadConfig } from '../config.js';
 import { createGit } from '../git.js';
 import { splitTitleBody } from './_shared/format.js';
+import { reconcileCommitPlan } from './_shared/plan.js';
 import { resolveTicketContext } from './_shared/ticket-context.js';
 
 export interface CommitOptions {
@@ -64,7 +65,10 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
   let plan: CommitMessage[];
   try {
     const diff = await git.getStagedDiff();
-    plan = await generateCommitMessages(grouped, diff, config, ticketCtx);
+    plan = reconcileCommitPlan(
+      await generateCommitMessages(grouped, diff, config, ticketCtx),
+      grouped,
+    );
     spinner.succeed(`Generated ${plan.length} commit message(s)`);
   } catch (err) {
     spinner.fail((err as Error).message);

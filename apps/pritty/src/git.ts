@@ -6,6 +6,7 @@
  * `pritty pr` and `pritty rebase` ship.
  */
 
+import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -23,9 +24,11 @@ export interface GitOps {
   /** Stage specific files. */
   stage(files: string[]): Promise<void>;
   /**
-   * Commit. When `files` is provided, the commit is path-restricted
-   * to that subset (matches `git commit -- <files>`); otherwise
-   * commits everything staged.
+   * Commit. Without `files`, commits everything staged. With `files`,
+   * commits only the INDEX content of those paths (never the working
+   * tree: `git commit -- <files>` would record what is on disk) and
+   * leaves every other staged path staged. Throws when nothing in the
+   * subset is staged.
    */
   commit(message: string, files?: string[]): Promise<void>;
   /** Push the current branch. setUpstream=true on first push. */
@@ -92,7 +95,7 @@ export function createGit(cwd: string = process.cwd()): GitOps {
 
     async commit(message: string, files?: string[]): Promise<void> {
       if (files && files.length > 0) {
-        await git.commit(message, files);
+        commitIndexSubset(cwd, message, files);
       } else {
         await git.commit(message);
       }
@@ -182,6 +185,70 @@ export function createGit(cwd: string = process.cwd()): GitOps {
       }
     },
   };
+}
+
+function runGit(
+  cwd: string,
+  args: string[],
+  opts: { env?: NodeJS.ProcessEnv; input?: string } = {},
+): string {
+  const r = spawnSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    env: opts.env ?? process.env,
+    input: opts.input,
+  });
+  if (r.status !== 0) {
+    throw new Error((r.stderr || r.stdout || `git ${args[0]} failed`).trim());
+  }
+  return r.stdout;
+}
+
+/**
+ * Commit the staged content of `files` and nothing else, through a temporary
+ * index so `git commit` (and therefore the repository's hooks, signing and
+ * templates) still does the committing:
+ *   1. seed the temporary index from HEAD (empty on an unborn branch)
+ *   2. copy the real index's entries for the subset into it
+ *   3. apply the subset's staged deletions
+ *   4. `git commit` with GIT_INDEX_FILE pointing at it
+ * The real index is untouched; after the commit its entries for the subset
+ * equal HEAD, so they read as clean, and every other staged path stays staged.
+ */
+function commitIndexSubset(cwd: string, message: string, files: string[]): void {
+  const dir = mkdtempSync(join(tmpdir(), 'pritty-index-'));
+  const env = { ...process.env, GIT_INDEX_FILE: join(dir, 'index') };
+  try {
+    const hasHead =
+      spawnSync('git', ['rev-parse', '--verify', '-q', 'HEAD'], { cwd, stdio: 'ignore' }).status ===
+      0;
+    runGit(cwd, hasHead ? ['read-tree', 'HEAD'] : ['read-tree', '--empty'], { env });
+    const entries = runGit(cwd, ['ls-files', '-s', '-z', '--', ...files]);
+    if (entries.length > 0)
+      runGit(cwd, ['update-index', '-z', '--index-info'], { env, input: entries });
+    const deleted = runGit(cwd, [
+      'diff',
+      '--cached',
+      '--name-only',
+      '-z',
+      '--diff-filter=D',
+      '--',
+      ...files,
+    ])
+      .split('\0')
+      .filter(Boolean);
+    if (deleted.length > 0)
+      runGit(cwd, ['update-index', '--force-remove', '--', ...deleted], { env });
+    const changed = hasHead
+      ? runGit(cwd, ['diff-index', '--cached', '--name-only', 'HEAD'], { env }).trim()
+      : runGit(cwd, ['ls-files', '-z'], { env }).trim();
+    if (changed.length === 0) {
+      throw new Error(`nothing staged for ${files.join(', ')}`);
+    }
+    runGit(cwd, ['commit', '-q', '-m', message], { env });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 /**
