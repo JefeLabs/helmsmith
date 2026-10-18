@@ -27,11 +27,18 @@ export function pidSignature(pid: number): string {
   return r.status === 0 ? (r.stdout ?? '').trim() : '';
 }
 
+export function serviceModes(name: string, spec: ServiceSpec): ('backend' | 'fullstack')[] {
+  if (spec.modes && spec.modes.length > 0) return spec.modes;
+  return name === 'frontend' ? ['fullstack'] : ['backend', 'fullstack'];
+}
+
 export interface RunnerArgs {
   m: Manifest;
   cwd: string;
   env: NodeJS.ProcessEnv;
   logDir: string;
+  mode?: 'backend' | 'fullstack';
+  onlyServices?: string[];
   onLog?: (line: string) => void;
   /** called the moment a service's process exists, before its health is known */
   onSpawn?: (service: string, pid: number, signature: string) => void;
@@ -111,7 +118,12 @@ export async function startServices(
 ): Promise<{ pids: Record<string, number>; signatures: Record<string, string> }> {
   const pids: Record<string, number> = {};
   const signatures: Record<string, string> = {};
-  for (const [name, spec] of Object.entries(a.m.services)) {
+  const targetMode = a.mode ?? 'fullstack';
+  const entries = Object.entries(a.m.services).filter(([name, spec]) => {
+    if (a.onlyServices) return a.onlyServices.includes(name);
+    return serviceModes(name, spec).includes(targetMode);
+  });
+  for (const [name, spec] of entries) {
     a.onLog?.(`starting ${name}: ${spec.start}`);
     pids[name] = spawnService(name, spec, a);
     signatures[name] = pidSignature(pids[name]);

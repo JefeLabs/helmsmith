@@ -146,4 +146,50 @@ describe('Registry', () => {
     expect(r.openEffortFor('demo', 'shop/cart')?.id).toBe('e1');
     expect(r.activeEffortFor('demo', 'shop/cart')).toBeUndefined();
   });
+
+  it('distinguishes area efforts from task sub-efforts and deduplicates/clears notices by source branch', () => {
+    const r = Registry.open(home());
+    r.addEffort({
+      id: 'e_area',
+      project: 'demo',
+      area: 'shop/cart',
+      type: 'feature',
+      mode: 'frontend',
+      branch: 'feature/shop/cart',
+      worktree: '/w1',
+      owner,
+      state: 'active',
+      scopes: [],
+      commons: [],
+      leases: [],
+      notices: [],
+      started: 'x',
+      lastActivity: 'x',
+    });
+    r.addEffort({
+      id: 'e_task',
+      project: 'demo',
+      area: 'shop/cart',
+      task: 'api',
+      type: 'feature',
+      mode: 'backend',
+      branch: 'feature/shop/cart--api',
+      worktree: '/w2',
+      owner,
+      state: 'active',
+      scopes: [],
+      commons: [],
+      leases: [],
+      notices: [],
+      started: 'x',
+      lastActivity: 'x',
+    });
+    expect(r.openEffortFor('demo', 'shop/cart')?.id).toBe('e_area');
+    expect(r.openEffortFor('demo', 'shop/cart', 'api')?.id).toBe('e_task');
+    r.addNotice('demo', 'shop/team', { from: 'chore/org/team', text: 't1', at: '1' });
+    r.addNotice('demo', 'shop/team', { from: 'chore/org/team', text: 't1', at: '2' });
+    expect(r.notices('demo', 'shop/team')).toHaveLength(1);
+    r.clearNoticesFrom('demo', ['chore/org/team']);
+    expect(r.notices('demo', 'shop/team')).toEqual([]);
+  });
 });

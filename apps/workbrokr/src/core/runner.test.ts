@@ -85,4 +85,41 @@ describe('runner', () => {
       foreign.kill('SIGKILL');
     }
   });
+
+  it('starts only backend-mode services when mode is backend, and only missing services when onlyServices is set', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'wk-run-'));
+    const m = validateManifest({
+      project: 'demo',
+      baseBranch: 'develop',
+      ports: { services: { backend: { base: 42200 }, frontend: { base: 42300 } } },
+      services: {
+        backend: {
+          start: `node ${svc} --port $PORT_BACKEND --name backend`,
+          stop: 'true',
+          health: 'curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:$PORT_BACKEND/health',
+          healthyCodes: [200],
+        },
+        frontend: {
+          start: `node ${svc} --port $PORT_FRONTEND --name frontend`,
+          stop: 'true',
+          health: 'curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:$PORT_FRONTEND/health',
+          healthyCodes: [200],
+        },
+      },
+      scopes: { frontend: [], backend: [] },
+      areas: { a: {} },
+    });
+    const env = { ...process.env, PORT_BACKEND: '42201', PORT_FRONTEND: '42301' };
+    const r1 = await startServices({ m, cwd, env, logDir: cwd, mode: 'backend' });
+    expect(Object.keys(r1.pids)).toEqual(['backend']);
+    const r2 = await startServices({ m, cwd, env, logDir: cwd, onlyServices: ['frontend'] });
+    expect(Object.keys(r2.pids)).toEqual(['frontend']);
+    await stopServices({
+      m,
+      cwd,
+      env,
+      pids: { ...r1.pids, ...r2.pids },
+      signatures: { ...r1.signatures, ...r2.signatures },
+    });
+  });
 });

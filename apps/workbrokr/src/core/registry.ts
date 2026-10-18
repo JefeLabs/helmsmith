@@ -130,26 +130,43 @@ export class Registry {
     );
   }
 
-  efforts(filter: Partial<Pick<Effort, 'project' | 'area' | 'state'>> = {}): Effort[] {
+  efforts(filter: Partial<Pick<Effort, 'project' | 'area' | 'task' | 'state'>> = {}): Effort[] {
     return this.read().efforts.filter((e) =>
       Object.entries(filter).every(([k, v]) => (e as unknown as Record<string, unknown>)[k] === v),
     );
   }
 
-  activeEffortFor(project: string, area: string): Effort | undefined {
-    return this.efforts({ project, area, state: 'active' })[0];
+  activeEffortFor(project: string, area: string, task?: string): Effort | undefined {
+    return this.efforts({ project, area, state: 'active' }).find(
+      (e) => (e.task ?? undefined) === (task ?? undefined),
+    );
   }
 
-  /** An effort that is being started counts as open: nobody else may start on the area meanwhile. */
-  openEffortFor(project: string, area: string): Effort | undefined {
+  /** An effort that is being started counts as open: nobody else may start on the same (area, task) meanwhile. */
+  openEffortFor(project: string, area: string, task?: string): Effort | undefined {
     return this.efforts({ project, area }).find(
-      (e) => e.state === 'starting' || e.state === 'active',
+      (e) =>
+        (e.state === 'starting' || e.state === 'active') &&
+        (e.task ?? undefined) === (task ?? undefined),
     );
   }
 
   addNotice(project: string, area: string, notice: Notice): void {
     this.update((r) => {
-      r.notices = [...(r.notices ?? []), { project, area, notice }];
+      const existing = r.notices ?? [];
+      const dup = existing.findIndex(
+        (n) =>
+          n.project === project &&
+          n.area === area &&
+          n.notice.from === notice.from &&
+          n.notice.text === notice.text,
+      );
+      if (dup >= 0) {
+        existing[dup] = { project, area, notice };
+        r.notices = existing;
+      } else {
+        r.notices = [...existing, { project, area, notice }];
+      }
     });
   }
 
@@ -162,6 +179,23 @@ export class Registry {
   clearNotices(project: string, area: string): void {
     this.update((r) => {
       r.notices = (r.notices ?? []).filter((n) => !(n.project === project && n.area === area));
+    });
+  }
+
+  clearNoticesFrom(project: string, branches: string[]): void {
+    const set = new Set(branches);
+    this.update((r) => {
+      r.notices = (r.notices ?? []).filter(
+        (n) => !(n.project === project && set.has(n.notice.from)),
+      );
+    });
+  }
+
+  pruneNoticesWhere(project: string, area: string, remove: (n: Notice) => boolean): void {
+    this.update((r) => {
+      r.notices = (r.notices ?? []).filter(
+        (n) => !(n.project === project && n.area === area && remove(n.notice)),
+      );
     });
   }
 
