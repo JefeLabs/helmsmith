@@ -29,7 +29,9 @@ import {
   type Registry,
   runRefresh,
   selectRefresh,
+  serviceModes,
   slotVars,
+  TASK_SLUG,
   WorkkitError,
 } from '../core/index.js';
 import type { StorybrokrClient } from './storybrokr.js';
@@ -40,6 +42,8 @@ export interface ServiceRunner {
     cwd: string;
     env: NodeJS.ProcessEnv;
     logDir: string;
+    mode?: 'backend' | 'fullstack';
+    onlyServices?: string[];
     onLog?: (l: string) => void;
     onSpawn?: (service: string, pid: number, signature: string) => void;
   }): Promise<{ pids: Record<string, number>; signatures?: Record<string, string> }>;
@@ -67,8 +71,10 @@ export interface Ctx {
 
 export interface StartOptions {
   area: string;
+  task?: string;
   type: string;
   mode: Mode;
+  scopes?: string[];
   join?: boolean;
   sync?: boolean;
   story?: string;
@@ -86,11 +92,17 @@ export interface StartResult {
   notices: Notice[];
 }
 
-export const worktreePathFor = (ctx: Ctx, area: string) =>
-  join(ctx.repoRoot, ctx.manifest.worktreeRoot, area);
-const branchFor = (type: string, area: string) => `${type}/${area}`;
+export const worktreePathFor = (ctx: Ctx, area: string, task?: string) =>
+  task
+    ? join(ctx.repoRoot, ctx.manifest.worktreeRoot, '_tasks', `${area}--${task}`)
+    : join(ctx.repoRoot, ctx.manifest.worktreeRoot, area);
+export const branchFor = (type: string, area: string, task?: string) =>
+  task ? `${type}/${area}--${task}` : `${type}/${area}`;
+const effortLabel = (area: string, task?: string) => (task ? `${area}--${task}` : area);
 const now = () => new Date().toISOString();
 const STARTING_GRACE_MS = 30 * 60_000;
+const JOIN_WAIT_MS = 60_000;
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 const realpathOr = (p: string) => {
   try {
@@ -100,12 +112,21 @@ const realpathOr = (p: string) => {
   }
 };
 
+function fetchBaseOnce(ctx: Ctx): void {
+  new Git(ctx.repoRoot).tryRun(['fetch', '-q', 'origin', ctx.manifest.baseBranch]);
+}
+
 function hoursFor(m: Manifest, kind: Lease['kind']): number {
   return {
     slot: m.expiry.slotHours,
     storybook: m.expiry.storybookHours,
     commons: m.expiry.commonsHours,
   }[kind];
+}
+
+function modeCovers(existing: Mode, requested: Mode): boolean {
+  if (existing === 'fullstack') return true;
+  return existing === requested;
 }
 
 /** Activity on an effort extends every lease it holds (spec §8.4: idle is measured from the last touch). */
@@ -150,6 +171,28 @@ async function anyPortAnswers(ports: Record<string, number> | undefined): Promis
   return false;
 }
 
+async function claimFreeSlot(
+  ctx: Ctx,
+  effortId: string,
+  warnings: string[],
+): Promise<Lease> {
+  const m = ctx.manifest;
+  const exclude = new Set<number>();
+  const busyNotes: string[] = [];
+  for (;;) {
+    const candidate = ctx.registry.allocateSlot(m.project, m, ctx.owner, effortId, exclude);
+    const busy = await busyPorts(candidate.ports ?? {});
+    if (busy.length === 0) {
+      if (busyNotes.length) warnings.push(...busyNotes);
+      return candidate;
+    }
+    ctx.registry.release(candidate.id);
+    exclude.add(candidate.value as number);
+    busyNotes.push(`slot ${candidate.value}: ${busy.join(', ')} already in use`);
+    ctx.log(busyNotes[busyNotes.length - 1]);
+  }
+}
+
 // ── start ────────────────────────────────────────────────────────────────────
 
 function guardStart(
@@ -164,23 +207,32 @@ function guardStart(
       `unknown area "${o.area}" (known: ${Object.keys(m.areas).join(', ')})`,
       { area: o.area },
     );
+  if (o.task !== undefined && !TASK_SLUG.test(o.task))
+    throw new WorkkitError(
+      'TASK_INVALID',
+      `invalid task slug "${o.task}" (must match /^[a-z0-9][a-z0-9_-]{0,47}$/ with no "--")`,
+      { task: o.task },
+    );
   if (!m.branch.types.includes(o.type))
     throw new WorkkitError(
       'TYPE_UNKNOWN',
       `unknown type "${o.type}" (allowed: ${m.branch.types.join(', ')})`,
       { type: o.type },
     );
-  if (o.mode !== 'frontend' && o.mode !== 'fullstack')
-    throw new WorkkitError('MODE_UNKNOWN', `unknown mode "${o.mode}" (frontend | fullstack)`);
-  const branch = branchFor(o.type, o.area);
+  if (o.mode !== 'frontend' && o.mode !== 'backend' && o.mode !== 'fullstack')
+    throw new WorkkitError(
+      'MODE_UNKNOWN',
+      `unknown mode "${o.mode}" (frontend | backend | fullstack)`,
+    );
+  const branch = branchFor(o.type, o.area, o.task);
   assertNotProtected(m, branch);
-  const scopes = expandScopes(m, o.area, o.mode);
+  const scopes = expandScopes(m, o.area, o.mode, o.scopes, Boolean(o.task));
   const commons = spec.commons ?? [];
   const warnings: string[] = [];
   if (commons.length > 0) {
     for (const e of ctx.registry.efforts({ project: m.project })) {
       if (
-        e.area === o.area ||
+        (e.area === o.area && (e.task ?? undefined) === (o.task ?? undefined)) ||
         (e.state !== 'active' && e.state !== 'starting') ||
         !existsSync(e.worktree)
       )
@@ -192,14 +244,14 @@ function guardStart(
       const hit = commonsTouched(m, changed).filter((c) => commons.includes(c));
       if (hit.length > 0)
         warnings.push(
-          `${e.area} (${e.branch}, ${e.owner.session}) already has commits under commons ${hit.join(', ')}: coordinate or wait for its merge`,
+          `${effortLabel(e.area, e.task)} (${e.branch}, ${e.owner.session}) already has commits under commons ${hit.join(', ')}: coordinate or wait for its merge`,
         );
     }
   }
   return { branch, scopes, commons, warnings };
 }
 
-/** One registry transaction: nobody else may be open on the area or hold an overlapping scope; the effort is written as `starting`. */
+/** One registry transaction: nobody else may be open on the same (area, task) or hold an overlapping scope; the effort is written as `starting`. */
 function reserveEffort(
   ctx: Ctx,
   o: StartOptions,
@@ -212,10 +264,11 @@ function reserveEffort(
     id: newId('eff'),
     project: m.project,
     area: o.area,
+    ...(o.task ? { task: o.task } : {}),
     type: o.type,
     mode: o.mode,
     branch,
-    worktree: worktreePathFor(ctx, o.area),
+    worktree: worktreePathFor(ctx, o.area, o.task),
     owner: ctx.owner,
     state: 'starting',
     scopes,
@@ -229,21 +282,25 @@ function reserveEffort(
     const open = r.efforts.filter(
       (e) => e.project === m.project && (e.state === 'active' || e.state === 'starting'),
     );
-    const onArea = open.find((e) => e.area === o.area);
-    if (onArea) {
+    const onTarget = open.find(
+      (e) => e.area === o.area && (e.task ?? undefined) === (o.task ?? undefined),
+    );
+    if (onTarget) {
+      const label = effortLabel(o.area, o.task);
       throw new WorkkitError(
         'EFFORT_OPEN',
-        `an effort is open on ${o.area} (${onArea.branch}, ${onArea.mode}) owned by ${onArea.owner.session} since ${onArea.started}; finish it, or pass --join to work in the same checkout`,
-        { owner: onArea.owner.session, effort: onArea.id, branch: onArea.branch },
+        `an effort is open on ${label} (${onTarget.branch}, ${onTarget.mode}) owned by ${onTarget.owner.session} since ${onTarget.started}; finish it, or pass --join to work in the same checkout`,
+        { owner: onTarget.owner.session, effort: onTarget.id, branch: onTarget.branch },
       );
     }
     for (const e of open) {
       const pairs = globsOverlap(scopes, e.scopes);
       if (pairs.length > 0) {
+        const otherLabel = effortLabel(e.area, e.task);
         throw new WorkkitError(
           'SCOPE_CONFLICT',
-          `scope overlaps the open effort on ${e.area} (${e.branch}, owner ${e.owner.session}): ${pairs.join('; ')}`,
-          { with: e.area, owner: e.owner.session, effort: e.id, pairs },
+          `scope overlaps the open effort on ${otherLabel} (${e.branch}, owner ${e.owner.session}): ${pairs.join('; ')}`,
+          { with: otherLabel, owner: e.owner.session, effort: e.id, pairs },
         );
       }
     }
@@ -252,15 +309,21 @@ function reserveEffort(
   return effort;
 }
 
-/** The directory at the area path must be THIS repo's registered worktree, never the main checkout seen through a bare directory. */
-function ensureWorktree(ctx: Ctx, area: string, branch: string): Git {
+/** The directory at the worktree path must be THIS repo's registered worktree, never the main checkout seen through a bare directory. */
+function ensureWorktree(
+  ctx: Ctx,
+  area: string,
+  branch: string,
+  task?: string,
+): { wg: Git; created: boolean } {
   const m = ctx.manifest;
-  const path = worktreePathFor(ctx, area);
+  const path = worktreePathFor(ctx, area, task);
   const main = new Git(ctx.repoRoot);
-  main.fetch(m.baseBranch);
   if (!existsSync(path)) {
     main.worktreeAdd(path, branch, `origin/${m.baseBranch}`);
-    return new Git(path);
+    const wg = new Git(path);
+    wg.repairSubmodules(ctx.repoRoot);
+    return { wg, created: true };
   }
   const registered = main
     .run(['worktree', 'list', '--porcelain'])
@@ -278,28 +341,43 @@ function ensureWorktree(ctx: Ctx, area: string, branch: string): Git {
   ) {
     throw new WorkkitError(
       'WORKTREE_INVALID',
-      `${path} exists but is not this repository's worktree for ${area} (a leftover directory?); move it away, or \`git worktree prune\` and retry`,
+      `${path} exists but is not this repository's worktree for ${effortLabel(area, task)} (a leftover directory?); move it away, or \`git worktree prune\` and retry`,
       { worktree: path },
     );
   }
+  wg.repairSubmodules(ctx.repoRoot);
   const current = wg.currentBranch();
   if (current !== branch) {
-    if (current.endsWith(`/${area}`) && wg.commitsNotOn(m.baseBranch).length > 0) {
-      throw new WorkkitError(
-        'EFFORT_OPEN',
-        `${current} holds ${wg.commitsNotOn(m.baseBranch).length} commit(s) not yet on ${m.baseBranch}: ship or finish it first, or --join it`,
-        { branch: current, area },
-      );
-    }
     if (wg.isDirty())
       throw new WorkkitError(
         'DIRTY_WORKTREE',
         `${path} has uncommitted changes on ${current}; commit or park them before switching to ${branch}`,
         { worktree: path },
       );
+    const unshipped = wg.commitsNotOn(m.baseBranch);
+    if (unshipped.length > 0 && !wg.isEquivalentToBase(m.baseBranch)) {
+      throw new WorkkitError(
+        'EFFORT_OPEN',
+        `${current} holds ${unshipped.length} commit(s) not yet on ${m.baseBranch}: ship or finish it first, or --join it`,
+        { branch: current, area },
+      );
+    }
     wg.checkout(branch, `origin/${m.baseBranch}`);
+    if (
+      !wg.isDirty() &&
+      wg.commitsNotOn(m.baseBranch).length > 0 &&
+      wg.isEquivalentToBase(m.baseBranch)
+    ) {
+      wg.run(['reset', '--hard', `origin/${m.baseBranch}`]);
+    }
+  } else if (
+    !wg.isDirty() &&
+    wg.commitsNotOn(m.baseBranch).length > 0 &&
+    wg.isEquivalentToBase(m.baseBranch)
+  ) {
+    wg.run(['reset', '--hard', `origin/${m.baseBranch}`]);
   }
-  return wg;
+  return { wg, created: false };
 }
 
 function appendLog(file: string, line: string): void {
@@ -308,11 +386,58 @@ function appendLog(file: string, line: string): void {
 
 export async function startEffort(ctx: Ctx, o: StartOptions): Promise<StartResult> {
   const m = ctx.manifest;
+  fetchBaseOnce(ctx);
   const { branch, scopes, commons, warnings } = guardStart(ctx, o);
   const notices = ctx.registry.notices(m.project, o.area);
 
-  const open = ctx.registry.openEffortFor(m.project, o.area);
+  let open = ctx.registry.openEffortFor(m.project, o.area, o.task);
   if (open && o.join) {
+    const deadline = Date.now() + JOIN_WAIT_MS;
+    while (open && open.state === 'starting' && Date.now() < deadline) {
+      await sleep(200);
+      open = ctx.registry.openEffortFor(m.project, o.area, o.task);
+    }
+    if (!open || open.state !== 'active') {
+      throw new WorkkitError(
+        'EFFORT_NOT_FOUND',
+        `effort on ${effortLabel(o.area, o.task)} did not become active in time to join`,
+        { area: o.area, task: o.task },
+      );
+    }
+    if (!modeCovers(open.mode, o.mode)) {
+      const label = effortLabel(o.area, o.task);
+      throw new WorkkitError(
+        'MODE_MISMATCH',
+        `open effort on ${label} is in ${open.mode} mode, which does not cover ${o.mode}; run \`work promote --area ${o.area}${o.task ? ` --task ${o.task}` : ''} --mode fullstack\` first`,
+        { area: o.area, task: o.task, openMode: open.mode, requestedMode: o.mode },
+      );
+    }
+    const currentLeases = ctx.registry.leases({ effort: open.id });
+    if (o.story && !currentLeases.some((l) => l.kind === 'storybook')) {
+      const hostRoot = m.storybook ? join(open.worktree, m.storybook.hostRoot) : open.worktree;
+      const inst = await ctx.storybrokr.up(o.story, hostRoot);
+      const sbLease = ctx.registry.addLease(
+        'storybook',
+        m.project,
+        inst.id,
+        ctx.owner,
+        open.id,
+        m.expiry.storybookHours,
+        { ports: { storybook: inst.port } },
+      );
+      open = ctx.registry.updateEffort(open.id, {
+        leases: [...open.leases, sbLease.id],
+      });
+    }
+    const existingParticipants = open.participants ?? [];
+    const isAlreadyMember =
+      open.owner.session === ctx.owner.session ||
+      existingParticipants.some((p) => p.session === ctx.owner.session);
+    if (!isAlreadyMember) {
+      open = ctx.registry.updateEffort(open.id, {
+        participants: [...existingParticipants, ctx.owner],
+      });
+    }
     touchEffort(ctx, open);
     return {
       effort: open,
@@ -353,18 +478,30 @@ export async function startEffort(ctx: Ctx, o: StartOptions): Promise<StartResul
   process.once('SIGTERM', onSignal);
 
   try {
-    const wg = ensureWorktree(ctx, o.area, branch);
+    const { wg, created } = ensureWorktree(ctx, o.area, branch, o.task);
     const worktree = wg.root();
     ctx.registry.updateEffort(effort.id, { worktree });
     effort.worktree = worktree;
     const logDir = join(worktree, m.logs.dir);
     mkdirSync(logDir, { recursive: true });
     const refreshLog = join(logDir, 'refresh.log');
+    const stampFile = join(logDir, '.refresh-stamps.json');
+
+    if (created && m.seed && m.seed.length > 0) {
+      runRefresh(
+        m.seed,
+        worktree,
+        (l) => {
+          appendLog(refreshLog, l);
+          ctx.log(l);
+        },
+        { ...process.env, WORKTREE: worktree, MAIN_ROOT: ctx.repoRoot },
+      );
+    }
 
     let sync: StartResult['sync'] = 'skipped';
     let changed: string[] = [];
     if (o.sync !== false) {
-      wg.fetch(m.baseBranch);
       const r = wg.syncFrom(m.baseBranch);
       if (r.kind === 'conflict') {
         throw new WorkkitError(
@@ -375,12 +512,29 @@ export async function startEffort(ctx: Ctx, o: StartOptions): Promise<StartResul
       }
       sync = r.kind;
       if (r.kind === 'ff' || r.kind === 'merge') changed = wg.changedPaths(r.before, r.after);
+      ctx.registry.pruneNoticesWhere(
+        m.project,
+        o.area,
+        (n) => wg.isAncestor(`origin/${n.from}`, 'HEAD') || wg.isAncestor(n.from, 'HEAD'),
+      );
     }
-    const sel = selectRefresh(m.refresh, changed);
-    runRefresh(sel.runs, worktree, (l) => {
-      appendLog(refreshLog, l);
-      ctx.log(l);
-    });
+    const sel = selectRefresh(m.refresh, changed, { worktree, stampFile });
+    runRefresh(
+      sel.runs,
+      worktree,
+      (l) => {
+        appendLog(refreshLog, l);
+        ctx.log(l);
+      },
+      process.env,
+      {
+        stampFile,
+        pendingStamps: sel.pendingStamps,
+        restoreFiles: sel.cleanWhenFiles,
+      },
+    );
+
+    const baseSha = wg.rev('HEAD');
 
     for (const name of commons)
       leases.push(
@@ -394,25 +548,9 @@ export async function startEffort(ctx: Ctx, o: StartOptions): Promise<StartResul
         ),
       );
 
-    if (o.mode === 'fullstack') {
-      const exclude = new Set<number>();
-      let slot: Lease | undefined;
-      const busyNotes: string[] = [];
-      for (;;) {
-        const candidate = ctx.registry.allocateSlot(m.project, m, ctx.owner, effort.id, exclude);
-        const busy = await busyPorts(candidate.ports ?? {});
-        if (busy.length === 0) {
-          slot = candidate;
-          break;
-        }
-        ctx.registry.release(candidate.id);
-        exclude.add(candidate.value as number);
-        busyNotes.push(`slot ${candidate.value}: ${busy.join(', ')} already in use`);
-        ctx.log(busyNotes[busyNotes.length - 1]);
-      }
-      if (!slot) throw new WorkkitError('NO_FREE_SLOT', busyNotes.join('; '));
+    if (o.mode === 'fullstack' || o.mode === 'backend') {
+      const slot = await claimFreeSlot(ctx, effort.id, warnings);
       leases.push(slot);
-      if (busyNotes.length) warnings.push(...busyNotes);
       const cfg = emitWorktreeConfig({
         m,
         worktree,
@@ -432,6 +570,7 @@ export async function startEffort(ctx: Ctx, o: StartOptions): Promise<StartResul
         cwd: worktree,
         env,
         logDir,
+        mode: o.mode,
         onLog: ctx.log,
         onSpawn: (service, pid, signature) => {
           pids[service] = pid;
@@ -466,6 +605,7 @@ export async function startEffort(ctx: Ctx, o: StartOptions): Promise<StartResul
 
     const active = ctx.registry.updateEffort(effort.id, {
       state: 'active',
+      baseSha,
       leases: leases.map((l) => l.id),
       lastActivity: now(),
     });
@@ -486,6 +626,132 @@ export async function startEffort(ctx: Ctx, o: StartOptions): Promise<StartResul
     process.off('SIGINT', onSignal);
     process.off('SIGTERM', onSignal);
   }
+}
+
+// ── promote ──────────────────────────────────────────────────────────────────
+
+export interface PromoteOptions {
+  area: string;
+  task?: string;
+  mode: 'backend' | 'fullstack';
+  story?: string;
+}
+
+export interface PromoteResult {
+  effort: Effort;
+  leases: Lease[];
+  startedServices: string[];
+  warnings: string[];
+}
+
+export async function promoteEffort(ctx: Ctx, o: PromoteOptions): Promise<PromoteResult> {
+  const m = ctx.manifest;
+  if (o.mode !== 'backend' && o.mode !== 'fullstack') {
+    throw new WorkkitError('MODE_UNKNOWN', `promote target mode must be backend or fullstack`);
+  }
+  const open = ctx.registry.openEffortFor(m.project, o.area, o.task);
+  if (!open) {
+    throw new WorkkitError(
+      'EFFORT_NOT_FOUND',
+      `no open effort on ${effortLabel(o.area, o.task)} to promote`,
+      { area: o.area, task: o.task },
+    );
+  }
+  if (
+    (open.mode === 'fullstack' && o.mode === 'backend') ||
+    (open.mode === 'frontend' && o.mode === 'backend')
+  ) {
+    throw new WorkkitError(
+      'MODE_MISMATCH',
+      `cannot transition effort on ${effortLabel(o.area, o.task)} from ${open.mode} to ${o.mode}`,
+      { from: open.mode, to: o.mode },
+    );
+  }
+  const modeScopes = expandScopes(m, o.area, o.mode);
+  const nextScopes = open.task ? [...new Set([...open.scopes, ...modeScopes])] : modeScopes;
+
+  ctx.registry.update((r) => {
+    const others = r.efforts.filter(
+      (e) =>
+        e.project === m.project &&
+        e.id !== open.id &&
+        (e.state === 'active' || e.state === 'starting'),
+    );
+    for (const e of others) {
+      const pairs = globsOverlap(nextScopes, e.scopes);
+      if (pairs.length > 0) {
+        const otherLabel = effortLabel(e.area, e.task);
+        throw new WorkkitError(
+          'SCOPE_CONFLICT',
+          `promoting ${effortLabel(o.area, o.task)} to ${o.mode} overlaps ${otherLabel} (${e.branch}): ${pairs.join('; ')}`,
+          { with: otherLabel, owner: e.owner.session, effort: e.id, pairs },
+        );
+      }
+    }
+    const idx = r.efforts.findIndex((e) => e.id === open.id);
+    if (idx >= 0) {
+      r.efforts[idx] = { ...r.efforts[idx], mode: o.mode, scopes: nextScopes, lastActivity: now() };
+    }
+  });
+
+  const warnings: string[] = [];
+  let slot = ctx.registry.leases({ effort: open.id, kind: 'slot' })[0];
+  const sb = ctx.registry.leases({ effort: open.id, kind: 'storybook' })[0];
+  if (!slot) {
+    slot = await claimFreeSlot(ctx, open.id, warnings);
+    ctx.registry.updateEffort(open.id, { leases: [...open.leases, slot.id] });
+  }
+  const cfg = emitWorktreeConfig({
+    m,
+    worktree: open.worktree,
+    slot: slot.value as number,
+    ports: slot.ports ?? {},
+    storybookPort: sb?.ports?.storybook,
+    area: o.area,
+    branch: open.branch,
+  });
+  const env = { ...process.env, ...cfg.vars };
+  const logDir = join(open.worktree, m.logs.dir);
+  mkdirSync(logDir, { recursive: true });
+
+  const existingPids = { ...(slot.pids ?? {}) };
+  const existingSigs = { ...(slot.signatures ?? {}) };
+  const missingServices = Object.entries(m.services)
+    .filter(([name, spec]) => serviceModes(name, spec).includes(o.mode) && !existingPids[name])
+    .map(([name]) => name);
+
+  if (missingServices.length > 0) {
+    const result = await ctx.runner.start({
+      m,
+      cwd: open.worktree,
+      env,
+      logDir,
+      mode: o.mode,
+      onlyServices: missingServices,
+      onLog: ctx.log,
+      onSpawn: (service, pid, signature) => {
+        existingPids[service] = pid;
+        existingSigs[service] = signature;
+        ctx.registry.patchLease(slot.id, {
+          pids: { ...existingPids },
+          signatures: { ...existingSigs },
+        });
+      },
+    });
+    ctx.registry.patchLease(slot.id, {
+      pids: { ...existingPids, ...result.pids },
+      signatures: { ...existingSigs, ...(result.signatures ?? {}) },
+    });
+  }
+
+  const updated = ctx.registry.updateEffort(open.id, { lastActivity: now() });
+  touchEffort(ctx, updated);
+  return {
+    effort: updated,
+    leases: ctx.registry.leases({ effort: open.id }),
+    startedServices: missingServices,
+    warnings,
+  };
 }
 
 // ── status / env ─────────────────────────────────────────────────────────────
@@ -509,21 +775,21 @@ export interface StatusReport {
 function behindBase(ctx: Ctx, worktree: string): number {
   if (!existsSync(worktree)) return 0;
   const g = new Git(worktree);
-  g.tryRun(['fetch', '-q', 'origin', ctx.manifest.baseBranch]);
   const r = g.tryRun(['rev-list', '--count', `HEAD..origin/${ctx.manifest.baseBranch}`]);
   return r.code === 0 ? Number(r.out.trim()) || 0 : 0;
 }
 
 /** Every area of the project (or one), with its open effort, leases, drift from the base branch and notices. Asking about one area counts as activity on it. */
-export function statusFor(ctx: Ctx, area?: string): StatusReport {
+export function statusFor(ctx: Ctx, area?: string, task?: string): StatusReport {
   const m = ctx.manifest;
+  fetchBaseOnce(ctx);
   const names = (area ? [area] : Object.keys(m.areas)).sort();
   const areas: AreaStatus[] = names.map((name) => {
-    const effort = ctx.registry.openEffortFor(m.project, name);
+    const effort = ctx.registry.openEffortFor(m.project, name, area ? task : undefined);
     if (effort && area) touchEffort(ctx, effort);
-    const worktree = worktreePathFor(ctx, name);
+    const worktree = worktreePathFor(ctx, name, area ? task : undefined);
     const out: AreaStatus = {
-      area: name,
+      area: area && task ? `${name}--${task}` : name,
       leases: effort ? ctx.registry.leases({ effort: effort.id }) : [],
       behindBase: behindBase(ctx, worktree),
       notices: ctx.registry.notices(m.project, name),
@@ -541,14 +807,14 @@ export function slotEnv(m: Manifest, slot: number): Record<string, string> {
 }
 
 /** The variables the open effort's config was emitted with, plus MODE. Counts as activity. */
-export function effortEnv(ctx: Ctx, area: string): Record<string, string> {
+export function effortEnv(ctx: Ctx, area: string, task?: string): Record<string, string> {
   const m = ctx.manifest;
-  const effort = ctx.registry.openEffortFor(m.project, area);
+  const effort = ctx.registry.openEffortFor(m.project, area, task);
   if (!effort)
     throw new WorkkitError(
       'EFFORT_NOT_FOUND',
-      `no open effort on ${area}; \`work start --area ${area} …\` first`,
-      { area },
+      `no open effort on ${effortLabel(area, task)}; \`work start --area ${area} …\` first`,
+      { area, task },
     );
   touchEffort(ctx, effort);
   const slot = ctx.registry.leases({ effort: effort.id, kind: 'slot' })[0];
@@ -604,7 +870,7 @@ async function releaseLease(ctx: Ctx, effort: Effort | undefined, lease: Lease):
   ctx.registry.release(lease.id);
 }
 
-/** Tell every other area that a commons set changed on this branch (informational only, kept until the area is retired). */
+/** Tell every other area that a commons set changed on this branch (informational only, kept until the area is retired or synced). */
 function leaveNotices(ctx: Ctx, effort: Effort, commons: string[]): number {
   if (commons.length === 0) return 0;
   const notice: Notice = {
@@ -621,46 +887,144 @@ function leaveNotices(ctx: Ctx, effort: Effort, commons: string[]): number {
   return count;
 }
 
+export interface FinishOptions {
+  area: string;
+  task?: string;
+  park?: boolean;
+  intoArea?: boolean;
+  force?: boolean;
+}
+
 export interface FinishResult {
   effort: Effort;
   pushed: boolean;
   parked: boolean;
+  mergedIntoArea?: boolean;
+  left?: boolean;
   notices: number;
 }
 
-/** Stop the runner, release every lease, push the branch, leave notices; the worktree and branch stay. A parked effort can be finished too. */
-export async function finishEffort(
-  ctx: Ctx,
-  o: { area: string; park?: boolean },
-): Promise<FinishResult> {
+/** Stop the runner, release every lease, push the branch (or merge --into-area), leave notices; area worktrees stay, task worktrees are cleaned up. */
+export async function finishEffort(ctx: Ctx, o: FinishOptions): Promise<FinishResult> {
   const m = ctx.manifest;
   const effort =
-    ctx.registry.openEffortFor(m.project, o.area) ??
+    ctx.registry.openEffortFor(m.project, o.area, o.task) ??
     ctx.registry
       .efforts({ project: m.project, area: o.area, state: 'parked' })
+      .filter((e) => (e.task ?? undefined) === (o.task ?? undefined))
       .sort((a, b) => b.started.localeCompare(a.started))[0];
   if (!effort)
-    throw new WorkkitError('EFFORT_NOT_FOUND', `no open or parked effort on ${o.area}`, {
-      area: o.area,
-    });
+    throw new WorkkitError(
+      'EFFORT_NOT_FOUND',
+      `no open or parked effort on ${effortLabel(o.area, o.task)}`,
+      { area: o.area, task: o.task },
+    );
+
+  if (!o.force && effort.participants && effort.participants.length > 0) {
+    if (ctx.owner.session === effort.owner.session) {
+      const [nextOwner, ...rest] = effort.participants;
+      const updated = ctx.registry.updateEffort(effort.id, {
+        owner: nextOwner,
+        participants: rest,
+        lastActivity: now(),
+      });
+      touchEffort(ctx, updated);
+      return { effort: updated, pushed: false, parked: false, left: true, notices: 0 };
+    }
+    if (effort.participants.some((p) => p.session === ctx.owner.session)) {
+      const updated = ctx.registry.updateEffort(effort.id, {
+        participants: effort.participants.filter((p) => p.session !== ctx.owner.session),
+        lastActivity: now(),
+      });
+      touchEffort(ctx, updated);
+      return { effort: updated, pushed: false, parked: false, left: true, notices: 0 };
+    }
+  }
+
+  const label = effortLabel(effort.area, effort.task);
   const g = new Git(effort.worktree);
   let parked = false;
   if (g.isDirty()) {
     if (!o.park) {
       throw new WorkkitError(
         'DIRTY_WORKTREE',
-        `${effort.worktree} has uncommitted changes: commit them, or \`work finish --park\` to commit them as wip(${effort.area}) and push`,
+        `${effort.worktree} has uncommitted changes: commit them, or \`work finish --park\` to commit them as wip(${label}) and push`,
         { worktree: effort.worktree },
       );
     }
     g.run(['add', '-A']);
-    g.run(['commit', '-q', '-m', `wip(${effort.area}): parked ${now()}`]);
+    g.run(['commit', '-q', '-m', `wip(${label}): parked ${now()}`]);
     parked = true;
   }
+
+  if (o.intoArea) {
+    if (!effort.task) {
+      throw new WorkkitError(
+        'MANIFEST_INVALID',
+        '--into-area requires a task sub-effort (--task <slug>)',
+        { area: effort.area },
+      );
+    }
+    fetchBaseOnce(ctx);
+    const parentBranch = branchFor(effort.type, effort.area);
+    const { wg: areaGit } = ensureWorktree(ctx, effort.area, parentBranch);
+    if (areaGit.isDirty()) {
+      throw new WorkkitError(
+        'DIRTY_WORKTREE',
+        `parent area worktree ${areaGit.cwd} has uncommitted changes; commit or clean it before merging task ${effort.branch} --into-area`,
+        { worktree: areaGit.cwd },
+      );
+    }
+    const merged = areaGit.tryRun(['merge', '--no-edit', '-q', effort.branch]);
+    if (merged.code !== 0) {
+      const conflicted = areaGit
+        .tryRun(['diff', '--name-only', '--diff-filter=U'])
+        .out.split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean);
+      areaGit.tryRun(['merge', '--abort']);
+      throw new WorkkitError(
+        'SYNC_CONFLICT',
+        `merging ${effort.branch} into ${parentBranch} conflicts in ${conflicted.join(', ')}; resolve in ${effort.worktree} before retrying \`work finish --into-area\``,
+        { conflicted, worktree: areaGit.cwd },
+      );
+    }
+  }
+
   for (const lease of ctx.registry.leases({ effort: effort.id }))
     await releaseLease(ctx, effort, lease);
-  g.push(effort.branch);
-  const notices = leaveNotices(ctx, effort, commonsTouched(m, g.changedSince(m.baseBranch)));
+
+  let notices = 0;
+  if (!o.intoArea) {
+    g.push(effort.branch);
+    if (g.commitsNotOn(m.baseBranch).length > 0 && !g.isEquivalentToBase(m.baseBranch)) {
+      const since = g.changedSince(m.baseBranch);
+      const sinceSet = new Set(since);
+      const changed = effort.baseSha
+        ? g.changedPaths(effort.baseSha, 'HEAD').filter((p) => sinceSet.has(p))
+        : since;
+      notices = leaveNotices(ctx, effort, commonsTouched(m, changed));
+    }
+  }
+
+  if (effort.task) {
+    archiveWorktree(ctx, label, effort.worktree);
+    const main = new Git(ctx.repoRoot);
+    main.worktreeRemove(effort.worktree);
+    if (o.intoArea) {
+      main.deleteLocalBranch(effort.branch);
+    }
+    const finished: Effort = { ...effort, state: 'finished', lastActivity: now() };
+    ctx.registry.removeEfforts((e) => e.id === effort.id);
+    return {
+      effort: finished,
+      pushed: !o.intoArea,
+      parked,
+      mergedIntoArea: Boolean(o.intoArea),
+      notices,
+    };
+  }
+
   const finished = ctx.registry.updateEffort(effort.id, { state: 'finished', lastActivity: now() });
   return { effort: finished, pushed: true, parked, notices };
 }
@@ -759,11 +1123,13 @@ export async function retireArea(ctx: Ctx, o: { area: string }): Promise<RetireR
   const m = ctx.manifest;
   if (!m.areas[o.area])
     throw new WorkkitError('AREA_UNKNOWN', `unknown area "${o.area}"`, { area: o.area });
-  const open = ctx.registry.openEffortFor(m.project, o.area);
+  const open = ctx.registry
+    .efforts({ project: m.project, area: o.area })
+    .find((e) => e.state === 'starting' || e.state === 'active');
   if (open)
     throw new WorkkitError(
       'EFFORT_OPEN',
-      `an effort is open on ${o.area} (${open.owner.session}); \`work finish\` it first`,
+      `an effort is open on ${effortLabel(open.area, open.task)} (${open.owner.session}); \`work finish\` it first`,
       { owner: open.owner.session },
     );
   const worktree = worktreePathFor(ctx, o.area);
@@ -789,8 +1155,8 @@ export async function retireArea(ctx: Ctx, o: { area: string }): Promise<RetireR
   }
   const branchesDeleted: string[] = [];
   const branchesKept: string[] = [];
-  for (const type of m.branch.types) {
-    const branch = `${type}/${o.area}`;
+  const allAreaBranches = m.branch.types.map((type) => `${type}/${o.area}`);
+  for (const branch of allAreaBranches) {
     if (!main.branchExists(branch)) continue;
     const onOrigin =
       main.remoteBranchExists(branch) &&
@@ -802,6 +1168,7 @@ export async function retireArea(ctx: Ctx, o: { area: string }): Promise<RetireR
   }
   ctx.registry.removeEfforts((e) => e.project === m.project && e.area === o.area);
   ctx.registry.clearNotices(m.project, o.area);
+  ctx.registry.clearNoticesFrom(m.project, allAreaBranches);
   return { archived, removed: worktree, branchesDeleted, branchesKept };
 }
 
@@ -844,10 +1211,11 @@ function registeredWorktrees(ctx: Ctx): { path: string; branch: string }[] {
 /** What would otherwise be forgotten: unsaved work, stray checkouts, aging leases, drift, stale notices, archive bulk. */
 export async function auditProject(ctx: Ctx): Promise<Finding[]> {
   const m = ctx.manifest;
+  fetchBaseOnce(ctx);
   const findings: Finding[] = [];
   const types = m.branch.types.join('|');
   const areaOf = (branch: string): string | null => {
-    const match = new RegExp(`^(${types})/(.+)$`).exec(branch);
+    const match = new RegExp(`^(${types})/(.+?)(?:--([a-z0-9][a-z0-9_-]*))?$`).exec(branch);
     return match && m.areas[match[2]] ? match[2] : null;
   };
   for (const w of registeredWorktrees(ctx)) {

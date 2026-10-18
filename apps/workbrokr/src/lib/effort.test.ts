@@ -10,6 +10,7 @@ import {
   type Ctx,
   effortEnv,
   finishEffort,
+  promoteEffort,
   reapLeases,
   retireArea,
   type ServiceRunner,
@@ -564,3 +565,131 @@ function manifestRaw() {
     refresh: [{ when: 'lock.json', run: 'touch refreshed.marker' }],
   };
 }
+
+describe('parallel waves, promote, join ref-counting & squash-merge recovery', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('runs parallel backend + narrowed frontend tasks in the same area and converges them with --into-area', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const ctx = ctxFor(f);
+    const api = await startEffort(ctx, {
+      area: 'shop/cart',
+      task: 'api',
+      type: 'feature',
+      mode: 'backend',
+    });
+    const viewA = await startEffort(
+      { ...ctx, owner: { session: 's2', pid: 2 } },
+      {
+        area: 'shop/cart',
+        task: 'search-input',
+        type: 'feature',
+        mode: 'frontend',
+        scopes: ['app-ui/app/shop/cart/SearchInput/**'],
+      },
+    );
+    const viewB = await startEffort(
+      { ...ctx, owner: { session: 's3', pid: 3 } },
+      {
+        area: 'shop/cart',
+        task: 'user-card',
+        type: 'feature',
+        mode: 'frontend',
+        scopes: ['app-ui/app/shop/cart/UserCard/**'],
+      },
+    );
+    expect(api.effort.branch).toBe('feature/shop/cart--api');
+    expect(viewA.effort.worktree).toContain('_tasks/shop/cart--search-input');
+    commitFile(api.effort.worktree, 'svc/cart/handler.go', 'package cart', 'api work');
+    commitFile(
+      viewA.effort.worktree,
+      'app-ui/app/shop/cart/SearchInput/index.tsx',
+      'export const S = 1;',
+      'view A',
+    );
+    commitFile(
+      viewB.effort.worktree,
+      'app-ui/app/shop/cart/UserCard/index.tsx',
+      'export const U = 2;',
+      'view B',
+    );
+
+    const finApi = await finishEffort(ctx, { area: 'shop/cart', task: 'api', intoArea: true });
+    expect(finApi.mergedIntoArea).toBe(true);
+    expect(existsSync(api.effort.worktree)).toBe(false);
+    await finishEffort(
+      { ...ctx, owner: { session: 's2', pid: 2 } },
+      { area: 'shop/cart', task: 'search-input', intoArea: true },
+    );
+    await finishEffort(
+      { ...ctx, owner: { session: 's3', pid: 3 } },
+      { area: 'shop/cart', task: 'user-card', intoArea: true },
+    );
+
+    const areaEffort = await startEffort(ctx, {
+      area: 'shop/cart',
+      type: 'feature',
+      mode: 'frontend',
+    });
+    expect(existsSync(join(areaEffort.effort.worktree, 'svc/cart/handler.go'))).toBe(true);
+    expect(
+      existsSync(join(areaEffort.effort.worktree, 'app-ui/app/shop/cart/SearchInput/index.tsx')),
+    ).toBe(true);
+    expect(
+      existsSync(join(areaEffort.effort.worktree, 'app-ui/app/shop/cart/UserCard/index.tsx')),
+    ).toBe(true);
+
+    const promoted = await promoteEffort(ctx, { area: 'shop/cart', mode: 'fullstack' });
+    expect(promoted.effort.mode).toBe('fullstack');
+    expect(promoted.leases.some((l) => l.kind === 'slot')).toBe(true);
+  });
+
+  it('reference-counts --join participants and refuses incompatible mode on --join', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const ctx = ctxFor(f);
+    await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'frontend' });
+    const other = { ...ctx, owner: { session: 's2', pid: 2 } };
+    await expect(
+      startEffort(other, { area: 'shop/cart', type: 'feature', mode: 'fullstack', join: true }),
+    ).rejects.toMatchObject({ code: 'MODE_MISMATCH' });
+    const joined = await startEffort(other, {
+      area: 'shop/cart',
+      type: 'feature',
+      mode: 'frontend',
+      join: true,
+    });
+    expect(joined.effort.participants).toEqual([{ session: 's2', pid: 2 }]);
+    const left = await finishEffort(other, { area: 'shop/cart' });
+    expect(left.left).toBe(true);
+    expect(left.pushed).toBe(false);
+    expect(ctx.registry.openEffortFor('demo', 'shop/cart')).toBeDefined();
+    const final = await finishEffort(ctx, { area: 'shop/cart' });
+    expect(final.pushed).toBe(true);
+  });
+
+  it('recovers cleanly when a previous branch was squash-merged into baseBranch', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const ctx = ctxFor(f);
+    const first = await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'frontend' });
+    commitFile(first.effort.worktree, 'app-ui/app/shop/cart/page.tsx', 'v1', 'feat commit');
+    await finishEffort(ctx, { area: 'shop/cart' });
+    commitFile(f.main, 'app-ui/app/shop/cart/page.tsx', 'v1', 'squash merged PR');
+    new Git(f.main).push('develop');
+    const next = await startEffort(ctx, { area: 'shop/cart', type: 'fix', mode: 'frontend' });
+    expect(next.effort.branch).toBe('fix/shop/cart');
+  });
+
+  it('emits 0 notices when an effort made no commits of its own, and clears notices from retired branches', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const ctx = ctxFor(f);
+    const r = await startEffort(ctx, { area: 'platform/auth', type: 'chore', mode: 'frontend' });
+    expect(r.effort.baseSha).toBeDefined();
+    const done = await finishEffort(ctx, { area: 'platform/auth' });
+    expect(done.notices).toBe(0);
+  });
+});
