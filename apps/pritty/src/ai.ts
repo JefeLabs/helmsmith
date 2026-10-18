@@ -431,36 +431,56 @@ export async function generateRebasePlan(
     throw new Error(`AI returned malformed rebase plan: missing steps[]`);
   }
 
-  // Validate: every input hash present, in order, no extras
-  const inputHashes = ordered.map((c) => c.hash);
-  if (plan.steps.length !== inputHashes.length) {
-    throw new Error(
-      `Plan has ${plan.steps.length} steps but rebase covers ${inputHashes.length} commits.`,
-    );
-  }
-  for (let i = 0; i < plan.steps.length; i++) {
-    const s = plan.steps[i]!;
-    if (!s.hash || !inputHashes.some((h) => h.startsWith(s.hash) || s.hash.startsWith(h))) {
-      throw new Error(`Plan step ${i + 1} references unknown hash: ${s.hash}`);
-    }
-    if (
-      s.action !== 'pick' &&
-      s.action !== 'reword' &&
-      s.action !== 'squash' &&
-      s.action !== 'fixup' &&
-      s.action !== 'drop'
-    ) {
-      throw new Error(`Plan step ${i + 1} has invalid action: ${s.action}`);
-    }
-  }
-  if (plan.steps[0]!.action !== 'pick') {
-    throw new Error(
-      `Plan's first step must be 'pick' (got '${plan.steps[0]!.action}'). git rebase rejects squash/fixup with no parent.`,
-    );
-  }
+  validateRebasePlan(
+    plan.steps as RebaseStep[],
+    ordered.map((c) => c.hash),
+  );
 
   return {
     steps: plan.steps as RebaseStep[],
     summary: typeof plan.summary === 'string' ? plan.summary : '',
   };
+}
+
+const REBASE_ACTIONS: readonly RebaseAction[] = ['pick', 'reword', 'squash', 'fixup', 'drop'];
+
+/**
+ * A plan must use every input commit exactly once (a step may abbreviate the
+ * hash), in any order, with a valid action, and open with `pick`. Length and
+ * membership alone would accept a plan that repeats one commit and silently
+ * drops another.
+ */
+export function validateRebasePlan(
+  steps: readonly { hash?: string; action?: string }[],
+  inputHashes: readonly string[],
+): void {
+  if (steps.length !== inputHashes.length) {
+    throw new Error(
+      `Plan has ${steps.length} steps but rebase covers ${inputHashes.length} commits.`,
+    );
+  }
+  const used = new Map<string, number>();
+  for (let i = 0; i < steps.length; i++) {
+    const s = steps[i]!;
+    const full = s.hash
+      ? inputHashes.find((h) => h.startsWith(s.hash as string) || (s.hash as string).startsWith(h))
+      : undefined;
+    if (!full) throw new Error(`Plan step ${i + 1} references unknown hash: ${s.hash}`);
+    used.set(full, (used.get(full) ?? 0) + 1);
+    if (!REBASE_ACTIONS.includes(s.action as RebaseAction)) {
+      throw new Error(`Plan step ${i + 1} has invalid action: ${s.action}`);
+    }
+  }
+  const missing = inputHashes.filter((h) => !used.has(h));
+  const repeated = [...used.entries()].filter(([, n]) => n > 1).map(([h]) => h);
+  if (missing.length > 0 || repeated.length > 0) {
+    throw new Error(
+      `Plan must use every commit exactly once: missing ${missing.map((h) => h.slice(0, 7)).join(', ') || 'none'}; repeated ${repeated.map((h) => h.slice(0, 7)).join(', ') || 'none'}.`,
+    );
+  }
+  if (steps[0]!.action !== 'pick') {
+    throw new Error(
+      `Plan's first step must be 'pick' (got '${steps[0]!.action}'). git rebase rejects squash/fixup with no parent.`,
+    );
+  }
 }

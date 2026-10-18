@@ -42,11 +42,13 @@ export interface GitOps {
   /** Working tree is clean (no staged or unstaged changes, no untracked files). */
   isWorkingTreeClean(): Promise<boolean>;
   /**
-   * Run an interactive rebase with a pre-written TODO. The plan
-   * is written to a temp file and `GIT_SEQUENCE_EDITOR` is pointed
-   * at a `cp` command so git uses it instead of opening $EDITOR.
-   * Returns true on clean completion, false on any failure (so the
-   * caller can prompt the user about `git rebase --abort`).
+   * Run an interactive rebase with a pre-written TODO. The plan is written
+   * to a temp file and `GIT_SEQUENCE_EDITOR` is pointed at a `cp` command so
+   * git uses it instead of opening $EDITOR; `GIT_EDITOR=true` accepts any
+   * message prompt git might still open. Runs git directly: simple-git
+   * refuses every editor variable, including ones inherited from the user's
+   * shell. Returns ok=false on any failure, with the rebase left in place so
+   * the caller can tell the user about `git rebase --continue` / `--abort`.
    */
   rebaseWithPlan(base: string, todoContent: string): Promise<{ ok: boolean; output: string }>;
   /**
@@ -163,23 +165,22 @@ export function createGit(cwd: string = process.cwd()): GitOps {
       base: string,
       todoContent: string,
     ): Promise<{ ok: boolean; output: string }> {
-      // Write the TODO to a tmp file and point GIT_SEQUENCE_EDITOR
-      // at a `cp` command. git uses this instead of opening $EDITOR
-      // for the rebase TODO step. POSIX-only — Windows users would
-      // need a different shim.
       const dir = mkdtempSync(join(tmpdir(), 'pritty-rebase-'));
       const todoPath = join(dir, 'rebase-todo');
       writeFileSync(todoPath, todoContent, 'utf8');
       try {
-        const env = {
-          ...process.env,
-          GIT_SEQUENCE_EDITOR: `cp ${JSON.stringify(todoPath)} `,
-        };
-        const result = await git.env(env).rebase(['-i', base]);
-        return { ok: true, output: typeof result === 'string' ? result : '' };
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        return { ok: false, output: message };
+        const r = spawnSync('git', ['rebase', '-i', base], {
+          cwd,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            GIT_SEQUENCE_EDITOR: `cp ${JSON.stringify(todoPath)} `,
+            GIT_EDITOR: 'true',
+          },
+        });
+        const output = `${r.stdout ?? ''}${r.stderr ?? ''}`.trim();
+        if (r.error) return { ok: false, output: r.error.message };
+        return { ok: r.status === 0, output };
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }

@@ -1,23 +1,47 @@
 import chalk from 'chalk';
 import type { RebaseStep } from '../../ai.js';
 
+/** POSIX single-quote: safe for any text, newlines included. */
+function shQuote(text: string): string {
+  return `'${text.replace(/'/g, `'\\''`)}'`;
+}
+
 /**
- * Render a rebase plan as the TODO file git expects (oldest-first,
- * one action per line). When a step has a message and the action
- * permits one (reword / squash / pick — git ignores it on fixup /
- * drop), append it after the hash so the rebase TODO carries the
- * intended subject.
+ * Render a rebase plan as the TODO file git expects (oldest-first, one action
+ * per line). git ignores any text after the hash, so a planned message is
+ * applied with `exec git commit --amend -m …` after the step it belongs to:
+ * right after a reword, or after the run of squash/fixup steps it closes.
+ * Squash is rendered as fixup because the message comes from the plan, not
+ * from an editor session; a message on the pick that opens a run names the
+ * combined commit when no squash step in the run carries one.
  */
 export function renderRebaseTodo(steps: readonly RebaseStep[]): string {
   const lines: string[] = [];
+  let runMessage: string | undefined;
+  const closeRun = (): void => {
+    if (runMessage !== undefined) lines.push(`exec git commit --amend -m ${shQuote(runMessage)}`);
+    runMessage = undefined;
+  };
   for (const step of steps) {
-    if (step.action === 'drop') {
-      lines.push(`drop ${step.hash}`);
-      continue;
+    switch (step.action) {
+      case 'drop':
+        closeRun();
+        lines.push(`drop ${step.hash}`);
+        break;
+      case 'pick':
+      case 'reword':
+        closeRun();
+        lines.push(`pick ${step.hash}`);
+        runMessage = step.message;
+        break;
+      case 'squash':
+      case 'fixup':
+        lines.push(`fixup ${step.hash}`);
+        if (step.message) runMessage = step.message;
+        break;
     }
-    const trail = step.message ? ` ${step.message}` : '';
-    lines.push(`${step.action} ${step.hash}${trail}`);
   }
+  closeRun();
   return `${lines.join('\n')}\n`;
 }
 

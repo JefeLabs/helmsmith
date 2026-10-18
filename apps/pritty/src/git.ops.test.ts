@@ -93,3 +93,81 @@ describe('GitOps.commit with a file subset commits index content, never the work
     expect(gitIn(r.dir, 'rev-parse', 'HEAD')).toBe(before);
   });
 });
+
+describe('GitOps.rebaseWithPlan', () => {
+  let cleanup = () => {};
+  const savedEnv = { GIT_EDITOR: process.env.GIT_EDITOR, PAGER: process.env.PAGER };
+  afterEach(() => {
+    cleanup();
+    for (const [k, v] of Object.entries(savedEnv)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  });
+
+  function threeCommits(): { dir: string; hashes: string[] } {
+    const r = makeRepo();
+    cleanup = r.cleanup;
+    commitFile(r.dir, 'f1', '1\n', 'c1');
+    commitFile(r.dir, 'f2', '2\n', 'c2');
+    commitFile(r.dir, 'f3', '3\n', 'c3');
+    const hashes = gitIn(r.dir, 'rev-list', '--reverse', 'HEAD~3..HEAD').trim().split('\n');
+    return { dir: r.dir, hashes };
+  }
+
+  it('runs even when the user environment carries an editor and a pager', async () => {
+    process.env.GIT_EDITOR = 'vim';
+    process.env.PAGER = 'less';
+    const { dir, hashes } = threeCommits();
+    const todo = `pick ${hashes[0]}\npick ${hashes[1]}\npick ${hashes[2]}\n`;
+
+    const result = await createGit(dir).rebaseWithPlan('HEAD~3', todo);
+
+    expect(result).toMatchObject({ ok: true });
+    expect(gitIn(dir, 'log', '--format=%s', 'HEAD~3..HEAD').trim().split('\n')).toEqual([
+      'c3',
+      'c2',
+      'c1',
+    ]);
+  });
+
+  it('applies a reword and a squash run with the planned messages', async () => {
+    const { dir, hashes } = threeCommits();
+    const todo = [
+      `pick ${hashes[0]}`,
+      "exec git commit --amend -m 'feat: one'",
+      `pick ${hashes[1]}`,
+      `fixup ${hashes[2]}`,
+      "exec git commit --amend -m 'feat: two and three'",
+      '',
+    ].join('\n');
+
+    const result = await createGit(dir).rebaseWithPlan('HEAD~3', todo);
+
+    expect(result).toMatchObject({ ok: true });
+    expect(gitIn(dir, 'log', '--format=%s', 'HEAD~2..HEAD').trim().split('\n')).toEqual([
+      'feat: two and three',
+      'feat: one',
+    ]);
+    expect(gitIn(dir, 'show', '--stat', '--format=', 'HEAD')).toMatch(/f2[\s\S]*f3/);
+  });
+
+  it('reports a conflict as not ok and leaves the rebase in progress for the user', async () => {
+    const r = makeRepo();
+    cleanup = r.cleanup;
+    commitFile(r.dir, 'f', 'base\n', 'base');
+    commitFile(r.dir, 'f', 'one\n', 'c1');
+    commitFile(r.dir, 'f', 'two\n', 'c2');
+    const hashes = gitIn(r.dir, 'rev-list', '--reverse', 'HEAD~2..HEAD').trim().split('\n');
+
+    const result = await createGit(r.dir).rebaseWithPlan(
+      'HEAD~2',
+      `pick ${hashes[1]}\npick ${hashes[0]}\n`,
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.output).toMatch(/conflict/i);
+    expect(gitIn(r.dir, 'status').toLowerCase()).toContain('rebase in progress');
+    gitIn(r.dir, 'rebase', '--abort');
+  });
+});
