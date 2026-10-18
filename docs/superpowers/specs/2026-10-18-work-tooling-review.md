@@ -9,7 +9,7 @@
 The three tools are in very different states.
 
 - **workbrokr** works for the happy path that was proven live on skoolscout, but one bug is a silent data-loss defect that fires on every `work start` there: the submodule repair runs `git checkout -f` against the **main checkout's** submodules (W1). Four more high-severity defects leave efforts stuck or slots double-leased when a start is killed, a push is rejected, a sync conflict is resolved, or a stack is running on a wildcard address (W2–W5). The reaper the spec relies on never runs on its own (W6).
-- **storybrokr** implements Spec 2 mostly as written, but two scoping holes defeat its purpose: `down --all --host` stops every instance on the machine, and `up` ignores `STORYBROKR_HOST` in both the CLI and the MCP server (S1–S2). A repeat `up` never applies the lease's TTL, so "TTL equals the lease" does not hold (S3). Daemon-restart adoption is unreliable (S4).
+- **storybrokr** implements Spec 2 mostly as written, but two scoping holes defeated its purpose: `down --all --host` stopped every instance on the machine, and `up` ignored `STORYBROKR_HOST` in both the CLI and the MCP server (S1–S2). A repeat `up` never applied the lease's TTL, so "TTL equals the lease" did not hold (S3). **S1–S3 are fixed on `main` as of 2026-10-18 (§4.1a), unpublished.** Daemon-restart adoption is unreliable (S4).
 - **pritty** could not run from its built output (`openai` imported but not declared), `commit` committed working-tree content instead of the index, `rebase` never reached git because simple-git blocks the editor variable, and `pr` listed the wrong commit range (P1–P4). None of its three commands had a test. **P1–P12 are fixed on `main` as of 2026-10-18 (§5.1a), unpublished.**
 - **§18 Amendment A** names four functions that do not exist, prescribes a `git log` range that reproduces P4, specifies a closed-PR check that cannot be implemented without creating a PR, and omits the packaging facts (Bun runtime, undeclared and unpublished dependencies) that gate "publish 0.1.0".
 
@@ -95,6 +95,16 @@ The pattern across all three is the same one the flow-spec review found in Augus
 | S11 | Low (design) | `server/registry.ts:66-74` | Hint fallthrough reaches other worktrees on destructive calls: `STORYBROKR_HOST=A down <comp>` with no instance in A and one in B stops B's. Follows the spec, but reopens §1's gap for `down`/`check`. | read |
 | S12 | Low | `lib/host.ts:13-20` | `realpathOrResolve` falls back to `resolve()`, so `/tmp/wt` never matches a stored `/private/tmp/wt` once the directory is gone. The orphan reaper still catches it. | reviewer traced |
 | S13 | Low | `server/inspector.ts:102-157` | No worker cancellation in `check`: one rejected `acquire` fails `Promise.all` while the other workers keep settling. `checkConcurrency` from `config.json` is not range-checked. | reviewer traced |
+
+### 4.1a Fixed 2026-10-18 (commits on `main`, unpublished)
+
+| # | Commit | What changed |
+|---|---|---|
+| S1 | 79b123f | `down --all --host <dir>` stops only that host's instances. |
+| S2 | 628e9f1 | `up` resolves its host as `--host`, then `STORYBROKR_HOST`, then the cwd walk, in both the CLI (`resolveUpTarget`) and the MCP tool. |
+| S3 | c39a189 | A repeat `up` with an explicit `ttlMinutes` applies it to the reused instance; omitting it keeps what was set. |
+
+Each landed with a test that failed first; unit suite 178, e2e 17 passed against the fixture Storybook. S4–S13 remain open. 0.3.0 is still unpublished.
 
 ### 4.2 Test gaps
 
