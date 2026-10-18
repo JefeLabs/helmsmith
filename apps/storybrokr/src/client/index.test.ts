@@ -287,6 +287,40 @@ describe('DaemonClient', () => {
       code: 'STORY_FAILED',
     });
   });
+
+  it('threads host and hint scopes across list, get, check, down, and downByHost', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'sb-client-'));
+    homes.push(home);
+    const seen: unknown[] = [];
+    const { daemon, registry } = fakeDaemon(home, {
+      check: async (record, req) => {
+        seen.push({ id: record.id, req });
+        return { instanceId: record.id, results: [], summary: { pass: 0, fail: 0, timeout: 0 } };
+      },
+    });
+    daemons.push(daemon);
+    await daemon.start(0);
+    registry.add({ ...makeRecord('a1'), hostRoot: '/wt-a/app-ui', component: 'src/Button' });
+    registry.add({ ...makeRecord('b1'), hostRoot: '/wt-b/app-ui', component: 'src/Button', port: 6101 });
+    const client = await DaemonClient.connect({ home, autoStart: false });
+
+    expect((await client.list({ host: '/wt-b/app-ui' })).map((r) => r.id)).toEqual(['b1']);
+    expect((await client.get('src/Button', { host: '/wt-b/app-ui' })).id).toBe('b1');
+    expect((await client.get('src/Button', { hint: '/wt-a/app-ui' })).id).toBe('a1');
+    await expect(client.get('src/Button')).rejects.toMatchObject({ code: 'INSTANCE_AMBIGUOUS' });
+
+    const checkRes = await client.check(
+      'src/Button',
+      { concurrency: 2 },
+      { host: '/wt-b/app-ui' },
+    );
+    expect(checkRes.instanceId).toBe('b1');
+    expect(seen[0]).toEqual({ id: 'b1', req: { concurrency: 2 } });
+
+    const stopped = await client.downByHost('/wt-a/app-ui');
+    expect(stopped).toEqual(['a1']);
+    expect((await client.list()).map((r) => r.id)).toEqual(['b1']);
+  });
 });
 
 describe('resolveDaemonEntry', () => {

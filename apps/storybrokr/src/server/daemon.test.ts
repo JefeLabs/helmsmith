@@ -128,7 +128,16 @@ describe('daemon', () => {
     expect(
       (await fetch(`${daemon.url}/v1/instances/r1`, { method: 'DELETE', headers: h })).status,
     ).toBe(204);
-    expect(down).toHaveBeenCalledWith('r1');
+    expect(down).toHaveBeenCalledWith('r1', { host: undefined, hint: undefined });
+
+    const downByHost = vi.spyOn(broker, 'downByHost').mockResolvedValue([record]);
+    const deletedHost = await fetch(`${daemon.url}/v1/instances?host=%2Fh`, {
+      method: 'DELETE',
+      headers: h,
+    });
+    expect(deletedHost.status).toBe(200);
+    expect(await deletedHost.json()).toEqual({ stopped: ['r1'] });
+    expect(downByHost).toHaveBeenCalledWith('/h');
   });
 
   it('refuses to start twice on the same home while the lock holder is alive', async () => {
@@ -307,7 +316,7 @@ describe('daemon', () => {
     const h = { authorization: `Bearer ${daemon.token}` };
 
     await fetch(`${daemon.url}/v1/instances/r1/logs?tail=abc`, { headers: h });
-    expect(logs).toHaveBeenCalledWith('r1', 200);
+    expect(logs).toHaveBeenCalledWith('r1', 200, { host: undefined, hint: undefined });
   });
 
   it('routes check and screenshot to the inspector with validated bodies, touching the instance', async () => {

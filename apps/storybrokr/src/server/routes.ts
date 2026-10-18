@@ -9,6 +9,7 @@ const UpBody = z.object({
   component: z.string().min(1),
   hostRoot: z.string().min(1).optional(),
   ttlMinutes: z.number().min(0).optional(),
+  includeChildren: z.boolean().optional(),
   wait: z.boolean().optional(),
 });
 
@@ -24,6 +25,7 @@ const CheckBody = z.object({
   storyIds: z.array(z.string().min(1)).min(1).optional(),
   waitFor: WaitForBody.optional(),
   timeoutMs: TimeoutMs,
+  concurrency: z.number().int().min(1).max(16).optional(),
 });
 
 const ScreenshotBody = z.object({
@@ -101,6 +103,10 @@ export async function handle(
   const url = new URL(req.url ?? '/', 'http://127.0.0.1');
   const parts = url.pathname.split('/').filter(Boolean); // ['v1', 'instances', ':id', 'logs']
   const method = req.method ?? 'GET';
+  const scope = {
+    host: url.searchParams.get('host') ?? undefined,
+    hint: url.searchParams.get('hint') ?? undefined,
+  };
   try {
     if (parts[0] !== 'v1') {
       const body: ErrorBody = { code: 'NOT_FOUND', message: 'unknown route' };
@@ -123,35 +129,42 @@ export async function handle(
         return send(res, created ? 201 : 200, { record });
       }
       if (parts.length === 2 && method === 'GET')
-        return send(res, 200, { instances: ctx.broker.list() });
+        return send(res, 200, { instances: ctx.broker.list({ host: scope.host }) });
+      if (parts.length === 2 && method === 'DELETE') {
+        if (!scope.host) {
+          throw new StorybrokrError('BAD_REQUEST', 'DELETE /v1/instances requires ?host=<dir>');
+        }
+        const stopped = await ctx.broker.downByHost(scope.host);
+        return send(res, 200, { stopped: stopped.map((r) => r.id) });
+      }
       const id = decodeURIComponent(parts[2] ?? '');
       if (parts.length === 3 && method === 'GET')
-        return send(res, 200, { record: ctx.broker.get(id) });
+        return send(res, 200, { record: ctx.broker.get(id, scope) });
       if (parts.length === 3 && method === 'DELETE') {
-        await ctx.broker.down(id);
+        await ctx.broker.down(id, scope);
         return send(res, 204);
       }
       if (parts.length === 4 && parts[3] === 'touch' && method === 'POST')
-        return send(res, 200, { record: ctx.broker.touch(id) });
+        return send(res, 200, { record: ctx.broker.touch(id, scope) });
       if (parts.length === 4 && parts[3] === 'check' && method === 'POST') {
         const body = parseBody(CheckBody, await readJson(req));
-        const record = ctx.broker.get(id); // touches the instance
+        const record = ctx.broker.get(id, scope); // touches the instance
         return send(res, 200, await ctx.inspector.check(record, body));
       }
       if (parts.length === 4 && parts[3] === 'screenshot' && method === 'POST') {
         const body = parseBody(ScreenshotBody, await readJson(req));
-        const record = ctx.broker.get(id);
+        const record = ctx.broker.get(id, scope);
         return send(res, 200, await ctx.inspector.screenshot(record, body));
       }
       if (parts.length === 4 && parts[3] === 'logs' && method === 'GET') {
         const rawTail = Number(url.searchParams.get('tail') ?? '200');
         const tail = Number.isInteger(rawTail) && rawTail > 0 ? rawTail : 200;
         if (url.searchParams.get('follow') !== '1')
-          return send(res, 200, { lines: ctx.broker.logs(id, tail) });
+          return send(res, 200, { lines: ctx.broker.logs(id, tail, scope) });
         // Resolved once, up front: a path-shaped `id` needs the real instance id for the
         // liveness poll below, and this touches the record (fine for a log read).
-        const resolvedId = ctx.broker.get(id).id;
-        const stream = ctx.broker.logStream(id);
+        const resolvedId = ctx.broker.get(id, scope).id;
+        const stream = ctx.broker.logStream(resolvedId);
         res.writeHead(200, {
           'content-type': 'text/event-stream',
           'cache-control': 'no-cache',
@@ -161,7 +174,7 @@ export async function handle(
         // a client awaiting the response (to confirm the stream is live) would hang until a
         // log line actually arrives.
         res.flushHeaders();
-        for (const line of ctx.broker.logs(id, tail))
+        for (const line of ctx.broker.logs(resolvedId, tail))
           res.write(`data: ${JSON.stringify(line)}\n\n`);
         if (!stream) {
           // No live process to follow (e.g. an adopted instance with no local log stream) —

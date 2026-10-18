@@ -2,8 +2,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { DaemonClient } from '../client/index.js';
-import { resolveComponent } from '../commands/_shared/output.js';
-import { toErrorBody } from '../lib/errors.js';
+import { resolveComponent, resolveTarget } from '../commands/_shared/output.js';
+import { StorybrokrError, toErrorBody } from '../lib/errors.js';
+import { realpathOrResolve } from '../lib/host.js';
 import { VERSION } from '../version.js';
 
 type ToolResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
@@ -27,11 +28,16 @@ async function guard(fn: () => Promise<unknown>): Promise<ToolResult> {
 export function buildMcpServer(connect: () => Promise<DaemonClient>): McpServer {
   const server = new McpServer({ name: 'storybrokr', version: VERSION });
 
+  const hostRootOpt = z
+    .string()
+    .optional()
+    .describe('Host repo root (optional; defaults to STORYBROKR_HOST or cwd host)');
+
   server.registerTool(
     'storybrokr_up',
     {
       description:
-        "Boot (or reuse) an ephemeral Storybook containing only one component and its child components, derived from the host repo's existing .storybook. Returns the instance with a per-story iframeUrl you can screenshot.",
+        "Boot (or reuse) an ephemeral Storybook containing only one component (and optionally its child components), derived from the host repo's existing .storybook. Returns the instance with a per-story iframeUrl you can screenshot.",
       inputSchema: {
         component: z
           .string()
@@ -44,43 +50,79 @@ export function buildMcpServer(connect: () => Promise<DaemonClient>): McpServer 
           .describe('Host repo root; default walks up from component to the nearest .storybook/'),
         ttlMinutes: z
           .number()
-          .int()
           .min(0)
           .optional()
           .describe('Idle minutes before reaping; 0 = never'),
+        includeChildren: z
+          .boolean()
+          .optional()
+          .describe(
+            'Also include stories of transitively imported child components (default false unless root has 0 stories)',
+          ),
         wait: z.boolean().optional().describe('Wait for readiness (default true)'),
       },
     },
-    async ({ component, hostRoot, ttlMinutes, wait }) =>
+    async ({ component, hostRoot, ttlMinutes, includeChildren, wait }) =>
       guard(async () => {
         const target =
           hostRoot === undefined ? resolveComponent(component) : { component, hostRoot };
-        return (await connect()).up({ ...target, ttlMinutes, wait: wait !== false });
+        return (await connect()).up({
+          ...target,
+          ttlMinutes,
+          ...(includeChildren !== undefined ? { includeChildren } : {}),
+          wait: wait !== false,
+        });
       }),
   );
 
   server.registerTool(
     'storybrokr_list',
-    { description: 'List brokered Storybook instances.', inputSchema: {} },
-    async () => guard(async () => (await connect()).list()),
+    {
+      description: 'List brokered Storybook instances (optionally filtered by hostRoot).',
+      inputSchema: { hostRoot: hostRootOpt },
+    },
+    async ({ hostRoot }) =>
+      guard(async () =>
+        (await connect()).list(hostRoot ? { host: realpathOrResolve(hostRoot) } : undefined),
+      ),
   );
 
   server.registerTool(
     'storybrokr_get',
     {
       description: 'Get one instance by id or component path, including its story URLs.',
-      inputSchema: { id: z.string() },
+      inputSchema: { id: z.string(), hostRoot: hostRootOpt },
     },
-    async ({ id }) => guard(async () => (await connect()).get(id)),
+    async ({ id, hostRoot }) =>
+      guard(async () => {
+        const target = resolveTarget(id, hostRoot);
+        return (await connect()).get(target.idOrPath, {
+          host: target.host,
+          hint: target.hint,
+        });
+      }),
   );
 
   server.registerTool(
     'storybrokr_down',
-    { description: 'Stop an instance and remove its config dir.', inputSchema: { id: z.string() } },
-    async ({ id }) =>
+    {
+      description:
+        'Stop an instance by id/path or stop all instances for a hostRoot, and remove their config dirs.',
+      inputSchema: { id: z.string().optional(), hostRoot: hostRootOpt },
+    },
+    async ({ id, hostRoot }) =>
       guard(async () => {
-        await (await connect()).down(id);
-        return { stopped: id };
+        const client = await connect();
+        if (!id && hostRoot) {
+          const stopped = await client.downByHost(realpathOrResolve(hostRoot));
+          return { stopped };
+        }
+        if (!id) {
+          throw new StorybrokrError('BAD_REQUEST', 'provide id or hostRoot');
+        }
+        const target = resolveTarget(id, hostRoot);
+        await client.down(target.idOrPath, { host: target.host, hint: target.hint });
+        return { stopped: target.idOrPath };
       }),
   );
 
@@ -88,16 +130,38 @@ export function buildMcpServer(connect: () => Promise<DaemonClient>): McpServer 
     'storybrokr_logs',
     {
       description: "Tail an instance's Storybook output.",
-      inputSchema: { id: z.string(), tail: z.number().int().min(1).max(2000).optional() },
+      inputSchema: {
+        id: z.string(),
+        hostRoot: hostRootOpt,
+        tail: z.number().int().min(1).max(2000).optional(),
+      },
     },
-    async ({ id, tail }) =>
-      guard(async () => ({ lines: await (await connect()).logs(id, tail ?? 200) })),
+    async ({ id, hostRoot, tail }) =>
+      guard(async () => {
+        const target = resolveTarget(id, hostRoot);
+        return {
+          lines: await (await connect()).logs(target.idOrPath, tail ?? 200, {
+            host: target.host,
+            hint: target.hint,
+          }),
+        };
+      }),
   );
 
   server.registerTool(
     'storybrokr_touch',
-    { description: "Reset an instance's idle timer.", inputSchema: { id: z.string() } },
-    async ({ id }) => guard(async () => (await connect()).touch(id)),
+    {
+      description: "Reset an instance's idle timer.",
+      inputSchema: { id: z.string(), hostRoot: hostRootOpt },
+    },
+    async ({ id, hostRoot }) =>
+      guard(async () => {
+        const target = resolveTarget(id, hostRoot);
+        return (await connect()).touch(target.idOrPath, {
+          host: target.host,
+          hint: target.hint,
+        });
+      }),
   );
 
   const waitFor = z
@@ -121,6 +185,7 @@ export function buildMcpServer(connect: () => Promise<DaemonClient>): McpServer 
         'Run stories headlessly in Chromium and report pass/fail per story. Play functions are executed; a story passes when Storybook reports its render (and play) completed. Failing stories are rows in the result, not tool errors.',
       inputSchema: {
         id: z.string().describe('Instance id or component path'),
+        hostRoot: hostRootOpt,
         storyIds: z
           .array(z.string())
           .min(1)
@@ -128,10 +193,29 @@ export function buildMcpServer(connect: () => Promise<DaemonClient>): McpServer 
           .describe('Default: every story in the instance'),
         waitFor,
         timeoutMs,
+        concurrency: z
+          .number()
+          .int()
+          .min(1)
+          .max(16)
+          .optional()
+          .describe('Max isolated browser contexts to run in parallel (default 4)'),
       },
     },
-    async ({ id, storyIds, waitFor: wf, timeoutMs: t }) =>
-      guard(async () => (await connect()).check(id, { storyIds, waitFor: wf, timeoutMs: t })),
+    async ({ id, hostRoot, storyIds, waitFor: wf, timeoutMs: t, concurrency }) =>
+      guard(async () => {
+        const target = resolveTarget(id, hostRoot);
+        return (await connect()).check(
+          target.idOrPath,
+          {
+            storyIds,
+            waitFor: wf,
+            timeoutMs: t,
+            ...(concurrency !== undefined ? { concurrency } : {}),
+          },
+          { host: target.host, hint: target.hint },
+        );
+      }),
   );
 
   server.registerTool(
@@ -141,6 +225,7 @@ export function buildMcpServer(connect: () => Promise<DaemonClient>): McpServer 
         'Write a PNG of one story at a viewport you choose and return its absolute path. Use an absolute outPath to save anywhere (e.g. a scratchpad). Refuses to capture a story that errored or timed out.',
       inputSchema: {
         id: z.string().describe('Instance id or component path'),
+        hostRoot: hostRootOpt,
         storyId: z.string(),
         outPath: z
           .string()
@@ -163,17 +248,22 @@ export function buildMcpServer(connect: () => Promise<DaemonClient>): McpServer 
         timeoutMs,
       },
     },
-    async ({ id, storyId, outPath, viewport, clip, waitFor: wf, timeoutMs: t }) =>
-      guard(async () =>
-        (await connect()).screenshot(id, {
-          storyId,
-          outPath,
-          viewport,
-          clip,
-          waitFor: wf,
-          timeoutMs: t,
-        }),
-      ),
+    async ({ id, hostRoot, storyId, outPath, viewport, clip, waitFor: wf, timeoutMs: t }) =>
+      guard(async () => {
+        const target = resolveTarget(id, hostRoot);
+        return (await connect()).screenshot(
+          target.idOrPath,
+          {
+            storyId,
+            outPath,
+            viewport,
+            clip,
+            waitFor: wf,
+            timeoutMs: t,
+          },
+          { host: target.host, hint: target.hint },
+        );
+      }),
   );
 
   server.registerTool(

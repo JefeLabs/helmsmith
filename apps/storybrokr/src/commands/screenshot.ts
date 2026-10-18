@@ -3,9 +3,10 @@ import type { Command } from 'commander';
 import type { DaemonClient } from '../client/index.js';
 import type { ScreenshotClip, Viewport } from '../types.js';
 import { parseClip, parseViewport, waitForFrom } from './_shared/inspect.js';
-import { fail, parseIntegerInRange, printJson } from './_shared/output.js';
+import { fail, parseIntegerInRange, printJson, resolveTarget } from './_shared/output.js';
 
 interface ScreenshotOpts {
+  host?: string;
   out?: string;
   viewport?: Viewport;
   clip?: ScreenshotClip;
@@ -19,6 +20,7 @@ export function registerScreenshot(program: Command, connect: () => Promise<Daem
   program
     .command('screenshot <id-or-path> <story-id>')
     .description('Write a PNG of one story at the requested viewport')
+    .option('--host <dir>', 'host repo root')
     .option(
       '--out <path>',
       'output file (default: <instance configDir>/screenshots/<story>-<WxH>.png)',
@@ -37,14 +39,19 @@ export function registerScreenshot(program: Command, connect: () => Promise<Daem
       try {
         // The daemon's cwd is meaningless to the caller: resolve relative paths here.
         const outPath = o.out === undefined ? undefined : resolve(process.cwd(), o.out);
-        const res = await (await connect()).screenshot(idOrPath, {
-          storyId,
-          outPath,
-          viewport: o.viewport,
-          clip: o.clip,
-          waitFor: waitForFrom(o),
-          timeoutMs: o.timeout,
-        });
+        const target = resolveTarget(idOrPath, o.host);
+        const res = await (await connect()).screenshot(
+          target.idOrPath,
+          {
+            storyId,
+            outPath,
+            viewport: o.viewport,
+            clip: o.clip,
+            waitFor: waitForFrom(o),
+            timeoutMs: o.timeout,
+          },
+          { host: target.host, hint: target.hint },
+        );
         if (o.json) printJson(res);
         else console.log(res.path);
       } catch (err) {

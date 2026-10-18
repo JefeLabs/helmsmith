@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type { DaemonClient } from '../client/index.js';
 import type { InstanceRecord } from '../types.js';
-import { selectDownTargets } from './down.js';
+import { runDown, selectDownTargets } from './down.js';
 
 const rec = (id: string) => ({ id }) as InstanceRecord;
 
@@ -14,9 +15,17 @@ describe('selectDownTargets', () => {
     expect(selectDownTargets([], 'abc', false)).toEqual(['abc']);
   });
 
-  it('throws when neither --all nor an id/path is given', () => {
+  it('throws when neither --all, --host, nor an id/path is given', () => {
     expect(() => selectDownTargets([], undefined, false)).toThrow(
-      /give an instance id\/path or --all/,
+      /give an instance id\/path, --host <dir>, or --all/,
     );
+  });
+
+  it('runDown calls downByHost when --host is passed without an id/path', async () => {
+    const downByHost = vi.fn(async () => ['a1', 'a2']);
+    const client = { downByHost } as unknown as DaemonClient;
+    const stopped = await runDown(client, undefined, { host: '/wt-a/app-ui' });
+    expect(downByHost).toHaveBeenCalledWith('/wt-a/app-ui');
+    expect(stopped).toEqual(['a1', 'a2']);
   });
 });

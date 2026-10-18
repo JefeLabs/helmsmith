@@ -14,19 +14,21 @@ const rec = {
 } as unknown as InstanceRecord;
 
 describe('runUp', () => {
-  it('sends component + hostRoot + ttl + wait to the client and returns the record', async () => {
+  it('sends component + hostRoot + ttl + includeChildren + wait to the client and returns the record', async () => {
     const up = vi.fn(async () => ({ record: rec, created: true }));
     const client = { up } as unknown as DaemonClient;
     const out = await runUp(client, {
       component: 'src/Button',
       hostRoot: '/h',
       ttl: 5,
+      includeChildren: true,
       wait: false,
     });
     expect(up).toHaveBeenCalledWith({
       component: 'src/Button',
       hostRoot: '/h',
       ttlMinutes: 5,
+      includeChildren: true,
       wait: false,
     });
     expect(out).toEqual({ record: rec, created: true });

@@ -45,17 +45,23 @@ describe('MCP server', () => {
     ]);
   });
 
-  it('storybrokr_up forwards arguments and returns the record as JSON text', async () => {
+  it('storybrokr_up forwards arguments (including includeChildren) and returns the record as JSON text', async () => {
     const up = vi.fn(async () => ({ record: rec, created: true }));
     const client = await connected({ up } as Partial<DaemonClient>);
     const result = await client.callTool({
       name: 'storybrokr_up',
-      arguments: { component: 'src/Button', hostRoot: '/h', ttlMinutes: 5 },
+      arguments: {
+        component: 'src/Button',
+        hostRoot: '/h',
+        ttlMinutes: 5,
+        includeChildren: true,
+      },
     });
     expect(up).toHaveBeenCalledWith({
       component: 'src/Button',
       hostRoot: '/h',
       ttlMinutes: 5,
+      includeChildren: true,
       wait: true,
     });
     const text = (result.content as { type: string; text: string }[])[0].text;
@@ -76,7 +82,7 @@ describe('MCP server', () => {
     });
   });
 
-  it('check and screenshot forward their arguments and surface failing stories as normal results', async () => {
+  it('check, screenshot, and down forward hostRoot and concurrency', async () => {
     const check = vi.fn(async () => ({
       instanceId: 'abc',
       results: [
@@ -93,21 +99,39 @@ describe('MCP server', () => {
     const screenshot = vi.fn(async () => {
       throw new StorybrokrError('STORY_TIMEOUT', 'slow');
     });
-    const client = await connected({ check, screenshot } as unknown as Partial<DaemonClient>);
+    const downByHost = vi.fn(async () => ['abc']);
+    const client = await connected({
+      check,
+      screenshot,
+      downByHost,
+    } as unknown as Partial<DaemonClient>);
     const r = await client.callTool({
       name: 'storybrokr_check',
-      arguments: { id: 'abc', storyIds: ['s'], waitFor: { text: 'Go' }, timeoutMs: 5000 },
+      arguments: {
+        id: 'abc',
+        hostRoot: '/wt-a/app-ui',
+        storyIds: ['s'],
+        waitFor: { text: 'Go' },
+        timeoutMs: 5000,
+        concurrency: 2,
+      },
     });
     expect(r.isError).toBeFalsy();
-    expect(check).toHaveBeenCalledWith('abc', {
-      storyIds: ['s'],
-      waitFor: { text: 'Go' },
-      timeoutMs: 5000,
-    });
+    expect(check).toHaveBeenCalledWith(
+      'abc',
+      {
+        storyIds: ['s'],
+        waitFor: { text: 'Go' },
+        timeoutMs: 5000,
+        concurrency: 2,
+      },
+      { host: '/wt-a/app-ui', hint: undefined },
+    );
     const s = await client.callTool({
       name: 'storybrokr_screenshot',
       arguments: {
         id: 'abc',
+        hostRoot: '/wt-a/app-ui',
         storyId: 's',
         outPath: '/tmp/s.png',
         viewport: { width: 640, height: 480 },
@@ -115,13 +139,27 @@ describe('MCP server', () => {
       },
     });
     expect(s.isError).toBe(true);
-    expect(screenshot).toHaveBeenCalledWith('abc', {
-      storyId: 's',
-      outPath: '/tmp/s.png',
-      viewport: { width: 640, height: 480 },
-      clip: 'page',
-      waitFor: undefined,
-      timeoutMs: undefined,
+    expect(screenshot).toHaveBeenCalledWith(
+      'abc',
+      {
+        storyId: 's',
+        outPath: '/tmp/s.png',
+        viewport: { width: 640, height: 480 },
+        clip: 'page',
+        waitFor: undefined,
+        timeoutMs: undefined,
+      },
+      { host: '/wt-a/app-ui', hint: undefined },
+    );
+
+    const d = await client.callTool({
+      name: 'storybrokr_down',
+      arguments: { hostRoot: '/wt-a/app-ui' },
+    });
+    expect(d.isError).toBeFalsy();
+    expect(downByHost).toHaveBeenCalledWith('/wt-a/app-ui');
+    expect(JSON.parse((d.content as { text: string }[])[0].text)).toEqual({
+      stopped: ['abc'],
     });
   });
 

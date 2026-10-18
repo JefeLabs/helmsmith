@@ -12,6 +12,7 @@ import type {
   DaemonInfo,
   HostInfo,
   InstanceRecord,
+  ResolveScope,
   ScreenshotRequest,
   ScreenshotResponse,
   UpRequest,
@@ -21,6 +22,14 @@ export interface ConnectOptions {
   home?: string;
   autoStart?: boolean;
   startCommand?: () => void | Promise<void>;
+}
+
+function scopeQuery(scope?: ResolveScope, extra?: Record<string, string>): string {
+  const params = new URLSearchParams(extra);
+  if (scope?.host) params.set('host', scope.host);
+  if (scope?.hint) params.set('hint', scope.hint);
+  const str = params.toString();
+  return str ? `?${str}` : '';
 }
 
 function readInfo(home: string): DaemonInfo | null {
@@ -277,47 +286,67 @@ export class DaemonClient {
     }
     return { record: (json as { record: InstanceRecord }).record, created: res.status === 201 };
   }
-  async list(): Promise<InstanceRecord[]> {
-    return (await this.request<{ instances: InstanceRecord[] }>('GET', '/v1/instances')).instances;
+  async list(opts?: { host?: string }): Promise<InstanceRecord[]> {
+    return (
+      await this.request<{ instances: InstanceRecord[] }>(
+        'GET',
+        `/v1/instances${scopeQuery(opts)}`,
+      )
+    ).instances;
   }
-  async get(id: string): Promise<InstanceRecord> {
+  async get(id: string, scope?: ResolveScope): Promise<InstanceRecord> {
     return (
       await this.request<{ record: InstanceRecord }>(
         'GET',
-        `/v1/instances/${encodeURIComponent(id)}`,
+        `/v1/instances/${encodeURIComponent(id)}${scopeQuery(scope)}`,
       )
     ).record;
   }
-  down(id: string): Promise<void> {
-    return this.request<void>('DELETE', `/v1/instances/${encodeURIComponent(id)}`);
+  down(id: string, scope?: ResolveScope): Promise<void> {
+    return this.request<void>(
+      'DELETE',
+      `/v1/instances/${encodeURIComponent(id)}${scopeQuery(scope)}`,
+    );
   }
-  async touch(id: string): Promise<InstanceRecord> {
+  async downByHost(host: string): Promise<string[]> {
+    return (
+      await this.request<{ stopped: string[] }>(
+        'DELETE',
+        `/v1/instances${scopeQuery({ host })}`,
+      )
+    ).stopped;
+  }
+  async touch(id: string, scope?: ResolveScope): Promise<InstanceRecord> {
     return (
       await this.request<{ record: InstanceRecord }>(
         'POST',
-        `/v1/instances/${encodeURIComponent(id)}/touch`,
+        `/v1/instances/${encodeURIComponent(id)}/touch${scopeQuery(scope)}`,
       )
     ).record;
   }
-  check(id: string, req: CheckRequest = {}): Promise<CheckResponse> {
+  check(id: string, req: CheckRequest = {}, scope?: ResolveScope): Promise<CheckResponse> {
     return this.requestLong<CheckResponse>(
       'POST',
-      `/v1/instances/${encodeURIComponent(id)}/check`,
+      `/v1/instances/${encodeURIComponent(id)}/check${scopeQuery(scope)}`,
       req,
     );
   }
-  screenshot(id: string, req: ScreenshotRequest): Promise<ScreenshotResponse> {
+  screenshot(
+    id: string,
+    req: ScreenshotRequest,
+    scope?: ResolveScope,
+  ): Promise<ScreenshotResponse> {
     return this.requestLong<ScreenshotResponse>(
       'POST',
-      `/v1/instances/${encodeURIComponent(id)}/screenshot`,
+      `/v1/instances/${encodeURIComponent(id)}/screenshot${scopeQuery(scope)}`,
       req,
     );
   }
-  async logs(id: string, tail = 200): Promise<string[]> {
+  async logs(id: string, tail = 200, scope?: ResolveScope): Promise<string[]> {
     return (
       await this.request<{ lines: string[] }>(
         'GET',
-        `/v1/instances/${encodeURIComponent(id)}/logs?tail=${tail}`,
+        `/v1/instances/${encodeURIComponent(id)}/logs${scopeQuery(scope, { tail: String(tail) })}`,
       )
     ).lines;
   }
@@ -330,11 +359,16 @@ export class DaemonClient {
     id: string,
     onLine: (line: string) => void,
     onEnd?: () => void,
+    scope?: ResolveScope,
   ): Promise<() => void> {
     const controller = new AbortController();
-    const res = await this.send('GET', `/v1/instances/${encodeURIComponent(id)}/logs?follow=1`, {
-      signal: controller.signal,
-    });
+    const res = await this.send(
+      'GET',
+      `/v1/instances/${encodeURIComponent(id)}/logs${scopeQuery(scope, { follow: '1' })}`,
+      {
+        signal: controller.signal,
+      },
+    );
     if (!res.ok) {
       const json = await this.parseBody<ErrorBody>(res);
       throw new StorybrokrError(

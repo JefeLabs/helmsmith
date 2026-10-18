@@ -61,8 +61,10 @@ storybrokr down <id>       # stop it, or let the idle TTL reap it
 ## How it works
 
 `storybrokr up` resolves the host by walking up from the given path until it
-finds a `.storybook/` with a `main.*`, then discovers the component's story
-file(s) and every local module they import. It writes a generated config
+finds a `.storybook/` with a `main.*`, then discovers the component's own
+story file(s) (falling back to imported child stories when the root directory
+has none, or when `--include-children` is passed) and every local module they
+import. It writes a generated config
 directory under the host's own
 `node_modules/.cache/storybrokr/<instance-id>/`: a `main.ts` that spreads the
 host's real `main` config and overrides only `stories` (to the discovered
@@ -79,26 +81,34 @@ also gets a `storybrokr.json` sidecar next to its generated config, so the
 daemon can rediscover instances still running from its last restart. An
 idle-reaper sweeps on an interval and stops any `ready` instance whose TTL
 has elapsed since it was last touched (every `get`/`touch`/reused `up`
-resets the clock); a `0` TTL disables reaping.
+resets the clock), or whose `hostRoot` directory has been removed (e.g. a
+cleaned-up git worktree); a `0` TTL disables idle reaping.
 
 ## Commands
 
 | Command | Purpose |
 |---|---|
-| `storybrokr up <path> [--host <dir>] [--ttl <min>] [--no-wait] [--json]` | Boot or reuse |
-| `storybrokr ls [--json]` / `get <id> [--json]` | Inspect |
-| `storybrokr down <id \| --all>` | Stop |
-| `storybrokr open <id \| path> [--story <id>]` | Open the manager, or one story, in the browser |
-| `storybrokr touch <id>` | Reset the idle timer |
-| `storybrokr check <id> [--story <id>]... [--wait-for-text <t> \| --wait-for-selector <s>] [--timeout <ms>] [--json]` | Run stories headlessly; pass/fail per story, exit 1 on any failure |
-| `storybrokr screenshot <id> <story-id> [--out <path>] [--viewport <WxH>] [--clip root\|viewport\|page] [--wait-for-text <t> \| --wait-for-selector <s>] [--timeout <ms>] [--json]` | Write a PNG of one story |
-| `storybrokr logs <id> [--follow]` | Storybook output |
+| `storybrokr up <path> [--host <dir>] [--include-children] [--ttl <min>] [--no-wait] [--json]` | Boot or reuse |
+| `storybrokr ls [--host <dir>] [--json]` / `get <id \| path> [--host <dir>] [--json]` | Inspect |
+| `storybrokr down [<id \| path>] [--host [<dir>]] [--all] [--json]` | Stop |
+| `storybrokr open <id \| path> [--host <dir>] [--story <id>]` | Open the manager, or one story, in the browser |
+| `storybrokr touch <id \| path> [--host <dir>]` | Reset the idle timer |
+| `storybrokr check <id \| path> [--host <dir>] [--story <id>]... [--concurrency <n>] [--wait-for-text <t> \| --wait-for-selector <s>] [--timeout <ms>] [--json]` | Run stories headlessly; pass/fail per story, exit 1 on any failure |
+| `storybrokr screenshot <id \| path> <story-id> [--host <dir>] [--out <path>] [--viewport <WxH>] [--clip root\|viewport\|page] [--wait-for-text <t> \| --wait-for-selector <s>] [--timeout <ms>] [--json]` | Write a PNG of one story |
+| `storybrokr logs <id \| path> [--host <dir>] [--follow]` | Storybook output |
 | `storybrokr doctor [<path>]` | Pre-flight a host |
 | `storybrokr daemon start\|stop\|status` | Daemon control |
 | `storybrokr mcp` | MCP stdio server |
 
 A few behaviors worth knowing:
 
+- `--host <dir>` (or `STORYBROKR_HOST` in the environment) scopes path-based
+  resolution and `ls` to a specific host/worktree, preventing cross-worktree
+  collisions when multiple worktrees run stories for the same component.
+  `storybrokr down --host [<dir>]` stops every instance belonging to that host.
+- `--include-children` includes story files of local components imported by the
+  target component (by default, only the target component's own stories are
+  included unless it has none).
 - `--ttl` accepts fractional minutes (`--ttl 0.5`); pass `0` to disable
   reaping for that instance.
 - `up --no-wait` returns as soon as the instance is registered, with
@@ -121,13 +131,12 @@ A story **settles** when Storybook's preview reports its render phase
 and, if given, `--wait-for-text` / `--wait-for-selector` matches. Hosts that
 show a Suspense fallback first ("Loading translations…") need the wait flag.
 
-- `check` runs every story in the instance (or `--story` ids) one after
-  another in a single browser context and prints one line per story. A
+- `check` runs every story in the instance (or `--story` ids) across up to
+  `--concurrency <n>` isolated browser contexts (default `checkConcurrency`,
+  `4`) and prints one line per story in input order. A
   failing or timed-out story is a result row, not an error; the exit code
   is 1 when any story is not `pass`. `played` is true when a play function
-  actually ran. `check` runs every story sequentially, so a whole-instance
-  run can take story-count × timeout; the client waits as long as the
-  daemon does.
+  actually ran.
 - `screenshot` captures `#storybook-root`'s bounding box by default
   (`--clip viewport` or `page` for the alternatives) at `--viewport`
   (default `1280x720`). A relative `--out` resolves against your cwd; the
@@ -154,11 +163,13 @@ The MCP server is a thin client of the same daemon the CLI talks to — tools
 are `storybrokr_up`, `storybrokr_list`, `storybrokr_get`, `storybrokr_down`,
 `storybrokr_logs`, `storybrokr_touch`, `storybrokr_inspect_host`,
 `storybrokr_check`, and `storybrokr_screenshot`. `up`'s `ttlMinutes` is an
-integer over MCP (the CLI's `--ttl` is the one that takes fractions), and
-`wait: false` mirrors `--no-wait`. `storybrokr_screenshot` returns the
-written path, not the image; pass an absolute `outPath` to save outside the
-host repo. See `SKILL.md` for the full tool schemas and the instance record
-shape.
+integer over MCP (the CLI's `--ttl` is the one that takes fractions),
+`includeChildren: true` mirrors `--include-children`, and
+`wait: false` mirrors `--no-wait`. Every instance-resolving tool accepts an
+optional `hostRoot` (falling back to `STORYBROKR_HOST`). `storybrokr_screenshot`
+returns the written path, not the image; pass an absolute `outPath` to save
+outside the host repo. See `SKILL.md` for the full tool schemas and the instance
+record shape.
 
 ## Configuration
 
@@ -167,7 +178,8 @@ shape.
 | Key | Default | Meaning |
 |---|---|---|
 | `ttlMinutes` | 30 | Idle minutes before a ready instance is reaped |
-| `instanceCap` | 6 | Max concurrent `starting`/`ready` instances |
+| `instanceCap` | 10 | Max concurrent `starting`/`ready` instances |
+| `checkConcurrency` | 4 | Default parallel browser contexts for `check` (1–8) |
 | `portRangeStart` | 6100 | First port tried for a new instance |
 | `portRangeEnd` | 6199 | Last port tried |
 | `readinessTimeoutMs` | 120000 | How long to wait for an instance to report ready before `BOOT_TIMEOUT` |
@@ -177,7 +189,8 @@ shape.
 
 `STORYBROKR_HOME` overrides the home directory (`~/.storybrokr` by default) —
 the daemon's lock, token, state, and config all move with it; the e2e suite
-uses this to run against an isolated home. `STORYBROKR_PORT` pins the port
+uses this to run against an isolated home. `STORYBROKR_HOST` sets the default
+host directory (`--host` overrides it) for multi-worktree isolation. `STORYBROKR_PORT` pins the port
 the detached daemon entry (`dist/server/start.js`, used when a command
 auto-starts the daemon) binds to; the foreground `storybrokr daemon start`
 takes `--port <n>` instead (default: ephemeral). Either way, `daemon.json`

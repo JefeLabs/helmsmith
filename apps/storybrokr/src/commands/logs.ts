@@ -1,6 +1,6 @@
 import type { Command } from 'commander';
 import type { DaemonClient } from '../client/index.js';
-import { fail, parseIntegerInRange } from './_shared/output.js';
+import { fail, parseIntegerInRange, resolveTarget } from './_shared/output.js';
 
 /**
  * Awaits the stream's end. `client.follow(...)` is awaited before anything is detached, so a
@@ -31,12 +31,17 @@ export function registerLogs(program: Command, connect: () => Promise<DaemonClie
   program
     .command('logs <id-or-path>')
     .description("Show an instance's Storybook output")
+    .option('--host <dir>', 'host repo root')
     .option('--tail <n>', 'lines to show', parseIntegerInRange(1, 2000), 200)
     .option('--follow', 'keep streaming new lines')
-    .action(async (idOrPath: string, o: { tail: number; follow?: boolean }) => {
+    .action(async (idOrPath: string, o: { host?: string; tail: number; follow?: boolean }) => {
       try {
         const client = await connect();
-        const record = await client.get(idOrPath);
+        const target = resolveTarget(idOrPath, o.host);
+        const record = await client.get(target.idOrPath, {
+          host: target.host,
+          hint: target.hint,
+        });
         for (const line of await client.logs(record.id, o.tail)) console.log(line);
         if (o.follow) {
           await followLogs(client, record.id, (line) => console.log(line));

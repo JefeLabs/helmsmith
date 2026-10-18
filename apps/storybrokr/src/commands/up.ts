@@ -14,6 +14,7 @@ export interface UpOptions {
   component: string;
   hostRoot?: string;
   ttl?: number;
+  includeChildren?: boolean;
   wait?: boolean;
 }
 
@@ -25,6 +26,7 @@ export async function runUp(
     component: opts.component,
     hostRoot: opts.hostRoot,
     ttlMinutes: opts.ttl,
+    ...(opts.includeChildren !== undefined ? { includeChildren: opts.includeChildren } : {}),
     wait: opts.wait !== false,
   });
 }
@@ -43,18 +45,36 @@ export function registerUp(program: Command, connect: () => Promise<DaemonClient
       parseNonNegativeNumber,
     )
     .option(
+      '--include-children',
+      'also include stories of transitively imported child components',
+    )
+    .option(
       '--no-wait',
       'return as soon as the instance is registered instead of waiting for ready',
     )
     .option('--json', 'print the instance record as JSON')
     .action(
-      async (path: string, o: { host?: string; ttl?: number; wait: boolean; json?: boolean }) => {
+      async (
+        path: string,
+        o: {
+          host?: string;
+          ttl?: number;
+          includeChildren?: boolean;
+          wait: boolean;
+          json?: boolean;
+        },
+      ) => {
         try {
           const target = o.host
             ? { component: path.replace(/\/+$/, ''), hostRoot: resolve(o.host) }
             : resolveComponent(path);
           const client = await connect();
-          const { record } = await runUp(client, { ...target, ttl: o.ttl, wait: o.wait });
+          const { record } = await runUp(client, {
+            ...target,
+            ttl: o.ttl,
+            includeChildren: o.includeChildren,
+            wait: o.wait,
+          });
           if (o.json) printJson(record);
           else printInstance(record);
         } catch (err) {
