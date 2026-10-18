@@ -17,13 +17,14 @@ describe('loadConfig', () => {
     expect(loadConfig(home)).toEqual(DEFAULT_CONFIG);
     expect(DEFAULT_CONFIG).toEqual({
       ttlMinutes: 30,
-      instanceCap: 6,
+      instanceCap: 10,
       portRangeStart: 6100,
       portRangeEnd: 6199,
       readinessTimeoutMs: 120_000,
       reaperIntervalMs: 60_000,
       autoStartWaitMs: 10_000,
       browserIdleMinutes: 10,
+      checkConcurrency: 4,
     });
   });
 

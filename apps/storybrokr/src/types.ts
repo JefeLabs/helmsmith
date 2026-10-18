@@ -15,6 +15,11 @@ export interface InstanceError {
   logTail?: string[];
 }
 
+export interface ResolveScope {
+  host?: string; // explicit hostRoot (authoritative)
+  hint?: string; // STORYBROKR_HOST or cwd hostRoot (preferred before global fallback)
+}
+
 export interface InstanceRecord {
   id: string;
   hostRoot: string;
@@ -30,6 +35,7 @@ export interface InstanceRecord {
   storyFiles: string[]; // relative to hostRoot
   stories: StoryEntry[];
   configDir: string; // absolute
+  includeChildren?: boolean;
   exitCode?: number | null;
   error?: InstanceError;
 }
@@ -38,6 +44,7 @@ export interface UpRequest {
   component: string;
   hostRoot?: string;
   ttlMinutes?: number;
+  includeChildren?: boolean;
   wait?: boolean; // default true
 }
 
@@ -62,6 +69,7 @@ export interface DaemonConfig {
   reaperIntervalMs: number;
   autoStartWaitMs: number;
   browserIdleMinutes: number; // 0 = never close the idle browser
+  checkConcurrency: number;
 }
 
 export interface DaemonInfo {
@@ -83,6 +91,7 @@ export interface CheckRequest {
   storyIds?: string[]; // default: every story in the instance
   waitFor?: WaitFor;
   timeoutMs?: number; // per story; default 30000
+  concurrency?: number; // default DaemonConfig.checkConcurrency (4)
 }
 
 export type CheckStatus = 'pass' | 'fail' | 'timeout';

@@ -24,7 +24,7 @@ describe('discoverStories', () => {
     for (const r of roots) rmSync(r, { recursive: true, force: true });
   });
 
-  it('walks relative and alias imports transitively and keeps only story-bearing modules', () => {
+  it('defaults to root-only stories when the component folder has its own stories, and includes children when requested', () => {
     const root = tree({
       'components/core/organisms/calendar/section/CalendarSection.tsx':
         "import { CalendarHeader } from '../molecules/CalendarHeader/CalendarHeader';\nimport { Switch } from '@core/atoms/switch/Switch';\nimport { fmt } from '../utils/fmt';\nexport const CalendarSection = () => null;\n",
@@ -46,7 +46,16 @@ describe('discoverStories', () => {
       'components/core/atoms/Unrelated/Unrelated.stories.tsx': '',
     });
     roots.push(root);
-    const result = discoverStories(root, 'components/core/organisms/calendar/section', PATHS);
+    const rootOnly = discoverStories(root, 'components/core/organisms/calendar/section', PATHS);
+    expect(rootOnly.storyFiles).toEqual([
+      'components/core/organisms/calendar/section/CalendarSection.stories.tsx',
+    ]);
+    expect(rootOnly.includedChildren).toBe(false);
+    expect(rootOnly.unresolved).toEqual([]);
+
+    const result = discoverStories(root, 'components/core/organisms/calendar/section', PATHS, {
+      includeChildren: true,
+    });
     expect(result.storyFiles).toEqual([
       'components/core/atoms/CalendarViewTab/CalendarViewTab.stories.tsx',
       'components/core/atoms/switch/Switch.stories.tsx',
@@ -54,8 +63,39 @@ describe('discoverStories', () => {
       'components/core/organisms/calendar/molecules/CalendarHeader/CalendarHeaderWithTabs.stories.tsx',
       'components/core/organisms/calendar/section/CalendarSection.stories.tsx',
     ]);
+    expect(result.includedChildren).toBe(true);
     expect(result.unresolved).toEqual([]);
     expect(result.modulesVisited).toBeGreaterThanOrEqual(5);
+  });
+
+  it('automatically falls back to transitive children when the root target has zero stories of its own', () => {
+    const root = tree({
+      'src/pages/HomePage.tsx':
+        "import { Button } from '../Button/Button';\nexport const HomePage = () => null;\n",
+      'src/Button/Button.tsx': 'export const Button = () => null;\n',
+      'src/Button/Button.stories.tsx': '',
+    });
+    roots.push(root);
+    const res = discoverStories(root, 'src/pages/HomePage.tsx', {});
+    expect(res.storyFiles).toEqual(['src/Button/Button.stories.tsx']);
+    expect(res.includedChildren).toBe(true);
+  });
+
+  it('leaf source file collects only its own storyFilesFor and excludes sibling imports unless includeChildren is set', () => {
+    const root = tree({
+      'src/Button.tsx': "import './Icon';\nexport const Button = () => null;\n",
+      'src/Button.stories.tsx': '',
+      'src/Icon.tsx': 'export const Icon = () => null;\n',
+      'src/Icon.stories.tsx': '',
+    });
+    roots.push(root);
+    const rootOnly = discoverStories(root, 'src/Button.tsx', {});
+    expect(rootOnly.storyFiles).toEqual(['src/Button.stories.tsx']);
+    expect(rootOnly.includedChildren).toBe(false);
+
+    const withChildren = discoverStories(root, 'src/Button.tsx', {}, { includeChildren: true });
+    expect(withChildren.storyFiles).toEqual(['src/Button.stories.tsx', 'src/Icon.stories.tsx']);
+    expect(withChildren.includedChildren).toBe(true);
   });
 
   it('accepts a single story file as the component', () => {
@@ -68,6 +108,7 @@ describe('discoverStories', () => {
     roots.push(root);
     const result = discoverStories(root, 'src/Button.stories.tsx', {});
     expect(result.storyFiles).toEqual(['src/Button.stories.tsx']);
+    expect(result.includedChildren).toBe(false);
   });
 
   it('resolves index files, dynamic imports, and survives cycles', () => {
@@ -79,8 +120,13 @@ describe('discoverStories', () => {
       'src/b/index.stories.tsx': '',
     });
     roots.push(root);
-    const result = discoverStories(root, 'src/a', {});
+    const rootOnly = discoverStories(root, 'src/a/index.ts', {});
+    expect(rootOnly.storyFiles).toEqual(['src/a/A.stories.tsx']);
+    expect(rootOnly.includedChildren).toBe(false);
+
+    const result = discoverStories(root, 'src/a', {}, { includeChildren: true });
     expect(result.storyFiles).toEqual(['src/a/A.stories.tsx', 'src/b/index.stories.tsx']);
+    expect(result.includedChildren).toBe(true);
   });
 
   it('logs unresolvable local specifiers without throwing and never enters node_modules', () => {

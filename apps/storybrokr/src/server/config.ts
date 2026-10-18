@@ -5,13 +5,14 @@ import type { DaemonConfig } from '../types.js';
 
 export const DEFAULT_CONFIG: DaemonConfig = {
   ttlMinutes: 30,
-  instanceCap: 6,
+  instanceCap: 10,
   portRangeStart: 6100,
   portRangeEnd: 6199,
   readinessTimeoutMs: 120_000,
   reaperIntervalMs: 60_000,
   autoStartWaitMs: 10_000,
   browserIdleMinutes: 10,
+  checkConcurrency: 4,
 };
 
 const KEYS = Object.keys(DEFAULT_CONFIG) as (keyof DaemonConfig)[];

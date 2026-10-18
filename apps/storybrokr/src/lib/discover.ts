@@ -3,15 +3,21 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { StorybrokrError } from './errors.js';
 
+export interface DiscoverOptions {
+  includeChildren?: boolean;
+}
+
 export interface DiscoveryResult {
   storyFiles: string[];
   modulesVisited: number;
   unresolved: string[];
+  includedChildren: boolean;
 }
 
 const SOURCE_EXTS = ['.tsx', '.ts', '.jsx', '.js'];
 const STORY_RE = /\.stories\.(tsx|ts|jsx|js|mdx)$/;
 const SKIP_RE = /\.(stories|test|spec|types)\./;
+const INDEX_RE = /^index\.(tsx|ts|jsx|js)$/;
 const STATIC_IMPORT_RE = /(?:^|\n)\s*(?:import|export)\s+(?:[^'"]*?\s+from\s+)?['"]([^'"]+)['"]/g;
 const DYNAMIC_IMPORT_RE = /import\(\s*['"]([^'"]+)['"]\s*\)/g;
 
@@ -87,6 +93,7 @@ export function discoverStories(
   hostRoot: string,
   component: string,
   tsconfigPaths: Record<string, string[]>,
+  opts?: DiscoverOptions,
 ): DiscoveryResult {
   const abs = resolve(hostRoot, component);
   if (!existsSync(abs)) {
@@ -95,48 +102,79 @@ export function discoverStories(
       `${component} does not exist under ${hostRoot}`,
     );
   }
-  const stories = new Set<string>();
-  const queue: string[] = [];
-  if (statSync(abs).isDirectory()) {
-    for (const f of readdirSync(abs)) {
-      const full = join(abs, f);
-      if (STORY_RE.test(f)) stories.add(full);
-      else if (
-        SOURCE_EXTS.some((e) => f.endsWith(e)) &&
-        !SKIP_RE.test(f) &&
-        statSync(full).isFile()
-      )
-        queue.push(full);
-    }
-  } else {
-    if (STORY_RE.test(abs)) stories.add(abs);
-    queue.push(abs);
+  const isDir = statSync(abs).isDirectory();
+  if (!isDir && STORY_RE.test(abs) && !opts?.includeChildren) {
+    return {
+      storyFiles: [relative(hostRoot, abs)],
+      modulesVisited: 1,
+      unresolved: [],
+      includedChildren: false,
+    };
   }
 
-  const seen = new Set<string>();
-  const unresolved: string[] = [];
-  while (queue.length > 0) {
-    const file = queue.shift() as string;
-    if (seen.has(file) || file.includes('/node_modules/')) continue;
-    seen.add(file);
-    for (const s of storyFilesFor(file)) stories.add(s);
-    for (const spec of importsOf(file)) {
-      const { local, file: target } = resolveImport(file, spec, hostRoot, tsconfigPaths);
-      if (!local) continue;
-      if (!target) {
-        unresolved.push(`${relative(hostRoot, file)} -> ${spec}`);
-        continue;
+  const walk = (
+    stayInRoot: boolean,
+  ): { storyFiles: string[]; modulesVisited: number; unresolved: string[] } => {
+    const stories = new Set<string>();
+    const queue: string[] = [];
+    if (isDir) {
+      for (const f of readdirSync(abs)) {
+        const full = join(abs, f);
+        if (STORY_RE.test(f)) stories.add(full);
+        else if (
+          SOURCE_EXTS.some((e) => f.endsWith(e)) &&
+          !SKIP_RE.test(f) &&
+          statSync(full).isFile()
+        )
+          queue.push(full);
       }
-      if (!target.includes('/node_modules/') && !seen.has(target)) queue.push(target);
+    } else {
+      if (STORY_RE.test(abs)) stories.add(abs);
+      queue.push(abs);
+    }
+
+    const isLeafSource = !isDir && !INDEX_RE.test(basename(abs));
+    const boundary = isDir ? abs : dirname(abs);
+    const seen = new Set<string>();
+    const unresolved: string[] = [];
+    while (queue.length > 0) {
+      const file = queue.shift() as string;
+      if (seen.has(file) || file.includes('/node_modules/')) continue;
+      seen.add(file);
+      for (const s of storyFilesFor(file)) stories.add(s);
+      if (stayInRoot && isLeafSource) continue;
+      for (const spec of importsOf(file)) {
+        const { local, file: target } = resolveImport(file, spec, hostRoot, tsconfigPaths);
+        if (!local) continue;
+        if (!target) {
+          unresolved.push(`${relative(hostRoot, file)} -> ${spec}`);
+          continue;
+        }
+        if (stayInRoot && target !== boundary && !target.startsWith(`${boundary}/`)) continue;
+        if (!target.includes('/node_modules/') && !seen.has(target)) queue.push(target);
+      }
+    }
+
+    const storyFiles = [...stories].map((s) => relative(hostRoot, s)).sort();
+    return { storyFiles, modulesVisited: seen.size, unresolved };
+  };
+
+  if (!opts?.includeChildren) {
+    const rootRes = walk(true);
+    if (rootRes.storyFiles.length > 0) {
+      return { ...rootRes, includedChildren: false };
     }
   }
 
-  const storyFiles = [...stories].map((s) => relative(hostRoot, s)).sort();
-  if (storyFiles.length === 0) {
+  const fullRes = walk(false);
+  if (fullRes.storyFiles.length === 0) {
     throw new StorybrokrError(
       'COMPONENT_NOT_FOUND',
       `no *.stories.* files reachable from ${component}`,
     );
   }
-  return { storyFiles, modulesVisited: seen.size, unresolved };
+  return {
+    ...fullRes,
+    includedChildren: !STORY_RE.test(abs) || Boolean(opts?.includeChildren),
+  };
 }

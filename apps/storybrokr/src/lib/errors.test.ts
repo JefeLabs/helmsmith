@@ -21,6 +21,7 @@ describe('StorybrokrError', () => {
     expect(httpStatusFor('STORY_TIMEOUT')).toBe(504);
     expect(httpStatusFor('SCREENSHOT_WRITE_FAILED')).toBe(500);
     expect(httpStatusFor('INSTANCE_NOT_READY')).toBe(409);
+    expect(httpStatusFor('INSTANCE_AMBIGUOUS')).toBe(409);
   });
 
   it('carries code, status and an optional log tail', () => {
