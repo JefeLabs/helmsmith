@@ -1,7 +1,15 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, realpathSync, rmSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { WorkkitError } from './errors.js';
+
+const realpathOr = (p: string): string => {
+  try {
+    return realpathSync(p);
+  } catch {
+    return p;
+  }
+};
 
 export interface SyncResult {
   kind: 'up-to-date' | 'ff' | 'merge' | 'conflict';
@@ -179,8 +187,16 @@ export class Git {
     return lines.length > 0 && lines.every((l) => l.startsWith('- '));
   }
 
-  /** Repair broken submodule .git pointers inside a linked worktree before git merge/syncFrom runs. */
-  repairSubmodules(mainRoot: string): void {
+  /**
+   * Give a linked worktree its own clone of every submodule the main checkout has initialized,
+   * cloned locally from the main checkout's module directory (no network) and then re-pointed at
+   * the real URL. `git worktree add` under submodule.recurse leaves a gitfile aimed at a module
+   * directory that was never cloned; a gitfile aimed at the MAIN checkout's module directory is
+   * worse, because that module's core.worktree is the main checkout's submodule, so any git
+   * command in the worktree's submodule (checkout -f, reset, merge) rewrites the human's files.
+   * Both shapes are replaced; a submodule that is already its own working tree is left alone.
+   */
+  repairSubmodules(mainRoot: string, log: (line: string) => void = () => {}): void {
     const gitmodules = join(this.cwd, '.gitmodules');
     if (!existsSync(gitmodules)) return;
     const cfg = this.tryRun([
@@ -191,29 +207,47 @@ export class Git {
       '^submodule\\..*\\.path$',
     ]);
     if (cfg.code !== 0) return;
+    const wtGitDir = this.run(['rev-parse', '--path-format=absolute', '--git-dir']).trim();
     for (const line of cfg.out.split('\n').filter(Boolean)) {
-      const parts = line.trim().split(/\s+/);
-      const subPath = parts[1];
-      if (!subPath) continue;
+      const m = /^submodule\.(.+)\.path\s+(.+)$/.exec(line.trim());
+      if (!m) continue;
+      const [, name, subPath] = m as unknown as [string, string, string];
       const wtSub = join(this.cwd, subPath);
       const wtGit = join(wtSub, '.git');
-      if (existsSync(wtGit) && new Git(wtSub).tryRun(['rev-parse', '--git-dir']).code === 0) {
+      if (this.isOwnSubmodule(wtSub, wtGit)) continue;
+      const mainSub = join(mainRoot, subPath);
+      if (!existsSync(join(mainSub, '.git'))) continue; // never initialized there: nothing to clone from
+      const src = new Git(mainSub).tryRun(['rev-parse', '--path-format=absolute', '--git-dir']);
+      if (src.code !== 0 || !src.out.trim()) continue;
+      // a stale or borrowed gitfile and a half-made module dir both make `submodule update` refuse
+      if (existsSync(wtGit) && statSync(wtGit).isFile()) rmSync(wtGit);
+      rmSync(join(wtGitDir, 'modules', name), { recursive: true, force: true });
+      const r = this.tryRun([
+        '-c',
+        'protocol.file.allow=always',
+        '-c',
+        `submodule.${name}.url=${src.out.trim()}`,
+        'submodule',
+        'update',
+        '--init',
+        '--',
+        subPath,
+      ]);
+      if (r.code !== 0) {
+        log(
+          `submodule ${subPath}: not repaired (${(r.err || r.out).trim()}); the project's refresh steps may still set it up`,
+        );
         continue;
       }
-      const mainSub = join(mainRoot, subPath);
-      if (existsSync(join(mainSub, '.git'))) {
-        const subGitDir = new Git(mainSub).tryRun([
-          'rev-parse',
-          '--path-format=absolute',
-          '--git-dir',
-        ]);
-        if (subGitDir.code === 0 && subGitDir.out.trim()) {
-          mkdirSync(wtSub, { recursive: true });
-          rmSync(wtGit, { recursive: true, force: true });
-          writeFileSync(wtGit, `gitdir: ${subGitDir.out.trim()}\n`);
-          new Git(wtSub).tryRun(['checkout', '-f', '-q']);
-        }
-      }
+      this.tryRun(['submodule', 'sync', '-q', '--', subPath]); // back to the .gitmodules URL
     }
+  }
+
+  /** A submodule is the worktree's own when git, run inside it, says its top level IS that directory. */
+  private isOwnSubmodule(wtSub: string, wtGit: string): boolean {
+    if (!existsSync(wtGit)) return false;
+    const top = new Git(wtSub).tryRun(['rev-parse', '--show-toplevel']);
+    if (top.code !== 0) return false;
+    return realpathOr(top.out.trim()) === realpathOr(wtSub);
   }
 }

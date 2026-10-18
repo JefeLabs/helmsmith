@@ -334,7 +334,7 @@ function ensureWorktree(
   if (!existsSync(path)) {
     main.worktreeAdd(path, branch, `origin/${m.baseBranch}`);
     const wg = new Git(path);
-    wg.repairSubmodules(ctx.repoRoot);
+    wg.repairSubmodules(ctx.repoRoot, ctx.log);
     return { wg, created: true };
   }
   const registered = main
@@ -357,7 +357,7 @@ function ensureWorktree(
       { worktree: path },
     );
   }
-  wg.repairSubmodules(ctx.repoRoot);
+  wg.repairSubmodules(ctx.repoRoot, ctx.log);
   const current = wg.currentBranch();
   if (current !== branch) {
     if (wg.isDirty())

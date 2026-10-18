@@ -1,9 +1,9 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Git } from './git.js';
-import { commitFile, makeRepo } from './testing/fixture-repo.js';
+import { commitFile, gitIn, makeRepo } from './testing/fixture-repo.js';
 
 describe('Git', () => {
   let cleanup = () => {};
@@ -122,5 +122,65 @@ describe('Git', () => {
     expect(w.commitsNotOn('develop').length).toBeGreaterThan(0);
     expect(w.isEquivalentToBase('develop')).toBe(true);
     expect(w.isAncestor('origin/develop', 'origin/develop')).toBe(true);
+  });
+
+  it("repairSubmodules gives the worktree its own submodule and never touches the main checkout's", () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const dir = dirname(f.main);
+    // a submodule source, added to the main checkout the way skoolscout has .scripts/.docs
+    const subSrc = join(dir, 'sub-src');
+    gitIn(dir, 'init', '-q', '-b', 'main', subSrc);
+    commitFile(subSrc, 'tool.sh', 'v1', 'sub1');
+    gitIn(f.main, '-c', 'protocol.file.allow=always', 'submodule', 'add', '-q', subSrc, 'scripts');
+    gitIn(f.main, 'commit', '-q', '-m', 'add submodule');
+    gitIn(f.main, 'config', 'submodule.recurse', 'true');
+    // the human has an uncommitted edit inside the main checkout's submodule
+    writeFileSync(join(f.main, 'scripts/tool.sh'), 'EDITED-UNCOMMITTED');
+
+    const wt = join(f.main, '.claude/worktrees/shop/cart');
+    new Git(f.main).worktreeAdd(wt, 'feature/shop/cart', 'develop');
+    new Git(wt).repairSubmodules(f.main);
+
+    expect(readFileSync(join(f.main, 'scripts/tool.sh'), 'utf8')).toBe('EDITED-UNCOMMITTED');
+    expect(readFileSync(join(wt, 'scripts/tool.sh'), 'utf8')).toBe('v1');
+    const subTop = realpathSync(gitIn(join(wt, 'scripts'), 'rev-parse', '--show-toplevel').trim());
+    expect(subTop).toBe(realpathSync(join(wt, 'scripts')));
+
+    // idempotent: a second start on the same worktree repairs nothing and still leaves the main checkout alone
+    new Git(wt).repairSubmodules(f.main);
+    expect(readFileSync(join(f.main, 'scripts/tool.sh'), 'utf8')).toBe('EDITED-UNCOMMITTED');
+    expect(readFileSync(join(wt, 'scripts/tool.sh'), 'utf8')).toBe('v1');
+  });
+
+  it('repairSubmodules replaces a gitfile borrowed from the main checkout (the shape the old repair left behind)', () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const dir = dirname(f.main);
+    const subSrc = join(dir, 'sub-src');
+    gitIn(dir, 'init', '-q', '-b', 'main', subSrc);
+    commitFile(subSrc, 'tool.sh', 'v1', 'sub1');
+    gitIn(f.main, '-c', 'protocol.file.allow=always', 'submodule', 'add', '-q', subSrc, 'scripts');
+    gitIn(f.main, 'commit', '-q', '-m', 'add submodule');
+    const wt = join(f.main, '.claude/worktrees/shop/cart');
+    new Git(f.main).worktreeAdd(wt, 'feature/shop/cart', 'develop');
+    // what the previous repair wrote: a gitfile aimed at the main checkout's module directory
+    const mainModule = gitIn(
+      join(f.main, 'scripts'),
+      'rev-parse',
+      '--path-format=absolute',
+      '--git-dir',
+    ).trim();
+    mkdirSync(join(wt, 'scripts'), { recursive: true });
+    writeFileSync(join(wt, 'scripts/.git'), `gitdir: ${mainModule}\n`);
+    writeFileSync(join(f.main, 'scripts/tool.sh'), 'EDITED-UNCOMMITTED');
+
+    new Git(wt).repairSubmodules(f.main);
+
+    expect(readFileSync(join(f.main, 'scripts/tool.sh'), 'utf8')).toBe('EDITED-UNCOMMITTED');
+    expect(readFileSync(join(wt, 'scripts/tool.sh'), 'utf8')).toBe('v1');
+    const subTop = realpathSync(gitIn(join(wt, 'scripts'), 'rev-parse', '--show-toplevel').trim());
+    expect(subTop).toBe(realpathSync(join(wt, 'scripts')));
+    expect(gitIn(join(wt, 'scripts'), 'remote', 'get-url', 'origin').trim()).toBe(subSrc);
   });
 });
