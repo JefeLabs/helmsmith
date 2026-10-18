@@ -183,4 +183,30 @@ describe('Git', () => {
     expect(subTop).toBe(realpathSync(join(wt, 'scripts')));
     expect(gitIn(join(wt, 'scripts'), 'remote', 'get-url', 'origin').trim()).toBe(subSrc);
   });
+
+  it('repairSubmodules refuses a submodule name that escapes the modules directory', () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const dir = dirname(f.main);
+    const subSrc = join(dir, 'sub-src');
+    gitIn(dir, 'init', '-q', '-b', 'main', subSrc);
+    commitFile(subSrc, 'tool.sh', 'v1', 'sub1');
+    gitIn(f.main, '-c', 'protocol.file.allow=always', 'submodule', 'add', '-q', subSrc, 'scripts');
+    gitIn(f.main, 'commit', '-q', '-m', 'add submodule');
+    const wt = join(f.main, '.claude/worktrees/shop/cart');
+    new Git(f.main).worktreeAdd(wt, 'feature/shop/cart', 'develop');
+    // a hostile .gitmodules: same path and url, but a name that walks up out of <git-dir>/modules
+    writeFileSync(
+      join(wt, '.gitmodules'),
+      `[submodule "../../victim"]\n\tpath = scripts\n\turl = ${subSrc}\n`,
+    );
+    const wtGitDir = gitIn(wt, 'rev-parse', '--path-format=absolute', '--git-dir').trim();
+    const victim = join(wtGitDir, 'modules', '../../victim');
+    mkdirSync(victim, { recursive: true });
+    writeFileSync(join(victim, 'keep'), 'x');
+
+    new Git(wt).repairSubmodules(f.main);
+
+    expect(readFileSync(join(victim, 'keep'), 'utf8')).toBe('x');
+  });
 });

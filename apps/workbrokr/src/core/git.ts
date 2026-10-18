@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, realpathSync, rmSync, statSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { WorkkitError } from './errors.js';
 
 const realpathOr = (p: string): string => {
@@ -10,6 +10,9 @@ const realpathOr = (p: string): string => {
     return p;
   }
 };
+
+/** No control characters, whitespace or `=`: the name is spliced into a `-c submodule.<name>.url=` key. */
+const SAFE_SUBMODULE_NAME = /^[^\p{Cc}\s=]+$/u;
 
 export interface SyncResult {
   kind: 'up-to-date' | 'ff' | 'merge' | 'conflict';
@@ -212,6 +215,18 @@ export class Git {
       const m = /^submodule\.(.+)\.path\s+(.+)$/.exec(line.trim());
       if (!m) continue;
       const [, name, subPath] = m as unknown as [string, string, string];
+      // the name becomes a path segment under <git-dir>/modules and a config key: refuse anything
+      // git itself would reject (CVE-2018-11235 shape) before we delete or spawn with it
+      const modulesDir = resolve(wtGitDir, 'modules');
+      const moduleDir = resolve(modulesDir, name);
+      if (
+        !SAFE_SUBMODULE_NAME.test(name) ||
+        name.split(/[\\/]/).some((seg) => seg === '' || seg === '.' || seg === '..') ||
+        !moduleDir.startsWith(modulesDir + sep)
+      ) {
+        log(`submodule ${subPath}: refusing name ${JSON.stringify(name)}; not repaired`);
+        continue;
+      }
       const wtSub = join(this.cwd, subPath);
       const wtGit = join(wtSub, '.git');
       if (this.isOwnSubmodule(wtSub, wtGit)) continue;
@@ -221,7 +236,7 @@ export class Git {
       if (src.code !== 0 || !src.out.trim()) continue;
       // a stale or borrowed gitfile and a half-made module dir both make `submodule update` refuse
       if (existsSync(wtGit) && statSync(wtGit).isFile()) rmSync(wtGit);
-      rmSync(join(wtGitDir, 'modules', name), { recursive: true, force: true });
+      rmSync(moduleDir, { recursive: true, force: true });
       const r = this.tryRun([
         '-c',
         'protocol.file.allow=always',
