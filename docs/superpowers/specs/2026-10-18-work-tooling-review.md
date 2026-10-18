@@ -10,7 +10,7 @@ The three tools are in very different states.
 
 - **workbrokr** works for the happy path that was proven live on skoolscout, but one bug is a silent data-loss defect that fires on every `work start` there: the submodule repair runs `git checkout -f` against the **main checkout's** submodules (W1). Four more high-severity defects leave efforts stuck or slots double-leased when a start is killed, a push is rejected, a sync conflict is resolved, or a stack is running on a wildcard address (W2–W5). The reaper the spec relies on never runs on its own (W6).
 - **storybrokr** implements Spec 2 mostly as written, but two scoping holes defeat its purpose: `down --all --host` stops every instance on the machine, and `up` ignores `STORYBROKR_HOST` in both the CLI and the MCP server (S1–S2). A repeat `up` never applies the lease's TTL, so "TTL equals the lease" does not hold (S3). Daemon-restart adoption is unreliable (S4).
-- **pritty** could not run from its built output (`openai` imported but not declared), `commit` committed working-tree content instead of the index, `rebase` never reached git because simple-git blocks the editor variable, and `pr` listed the wrong commit range (P1–P4). None of its three commands had a test. **P1–P6 are fixed on `main` as of 2026-10-18 (§5.1a), unpublished.**
+- **pritty** could not run from its built output (`openai` imported but not declared), `commit` committed working-tree content instead of the index, `rebase` never reached git because simple-git blocks the editor variable, and `pr` listed the wrong commit range (P1–P4). None of its three commands had a test. **P1–P12 are fixed on `main` as of 2026-10-18 (§5.1a), unpublished.**
 - **§18 Amendment A** names four functions that do not exist, prescribes a `git log` range that reproduces P4, specifies a closed-PR check that cannot be implemented without creating a PR, and omits the packaging facts (Bun runtime, undeclared and unpublished dependencies) that gate "publish 0.1.0".
 
 The pattern across all three is the same one the flow-spec review found in August: the surface (flags, config keys, spec sections) is wider than what the code does, and the gaps sit exactly where no test runs.
@@ -130,6 +130,8 @@ The pattern across all three is the same one the flow-spec review found in Augus
 
 ### 5.1a Fixed 2026-10-18 (commits on `main`, unpublished)
 
+Each fix landed with a test that failed first; pritty's suite went from 118 to 198 tests.
+
 | # | Commit | What changed |
 |---|---|---|
 | P1 | 32e8a52 | `openai` declared; private workspace packages moved to devDependencies; unused `@langchain/core` and `cli-table3` dropped; build code-split so the TUI is a lazily loaded chunk and `dist/cli.js` loads under plain Node; the bin re-execs under Bun only for `connect`. `src/packaging.test.ts` builds once and checks imports, private deps and Node startup with `NODE_PATH` scrubbed (pnpm's hoisted store on `NODE_PATH` had hidden the missing dependency inside the test runner). |
@@ -138,8 +140,14 @@ The pattern across all three is the same one the flow-spec review found in Augus
 | P4 | cca606c | `log` uses `base..head`, `changedFilesBetween` uses `base...head`; new `resolveBaseRef` prefers `origin/<base>` when the remote has it; `pr` and `rebase` compare against it. |
 | P5 | 6697942 | `baseBranch` is optional in the schema and absent from the starter config; `resolveBaseBranch` orders flag, config, repository default, `main`; `pr` queries GitHub for the default only when neither flag nor config names a base. |
 | P6 | 406f527 | `runPr` resolves the token first, then returns an existing open PR for the same head and base instead of creating another (a failed lookup is fatal), then lists commits, drafts, confirms, pushes and creates; detached HEAD refused; `process.exit` replaced by thrown errors; dependencies injectable, order asserted with recording fakes. |
+| P7 | b6e0768, b060127 | Token order is `GH_TOKEN`, `GITHUB_TOKEN`, `gh auth token --user <github.account>` (new `.pritty.json` key), `gh auth token`, then the Copilot token with a printed warning about its `read:user` scope; the account value must look like a GitHub login. `parseGitHubRemote` accepts userinfo tokens, `ssh://` URLs and SSH host aliases; `describeRemote` masks userinfo and token-like query parameters before any URL is printed. |
+| P8 | bc1de2d | Staged and changed paths come from `git diff --no-renames`, so a rename is its old and new path, and the index-subset commit applies the old side as a deletion. |
+| P9 | 1a3508c | `pritty pr --json` prints one JSON line `{ number, url, created, head, base }` on stdout, everything else on stderr, implies `--auto-approve`, and requires `--base` or a configured `baseBranch`. Every prompt goes through `guardPrompt`, which fails with the flag to pass when stdin is not a terminal. The stale-ticket question is skipped under auto-approve. |
+| P10 | e99c843 | `loadConfig`, `findPullRequestTemplate` and `findCodeowners` search from cwd up to the repository root, nearest first, never above it. `preCommit`, `prePush`, `skipHooks` and `verbose` are removed from the schema and the starter; legacy configs still load. `autoApprove` and `dryRun` from config act as defaults for `commit` and `pr`. README status table and config example corrected. |
+| P11 | f4f4997, b060127 | `redactDiff` omits diffs of files that are secrets by name, drops private-key blocks and masks secret-looking assignments, bearer tokens and known token prefixes on added, removed and context lines, before truncation; quoted, renamed and combined diff headers are honoured. Every model call is bounded by `aiTimeoutMs` (default 60 s). |
+| P12 | 83b1ea8 | Default categories list `test`, `storybook`, `infra`, `config` before `app`. |
 
-Still open from §5.1: P7 (token order and the `read:user` Copilot scope, token in a remote URL printed to stderr), P8 renames, P9 `--json` and non-interactive gaps, P10 repo-root config lookup and dead config keys, P11 unredacted diff and no timeout, P12 default category order. These are the §18.2 prerequisites' remaining ground.
+All twelve findings of §5.1 are fixed on `main`, unpublished. What remains before `work pr` (§6): the §18.2 items that are features rather than defects (`--draft`, `--title`/`--body-file` no-AI path, `--no-push`, `commitTrailers`/`prFooter`, the `/core` subpath export), adding `@helmsmith/pritty` to `PUBLISH_PKGS`, and the live proof against a throwaway repository. `pritty rebase` stays as is: the owner's rule is that rebase is a last resort and a merge commit is preferred.
 
 ### 5.2 Tests
 
