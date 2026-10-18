@@ -149,11 +149,33 @@ export class Git {
     return { kind: 'conflict', before, after: before, conflicted };
   }
 
+  /** `origin/<branch>` after a fetch attempt, when the remote has it; the local copy may have been retired. */
+  remoteRef(branch: string): string | undefined {
+    this.tryRun(['fetch', '-q', 'origin', branch]);
+    const ref = `refs/remotes/origin/${branch}`;
+    return this.tryRun(['rev-parse', '--verify', '-q', ref]).code === 0
+      ? `origin/${branch}`
+      : undefined;
+  }
+
+  /**
+   * Add a worktree on `branch`: the local branch if it exists, else a tracking
+   * branch from origin/<branch> if the remote has it (so retiring the local
+   * branch while its PR was open never recreates it from the base), else a
+   * new branch from `startPoint`.
+   */
   worktreeAdd(path: string, branch: string, startPoint?: string): void {
     mkdirSync(dirname(path), { recursive: true });
-    if (this.branchExists(branch)) this.run(['worktree', 'add', '-q', path, branch]);
-    else
-      this.run(['worktree', 'add', '-q', '--no-track', '-b', branch, path, startPoint ?? 'HEAD']);
+    if (this.branchExists(branch)) {
+      this.run(['worktree', 'add', '-q', path, branch]);
+      return;
+    }
+    const remote = this.remoteRef(branch);
+    if (remote) {
+      this.run(['worktree', 'add', '-q', '--track', '-b', branch, path, remote]);
+      return;
+    }
+    this.run(['worktree', 'add', '-q', '--no-track', '-b', branch, path, startPoint ?? 'HEAD']);
   }
 
   worktreeRemove(path: string): void {
@@ -161,8 +183,16 @@ export class Git {
   }
 
   checkout(branch: string, createFrom?: string): void {
-    if (this.branchExists(branch)) this.run(['checkout', '-q', branch]);
-    else this.run(['checkout', '-q', '--no-track', '-b', branch, createFrom ?? 'HEAD']);
+    if (this.branchExists(branch)) {
+      this.run(['checkout', '-q', branch]);
+      return;
+    }
+    const remote = this.remoteRef(branch);
+    if (remote) {
+      this.run(['checkout', '-q', '--track', '-b', branch, remote]);
+      return;
+    }
+    this.run(['checkout', '-q', '--no-track', '-b', branch, createFrom ?? 'HEAD']);
   }
 
   push(branch: string): void {

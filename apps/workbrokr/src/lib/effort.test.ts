@@ -754,3 +754,50 @@ describe('parallel waves, promote, join ref-counting & squash-merge recovery', (
     expect(sb.downHosts).toEqual([expectedHost, expectedHost]);
   });
 });
+
+describe('W3: pushes and origin-only branches', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('a rejected push leaves the leases, the services and the effort untouched', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const { gitIn } = await import('../core/testing/fixture-repo.js');
+    const ctx = ctxFor(f);
+    const r = await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'fullstack' });
+    commitFile(r.effort.worktree, 'cart.txt', '1', 'c1');
+    // meanwhile someone else put a different commit on origin's feature/shop/cart
+    gitIn(f.main, 'checkout', '-q', '-b', 'tmp-other', 'develop');
+    commitFile(f.main, 'other.txt', 'x', 'other');
+    gitIn(f.main, 'push', '-q', 'origin', 'tmp-other:refs/heads/feature/shop/cart');
+    gitIn(f.main, 'checkout', '-q', 'develop');
+    gitIn(f.main, 'branch', '-q', '-D', 'tmp-other');
+
+    await expect(finishEffort(ctx, { area: 'shop/cart' })).rejects.toThrow(/push/i);
+
+    expect(ctx.registry.leases({ effort: r.effort.id })).toHaveLength(1);
+    expect(ctx.runner.calls).not.toContain('stop');
+    expect(ctx.registry.openEffortFor('demo', 'shop/cart')?.state).toBe('active');
+  });
+
+  it('an area branch that exists only on origin is checked out from it, not recreated from the base', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const { gitIn } = await import('../core/testing/fixture-repo.js');
+    gitIn(f.main, 'checkout', '-q', '-b', 'feature/shop/cart', 'develop');
+    commitFile(f.main, 'cart.txt', '1', 'earlier cart work');
+    gitIn(f.main, 'push', '-q', 'origin', 'feature/shop/cart');
+    gitIn(f.main, 'checkout', '-q', 'develop');
+    gitIn(f.main, 'branch', '-q', '-D', 'feature/shop/cart');
+
+    const ctx = ctxFor(f);
+    const r = await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'fullstack' });
+
+    expect(gitIn(r.effort.worktree, 'log', '--format=%s', '-n', '3')).toContain(
+      'earlier cart work',
+    );
+    expect(new Git(r.effort.worktree).unpushedCount('develop')).toBe(0);
+    const done = await finishEffort(ctx, { area: 'shop/cart' });
+    expect(done.pushed).toBe(true);
+  });
+});

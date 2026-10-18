@@ -25,6 +25,7 @@ export type ErrorCode =
   | 'SERVICE_FAILED'
   | 'STORYBROKR_FAILED'
   | 'GIT_FAILED'
+  | 'PUSH_REJECTED'
   | 'INTERNAL';
 
 const REFUSALS = new Set<ErrorCode>([

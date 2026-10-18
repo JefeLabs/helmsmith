@@ -183,11 +183,7 @@ async function anyPortAnswers(ports: Record<string, number> | undefined): Promis
   return false;
 }
 
-async function claimFreeSlot(
-  ctx: Ctx,
-  effortId: string,
-  warnings: string[],
-): Promise<Lease> {
+async function claimFreeSlot(ctx: Ctx, effortId: string, warnings: string[]): Promise<Lease> {
   const m = ctx.manifest;
   const exclude = new Set<number>();
   const busyNotes: string[] = [];
@@ -1009,6 +1005,20 @@ export async function finishEffort(ctx: Ctx, o: FinishOptions): Promise<FinishRe
     }
   }
 
+  // Push first: a rejected push must leave the services running and the leases held,
+  // so the effort can be synced and finished again instead of standing active with nothing.
+  if (!o.intoArea) {
+    try {
+      g.push(effort.branch);
+    } catch (err) {
+      throw new WorkkitError(
+        'PUSH_REJECTED',
+        `push of ${effort.branch} was rejected (${err instanceof Error ? err.message : String(err)}); nothing was stopped or released. Merge origin/${effort.branch} into the worktree and run \`work finish\` again.`,
+        { branch: effort.branch, worktree: effort.worktree },
+      );
+    }
+  }
+
   for (const lease of ctx.registry.leases({ effort: effort.id }))
     await releaseLease(ctx, effort, lease);
   await Promise.resolve(ctx.storybrokr.downHost?.(storybookHostFor(m, effort.worktree))).catch(
@@ -1017,7 +1027,6 @@ export async function finishEffort(ctx: Ctx, o: FinishOptions): Promise<FinishRe
 
   let notices = 0;
   if (!o.intoArea) {
-    g.push(effort.branch);
     if (g.commitsNotOn(m.baseBranch).length > 0 && !g.isEquivalentToBase(m.baseBranch)) {
       const since = g.changedSince(m.baseBranch);
       const sinceSet = new Set(since);
