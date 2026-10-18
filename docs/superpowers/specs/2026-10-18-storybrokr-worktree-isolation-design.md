@@ -1,290 +1,222 @@
-# Spec 2: Worktree-Scoped `storybrokr`, Root-First Discovery, Parallel `BrowserPool`, and Unified Leases
+# storybrokr — worktree-scoped instances, root-first discovery, parallel `check`, and a lease-aligned lifecycle with workbrokr (design)
 
-- **Date:** 2026-10-18
-- **Packages:** `@helmsmith/storybrokr` (`apps/storybrokr`), `@helmsmith/workbrokr` (`apps/workbrokr`)
-- **Status:** Draft — Pending User Review
-- **Related:** Spec 1 (`docs/superpowers/specs/2026-10-18-workbrokr-parallel-waves-design.md`), Spec 3 (planned: bidirectional import graph, `--affected`, Storybook globals, runtime error capture, visual diffing)
-
----
-
-## 1. Problem Statement
-
-When multiple parallel efforts run across git worktrees on the same repository (enabled by Spec 1's intra-area task waves and multi-area worktrees), four concrete bottlenecks and isolation failures surface between `@helmsmith/storybrokr` and `@helmsmith/workbrokr`:
-
-1. **Cross-Worktree Instance Collisions (`storybrokr`):**
-   - `instanceId(hostRoot, component)` hashes `hostRoot + component`, creating distinct 12-hex IDs per worktree.
-   - However, only `storybrokr up` resolves a component path to `{ component, hostRoot }`. Every other command (`get`, `down`, `touch`, `check`, `screenshot`, `logs`, `open`) and MCP tool (`storybrokr_get`, `storybrokr_down`, `storybrokr_touch`, `storybrokr_check`, `storybrokr_screenshot`, `storybrokr_logs`), as well as the HTTP routes (`/v1/instances/:id/*`) and `DaemonClient`, omit `hostRoot`.
-   - Worse, `Registry.resolve(idOrPath, hostRoot)` falls back to `this.list().find((r) => r.component === idOrPath)` when `hostRoot` is `undefined`—silently returning whichever worktree booted that component first (`createdAt` order). An agent in `worktrees/school--card` running `storybrokr check components/Card` silently checks, screenshots, or tears down `worktrees/billing--card`'s Storybook instance.
-   - Passing a relative path like `./components/Card` or an absolute worktree path to `storybrokr check ./components/Card` fails with `INSTANCE_NOT_FOUND` because only `up` normalizes paths via `resolveComponent`.
-
-2. **Unbounded Transitive Story Discovery (`discover.ts`):**
-   - `discoverStories(hostRoot, component, tsconfigPaths)` unconditionally performs a full transitive BFS over all relative and `tsconfig` alias imports, collecting `.stories.*` files from every transitive dependency.
-   - Booting a molecule, organism, or page section imports shared atoms (`Button`, `Icon`, `Badge`, `Modal`, `Switch`, etc.), dragging 20–50 child story files into the generated `.storybook/main.ts`. This inflates bundler compile time and causes `storybrokr check` to run dozens of unrelated atom stories.
-
-3. **Serial Story Verification (`inspector.ts`):**
-   - `inspector.check()` opens a single Playwright `Page` and runs `for (const story of stories) { await settle(page, ...); }` strictly sequentially.
-   - A component with 8 stories taking 1.5s each takes 12s serially; a single story that hits the 30s settle timeout blocks all subsequent stories in the queue.
-
-4. **Disconnected `workbrokr` ↔ `storybrokr` Lifecycles & TTLs:**
-   - `work start --mode frontend --story <path>` boots `storybrokr` with its default 30-minute TTL (`ttlMinutes: 30`), while `workbrokr` effort leases default to 4 hours (`leaseTtlSeconds: 14400`). After 30 minutes of editing code, `storybrokr` reaps the active effort's Storybook instance.
-   - `work status` and `work env` touch `workbrokr`'s port leases in `leases.json`, but never call `storybrokr touch <storybrokrId>`.
-   - `reapLeases`, `retireArea`, and `promoteEffort` (when demoting to `backend`) never stop `storybrokr` instances, and `finishEffort` only stops `effort.storybrokrId`—leaking any additional `storybrokr` instances the agent booted directly inside `effort.worktree`.
-   - `storybrokr`'s `reapIdle()` never checks whether `r.hostRoot` still exists on disk, leaving orphan processes if a worktree directory is removed externally.
-   - Agents inside a `workbrokr` effort must manually look up `storybrokrId` or pass `--host <worktree>` to run `storybrokr check` / `storybrokr screenshot`.
+**Status:** approved in conversation 2026-10-18 (revised after critical review; §9 questions resolved).
+**Home:** `apps/storybrokr` (`@helmsmith/storybrokr`, 0.2.0 → 0.3.0) and `apps/workbrokr` (`@helmsmith/workbrokr`, 0.1.0 → 0.2.0).
+**Series:** Spec 2 of 3. Spec 1: `2026-10-18-workbrokr-parallel-waves-design.md` (task waves, `_tasks/<area>--<task>` worktrees, `work promote`). Spec 3 (planned): import graph, `--affected`, Storybook globals, runtime error capture, visual diffing.
+**Standing decision:** workbrokr spec §16 decision 14 (owner, 2026-10-18): storybrokr stays independent; it keeps its own daemon, registry and ports. This spec does **not** unify registries. It makes the two brokers agree on three things: which host an instance belongs to, how long it lives, and who stops it.
 
 ---
 
-## 2. Design Overview
+## 1. Problem
 
-### 2.1 Worktree-Scoped Instance Resolution & Host Teardown (`storybrokr`)
+Spec 1 puts several worktrees of one repository on one machine at once: `<worktreeRoot>/<area>` per area and `<worktreeRoot>/_tasks/<area>--<task>` per parallel task. Every worktree contains the same component paths. Against that layout, the code on `main` today has four gaps. Each is stated against the code, not against the first draft's memory of it.
 
-1. **`INSTANCE_AMBIGUOUS` Error Code (`errors.ts`):**
-   - Add `'INSTANCE_AMBIGUOUS'` to `ErrorCode` with HTTP status `409` (`Conflict`).
-   - In `Registry.resolve(idOrPath: string, hostRoot?: string)`:
-     - If `this.byId.get(idOrPath)` exists, return it immediately.
-     - Filter `this.list()` by `r.component === idOrPath && (hostRoot === undefined || r.hostRoot === hostRoot)`.
-     - If `matches.length === 1`, return `matches[0]`.
-     - If `matches.length > 1`, throw:
-       ```ts
-       new StorybrokrError(
-         'INSTANCE_AMBIGUOUS',
-         `multiple instances match ${idOrPath} (${matches.map((m) => `${m.id} @ ${m.hostRoot}`).join(', ')}); pass --host <dir> or an instance id`,
-       )
-       ```
-     - If `matches.length === 0`, throw `INSTANCE_NOT_FOUND`.
+1. **Instances are keyed by host, but almost nothing asks for the host.** `instanceId(hostRoot, component)` and `Registry.find(hostRoot, component)` are host-scoped, so two worktrees booting `components/Card` get two instances. But `Registry.resolve(idOrPath, hostRoot?)` falls back to `list().find(r => r.component === idOrPath)` when `hostRoot` is undefined, which is every caller except `up`: `Broker.touch/logs/logStream/down` pass no host, the routes read none, `DaemonClient.get/down/touch/check/screenshot/logs/follow` send none, and the CLI and MCP tools accept none. An agent in `_tasks/billing--card` running `storybrokr check components/Card` silently checks, screenshots or tears down whichever worktree booted `components/Card` first (`createdAt` order). A `./components/Card` or absolute path to any command but `up` is `INSTANCE_NOT_FOUND`, because only `up` normalizes through `resolveComponent`.
 
-2. **Client-Side Target Resolution (`resolveTarget` in `commands/_shared/output.ts`):**
-   - Introduce `resolveTarget(idOrPath: string, explicitHost?: string): { idOrPath: string; hostRoot?: string }`:
-     - If `explicitHost` is provided:
-       - If `/^[0-9a-f]{12}$/.test(idOrPath)`, return `{ idOrPath, hostRoot: resolve(explicitHost) }`.
-       - Otherwise normalize `idOrPath` relative to `resolve(explicitHost)` (if `isAbsolute(idOrPath)` and inside `explicitHost`, use `relative(hostRoot, idOrPath)`, else strip leading `./` and trailing `/`), returning `{ idOrPath: component, hostRoot: resolve(explicitHost) }`.
-     - If `explicitHost` is not provided:
-       - If `/^[0-9a-f]{12}$/.test(idOrPath)`, return `{ idOrPath }`.
-       - Otherwise attempt `resolveComponent(idOrPath)` (which walks up from `resolve(process.cwd(), idOrPath)` to find `.storybook/main.*`). If found and `component` is non-empty and doesn't start with `..`, return `{ idOrPath: component, hostRoot }`. If not found on disk (e.g., a bare component string when `cwd` is outside a host repo), fall back to `{ idOrPath: idOrPath.replace(/\/+$/, '') }`.
+2. **Discovery is always transitive.** `discoverStories` follows every relative and `tsconfig`-alias import and adds `storyFilesFor()` of every module it visits. That is what the 2026-09-06 spec asked for ("one component plus its child components"). In the first adopter it means a molecule or page section pulls 20 to 50 atom story files (`Button`, `Icon`, `Badge`, `Modal`, …) into the generated `main.ts`: slower boot, and `check` spends most of its time on stories the agent did not change.
 
-3. **End-to-End `hostRoot` Propagation (`Broker`, `routes.ts`, `DaemonClient`, CLI, MCP):**
-   - `Broker`:
-     - `get(idOrPath: string, hostRoot?: string): InstanceRecord`
-     - `touch(idOrPath: string, hostRoot?: string): InstanceRecord`
-     - `logs(idOrPath: string, tail = 200, hostRoot?: string): string[]`
-     - `logStream(idOrPath: string, hostRoot?: string): LogBuffer | undefined`
-     - `down(idOrPath: string, hostRoot?: string): Promise<void>`
-     - `downByHost(hostRoot: string): Promise<InstanceRecord[]>` — stops all instances where `r.hostRoot === resolve(hostRoot)` and returns the stopped records.
-   - `routes.ts`:
-     - Read optional `?hostRoot=<dir>` query parameter on:
-       - `GET /v1/instances` (when `?hostRoot=<dir>` is present, filters list to `r.hostRoot === resolve(hostRoot)`)
-       - `DELETE /v1/instances?hostRoot=<dir>` (calls `ctx.broker.downByHost(hostRoot)` and returns `200 { stopped: records.map(r => r.id) }`)
-       - `GET /v1/instances/:id?hostRoot=<dir>`
-       - `DELETE /v1/instances/:id?hostRoot=<dir>`
-       - `POST /v1/instances/:id/touch?hostRoot=<dir>`
-       - `POST /v1/instances/:id/check?hostRoot=<dir>` (also accepts `hostRoot?: string` in `CheckBody`)
-       - `POST /v1/instances/:id/screenshot?hostRoot=<dir>` (also accepts `hostRoot?: string` in `ScreenshotBody`)
-       - `GET /v1/instances/:id/logs?hostRoot=<dir>&tail=...&follow=...`
-   - `DaemonClient`:
-     - `list(opts?: { hostRoot?: string }): Promise<InstanceRecord[]>`
-     - `get(idOrPath: string, hostRoot?: string): Promise<InstanceRecord>`
-     - `down(idOrPath: string, hostRoot?: string): Promise<void>`
-     - `downByHost(hostRoot: string): Promise<string[]>`
-     - `touch(idOrPath: string, hostRoot?: string): Promise<InstanceRecord>`
-     - `check(idOrPath: string, req?: CheckRequest, hostRoot?: string): Promise<CheckResponse>`
-     - `screenshot(idOrPath: string, req: ScreenshotRequest, hostRoot?: string): Promise<ScreenshotResponse>`
-     - `logs(idOrPath: string, tail?: number, hostRoot?: string): Promise<string[]>`
-     - `follow(idOrPath: string, onLine: (line: string) => void, onEnd?: () => void, hostRoot?: string): Promise<() => void>`
-   - CLI commands (`get`, `down`, `touch`, `check`, `screenshot`, `logs`, `open`, `ls`):
-     - Add `--host <dir>` option to `get`, `down`, `touch`, `check`, `screenshot`, `logs`, `open`, and `ls`.
-     - In `down [id-or-path]`: allow `storybrokr down --host <dir>` (without `id-or-path`) to stop all instances for that `hostRoot` via `client.downByHost(resolve(o.host))`.
-     - Use `resolveTarget(idOrPath, o.host)` in `get`, `down`, `touch`, `check`, `screenshot`, `logs`, and `open`.
-   - MCP tools (`storybrokr_list`, `storybrokr_get`, `storybrokr_down`, `storybrokr_touch`, `storybrokr_check`, `storybrokr_screenshot`, `storybrokr_logs`):
-     - Add optional `hostRoot?: z.string()` to input schemas.
-     - In `storybrokr_down`: allow `{ hostRoot }` without `id` (or `{ id, hostRoot }`) so agents can tear down an entire worktree's instances.
-     - Use `resolveTarget(id, hostRoot)` before invoking `DaemonClient`.
+3. **`check` is serial.** `inspector.check` opens one page and settles stories in a `for … await` loop. Eight stories at 1.5 s each is 12 s; one story that hits the 30 s budget holds every story behind it.
 
----
+4. **The two lifecycles disagree on time and ownership.**
+   - `work start --mode frontend --story <p>` calls `storybrokr up <p> --host <host> --json` with no `--ttl`, so the instance gets the daemon default of 30 idle minutes, while the `storybook` lease that records it (`Lease.kind === 'storybook'`, `value` = instance id) lives `manifest.expiry.storybookHours` (2 h in skoolscout). `touchEffort` extends the lease and never tells storybrokr, so storybrokr reaps the instance of an effort that is still active.
+   - What does already work: `finishEffort` and `reapLeases` both go through `releaseLease`, which calls `storybrokr.down(lease.value)` for every `storybook` lease. The leak is narrower than "nothing stops storybrokr": instances an agent booted **by hand** with `storybrokr up` inside the effort's worktree have no lease and nobody stops them when the effort finishes, is reaped, or the area is retired. (`retireArea` refuses while an effort is open, so lease-owned instances are already down by then; `promoteEffort` refuses every transition to `backend`, so there is no demotion path to handle.)
+   - storybrokr's `reapIdle()` never checks that `r.hostRoot` still exists. After `git worktree remove` or `work retire`, the Storybook process keeps running until its TTL, holding a port and a cap slot.
+   - Inside an effort, an agent has to know the instance id or type `--host <worktree>/app-ui` on every storybrokr command. The host is `join(effort.worktree, manifest.storybook.hostRoot)` (skoolscout: `<worktree>/app-ui`), **not** the worktree itself. Any design that keys on `effort.worktree` matches nothing there.
 
-### 2.2 Root-First Story Discovery with Automatic Fallback (`discover.ts`)
+Capacity is the real ceiling behind all four: `instanceCap` is 6 today (raised to 10 in this spec to match `workbrokr`'s default `slots.count`) and the port range is 6100 to 6199, and each instance is a full Storybook dev server. Stopping instances from leaking ensures the cap is spent on live work.
 
-1. **`DiscoverOptions` & `DiscoveryResult` (`discover.ts`, `types.ts`):**
-   ```ts
-   export interface DiscoverOptions {
-     includeChildren?: boolean;
-   }
+## 2. Goals and non-goals
 
-   export interface DiscoveryResult {
-     storyFiles: string[];
-     modulesVisited: number;
-     unresolved: string[];
-     includedChildren: boolean;
-   }
-   ```
-   - Add `includeChildren?: boolean` to `UpRequest` and `InstanceRecord` (defaults to `false`).
+**Goals**
 
-2. **Two-Phase Discovery Algorithm (`discoverStories`):**
-   - **Root Boundary Definition:**
-     - Let `abs = resolve(hostRoot, component)`.
-     - If `abs` is a `.stories.*` file and `!opts?.includeChildren`, return `{ storyFiles: [relative(hostRoot, abs)], modulesVisited: 1, unresolved: [], includedChildren: false }` immediately.
-     - If `abs` is a **directory**: root modules are files inside `abs` (`file === abs || file.startsWith(abs + '/')`). Imports to files outside `abs` are child imports.
-     - If `abs` is an **`index.*` source file**: root modules are files inside `dirname(abs)` (`file.startsWith(dirname(abs) + '/')`). Imports to files outside `dirname(abs)` are child imports.
-     - If `abs` is a **non-index source file** (e.g., `components/Button.tsx`): root stories are `storyFilesFor(abs)` (e.g., `components/Button.stories.tsx`). Any imported module (including sibling files in the same folder like `./Icon`) is a child import.
-   - **Phase 1 — Root Discovery (when `!opts?.includeChildren`):**
-     - Collect stories within the root boundary defined above.
-     - If root discovery finds `>= 1` story file (`rootStories.size > 0`), return `{ storyFiles, modulesVisited, unresolved, includedChildren: false }`.
-   - **Phase 2 — Automatic Fallback / Explicit `--include-children`:**
-     - If `opts?.includeChildren === true` OR Phase 1 found `0` root stories:
-       - Run the full transitive import BFS across all local relative and `tsconfig` alias imports.
-       - Return `{ storyFiles, modulesVisited, unresolved, includedChildren: true }`.
+- Every storybrokr surface (CLI, MCP, HTTP, `DaemonClient`) can name the host; an unqualified component path that matches more than one host is an error, not a guess.
+- Inside a `work` worktree, storybrokr commands find that worktree's instance with no extra flags.
+- The default instance holds the stories of the component asked for; the transitive set is one flag away, and a repeat `up` never silently narrows an instance.
+- `check` runs stories concurrently with isolated browser state per worker, deterministic result order, and the same exit semantics.
+- An instance never outlives its effort by accident: TTL equals the lease, activity on the effort touches the instance, finish / reap / retire stop every instance under the effort's host, and a deleted host is reaped by storybrokr itself.
+- Raise `DEFAULT_CONFIG.instanceCap` from 6 to 10 to match `workbrokr`'s default `slots.count`.
 
-3. **Broker Re-Creation on `includeChildren` Change (`broker.ts`):**
-   - In `Broker.up(req)`:
-     - Pass `{ includeChildren: req.includeChildren }` to `discoverStories`.
-     - If an instance is already `ready` for `(host.hostRoot, component)`, compare `discovery.storyFiles` against `existing.storyFiles` (just as today). If the caller switched from default (`includeChildren: false`) to `includeChildren: true` (or vice versa) and the discovered `storyFiles` list changed, `Broker.up` stops the existing instance and creates a fresh one with the updated story list.
+**Non-goals**
 
-4. **CLI & MCP Surface (`up.ts`, `mcp/server.ts`, `routes.ts`):**
-   - `storybrokr up <path> --include-children` (`includeChildren?: boolean` on `UpOptions`, `UpRequest`, `UpBody` in `routes.ts`, and `storybrokr_up` in `mcp/server.ts`).
+- Merging the two registries, moving storybrokr onto workbrokr leases, or a shared reaper (decision 14).
+- `work check` / `work screenshot`: a second copy of storybrokr's option surface in workbrokr. The host default in §3.5 gives the same ergonomics with one environment variable (§4).
+- Changing port ranges or multi-instance Storybook builds.
+- Anything in Spec 3 (`--affected`, globals, console/network capture, visual diff).
 
----
+## 3. Design
 
-### 2.3 Parallel Multi-Page `check` in `inspector.ts` (`BrowserPool` Concurrency)
+### 3.1 Host-scoped resolution (storybrokr)
 
-1. **Configuration & Request Types (`types.ts`, `config.ts`, `routes.ts`):**
-   - Add `checkConcurrency: number` to `DaemonConfig` in `types.ts` and `DEFAULT_CONFIG` in `config.ts` with default `4`.
-   - Add `concurrency?: number` (integer `1..16`) to `CheckRequest` in `types.ts`, `CheckBody` in `routes.ts`, `--concurrency <n>` in `commands/check.ts`, and `concurrency` in `storybrokr_check` (`mcp/server.ts`).
+**Identity.** `hostRoot` is stored and compared as a realpath. `Broker.up` resolves `req.hostRoot` (or the walked-up root) through `realpathSync` before `inspectHost`; `resolveComponent` and `findHostRoot` return realpaths. Comparisons in the registry use the stored value against `realpathSync(input)`. (macOS `/tmp` → `/private/tmp` and symlinked worktree roots otherwise never match. Instance ids change for symlinked hosts; instances are ephemeral and reconcile reads the path from each record, so nothing else moves.)
 
-2. **Single-Context Multi-Page Worker Pool (`inspector.ts`):**
-   - `createInspector(deps: InspectorDeps)` accepts `defaultConcurrency?: number` in `InspectorDeps` (default `4`).
-   - In `inspector.check(record, req)`:
-     - Validate `assertReady(record)` and `const stories = findStories(record, req.storyIds)`.
-     - Allocate `const results = new Array<CheckResult>(stories.length)`.
-     - Acquire **one** `BrowserContext` (`const ctx = await deps.pool.acquire()`), and call `await ctx.addInitScript(RECORDER_SCRIPT)` once on the context.
-     - Compute `const concurrency = Math.max(1, Math.min(stories.length || 1, req.concurrency ?? deps.defaultConcurrency ?? 4))`.
-     - Spawn `concurrency` async workers sharing `let nextIdx = 0`:
-       - Each worker opens its own tab via `const page = await ctx.newPage()`.
-       - In a `while (true)` loop:
-         - Claim `const idx = nextIdx++`; if `idx >= stories.length`, break.
-         - Settle `stories[idx]` on `page` and write `results[idx]`.
-     - `await Promise.all(workers)` inside `try { ... } finally { await ctx.close(); }`.
-     - Compute `summary` and return `{ instanceId: record.id, results, summary }`.
-   - **Why Single-Context Multi-Page:**
-     - `pool.acquire()`, `ctx.addInitScript(RECORDER_SCRIPT)`, and `ctx.close()` are each called once per `check()` invocation.
-     - Each worker's `page` has its own isolated `window.__STORYBROKR__` event array while sharing the `BrowserContext` HTTP cache so Storybook preview bundles are not re-fetched across parallel tabs.
-     - `results` order is deterministic and matches `stories` order regardless of completion order.
+**`Registry.resolve(idOrPath, scope?)`** where `scope` is `{ host?: string; hint?: string }`:
 
----
+1. `byId.get(idOrPath)` → return it. (An id is unique; a mismatching `host` is ignored.)
+2. `host` given (explicit `--host` / `hostRoot`): candidates = instances with `component === idOrPath && hostRoot === realpath(host)`. One → return. None → `INSTANCE_NOT_FOUND` naming the host.
+3. No `host`, `hint` given (derived from cwd or `STORYBROKR_HOST`, §3.5): try step 2 with the hint. One → return. None → fall through to step 4. The hint never produces an error on its own.
+4. No scope: candidates = instances with `component === idOrPath`. One → return. More → `INSTANCE_AMBIGUOUS`. None → `INSTANCE_NOT_FOUND`.
 
-### 2.4 Orphan Worktree Reaping & Unified `workbrokr` ↔ `storybrokr` Lifecycle
+```ts
+new StorybrokrError(
+  'INSTANCE_AMBIGUOUS',
+  `${idOrPath} is running in ${matches.length} hosts: ${matches.map((m) => `${m.id} @ ${m.hostRoot}`).join(', ')}; pass --host <dir> or an instance id`,
+)
+```
 
-1. **Orphan `hostRoot` Reaping in `storybrokr` (`registry.ts` / `broker.ts`):**
-   - In `Broker.reapIdle()`:
-     - In addition to `this.registry.idleInstances()`, check active instances (`starting` or `ready`) whose `r.hostRoot` no longer exists on disk (`!existsSync(r.hostRoot)`).
-     - Stop and remove any instance whose `hostRoot` directory has been deleted (e.g., after `git worktree remove` or `work retire`).
+`INSTANCE_AMBIGUOUS` joins `ErrorCode` with HTTP 409.
 
-2. **Extended `StorybrokrClient` in `workbrokr` (`apps/workbrokr/src/lib/storybrokr.ts`):**
-   ```ts
-   export interface StorybrokrUpOptions {
-     ttlMinutes?: number;
-     includeChildren?: boolean;
-   }
+Why a hint and not a strict cwd rule: the MCP server's cwd is wherever the editor launched it, usually the main checkout, and the main checkout has the same component on disk. A strict cwd rule would turn today's wrong answer into `INSTANCE_NOT_FOUND` for every MCP caller that omits `hostRoot`. With the hint, an agent inside its worktree gets its own instance, a caller from the main checkout with one instance anywhere gets that instance, and two instances produce the 409 with the list.
 
-   export interface StorybrokrCheckOptions {
-     storyIds?: string[];
-     waitForText?: string;
-     waitForSelector?: string;
-     timeoutMs?: number;
-     concurrency?: number;
-   }
+**Client-side `resolveTarget(idOrPath, explicitHost?)`** in `commands/_shared/output.ts`, returning `{ idOrPath, host?, hint? }`:
 
-   export interface StorybrokrScreenshotOptions {
-     storyId: string;
-     outPath?: string;
-     viewport?: string;
-     clip?: 'root' | 'viewport' | 'page';
-     waitForText?: string;
-     waitForSelector?: string;
-     timeoutMs?: number;
-   }
+- 12-hex id → `{ idOrPath, host: explicitHost }`.
+- `explicitHost` → normalize the path relative to `realpath(explicitHost)` (absolute inside the host → `relative()`; otherwise strip `./` and trailing `/`) and return it as `host`.
+- Otherwise, `process.env.STORYBROKR_HOST` set → same normalization, returned as `hint`.
+- Otherwise `resolveComponent(idOrPath)` from cwd; found and inside the host → `{ idOrPath: component, hint: hostRoot }`; not found → `{ idOrPath: idOrPath.replace(/\/+$/, '') }`.
 
-   export interface StorybrokrClient {
-     up(story: string, hostRoot: string, opts?: StorybrokrUpOptions): Promise<StorybrokrInstance>;
-     down(id: string, hostRoot?: string): Promise<void>;
-     downHost?(hostRoot: string): Promise<void>;
-     touch?(id: string, hostRoot?: string): Promise<void>;
-     check?(idOrPath: string, hostRoot: string, opts?: StorybrokrCheckOptions): Promise<unknown>;
-     screenshot?(
-       idOrPath: string,
-       hostRoot: string,
-       opts: StorybrokrScreenshotOptions,
-     ): Promise<unknown>;
-   }
-   ```
-   - `storybrokrCli.up(story, hostRoot, opts)` passes `['up', story, '--host', hostRoot, '--json']` plus `['--ttl', String(opts.ttlMinutes)]` when `opts?.ttlMinutes !== undefined` and `['--include-children']` when `opts?.includeChildren` is true.
-   - `storybrokrCli.down(id, hostRoot)` passes `['down', id, ...(hostRoot ? ['--host', hostRoot] : [])]`.
-   - `storybrokrCli.downHost(hostRoot)` runs `storybrokr down --host <hostRoot>` (ignoring `DAEMON_UNAVAILABLE` if the daemon isn't running).
-   - `storybrokrCli.touch(id, hostRoot)` runs `storybrokr touch <id> [--host <hostRoot>]` (best-effort).
-   - `storybrokrCli.check(idOrPath, hostRoot, opts)` runs `storybrokr check <idOrPath> --host <hostRoot> --json` with optional `--story`, `--wait-for-text`, `--wait-for-selector`, `--timeout`, `--concurrency`.
-   - `storybrokrCli.screenshot(idOrPath, hostRoot, opts)` runs `storybrokr screenshot <idOrPath> <storyId> --host <hostRoot> --json` with optional `--out`, `--viewport`, `--clip`, `--wait-for-text`, `--wait-for-selector`, `--timeout`.
+**Propagation.** `Broker.get/touch/logs/logStream/down(idOrPath, scope?)`; `Broker.downByHost(host): Promise<InstanceRecord[]>` stops every instance whose `hostRoot` equals `realpath(host)` and returns them. Routes read `?host=` and `?hint=` on `GET /v1/instances` (filter), `GET|DELETE /v1/instances/:id`, `POST /v1/instances/:id/{touch,check,screenshot}`, `GET /v1/instances/:id/logs`; `DELETE /v1/instances?host=<dir>` → `200 { stopped: string[] }`. `DaemonClient` gains the matching `scope?` parameter on `get/down/touch/check/screenshot/logs/follow`, `list({ host? })`, and `downByHost(host)`. CLI: `--host <dir>` on `get down touch check screenshot logs open ls`; `down --host <dir>` with no id stops that host's instances (`--all --host <dir>` is the same thing spelled out). MCP: optional `hostRoot` on `storybrokr_list/get/down/touch/check/screenshot/logs`; `storybrokr_down` accepts `{ hostRoot }` without `id`. Every tool runs its `id` through `resolveTarget` first, so `STORYBROKR_HOST` in the MCP server's environment also works.
 
-3. **Synchronized TTL, Touch, and Teardown in `effort.ts` (`apps/workbrokr/src/lib/effort.ts`):**
-   - **Boot (`startEffort` and `promoteEffort`):**
-     - Compute `const ttlMinutes = Math.ceil((ctx.leaseTtlSeconds ?? 4 * 3600) / 60)`.
-     - Call `sb.up(story, worktree, { ttlMinutes })`.
-   - **Touch (`statusFor` and `effortEnv`):**
-     - Whenever `statusFor` or `effortEnv` touches port leases for open efforts, also call `await sb.touch?.(e.storybrokrId, e.worktree)` (wrapped in `try/catch` so a stopped `storybrokr` daemon never breaks `work status` or `work env`).
-   - **Teardown (`finishEffort`, `promoteEffort` demotion to `backend`, `reapLeases`, `retireArea`):**
-     - In `finishEffort`: if `effort.storybrokrId` is set, call `await sb.down(effort.storybrokrId, effort.worktree)` AND call `await sb.downHost?.(effort.worktree)` (best-effort) so any additional `storybrokr` instances the agent started manually inside `effort.worktree` are also stopped!
-     - In `promoteEffort` (when demoting to `backend`): stop `effort.storybrokrId` and `await sb.downHost?.(effort.worktree)`.
-     - In `reapLeases`: when reaping an effort whose lease expired, also stop `effort.storybrokrId` and `await sb.downHost?.(effort.worktree)` (best-effort) and clear `storybrokrId`/`storybrokrPort`/`storybrokrUrl` on the parked effort.
-     - In `retireArea`: call `await sb.downHost?.(wt)` before removing the worktree directory so no orphan `storybrokr` instance survives area retirement.
+### 3.2 Orphan reaping (storybrokr)
 
-4. **`work check` and `work screenshot` Commands & MCP Tools (`apps/workbrokr`):**
-   - `checkEffort(ctx, opts: { area?: string; task?: string; component?: string; storyIds?: string[]; waitForText?: string; waitForSelector?: string; timeoutMs?: number; concurrency?: number })` in `effort.ts`:
-     - Resolves the open effort via `(area, task)` or `cwd` worktree (same resolution pattern as `effortEnv`).
-     - Selects target `idOrPath = opts.component ?? effort.storybrokrId ?? effort.story` (throwing `WorkkitError('STORY_REQUIRED', ...)` if none is available).
-     - Touches the effort's port leases and calls `sb.check(idOrPath, effort.worktree, ...)`.
-   - `screenshotEffort(ctx, opts: { area?: string; task?: string; component?: string; storyId: string; outPath?: string; viewport?: string; clip?: 'root' | 'viewport' | 'page'; waitForText?: string; waitForSelector?: string; timeoutMs?: number })` in `effort.ts`:
-     - Resolves the open effort via `(area, task)` or `cwd` worktree.
-     - Selects target `idOrPath = opts.component ?? effort.storybrokrId ?? effort.story`.
-     - Touches the effort's port leases and calls `sb.screenshot(idOrPath, effort.worktree, ...)`.
-   - CLI commands:
-     - `work check [area] [--task <slug>] [--component <path>] [--story <id>...] [--concurrency <n>] [--wait-for-text <text>] [--wait-for-selector <sel>] [--timeout <ms>] [--json]`
-     - `work screenshot <story-id> [area] [--task <slug>] [--component <path>] [--out <path>] [--viewport <WxH>] [--clip <mode>] [--wait-for-text <text>] [--wait-for-selector <sel>] [--timeout <ms>] [--json]`
-   - MCP tools (`apps/workbrokr/src/mcp/server.ts`):
-     - `work_check` and `work_screenshot` with optional `rootDir`, `area`, `task`, `component`, etc.
+`Broker.reapIdle()` also stops any instance in `starting` or `ready` whose `hostRoot` no longer exists (`!existsSync`). `stop()` already tolerates a missing config dir. The reaper interval is unchanged (60 s), so a removed worktree frees its port and cap slot within a minute, with no cooperation from whoever removed it.
 
----
+### 3.3 Root-first discovery (storybrokr)
 
-## 3. Files Affected
+`discoverStories(hostRoot, component, tsconfigPaths, opts?: { includeChildren?: boolean })` returns `DiscoveryResult` with a new `includedChildren: boolean`.
 
-### `@helmsmith/storybrokr` (`apps/storybrokr`)
-- `src/types.ts` — Add `includeChildren?: boolean` to `UpRequest` & `InstanceRecord`; add `checkConcurrency: number` to `DaemonConfig`; add `concurrency?: number` and `hostRoot?: string` to `CheckRequest` / `ScreenshotRequest`.
-- `src/lib/errors.ts` & `src/lib/errors.test.ts` — Add `INSTANCE_AMBIGUOUS` (HTTP `409`).
-- `src/lib/discover.ts` & `src/lib/discover.test.ts` — Root-first story discovery with automatic fallback to transitive child imports and `includeChildren?: boolean`.
-- `src/server/config.ts` & `src/server/config.test.ts` — Add `checkConcurrency: 4` to `DEFAULT_CONFIG`.
-- `src/server/registry.ts` & `src/server/registry.test.ts` — Throw `INSTANCE_AMBIGUOUS` in `resolve(idOrPath, hostRoot)` when multiple worktrees match an unqualified component path.
-- `src/server/broker.ts` & `src/server/broker.test.ts` — Thread `hostRoot` through `get`, `touch`, `logs`, `logStream`, `down`; add `downByHost(hostRoot)`; pass `includeChildren` to `discoverStories`; reap instances whose `hostRoot` no longer exists on disk in `reapIdle()`.
-- `src/server/inspector.ts` & `src/server/inspector.test.ts` — Multi-page concurrent `check()` inside a single `BrowserContext`.
-- `src/server/routes.ts` — Support `?hostRoot=` query parameter on `/v1/instances` and `/v1/instances/:id/*`, `DELETE /v1/instances?hostRoot=`, `includeChildren` on `UpBody`, and `concurrency` on `CheckBody`.
-- `src/client/index.ts` & `src/client/index.test.ts` — Thread `hostRoot` and `downByHost` through `DaemonClient`.
-- `src/commands/_shared/output.ts` & `src/commands/_shared/output.test.ts` — Add `resolveTarget(idOrPath, explicitHost)`.
-- `src/commands/up.ts`, `get.ts`, `down.ts`, `touch.ts`, `check.ts`, `screenshot.ts`, `logs.ts`, `open.ts`, `ls.ts` — Add `--host <dir>`, `--include-children` (on `up`), `--concurrency <n>` (on `check`).
-- `src/mcp/server.ts` & `src/mcp/server.test.ts` — Add `hostRoot`, `includeChildren`, and `concurrency` to MCP tool schemas.
+**Root boundary.** `abs = resolve(hostRoot, component)`:
 
-### `@helmsmith/workbrokr` (`apps/workbrokr`)
-- `src/lib/storybrokr.ts` — Add `ttlMinutes`/`includeChildren` to `up`, `hostRoot` to `down`, plus `downHost`, `touch`, `check`, and `screenshot` methods.
-- `src/lib/effort.ts` & `src/lib/effort.test.ts` — Pass `ttlMinutes` on `sb.up`, call `sb.touch` on `statusFor`/`effortEnv`, call `sb.downHost` on `finishEffort`/`promoteEffort`/`reapLeases`/`retireArea`, and implement `checkEffort` / `screenshotEffort`.
-- `src/commands/check.ts`, `src/commands/screenshot.ts`, `src/cli.ts` — Register `work check` and `work screenshot`.
-- `src/mcp/server.ts` & `src/mcp/server.test.ts` — Register `work_check` and `work_screenshot` MCP tools.
+- `abs` is a `.stories.*` file → that file alone (no fallback, no children unless asked).
+- `abs` is a directory → root modules are the files under `abs`; stories found under `abs` are root stories. Imports that resolve outside `abs` are children.
+- `abs` is `index.*` → the boundary is `dirname(abs)`.
+- `abs` is any other source file (`components/Button.tsx`) → root stories are `storyFilesFor(abs)` (`Button.stories.tsx`, `Button.variants.stories.tsx`); every import, including a sibling, is a child.
 
----
+**Phases.** Phase 1 collects root stories only (the BFS still runs over root modules so a root `index.ts` that re-exports `./Button` finds `Button.stories.tsx`, but it does not leave the boundary). If phase 1 finds at least one story and `includeChildren` is not `true`, return with `includedChildren: false`. Otherwise run today's full transitive BFS and return `includedChildren: true`. Zero stories after both phases is `COMPONENT_NOT_FOUND`, as today.
 
-## 4. Testing & Verification Plan
+**Record and repeat `up`.** `UpRequest.includeChildren?: boolean` and `InstanceRecord.includeChildren: boolean`. In `Broker.up` for an existing `ready` instance:
 
-1. **`storybrokr` Unit & Integration Tests:**
-   - `discover.test.ts`: Verify root-only discovery when the target component/directory has its own `.stories.*`, automatic fallback when the target has 0 own stories, and explicit `{ includeChildren: true }` walking transitive child imports.
-   - `registry.test.ts` & `broker.test.ts`: Verify two worktrees (`hostA`, `hostB`) with the same `component` path coexist, `resolve(component, hostA)` returns `hostA`'s instance, `resolve(component)` without `hostRoot` throws `INSTANCE_AMBIGUOUS`, `downByHost(hostA)` stops only `hostA`'s instances, and `reapIdle()` stops instances whose `hostRoot` was deleted from disk.
-   - `inspector.test.ts`: Verify `check()` opens multiple pages concurrently up to `concurrency`, preserves story result order, and still acquires/closes a single `BrowserContext`.
-   - `mcp/server.test.ts`, `client/index.test.ts`, `commands/*.test.ts`: Verify `--host`, `--include-children`, and `--concurrency` end-to-end.
-2. **`workbrokr` Unit & Integration Tests:**
-   - `effort.test.ts`: Verify `startEffort` passes `ttlMinutes` derived from `leaseTtlSeconds`, `statusFor`/`effortEnv` touch `storybrokrId`, `reapLeases`/`retireArea`/`finishEffort`/`promoteEffort` tear down worktree `storybrokr` instances, and `checkEffort`/`screenshotEffort` delegate with the effort's worktree `hostRoot`.
-   - `mcp/server.test.ts`: Verify `work_check` and `work_screenshot`.
-3. **Full Suite & E2E:**
-   - `pnpm --filter @helmsmith/storybrokr test && pnpm --filter @helmsmith/storybrokr typecheck && pnpm --filter @helmsmith/storybrokr build`
-   - `pnpm --filter @helmsmith/workbrokr test && pnpm --filter @helmsmith/workbrokr typecheck && pnpm --filter @helmsmith/workbrokr build`
+- `req.includeChildren === undefined` → re-discover with the **record's** value. A plain `up` (which `work start`, `--join` and a human retyping the command all issue) never narrows or widens an instance it did not create.
+- `req.includeChildren` explicit → re-discover with it; if the story list differs, stop and recreate (same id, new port), as today for a changed list.
+
+**Surface.** `storybrokr up <path> --include-children`; `includeChildren` on `UpBody` and `storybrokr_up`; `ls`/`get` show `children: yes|no`. README, SKILL.md and the MCP descriptions change from "one component plus its child components" to "one component's stories; `--include-children` adds the stories of everything it imports". The plan records before/after numbers for the README table (today: `organisms/calendar/section` + children = 16 stories, 83 modules).
+
+This is a behaviour change for every existing caller and ships as 0.3.0 with a breaking changeset (§6). The alternative, opt-in `--root-only` with the transitive default kept, is in §4 and §9.
+
+### 3.4 Parallel `check` (storybrokr)
+
+`DaemonConfig.checkConcurrency` (default 4, `config.json` overridable); `CheckRequest.concurrency?: number` (1 to 16) via `--concurrency <n>` and the `concurrency` field of `storybrokr_check`.
+
+`inspector.check(record, req)`:
+
+1. `assertReady`, `findStories`, `results = new Array(stories.length)`.
+2. `n = max(1, min(stories.length || 1, req.concurrency ?? deps.defaultConcurrency ?? 4))`.
+3. Start `n` workers. **Each worker acquires its own `BrowserContext`** (`deps.pool.acquire()`), adds `RECORDER_SCRIPT`, opens one page, and loops: claim `idx = next++`, stop when `idx >= stories.length`, settle `stories[idx]`, write `results[idx]`. Each worker closes its context in `finally`.
+4. `Promise.all(workers)`, then the summary as today.
+
+One context per worker, not one shared context: pages in a Playwright context share cookies, `localStorage`, `sessionStorage` and IndexedDB, and the first adopter persists Zustand stores and the theme to `localStorage`. Shared storage would make story results depend on which stories ran beside them. The cost is `n` contexts instead of one; the Storybook dev server serves the preview bundle from memory, so the shared HTTP cache the first draft wanted buys little. `BrowserPool.open` already counts contexts and defers the idle close until all are released.
+
+Results are index-ordered, so output and exit code are the same as a serial run. `durationMs` per story is still reported but is now measured under contention; the SKILL notes `--concurrency 1` for timing questions and for stories known to be timing sensitive.
+
+`screenshot` is unchanged (one story, one context).
+
+### 3.5 Lease-aligned lifecycle (workbrokr)
+
+All of this is written against `apps/workbrokr/src/lib/effort.ts` and `src/lib/storybrokr.ts` as they are on `main` today: the `Ctx.storybrokr: StorybrokrClient`, the `storybook` lease whose `value` is the instance id, `touchEffort`, `releaseLease`, `finishEffort`, `reapLeases`, `retireArea`.
+
+**One host helper.** `storybookHostFor(m, worktree) = m.storybook ? join(worktree, m.storybook.hostRoot) : worktree`, replacing the two inline copies in `startEffort` and used by every call below. The host is never `effort.worktree` unless the manifest says so.
+
+**Client.**
+
+```ts
+export interface StorybrokrClient {
+  up(story: string, hostRoot: string, opts?: { ttlMinutes?: number; includeChildren?: boolean }): Promise<StorybrokrInstance>;
+  down(id: string, hostRoot?: string): Promise<void>;
+  downHost(hostRoot: string): Promise<string[]>;   // stopped ids; [] when the daemon is not running
+  touch(id: string, hostRoot?: string): Promise<void>;
+  version(): string;                                // `storybrokr --version`
+}
+```
+
+`storybrokrCli` maps these onto `up … --host H --json [--ttl N] [--include-children]`, `down ID [--host H]`, `down --host H --json`, `touch ID [--host H]`. `downHost` and `touch` are best effort: a non-zero exit or `DAEMON_UNAVAILABLE` is logged through `ctx.log`, never thrown. `up`/`down` keep today's `STORYBROKR_FAILED` behaviour.
+
+**TTL.** Both `up` call sites in `startEffort` (the fresh start and the `--join` late story attachment) pass `ttlMinutes: Math.ceil(m.expiry.storybookHours * 60)`. The instance and the lease now expire together, and both are extended by the same touches.
+
+**Touch.** `touchEffort` stays synchronous (the CLI client is `spawnSync`). For each `storybook` lease it calls `storybrokr.touch(value, host)` **only when the lease's `touched` is older than 60 s**, then extends the lease as today. The throttle matters because `work env` runs from Makefiles (`slot-check`, every `make` in a worktree) and each storybrokr call is a Node process start.
+
+**Teardown.** `releaseLease` passes the host to `down`. After the lease loop in `finishEffort` and `reapLeases`, and before `worktreeRemove` in the task path of `finishEffort` and in `retireArea`, call `storybrokr.downHost(storybookHostFor(m, worktree))` when the worktree still exists. That is what catches hand-booted instances. When the worktree is already gone, §3.2 catches them within a minute.
+
+**Host default.** `slotVars` emits `STORYBROKR_HOST=<storybookHostFor(m, worktree)>`; it joins the known-variable list in `manifest.ts` so a project can put it in `env.template`, and `work env` prints it. Inside a worktree whose env file is sourced (or under `work env -- <cmd>`), every storybrokr command and the storybrokr MCP server resolve paths to that host with no flags (§3.1 step 3). skoolscout adds the variable to its template in the adoption follow-up.
+
+**Version gate.** `startEffort` in frontend mode calls `storybrokr.version()` once and refuses with `STORYBROKR_FAILED` ("storybrokr 0.3.0 or newer is required; found X") below 0.3.0, because `--include-children` and `down --host` do not exist before it.
+
+## 4. Alternatives considered
+
+- **Strict cwd scoping with no hint.** Rejected: breaks every MCP caller launched from the main checkout (§3.1).
+- **Shared `BrowserContext`, many pages.** Rejected for state leakage between stories (§3.4).
+- **Keep the transitive default, add `--root-only`.** Keeps today's contract and avoids a breaking release, at the cost of every agent having to learn the flag to get the fast path. The problem statement says the fast path is what agents want almost always, so the default moves and the flag goes the other way. Open for the owner (§9).
+- **`work check` / `work screenshot`.** Rejected: duplicates storybrokr's option surface in a second CLI and MCP, and every future storybrokr flag would need mirroring. `STORYBROKR_HOST` gives the same ergonomics.
+- **storybrokr on workbrokr leases.** Already rejected by decision 14; this spec aligns the two without merging them.
+- **Realpath-insensitive matching (string equality on `resolve()`).** Rejected: fails on symlinked hosts and macOS `/tmp`.
+
+## 5. Files affected
+
+**`apps/storybrokr`**
+- `src/types.ts`: `includeChildren` on `UpRequest` and `InstanceRecord`; `checkConcurrency` on `DaemonConfig`; `concurrency` on `CheckRequest`.
+- `src/lib/errors.ts` (+test): `INSTANCE_AMBIGUOUS` = 409.
+- `src/lib/host.ts`, `src/commands/_shared/output.ts` (+tests): realpath roots; `resolveTarget`.
+- `src/lib/discover.ts` (+test): root boundary, two phases, `includedChildren`.
+- `src/server/registry.ts` (+test): `resolve(idOrPath, scope)`.
+- `src/server/broker.ts` (+test): scope threading, `downByHost`, realpath at `up`, `includeChildren` inheritance, orphan reap.
+- `src/server/inspector.ts` (+test): worker pool with one context per worker.
+- `src/server/config.ts` (+test): `checkConcurrency: 4`, `instanceCap: 10`.
+- `src/server/routes.ts`: `host`/`hint` query params, `DELETE /v1/instances?host=`, `includeChildren`, `concurrency`.
+- `src/client/index.ts` (+test): scope parameters, `downByHost`, `list({ host })`.
+- `src/commands/{up,get,down,touch,check,screenshot,logs,open,ls}.ts`: `--host`, `--include-children`, `--concurrency`.
+- `src/mcp/server.ts` (+test): `hostRoot`, `includeChildren`, `concurrency`.
+- `README.md`, `SKILL.md`, `CHANGELOG.md` (via changeset).
+- `tests/e2e/worktrees.test.ts` (new), `tests/e2e/render.test.ts` and `inspect.test.ts` (updated for the new default and `--concurrency`).
+
+**`apps/workbrokr`**
+- `src/lib/storybrokr.ts`: the client in §3.5.
+- `src/lib/effort.ts` (+test): `storybookHostFor`, TTL, throttled touch, `downHost` in finish / reap / retire, version gate.
+- `src/core/config.ts`, `src/core/manifest.ts` (+tests): `STORYBROKR_HOST`.
+- `SKILL.md`: "inside a worktree, storybrokr finds your instance; pass `--include-children` when you need the atoms".
+
+## 6. Compatibility, versions, rollout
+
+- **storybrokr 0.3.0 (minor, breaking by the project's pre-1.0 convention).** Breaking: default discovery is root-first; unqualified paths that match several hosts return 409 where they used to return the oldest instance; instance ids change for symlinked hosts. Additive: `--host` everywhere, `--include-children`, `--concurrency`, `STORYBROKR_HOST`, orphan reaping, `instanceCap: 10`. Changeset: `minor` with a "Breaking" paragraph naming the three changes.
+- **workbrokr 0.2.0 (minor).** Requires storybrokr ≥ 0.3.0 in frontend mode (version gate). Changeset `minor`. The pending Spec 1 work on `main` ships in the same release.
+- **Rollout in skoolscout-com:** install both, add `STORYBROKR_HOST: '${STORYBROKR_HOST}'` to `helmsmith.config.ts` `env.template`, update the e2e-inspect skills that mention storybrokr. No migration of running instances: the first `reapIdle` after upgrade adopts old records unchanged (`includeChildren` is read as `false` when absent, which matches what they were booted with only if they had no children; a repeat `up` on such a record re-discovers with `false` and may rebuild narrower once — acceptable for ephemeral instances, noted in the changeset).
+
+## 7. Testing
+
+**Unit (vitest, both packages).**
+- `registry.test.ts`: two hosts, same component; `resolve(c, { host: A })` → A; `resolve(c)` → `INSTANCE_AMBIGUOUS` listing both; `resolve(c, { hint: X })` with no instance in X → falls through; by-id ignores a mismatching host; realpath equality.
+- `broker.test.ts`: `downByHost(A)` stops A's instances only; `reapIdle` stops an instance whose `hostRoot` was removed; repeat `up` without `includeChildren` keeps the record's value, with an explicit flip rebuilds.
+- `discover.test.ts`: directory with own stories → root only; `index.ts` re-export → sibling story found, child excluded; leaf file → `storyFilesFor` only; zero root stories → transitive fallback with `includedChildren: true`; explicit `includeChildren: true` on a component with root stories → transitive.
+- `inspector.test.ts`: with a fake pool, `check` acquires exactly `min(n, stories)` contexts, results keep story order, one timing-out story does not delay the others past its own budget, `concurrency: 1` equals today's behaviour.
+- `output.test.ts`: `resolveTarget` for id / `--host` / `STORYBROKR_HOST` / cwd / bare string.
+- `effort.test.ts`: `up` receives `ttlMinutes = storybookHours * 60` on both paths; `touchEffort` calls `touch` once per minute at most; `finishEffort`, `reapLeases` and `retireArea` call `downHost(storybookHostFor(...))` with the manifest's host (not the worktree) before removing anything; the version gate refuses 0.2.0.
+- `manifest.test.ts` / `config.test.ts`: `STORYBROKR_HOST` accepted in a template and emitted.
+
+**E2E (`tests/e2e`, subprocess, built CLI).**
+- `worktrees.test.ts`: copy the fixture host to `A` and `B`; `up` the same component in both; `check <component>` → exit 1 with `INSTANCE_AMBIGUOUS`; `check <component> --host B` → B's instance; `STORYBROKR_HOST=A check <component>` → A's; `cd A && check <component>` → A's; `down --host A` leaves B running; `rm -rf B` then wait one reaper tick → B's instance gone from `ls`.
+- `render.test.ts`: the Panel fixture by default renders only Panel stories; with `--include-children` its children's stories are present (today's assertion moves behind the flag).
+- `inspect.test.ts`: `check --concurrency 4` and `--concurrency 1` report identical per-story statuses in identical order.
+- `mcp.test.ts`: `storybrokr_check` with `hostRoot` and with `STORYBROKR_HOST` in the server environment.
+
+**Live proof** before merge: in skoolscout-com, `work start --area <a> --task t1 --mode frontend --story <p>` and the same for `t2`, then from inside each worktree `storybrokr check <p>` hits its own instance, `work finish --area <a> --task t1` leaves `t2`'s instance up, and `storybrokr ls` shows the TTL equal to the lease.
+
+## 8. Decisions log
+
+1. storybrokr stays independent (decision 14 carried over); alignment, not unification.
+2. The cwd-derived host is a hint that falls back to an unscoped match; only `--host` is strict.
+3. `hostRoot` is a realpath everywhere.
+4. Parallel `check` uses one browser context per worker (`DEFAULT_CONFIG.checkConcurrency = 4`).
+5. Root-first becomes the default in 0.3.0 with a breaking changeset; a repeat `up` without the flag inherits the record's `includeChildren`.
+6. No `work check` / `work screenshot`; `STORYBROKR_HOST` instead.
+7. Instance TTL = `expiry.storybookHours`; touches are throttled to once a minute per lease.
+8. Hand-booted instances are stopped by `downHost` on the manifest's Storybook host at finish, reap and retire; storybrokr reaps instances whose host directory is gone.
+9. The first draft's workbrokr section was replaced: it referenced `effort.storybrokrId`, `effort.story`, `ctx.leaseTtlSeconds`, a demotion path and a reap gap that do not exist on `main`, and keyed teardown on `effort.worktree` where the host is `<worktree>/app-ui`.
+10. `DEFAULT_CONFIG.instanceCap` raised from `6` to `10` to match `workbrokr`'s default `slots.count`.
+11. `work audit` remains focused on git worktrees and `workbrokr` leases (`downHost` on finish/reap/retire + `storybrokr` orphan reaping already clean up hand-booted instances).

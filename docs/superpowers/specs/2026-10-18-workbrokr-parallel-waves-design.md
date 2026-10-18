@@ -4,7 +4,7 @@
 **Home:** `apps/workbrokr` (`@helmsmith/workbrokr`, including `apps/workbrokr/src/core`).
 **Series:** Spec 1 of 3 for parallel-workflow upgrades across `workbrokr` and `storybrokr`:
 - **Spec 1 (this document):** Intra-area wave parallelism (`--mode backend`, `--task <slug>`, `--scope <glob>`), in-place mode promotion (`work promote`), task convergence (`work finish --into-area`), reference-counted `--join`, squash-merge & foreign-branch recovery, cold-worktree seeding & hash-stamped refresh with clean lockfile restore, submodule pre-sync repair, notice lifecycle & attribution fixes, mode-aware `extraScopes` + `sharedScopes`, git hook chaining, worktree-bound `commons` & scope commit guards, single-fetch git status/audit, and `./core` package export.
-- **Spec 2 (planned):** Worktree-scoped `storybrokr` instances, root-only default story discovery, parallel `BrowserPool` checks, and unified `workbrokr`/`storybrokr` lease & TTL management.
+- **Spec 2 (drafted, `2026-10-18-storybrokr-worktree-isolation-design.md`):** worktree-scoped `storybrokr` instances, root-first default story discovery, parallel `check`, and a lease-aligned lifecycle (TTL, touch, teardown) between `workbrokr` and `storybrokr` — the registries stay separate (decision 14).
 - **Spec 3 (planned):** Bidirectional import graph, `--affected` story verification, targeted impact notices, Storybook globals (`theme`/`locale`), console/network/a11y failure capture, and base-vs-worktree visual diffing.
 
 ---
