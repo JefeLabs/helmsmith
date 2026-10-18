@@ -11,7 +11,7 @@ describe('storybrokr up / ls / get / logs / down against the fixture host', () =
     cleanup();
   });
 
-  it('boots Panel with its Button and Icon children and reports story URLs', async () => {
+  it('boots Panel with only its own stories by default, and --include-children adds Button and Icon stories', async () => {
     const t0 = Date.now();
     const record = await runJson<InstanceRecord>(
       ['up', 'src/components/Panel', '--host', FIXTURE_HOST],
@@ -19,16 +19,10 @@ describe('storybrokr up / ls / get / logs / down against the fixture host', () =
     );
     console.log(`fixture up ready in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
     expect(record.status).toBe('ready');
-    expect(record.storyFiles).toEqual([
-      'src/components/Button/Button.stories.tsx',
-      'src/components/Icon/Icon.stories.tsx',
-      'src/components/Panel/Panel.stories.tsx',
-    ]);
+    expect(record.includeChildren).toBe(false);
+    expect(record.storyFiles).toEqual(['src/components/Panel/Panel.stories.tsx']);
     const ids = record.stories.map((s) => s.id).sort();
     expect(ids).toEqual([
-      'atoms-button--primary',
-      'atoms-button--secondary',
-      'atoms-icon--star',
       'organisms-panel--default',
       'organisms-panel--play-fails',
       'organisms-panel--with-play',
@@ -43,11 +37,25 @@ describe('storybrokr up / ls / get / logs / down against the fixture host', () =
     expect(iframe.status).toBe(200);
   });
 
-  it('a second up reuses the instance; ls and get see it; logs has the banner', async () => {
+  it('a second up reuses the instance; --include-children respawns with child stories; ls, get, and logs work', async () => {
     const again = await runJson<InstanceRecord>(
       ['up', 'src/components/Panel', '--host', FIXTURE_HOST],
       { home },
     );
+    expect(again.stories.length).toBe(3);
+
+    const withChildren = await runJson<InstanceRecord>(
+      ['up', 'src/components/Panel', '--host', FIXTURE_HOST, '--include-children'],
+      { home },
+    );
+    expect(withChildren.id).toBe(again.id);
+    expect(withChildren.includeChildren).toBe(true);
+    expect(withChildren.storyFiles).toEqual([
+      'src/components/Button/Button.stories.tsx',
+      'src/components/Icon/Icon.stories.tsx',
+      'src/components/Panel/Panel.stories.tsx',
+    ]);
+
     const list = await runJson<InstanceRecord[]>(['ls'], { home });
     expect(list).toHaveLength(1);
     expect(list[0].id).toBe(again.id);

@@ -32,7 +32,11 @@ describe('MCP stdio surface', () => {
     };
     expect(body.record.status).toBe('ready');
     expect(body.record.stories[0].iframeUrl).toMatch(/iframe\.html/);
-    await client.callTool({ name: 'storybrokr_down', arguments: { id: 'src/components/Button' } });
+    const downRes = await client.callTool({
+      name: 'storybrokr_down',
+      arguments: { id: 'src/components/Button', hostRoot: FIXTURE_HOST },
+    });
+    expect(downRes.isError).toBeFalsy();
     await client.close();
   });
 });

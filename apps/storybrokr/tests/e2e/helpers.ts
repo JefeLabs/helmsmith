@@ -49,7 +49,10 @@ export function runCli(
   });
 }
 
-export async function runJson<T>(args: string[], opts: { home: string; cwd?: string }): Promise<T> {
+export async function runJson<T>(
+  args: string[],
+  opts: { home: string; cwd?: string; env?: NodeJS.ProcessEnv },
+): Promise<T> {
   const r = await runCli([...args, '--json'], opts);
   if (r.code !== 0) throw new Error(`exit ${r.code}: ${r.stderr || r.stdout}`);
   return JSON.parse(r.stdout) as T;

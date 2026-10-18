@@ -25,15 +25,22 @@ describe('check and screenshot', () => {
     expect(by['organisms-panel--with-play']).toMatchObject({ status: 'pass', played: true });
     expect(by['organisms-panel--play-fails'].status).toBe('fail');
     expect(by['organisms-panel--play-fails'].error?.message).toMatch(/Not the title/);
-    // No --story filter, so this checks every story discovered for the instance (Button x2,
-    // Icon, and the 3 Panel stories) — 5 pass (Button, Icon, Default, WithPlay), 1 fails
-    // (PlayFails), not just the 3 Panel stories.
-    expect(res.summary).toEqual({ pass: 5, fail: 1, timeout: 0 });
+    // Root-first discovery checks the 3 Panel stories (Default, WithPlay pass; PlayFails fails).
+    expect(res.summary).toEqual({ pass: 2, fail: 1, timeout: 0 });
   });
 
   it('check --story restricts the run and exits 0 when everything passes', async () => {
     const res = await runJson<CheckResponse>(
-      ['check', rec.id, '--story', 'organisms-panel--default', '--wait-for-text', 'Go'],
+      [
+        'check',
+        rec.id,
+        '--story',
+        'organisms-panel--default',
+        '--wait-for-text',
+        'Go',
+        '--concurrency',
+        '2',
+      ],
       { home },
     );
     expect(res.results.map((x) => x.storyId)).toEqual(['organisms-panel--default']);
@@ -47,6 +54,8 @@ describe('check and screenshot', () => {
         'screenshot',
         'src/components/Panel',
         'organisms-panel--default',
+        '--host',
+        FIXTURE_HOST,
         '--out',
         out,
         '--viewport',
