@@ -23,7 +23,7 @@ Spec 1 puts several worktrees of one repository on one machine at once: `<worktr
    - storybrokr's `reapIdle()` never checks that `r.hostRoot` still exists. After `git worktree remove` or `work retire`, the Storybook process keeps running until its TTL, holding a port and a cap slot.
    - Inside an effort, an agent has to know the instance id or type `--host <worktree>/app-ui` on every storybrokr command. The host is `join(effort.worktree, manifest.storybook.hostRoot)` (skoolscout: `<worktree>/app-ui`), **not** the worktree itself. Any design that keys on `effort.worktree` matches nothing there.
 
-Capacity is the real ceiling behind all four: `instanceCap` is 6 today (raised to 10 in this spec to match `workbrokr`'s default `slots.count`) and the port range is 6100 to 6199, and each instance is a full Storybook dev server. Stopping instances from leaking ensures the cap is spent on live work.
+Capacity is the real ceiling behind all four: `instanceCap` is 6 today (raised to 10 in this spec, the first adopter's `slots.count`; the workbrokr manifest schema has no default for it) and the port range is 6100 to 6199, and each instance is a full Storybook dev server. Stopping instances from leaking ensures the cap is spent on live work.
 
 ## 2. Goals and non-goals
 
@@ -34,7 +34,7 @@ Capacity is the real ceiling behind all four: `instanceCap` is 6 today (raised t
 - The default instance holds the stories of the component asked for; the transitive set is one flag away, and a repeat `up` never silently narrows an instance.
 - `check` runs stories concurrently with isolated browser state per worker, deterministic result order, and the same exit semantics.
 - An instance never outlives its effort by accident: TTL equals the lease, activity on the effort touches the instance, finish / reap / retire stop every instance under the effort's host, and a deleted host is reaped by storybrokr itself.
-- Raise `DEFAULT_CONFIG.instanceCap` from 6 to 10 to match `workbrokr`'s default `slots.count`.
+- Raise `DEFAULT_CONFIG.instanceCap` from 6 to 10, the first adopter's `slots.count`, so a full wave of frontend tasks fits; `config.json` still overrides it per machine.
 
 **Non-goals**
 
@@ -73,6 +73,8 @@ Why a hint and not a strict cwd rule: the MCP server's cwd is wherever the edito
 - `explicitHost` → normalize the path relative to `realpath(explicitHost)` (absolute inside the host → `relative()`; otherwise strip `./` and trailing `/`) and return it as `host`.
 - Otherwise, `process.env.STORYBROKR_HOST` set → same normalization, returned as `hint`.
 - Otherwise `resolveComponent(idOrPath)` from cwd; found and inside the host → `{ idOrPath: component, hint: hostRoot }`; not found → `{ idOrPath: idOrPath.replace(/\/+$/, '') }`.
+
+`up` uses the same precedence for the host it boots in: `--host`, then `STORYBROKR_HOST`, then the walk-up from the path. Without this, `storybrokr_up` from an MCP server whose cwd is the main checkout would boot the main checkout's Storybook even with the variable set.
 
 **Propagation.** `Broker.get/touch/logs/logStream/down(idOrPath, scope?)`; `Broker.downByHost(host): Promise<InstanceRecord[]>` stops every instance whose `hostRoot` equals `realpath(host)` and returns them. Routes read `?host=` and `?hint=` on `GET /v1/instances` (filter), `GET|DELETE /v1/instances/:id`, `POST /v1/instances/:id/{touch,check,screenshot}`, `GET /v1/instances/:id/logs`; `DELETE /v1/instances?host=<dir>` → `200 { stopped: string[] }`. `DaemonClient` gains the matching `scope?` parameter on `get/down/touch/check/screenshot/logs/follow`, `list({ host? })`, and `downByHost(host)`. CLI: `--host <dir>` on `get down touch check screenshot logs open ls`; `down --host <dir>` with no id stops that host's instances (`--all --host <dir>` is the same thing spelled out). MCP: optional `hostRoot` on `storybrokr_list/get/down/touch/check/screenshot/logs`; `storybrokr_down` accepts `{ hostRoot }` without `id`. Every tool runs its `id` through `resolveTarget` first, so `STORYBROKR_HOST` in the MCP server's environment also works.
 
@@ -130,22 +132,22 @@ All of this is written against `apps/workbrokr/src/lib/effort.ts` and `src/lib/s
 ```ts
 export interface StorybrokrClient {
   up(story: string, hostRoot: string, opts?: { ttlMinutes?: number; includeChildren?: boolean }): Promise<StorybrokrInstance>;
-  down(id: string, hostRoot?: string): Promise<void>;
+  down(id: string): Promise<void>;
   downHost(hostRoot: string): Promise<string[]>;   // stopped ids; [] when the daemon is not running
-  touch(id: string, hostRoot?: string): Promise<void>;
+  touch(id: string): void;                          // synchronous: touchEffort is synchronous
   version(): string;                                // `storybrokr --version`
 }
 ```
 
-`storybrokrCli` maps these onto `up … --host H --json [--ttl N] [--include-children]`, `down ID [--host H]`, `down --host H --json`, `touch ID [--host H]`. `downHost` and `touch` are best effort: a non-zero exit or `DAEMON_UNAVAILABLE` is logged through `ctx.log`, never thrown. `up`/`down` keep today's `STORYBROKR_FAILED` behaviour.
+`down` and `touch` take an instance id only: an id resolves in step 1 of §3.1 regardless of host, so the lease's `value` is enough and no host needs threading through `releaseLease`. `storybrokrCli` maps these onto `up … --host H --json [--ttl N] [--include-children]`, `down ID`, `down --host H --json`, `touch ID`, `--version`. `downHost` and `touch` are best effort: a non-zero exit or `DAEMON_UNAVAILABLE` is logged through `ctx.log`, never thrown. `up`/`down` keep today's `STORYBROKR_FAILED` behaviour. The client is `spawnSync` throughout, so the synchronous `touch` and `version` cost nothing extra.
 
 **TTL.** Both `up` call sites in `startEffort` (the fresh start and the `--join` late story attachment) pass `ttlMinutes: Math.ceil(m.expiry.storybookHours * 60)`. The instance and the lease now expire together, and both are extended by the same touches.
 
-**Touch.** `touchEffort` stays synchronous (the CLI client is `spawnSync`). For each `storybook` lease it calls `storybrokr.touch(value, host)` **only when the lease's `touched` is older than 60 s**, then extends the lease as today. The throttle matters because `work env` runs from Makefiles (`slot-check`, every `make` in a worktree) and each storybrokr call is a Node process start.
+**Touch.** `touchEffort` stays synchronous; `statusFor` and `effortEnv` call it and are synchronous too. For each `storybook` lease it calls `storybrokr.touch(String(lease.value))` **only when the lease's `touched` is older than 60 s**, then extends the lease as today. The throttle matters because `work env` runs from Makefiles (`slot-check`, every `make` in a worktree) and each storybrokr call is a Node process start.
 
-**Teardown.** `releaseLease` passes the host to `down`. After the lease loop in `finishEffort` and `reapLeases`, and before `worktreeRemove` in the task path of `finishEffort` and in `retireArea`, call `storybrokr.downHost(storybookHostFor(m, worktree))` when the worktree still exists. That is what catches hand-booted instances. When the worktree is already gone, §3.2 catches them within a minute.
+**Teardown.** `releaseLease` is unchanged (`down(lease.value)`). After the lease loop in `finishEffort` and `reapLeases`, and before `worktreeRemove` in the task path of `finishEffort` and in `retireArea`, call `storybrokr.downHost(storybookHostFor(m, worktree))` when the worktree still exists. That is what catches hand-booted instances. When the worktree is already gone, §3.2 catches them within a minute.
 
-**Host default.** `slotVars` emits `STORYBROKR_HOST=<storybookHostFor(m, worktree)>`; it joins the known-variable list in `manifest.ts` so a project can put it in `env.template`, and `work env` prints it. Inside a worktree whose env file is sourced (or under `work env -- <cmd>`), every storybrokr command and the storybrokr MCP server resolve paths to that host with no flags (§3.1 step 3). skoolscout adds the variable to its template in the adoption follow-up.
+**Host default.** `slotVars` emits `STORYBROKR_HOST=<storybookHostFor(m, worktree)>`; it joins the known-variable list in `manifest.ts` so a project can put it in `env.template`, and `work env` prints it. Inside a worktree whose env file is sourced, or in a shell that ran `eval "$(work env --sh)"`, every storybrokr command and the storybrokr MCP server resolve paths to that host with no flags (§3.1 step 3). skoolscout adds the variable to its template in the adoption follow-up.
 
 **Version gate.** `startEffort` in frontend mode calls `storybrokr.version()` once and refuses with `STORYBROKR_FAILED` ("storybrokr 0.3.0 or newer is required; found X") below 0.3.0, because `--include-children` and `down --host` do not exist before it.
 
@@ -174,7 +176,7 @@ export interface StorybrokrClient {
 - `src/commands/{up,get,down,touch,check,screenshot,logs,open,ls}.ts`: `--host`, `--include-children`, `--concurrency`.
 - `src/mcp/server.ts` (+test): `hostRoot`, `includeChildren`, `concurrency`.
 - `README.md`, `SKILL.md`, `CHANGELOG.md` (via changeset).
-- `tests/e2e/worktrees.test.ts` (new), `tests/e2e/render.test.ts` and `inspect.test.ts` (updated for the new default and `--concurrency`).
+- `tests/e2e/worktrees.test.ts` (new), `tests/e2e/up-down.test.ts` (default story set, `--include-children`), `tests/e2e/inspect.test.ts` (`--concurrency`). `render.test.ts` is unchanged: it asserts that the Panel story renders its child Button, which root-first discovery does not affect (children are still bundled as modules; only their stories are left out).
 
 **`apps/workbrokr`**
 - `src/lib/storybrokr.ts`: the client in §3.5.
@@ -186,7 +188,7 @@ export interface StorybrokrClient {
 
 - **storybrokr 0.3.0 (minor, breaking by the project's pre-1.0 convention).** Breaking: default discovery is root-first; unqualified paths that match several hosts return 409 where they used to return the oldest instance; instance ids change for symlinked hosts. Additive: `--host` everywhere, `--include-children`, `--concurrency`, `STORYBROKR_HOST`, orphan reaping, `instanceCap: 10`. Changeset: `minor` with a "Breaking" paragraph naming the three changes.
 - **workbrokr 0.2.0 (minor).** Requires storybrokr ≥ 0.3.0 in frontend mode (version gate). Changeset `minor`. The pending Spec 1 work on `main` ships in the same release.
-- **Rollout in skoolscout-com:** install both, add `STORYBROKR_HOST: '${STORYBROKR_HOST}'` to `helmsmith.config.ts` `env.template`, update the e2e-inspect skills that mention storybrokr. No migration of running instances: the first `reapIdle` after upgrade adopts old records unchanged (`includeChildren` is read as `false` when absent, which matches what they were booted with only if they had no children; a repeat `up` on such a record re-discovers with `false` and may rebuild narrower once — acceptable for ephemeral instances, noted in the changeset).
+- **Rollout in skoolscout-com:** install both, add `STORYBROKR_HOST: '${STORYBROKR_HOST}'` to `helmsmith.config.ts` `env.template`, update the e2e-inspect skills that mention storybrokr. No migration of running instances: `Registry.load` and `reconcile` read a record without `includeChildren` as `true`, because every 0.2.0 instance was booted transitively. A repeat `up` without the flag therefore keeps such an instance exactly as it was; the way to narrow one is `down` and a fresh `up`.
 
 ## 7. Testing
 
@@ -201,11 +203,12 @@ export interface StorybrokrClient {
 
 **E2E (`tests/e2e`, subprocess, built CLI).**
 - `worktrees.test.ts`: copy the fixture host to `A` and `B`; `up` the same component in both; `check <component>` → exit 1 with `INSTANCE_AMBIGUOUS`; `check <component> --host B` → B's instance; `STORYBROKR_HOST=A check <component>` → A's; `cd A && check <component>` → A's; `down --host A` leaves B running; `rm -rf B` then wait one reaper tick → B's instance gone from `ls`.
-- `render.test.ts`: the Panel fixture by default renders only Panel stories; with `--include-children` its children's stories are present (today's assertion moves behind the flag).
+- `up-down.test.ts`: `up src/components/Panel` returns only `organisms-panel--*` stories by default and `includeChildren: false`; `up … --include-children` adds the child stories and flips the record; a plain repeat `up` after that keeps the wider instance.
+- `render.test.ts`: unchanged, and it must still pass under the new default (the Panel story renders its child Button).
 - `inspect.test.ts`: `check --concurrency 4` and `--concurrency 1` report identical per-story statuses in identical order.
 - `mcp.test.ts`: `storybrokr_check` with `hostRoot` and with `STORYBROKR_HOST` in the server environment.
 
-**Live proof** before merge: in skoolscout-com, `work start --area <a> --task t1 --mode frontend --story <p>` and the same for `t2`, then from inside each worktree `storybrokr check <p>` hits its own instance, `work finish --area <a> --task t1` leaves `t2`'s instance up, and `storybrokr ls` shows the TTL equal to the lease.
+**Live proof** before merge: in skoolscout-com, `work start --area <a> --task t1 --mode frontend --scope <glob1> --story <p>` and the same for `t2` with a non-overlapping `--scope`, then from inside each worktree `storybrokr check <p>` hits its own instance, `work finish --area <a> --task t1` leaves `t2`'s instance up, and `storybrokr ls` shows the TTL equal to the lease.
 
 ## 8. Decisions log
 
@@ -218,5 +221,8 @@ export interface StorybrokrClient {
 7. Instance TTL = `expiry.storybookHours`; touches are throttled to once a minute per lease.
 8. Hand-booted instances are stopped by `downHost` on the manifest's Storybook host at finish, reap and retire; storybrokr reaps instances whose host directory is gone.
 9. The first draft's workbrokr section was replaced: it referenced `effort.storybrokrId`, `effort.story`, `ctx.leaseTtlSeconds`, a demotion path and a reap gap that do not exist on `main`, and keyed teardown on `effort.worktree` where the host is `<worktree>/app-ui`.
-10. `DEFAULT_CONFIG.instanceCap` raised from `6` to `10` to match `workbrokr`'s default `slots.count`.
+10. `DEFAULT_CONFIG.instanceCap` raised from `6` to `10` (owner), sized to the first adopter's `slots.count`; per-machine `config.json` can lower it.
 11. `work audit` remains focused on git worktrees and `workbrokr` leases (`downHost` on finish/reap/retire + `storybrokr` orphan reaping already clean up hand-booted instances).
+12. `down` and `touch` address instances by id only; hosts matter for component paths, not ids.
+13. A record saved before 0.3.0 loads as `includeChildren: true`, so upgrading never narrows a running instance.
+14. `up` resolves its host with the same precedence as every other command: `--host`, `STORYBROKR_HOST`, walk-up.
