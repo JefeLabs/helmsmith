@@ -13,6 +13,7 @@ import {
   requestReviewers,
 } from '../github.js';
 import { findPullRequestTemplate } from '../pr-template.js';
+import { resolveBaseBranch } from './_shared/base.js';
 import { splitTitleBody } from './_shared/format.js';
 import { resolveTicketContext } from './_shared/ticket-context.js';
 
@@ -46,23 +47,31 @@ export async function runPr(options: PrOptions = {}): Promise<void> {
     process.exit(1);
   }
 
-  const base = options.base ?? config.baseBranch;
-  // If config.baseBranch is the schema default ("main") but the
-  // repo's actual default branch differs, prefer the GitHub-side
-  // default. Saves users from accidental wrong-base PRs.
-  let effectiveBase = base;
-  try {
-    const defaultBranch = await getDefaultBranch(repo.owner, repo.repo);
-    if (!options.base && defaultBranch !== base) {
-      console.log(
-        chalk.dim(
-          `Note: repo's default branch is ${defaultBranch}, config's baseBranch is ${base}. Using ${defaultBranch}. Pass --base to override.`,
+  // Base: --base, else an explicit config value, else the repository's default
+  // branch (queried only when neither is set), else main.
+  let remoteDefault: string | undefined;
+  if (!options.base && !config.baseBranch) {
+    try {
+      remoteDefault = await getDefaultBranch(repo.owner, repo.repo);
+    } catch (err) {
+      console.error(
+        chalk.yellow(
+          `⚠ Couldn't query the repository's default branch (${(err as Error).message}); assuming main. Pass --base or set baseBranch in .pritty.json.`,
         ),
       );
-      effectiveBase = defaultBranch;
     }
-  } catch (err) {
-    console.error(chalk.yellow(`⚠ Couldn't query repo default branch: ${(err as Error).message}`));
+  }
+  const { base: effectiveBase, source: baseSource } = resolveBaseBranch({
+    flag: options.base,
+    config: config.baseBranch,
+    remoteDefault,
+  });
+  if (baseSource === 'remote') {
+    console.log(
+      chalk.dim(
+        `Base ${effectiveBase} is the repository's default branch; set baseBranch in .pritty.json or pass --base to override.`,
+      ),
+    );
   }
 
   console.log(

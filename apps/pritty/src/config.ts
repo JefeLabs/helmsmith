@@ -57,7 +57,8 @@ export const ProviderSchema = z.enum(['copilot', 'anthropic', 'openai']);
 
 export const ConfigSchema = z.object({
   model: z.string().default('gpt-4o'),
-  baseBranch: z.string().default('main'),
+  /** Unset means "the repository's default branch"; an explicit value is never overridden. */
+  baseBranch: z.string().optional(),
   autoApprove: z.boolean().default(false),
   dryRun: z.boolean().default(false),
   verbose: z.boolean().default(false),
@@ -122,7 +123,6 @@ export function loadConfig(cwd: string = process.cwd()): Config {
 export function defaultStarterConfig(): unknown {
   return {
     model: 'gpt-4o',
-    baseBranch: 'main',
     commitStyle: 'conventional',
     preCommit: ['eslint', 'prettier'],
     prePush: ['test'],

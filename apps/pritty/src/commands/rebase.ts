@@ -4,6 +4,7 @@ import ora from 'ora';
 import { generateRebasePlan, type RebasePlan } from '../ai.js';
 import { loadConfig } from '../config.js';
 import { createGit } from '../git.js';
+import { resolveBaseBranch } from './_shared/base.js';
 import { colorAction, renderRebaseTodo } from './_shared/format.js';
 
 export interface RebaseOptions {
@@ -53,7 +54,9 @@ export async function runRebase(options: RebaseOptions = {}): Promise<void> {
     process.exit(1);
   }
 
-  const base = await git.resolveBaseRef(options.base ?? config.baseBranch);
+  const base = await git.resolveBaseRef(
+    resolveBaseBranch({ flag: options.base, config: config.baseBranch }).base,
+  );
   const commits = await git.log(base);
   if (commits.length === 0) {
     console.log(chalk.dim(`No commits between ${base} and ${branch}. Nothing to rebase.`));
