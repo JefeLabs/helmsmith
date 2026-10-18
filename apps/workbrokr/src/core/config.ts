@@ -68,13 +68,16 @@ export function slotVars(
     BRANCH: o.branch ?? '',
     WORKTREE: o.worktree ?? '',
     LOG_DIR: o.logDir ?? '',
-    PORT_STORYBOOK: o.storybookPort === undefined ? '' : String(o.storybookPort),
     STORYBROKR_HOST: storybookHostFor(m, o.worktree),
   };
   for (const service of Object.keys(m.ports.services)) {
     const p = o.ports[service];
     vars[`PORT_${service.toUpperCase()}`] = p === undefined ? '' : String(p);
   }
+  // The storybrokr instance port wins; a manifest that also declares a `storybook`
+  // port service supplies the slot-derived fallback through the loop above.
+  if (o.storybookPort !== undefined) vars.PORT_STORYBOOK = String(o.storybookPort);
+  else if (vars.PORT_STORYBOOK === undefined) vars.PORT_STORYBOOK = '';
   return vars;
 }
 

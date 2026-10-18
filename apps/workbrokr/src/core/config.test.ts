@@ -74,3 +74,34 @@ describe('config', () => {
     }
   });
 });
+
+describe('W7: PORT_STORYBOOK with a storybook port service in the manifest', () => {
+  it('keeps the storybrokr instance port when one is given, else falls back to the slot-derived port', async () => {
+    const { validateManifest } = await import('./manifest.js');
+    const { minimal } = await import('./testing/manifests.js');
+    const { slotVars } = await import('./config.js');
+    const m = validateManifest({
+      ...minimal,
+      ports: {
+        services: {
+          frontend: { base: 43000 },
+          backend: { base: 43100 },
+          storybook: { base: 6100 },
+        },
+      },
+    });
+    const withInstance = slotVars(m, {
+      slot: 3,
+      ports: { frontend: 43003, backend: 43103, storybook: 6103 },
+      storybookPort: 6150,
+    });
+    expect(withInstance.PORT_STORYBOOK).toBe('6150');
+    const slotOnly = slotVars(m, {
+      slot: 3,
+      ports: { frontend: 43003, backend: 43103, storybook: 6103 },
+    });
+    expect(slotOnly.PORT_STORYBOOK).toBe('6103');
+    const frontendNoSlot = slotVars(m, { ports: {}, storybookPort: 6150 });
+    expect(frontendNoSlot.PORT_STORYBOOK).toBe('6150');
+  });
+});
