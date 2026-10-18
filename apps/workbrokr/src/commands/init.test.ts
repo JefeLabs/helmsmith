@@ -1,8 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { loadManifest } from '@helmsmith/workkit';
-import { makeRepo } from '@helmsmith/workkit/testing';
 import { afterEach, describe, expect, it } from 'vitest';
+import { loadManifest } from '../core/index.js';
+import { makeRepo } from '../core/testing/index.js';
 import { runInit } from './init.js';
 
 describe('work init', () => {

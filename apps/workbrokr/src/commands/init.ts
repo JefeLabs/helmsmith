@@ -1,5 +1,6 @@
 import { existsSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import type { Command } from 'commander';
 import {
   claimRanges,
   Git,
@@ -9,8 +10,7 @@ import {
   Registry,
   validateManifest,
   WorkkitError,
-} from '@helmsmith/workkit';
-import type { Command } from 'commander';
+} from '../core/index.js';
 import { fail, printJson } from './_shared/output.js';
 
 export interface InitOptions {

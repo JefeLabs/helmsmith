@@ -1,6 +1,6 @@
-import type { Mode } from '@helmsmith/workkit';
 import chalk from 'chalk';
 import type { Command } from 'commander';
+import type { Mode } from '../core/index.js';
 import { buildCtx } from '../lib/context.js';
 import { type StartResult, startEffort } from '../lib/effort.js';
 import { fail, printJson, warn } from './_shared/output.js';

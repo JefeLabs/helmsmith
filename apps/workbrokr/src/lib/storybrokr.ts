@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { WorkkitError } from '@helmsmith/workkit';
+import { WorkkitError } from '../core/index.js';
 
 export interface StorybrokrInstance {
   id: string;

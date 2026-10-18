@@ -31,7 +31,7 @@ import {
   selectRefresh,
   slotVars,
   WorkkitError,
-} from '@helmsmith/workkit';
+} from '../core/index.js';
 import type { StorybrokrClient } from './storybrokr.js';
 
 export interface ServiceRunner {

@@ -1,7 +1,7 @@
-import { toErrorBody } from '@helmsmith/workkit';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { toErrorBody } from '../core/index.js';
 import { buildCtx } from '../lib/context.js';
 import {
   auditProject,

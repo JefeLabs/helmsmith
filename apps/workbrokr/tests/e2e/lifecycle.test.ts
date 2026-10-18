@@ -1,7 +1,7 @@
 import { cpSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { gitIn, makeRepo } from '@helmsmith/workkit/testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { gitIn, makeRepo } from '../../src/core/testing/index.js';
 import { APP_ROOT, makeHome, runCli } from './helpers.js';
 
 const FIXTURE = join(APP_ROOT, 'tests', 'e2e', 'fixtures', 'project');

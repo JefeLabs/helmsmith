@@ -21,7 +21,7 @@
 # dependent first leaves it briefly unresolvable.
 #   flow-spec → flow-designer
 #   cli-kit   → storybrokr
-PUBLISH_PKGS ?= @helmsmith/flow-spec @helmsmith/flow-designer @helmsmith/cli-kit @helmsmith/storybrokr @helmsmith/workkit @helmsmith/workbrokr
+PUBLISH_PKGS ?= @helmsmith/flow-spec @helmsmith/flow-designer @helmsmith/cli-kit @helmsmith/storybrokr @helmsmith/workbrokr
 
 PACK_DIR ?= /tmp/helmsmith-pack
 
