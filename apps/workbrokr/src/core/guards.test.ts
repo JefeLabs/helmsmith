@@ -261,3 +261,57 @@ describe('guards', () => {
     expect(r.warnings[0]).toMatch(/outside the effort's scope.*unscoped\/file\.ts/);
   });
 });
+
+describe("W4: resolving a merge is not writing into another effort's scope", () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('exempts paths the merge brought in, still refuses paths authored during the merge', async () => {
+    const { commitFile, gitIn } = await import('./testing/fixture-repo.js');
+    const { writeFileSync, mkdirSync } = await import('node:fs');
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const registry = reg();
+    registry.addEffort({
+      id: 'e2',
+      project: 'demo',
+      area: 'shop/team',
+      type: 'feature',
+      mode: 'frontend',
+      branch: 'feature/shop/team',
+      worktree: '/w2',
+      owner: { session: 'other', pid: 2 },
+      state: 'active',
+      scopes: ['app-ui/app/shop/team/**'],
+      commons: [],
+      leases: [],
+      notices: [],
+      started: 'x',
+      lastActivity: 'x',
+    });
+    gitIn(f.main, 'checkout', '-q', '-b', 'feature/shop/cart', 'develop');
+    commitFile(f.main, 'app-ui/app/shop/cart/a.tsx', 'a', 'cart');
+    gitIn(f.main, 'checkout', '-q', 'develop');
+    commitFile(f.main, 'app-ui/app/shop/team/t.tsx', 't', 'team landed on develop');
+    gitIn(f.main, 'checkout', '-q', 'feature/shop/cart');
+    gitIn(f.main, 'merge', '-q', '--no-commit', '--no-ff', 'develop');
+    const git = new Git(f.main);
+    const base = {
+      m,
+      registry,
+      git,
+      project: 'demo',
+      branch: 'feature/shop/cart',
+      ownerSession: 's1',
+    };
+
+    expect(checkCommit({ ...base, stagedPaths: git.changedPathsStaged() }).refusals).toEqual([]);
+
+    mkdirSync(join(f.main, 'app-ui/app/shop/team'), { recursive: true });
+    writeFileSync(join(f.main, 'app-ui/app/shop/team/mine.tsx'), 'edited during the merge');
+    gitIn(f.main, 'add', 'app-ui/app/shop/team/mine.tsx');
+    const r = checkCommit({ ...base, stagedPaths: git.changedPathsStaged() });
+    expect(r.refusals.join('\n')).toMatch(/mine\.tsx.*shop\/team/);
+    expect(r.refusals.join('\n')).not.toMatch(/t\.tsx/);
+  });
+});

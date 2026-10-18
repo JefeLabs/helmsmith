@@ -112,6 +112,18 @@ export class Git {
     return this.lines(['diff', '--cached', '--name-only']);
   }
 
+  /** The other parent of a merge in progress, or undefined when none is. */
+  mergeHead(): string | undefined {
+    const r = this.tryRun(['rev-parse', '-q', '--verify', 'MERGE_HEAD']);
+    return r.code === 0 ? r.out.trim() : undefined;
+  }
+
+  /** Staged paths whose index content differs from `ref` (so, authored here rather than taken from `ref`). */
+  stagedDifferingFrom(ref: string, paths: string[]): string[] {
+    if (paths.length === 0) return [];
+    return this.lines(['diff', '--cached', '--name-only', '--no-renames', ref, '--', ...paths]);
+  }
+
   changedPaths(from: string, to: string): string[] {
     return this.lines(['diff', '--name-only', '--no-renames', from, to]);
   }

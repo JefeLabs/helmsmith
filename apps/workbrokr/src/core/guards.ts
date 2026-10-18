@@ -57,6 +57,14 @@ export function checkCommit(c: CommitCheck): { refusals: string[]; warnings: str
       `branch "${c.branch}" is protected (${c.m.protectedBranches.join(', ')}): work happens on <type>/<area> branches, never here`,
     );
   }
+  // Resolving a merge stages everything the other parent brought in. Those paths are
+  // not this effort's writes: scope and commons checks look only at paths whose staged
+  // content differs from MERGE_HEAD (authored here, or a conflict resolved by hand).
+  const mergeHead = c.git.mergeHead();
+  const authored = mergeHead
+    ? new Set(c.git.stagedDifferingFrom(mergeHead, c.stagedPaths))
+    : new Set(c.stagedPaths);
+  const ownPaths = c.stagedPaths.filter((p) => authored.has(p));
   const allEfforts = c.registry.efforts({ project: c.project });
   const efforts = new Map(allEfforts.map((e) => [e.id, e]));
   for (const lease of c.registry.leases({ project: c.project, kind: 'commons' })) {
@@ -68,7 +76,7 @@ export function checkCommit(c: CommitCheck): { refusals: string[]; warnings: str
       continue;
     }
     const globs = c.m.commons[String(lease.value)] ?? [];
-    const hit = pathsMatching(c.stagedPaths, globs);
+    const hit = pathsMatching(ownPaths, globs);
     if (hit.length > 0) {
       refusals.push(
         `commons "${lease.value}" is write-locked by ${lease.owner.session} (effort ${lease.effort}, since ${lease.touched}); staged: ${hit.join(', ')}`,
@@ -81,7 +89,7 @@ export function checkCommit(c: CommitCheck): { refusals: string[]; warnings: str
       continue;
     }
     if (!c.checkoutRoot && other.branch === c.branch) continue;
-    const hit = pathsMatching(c.stagedPaths, other.scopes);
+    const hit = pathsMatching(ownPaths, other.scopes);
     if (hit.length > 0) {
       refusals.push(
         `path(s) ${hit.join(', ')} are inside the active scope of ${effortLabel(other)} (${other.branch}, owned by ${other.owner.session})`,
@@ -93,10 +101,10 @@ export function checkCommit(c: CommitCheck): { refusals: string[]; warnings: str
       ? same(e.worktree, c.checkoutRoot)
       : e.branch === c.branch,
   );
-  if (mine && c.stagedPaths.length > 0) {
+  if (mine && ownPaths.length > 0) {
     const allowed = allowedScopesForEffort(c.m, mine);
-    const inScope = new Set(pathsMatching(c.stagedPaths, allowed));
-    const outside = c.stagedPaths.filter((p) => !inScope.has(p));
+    const inScope = new Set(pathsMatching(ownPaths, allowed));
+    const outside = ownPaths.filter((p) => !inScope.has(p));
     if (outside.length > 0) {
       warnings.push(
         `${outside.length} staged path(s) are outside the effort's scope (${effortLabel(mine)}): ${outside.join(', ')}`,
