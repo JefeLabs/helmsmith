@@ -16,13 +16,15 @@ export interface CategoryMap {
 }
 
 /**
- * Built-in defaults — match the PRD's category table. User entries
- * override per-key (a custom `app` replaces the default `app`).
- * To add to a default category, copy its patterns and append.
+ * Built-in defaults. Order matters (first match wins): the specific buckets
+ * come before `app`, so `src/foo.test.ts` and `src/Button.stories.tsx` land
+ * in `test` and `storybook`, not `app`. User entries override per-key (a
+ * custom `app` replaces the default `app`); to add to a default category,
+ * copy its patterns and append.
  */
 export const DEFAULT_CATEGORIES: CategoryMap = {
-  app: ['src/**', 'lib/**', 'app/**', 'pages/**', 'components/**', 'hooks/**', 'utils/**'],
   test: ['test/**', 'tests/**', '__tests__/**', '**/*.test.*', '**/*.spec.*', '**/*_test.*'],
+  storybook: ['**/*.stories.*', '**/*.story.*', '.storybook/**'],
   infra: [
     'terraform/**',
     '.github/**',
@@ -33,7 +35,6 @@ export const DEFAULT_CATEGORIES: CategoryMap = {
     '.gitlab-ci*',
     '.circleci/**',
   ],
-  storybook: ['**/*.stories.*', '**/*.story.*', '.storybook/**'],
   config: [
     '*.config.*',
     'package.json',
@@ -44,6 +45,7 @@ export const DEFAULT_CATEGORIES: CategoryMap = {
     'pyproject.toml',
     'go.mod',
   ],
+  app: ['src/**', 'lib/**', 'app/**', 'pages/**', 'components/**', 'hooks/**', 'utils/**'],
 };
 
 /** Bucket that catches files matching no configured category. */

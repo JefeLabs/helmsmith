@@ -26,13 +26,11 @@ describe('categorize', () => {
   });
 
   it('first-match-wins — order in CategoryMap matters', () => {
-    // src/foo.test.ts matches both `app` (src/**) and `test` (**/*.test.*).
-    // Defaults order: app first, then test → so src/foo.test.ts → app.
-    // That's actually wrong for typical repos; users override by putting
-    // their custom `test` ahead of `app` in their config.
+    // src/foo.test.ts matches both `test` (**/*.test.*) and `app` (src/**).
+    // The defaults list `test` first, so it lands in `test`.
     const result = categorize(['src/foo.test.ts']);
-    expect(result.app).toContain('src/foo.test.ts');
-    expect(result.test).not.toContain('src/foo.test.ts');
+    expect(result.test).toContain('src/foo.test.ts');
+    expect(result.app).not.toContain('src/foo.test.ts');
   });
 
   it('user-ordered categories let test win over app', () => {
@@ -75,5 +73,19 @@ describe('mergeCategories', () => {
     const merged = mergeCategories({ docs: ['docs/**'] });
     expect(merged.docs).toEqual(['docs/**']);
     expect(merged.app).toEqual(DEFAULT_CATEGORIES.app);
+  });
+});
+
+describe('default category order puts the specific buckets before app', () => {
+  it('sends tests and stories under src/ to their own categories', () => {
+    const out = categorize([
+      'src/foo.test.ts',
+      'src/Button.stories.tsx',
+      'src/a.ts',
+      'src/b.spec.tsx',
+    ]);
+    expect(out.test).toEqual(['src/foo.test.ts', 'src/b.spec.tsx']);
+    expect(out.storybook).toEqual(['src/Button.stories.tsx']);
+    expect(out.app).toEqual(['src/a.ts']);
   });
 });
