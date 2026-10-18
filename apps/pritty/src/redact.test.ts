@@ -92,3 +92,39 @@ describe('redactDiff hardening', () => {
     expect(out).toContain('+export const ok = true;');
   });
 });
+
+describe('redactDiff against header shapes git really emits', () => {
+  it('omits a secret file whose path has spaces (git does not quote those)', () => {
+    const diff = [
+      'diff --git a/config/prod secrets.json b/config/prod secrets.json',
+      'index 1..2 100644',
+      '--- a/config/prod secrets.json',
+      '+++ b/config/prod secrets.json',
+      '+{"k":"1secret"}',
+      'diff --git a/src/ok.ts b/src/ok.ts',
+      '+export const ok = true;',
+    ].join('\n');
+    const out = redactDiff(diff);
+    expect(out).not.toContain('1secret');
+    expect(out).toContain('+export const ok = true;');
+  });
+
+  it('handles CRLF line endings', () => {
+    const diff = ['diff --git a/.env b/.env', '+A=2secret', 'diff --git a/x.ts b/x.ts', '+ok'].join(
+      '\r\n',
+    );
+    const out = redactDiff(diff);
+    expect(out).not.toContain('2secret');
+    expect(out).toContain('+ok');
+  });
+
+  it('decides from the +++ line when the header was ambiguous', () => {
+    const diff = [
+      'diff --git a/weird b/thing b/.env',
+      '--- a/weird b/thing',
+      '+++ b/.env',
+      '+C=3secret',
+    ].join('\n');
+    expect(redactDiff(diff)).not.toContain('3secret');
+  });
+});

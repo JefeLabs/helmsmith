@@ -15,26 +15,72 @@ const KNOWN_TOKENS =
 const PEM_BEGIN = /-----BEGIN [A-Z ]*PRIVATE KEY-----/;
 const PEM_END = /-----END [A-Z ]*PRIVATE KEY-----/;
 
-/** Old and new path from a diff header, with git's optional quoting removed; null for non-header lines. */
+function unquotePath(p: string): string {
+  const unquoted =
+    p.startsWith('"') && p.endsWith('"') ? p.slice(1, -1).replace(/\\(.)/g, '$1') : p;
+  return unquoted.replace(/^[ab]\//, '');
+}
+
+/**
+ * Candidate paths named by a diff header. git quotes a path only when it has
+ * control or non-ASCII characters, so `a/my file.env b/my file.env` arrives
+ * unquoted and ambiguous; every ` b/` split is returned and the caller omits
+ * the file if any candidate is a secret. Returns null for non-header lines.
+ */
 function headerPaths(line: string): string[] | null {
-  const unq = (p: string): string => p.replace(/^"(.*)"$/, '$1').replace(/^[ab]\//, '');
-  const git = line.match(/^diff --git ("(?:[^"\\]|\\.)*"|\S+) ("(?:[^"\\]|\\.)*"|\S+)$/);
-  if (git) return [unq(git[1]!), unq(git[2]!)];
+  const git = line.match(/^diff --git (.+)$/);
+  if (git) {
+    const rest = git[1]!;
+    const quoted = rest.match(/^("(?:[^"\\]|\\.)*") ("(?:[^"\\]|\\.)*")$/);
+    if (quoted) return [unquotePath(quoted[1]!), unquotePath(quoted[2]!)];
+    const out: string[] = [];
+    let at = rest.indexOf(' b/');
+    while (at !== -1) {
+      out.push(unquotePath(rest.slice(0, at)), unquotePath(rest.slice(at + 1)));
+      at = rest.indexOf(' b/', at + 1);
+    }
+    return out.length > 0 ? out : [rest];
+  }
   const combined = line.match(/^diff --(?:cc|combined) (.+)$/);
-  if (combined) return [unq(combined[1]!)];
+  if (combined) return [unquotePath(combined[1]!)];
   return null;
 }
+
+/** Per-file metadata lines that also name the file; `/dev/null` is not a path. */
+function metaPath(line: string): string | null {
+  const m = line.match(/^(?:--- |\+\+\+ |rename from |rename to |copy from |copy to )(.+)$/);
+  if (!m || m[1] === '/dev/null') return null;
+  return unquotePath(m[1]!);
+}
+
+const isSecretPath = (p: string): boolean => SECRET_FILE.test(p);
 
 export function redactDiff(diff: string): string {
   const out: string[] = [];
   let omitting = false;
+  let announced = false;
   let inPem = false;
-  for (const line of diff.split('\n')) {
+  for (const raw of diff.split('\n')) {
+    const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw;
     const paths = headerPaths(line);
     if (paths) {
-      omitting = paths.some((p) => SECRET_FILE.test(p));
+      omitting = paths.some(isSecretPath);
+      announced = false;
       inPem = false;
-      out.push(omitting ? `[diff for ${paths[paths.length - 1]} omitted]` : line);
+      if (omitting) {
+        out.push(`[diff for ${paths[paths.length - 1]} omitted]`);
+        announced = true;
+      } else out.push(line);
+      continue;
+    }
+    const meta = metaPath(line);
+    if (meta && isSecretPath(meta) && !omitting) {
+      // the header was ambiguous or missing; the file names itself here, before any content
+      omitting = true;
+      if (!announced) {
+        out.push(`[diff for ${meta} omitted]`);
+        announced = true;
+      }
       continue;
     }
     if (omitting) continue;
