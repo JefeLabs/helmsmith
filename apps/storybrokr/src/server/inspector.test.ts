@@ -83,18 +83,64 @@ function harness(
 }
 
 describe('inspector.check', () => {
-  it('runs every story in order on one context, installs the recorder, and closes the context', async () => {
+  it('runs stories across isolated worker contexts (1 per worker up to concurrency), installs the recorder, and closes every context', async () => {
     const h = harness({ 'panel--b': { kind: 'pass', played: true } });
     const res = await h.inspector.check(record, {});
-    expect(h.acquire).toHaveBeenCalledTimes(1);
-    expect(h.ctx.addInitScript).toHaveBeenCalledTimes(1);
-    expect(h.ctx.close).toHaveBeenCalledTimes(1);
+    expect(h.acquire).toHaveBeenCalledTimes(2);
+    expect(h.ctx.addInitScript).toHaveBeenCalledTimes(2);
+    expect(h.ctx.close).toHaveBeenCalledTimes(2);
     expect(res.instanceId).toBe('inst1');
     expect(res.results.map((r) => [r.storyId, r.status, r.played])).toEqual([
       ['panel--a', 'pass', false],
       ['panel--b', 'pass', true],
     ]);
     expect(res.summary).toEqual({ pass: 2, fail: 0, timeout: 0 });
+  });
+
+  it('concurrency: 1 acquires a single context and runs stories serially', async () => {
+    const h = harness({ 'panel--b': { kind: 'pass', played: true } });
+    const res = await h.inspector.check(record, { concurrency: 1 });
+    expect(h.acquire).toHaveBeenCalledTimes(1);
+    expect(h.ctx.close).toHaveBeenCalledTimes(1);
+    expect(res.results.map((r) => r.storyId)).toEqual(['panel--a', 'panel--b']);
+  });
+
+  it('runs up to concurrency workers in parallel without blocking faster stories and preserves story order in results', async () => {
+    const manyRecord: InstanceRecord = {
+      ...record,
+      stories: ['s1', 's2', 's3', 's4', 's5'].map((id) => ({
+        id: `panel--${id}`,
+        title: 'Panel',
+        name: id,
+        importPath: './x',
+        url: `http://127.0.0.1:6100/?path=/story/panel--${id}`,
+        iframeUrl: `http://127.0.0.1:6100/iframe.html?id=panel--${id}&viewMode=story`,
+      })),
+    };
+    const h = harness({});
+    const completionOrder: string[] = [];
+    h.settle.mockImplementation(async (_p: unknown, o: { iframeUrl: string }) => {
+      const id = new URL(o.iframeUrl).searchParams.get('id') ?? '';
+      const delay = id === 'panel--s1' ? 60 : 5;
+      await new Promise((r) => setTimeout(r, delay));
+      completionOrder.push(id);
+      return { kind: 'pass', played: id === 'panel--s1' };
+    });
+
+    const res = await h.inspector.check(manyRecord, { concurrency: 3 });
+    expect(h.acquire).toHaveBeenCalledTimes(3);
+    expect(h.ctx.close).toHaveBeenCalledTimes(3);
+    // panel--s1 started first on worker 0, but faster stories on workers 1 & 2 finish before s1
+    expect(completionOrder[0]).not.toBe('panel--s1');
+    // Results array still preserves the exact input story order
+    expect(res.results.map((r) => r.storyId)).toEqual([
+      'panel--s1',
+      'panel--s2',
+      'panel--s3',
+      'panel--s4',
+      'panel--s5',
+    ]);
+    expect(res.results[0].played).toBe(true);
   });
 
   it('reports fail and timeout as rows, with the error detail, and passes waitFor/timeout through', async () => {
@@ -141,7 +187,7 @@ describe('inspector.check', () => {
   it('closes the context even when settle throws', async () => {
     const h = harness({});
     h.settle.mockRejectedValueOnce(new Error('page crashed'));
-    await expect(h.inspector.check(record, {})).rejects.toThrow(/page crashed/);
+    await expect(h.inspector.check(record, { concurrency: 1 })).rejects.toThrow(/page crashed/);
     expect(h.ctx.close).toHaveBeenCalledTimes(1);
   });
 });

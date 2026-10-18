@@ -1,5 +1,5 @@
 // src/server/broker.test.ts
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -30,7 +30,7 @@ function fakeHost(): string {
   mkdirSync(join(root, 'src', 'Icon'));
   writeFileSync(join(root, 'src', 'Icon', 'Icon.tsx'), 'export const Icon = 1;\n');
   writeFileSync(join(root, 'src', 'Icon', 'Icon.stories.tsx'), '');
-  return root;
+  return realpathSync(root);
 }
 
 /** Fake storybook: reads PORT from argv via the spawner's args, serves index.json, prints the banner. */
@@ -103,7 +103,7 @@ describe('Broker', () => {
     return { broker, registry };
   }
 
-  it('up discovers stories, spawns, waits for readiness, and returns a ready record with story URLs', async () => {
+  it('up discovers root stories by default, spawns, waits for readiness, and returns a ready record with story URLs', async () => {
     const host = fakeHost();
     dirs.push(host);
     const { broker } = make();
@@ -111,10 +111,8 @@ describe('Broker', () => {
     expect(created).toBe(true);
     expect(record.status).toBe('ready');
     expect(record.port).toBe(6150);
-    expect(record.storyFiles).toEqual([
-      'src/Button/Button.stories.tsx',
-      'src/Icon/Icon.stories.tsx',
-    ]);
+    expect(record.storyFiles).toEqual(['src/Button/Button.stories.tsx']);
+    expect(record.includeChildren).toBe(false);
     expect(record.stories[0].iframeUrl).toBe(
       'http://127.0.0.1:6150/iframe.html?id=button--primary&viewMode=story',
     );
@@ -375,18 +373,38 @@ describe('Broker', () => {
     expect(r2.record.status).toBe('starting');
   });
 
-  it('a repeat up re-discovers: an unchanged tree returns the same pid, a changed one respawns', async () => {
+  it('a repeat up re-discovers: an unchanged tree returns the same pid, a changed one respawns, and includeChildren is inherited unless explicitly flipped', async () => {
     const host = fakeHost();
     dirs.push(host);
     const { broker } = make({ portRangeStart: 6180, portRangeEnd: 6181 });
 
     const first = await broker.up({ component: 'src/Button', hostRoot: host });
     expect(first.created).toBe(true);
-    expect(first.record.storyFiles).toEqual([
+    expect(first.record.storyFiles).toEqual(['src/Button/Button.stories.tsx']);
+    expect(first.record.includeChildren).toBe(false);
+    const firstPid = first.record.pid;
+
+    // Flip includeChildren: true -> should respawn with child stories included
+    const withChildren = await broker.up({
+      component: 'src/Button',
+      hostRoot: host,
+      includeChildren: true,
+    });
+    expect(withChildren.created).toBe(true);
+    expect(withChildren.record.id).toBe(first.record.id);
+    expect(withChildren.record.storyFiles).toEqual([
       'src/Button/Button.stories.tsx',
       'src/Icon/Icon.stories.tsx',
     ]);
-    const firstPid = first.record.pid;
+    expect(withChildren.record.includeChildren).toBe(true);
+    expect(withChildren.record.pid).not.toBe(firstPid);
+    const withChildrenPid = withChildren.record.pid;
+
+    // Repeat up without includeChildren inherits existing includeChildren: true (no respawn)
+    const inherited = await broker.up({ component: 'src/Button', hostRoot: host });
+    expect(inherited.created).toBe(false);
+    expect(inherited.record.pid).toBe(withChildrenPid);
+    expect(inherited.record.includeChildren).toBe(true);
 
     // Add a new sibling reachable from Button and re-up: should be picked up and respawn.
     mkdirSync(join(host, 'src', 'Extra'), { recursive: true });
@@ -405,7 +423,7 @@ describe('Broker', () => {
       'src/Extra/Extra.stories.tsx',
       'src/Icon/Icon.stories.tsx',
     ]);
-    expect(second.record.pid).not.toBe(firstPid);
+    expect(second.record.pid).not.toBe(withChildrenPid);
     expect(broker.list()).toHaveLength(1);
     const secondPid = second.record.pid;
 
@@ -414,6 +432,38 @@ describe('Broker', () => {
     expect(third.created).toBe(false);
     expect(third.record.pid).toBe(secondPid);
     expect(broker.list()).toHaveLength(1);
+  });
+
+  it('downByHost stops only instances in the specified host and list({ host }) filters by host', async () => {
+    const hostA = fakeHost();
+    const hostB = fakeHost();
+    dirs.push(hostA, hostB);
+    const { broker } = make({ portRangeStart: 6190, portRangeEnd: 6195 });
+
+    const a = await broker.up({ component: 'src/Button', hostRoot: hostA });
+    const b = await broker.up({ component: 'src/Button', hostRoot: hostB });
+    expect(broker.list()).toHaveLength(2);
+    expect(broker.list({ host: hostA }).map((r) => r.id)).toEqual([a.record.id]);
+    expect(broker.list({ host: hostB }).map((r) => r.id)).toEqual([b.record.id]);
+
+    const stopped = await broker.downByHost(hostA);
+    expect(stopped.map((r) => r.id)).toEqual([a.record.id]);
+    expect(broker.list().map((r) => r.id)).toEqual([b.record.id]);
+  });
+
+  it('reapIdle stops an active instance whose hostRoot directory was removed even before TTL expires', async () => {
+    const hostA = fakeHost();
+    const hostB = fakeHost();
+    dirs.push(hostA, hostB);
+    const { broker } = make({ ttlMinutes: 60, portRangeStart: 6196, portRangeEnd: 6199 });
+
+    const a = await broker.up({ component: 'src/Button', hostRoot: hostA });
+    const b = await broker.up({ component: 'src/Button', hostRoot: hostB });
+
+    rmSync(hostA, { recursive: true, force: true });
+    const reaped = await broker.reapIdle();
+    expect(reaped.map((r) => r.id)).toEqual([a.record.id]);
+    expect(broker.list().map((r) => r.id)).toEqual([b.record.id]);
   });
 
   it('reconcile adopts more live instances than the configured cap instead of rejecting', async () => {

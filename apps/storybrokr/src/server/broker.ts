@@ -1,7 +1,8 @@
+import { existsSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { discoverStories } from '../lib/discover.js';
 import { StorybrokrError, toErrorBody } from '../lib/errors.js';
-import { inspectHost as defaultInspect, resolveHost } from '../lib/host.js';
+import { inspectHost as defaultInspect, realpathOrResolve, resolveHost } from '../lib/host.js';
 import {
   configDirFor,
   generateConfigDir,
@@ -14,7 +15,7 @@ import type { LogBuffer } from '../lib/logbuffer.js';
 import { findFreePort } from '../lib/ports.js';
 import { fetchStories, waitForReady } from '../lib/readiness.js';
 import { type SpawnedProcess, type Spawner, terminate } from '../lib/spawn.js';
-import type { DaemonConfig, HostInfo, InstanceRecord, UpRequest } from '../types.js';
+import type { DaemonConfig, HostInfo, InstanceRecord, ResolveScope, UpRequest } from '../types.js';
 import type { Registry } from './registry.js';
 
 export interface BrokerOptions {
@@ -37,7 +38,7 @@ function isAlive(pid: number | null): boolean {
 
 /** Resolve `component` (relative, `./`-prefixed, or absolute) to a path relative to hostRoot. */
 function normalizeComponent(hostRoot: string, component: string): string {
-  const abs = isAbsolute(component) ? component : resolve(hostRoot, component);
+  const abs = isAbsolute(component) ? realpathOrResolve(component) : resolve(hostRoot, component);
   const rel = relative(hostRoot, abs).split('\\').join('/');
   if (rel === '' || rel === '.') {
     throw new StorybrokrError(
@@ -71,30 +72,33 @@ export class Broker {
     this.inspect = opts.inspect ?? defaultInspect;
   }
 
-  list(): InstanceRecord[] {
-    return this.registry.list();
+  list(opts?: { host?: string }): InstanceRecord[] {
+    const all = this.registry.list();
+    if (!opts?.host) return all;
+    const target = realpathOrResolve(opts.host);
+    return all.filter((r) => realpathOrResolve(r.hostRoot) === target);
   }
 
-  get(idOrPath: string, hostRoot?: string): InstanceRecord {
-    const r = this.registry.resolve(idOrPath, hostRoot);
+  get(idOrPath: string, scope?: ResolveScope | string): InstanceRecord {
+    const r = this.registry.resolve(idOrPath, scope);
     this.registry.touch(r.id);
     return this.registry.get(r.id) as InstanceRecord;
   }
 
-  touch(id: string): InstanceRecord {
-    const r = this.registry.resolve(id);
+  touch(idOrPath: string, scope?: ResolveScope | string): InstanceRecord {
+    const r = this.registry.resolve(idOrPath, scope);
     this.registry.touch(r.id);
     return this.registry.get(r.id) as InstanceRecord;
   }
 
-  logs(idOrPath: string, tail = 200): string[] {
-    const r = this.registry.resolve(idOrPath);
+  logs(idOrPath: string, tail = 200, scope?: ResolveScope | string): string[] {
+    const r = this.registry.resolve(idOrPath, scope);
     this.registry.touch(r.id);
     return this.procs.get(r.id)?.log.tail(tail) ?? [];
   }
 
-  logStream(idOrPath: string): LogBuffer | undefined {
-    const r = this.registry.resolve(idOrPath);
+  logStream(idOrPath: string, scope?: ResolveScope | string): LogBuffer | undefined {
+    const r = this.registry.resolve(idOrPath, scope);
     this.registry.touch(r.id);
     return this.procs.get(r.id)?.log;
   }
@@ -104,9 +108,12 @@ export class Broker {
   }
 
   async up(req: UpRequest): Promise<{ record: InstanceRecord; created: boolean }> {
-    const host = req.hostRoot ? this.inspect(resolve(req.hostRoot)) : resolveHost(req.component);
+    const host = req.hostRoot
+      ? this.inspect(realpathOrResolve(req.hostRoot))
+      : resolveHost(req.component);
     const component = normalizeComponent(host.hostRoot, req.component);
     const id = instanceId(host.hostRoot, component);
+    let effectiveIncludeChildren = req.includeChildren;
 
     const existing = this.registry.find(host.hostRoot, component);
     if (existing?.status === 'starting') {
@@ -116,11 +123,13 @@ export class Broker {
     }
     if (existing?.status === 'ready') {
       // A repeat `up` re-discovers so a newly added sibling story file is picked up (spec §7.4).
-      // Unchanged story files: touch and return the existing instance untouched. Changed: stop
-      // it (full ladder, config dir + record removed) and fall through to a fresh creation —
-      // same id (deterministic from hostRoot+component), a new port allocation.
-      const discovery = discoverStories(host.hostRoot, component, host.tsconfigPaths);
+      // When req.includeChildren is omitted, inherit the existing record's includeChildren setting.
+      effectiveIncludeChildren = req.includeChildren ?? existing.includeChildren ?? false;
+      const discovery = discoverStories(host.hostRoot, component, host.tsconfigPaths, {
+        includeChildren: effectiveIncludeChildren,
+      });
       const unchanged =
+        Boolean(existing.includeChildren) === discovery.includedChildren &&
         discovery.storyFiles.length === existing.storyFiles.length &&
         discovery.storyFiles.every((f, i) => f === existing.storyFiles[i]);
       if (unchanged) {
@@ -139,7 +148,10 @@ export class Broker {
       return { record: this.registry.get(id) as InstanceRecord, created: false };
     }
 
-    const creation = this.createInstance(host, component, id, req).finally(() => {
+    const creation = this.createInstance(host, component, id, {
+      ...req,
+      includeChildren: effectiveIncludeChildren,
+    }).finally(() => {
       this.inflight.delete(id);
     });
     this.inflight.set(id, creation);
@@ -165,7 +177,9 @@ export class Broker {
     if (activeCount >= this.config.instanceCap) await this.reapIdle();
     this.registry.assertCapacity();
 
-    const discovery = discoverStories(host.hostRoot, component, host.tsconfigPaths);
+    const discovery = discoverStories(host.hostRoot, component, host.tsconfigPaths, {
+      includeChildren: req.includeChildren,
+    });
     const port = await findFreePort(
       this.config.portRangeStart,
       this.config.portRangeEnd,
@@ -188,6 +202,7 @@ export class Broker {
       storyFiles: discovery.storyFiles,
       stories: [],
       configDir,
+      includeChildren: discovery.includedChildren,
     };
     this.registry.add(record);
     writeSidecar(configDir, record);
@@ -247,9 +262,18 @@ export class Broker {
     if (p) await p;
   }
 
-  async down(idOrPath: string): Promise<void> {
-    const r = this.registry.resolve(idOrPath);
+  async down(idOrPath: string, scope?: ResolveScope | string): Promise<void> {
+    const r = this.registry.resolve(idOrPath, scope);
     await this.stop(r);
+  }
+
+  async downByHost(host: string): Promise<InstanceRecord[]> {
+    const target = realpathOrResolve(host);
+    const matching = this.registry
+      .list()
+      .filter((r) => realpathOrResolve(r.hostRoot) === target);
+    for (const r of matching) await this.stop(r);
+    return matching;
   }
 
   async downAll(): Promise<void> {
@@ -276,11 +300,20 @@ export class Broker {
     if (this.registry.get(r.id)) this.registry.remove(r.id);
   }
 
-  /** Stop ready instances idle past their TTL; returns what was stopped. */
+  /** Stop ready instances idle past their TTL and active instances whose hostRoot disappeared. */
   async reapIdle(): Promise<InstanceRecord[]> {
     const idle = this.registry.idleInstances();
-    for (const r of idle) await this.stop(r);
-    return idle;
+    const orphaned = this.registry
+      .list()
+      .filter(
+        (r) =>
+          (r.status === 'starting' || r.status === 'ready') &&
+          !existsSync(r.hostRoot) &&
+          !idle.some((i) => i.id === r.id),
+      );
+    const toStop = [...idle, ...orphaned];
+    for (const r of toStop) await this.stop(r);
+    return toStop;
   }
 
   /** On daemon start: adopt instances that are alive and answering, drop the rest. */

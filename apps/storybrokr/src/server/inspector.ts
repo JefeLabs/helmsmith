@@ -38,6 +38,7 @@ export interface InspectorDeps {
   settle?: typeof settleStory;
   writeFile?: (path: string, data: Buffer) => Promise<void>;
   now?: () => number;
+  defaultConcurrency?: number;
 }
 
 export interface Inspector {
@@ -84,57 +85,76 @@ export function createInspector(deps: InspectorDeps): Inspector {
   const settle = deps.settle ?? settleStory;
   const writeFile = deps.writeFile ?? defaultWriteFile;
   const now = deps.now ?? Date.now;
+  const defaultConcurrency = deps.defaultConcurrency ?? 4;
 
   return {
     async check(record, req) {
       assertReady(record);
       const stories = findStories(record, req.storyIds);
       const timeoutMs = req.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-      const results: CheckResult[] = [];
-      const ctx = await deps.pool.acquire();
-      try {
-        await ctx.addInitScript(RECORDER_SCRIPT);
-        const page = await ctx.newPage();
-        for (const story of stories) {
-          const t0 = now();
-          const outcome = await settle(page, {
-            iframeUrl: story.iframeUrl,
-            waitFor: req.waitFor,
-            timeoutMs,
-          });
-          const durationMs = now() - t0;
-          if (outcome.kind === 'pass') {
-            results.push({ storyId: story.id, status: 'pass', played: outcome.played, durationMs });
-          } else if (outcome.kind === 'fail') {
-            results.push({
-              storyId: story.id,
-              status: 'fail',
-              played: false,
-              durationMs,
-              error:
-                outcome.stack === undefined
-                  ? { message: outcome.reason, event: outcome.event }
-                  : { message: outcome.reason, event: outcome.event, stack: outcome.stack },
-            });
-          } else {
-            // 'timeout' carries an optional lastPhase; settleStory's contract never resolves
-            // 'pending' (its loop only returns on a terminal state or a timeout), but the type
-            // allows it, so treat it the same as an unqualified timeout.
-            const lastPhase = outcome.kind === 'timeout' ? outcome.lastPhase : undefined;
-            results.push({
-              storyId: story.id,
-              status: 'timeout',
-              played: false,
-              durationMs,
-              error: {
-                message: `did not settle within ${timeoutMs}ms (last phase: ${lastPhase ?? 'none'})`,
-                event: 'timeout',
-              },
-            });
+      const results = new Array<CheckResult>(stories.length);
+      if (stories.length > 0) {
+        const workerCount = Math.max(
+          1,
+          Math.min(stories.length, req.concurrency ?? defaultConcurrency),
+        );
+        let nextIdx = 0;
+        const workers = Array.from({ length: workerCount }, async () => {
+          const ctx = await deps.pool.acquire();
+          try {
+            await ctx.addInitScript(RECORDER_SCRIPT);
+            const page = await ctx.newPage();
+            for (;;) {
+              const i = nextIdx++;
+              if (i >= stories.length) break;
+              const story = stories[i];
+              const t0 = now();
+              const outcome = await settle(page, {
+                iframeUrl: story.iframeUrl,
+                waitFor: req.waitFor,
+                timeoutMs,
+              });
+              const durationMs = now() - t0;
+              if (outcome.kind === 'pass') {
+                results[i] = {
+                  storyId: story.id,
+                  status: 'pass',
+                  played: outcome.played,
+                  durationMs,
+                };
+              } else if (outcome.kind === 'fail') {
+                results[i] = {
+                  storyId: story.id,
+                  status: 'fail',
+                  played: false,
+                  durationMs,
+                  error:
+                    outcome.stack === undefined
+                      ? { message: outcome.reason, event: outcome.event }
+                      : { message: outcome.reason, event: outcome.event, stack: outcome.stack },
+                };
+              } else {
+                // 'timeout' carries an optional lastPhase; settleStory's contract never resolves
+                // 'pending' (its loop only returns on a terminal state or a timeout), but the type
+                // allows it, so treat it the same as an unqualified timeout.
+                const lastPhase = outcome.kind === 'timeout' ? outcome.lastPhase : undefined;
+                results[i] = {
+                  storyId: story.id,
+                  status: 'timeout',
+                  played: false,
+                  durationMs,
+                  error: {
+                    message: `did not settle within ${timeoutMs}ms (last phase: ${lastPhase ?? 'none'})`,
+                    event: 'timeout',
+                  },
+                };
+              }
+            }
+          } finally {
+            await ctx.close();
           }
-        }
-      } finally {
-        await ctx.close();
+        });
+        await Promise.all(workers);
       }
       const summary = { pass: 0, fail: 0, timeout: 0 };
       for (const r of results) summary[r.status]++;

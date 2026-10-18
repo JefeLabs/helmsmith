@@ -98,6 +98,7 @@ export function createDaemon(opts: DaemonOptions): Daemon {
     opts.inspector ??
     createInspector({
       pool,
+      defaultConcurrency: opts.config.checkConcurrency,
     });
 
   const stop = async (): Promise<void> => {
