@@ -147,7 +147,7 @@ Each fix landed with a test that failed first; pritty's suite went from 118 to 1
 | P11 | f4f4997, b060127 | `redactDiff` omits diffs of files that are secrets by name, drops private-key blocks and masks secret-looking assignments, bearer tokens and known token prefixes on added, removed and context lines, before truncation; quoted, renamed and combined diff headers are honoured. Every model call is bounded by `aiTimeoutMs` (default 60 s). |
 | P12 | 83b1ea8 | Default categories list `test`, `storybook`, `infra`, `config` before `app`. |
 
-All twelve findings of §5.1 are fixed on `main`, unpublished. What remains before `work pr` (§6): the §18.2 items that are features rather than defects (`--draft`, `--title`/`--body-file` no-AI path, `--no-push`, `commitTrailers`/`prFooter`, the `/core` subpath export), adding `@helmsmith/pritty` to `PUBLISH_PKGS`, and the live proof against a throwaway repository. `pritty rebase` stays as is: the owner's rule is that rebase is a last resort and a merge commit is preferred.
+All twelve findings of §5.1 are fixed on `main`, and the §18.2 prerequisites followed the same day (`--draft`, given title/body with in-place update of an existing PR, `--no-push`, `commitTrailers`/`prFooter`, the `/core` export, version 0.1.0 on the publish allowlist; status paragraph at the top of §18.2 in the workbrokr spec). Unpublished until the owner runs the browser step. What remains before `work pr`: the live proof against a throwaway repository, then §18.3 in workbrokr. `pritty rebase` stays as is: the owner's rule is that rebase is a last resort and a merge commit is preferred.
 
 ### 5.2 Tests
 
