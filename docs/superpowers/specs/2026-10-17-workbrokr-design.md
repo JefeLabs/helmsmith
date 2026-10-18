@@ -255,6 +255,10 @@ The only destructive verb. Refuses while an effort is open or the branch has unp
 
 The weekly list of what would otherwise be forgotten: areas with uncommitted or unpushed work and their age; worktrees whose branch is not a `<type>/<area>` branch (detached, `tmp/`, by-hand checkouts); leases past half their expiry; areas behind the base branch by more than N commits; branches whose last diff left their scope; pending impact notices older than a week; archive size against retention. Optionally parks (as in `finish --park`) anything dirty older than a threshold.
 
+### 8.7 `work pr [--area <area>] [--task <slug>] [--draft] [--title <t>] [--body-file <f>] [--json]`
+
+Opens (or reports) the pull request for the effort's branch against the manifest's base branch, through pritty (§18). Pushes first if the branch is not on origin, refuses a dirty worktree, and records `{ number, url, draft }` on the effort so `status` shows it. Running it twice returns the open PR instead of creating a second one. Added by amendment A, 2026-10-18.
+
 ## 9. Registry
 
 ### 9.1 Location and shape
@@ -279,6 +283,7 @@ The weekly list of what would otherwise be forgotten: areas with uncommitted or 
       "owner": { "session": "…" }, "state": "active|parked|finished",
       "scopes": ["app-ui/app/discover-schools/applications/**", "…"],
       "leases": ["lease_…"], "notices": [ { "from": "#5440", "text": "core Button changed", "at": "…" } ],
+      "pr": { "number": 5464, "url": "https://github.com/…/pull/5464", "draft": false },
       "started": "…", "lastActivity": "…" }
   ]
 }
@@ -309,7 +314,7 @@ The weekly list of what would otherwise be forgotten: areas with uncommitted or 
 ## 12. Agent surface
 
 - **CLI** `work <verb>`, every verb with `--json`; exit codes: 0 ok, 2 refused (with the reason as the first line), 1 error.
-- **MCP** `work mcp` (stdio), tools `work_start`, `work_status`, `work_finish`, `work_reap`, `work_audit`, `work_env`; refusal payloads carry the owner and the overlap so an agent can act without parsing prose.
+- **MCP** `work mcp` (stdio), tools `work_start`, `work_status`, `work_finish`, `work_reap`, `work_audit`, `work_env`, `work_pr` (amendment A); refusal payloads carry the owner and the overlap so an agent can act without parsing prose.
 - **Claude skill `/work`** wraps the CLI and carries the rules an agent must apply before calling it (declare area and type, pick the mode, read refusals, never bypass with raw git in a protected checkout).
 - Output is stable and greppable: one line per lease in `status`, one line per finding in `audit`.
 
@@ -326,7 +331,7 @@ The weekly list of what would otherwise be forgotten: areas with uncommitted or 
 - **Phase 1 — core + workbrokr, make-backed fullstack.** Registry, leases, port blocks, worktree/branch ops, sync + refresh, scopes and commons locks, hooks, all verbs, CLI + MCP + skill, skoolscout-com adoption. This phase already removes every failure class from §1.
 - **Phase 2 — stackbrokr.** Daemon running the manifest's services on core leases, health watching, log tailing, the same `up/down/ls` shape as storybrokr. `work` switches runner; nothing else changes.
 - **Phase 3 — storybrokr on core.** Instance registry moves onto core leases; one reaper and one `status` for everything; CLI/MCP unchanged.
-- **Later, optional.** Impact notices from a real dependency graph service; `audit` posted to a channel; a `work pr` helper that opens the effort's PR with the area's scope summary.
+- **Later, optional.** Impact notices from a real dependency graph service; `audit` posted to a channel. (`work pr` moved out of this bucket: amendment A, §18.)
 
 ## 15. Testing
 
@@ -351,10 +356,83 @@ The weekly list of what would otherwise be forgotten: areas with uncommitted or 
 12. (phase 1 execution) Impact notices are commons-based ("commons X changed on branch Y"); the import-graph version stays in "later, optional".
 13. (phase 1 execution) The emitted `.slot`, env file, log dir and the worktree root are excluded from git through the clone's `info/exclude`, not `.gitignore`, so `finish --park` never commits them.
 14. **No separate workkit package (owner, 2026-10-18).** storybrokr stays independent (phase 3 as written is dropped; `work audit` should instead warn when storybrokr's port range overlaps a claimed project range), so workbrokr is workkit's only consumer. The core is folded into `apps/workbrokr/src/core`; one package, one publish. A second consumer would be the trigger to extract it again.
+15. **PRs are opened by `work pr`, not by `work start`, and through pritty (amendment A, 2026-10-18).** A draft at start would give every effort a PR before it has a commit; a verb the agent calls when the branch is ready keeps the PR list honest. workbrokr does not grow its own GitHub client: `@helmsmith/pritty` already owns push, create, template, labels and reviewers, and gains the non-interactive, non-AI path workbrokr needs.
 
 ## 17. Open questions
 
 - Idle-expiry defaults (12 h slot, 4 h commons, 2 h Storybook) are proposals; confirm against how long an e2e run or a review wait really takes here.
 - Session identity for `owner`: the Claude session name is available inside Claude Code; for a human shell the fallback is `user@host:pid`. Good enough, or should `work` mint a per-shell token?
 - Archive retention default (30 days or last 5 per area) against the 18 GB found today.
-- Whether `work start` should open the effort's PR as a draft immediately (gives the branch a visible home from minute one) or leave that to `work pr` later.
+
+## 18. Amendment A (2026-10-18): `work pr` through pritty
+
+**Status:** proposed; resolves the fourth §17 question (decision 15).
+**Packages:** `apps/pritty` (`@helmsmith/pritty`, 0.0.1 unpublished → 0.1.0 published) and `apps/workbrokr` (0.2.0, alongside Spec 2).
+
+### 18.1 Why pritty
+
+`work finish` pushes the branch and stops; nothing in workbrokr opens the pull request, so every effort ends with the agent hand-rolling `gh pr create` and the body conventions drift. `apps/pritty` already has the pieces, exported as a programmatic API and as a CLI: push with upstream, `createPR`, `listOpenPRsForHead` (the duplicate check), `findPullRequestTemplate`, `CODEOWNERS` reviewers, labels, and an AI title/body when nothing better is available. The value for an agent-driven flow is the deterministic part; inside Claude Code the agent knows what it changed and writes a better body than a second model would. So `work pr` uses pritty for the mechanics and lets the caller supply the words.
+
+What pritty is today, from the code rather than its README (whose status table is stale: `commit`, `pr` and `rebase` are implemented): version 0.0.1, never published, not in the Makefile allowlist, interactive by design (inquirer prompts), one global GitHub token, no `--json`, no way to pass a title or body, no commit trailer or PR footer configuration, and a dependency list that includes OpenTUI, React, LangChain and `bun` for its `connect` TUI.
+
+### 18.2 Changes to pritty (prerequisites, pritty 0.1.0)
+
+1. **Non-interactive, machine-readable `pr` & idempotent existing-PR reuse.** `pritty pr --json` prints `{ number, url, draft, created: boolean, head, base }` and nothing else on stdout; prompts are skipped under `--auto-approve` as today. A `--draft` flag creates a draft PR (adding `draft?: boolean` to `createPR`, `OpenPRSummary`, and `PRResult`). When `listOpenPRsForHead` finds an existing open PR for `(head, base)`, `pritty pr` under `--json` / `--auto-approve` short-circuits *before* AI generation and `createPR`, returning the existing PR with `created: false` (and if `--title` or `--body`/`--body-file` was explicitly passed, calls `pulls.update` to update the existing PR's title/body in place).
+2. **A non-AI path that bypasses ticket validation.** `pritty pr --title <t> --body-file <f>` (or `--body <text>`) uses the given text verbatim, skips `resolveTicketContext` entirely (so `buildAdapter` is never constructed, `ticket.validate: true` never blocks branch names like `feature/discover-schools/applications` that lack a Jira key, and stale commit-ticket `confirm()` prompts never fire), and never calls an LLM. On the AI path, `resolveTicketContext` also guards its interactive `confirm()` prompt behind `!autoApprove && !json`. The PR template, labels and reviewers still apply.
+3. **Strict base & remote-tracking diff base (`origin/<base>...HEAD`).** An explicit `--base` is final (true today) and is **required** under `--json`, so a non-interactive caller can never inherit GitHub's default branch. In `git.ts`, `getCommitsSinceBase` and `getDiffStatSinceBase` resolve the comparison ref as `origin/${base}` when `refs/remotes/origin/${base}` exists (falling back to local `${base}`), and diff against the merge-base (`origin/${base}...HEAD`) rather than the local `base` branch pointer—which in a `workbrokr` worktree sits stale in the main checkout while worktrees fetch and merge `origin/<base>`.
+4. **`--no-push` flag.** `pritty pr --no-push` skips `pushBranch` when the caller (`work pr`) has already pushed `effort.branch` with upstream tracking, avoiding a duplicate `git push` and a duplicate `.helmsmith/hooks/pre-push` invocation.
+5. **Repo-root config, template, and CODEOWNERS lookup.** `loadConfig()`, `findPullRequestTemplate()`, and `findCodeowners()` resolve paths relative to `git rev-parse --show-toplevel` (falling back to `process.cwd()`), so running `pritty` from a package subdirectory inside a worktree (`app-ui/`) still loads the repository's `.pritty.json`, PR template, and `CODEOWNERS`.
+6. **Per-repository GitHub identity.** Token resolution becomes: `GH_TOKEN` / `GITHUB_TOKEN` in the environment; else `.pritty.json` `github.account` → `gh auth token --user <login>`; else `gh auth token`; else the Copilot device-flow token. Today the Copilot token comes first and is global, which opens helmsmith PRs as the skoolscout account or the reverse. Whether the Copilot client's OAuth token can create PRs on organisation repositories is unverified and stops mattering once `gh` is preferred.
+7. **Attribution.** `.pritty.json` gains `commitTrailers: string[]` (appended to every commit `pritty commit` makes) and `prFooter: string` (appended to every body, AI or given, idempotently so updating an existing PR body does not duplicate the footer). skoolscout sets `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>` and the "Generated with Claude Code" line there.
+8. **`skipHooks` is refused inside a workbrokr worktree** (a `.helmsmith/hooks` `core.hooksPath` or a `WORKTREE` variable in the environment): the hooks are the scope and protected-branch guards, and pritty must not be the way around them.
+9. **Packaging.** `@helmsmith/pritty/core` subpath export with git, GitHub, template, CODEOWNERS and config only (no AI adapters, no TUI), so a future in-process consumer does not inherit the TUI stack. workbrokr still spawns the CLI in this amendment (§18.3) and only needs the published binary. Add `@helmsmith/pritty` to `PUBLISH_PKGS`, fix the README status table, publish 0.1.0.
+
+### 18.3 Changes to workbrokr (0.2.0)
+
+**`prEffort(ctx, o)` in `src/lib/effort.ts`**, behind `work pr` and `work_pr`:
+
+1. Resolve the effort as `effortEnv` does (`--area`/`--task`, else the cwd worktree). No open or parked effort → `EFFORT_NOT_FOUND`.
+2. `g.isDirty()` → `DIRTY_WORKTREE` (same message as `finish`: commit, or `work finish --park`). A parked effort is allowed: its wip commit is on the branch.
+3. `g.unpushedCount(m.baseBranch) > 0` or no upstream → `g.push(effort.branch)` first. workbrokr owns the push so the pre-push hook runs once under workbrokr's identity and the branch is on origin even if pritty fails afterwards. If `g.behindCount(m.baseBranch) > BEHIND_LIMIT` (20), log a non-blocking warning (`branch is <N> commits behind <baseBranch>`) and include `behindBase: N` in `--json` output, without refusing.
+4. `effort.pr` already set → verify it is still open through `pritty pr --no-push --json` (which returns the existing open PR for `(head, base)` instead of creating another, and updates its title/body if `--title` or `--body-file` was passed); return it. Not open any more (merged or closed) → fall through and create a new one only with `--force`; otherwise refuse with `PR_CLOSED` naming the old number. Note: `pr` is stored per `Effort` record (not per area), so after `work finish` closes an effort and its PR merges, the next `work start` on that reused `<type>/<area>` branch creates a fresh `Effort` with `pr: undefined`.
+5. Spawn `pritty pr --base <m.baseBranch> --no-push --auto-approve --json [--draft] [--title <t>] [--body-file <f>]` with `cwd = effort.worktree`. No `--title` → pritty's AI path; the skill tells agents to always pass a title and a body file.
+6. Parse the JSON, `updateEffort(effort.id, { pr: { number, url, draft } })`, touch the effort, return `{ effort, pr, created, behindBase }`.
+
+**Errors.** New `WorkkitError` codes `PRITTY_FAILED` (exit 1: pritty missing, below 0.1.0, or non-zero exit; the message carries pritty's stderr) and `PR_CLOSED` (exit 2, refusal). A pritty version gate mirrors the storybrokr one in Spec 2: `pritty --version` once per call, refuse below 0.1.0.
+
+**Surface.** `work pr [area] [--task <slug>] [--draft] [--title <t>] [--body-file <f>] [--force] [--json]`; MCP `work_pr { rootDir?, area?, task?, draft?, title?, bodyFile?, force? }`. `work status` prints the PR as `PR #5464 open` in the effort's line and in `--json`, and includes each effort's `scopes` and `commons` leases in `--json` so the `/work` skill can include a scope summary in the PR body when desired. `Effort.pr?: { number: number; url: string; draft: boolean }` in `core/types.ts`.
+
+**`finish` is unchanged.** It still pushes and never opens a PR; `--pr` on finish was considered and dropped so that finishing (release the slot, leave the branch) and publishing (ask for review) stay separate verbs an agent can call in either order. `retireArea` keeps refusing while the branch has commits not on origin; an open PR is not a reason to refuse retirement, because the branch stays on origin.
+
+**Skill.** `/work` and the skoolscout skills gain one step: after the final commit, `work pr --title "<conventional title>" --body-file <scratch>/pr-body.md`, body written by the agent in the repo's PR conventions; the footer comes from pritty's config, not from the agent.
+
+### 18.4 Identity and conventions in the two repositories
+
+| | skoolscout-com | helmsmith |
+|---|---|---|
+| GitHub default branch | `develop` | `main` |
+| Manifest `baseBranch` | `develop` | (no manifest yet) |
+| Account | `edwin-skoolscout` | `ecruz165` |
+| PR template / CODEOWNERS | none today | none today |
+| Required attribution | commit trailer + PR footer | PR footer |
+
+With `.pritty.json` `github.account` per repository and `--base` always passed by workbrokr, neither repo depends on pritty's default-branch guess or on a global token. The template and CODEOWNERS features are latent until either repo adds those files.
+
+### 18.5 Testing
+
+- pritty unit: `--json` output shape; existing open PR short-circuits with `created: false` and calls `pulls.update` when `--title`/`--body-file` is passed; `--title/--body-file` skips `resolveTicketContext` and never constructs an adapter (spy on `buildAdapter`); `--json` without `--base` is a usage error; `origin/<base>...HEAD` merge-base diffing when local `<base>` is stale; `--no-push` skips `pushBranch`; repo-root `.pritty.json` lookup from a subdirectory; token resolution order with a fake `gh`; `prFooter` appended idempotently; `commitTrailers` present on every commit; `skipHooks` refused when `WORKTREE` is set.
+- workbrokr unit (`effort.test.ts`, fake pritty): dirty worktree refused; unpushed branch pushed before `pritty pr --no-push` runs; `behindBase > BEHIND_LIMIT` warns without refusing; second call returns the stored PR (or updates title/body); closed PR refused without `--force`; `pr` persisted on the effort and shown by `statusFor`; version gate.
+- e2e (pritty, with the existing fixture repo and a throwaway GitHub repo under the `ecruz165` account, skipped without a token): create, re-run returns the same number, draft flag honoured.
+- Live proof: in skoolscout-com, an area effort with one commit, `work pr --title … --body-file …` opens the PR against `develop` as `edwin-skoolscout` with the footer; `work status` shows it; `work pr` again returns the same number.
+
+### 18.6 Decisions
+
+1. `work pr` is a verb, not a side effect of `start` or `finish` (decision 15).
+2. workbrokr spawns the pritty CLI; it does not import `@helmsmith/pritty` until the `/core` export exists and the TUI dependencies are out of the path.
+3. The agent writes the title and body; pritty's AI path is the fallback, never the default inside Claude Code.
+4. workbrokr pushes before calling `pritty pr --no-push`, so hooks and identity are workbrokr's, and pritty does not push a second time.
+5. One PR per effort record; a second one on the same effort needs `--force` after the first was closed or merged, while a new effort started after `work finish` gets a fresh `pr: undefined`.
+6. `work pr` warns (and reports `behindBase` in `--json`) when the branch is more than `BEHIND_LIMIT` (20) commits behind `origin/<baseBranch>`, rather than refusing—publishing a draft PR or checkpoint PR for review should not force a merge mid-flight.
+7. `workbrokr` does not mutate the caller's PR body to inject a scope summary; `work status --json` exposes the effort's `scopes` and `commons` so the `/work` skill can include a collapsible scope block when appropriate.
+8. `work finish --park` keeps its deterministic, offline `wip(<area>): parked <iso>` commit rather than invoking `pritty commit`.
+
