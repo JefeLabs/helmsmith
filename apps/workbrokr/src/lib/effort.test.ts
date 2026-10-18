@@ -801,3 +801,52 @@ describe('W3: pushes and origin-only branches', () => {
     expect(done.pushed).toBe(true);
   });
 });
+
+describe('W2: a start that died before its first lease', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('is parked by reap once the grace period has passed, and left alone inside it', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const ctx = ctxFor(f);
+    const r = await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'fullstack' });
+    for (const l of ctx.registry.leases({ effort: r.effort.id })) ctx.registry.release(l.id);
+    // the shape a SIGKILL during fetch/worktree add/refresh leaves behind
+    ctx.registry.updateEffort(r.effort.id, { state: 'starting' });
+    expect((await reapLeases(ctx)).reaped).toEqual([]);
+    expect(ctx.registry.openEffortFor('demo', 'shop/cart')?.state).toBe('starting');
+
+    const old = new Date(Date.now() - 31 * 60_000).toISOString();
+    ctx.registry.updateEffort(r.effort.id, { started: old, lastActivity: old });
+    await reapLeases(ctx);
+    expect(ctx.registry.openEffortFor('demo', 'shop/cart')).toBeUndefined();
+    const parked = ctx.registry.efforts({ project: 'demo', area: 'shop/cart', state: 'parked' });
+    expect(parked).toHaveLength(1);
+    expect(parked[0]?.parkedReason).toMatch(/start/i);
+    // the area is free again
+    const again = await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'fullstack' });
+    expect(again.effort.state).toBe('active');
+  });
+});
+
+describe('W5: a slot whose port is held on a wildcard address is not free', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  for (const addr of ['0.0.0.0', '::']) {
+    it(`skips a slot whose port is listened on ${addr}`, async () => {
+      const f = makeRepo();
+      cleanup = f.cleanup;
+      const ctx = ctxFor(f);
+      const busy = createServer().listen(43101, addr);
+      await new Promise((res) => busy.once('listening', res));
+      try {
+        const r = await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'fullstack' });
+        expect(r.leases[0]?.value).toBe(2);
+      } finally {
+        busy.close();
+      }
+    });
+  }
+});

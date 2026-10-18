@@ -150,12 +150,24 @@ export function touchEffort(ctx: Ctx, effort: Effort): void {
 
 // ── ports ────────────────────────────────────────────────────────────────────
 
-function portBusy(port: number): Promise<boolean> {
+/** True when binding `port` on `host` fails with EADDRINUSE; other failures (no IPv6, etc.) read as free. */
+function bindFails(port: number, host: string): Promise<boolean> {
   return new Promise((resolve) => {
     const srv = createServer();
-    srv.once('error', () => resolve(true));
-    srv.listen(port, '127.0.0.1', () => srv.close(() => resolve(false)));
+    srv.once('error', (err: NodeJS.ErrnoException) => resolve(err.code === 'EADDRINUSE'));
+    srv.listen(port, host, () => srv.close(() => resolve(false)));
   });
+}
+
+/**
+ * A port is busy when any of the loopback, IPv4 wildcard or IPv6 wildcard binds
+ * fails: on macOS a 127.0.0.1 bind succeeds while 0.0.0.0 or :: is held (Docker
+ * publishes on 0.0.0.0, Storybook and Next listen on ::), which handed a running
+ * stack's slot out a second time.
+ */
+async function portBusy(port: number): Promise<boolean> {
+  for (const host of ['127.0.0.1', '0.0.0.0', '::']) if (await bindFails(port, host)) return true;
+  return false;
 }
 
 async function busyPorts(ports: Record<string, number>): Promise<string[]> {
@@ -165,9 +177,9 @@ async function busyPorts(ports: Record<string, number>): Promise<string[]> {
   return out;
 }
 
-function portAnswers(port: number): Promise<boolean> {
+function portAnswersOn(port: number, host: string): Promise<boolean> {
   return new Promise((resolve) => {
-    const sock = connect({ port, host: '127.0.0.1' });
+    const sock = connect({ port, host });
     const done = (v: boolean) => {
       sock.destroy();
       resolve(v);
@@ -176,6 +188,11 @@ function portAnswers(port: number): Promise<boolean> {
     sock.once('connect', () => done(true));
     sock.once('error', () => done(false));
   });
+}
+
+/** Something accepts on the port over IPv4 loopback or IPv6 loopback. */
+async function portAnswers(port: number): Promise<boolean> {
+  return (await portAnswersOn(port, '127.0.0.1')) || (await portAnswersOn(port, '::1'));
 }
 
 async function anyPortAnswers(ports: Record<string, number> | undefined): Promise<boolean> {
@@ -1079,6 +1096,14 @@ export async function reapLeases(
     const garbage = orphaned && !(await anyPortAnswers(l.ports));
     if (expired || garbage) doomed.add(l.effort);
   }
+  // A start that died before its first lease leaves a `starting` effort nothing
+  // above can reach (reap walks leases); past the grace period it is parked too.
+  for (const e of efforts.values()) {
+    if (e.state !== 'starting' || doomed.has(e.id)) continue;
+    if (leases.some((l) => l.effort === e.id)) continue;
+    if (Date.now() - Date.parse(e.started) < STARTING_GRACE_MS) continue;
+    doomed.add(e.id);
+  }
   const reaped = leases.filter((l) => doomed.has(l.effort));
   if (o.dryRun) return { reaped };
   for (const lease of reaped) await releaseLease(ctx, efforts.get(lease.effort), lease);
@@ -1089,9 +1114,12 @@ export async function reapLeases(
         () => undefined,
       );
       if (effort.state === 'active' || effort.state === 'starting') {
+        const hadLease = leases.some((l) => l.effort === effort.id);
         ctx.registry.updateEffort(effort.id, {
           state: 'parked',
-          parkedReason: `idle: a lease expired by ${at.toISOString()}`,
+          parkedReason: hadLease
+            ? `idle: a lease expired by ${at.toISOString()}`
+            : `start died before its first lease (started ${effort.started})`,
           lastActivity: now(),
         });
       }
