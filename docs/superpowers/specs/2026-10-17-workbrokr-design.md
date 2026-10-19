@@ -392,6 +392,9 @@ What pritty is today, from the code rather than its README (whose status table i
 
 ### 18.3 Changes to workbrokr (0.2.0)
 
+**Status 2026-10-18: implemented** in workbrokr 0.3.0 (unpublished): `prEffort`, `work pr`, `work_pr`, `Effort.pr`, `PRITTY_FAILED`/`PR_CLOSED`, `work status` PR column, `Git.behindCount` with `BEHIND_LIMIT` 20, pritty version gate ≥ 0.1.1. The closed-PR question in step 4 is answered by `pritty pr --check --base <b>` (pritty 0.1.1), which reports the open PR for the head and base, or null, and creates nothing. Resolution without `--area` uses the effort whose worktree contains the cwd. Tests: seven in `effort.test.ts` with a recording fake pritty; `pritty pr --check` tests in pritty. Live proof against skoolscout still pending the publish of pritty 0.1.1 and workbrokr 0.3.0.
+
+
 **`prEffort(ctx, o)` in `src/lib/effort.ts`**, behind `work pr` and `work_pr`:
 
 1. Resolve the effort as `effortEnv` does (`--area`/`--task`, else the cwd worktree). No open or parked effort → `EFFORT_NOT_FOUND`.
