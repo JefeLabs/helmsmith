@@ -193,3 +193,17 @@ describe('BrowserPool', () => {
     expect(p.openContexts).toBe(0);
   });
 });
+
+describe('BrowserPool after a crash', () => {
+  it('ignores close events from contexts of a browser that already disconnected', async () => {
+    const { p, browser, contexts, timers } = pool();
+    await p.acquire(); // ctx1 on the first browser
+    await browser.close(); // crash: 'disconnected', ctx1 never closed
+    expect(p.openContexts).toBe(0);
+    await p.acquire(); // ctx2 on the relaunched browser
+    expect(p.openContexts).toBe(1);
+    await contexts[0]!.close(); // the old context's close arrives late
+    expect(p.openContexts).toBe(1);
+    expect(timers).toHaveLength(0); // the idle timer must not arm while ctx2 is live
+  });
+});

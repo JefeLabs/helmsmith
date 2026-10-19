@@ -574,6 +574,15 @@ describe('Broker S4/S8/S10', () => {
     expect(b.list()).toEqual([]);
   });
 
+  it('logs for an adopted instance come from storybook.log, not an empty buffer', async () => {
+    const host = fakeHost();
+    dirs.push(host);
+    const { a, b } = pair(6186);
+    const first = await a.up({ component: 'src/Button', hostRoot: host });
+    await b.reconcile();
+    expect(b.logs(first.record.id).join('\n')).toMatch(/Local:/);
+  });
+
   it('S4c: a mid-boot instance is adopted as starting and becomes ready with its stories, not ready with none', async () => {
     const host = fakeHost();
     dirs.push(host);

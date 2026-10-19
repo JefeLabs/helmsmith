@@ -66,6 +66,8 @@ export class BrowserPool {
    * closed immediately instead of being handed to any acquire() waiting on it.
    */
   private launchEpoch = 0;
+  /** Bumped on every successful launch; a context's close event counts only against the launch it belongs to. */
+  private generation = 0;
   private readonly opts: Required<BrowserPoolOptions>;
 
   constructor(opts: BrowserPoolOptions) {
@@ -97,8 +99,12 @@ export class BrowserPool {
     }
     const browser = await this.ensureBrowser();
     const context = await browser.newContext(viewport ? { viewport } : {});
+    const generation = this.generation;
     this.open++;
-    context.on('close', () => this.release());
+    context.on('close', () => {
+      // a context of a browser that has since crashed was already discounted when it disconnected
+      if (generation === this.generation) this.release();
+    });
     return context;
   }
 
@@ -169,6 +175,7 @@ export class BrowserPool {
           }
         });
         this.browser = b;
+        this.generation++;
         return b;
       })().finally(() => {
         this.launching = null;

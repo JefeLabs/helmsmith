@@ -1,5 +1,5 @@
-import { existsSync } from 'node:fs';
-import { isAbsolute, relative, resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import { discoverStories } from '../lib/discover.js';
 import { StorybrokrError, toErrorBody } from '../lib/errors.js';
 import { inspectHost as defaultInspect, realpathOrResolve, resolveHost } from '../lib/host.js';
@@ -94,7 +94,10 @@ export class Broker {
   logs(idOrPath: string, tail = 200, scope?: ResolveScope | string): string[] {
     const r = this.registry.resolve(idOrPath, scope);
     this.registry.touch(r.id);
-    return this.procs.get(r.id)?.log.tail(tail) ?? [];
+    const proc = this.procs.get(r.id);
+    if (proc) return proc.log.tail(tail);
+    // adopted after a daemon restart: no buffer, but the child writes to its log file
+    return tailFile(join(r.configDir, 'storybook.log'), tail);
   }
 
   logStream(idOrPath: string, scope?: ResolveScope | string): LogBuffer | undefined {
@@ -461,6 +464,14 @@ export class Broker {
       }
     }
   }
+}
+
+/** Last `n` lines of a file, or none when it does not exist. */
+function tailFile(path: string, n: number): string[] {
+  if (!existsSync(path)) return [];
+  const lines = readFileSync(path, 'utf8').split('\n');
+  if (lines[lines.length - 1] === '') lines.pop();
+  return lines.slice(Math.max(0, lines.length - n));
 }
 
 export { StorybrokrError };

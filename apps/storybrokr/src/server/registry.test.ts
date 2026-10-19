@@ -152,9 +152,12 @@ describe('Registry', () => {
       /INSTANCE_NOT_FOUND|no instance/,
     );
 
-    // 2. Hint prefers matching host, but falls back to unique global match when hint misses
+    // 2. A hint (STORYBROKR_HOST) scopes the lookup like a host: no instance in that host means
+    //    not found, never another worktree's instance
     expect(reg.resolve('src/Button', { hint: '/wt-b/app-ui' }).id).toBe('b1');
-    expect(reg.resolve('src/Unique', { hint: '/wt-c/app-ui' }).id).toBe('u1');
+    expect(() => reg.resolve('src/Unique', { hint: '/wt-c/app-ui' })).toThrow(
+      /INSTANCE_NOT_FOUND|no instance/,
+    );
 
     // 3. Unscoped (or missed hint) with multiple matches throws INSTANCE_AMBIGUOUS
     try {

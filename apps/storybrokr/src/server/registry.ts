@@ -63,11 +63,17 @@ export class Registry {
       );
     }
     if (normScope.hint !== undefined) {
+      // STORYBROKR_HOST scopes like an explicit host: a miss is not found, never another
+      // worktree's instance (the same rule for get/check/screenshot as for down)
       const hintHost = realpathOrResolve(normScope.hint);
       const hinted = all.find(
         (r) => r.component === idOrPath && realpathOrResolve(r.hostRoot) === hintHost,
       );
       if (hinted) return hinted;
+      throw new StorybrokrError(
+        'INSTANCE_NOT_FOUND',
+        `no instance matches ${idOrPath} in host ${hintHost} (STORYBROKR_HOST); pass --host <dir> or an instance id`,
+      );
     }
     const matches = all.filter((r) => r.component === idOrPath);
     if (matches.length === 1) return matches[0];
