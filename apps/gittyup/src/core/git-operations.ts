@@ -1,8 +1,8 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import simpleGit, { type SimpleGit, type StatusResult } from 'simple-git';
 import { APP_NAME } from '../config/branding.js';
-import type { ConflictFile, RepoBranchState, RepoState } from '../config/schema.js';
+import type { ConflictFile, ConflictHunk, RepoBranchState, RepoState } from '../config/schema.js';
 
 /**
  * Low-level git operations for a single repository.
@@ -187,42 +187,47 @@ export class GitOperations {
 
   // ─── Conflict Inspection ──────────────────────────────────────────
 
+  /**
+   * Every conflicted path with the complete file from each index stage
+   * (:1 base, :2 ours, :3 theirs) plus the marked working copy. A stage
+   * that does not exist (the side deleted the file) is `undefined`.
+   */
   async getConflictedFiles(): Promise<ConflictFile[]> {
     const status = await this.git.status();
     const files: ConflictFile[] = [];
 
     for (const filePath of status.conflicted) {
       const fullPath = join(this.repoPath, filePath);
-      let content = '';
+      let markedContent = '';
       try {
-        content = readFileSync(fullPath, 'utf-8');
+        markedContent = readFileSync(fullPath, 'utf-8');
       } catch {
-        continue;
+        /* absent on disk (deleted by one side) */
       }
-
-      const { ours, theirs, base } = this.parseConflictMarkers(content);
-      files.push({ path: filePath, oursContent: ours, theirsContent: theirs, baseContent: base });
+      const [base, ours, theirs] = await Promise.all([
+        this.showStage(1, filePath),
+        this.showStage(2, filePath),
+        this.showStage(3, filePath),
+      ]);
+      files.push({
+        path: filePath,
+        markedContent,
+        ours,
+        theirs,
+        base,
+        hunks: parseConflictHunks(markedContent),
+      });
     }
     return files;
   }
 
-  private parseConflictMarkers(content: string): { ours: string; theirs: string; base: string } {
-    const lines = content.split('\n');
-    let ours = '',
-      theirs = '',
-      base = '';
-    let section: 'none' | 'ours' | 'base' | 'theirs' = 'none';
-
-    for (const line of lines) {
-      if (line.startsWith('<<<<<<<')) section = 'ours';
-      else if (line.startsWith('|||||||')) section = 'base';
-      else if (line.startsWith('=======')) section = 'theirs';
-      else if (line.startsWith('>>>>>>>')) section = 'none';
-      else if (section === 'ours') ours += `${line}\n`;
-      else if (section === 'base') base += `${line}\n`;
-      else if (section === 'theirs') theirs += `${line}\n`;
+  /** `git show :<stage>:<path>`, or undefined when that stage is absent. */
+  private async showStage(stage: 1 | 2 | 3, filePath: string): Promise<string | undefined> {
+    try {
+      return await this.git.show([`:${stage}:${filePath}`]);
+    } catch {
+      return undefined;
     }
-    return { ours: ours.trimEnd(), theirs: theirs.trimEnd(), base: base.trimEnd() };
   }
 
   // ─── Resolution ───────────────────────────────────────────────────
@@ -232,13 +237,28 @@ export class GitOperations {
     await this.git.add(filePath);
   }
 
+  /** Keep our side. When our side deleted the file, the resolution is the deletion. */
   async resolveUseOurs(filePath: string): Promise<void> {
-    await this.git.raw(['checkout', '--ours', filePath]);
-    await this.git.add(filePath);
+    await this.resolveUseSide(2, '--ours', filePath);
   }
 
+  /** Keep their side. When their side deleted the file, the resolution is the deletion. */
   async resolveUseTheirs(filePath: string): Promise<void> {
-    await this.git.raw(['checkout', '--theirs', filePath]);
+    await this.resolveUseSide(3, '--theirs', filePath);
+  }
+
+  private async resolveUseSide(
+    stage: 2 | 3,
+    flag: '--ours' | '--theirs',
+    filePath: string,
+  ): Promise<void> {
+    if ((await this.showStage(stage, filePath)) === undefined) {
+      await this.git.raw(['rm', '-q', '--cached', filePath]);
+      const fullPath = join(this.repoPath, filePath);
+      if (existsSync(fullPath)) unlinkSync(fullPath);
+      return;
+    }
+    await this.git.raw(['checkout', flag, filePath]);
     await this.git.add(filePath);
   }
 
@@ -300,4 +320,42 @@ export class GitOperations {
   get instance(): SimpleGit {
     return this.git;
   }
+}
+
+/**
+ * Split a marked file into its conflict regions. Lines are joined with
+ * `\n` regardless of the file's line endings; `base` is present only for
+ * diff3-style markers. Non-conflicting lines are dropped — this is for
+ * preview, never for writing.
+ */
+export function parseConflictHunks(marked: string): ConflictHunk[] {
+  const hunks: ConflictHunk[] = [];
+  let section: 'none' | 'ours' | 'base' | 'theirs' = 'none';
+  let ours: string[] = [];
+  let base: string[] | undefined;
+  let theirs: string[] = [];
+
+  for (const line of marked.split(/\r?\n/)) {
+    if (line.startsWith('<<<<<<<')) {
+      section = 'ours';
+      ours = [];
+      base = undefined;
+      theirs = [];
+    } else if (line.startsWith('|||||||') && section === 'ours') {
+      section = 'base';
+      base = [];
+    } else if (line.startsWith('=======') && (section === 'ours' || section === 'base')) {
+      section = 'theirs';
+    } else if (line.startsWith('>>>>>>>') && section === 'theirs') {
+      section = 'none';
+      hunks.push({
+        ours: ours.join('\n'),
+        theirs: theirs.join('\n'),
+        ...(base !== undefined ? { base: base.join('\n') } : {}),
+      });
+    } else if (section === 'ours') ours.push(line);
+    else if (section === 'base') base?.push(line);
+    else if (section === 'theirs') theirs.push(line);
+  }
+  return hunks;
 }

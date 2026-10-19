@@ -118,12 +118,25 @@ export interface RepoState {
 
 // ─── Conflict Types ────────────────────────────────────────────────
 
+/** One `<<<<<<< … >>>>>>>` region of a conflicted file, for preview only. */
+export interface ConflictHunk {
+  ours: string;
+  theirs: string;
+  /** Present only for diff3-style markers (`|||||||`). */
+  base?: string;
+}
+
 export interface ConflictFile {
   path: string;
-  oursContent: string;
-  theirsContent: string;
-  baseContent: string;
-  mergedContent?: string;
+  /** Working-tree content with markers; '' when the file is absent on disk. */
+  markedContent: string;
+  /** Complete file from index stage 2; undefined when this side deleted it. */
+  ours?: string;
+  /** Complete file from index stage 3; undefined when that side deleted it. */
+  theirs?: string;
+  /** Complete file from index stage 1; undefined for add/add conflicts. */
+  base?: string;
+  hunks: ConflictHunk[];
 }
 
 export interface ConflictSession {
