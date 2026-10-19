@@ -1,6 +1,6 @@
 ---
 name: work
-description: Start, run, finish and audit area-based work with `work` (@helmsmith/workbrokr). Fires when the user wants to begin an effort on a part of the application ("start work on applications", "new effort on org/team", "open the cart area"), needs a slot or a running stack for a worktree, asks which slot or worktree to use, wants to finish or park an effort, or asks to clean up, retire or audit worktrees and slots. One worktree per area, branches are <type>/<area>, every effort starts from the latest base branch, no work ever happens on develop. CLI (`work start|status|finish|reap|retire|audit|env`) and MCP tools (`work_start`, `work_status`, `work_finish`, `work_reap`, `work_audit`, `work_env`).
+description: Start, run, finish and audit area-based work with `work` (@helmsmith/workbrokr). Fires when the user wants to begin an effort on a part of the application ("start work on applications", "new effort on org/team", "open the cart area"), needs a slot or a running stack for a worktree, asks which slot or worktree to use, wants to open the effort's pull request, wants to finish or park an effort, or asks to clean up, retire or audit worktrees and slots. One worktree per area, branches are <type>/<area>, every effort starts from the latest base branch, no work ever happens on develop. CLI (`work start|promote|status|pr|finish|reap|retire|audit|env`) and MCP tools (`work_start`, `work_promote`, `work_status`, `work_pr`, `work_finish`, `work_reap`, `work_audit`, `work_env`).
 ---
 
 # work
