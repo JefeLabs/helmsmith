@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { configDirFor, instanceId } from '../lib/instance.js';
+import type { LogBuffer } from '../lib/logbuffer.js';
 import { commandSpawner, type Spawner } from '../lib/spawn.js';
 import type { HostInfo } from '../types.js';
 import { Broker } from './broker.js';
@@ -592,6 +593,39 @@ describe('Broker S4/S8/S10', () => {
     const first = await a.up({ component: 'src/Button', hostRoot: host });
     await b.reconcile();
     expect(b.logs(first.record.id).join('\n')).toMatch(/Local:/);
+  });
+
+  it('logs --follow for an adopted instance streams new lines from storybook.log', async () => {
+    const host = fakeHost();
+    dirs.push(host);
+    const ticking: Spawner = {
+      spawn(h: HostInfo, configDir: string, port: number) {
+        process.env.SB_PORT = String(port);
+        return commandSpawner(process.execPath, [
+          '-e',
+          `${FAKE_SB}\nsetInterval(() => console.log('tick ' + Date.now()), 100);`,
+        ]).spawn(h, configDir, port);
+      },
+    };
+    const { a, b } = pair(6190, ticking);
+    const first = await a.up({ component: 'src/Button', hostRoot: host });
+    await b.reconcile();
+    const stream = b.logStream(first.record.id);
+    expect(stream).toBeDefined();
+    const line = await Promise.race([
+      new Promise<string>((resolve) => {
+        const off = (stream as LogBuffer).onLine((l) => {
+          if (l.startsWith('tick')) {
+            off();
+            resolve(l);
+          }
+        });
+      }),
+      new Promise<string>((_, reject) =>
+        setTimeout(() => reject(new Error('no tick within 3 s')), 3000),
+      ),
+    ]);
+    expect(line).toMatch(/^tick \d+/);
   });
 
   it('S4c: a mid-boot instance is adopted as starting and becomes ready with its stories, not ready with none', async () => {

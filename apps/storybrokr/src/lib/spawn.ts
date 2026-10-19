@@ -1,8 +1,9 @@
 import { type ChildProcess, type SpawnOptions, spawn } from 'node:child_process';
-import { closeSync, openSync, readSync, statSync } from 'node:fs';
+import { closeSync, openSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HostInfo } from '../types.js';
 import { LogBuffer } from './logbuffer.js';
+import { tailFile } from './logtail.js';
 
 export interface SpawnedProcess {
   pid: number;
@@ -53,38 +54,17 @@ function spawnLogged(
 
 function wrap(child: ChildProcess, logPath: string, startOffset: number): SpawnedProcess {
   const log = new LogBuffer();
-  let offset = startOffset;
-  const drain = (): void => {
-    let fd: number;
-    try {
-      fd = openSync(logPath, 'r');
-    } catch {
-      return;
-    }
-    try {
-      const size = statSync(logPath).size;
-      if (size <= offset) return;
-      const buf = Buffer.alloc(size - offset);
-      const n = readSync(fd, buf, 0, buf.length, offset);
-      offset += n;
-      log.push(buf.subarray(0, n).toString());
-    } finally {
-      closeSync(fd);
-    }
-  };
-  const tail = setInterval(drain, 100);
-  tail.unref();
+  const tail = tailFile(logPath, startOffset, log);
   let resolveExited!: (code: number | null) => void;
   const exited = new Promise<number | null>((resolve) => {
     resolveExited = resolve;
   });
   child.once('close', (code) => {
-    clearInterval(tail);
-    drain();
+    tail.stop();
     resolveExited(code);
   });
   child.once('error', (err) => {
-    clearInterval(tail);
+    tail.stop();
     log.push(`spawn failed: ${err.message}\n`);
     resolveExited(null);
   });

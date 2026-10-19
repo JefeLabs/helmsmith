@@ -11,7 +11,8 @@ import {
   removeConfigDir,
   writeSidecar,
 } from '../lib/instance.js';
-import type { LogBuffer } from '../lib/logbuffer.js';
+import { LogBuffer } from '../lib/logbuffer.js';
+import { fileSize, tailFile } from '../lib/logtail.js';
 import { findFreePort } from '../lib/ports.js';
 import { fetchStories, waitForReady } from '../lib/readiness.js';
 import { type SpawnedProcess, type Spawner, terminate } from '../lib/spawn.js';
@@ -98,13 +99,32 @@ export class Broker {
     const proc = this.procs.get(r.id);
     if (proc) return proc.log.tail(tail);
     // adopted after a daemon restart: no buffer, but the child writes to its log file
-    return tailFile(join(r.configDir, 'storybook.log'), tail);
+    return tailLines(join(r.configDir, 'storybook.log'), tail);
   }
 
+  /** Live lines: the child's buffer, or, for an instance adopted after a daemon restart, a tail of its storybook.log started now (`logs` already serves the lines before now). */
   logStream(idOrPath: string, scope?: ResolveScope | string): LogBuffer | undefined {
     const r = this.registry.resolve(idOrPath, scope);
     this.registry.touch(r.id);
-    return this.procs.get(r.id)?.log;
+    const proc = this.procs.get(r.id);
+    if (proc) return proc.log;
+    if (r.status !== 'starting' && r.status !== 'ready') return undefined;
+    const existing = this.adoptedTails.get(r.id);
+    if (existing) return existing.log;
+    const log = new LogBuffer();
+    const path = join(r.configDir, 'storybook.log');
+    const tail = tailFile(path, fileSize(path), log);
+    this.adoptedTails.set(r.id, { log, stop: tail.stop });
+    return log;
+  }
+
+  private readonly adoptedTails = new Map<string, { log: LogBuffer; stop: () => void }>();
+
+  private dropAdoptedTail(id: string): void {
+    const t = this.adoptedTails.get(id);
+    if (!t) return;
+    t.stop();
+    this.adoptedTails.delete(id);
   }
 
   inspectHost(path: string): HostInfo {
@@ -325,6 +345,7 @@ export class Broker {
       await terminate(r.pid as number);
     }
     this.procs.delete(r.id);
+    this.dropAdoptedTail(r.id);
     if (this.registry.get(r.id)) this.registry.update(r.id, { status: 'stopped' });
     try {
       removeConfigDir(r.configDir);
@@ -373,6 +394,7 @@ export class Broker {
     for (const r of dead) {
       await this.withLock(r.id, async () => {
         if (!this.registry.get(r.id) || isAlive(r.pid)) return;
+        this.dropAdoptedTail(r.id);
         this.registry.remove(r.id);
         try {
           removeConfigDir(r.configDir);
@@ -468,7 +490,7 @@ export class Broker {
 }
 
 /** Last `n` lines of a file, or none when it does not exist. */
-function tailFile(path: string, n: number): string[] {
+function tailLines(path: string, n: number): string[] {
   if (!existsSync(path)) return [];
   const lines = readFileSync(path, 'utf8').split('\n');
   if (lines[lines.length - 1] === '') lines.pop();
