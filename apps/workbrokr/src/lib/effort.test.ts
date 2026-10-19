@@ -714,6 +714,7 @@ describe('parallel waves, promote, join ref-counting & squash-merge recovery', (
     expect(left.left).toBe(true);
     expect(left.pushed).toBe(false);
     expect(ctx.registry.openEffortFor('demo', 'shop/cart')).toBeDefined();
+    commitFile(joined.effort.worktree, 'app-ui/app/shop/cart/j.tsx', 'j', 'joined work');
     const final = await finishEffort(ctx, { area: 'shop/cart' });
     expect(final.pushed).toBe(true);
   });
@@ -1162,5 +1163,56 @@ describe('§18.3 work pr', () => {
     await expect(prEffort(ctx, { cwd: f.main, title: 't' })).rejects.toMatchObject({
       code: 'EFFORT_NOT_FOUND',
     });
+  });
+});
+
+describe('finish and retire branch hygiene', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('finish does not push a branch with no commits of its own, and pushes once it has some', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const ctx = ctxFor(f);
+    const main = new Git(f.main);
+    await startEffort(ctx, { area: 'shop/cart', type: 'chore', mode: 'frontend' });
+    const empty = await finishEffort(ctx, { area: 'shop/cart' });
+    expect(empty.pushed).toBe(false);
+    expect(main.remoteBranchExists('chore/shop/cart')).toBe(false);
+
+    const again = await startEffort(ctx, { area: 'shop/cart', type: 'chore', mode: 'frontend' });
+    commitFile(again.effort.worktree, 'app-ui/app/shop/cart/a.tsx', 'a', 'cart work');
+    const done = await finishEffort(ctx, { area: 'shop/cart' });
+    expect(done.pushed).toBe(true);
+    expect(main.remoteBranchExists('chore/shop/cart')).toBe(true);
+  });
+
+  it('retire deletes a local branch that is merged into the base even when GitHub removed the remote, and keeps an unmerged one', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const { gitIn } = await import('../core/testing/fixture-repo.js');
+    const ctx = ctxFor(f);
+    const main = new Git(f.main);
+    const r = await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'frontend' });
+    commitFile(r.effort.worktree, 'app-ui/app/shop/cart/a.tsx', 'a', 'cart work');
+    await finishEffort(ctx, { area: 'shop/cart' });
+    // the PR merges (merge commit) and GitHub auto-deletes the remote branch
+    gitIn(f.main, 'merge', '-q', '--no-ff', '-m', 'Merge feature/shop/cart', 'feature/shop/cart');
+    main.push('develop');
+    gitIn(f.main, 'push', '-q', 'origin', '--delete', 'feature/shop/cart');
+
+    const out = await retireArea(ctx, { area: 'shop/cart' });
+    expect(out.branchesDeleted).toEqual(['feature/shop/cart']);
+    expect(main.branchExists('feature/shop/cart')).toBe(false);
+
+    // unmerged work whose remote is gone is on neither origin nor the base: retire refuses
+    const t = await startEffort(ctx, { area: 'shop/team', type: 'feature', mode: 'frontend' });
+    commitFile(t.effort.worktree, 'app-ui/app/shop/team/b.tsx', 'b', 'team work');
+    await finishEffort(ctx, { area: 'shop/team' });
+    gitIn(f.main, 'push', '-q', 'origin', '--delete', 'feature/shop/team');
+    await expect(retireArea(ctx, { area: 'shop/team' })).rejects.toMatchObject({
+      code: 'UNPUSHED',
+    });
+    expect(main.branchExists('feature/shop/team')).toBe(true);
   });
 });

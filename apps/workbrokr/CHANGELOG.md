@@ -1,5 +1,11 @@
 # @helmsmith/workbrokr
 
+## 0.3.1
+
+### Patch Changes
+
+- `work finish` no longer pushes a branch that has no commits of its own and is not on origin yet (`pushed: false`); sync merge commits do not count as own work. `work retire` deletes a local area branch that is already in the base (merged, squash-merged, or without own commits) even after GitHub removed the remote branch, and still keeps a branch with unmerged work.
+
 ## 0.3.0
 
 ### Minor Changes

@@ -104,6 +104,27 @@ export class Git {
     return this.lines(['rev-list', `${ref}..HEAD`]).length;
   }
 
+  /** Non-merge commits on HEAD that origin/<base> does not have: the branch's own work (sync merges do not count). */
+  ownCommitCount(base: string): number {
+    const r = this.tryRun(['rev-list', '--count', '--no-merges', `origin/${base}..HEAD`]);
+    return r.code === 0 ? Number(r.out.trim()) || 0 : 0;
+  }
+
+  /** `branch` is already in origin/<base>: an ancestor of it, patch-equivalent (squash-merged), or without own commits. */
+  branchMergedInto(branch: string, base: string): boolean {
+    const target = `origin/${base}`;
+    if (this.isAncestor(branch, target)) return true;
+    const own = this.tryRun(['rev-list', '--count', '--no-merges', `${target}..${branch}`]);
+    if (own.code === 0 && Number(own.out.trim()) === 0) return true;
+    const cherry = this.tryRun(['cherry', target, branch]);
+    if (cherry.code !== 0) return false;
+    const lines = cherry.out
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+    return lines.length > 0 && lines.every((l) => l.startsWith('- '));
+  }
+
   /** Commits on origin/<base> that HEAD does not have (0 when the ref is unknown). */
   behindCount(base: string): number {
     const r = this.tryRun(['rev-list', '--count', `HEAD..origin/${base}`]);

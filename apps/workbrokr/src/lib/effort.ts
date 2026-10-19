@@ -1109,7 +1109,12 @@ export async function finishEffort(ctx: Ctx, o: FinishOptions): Promise<FinishRe
 
   // Push first: a rejected push must leave the services running and the leases held,
   // so the effort can be synced and finished again instead of standing active with nothing.
-  if (!o.intoArea) {
+  // A branch with no commits of its own that is not on origin yet is not pushed: an empty
+  // remote branch is noise for GitHub and for the next retire.
+  fetchBaseOnce(ctx);
+  const shouldPush =
+    !o.intoArea && (g.ownCommitCount(m.baseBranch) > 0 || g.remoteBranchExists(effort.branch));
+  if (shouldPush) {
     try {
       g.push(effort.branch);
     } catch (err) {
@@ -1148,7 +1153,7 @@ export async function finishEffort(ctx: Ctx, o: FinishOptions): Promise<FinishRe
     ctx.registry.removeEfforts((e) => e.id === effort.id);
     return {
       effort: finished,
-      pushed: !o.intoArea,
+      pushed: shouldPush,
       parked,
       mergedIntoArea: Boolean(o.intoArea),
       notices,
@@ -1156,7 +1161,7 @@ export async function finishEffort(ctx: Ctx, o: FinishOptions): Promise<FinishRe
   }
 
   const finished = ctx.registry.updateEffort(effort.id, { state: 'finished', lastActivity: now() });
-  return { effort: finished, pushed: true, parked, notices };
+  return { effort: finished, pushed: shouldPush, parked, notices };
 }
 
 /** Expire idle efforts as a whole: when any lease is expired (or garbage) every lease of that effort is released and the effort parked. */
@@ -1262,7 +1267,7 @@ export interface RetireResult {
   branchesKept: string[];
 }
 
-/** The only destructive verb: archive, remove the worktree, delete the local branches that are fully on origin. */
+/** The only destructive verb: archive, remove the worktree, delete the local branches that are fully on origin or already in the base. */
 export async function retireArea(ctx: Ctx, o: { area: string }): Promise<RetireResult> {
   const m = ctx.manifest;
   if (!m.areas[o.area])
@@ -1305,12 +1310,16 @@ export async function retireArea(ctx: Ctx, o: { area: string }): Promise<RetireR
   const branchesDeleted: string[] = [];
   const branchesKept: string[] = [];
   const allAreaBranches = m.branch.types.map((type) => `${type}/${o.area}`);
+  fetchBaseOnce(ctx);
   for (const branch of allAreaBranches) {
     if (!main.branchExists(branch)) continue;
+    // safe to drop when origin has every commit, or when the base already contains the work
+    // (merged, squash-merged, or no work at all) and GitHub has removed the remote branch
     const onOrigin =
       main.remoteBranchExists(branch) &&
       main.tryRun(['rev-list', '--count', `origin/${branch}..${branch}`]).out.trim() === '0';
-    if (onOrigin) {
+    const mergedIntoBase = !onOrigin && main.branchMergedInto(branch, m.baseBranch);
+    if (onOrigin || mergedIntoBase) {
       main.deleteLocalBranch(branch);
       branchesDeleted.push(branch);
     } else branchesKept.push(branch);

@@ -98,7 +98,8 @@ describe('MCP server', () => {
     const finished = JSON.parse(
       text(await client.callTool({ name: 'work_finish', arguments: { area: 'shop/cart' } })),
     ) as { pushed: boolean };
-    expect(finished.pushed).toBe(true);
+    // nothing was committed on the branch: finish does not push an empty branch
+    expect(finished.pushed).toBe(false);
     const audit = JSON.parse(
       text(await client.callTool({ name: 'work_audit', arguments: {} })),
     ) as unknown[];

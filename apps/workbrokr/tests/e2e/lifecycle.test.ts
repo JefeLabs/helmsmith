@@ -1,7 +1,7 @@
 import { cpSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { gitIn, makeRepo } from '../../src/core/testing/index.js';
+import { commitFile, gitIn, makeRepo } from '../../src/core/testing/index.js';
 import { APP_ROOT, makeHome, runCli } from './helpers.js';
 
 const FIXTURE = join(APP_ROOT, 'tests', 'e2e', 'fixtures', 'project');
@@ -104,6 +104,13 @@ describe('lifecycle through the bin', () => {
   });
 
   it('finish stops the services, releases the slot, pushes the branch', async () => {
+    // finish pushes only a branch with commits of its own: give it one
+    const wt = gitIn(repo.main, 'worktree', 'list', '--porcelain')
+      .split('\n')
+      .filter((l) => l.startsWith('worktree ') && l.includes('shop/cart'))
+      .map((l) => l.slice('worktree '.length))[0];
+    expect(wt).toBeDefined();
+    commitFile(wt as string, 'svc/cart/e2e.ts', 'export const e2e = 1;\n', 'feat(cart): e2e work');
     const r = await runCli(
       ['finish', '--area', 'shop/cart', '--project-root', repo.main, '--json'],
       { home, env },
