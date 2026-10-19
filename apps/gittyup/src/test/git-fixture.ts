@@ -83,9 +83,16 @@ export function fixtureEnv(extra: Record<string, string> = {}): Record<string, s
   return { ...env, ...FIXTURE_GIT_ENV, ...extra };
 }
 
-/** simple-git bound to `baseDir` with the fixture env; config-path overrides allowed (test-only). */
-function fixtureGit(baseDir: string): SimpleGit {
-  return simpleGit({ baseDir, unsafe: { allowUnsafeConfigPaths: true } }).env(fixtureEnv());
+/**
+ * simple-git bound to `baseDir` with the fixture env; config-path overrides
+ * allowed (test-only). HOME and XDG_CONFIG_HOME point inside `root` so git
+ * never reads the developer's `~/.config/git/{ignore,attributes}` — those
+ * are default file paths, not config, and GIT_CONFIG_GLOBAL does not
+ * disable them.
+ */
+function fixtureGit(baseDir: string, root: string): SimpleGit {
+  const env = fixtureEnv({ HOME: root, XDG_CONFIG_HOME: join(root, 'xdg') });
+  return simpleGit({ baseDir, unsafe: { allowUnsafeConfigPaths: true } }).env(env);
 }
 
 const created = new Set<string>();
@@ -97,7 +104,7 @@ export async function makeRepo(spec: RepoSpec): Promise<FixtureRepo> {
 
   const path = join(root, 'repo');
   await mkdir(path);
-  const git = fixtureGit(path);
+  const git = fixtureGit(path, root);
   await git.init(['-b', defaultBranch]);
 
   const known = new Set<string>();
@@ -132,7 +139,7 @@ export async function makeRepo(spec: RepoSpec): Promise<FixtureRepo> {
   let remotePath: string | undefined;
   if (spec.remote) {
     remotePath = join(root, 'origin.git');
-    await fixtureGit(root).init(['--bare', remotePath]);
+    await fixtureGit(root, root).init(['--bare', remotePath]);
     await git.addRemote('origin', remotePath);
     await git.push(['-q', 'origin', '--all']);
   }

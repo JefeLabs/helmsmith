@@ -1,12 +1,9 @@
-import { execFile as execFileCb } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { promisify } from 'node:util';
 import { dump } from 'js-yaml';
 import { fixtureEnv } from '../../src/test/git-fixture.js';
-
-const execFile = promisify(execFileCb);
 
 /** The real launcher, so the Bun re-exec path is exercised, not just dist/cli.js. */
 const BIN = resolve(import.meta.dirname, '../../bin/gittyup.mjs');
@@ -14,7 +11,20 @@ const BIN = resolve(import.meta.dirname, '../../bin/gittyup.mjs');
 export interface CliResult {
   stdout: string;
   stderr: string;
+  /** Exit code; 1 when the process died by signal or timed out. */
   exitCode: number;
+  /** True when `timeoutMs` elapsed and the process group was killed. */
+  timedOut: boolean;
+}
+
+export interface RunCliOptions {
+  env?: Record<string, string>;
+  /** Default 20 s. On expiry the whole process group (node + Bun) is SIGKILLed. */
+  timeoutMs?: number;
+  /** Text written to stdin before it is closed. Default: nothing (immediate EOF). */
+  stdin?: string;
+  /** Keep stdin open so prompts block; only for testing the timeout path. */
+  keepStdinOpen?: boolean;
 }
 
 export interface Workspace {
@@ -52,13 +62,16 @@ export async function createWorkspace(
 /**
  * Run the CLI inside a workspace. HOME and AGENTX_HOME point at the
  * workspace so config, cache and auth never touch the developer's home;
- * GitHub tokens are blanked so nothing reaches the network. Never throws
- * on a non-zero exit — callers check `exitCode`.
+ * GitHub tokens are blanked so nothing reaches the network. stdin is
+ * closed right after `opts.stdin` (if any) so an interactive prompt fails
+ * fast on EOF instead of hanging. The child runs detached in its own
+ * process group so a timeout kills the Bun re-exec too. Never throws on a
+ * non-zero exit — callers check `exitCode` and `timedOut`.
  */
-export async function runCli(
+export function runCli(
   ws: Workspace,
   args: string[],
-  opts: { env?: Record<string, string>; timeoutMs?: number } = {},
+  opts: RunCliOptions = {},
 ): Promise<CliResult> {
   const env = fixtureEnv({
     HOME: ws.dir,
@@ -68,20 +81,43 @@ export async function runCli(
     COPILOT_GITHUB_TOKEN: '',
     ...opts.env,
   });
-  try {
-    const { stdout, stderr } = await execFile('node', [BIN, ...args], {
+  return new Promise((resolvePromise) => {
+    const child = spawn('node', [BIN, ...args], {
       cwd: ws.dir,
       env,
-      timeout: opts.timeoutMs ?? 20_000,
-      maxBuffer: 10 * 1024 * 1024,
+      detached: true,
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
-    return { stdout, stderr, exitCode: 0 };
-  } catch (err: unknown) {
-    const e = err as { stdout?: string; stderr?: string; code?: number | string };
-    return {
-      stdout: e.stdout ?? '',
-      stderr: e.stderr ?? '',
-      exitCode: typeof e.code === 'number' ? e.code : 1,
-    };
-  }
+    let stdout = '';
+    let stderr = '';
+    let timedOut = false;
+    child.stdout.on('data', (d) => {
+      stdout += d;
+    });
+    child.stderr.on('data', (d) => {
+      stderr += d;
+    });
+    if (opts.stdin) child.stdin.write(opts.stdin);
+    if (!opts.keepStdinOpen) child.stdin.end();
+
+    const timer = setTimeout(() => {
+      timedOut = true;
+      if (child.pid) {
+        try {
+          process.kill(-child.pid, 'SIGKILL');
+        } catch {
+          child.kill('SIGKILL');
+        }
+      }
+    }, opts.timeoutMs ?? 20_000);
+
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      resolvePromise({ stdout, stderr, exitCode: code ?? 1, timedOut });
+    });
+    child.on('error', (err) => {
+      clearTimeout(timer);
+      resolvePromise({ stdout, stderr: `${stderr}${err.message}`, exitCode: 1, timedOut });
+    });
+  });
 }

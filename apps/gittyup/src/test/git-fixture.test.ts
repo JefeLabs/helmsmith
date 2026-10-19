@@ -98,3 +98,28 @@ describe('makeRepo', () => {
     expect(existsSync(repo.path)).toBe(false);
   });
 });
+
+describe('makeRepo isolation from the developer home', () => {
+  it("commits files the developer's global ignore would exclude", async () => {
+    const { mkdtemp, mkdir, writeFile, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const fakeHome = await mkdtemp(join(tmpdir(), 'gittyup-home-'));
+    await mkdir(join(fakeHome, '.config', 'git'), { recursive: true });
+    await writeFile(join(fakeHome, '.config', 'git', 'ignore'), 'g.txt\n');
+    const saved = { HOME: process.env.HOME, XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME };
+    process.env.HOME = fakeHome;
+    delete process.env.XDG_CONFIG_HOME;
+    try {
+      const repo = await makeRepo({
+        commits: [{ message: 'base', files: { 'f.txt': 'x\n', 'g.txt': 'g\n' } }],
+      });
+      const tracked = await repo.git.raw(['ls-files']);
+      expect(tracked.split('\n').filter(Boolean).sort()).toEqual(['f.txt', 'g.txt']);
+    } finally {
+      process.env.HOME = saved.HOME;
+      if (saved.XDG_CONFIG_HOME !== undefined) process.env.XDG_CONFIG_HOME = saved.XDG_CONFIG_HOME;
+      await rm(fakeHome, { recursive: true, force: true });
+    }
+  });
+});

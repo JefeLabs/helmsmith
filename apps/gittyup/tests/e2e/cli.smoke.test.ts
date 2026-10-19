@@ -75,3 +75,42 @@ describe('gittyup CLI smoke', () => {
     expect(r.stdout).toContain('not found');
   });
 });
+
+/** Number of live `gittyup/dist/cli.js` processes (Bun re-execs); 0 when pgrep finds none. */
+function countCliProcesses(): number {
+  try {
+    const out = execFileSync('pgrep', ['-f', 'gittyup/dist/cli.js'], { stdio: 'pipe' }).toString();
+    return out.split('\n').filter(Boolean).length;
+  } catch {
+    return 0;
+  }
+}
+
+describe('runCli process hygiene', () => {
+  it('lets an interactive prompt fail fast on stdin EOF instead of waiting for the timeout', async () => {
+    const repo = await makeRepo({ commits: [{ message: 'base', files: { 'f.txt': 'x\n' } }] });
+    ws = await createWorkspace({
+      workspace: '.',
+      groups: { app: { repos: [{ name: 'fixture', path: repo.path }] } },
+    });
+    const started = Date.now();
+    const r = await runCli(ws, ['repo', 'tag'], { timeoutMs: 15_000 });
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(r.timedOut).toBe(false);
+  });
+
+  it('kills the whole process group on timeout and reports it', async () => {
+    const repo = await makeRepo({ commits: [{ message: 'base', files: { 'f.txt': 'x\n' } }] });
+    ws = await createWorkspace({
+      workspace: '.',
+      groups: { app: { repos: [{ name: 'fixture', path: repo.path }] } },
+    });
+    const before = countCliProcesses();
+    const r = await runCli(ws, ['repo', 'tag'], { timeoutMs: 1_500, keepStdinOpen: true });
+    expect(r.timedOut).toBe(true);
+    expect(r.exitCode).not.toBe(0);
+    await new Promise((res) => setTimeout(res, 300));
+    const after = countCliProcesses();
+    expect(after).toBe(before);
+  });
+});
