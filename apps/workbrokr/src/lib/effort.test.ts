@@ -91,18 +91,20 @@ const fakeSb = (): StorybrokrClient & {
 type FakePritty = PrittyClient & {
   calls: Array<{ kind: 'check' | 'pr'; o: Record<string, unknown> }>;
   open: { number: number; url: string; draft: boolean } | null;
+  last: { number: number; url: string; state: 'MERGED' | 'CLOSED' } | null;
   versionString: string;
 };
-const fakePritty = (version = '0.1.1'): FakePritty => {
+const fakePritty = (version = '0.1.2'): FakePritty => {
   let n = 100;
   const p: FakePritty = {
     calls: [],
     open: null,
+    last: null,
     versionString: version,
     version: () => p.versionString,
     check: async (o) => {
       p.calls.push({ kind: 'check', o: o as unknown as Record<string, unknown> });
-      return p.open;
+      return { open: p.open, last: p.last };
     },
     pr: async (o) => {
       p.calls.push({ kind: 'pr', o: o as unknown as Record<string, unknown> });
@@ -1116,12 +1118,18 @@ describe('§18.3 work pr', () => {
     cleanup = f.cleanup;
     const { ctx } = await started(f);
     const first = await prEffort(ctx, { area: 'shop/cart', title: 't', body: 'b' });
-    ctx.pritty.open = null; // merged or closed on GitHub
+    ctx.pritty.open = null; // merged on GitHub
+    ctx.pritty.last = { number: first.pr.number, url: first.pr.url, state: 'MERGED' };
     await expect(
       prEffort(ctx, { area: 'shop/cart', title: 't2', body: 'b' }),
     ).rejects.toMatchObject({
       code: 'PR_CLOSED',
+      message: expect.stringMatching(/was merged/),
     });
+    ctx.pritty.last = { number: first.pr.number, url: first.pr.url, state: 'CLOSED' };
+    await expect(
+      prEffort(ctx, { area: 'shop/cart', title: 't2', body: 'b' }),
+    ).rejects.toMatchObject({ message: expect.stringMatching(/was closed without merging/) });
     const forced = await prEffort(ctx, { area: 'shop/cart', title: 't2', body: 'b', force: true });
     expect(forced.created).toBe(true);
     expect(forced.pr.number).not.toBe(first.pr.number);
@@ -1140,10 +1148,10 @@ describe('§18.3 work pr', () => {
     expect(out.created).toBe(true);
   });
 
-  it('refuses a pritty below 0.1.1 before touching anything', async () => {
+  it('refuses a pritty below 0.1.2 before touching anything', async () => {
     const f = makeRepo();
     cleanup = f.cleanup;
-    const { ctx } = await started(f, fakePritty('0.1.0'));
+    const { ctx } = await started(f, fakePritty('0.1.1'));
     await expect(prEffort(ctx, { area: 'shop/cart', title: 't' })).rejects.toMatchObject({
       code: 'PRITTY_FAILED',
     });

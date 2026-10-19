@@ -1425,7 +1425,7 @@ export async function prEffort(ctx: Ctx, o: PrOptions): Promise<PrResult> {
   };
 
   if (effort.pr) {
-    const open = await ctx.pritty.check({ cwd: effort.worktree, base: m.baseBranch });
+    const { open, last } = await ctx.pritty.check({ cwd: effort.worktree, base: m.baseBranch });
     if (open) {
       if (!given) {
         return { effort: store(open), pr: open, created: false, behindBase: behind, warnings };
@@ -1442,10 +1442,16 @@ export async function prEffort(ctx: Ctx, o: PrOptions): Promise<PrResult> {
       return { effort: store(pr), pr, created: false, behindBase: behind, warnings };
     }
     if (!o.force) {
+      const fate =
+        last?.number === effort.pr.number
+          ? last.state === 'MERGED'
+            ? 'was merged'
+            : 'was closed without merging'
+          : 'is no longer open';
       throw new WorkkitError(
         'PR_CLOSED',
-        `PR #${effort.pr.number} for ${label} is no longer open (${effort.pr.url}); pass --force to open a new one`,
-        { pr: effort.pr },
+        `PR #${effort.pr.number} for ${label} ${fate} (${effort.pr.url}); pass --force to open a new one`,
+        { pr: effort.pr, state: last?.state },
       );
     }
   }

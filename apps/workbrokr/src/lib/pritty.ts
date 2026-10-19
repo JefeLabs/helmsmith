@@ -23,11 +23,16 @@ export interface PrittyClient {
   version(): string;
   /** Open a PR for the current branch, or return (and, with given words, update) the open one. */
   pr(o: PrittyPrOptions): Promise<PrRecord & { created: boolean }>;
-  /** The open PR for the current branch and base, or null; creates nothing. */
-  check(o: { cwd: string; base: string }): Promise<PrRecord | null>;
+  /** The open PR for the current branch and base, and what became of the last one when none is open; creates nothing. */
+  check(o: { cwd: string; base: string }): Promise<PrCheck>;
 }
 
-export const MIN_PRITTY_VERSION = '0.1.1';
+export interface PrCheck {
+  open: PrRecord | null;
+  last: { number: number; url: string; state: 'MERGED' | 'CLOSED' } | null;
+}
+
+export const MIN_PRITTY_VERSION = '0.1.2';
 
 export function assertPrittyVersion(client: PrittyClient): void {
   const found = client.version();
@@ -99,10 +104,15 @@ export const prittyCli: PrittyClient = {
         },
       );
     }
-    const j = lastJsonLine<{ open: { number: number; url: string; draft: boolean } | null }>(
-      r.out,
-      'pr --check',
-    );
-    return j.open ? { number: j.open.number, url: j.open.url, draft: Boolean(j.open.draft) } : null;
+    const j = lastJsonLine<{
+      open: { number: number; url: string; draft: boolean } | null;
+      last?: { number: number; url: string; state: 'MERGED' | 'CLOSED' } | null;
+    }>(r.out, 'pr --check');
+    return {
+      open: j.open
+        ? { number: j.open.number, url: j.open.url, draft: Boolean(j.open.draft) }
+        : null,
+      last: j.last ?? null,
+    };
   },
 };
