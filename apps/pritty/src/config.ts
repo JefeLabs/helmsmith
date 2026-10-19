@@ -54,7 +54,7 @@ export const TicketSchema = z.object({
   validateStrict: z.boolean().default(false),
 });
 
-export const ProviderSchema = z.enum(['copilot', 'anthropic', 'openai']);
+export const ProviderSchema = z.enum(['copilot', 'anthropic', 'openai', 'claude']);
 
 export const ConfigSchema = z.object({
   /** Unset means the provider's own default (see effectiveModel). */
@@ -66,7 +66,9 @@ export const ConfigSchema = z.object({
   commitStyle: z.enum(['conventional', 'gitmoji', 'angular', 'simple']).default('conventional'),
   /**
    * Primary AI provider. `copilot` (default) uses the OAuth Device
-   * Flow login at ~/.pritty/auth.json. `anthropic` reads the API key
+   * Flow login at ~/.pritty/auth.json. `claude` runs the Claude Code
+   * binary on PATH headlessly, on its own login (a claude.ai subscription
+   * works; no key passes through pritty). `anthropic` reads the API key
    * from `anthropicKeyEnv`; `openai` from `openaiKeyEnv`.
    */
   provider: ProviderSchema.default('copilot'),
@@ -96,6 +98,7 @@ export type Config = z.infer<typeof ConfigSchema>;
 export const DEFAULT_MODEL_BY_PROVIDER: Record<z.infer<typeof ProviderSchema>, string> = {
   copilot: 'claude-opus-5-5',
   anthropic: 'claude-opus-5-5',
+  claude: 'claude-opus-5-5',
   openai: 'gpt-6-astra',
 };
 

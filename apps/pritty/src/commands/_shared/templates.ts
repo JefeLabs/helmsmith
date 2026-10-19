@@ -172,7 +172,7 @@ the repo. \`pritty init\` scaffolds one. Common fields:
   "model": "claude-opus-5-5",
   "baseBranch": "main",
   "commitStyle": "conventional",
-  "provider": "copilot",                    // or "anthropic" / "openai"
+  "provider": "copilot",                    // or "claude" / "anthropic" / "openai"
   "fallback": [],                           // opt-in multi-provider
   "ticket": {
     "pattern": "[A-Z]+-\\\\d+",

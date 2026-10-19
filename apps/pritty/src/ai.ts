@@ -8,7 +8,7 @@
  * way (Copilot uses authPath; the others use API keys).
  */
 
-import { type AgentAdapter, createAgent } from '@helmsmith/agent-adapter';
+import { type AgentInput, type AgentInvocationResult, createAgent } from '@helmsmith/agent-adapter';
 import { registerClaudeSdk } from '@helmsmith/agent-adapter/adapters/claude-sdk';
 import { registerCopilotSdk } from '@helmsmith/agent-adapter/adapters/copilot-sdk';
 import { registerOpenAiSdk } from '@helmsmith/agent-adapter/adapters/openai-sdk';
@@ -21,14 +21,16 @@ import {
 } from '@helmsmith/agent-auth';
 import { getAuthStore, readAuth } from './auth.js';
 import type { CategorizedFiles } from './categorizer.js';
+import { createClaudeCliAdapter, findClaudeBinary } from './claude-cli.js';
 import { type Config, effectiveModel } from './config.js';
 import { type PullRequestTemplate, templatePromptGuidance } from './pr-template.js';
 import { redactDiff, withTimeout } from './redact.js';
 import { ticketPromptGuidance } from './ticket.js';
 
 // pritty is a composition root: @helmsmith/agent-adapter registers nothing on
-// import, so declare the three providers this app can actually reach. Anything
-// not listed here fails at createAgent() with a message naming the fix.
+// import, so declare the SDK providers this app can actually reach. Anything
+// not listed here fails at createAgent() with a message naming the fix. The
+// `claude` provider is pritty's own subprocess adapter (claude-cli.ts).
 registerClaudeSdk();
 registerCopilotSdk();
 registerOpenAiSdk();
@@ -46,8 +48,11 @@ class EnvBroker implements CredentialBroker {
   }
 }
 
-/** Common adapter interface — every provider builds an AgentAdapter. */
-type ChatAdapter = AgentAdapter;
+/** What pritty needs from a provider: one prompt in, one text answer out. */
+interface ChatAdapter {
+  readonly type: string;
+  invoke(input: AgentInput): Promise<AgentInvocationResult>;
+}
 
 export interface TicketContext {
   ticket: string | null;
@@ -106,6 +111,16 @@ async function tryBuildProvider(
         credentialBroker: bridgeBroker(new EnvBroker(config.anthropicKeyEnv)),
       });
     }
+    case 'claude': {
+      const binary = findClaudeBinary();
+      if (!binary) return null;
+      return createClaudeCliAdapter({
+        binary,
+        model: effectiveModel(config, 'claude'),
+        timeoutMs: config.aiTimeoutMs,
+        cwd: process.cwd(),
+      });
+    }
     case 'openai': {
       if (!process.env[config.openaiKeyEnv]) return null;
       return createAgent({
@@ -144,6 +159,7 @@ export async function buildAdapter(config: Config): Promise<ChatAdapter> {
       `No AI provider available. Tried: ${dedupedTried.join(', ')}.`,
       'Configure one:',
       `  copilot:    pritty auth login`,
+      '  claude:     install Claude Code (npm i -g @anthropic-ai/claude-code) and run `claude` once to log in',
       `  anthropic:  set ${config.anthropicKeyEnv}`,
       `  openai:     set ${config.openaiKeyEnv}`,
     ].join('\n'),

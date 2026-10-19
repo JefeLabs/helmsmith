@@ -109,10 +109,11 @@ describe('attribution config', () => {
 });
 
 describe('model default follows the provider', () => {
-  it('is Claude Opus 5.5 for anthropic and copilot, GPT-6 Astra for openai, and never overrides an explicit model', async () => {
+  it('is Claude Opus 5.5 for anthropic, copilot and claude, GPT-6 Astra for openai, and never overrides an explicit model', async () => {
     const { effectiveModel } = await import('./config.js');
     expect(effectiveModel(ConfigSchema.parse({ provider: 'anthropic' }))).toBe('claude-opus-5-5');
     expect(effectiveModel(ConfigSchema.parse({ provider: 'copilot' }))).toBe('claude-opus-5-5');
+    expect(effectiveModel(ConfigSchema.parse({ provider: 'claude' }))).toBe('claude-opus-5-5');
     expect(effectiveModel(ConfigSchema.parse({ provider: 'openai' }))).toBe('gpt-6-astra');
     expect(
       effectiveModel(ConfigSchema.parse({ provider: 'anthropic', model: 'claude-sonnet-5-5' })),

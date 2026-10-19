@@ -1,5 +1,11 @@
 # @helmsmith/pritty
 
+## 0.3.0
+
+### Minor Changes
+
+- New provider `claude`: pritty runs the Claude Code binary on PATH headlessly (`claude -p`, one turn, no tools, no MCP servers, no session on disk, skills off) on its own login, so a claude.ai subscription drafts commit messages and PR text without an API key. Works from inside a Claude Code session. Default model `claude-opus-5-5`. When `claude` is not on PATH the provider counts as unconfigured and the error says how to install and log in.
+
 ## 0.2.2
 
 ### Patch Changes

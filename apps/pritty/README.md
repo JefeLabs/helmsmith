@@ -207,12 +207,19 @@ AI adapters, OpenTUI or inquirer.
 
 ## Providers
 
-`provider` is `copilot` (default; `pritty auth login` runs the GitHub device flow), `anthropic` (reads the key from `ANTHROPIC_API_KEY`, or the variable named by `anthropicKeyEnv`) or `openai` (`OPENAI_API_KEY` / `openaiKeyEnv`). `model` is optional and defaults per provider: `claude-opus-5-5` for Anthropic and Copilot, `gpt-6-astra` for OpenAI. `fallback` lists providers to try when the primary is not configured on the machine.
+`provider` is one of:
 
-To use Claude by default in a repository:
+- `copilot` (default): `pritty auth login` runs the GitHub device flow.
+- `claude`: runs the `claude` binary on PATH headlessly (`claude -p`, one turn, no tools, no MCP servers, no session on disk) on whatever login that binary has. A claude.ai subscription works; no API key passes through pritty. Install Claude Code and run `claude` once to log in.
+- `anthropic`: the Anthropic API with the key from `ANTHROPIC_API_KEY` (or the variable named by `anthropicKeyEnv`).
+- `openai`: `OPENAI_API_KEY` / `openaiKeyEnv`.
+
+`model` is optional and defaults per provider: `claude-opus-5-5` for `claude`, `anthropic` and `copilot`, `gpt-6-astra` for `openai`. `fallback` lists providers to try when the primary is not configured on the machine.
+
+To use Claude on the team's subscriptions by default in a repository:
 
 ```json
-{ "provider": "anthropic" }
+{ "provider": "claude" }
 ```
 
-with `ANTHROPIC_API_KEY` exported in the shell that runs `pritty` (or `work pr`).
+or `{ "provider": "anthropic" }` with `ANTHROPIC_API_KEY` exported in the shell that runs `pritty` (or `work pr`) to bill an API key instead.

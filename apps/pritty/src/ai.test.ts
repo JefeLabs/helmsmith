@@ -39,6 +39,7 @@ function writeCopilotAuth(home: string): void {
 
 describe('buildAdapter — provider resolution', () => {
   let tmp: string;
+  const originalPath = process.env.PATH ?? '';
 
   beforeEach(() => {
     tmp = mkdtempSync(join(tmpdir(), 'pritty-ai-test-'));
@@ -51,7 +52,30 @@ describe('buildAdapter — provider resolution', () => {
     delete process.env.PRITTY_HOME;
     delete process.env.ANTHROPIC_API_KEY;
     delete process.env.OPENAI_API_KEY;
+    process.env.PATH = originalPath;
     rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it('uses claude when a claude binary is on PATH', async () => {
+    const bin = join(tmp, 'bin');
+    mkdirSync(bin, { recursive: true });
+    writeFileSync(join(bin, 'claude'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    process.env.PATH = `${bin}:${originalPath}`;
+    const adapter = await buildAdapter(defaultConfig({ provider: 'claude' }));
+    expect(adapter.type).toBe('claude-cli');
+  });
+
+  it('treats claude as unconfigured without a claude binary on PATH, and says how to get one', async () => {
+    process.env.PATH = join(tmp, 'empty');
+    try {
+      await buildAdapter(defaultConfig({ provider: 'claude' }));
+      throw new Error('expected to throw');
+    } catch (err) {
+      const msg = (err as Error).message;
+      expect(msg).toMatch(/No AI provider available/);
+      expect(msg).toContain('claude:');
+      expect(msg).toMatch(/log in/);
+    }
   });
 
   it('uses copilot when configured and auth.json present', async () => {
