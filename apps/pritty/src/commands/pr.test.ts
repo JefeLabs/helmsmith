@@ -323,3 +323,32 @@ describe('runPr prFooter', () => {
     expect(f.createArgs[0]).toMatchObject({ body: `body\n\n${FOOTER}` });
   });
 });
+
+describe('runPr --check', () => {
+  it('reports the open PR for head and base as one JSON line and touches nothing', async () => {
+    const f = fakes({
+      config: { baseBranch: 'main' },
+      openPRs: [{ number: 7, url: 'u', title: 't', head: 'feature/x', base: 'main', draft: true }],
+    });
+    const out: string[] = [];
+    f.deps.io = { out: (s) => out.push(s), err: () => {} };
+    const result = await runPr({ check: true }, f.deps);
+    expect(JSON.parse(out[0]!)).toEqual({
+      open: { number: 7, url: 'u', created: false, draft: true, head: 'feature/x', base: 'main' },
+    });
+    expect(result).toMatchObject({ number: 7, created: false });
+    for (const k of ['generatePR', 'push', 'createPR', 'updatePR', 'log'])
+      expect(f.calls).not.toContain(k);
+  });
+
+  it('reports null when there is none, and needs a base like --json', async () => {
+    const f = fakes({ config: { baseBranch: 'main' } });
+    const out: string[] = [];
+    f.deps.io = { out: (s) => out.push(s), err: () => {} };
+    expect(await runPr({ check: true }, f.deps)).toBeUndefined();
+    expect(JSON.parse(out[0]!)).toEqual({ open: null });
+    const g = fakes({ remoteDefault: 'main' });
+    g.deps.io = { out: () => {}, err: () => {} };
+    await expect(runPr({ check: true }, g.deps)).rejects.toThrow(/--base/);
+  });
+});

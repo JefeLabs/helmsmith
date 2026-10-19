@@ -1,5 +1,11 @@
 # @helmsmith/pritty
 
+## 0.1.1
+
+### Patch Changes
+
+- `pritty pr --check`: print the open PR for this head and base as one JSON line `{ open }` (or `{ open: null }`) and push, generate and create nothing. workbrokr's `work pr` uses it to learn that a stored PR was closed without creating another.
+
 ## 0.1.0
 
 ### Minor Changes

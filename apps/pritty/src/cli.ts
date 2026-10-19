@@ -28,7 +28,7 @@ import { runRebase } from './commands/rebase.js';
 // AuthProvider is reachable via cli-kit if a future handler needs it.
 const { program } = createCli({
   name: 'pritty',
-  version: '0.1.0',
+  version: '0.1.1',
   description: 'Pretty PRs, zero effort.',
   auth: prittyAuthProvider,
 });
@@ -136,6 +136,10 @@ program
   .option('--body <text>', 'Use this body verbatim (with --title)')
   .option('--body-file <path>', 'Read the body from a file (with --title)')
   .option('--no-push', 'Do not push: the branch is already on origin')
+  .option(
+    '--check',
+    'Only print the open PR for this head and base as one JSON line { open }; push, generate and create nothing',
+  )
   .action(
     async (options: {
       base?: string;
@@ -146,6 +150,7 @@ program
       title?: string;
       body?: string;
       bodyFile?: string;
+      check?: boolean;
       push: boolean;
     }) => {
       const { push, ...rest } = options;

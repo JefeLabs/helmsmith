@@ -42,6 +42,8 @@ export interface PrOptions {
   bodyFile?: string;
   /** The caller already pushed the branch with upstream tracking. */
   noPush?: boolean;
+  /** Only report the open PR for this head and base (one JSON line `{ open }`); create, push and generate nothing. */
+  check?: boolean;
 }
 
 export interface PrOutcome {
@@ -127,8 +129,9 @@ export async function runPr(
     out: (l: string) => console.log(l),
     err: (l: string) => console.error(l),
   };
-  const say = options.json ? io.err : io.out;
-  const auto = Boolean(options.json) || (options.autoApprove ?? config.autoApprove);
+  const machine = Boolean(options.json) || Boolean(options.check);
+  const say = machine ? io.err : io.out;
+  const auto = machine || (options.autoApprove ?? config.autoApprove);
   const dryRun = options.dryRun ?? config.dryRun;
   const finish = (o: PrOutcome): PrOutcome => {
     if (options.json) io.out(JSON.stringify(o));
@@ -174,9 +177,9 @@ export async function runPr(
     config: config.baseBranch,
     remoteDefault,
   });
-  if (options.json && baseSource !== 'flag' && baseSource !== 'config') {
+  if (machine && baseSource !== 'flag' && baseSource !== 'config') {
     throw new Error(
-      '--json needs --base <branch> (or baseBranch in .pritty.json) so an unattended run never inherits the repository default branch.',
+      `${options.check ? '--check' : '--json'} needs --base <branch> (or baseBranch in .pritty.json) so an unattended run never inherits the repository default branch.`,
     );
   }
   if (baseSource === 'remote') {
@@ -196,6 +199,21 @@ export async function runPr(
   //    title/body when they were given explicitly), create nothing. A failed
   //    lookup is fatal; pushing without knowing would be worse.
   const open = await deps.github.listOpenPRs(repo.owner, repo.repo, branch, effectiveBase);
+  if (options.check) {
+    const existing = open[0];
+    const outcome: PrOutcome | undefined = existing
+      ? {
+          number: existing.number,
+          url: existing.url,
+          created: false,
+          draft: existing.draft,
+          head: branch,
+          base: effectiveBase,
+        }
+      : undefined;
+    io.out(JSON.stringify({ open: outcome ?? null }));
+    return outcome;
+  }
   if (open.length > 0) {
     const existing = open[0]!;
     say(
