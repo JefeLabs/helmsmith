@@ -94,9 +94,9 @@ export const ConfigSchema = z.object({
 export type Config = z.infer<typeof ConfigSchema>;
 
 export const DEFAULT_MODEL_BY_PROVIDER: Record<z.infer<typeof ProviderSchema>, string> = {
-  copilot: 'gpt-4o',
-  openai: 'gpt-4o',
+  copilot: 'claude-opus-5-5',
   anthropic: 'claude-opus-5-5',
+  openai: 'gpt-4o',
 };
 
 /** The model to ask `provider` for: an explicit `model` wins, else that provider's default, so switching provider never sends another vendor's model name. */

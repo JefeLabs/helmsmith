@@ -4,7 +4,7 @@
 
 ### Patch Changes
 
-- The model default follows the provider: `claude-opus-5-5` for `anthropic`, `gpt-4o` for `copilot` and `openai`. `provider: "anthropic"` without a `model` no longer sends a GPT model name to Anthropic; an explicit `model` still wins. The starter config sets the provider instead of a model.
+- The model default follows the provider: `claude-opus-5-5` for `anthropic` and `copilot` (Copilot serves Claude through its models API), `gpt-4o` for `openai`. `provider: "anthropic"` without a `model` no longer sends a GPT model name to Anthropic; an explicit `model` still wins. The starter config sets the provider instead of a model.
 
 ## 0.2.0
 

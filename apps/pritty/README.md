@@ -207,7 +207,7 @@ AI adapters, OpenTUI or inquirer.
 
 ## Providers
 
-`provider` is `copilot` (default; `pritty auth login` runs the GitHub device flow), `anthropic` (reads the key from `ANTHROPIC_API_KEY`, or the variable named by `anthropicKeyEnv`) or `openai` (`OPENAI_API_KEY` / `openaiKeyEnv`). `model` is optional and defaults per provider: `claude-opus-5-5` for Anthropic, `gpt-4o` otherwise. `fallback` lists providers to try when the primary is not configured on the machine.
+`provider` is `copilot` (default; `pritty auth login` runs the GitHub device flow), `anthropic` (reads the key from `ANTHROPIC_API_KEY`, or the variable named by `anthropicKeyEnv`) or `openai` (`OPENAI_API_KEY` / `openaiKeyEnv`). `model` is optional and defaults per provider: `claude-opus-5-5` for Anthropic and Copilot, `gpt-4o` for OpenAI. `fallback` lists providers to try when the primary is not configured on the machine.
 
 To use Claude by default in a repository:
 
