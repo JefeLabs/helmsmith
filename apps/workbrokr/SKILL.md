@@ -65,3 +65,5 @@ work pr <area> --title "feat(area): what changed" --body-file /tmp/pr-body.md   
 ```
 
 `work pr` pushes the branch first, then opens the PR through `pritty pr --no-push --auto-approve --json` against the manifest's base branch, and stores `{ number, url, draft }` on the effort (`work status` shows it). Run it again and it returns the same PR; pass `--title`/`--body-file` again to update the PR's words in place. If the stored PR was merged or closed it refuses with `PR_CLOSED`; `--force` opens a new one. Write the body in the repository's PR conventions; the attribution footer comes from pritty's `prFooter`, not from you. Always pass a title and a body: pritty's AI path is the fallback, never the default. Needs `@helmsmith/pritty` 0.1.1 or newer on PATH.
+
+`--story` takes a path relative to the manifest's Storybook host (`app-ui` in skoolscout): a folder, a story or module file, or a bare stem such as `components/discover-schools/dashboards/charts/ChartSkeleton` (storybrokr 0.3.1 or newer resolves a stem to its file).
