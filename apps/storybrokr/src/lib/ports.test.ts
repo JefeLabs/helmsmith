@@ -32,3 +32,22 @@ describe('findFreePort', () => {
     });
   });
 });
+
+describe('S6: wildcard listeners', () => {
+  const servers: Server[] = [];
+  afterEach(async () => {
+    await Promise.all(servers.map((s) => new Promise((r) => s.close(r))));
+    servers.length = 0;
+  });
+  for (const addr of ['0.0.0.0', '::']) {
+    it(`treats a port held on ${addr} as busy`, async () => {
+      const s = await new Promise<Server>((res, rej) => {
+        const srv = createServer();
+        srv.once('error', rej);
+        srv.listen(6197, addr, () => res(srv));
+      });
+      servers.push(s);
+      expect(await findFreePort(6197, 6198, new Set())).toBe(6198);
+    });
+  }
+});
