@@ -205,3 +205,15 @@ describe('pritty without the TUI', () => {
     expect(readFileSync(join(root, 'bin/pritty.mjs'), 'utf8')).not.toMatch(/bun/i);
   });
 });
+
+describe('pritty has no connect command', () => {
+  it('lists auth login/status/logout and no connect in --help', () => {
+    const out = execFileSync(process.execPath, [join(root, 'dist/cli.js'), '--help'], {
+      cwd: root,
+      encoding: 'utf8',
+      env: { ...process.env, NODE_PATH: '' },
+    });
+    expect(out).not.toMatch(/\bconnect\b/);
+    expect(out).toMatch(/\bauth\b/);
+  });
+});

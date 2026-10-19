@@ -4,7 +4,7 @@
 
 ### Minor Changes
 
-- The connections view moved to `@helmsmith/pritty-connect`. `pritty connect` now delegates to that binary when it is on PATH and otherwise says how to install it. With the view gone, `@helmsmith/pritty` no longer depends on Bun, OpenTUI or React and runs under plain Node end to end; the bin no longer re-execs anything.
+- `pritty connect` is removed. The view only showed the GitHub Copilot login and offered login and logout, which `pritty auth status`, `pritty auth login` and `pritty auth logout` already do; it was also the sole reason the package depended on Bun, OpenTUI and React. Those dependencies are gone, the bin no longer re-execs anything, and every command runs under plain Node.
 
 ## 0.1.2
 

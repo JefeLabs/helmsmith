@@ -52,18 +52,6 @@ authCmd
   .description('Show authentication status')
   .action(() => runAuthStatus());
 
-// ─── connect (interactive TUI) ────────────────────────────────────────
-
-program
-  .command('connect')
-  .description('Open the interactive connections view (TUI)')
-  .allowUnknownOption()
-  .allowExcessArguments()
-  .action(async (_opts: unknown, cmd: { args: string[] }) => {
-    const { runConnect } = await import('./commands/connect.js');
-    process.exitCode = await runConnect(cmd.args);
-  });
-
 // ─── init ─────────────────────────────────────────────────────────────
 
 program

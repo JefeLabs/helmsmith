@@ -299,46 +299,6 @@ importers:
         specifier: ^5.0.0
         version: 5.0.0(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
-  apps/pritty-connect:
-    dependencies:
-      '@helmsmith/pritty':
-        specifier: workspace:*
-        version: link:../pritty
-      '@opentui/core':
-        specifier: ^0.5.10
-        version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.0)
-      '@opentui/react':
-        specifier: ^0.5.10
-        version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.8)(typescript@7.0.2)(web-tree-sitter@0.27.0)(ws@8.21.3)
-      bun:
-        specifier: ^1.4.2
-        version: 1.4.2
-      commander:
-        specifier: ^15.0.0
-        version: 15.0.0
-      react:
-        specifier: 19.2.8
-        version: 19.2.8
-    devDependencies:
-      '@helmsmith/tui-view-components':
-        specifier: workspace:*
-        version: link:../../platform/core/tui-view-components-lib
-      '@types/node':
-        specifier: ^24.13.3
-        version: 24.13.3
-      '@types/react':
-        specifier: ^19.2.18
-        version: 19.2.18
-      tsup:
-        specifier: ^8.5.1
-        version: 8.5.1(jiti@2.7.0)(postcss@8.5.28)(tsx@4.23.13)(typescript@7.0.2)(yaml@2.9.0)
-      typescript:
-        specifier: ^7.0.2
-        version: 7.0.2
-      vitest:
-        specifier: ^5.0.0
-        version: 5.0.0(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
-
   apps/storybrokr:
     dependencies:
       '@helmsmith/cli-kit':
