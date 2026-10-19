@@ -1,0 +1,42 @@
+{
+  "name": "@helmsmith/pritty-connect",
+  "version": "0.1.0",
+  "description": "The interactive connections view for pritty (GitHub Copilot login status, login, logout). Separate from @helmsmith/pritty because its OpenTUI view needs the Bun runtime.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "bin": {
+    "pritty-connect": "./bin/pritty-connect.mjs"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@helmsmith/pritty": "workspace:*",
+    "@opentui/core": "^0.5.10",
+    "@opentui/react": "^0.5.10",
+    "bun": "^1.4.2",
+    "commander": "^15.0.0",
+    "react": "^19.2.8"
+  },
+  "devDependencies": {
+    "@helmsmith/tui-view-components": "workspace:*",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "tsup": "^8.5.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
+}

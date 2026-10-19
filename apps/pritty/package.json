@@ -1,6 +1,6 @@
 {
   "name": "@helmsmith/pritty",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Pretty PRs, zero effort. AI-powered CLI that categorizes staged files, generates conventional commits, and creates pull requests with human-in-the-loop approval.",
   "type": "module",
   "bin": {
@@ -36,9 +36,6 @@
     "@anthropic-ai/sdk": "^0.124.0",
     "@helmsmith/cli-kit": "workspace:*",
     "@inquirer/prompts": "^8.7.1",
-    "@opentui/core": "^0.5.10",
-    "@opentui/react": "^0.5.10",
-    "bun": "^1.4.2",
     "chalk": "^6.0.0",
     "commander": "^15.0.0",
     "js-yaml": "^5.4.1",
@@ -46,14 +43,12 @@
     "octokit": "^5.0.5",
     "openai": "^7.10.0",
     "ora": "^9.4.1",
-    "react": "^19.2.8",
     "simple-git": "^3.36.0",
     "zod": "^4.5.4"
   },
   "devDependencies": {
     "@helmsmith/agent-adapter": "workspace:*",
     "@helmsmith/agent-auth": "workspace:*",
-    "@helmsmith/tui-view-components": "workspace:*",
     "@types/node": "^24.13.3",
     "tsup": "^8.5.1",
     "tsx": "^4.23.13",

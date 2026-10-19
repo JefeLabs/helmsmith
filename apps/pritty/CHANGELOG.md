@@ -1,5 +1,11 @@
 # @helmsmith/pritty
 
+## 0.2.0
+
+### Minor Changes
+
+- The connections view moved to `@helmsmith/pritty-connect`. `pritty connect` now delegates to that binary when it is on PATH and otherwise says how to install it. With the view gone, `@helmsmith/pritty` no longer depends on Bun, OpenTUI or React and runs under plain Node end to end; the bin no longer re-execs anything.
+
 ## 0.1.2
 
 ### Patch Changes

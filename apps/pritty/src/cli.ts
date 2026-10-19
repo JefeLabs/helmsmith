@@ -28,7 +28,7 @@ import { runRebase } from './commands/rebase.js';
 // AuthProvider is reachable via cli-kit if a future handler needs it.
 const { program } = createCli({
   name: 'pritty',
-  version: '0.1.2',
+  version: '0.2.0',
   description: 'Pretty PRs, zero effort.',
   auth: prittyAuthProvider,
 });
@@ -57,10 +57,11 @@ authCmd
 program
   .command('connect')
   .description('Open the interactive connections view (TUI)')
-  .action(async () => {
-    // Loaded on demand: the TUI needs Bun's FFI, and nothing else in pritty does.
+  .allowUnknownOption()
+  .allowExcessArguments()
+  .action(async (_opts: unknown, cmd: { args: string[] }) => {
     const { runConnect } = await import('./commands/connect.js');
-    await runConnect();
+    process.exitCode = await runConnect(cmd.args);
   });
 
 // ─── init ─────────────────────────────────────────────────────────────

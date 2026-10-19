@@ -202,3 +202,7 @@ bounded by `aiTimeoutMs`.
 exports only the deterministic pieces (git, GitHub, token resolution, PR
 template, CODEOWNERS, config, attribution, redaction) and loads without the
 AI adapters, OpenTUI or inquirer.
+
+## Connections view
+
+`pritty connect` opens the GitHub Copilot connections view. It ships separately as `@helmsmith/pritty-connect` because the view needs the Bun runtime; `npm i -g @helmsmith/pritty-connect` and `pritty connect` delegates to it.

@@ -186,3 +186,22 @@ describe('@helmsmith/pritty/core', () => {
     expect(exportsField['./core']).toBeDefined();
   });
 });
+
+describe('pritty without the TUI', () => {
+  const tui = ['bun', '@opentui/core', '@opentui/react', 'react', '@helmsmith/tui-view-components'];
+
+  it('declares none of the TUI stack as a runtime dependency', () => {
+    expect(runtimeDeps.filter((d) => tui.includes(d))).toEqual([]);
+  });
+
+  it('ships no chunk that imports OpenTUI or React', () => {
+    const imported = new Set<string>();
+    for (const file of jsFilesUnder(join(root, 'dist')))
+      for (const n of bareImports(file)) imported.add(n);
+    expect([...imported].filter((n) => tui.includes(n))).toEqual([]);
+  });
+
+  it('the bin never re-execs under bun', () => {
+    expect(readFileSync(join(root, 'bin/pritty.mjs'), 'utf8')).not.toMatch(/bun/i);
+  });
+});
