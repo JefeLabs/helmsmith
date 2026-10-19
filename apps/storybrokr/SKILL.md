@@ -5,6 +5,8 @@ description: Broker an ephemeral Storybook for ONE component (plus its child com
 
 # storybrokr
 
+> Where storybrokr sits in a feature's life (leased per worktree by `work start --story`, swept at finish and retire): [The life of a worktree](https://github.com/JefeLabs/helmsmith/blob/main/docs/work-lifecycle.md).
+
 Boots a throwaway Storybook that contains only one component and the components it imports, using the host repo's own `.storybook/` config, addons, and theme. Instances are owned by a local daemon, so they survive your session and are reused across calls.
 
 ## When to fire

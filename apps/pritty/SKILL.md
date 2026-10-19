@@ -5,6 +5,8 @@ description: AI-powered commit & PR creation. Fires when the user wants to commi
 
 # pritty
 
+> Where pritty sits in a feature's life (`work pr` pushes first, then pritty opens the PR with the repository's conventions): [The life of a worktree](https://github.com/JefeLabs/helmsmith/blob/main/docs/work-lifecycle.md).
+
 A CLI for AI-driven git wrap-up — commits, PRs, and rebases. Designed
 to *speed* the wrap-up: invisible enrichment from repo signals
 (commitlint config, PR template, CODEOWNERS, ticket patterns), default

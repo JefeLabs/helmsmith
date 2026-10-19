@@ -1,5 +1,7 @@
 # @helmsmith/storybrokr
 
+> Where storybrokr sits in a feature's life (leased per worktree by `work start --story`, swept at finish and retire): [The life of a worktree](https://github.com/JefeLabs/helmsmith/blob/main/docs/work-lifecycle.md).
+
 Brokers a throwaway Storybook that contains just one component — and the
 components it imports — from a repo's existing `.storybook/` config. A local
 daemon owns the running instances, a CLI and an MCP server drive it, and

@@ -1,5 +1,7 @@
 # 🎀 @helmsmith/pritty
 
+> Where pritty sits in a feature's life (`work pr` pushes first, then pritty opens the PR with the repository's conventions): [The life of a worktree](https://github.com/JefeLabs/helmsmith/blob/main/docs/work-lifecycle.md).
+
 **Pretty PRs, zero effort.** AI-powered CLI that categorizes staged
 files by purpose, generates conventional commits, and creates pull
 requests — with pluggable hooks and human-in-the-loop approval.

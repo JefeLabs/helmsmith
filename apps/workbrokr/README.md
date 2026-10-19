@@ -1,5 +1,7 @@
 # @helmsmith/workbrokr
 
+> The whole arc, from `work start` through tasks, `work pr`, `finish` and `retire`, with storybrokr and pritty's parts: [The life of a worktree](https://github.com/JefeLabs/helmsmith/blob/main/docs/work-lifecycle.md).
+
 `work` starts, runs, finishes, expires, retires and audits **area-based work**: one git worktree per area of the application, branches named `<type>/<area>`, every effort synced from the latest base branch before it begins, slots and ports handed out by one machine-wide registry, a scoped Storybook (via [`@helmsmith/storybrokr`](../storybrokr)) for frontend work and the project's own stack for full-stack work. It is a CLI, an MCP server and a skill over the same functions. The registry, lease, scope, git and runner logic lives in [`src/core`](src/core) inside this package.
 
 It exists because creating worktrees and stacks was easy and nothing ever closed the loop: dozens of merged worktrees, slots claimed by several checkouts, stacks running unattended for days, work that lived only on one machine, and a stray command that dialled the human's database. `work` makes finishing, expiring and auditing as cheap as starting, and turns the rules that used to live in memory notes into refusals.

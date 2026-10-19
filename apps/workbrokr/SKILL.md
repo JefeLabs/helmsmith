@@ -5,6 +5,8 @@ description: Start, run, finish and audit area-based work with `work` (@helmsmit
 
 # work
 
+> The whole arc, from `work start` through tasks, `work pr`, `finish` and `retire`, with storybrokr and pritty's parts: [The life of a worktree](https://github.com/JefeLabs/helmsmith/blob/main/docs/work-lifecycle.md).
+
 `work` owns the lifecycle of a piece of work in a repo that has a `helmsmith.config.{ts,mjs,json}`: it creates or reuses the **area's** worktree on a `<type>/<area>` branch, syncs it from the base branch, refreshes it, leases what the mode needs (a **slot** for `fullstack`, a storybrokr instance for `frontend`), writes the per-worktree config, runs it, and later finishes, expires, retires and audits it. State lives in one registry under `~/.cache/helmsmith`.
 
 ## Rules an agent applies before calling it
