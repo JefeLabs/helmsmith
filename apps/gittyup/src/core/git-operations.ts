@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import simpleGit, { type SimpleGit, type StatusResult } from 'simple-git';
 import { APP_NAME } from '../config/branding.js';
@@ -242,7 +242,7 @@ export class GitOperations {
     const verdict = checkResolution(content, file);
     if (!verdict.ok) throw new ResolutionRejected(file.path, verdict.reason);
     writeFileSync(join(this.repoPath, file.path), content, 'utf-8');
-    await this.git.add(file.path);
+    await this.git.raw(['add', '--', file.path]);
   }
 
   /** Keep our side. When our side deleted the file, the resolution is the deletion. */
@@ -261,13 +261,13 @@ export class GitOperations {
     filePath: string,
   ): Promise<void> {
     if ((await this.showStage(stage, filePath)) === undefined) {
-      await this.git.raw(['rm', '-q', '--cached', filePath]);
-      const fullPath = join(this.repoPath, filePath);
-      if (existsSync(fullPath)) unlinkSync(fullPath);
+      // Resolve by deletion; git removes both the index entries and the
+      // working-tree file, so no filesystem handling here.
+      await this.git.raw(['rm', '-q', '--', filePath]);
       return;
     }
-    await this.git.raw(['checkout', flag, filePath]);
-    await this.git.add(filePath);
+    await this.git.raw(['checkout', flag, '--', filePath]);
+    await this.git.raw(['add', '--', filePath]);
   }
 
   async commitResolution(message?: string): Promise<string> {
