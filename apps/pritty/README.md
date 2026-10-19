@@ -62,7 +62,7 @@ your repo root (found from any subdirectory; a nearer one wins):
 
 ```json
 {
-  "model": "gpt-4o",
+  "provider": "anthropic",
   "baseBranch": "develop",
   "commitStyle": "conventional",
   "github": { "account": "my-gh-login" },
@@ -205,3 +205,14 @@ exports only the deterministic pieces (git, GitHub, token resolution, PR
 template, CODEOWNERS, config, attribution, redaction) and loads without the
 AI adapters, OpenTUI or inquirer.
 
+## Providers
+
+`provider` is `copilot` (default; `pritty auth login` runs the GitHub device flow), `anthropic` (reads the key from `ANTHROPIC_API_KEY`, or the variable named by `anthropicKeyEnv`) or `openai` (`OPENAI_API_KEY` / `openaiKeyEnv`). `model` is optional and defaults per provider: `claude-opus-5-5` for Anthropic, `gpt-4o` otherwise. `fallback` lists providers to try when the primary is not configured on the machine.
+
+To use Claude by default in a repository:
+
+```json
+{ "provider": "anthropic" }
+```
+
+with `ANTHROPIC_API_KEY` exported in the shell that runs `pritty` (or `work pr`).

@@ -21,7 +21,7 @@ import {
 } from '@helmsmith/agent-auth';
 import { getAuthStore, readAuth } from './auth.js';
 import type { CategorizedFiles } from './categorizer.js';
-import type { Config } from './config.js';
+import { type Config, effectiveModel } from './config.js';
 import { type PullRequestTemplate, templatePromptGuidance } from './pr-template.js';
 import { redactDiff, withTimeout } from './redact.js';
 import { ticketPromptGuidance } from './ticket.js';
@@ -93,7 +93,7 @@ async function tryBuildProvider(
         },
       };
       return createAgent({
-        spec: { type: 'copilot-sdk', model: config.model },
+        spec: { type: 'copilot-sdk', model: effectiveModel(config, 'copilot') },
         workdir: process.cwd(),
         credentialBroker,
       });
@@ -101,7 +101,7 @@ async function tryBuildProvider(
     case 'anthropic': {
       if (!process.env[config.anthropicKeyEnv]) return null;
       return createAgent({
-        spec: { type: 'claude-sdk', model: config.model },
+        spec: { type: 'claude-sdk', model: effectiveModel(config, 'anthropic') },
         workdir: process.cwd(),
         credentialBroker: bridgeBroker(new EnvBroker(config.anthropicKeyEnv)),
       });
@@ -109,7 +109,7 @@ async function tryBuildProvider(
     case 'openai': {
       if (!process.env[config.openaiKeyEnv]) return null;
       return createAgent({
-        spec: { type: 'openai-sdk', model: config.model },
+        spec: { type: 'openai-sdk', model: effectiveModel(config, 'openai') },
         workdir: process.cwd(),
         credentialBroker: bridgeBroker(new EnvBroker(config.openaiKeyEnv)),
       });

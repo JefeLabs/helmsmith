@@ -28,7 +28,7 @@ import { runRebase } from './commands/rebase.js';
 // AuthProvider is reachable via cli-kit if a future handler needs it.
 const { program } = createCli({
   name: 'pritty',
-  version: '0.2.0',
+  version: '0.2.1',
   description: 'Pretty PRs, zero effort.',
   auth: prittyAuthProvider,
 });

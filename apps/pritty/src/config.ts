@@ -57,7 +57,8 @@ export const TicketSchema = z.object({
 export const ProviderSchema = z.enum(['copilot', 'anthropic', 'openai']);
 
 export const ConfigSchema = z.object({
-  model: z.string().default('gpt-4o'),
+  /** Unset means the provider's own default (see effectiveModel). */
+  model: z.string().optional(),
   /** Unset means "the repository's default branch"; an explicit value is never overridden. */
   baseBranch: z.string().optional(),
   autoApprove: z.boolean().default(false),
@@ -91,6 +92,20 @@ export const ConfigSchema = z.object({
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
+
+export const DEFAULT_MODEL_BY_PROVIDER: Record<z.infer<typeof ProviderSchema>, string> = {
+  copilot: 'gpt-4o',
+  openai: 'gpt-4o',
+  anthropic: 'claude-opus-5-5',
+};
+
+/** The model to ask `provider` for: an explicit `model` wins, else that provider's default, so switching provider never sends another vendor's model name. */
+export function effectiveModel(
+  config: Config,
+  provider: Config['provider'] = config.provider,
+): string {
+  return config.model ?? DEFAULT_MODEL_BY_PROVIDER[provider];
+}
 
 /**
  * Candidate config filenames in load priority. First match wins.
@@ -132,7 +147,7 @@ export function loadConfig(cwd: string = process.cwd()): Config {
 /** Produce the starter config used by `pritty init`. */
 export function defaultStarterConfig(): unknown {
   return {
-    model: 'gpt-4o',
+    provider: 'copilot',
     commitStyle: 'conventional',
   };
 }

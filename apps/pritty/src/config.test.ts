@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { defaultStarterConfig, loadConfig } from './config.js';
+import { ConfigSchema, defaultStarterConfig, loadConfig } from './config.js';
 
 describe('config baseBranch', () => {
   let dir = '';
@@ -105,5 +105,25 @@ describe('attribution config', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('model default follows the provider', () => {
+  it('is a Claude model for anthropic, gpt-4o for copilot and openai, and never overrides an explicit model', async () => {
+    const { effectiveModel } = await import('./config.js');
+    expect(effectiveModel(ConfigSchema.parse({ provider: 'anthropic' }))).toBe('claude-opus-5-5');
+    expect(effectiveModel(ConfigSchema.parse({ provider: 'copilot' }))).toBe('gpt-4o');
+    expect(effectiveModel(ConfigSchema.parse({ provider: 'openai' }))).toBe('gpt-4o');
+    expect(
+      effectiveModel(ConfigSchema.parse({ provider: 'anthropic', model: 'claude-sonnet-5-5' })),
+    ).toBe('claude-sonnet-5-5');
+    expect(effectiveModel(ConfigSchema.parse({ model: 'o3' }))).toBe('o3');
+  });
+
+  it("picks the fallback provider's own default when the primary is unavailable", async () => {
+    const { effectiveModel } = await import('./config.js');
+    expect(effectiveModel(ConfigSchema.parse({ provider: 'copilot' }), 'anthropic')).toBe(
+      'claude-opus-5-5',
+    );
   });
 });
