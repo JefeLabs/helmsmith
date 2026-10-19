@@ -86,6 +86,8 @@ export interface StartOptions {
   join?: boolean;
   sync?: boolean;
   story?: string;
+  /** Force the postgres `reset` (and `seed`) on this start, migration or not. */
+  resetDb?: boolean;
 }
 
 export interface StartResult {
@@ -628,14 +630,19 @@ export async function startEffort(ctx: Ctx, o: StartOptions): Promise<StartResul
         branch,
       });
       const env = { ...process.env, ...cfg.vars };
-      const owedMarks = [...new Set([...sel.marks, ...readPendingMarks(logDir)])];
+      const owedMarks = [
+        ...new Set([...sel.marks, ...readPendingMarks(logDir), ...(o.resetDb ? ['db-reset'] : [])]),
+      ];
+      let didReset = false;
       if (owedMarks.includes('db-reset') && m.services.postgres?.reset) {
         runRefresh([m.services.postgres.reset], worktree, (l) => appendLog(refreshLog, l), env);
+        didReset = true;
         writePendingMarks(
           logDir,
           owedMarks.filter((x) => x !== 'db-reset'),
         );
       }
+      ctx.registry.updateEffort(effort.id, { lastSlot: slot.value as number });
       const pids: Record<string, number> = {};
       const signatures: Record<string, string> = {};
       const result = await ctx.runner.start({
@@ -655,6 +662,9 @@ export async function startEffort(ctx: Ctx, o: StartOptions): Promise<StartResul
         pids: result.pids,
         signatures: result.signatures ?? signatures,
       });
+      if (didReset && m.services.postgres?.seed) {
+        runRefresh([m.services.postgres.seed], worktree, (l) => appendLog(refreshLog, l), env);
+      }
     } else {
       let storybookPort: number | undefined;
       if (o.story) {
@@ -689,7 +699,7 @@ export async function startEffort(ctx: Ctx, o: StartOptions): Promise<StartResul
       leases: ctx.registry.leases({ effort: effort.id }),
       sync,
       refreshed: sel.runs,
-      marks: sel.marks,
+      marks: o.resetDb ? [...new Set([...sel.marks, 'db-reset'])] : sel.marks,
       joined: false,
       warnings,
       notices,
@@ -790,7 +800,9 @@ export async function promoteEffort(ctx: Ctx, o: PromoteOptions): Promise<Promot
   }
   // a database reset owed since a start without a database (W10)
   const owed = readPendingMarks(join(open.worktree, m.logs.dir));
+  let didReset = false;
   if (owed.includes('db-reset') && m.services.postgres?.reset) {
+    didReset = true;
     const cfgForReset = emitWorktreeConfig({
       m,
       worktree: open.worktree,
@@ -851,7 +863,14 @@ export async function promoteEffort(ctx: Ctx, o: PromoteOptions): Promise<Promot
     });
   }
 
-  const updated = ctx.registry.updateEffort(open.id, { lastActivity: now() });
+  if (didReset && m.services.postgres?.seed) {
+    runRefresh([m.services.postgres.seed], open.worktree, ctx.log, env);
+  }
+
+  const updated = ctx.registry.updateEffort(open.id, {
+    lastActivity: now(),
+    lastSlot: slot.value as number,
+  });
   touchEffort(ctx, updated);
   return {
     effort: updated,
@@ -859,6 +878,99 @@ export async function promoteEffort(ctx: Ctx, o: PromoteOptions): Promise<Promot
     startedServices: missingServices,
     warnings,
   };
+}
+
+// ── reset ────────────────────────────────────────────────────────────────────
+
+export interface ResetOptions {
+  area: string;
+  task?: string;
+}
+
+export interface ResetResult {
+  effort: Effort;
+  lease: Lease;
+  /** Services the runner brought back after the reset. */
+  restarted: string[];
+  seeded: boolean;
+}
+
+/**
+ * A fresh database for an open effort that holds a slot: stop what the lease started except
+ * postgres (reverse order), run `services.postgres.reset`, start the mode's services again with
+ * their health checks, then `services.postgres.seed` if the manifest has one. Counts as activity.
+ */
+export async function resetEffort(ctx: Ctx, o: ResetOptions): Promise<ResetResult> {
+  const m = ctx.manifest;
+  const reset = m.services.postgres?.reset;
+  if (!reset)
+    throw new WorkkitError(
+      'MANIFEST_INVALID',
+      'services.postgres.reset is not set in the manifest, so nothing can reset the database',
+    );
+  const label = effortLabel(o.area, o.task);
+  const open = ctx.registry.openEffortFor(m.project, o.area, o.task);
+  if (!open)
+    throw new WorkkitError('EFFORT_NOT_FOUND', `no open effort on ${label}`, {
+      area: o.area,
+      task: o.task,
+    });
+  const slot = ctx.registry.leases({ effort: open.id, kind: 'slot' })[0];
+  if (!slot)
+    throw new WorkkitError(
+      'LEASE_NOT_FOUND',
+      `${label} holds no slot (mode ${open.mode}); \`work promote --area ${o.area} --mode fullstack\` first`,
+      { area: o.area, task: o.task, mode: open.mode },
+    );
+  const env = leaseEnv(ctx, open, slot);
+  const logDir = join(open.worktree, m.logs.dir);
+  mkdirSync(logDir, { recursive: true });
+
+  const notPostgres = (entries: Record<string, unknown> | undefined) =>
+    Object.fromEntries(Object.entries(entries ?? {}).filter(([name]) => name !== 'postgres'));
+  const pids = notPostgres(slot.pids) as Record<string, number>;
+  if (Object.keys(pids).length > 0) {
+    await ctx.runner.stop({
+      m,
+      cwd: open.worktree,
+      env,
+      pids,
+      signatures: notPostgres(slot.signatures) as Record<string, string>,
+      onLog: ctx.log,
+    });
+  }
+  ctx.log(`resetting the database: ${reset}`);
+  runRefresh([reset], open.worktree, ctx.log, env);
+
+  const newPids: Record<string, number> = {};
+  const newSigs: Record<string, string> = {};
+  const mode = open.mode === 'frontend' ? 'fullstack' : open.mode;
+  const result = await ctx.runner.start({
+    m,
+    cwd: open.worktree,
+    env,
+    logDir,
+    mode,
+    onLog: ctx.log,
+    onSpawn: (service, pid, signature) => {
+      newPids[service] = pid;
+      newSigs[service] = signature;
+      ctx.registry.patchLease(slot.id, { pids: { ...newPids }, signatures: { ...newSigs } });
+    },
+  });
+  ctx.registry.patchLease(slot.id, {
+    pids: result.pids,
+    signatures: result.signatures ?? newSigs,
+  });
+  let seeded = false;
+  if (m.services.postgres?.seed) {
+    runRefresh([m.services.postgres.seed], open.worktree, ctx.log, env);
+    seeded = true;
+  }
+  const updated = ctx.registry.updateEffort(open.id, { lastActivity: now() });
+  touchEffort(ctx, updated);
+  const lease = ctx.registry.leases({ effort: open.id, kind: 'slot' })[0] ?? slot;
+  return { effort: updated, lease, restarted: Object.keys(result.pids), seeded };
 }
 
 // ── status / env ─────────────────────────────────────────────────────────────
@@ -1265,6 +1377,10 @@ export interface RetireResult {
   removed: string;
   branchesDeleted: string[];
   branchesKept: string[];
+  /** The slot whose database `services.postgres.purge` dropped. */
+  purged?: number;
+  /** Why the purge did not run although a purge command exists. */
+  purgeSkipped?: string;
 }
 
 /** The only destructive verb: archive, remove the worktree, delete the local branches that are fully on origin or already in the base. */
@@ -1284,6 +1400,8 @@ export async function retireArea(ctx: Ctx, o: { area: string }): Promise<RetireR
   const worktree = realpathOr(worktreePathFor(ctx, o.area));
   const main = new Git(ctx.repoRoot);
   let archived: string[] = [];
+  let purged: number | undefined;
+  let purgeSkipped: string | undefined;
   if (existsSync(worktree)) {
     const g = new Git(worktree);
     if (g.isDirty())
@@ -1305,6 +1423,7 @@ export async function retireArea(ctx: Ctx, o: { area: string }): Promise<RetireR
       .some((e) => e.mode !== 'backend');
     if (hadStorybook) await sweepStorybook(ctx, { worktree, mode: 'frontend' });
     archived = archiveWorktree(ctx, o.area, worktree);
+    ({ purged, purgeSkipped } = await purgeLastSlot(ctx, o.area, worktree));
     main.worktreeRemove(worktree);
   }
   const branchesDeleted: string[] = [];
@@ -1327,7 +1446,42 @@ export async function retireArea(ctx: Ctx, o: { area: string }): Promise<RetireR
   ctx.registry.removeEfforts((e) => e.project === m.project && e.area === o.area);
   ctx.registry.clearNotices(m.project, o.area);
   ctx.registry.clearNoticesFrom(m.project, allAreaBranches);
-  return { archived, removed: worktree, branchesDeleted, branchesKept };
+  return { archived, removed: worktree, branchesDeleted, branchesKept, purged, purgeSkipped };
+}
+
+/**
+ * Drop the database of the slot the area last held, in the area's worktree (the slot targets read
+ * its `.slot`), but only when no effort holds that slot now and none of its ports answer: slots
+ * are shared in turn, so the volume may already belong to someone else. A failing purge throws
+ * before the worktree is removed, so nothing is lost and retire can be rerun.
+ */
+async function purgeLastSlot(
+  ctx: Ctx,
+  area: string,
+  worktree: string,
+): Promise<{ purged?: number; purgeSkipped?: string }> {
+  const m = ctx.manifest;
+  const purge = m.services.postgres?.purge;
+  if (!purge) return {};
+  const slot = ctx.registry
+    .efforts({ project: m.project, area })
+    .filter((e) => e.lastSlot !== undefined)
+    .sort((a, b) => b.lastActivity.localeCompare(a.lastActivity))[0]?.lastSlot;
+  if (slot === undefined) return { purgeSkipped: 'no effort of this area ever held a slot' };
+  const holder = ctx.registry
+    .leases({ project: m.project, kind: 'slot' })
+    .find((l) => l.value === slot);
+  if (holder) {
+    const e = ctx.registry.efforts({ project: m.project }).find((x) => x.id === holder.effort);
+    return {
+      purgeSkipped: `slot ${slot} is held by ${e ? effortLabel(e.area, e.task) : holder.owner.session}; its next reset or retire covers it`,
+    };
+  }
+  if (await anyPortAnswers(portsForSlot(m, slot)))
+    return { purgeSkipped: `slot ${slot}'s ports answer; something outside work is using it` };
+  ctx.log(`purging slot ${slot}'s database: ${purge}`);
+  runRefresh([purge], worktree, ctx.log, { ...process.env, ...slotEnv(m, slot) });
+  return { purged: slot };
 }
 
 // ── pr ───────────────────────────────────────────────────────────────────────

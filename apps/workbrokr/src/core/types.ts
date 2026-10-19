@@ -9,6 +9,10 @@ export interface ServiceSpec {
   /** stdout of `health` (trimmed, last token) must be one of these; absent = exit code 0 is healthy */
   healthyCodes?: number[];
   reset?: string;
+  /** postgres only: run after the services are up whenever `reset` ran */
+  seed?: string;
+  /** postgres only: run by `work retire` in the worktree when the slot it last used is free */
+  purge?: string;
   /** default 180_000 */
   healthTimeoutMs?: number;
   /** Which slot-bearing modes start this service. Default: ['fullstack'] for 'frontend', else ['backend', 'fullstack']. */
@@ -118,6 +122,8 @@ export interface Effort {
   parkedReason?: string;
   /** The pull request `work pr` opened or adopted for this effort. */
   pr?: { number: number; url: string; draft: boolean };
+  /** The slot this effort last held; `work retire` purges it when it is free. */
+  lastSlot?: number;
 }
 
 export interface ProjectEntry {

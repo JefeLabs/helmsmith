@@ -40,7 +40,8 @@ This writes `helmsmith.config.mjs` (edit the service commands, the scope templat
 | `storybook.hostRoot` | the package whose `.storybook` storybrokr boots from |
 | `logs.dir` | per-worktree log directory (`.logs`), one file per service plus `refresh.log` |
 | `env.file`, `env.template` | the env file emitted per worktree from `${VAR}` placeholders (`SLOT`, `PORT_<SERVICE>`, `PORT_STORYBOOK`, `LOG_DIR`, `PROJECT`, `AREA`, `BRANCH`, `WORKTREE`) |
-| `refresh[]` | `{ when: glob, run }` commands and `{ when, mark }` marks selected by the paths a sync changed; `{ always: true, run }` runs every time; the mark `db-reset` runs `services.postgres.reset` before a fullstack start |
+| `refresh[]` | `{ when: glob, run }` commands and `{ when, mark }` marks selected by the paths a sync changed; `{ always: true, run }` runs every time; the mark `db-reset` runs `services.postgres.reset` before a fullstack start, then `services.postgres.seed` once the services are up |
+| `services.postgres.{reset,seed,purge}` | `reset` recreates the slot database (a `db-reset` mark, `work start --reset-db`, `work reset`); `seed` runs after the services are back up whenever `reset` ran; `purge` drops the slot's container and volume at `work retire`, only when the slot the area last used is free |
 | `scopes.frontend`, `scopes.backend` | glob templates with `{group}`, `{section}`, `{module}`; a frontend effort holds the first set, a fullstack effort both |
 | `areas.<path>.{module,commons,extraScopes}` | leaves only (`shop/cart`, never `shop` and `shop/cart` together); `module` fills the backend templates; `commons` makes the area cross-cutting |
 | `commons.<name>` | shared paths never held exclusively; a cross-cutting effort write-locks them briefly |
@@ -49,11 +50,12 @@ This writes `helmsmith.config.mjs` (edit the service commands, the scope templat
 
 ## Verbs
 
-- `work start --area <area> --type <type> --mode <fullstack|frontend> [--story <path>] [--join] [--no-sync]`: guards (area, type, mode, one open effort per area, scope overlap), the worktree, the branch, sync (fast-forward or merge, never rebase; a conflict stops before any lease), refresh, leases, config, run, record.
+- `work start --area <area> --type <type> --mode <fullstack|frontend> [--story <path>] [--join] [--no-sync] [--reset-db]`: guards (area, type, mode, one open effort per area, scope overlap), the worktree, the branch, sync (fast-forward or merge, never rebase; a conflict stops before any lease), refresh, leases, config, run, record.
 - `work status`, `work env`: what is open and the variables it runs with.
+- `work reset --area <area> [--task <slug>]`: a fresh database for an open fullstack or backend effort: stop the app services (never postgres), run `services.postgres.reset`, start them again with their health checks, run `services.postgres.seed`. Refuses without an open effort, without a slot (promote first) or without a reset command.
 - `work finish [--park]`: stop only the pids the lease recorded, bring the Storybook down, release leases, push, leave commons notices; the worktree and branch stay.
 - `work reap [--dry-run]`: the same for expired leases, parking the effort.
-- `work retire`: archive, remove the worktree, delete the local branches that are on origin. The only destructive verb; refuses unpushed work.
+- `work retire`: archive, remove the worktree, delete the local branches that are on origin, and run `services.postgres.purge` for the slot the area last held when no effort holds it and its ports are silent (`purgeSkipped` says why otherwise). The only destructive verb; refuses unpushed work.
 - `work audit`: dirty or unpushed worktrees, foreign checkouts, aging leases, drift, stale notices, archive size.
 
 Exit codes: 0 ok, 2 refused (first stderr line is the reason; `--json` prints `{ code, message, details }`), 1 error. The registry is `$HELMSMITH_HOME/registry.json`, default `~/.cache/helmsmith`, written atomically under a lock.

@@ -1,8 +1,8 @@
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { currentOwner, ensureExcluded, Git, Registry, validateManifest } from '../core/index.js';
 import { commitFile, makeRepo } from '../core/testing/index.js';
 import {
@@ -14,6 +14,7 @@ import {
   prEffort,
   promoteEffort,
   reapLeases,
+  resetEffort,
   retireArea,
   type ServiceRunner,
   type StorybrokrClient,
@@ -1252,5 +1253,226 @@ describe('notices and retire', () => {
     expect(after.areas.find((x) => x.area === 'shop/cart')?.notices).toEqual([]);
     expect(after.areas.find((x) => x.area === 'shop/team')?.notices).toEqual([]);
     expect(after.areas.find((x) => x.area === 'platform/auth')?.notices).toEqual([]);
+  });
+});
+
+describe('database reset: --reset-db, seed after a reset, purge at retire', () => {
+  let cleanup = () => {};
+  let marks = '';
+  beforeEach(() => {
+    marks = mkdtempSync(join(tmpdir(), 'wk-marks-'));
+    process.env.MARKS = marks;
+  });
+  afterEach(() => {
+    cleanup();
+    delete process.env.MARKS;
+  });
+  const mark = (name: string) => existsSync(join(marks, name));
+
+  /** postgres first in key order; reset/seed/purge leave markers under $MARKS (outside the worktree, so finish stays clean); seed only succeeds after the runner started. */
+  const withDb = (over: Record<string, unknown> = {}) =>
+    validateManifest({
+      ...manifestSource,
+      ports: {
+        services: {
+          frontend: { base: 43000 },
+          backend: { base: 43100 },
+          postgres: { base: 45400 },
+        },
+      },
+      services: {
+        postgres: {
+          start: 'true',
+          stop: 'true',
+          health: 'true',
+          reset: 'touch "$MARKS/reset"',
+          seed: 'test -f "$MARKS/started" && touch "$MARKS/seed"',
+          purge: 'echo "$SLOT" >> "$MARKS/purged"',
+        },
+        ...manifestSource.services,
+      },
+      ...over,
+    });
+  const markingRunner = () => {
+    const r = fakeRunner();
+    r.start = async () => {
+      r.calls.push('start');
+      writeFileSync(join(process.env.MARKS ?? '', 'started'), '');
+      return { pids: { postgres: process.pid, backend: process.pid } };
+    };
+    return r;
+  };
+
+  it('the manifest keeps postgres.seed and postgres.purge', () => {
+    const m = withDb();
+    expect(m.services.postgres?.seed).toBe('test -f "$MARKS/started" && touch "$MARKS/seed"');
+    expect(m.services.postgres?.purge).toBe('echo "$SLOT" >> "$MARKS/purged"');
+  });
+
+  it('--reset-db forces the reset on a fullstack start and seeds once the services are up', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const ctx = { ...ctxFor(f, markingRunner()), manifest: withDb() };
+    await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'fullstack' });
+    expect(mark('reset')).toBe(false);
+    expect(mark('seed')).toBe(false);
+    await finishEffort(ctx, { area: 'shop/cart' });
+
+    const r = await startEffort(ctx, {
+      area: 'shop/cart',
+      type: 'feature',
+      mode: 'fullstack',
+      resetDb: true,
+    });
+    expect(mark('reset')).toBe(true);
+    expect(mark('seed')).toBe(true);
+    expect(r.marks).toContain('db-reset');
+    expect(r.effort.lastSlot).toBeTypeOf('number');
+  });
+
+  it('promote seeds after it runs an owed reset', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const ctx = {
+      ...ctxFor(f, markingRunner()),
+      manifest: withDb({ refresh: [{ when: 'migrations/**', mark: 'db-reset' }] }),
+    };
+    commitFile(f.main, 'migrations/V1.sql', 'create table t();', 'migration');
+    new Git(f.main).push('develop');
+    await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'frontend' });
+    await promoteEffort(ctx, { area: 'shop/cart', mode: 'fullstack' });
+    expect(mark('reset')).toBe(true);
+    expect(mark('seed')).toBe(true);
+    await finishEffort(ctx, { area: 'shop/cart' });
+  });
+
+  it('retire purges the slot the area last used when that slot is free', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const ctx = { ...ctxFor(f, markingRunner()), manifest: withDb() };
+    const r = await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'fullstack' });
+    const slot = r.leases.find((l) => l.kind === 'slot')?.value as number;
+    await finishEffort(ctx, { area: 'shop/cart' });
+
+    const retired = await retireArea(ctx, { area: 'shop/cart' });
+    expect(retired.purged).toBe(slot);
+    expect(readFileSync(join(marks, 'purged'), 'utf8').trim()).toBe(String(slot));
+  });
+
+  it('retire skips the purge, and says so, when another effort now holds that slot', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const ctx = {
+      ...ctxFor(f, markingRunner()),
+      manifest: withDb({ slots: { count: 2, reserved: [0] } }),
+    };
+    await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'fullstack' });
+    await finishEffort(ctx, { area: 'shop/cart' });
+    // the only slot (1) now belongs to another area
+    await startEffort(ctx, { area: 'shop/team', type: 'feature', mode: 'fullstack' });
+
+    const retired = await retireArea(ctx, { area: 'shop/cart' });
+    expect(retired.purged).toBeUndefined();
+    expect(retired.purgeSkipped).toMatch(/slot 1/);
+    expect(mark('purged')).toBe(false);
+    await finishEffort(ctx, { area: 'shop/team' });
+  });
+});
+
+describe('work reset: a fresh database for an open fullstack effort', () => {
+  let cleanup = () => {};
+  let marks = '';
+  beforeEach(() => {
+    marks = mkdtempSync(join(tmpdir(), 'wk-marks-'));
+    process.env.MARKS = marks;
+  });
+  afterEach(() => {
+    cleanup();
+    delete process.env.MARKS;
+  });
+  const mark = (name: string) => existsSync(join(marks, name));
+  const withDb = () =>
+    validateManifest({
+      ...manifestSource,
+      ports: {
+        services: {
+          frontend: { base: 43000 },
+          backend: { base: 43100 },
+          postgres: { base: 45400 },
+        },
+      },
+      services: {
+        postgres: {
+          start: 'true',
+          stop: 'true',
+          health: 'true',
+          reset: 'touch "$MARKS/reset"',
+          seed: 'test -f "$MARKS/restarted" && touch "$MARKS/seed"',
+        },
+        ...manifestSource.services,
+      },
+    });
+  /** The second start writes `restarted`, so the seed proves it ran after the services came back. */
+  const countingRunner = () => {
+    const r = fakeRunner();
+    let starts = 0;
+    r.start = async () => {
+      r.calls.push('start');
+      starts++;
+      if (starts === 2) writeFileSync(join(process.env.MARKS ?? '', 'restarted'), '');
+      return { pids: { postgres: process.pid, backend: process.pid } };
+    };
+    return r;
+  };
+
+  it('stops the app services but not postgres, resets, restarts, then seeds', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const runner = countingRunner();
+    const ctx = { ...ctxFor(f, runner), manifest: withDb() };
+    const started = await startEffort(ctx, {
+      area: 'shop/cart',
+      type: 'feature',
+      mode: 'fullstack',
+    });
+
+    const r = await resetEffort(ctx, { area: 'shop/cart' });
+
+    expect(runner.calls).toEqual(['start', 'stop', 'start']);
+    expect(Object.keys(runner.stopped[0] ?? {})).toEqual(['backend']);
+    expect(mark('reset')).toBe(true);
+    expect(mark('seed')).toBe(true);
+    expect(r.seeded).toBe(true);
+    expect(r.effort.id).toBe(started.effort.id);
+    expect(
+      ctx.registry.leases({ effort: started.effort.id }).find((l) => l.kind === 'slot')?.pids,
+    ).toEqual({ postgres: process.pid, backend: process.pid });
+    await finishEffort(ctx, { area: 'shop/cart' });
+  });
+
+  it('refuses without an open effort, and for an effort that holds no slot', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const ctx = { ...ctxFor(f, countingRunner()), manifest: withDb() };
+    await expect(resetEffort(ctx, { area: 'shop/cart' })).rejects.toMatchObject({
+      code: 'EFFORT_NOT_FOUND',
+    });
+    await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'frontend' });
+    await expect(resetEffort(ctx, { area: 'shop/cart' })).rejects.toMatchObject({
+      code: 'LEASE_NOT_FOUND',
+    });
+    expect(mark('reset')).toBe(false);
+    await finishEffort(ctx, { area: 'shop/cart' });
+  });
+
+  it('refuses when the manifest has no postgres reset command', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const ctx = ctxFor(f, countingRunner());
+    await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'fullstack' });
+    await expect(resetEffort(ctx, { area: 'shop/cart' })).rejects.toMatchObject({
+      code: 'MANIFEST_INVALID',
+    });
+    await finishEffort(ctx, { area: 'shop/cart' });
   });
 });

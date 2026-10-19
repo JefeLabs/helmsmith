@@ -86,7 +86,7 @@ work start --area org/dashboard --task chart --type feature --mode frontend \
 work start --area org/dashboard --task e2e   --type feature --mode fullstack
 ```
 
-- **`api`** leases a slot: Postgres, Spring Boot and Next on that slot's ports, health-probed, pids recorded on the lease. If a migration landed on the base, the `db-reset` mark runs the reset here; a frontend start would have kept it owed until a start with a database.
+- **`api`** leases a slot: Postgres, Spring Boot and Next on that slot's ports, health-probed, pids recorded on the lease. If a migration landed on the base, the `db-reset` mark recreates the database here and the manifest's `seed` runs once the services are up; a frontend start would have kept it owed until a start with a database. `work start --reset-db` forces the same, and `work reset --area org/dashboard --task api` does it later for the open effort when a run left the data in a bad state: app services stop, Postgres is recreated, services come back, the seed runs.
 - **`chart`** leases a storybrokr instance: workbrokr calls `storybrokr up <story> --host <worktree>/app-ui --ttl 120`, and the daemon boots one Storybook containing only that component's stories, with a TTL equal to the lease. The agent iterates with the storybrokr MCP tools: `storybrokr_check` settles every story in a headless browser and reports play-function failures, `storybrokr_screenshot` for visual review, `storybrokr_logs` to read the dev server. `STORYBROKR_HOST` keeps every call scoped to this worktree, even from a shell sitting in the main checkout. A `--story` may be a folder, a story or module file, or a bare stem.
 - **`e2e`** leases a second slot for the Playwright runner (always through the `make` targets; never `npx playwright test` directly in a slot worktree). If the chart task later needs the API live, `work promote --task chart --mode fullstack` claims a slot first and only then changes the task's mode.
 
@@ -141,7 +141,7 @@ CI runs on the PR, a human reviews, and the merge is a merge commit into `develo
 work retire --area org/dashboard
 ```
 
-Refuses while an effort is open, or the worktree is dirty, or it holds commits that are on neither origin nor the base. Otherwise it archives the evidence, removes the worktree, deletes local area branches that origin holds or that `develop` already contains (so GitHub's auto-delete after a merge is fine), clears the notices the area left and received, and drops its registry records. Retention keeps 30 days or the last five archives per area. `work audit` is the backstop for anything forgotten: dirty areas, unpushed work, stray worktrees, aging leases, drift behind the base, stale notices, archive bulk.
+Refuses while an effort is open, or the worktree is dirty, or it holds commits that are on neither origin nor the base. Otherwise it archives the evidence, runs the manifest's `purge` for the slot the area last held (dropping that slot's Postgres container and volume) if no effort holds the slot now and its ports are silent, removes the worktree, deletes local area branches that origin holds or that `develop` already contains (so GitHub's auto-delete after a merge is fine), clears the notices the area left and received, and drops its registry records. Finish only stops the slot's services, so a slot's database outlives the effort until a reset, a retire or the next tenant's `db-reset` mark. Retention keeps 30 days or the last five archives per area. `work audit` is the backstop for anything forgotten: dirty areas, unpushed work, stray worktrees, aging leases, drift behind the base, stale notices, archive bulk.
 
 ---
 
@@ -151,6 +151,7 @@ Refuses while an effort is open, or the worktree is dirty, or it holds commits t
 |---|---|---|---|
 | Worktree, branch, sync, refresh, submodules | owns | | |
 | Slots, ports, service start/stop, health | owns | | |
+| Slot database: reset after a migration, on request, seed, purge at retire | owns (runs the manifest's commands) | | |
 | Component Storybook per worktree, TTL, check, screenshot, logs | leases and sweeps | owns | |
 | Scope and commons locks, protected branches | hooks | | |
 | Commits | git plus trailer | | optional `commit --json` |

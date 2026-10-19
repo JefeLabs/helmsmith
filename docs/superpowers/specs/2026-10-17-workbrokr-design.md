@@ -443,3 +443,25 @@ With `.pritty.json` `github.account` per repository and `--base` always passed b
 7. `workbrokr` does not mutate the caller's PR body to inject a scope summary; `work status --json` exposes the effort's `scopes` and `commons` so the `/work` skill can include a collapsible scope block when appropriate.
 8. `work finish --park` keeps its deterministic, offline `wip(<area>): parked <iso>` commit rather than invoking `pritty commit`.
 
+## 19. Amendment B (2026-10-19): the slot database — reset on request, seed, purge at retire
+
+### 19.1 Why
+
+A slot's Postgres is a Docker container and volume shared by every effort that takes the slot in turn. §8.1 resets it only when a sync brings a migration (`db-reset` mark). Nothing let an agent ask for a fresh database after a run polluted it, the migration reset never applied the seed the host needs after a boot (skoolscout's `db-reset-seed`), and `finish` and `retire` left the container and volume behind for good.
+
+### 19.2 Manifest
+
+`services.postgres` gains two optional commands beside `reset`: `seed`, run after the services are up whenever `reset` ran; `purge`, run by `retire` in the area's worktree (so the slot targets read its `.slot`) to drop the slot's container and volume. skoolscout: `reset: make -C app-service db-reset`, `seed: make -C app-service db-reset-seed`, `purge: make slot-down PURGE=1`.
+
+### 19.3 Verbs
+
+- `work start --reset-db` (`work_start { resetDb }`): the `db-reset` mark is forced for this start.
+- `work reset --area <a> [--task <t>]` (`work_reset`): for an open effort holding a slot, stop the pids the lease started except postgres (reverse order, the same path as finish), run `reset`, start the mode's services again with their health checks (postgres `start` is idempotent), patch the lease's pids, run `seed`. Refuses `EFFORT_NOT_FOUND`, `LEASE_NOT_FOUND` (promote first), `MANIFEST_INVALID` (no `reset`).
+- `work retire`: after the refusals and the archive, before the worktree is removed, run `purge` for the slot the area last held (`Effort.lastSlot`, recorded when a slot is claimed at start or promote). Guard: skipped, with `purgeSkipped` naming the holder, when another effort leases that slot or any of its ports answer, because slots are shared in turn and the volume may already be someone else's. A failing purge throws before the worktree is removed, so retire can be rerun.
+
+### 19.4 Decisions
+
+1. Finish still only stops the services (decision kept from §8.3): the next effort on the slot reuses a seeded database for free, and the `db-reset` mark, `work reset` and the retire purge are the three ways a slot's data ends.
+2. The purge is keyed to the slot, not the area, which is why it needs the free-slot guard rather than running unconditionally.
+3. The seed is a manifest command, not a workbrokr behaviour: workbrokr knows when a reset happened, the host knows what a fresh database needs.
+

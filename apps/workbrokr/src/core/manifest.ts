@@ -25,6 +25,10 @@ const Service = z.object({
   health: z.string().min(1),
   healthyCodes: z.array(z.number().int()).optional(),
   reset: z.string().optional(),
+  /** Run after the services are up whenever `reset` ran (postgres only): seeds the fresh database. */
+  seed: z.string().optional(),
+  /** Run by `work retire` in the area's worktree when the slot it last used is free (postgres only): drops the slot's container and volume. */
+  purge: z.string().optional(),
   healthTimeoutMs: z.number().int().positive().optional(),
   modes: z.array(z.enum(['backend', 'fullstack'])).optional(),
 });

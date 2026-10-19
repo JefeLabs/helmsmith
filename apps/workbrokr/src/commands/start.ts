@@ -34,7 +34,10 @@ export function registerStart(program: Command): void {
       "Start an effort: the area's worktree on <type>/<area> (or <type>/<area>--<task>), synced from the base branch, leased and running",
     )
     .requiredOption('--area <area>', 'a leaf area from helmsmith.config (e.g. org/applications)')
-    .option('--task <slug>', 'intra-area task slug for parallel sub-efforts (<type>/<area>--<slug>)')
+    .option(
+      '--task <slug>',
+      'intra-area task slug for parallel sub-efforts (<type>/<area>--<slug>)',
+    )
     .requiredOption('--type <type>', 'feature | chore | fix (as the manifest allows)')
     .requiredOption('--mode <mode>', 'fullstack | backend (a slot) | frontend (storybrokr)')
     .option('--scope <glob...>', 'narrow exclusive scope globs for this task sub-effort')
@@ -43,6 +46,10 @@ export function registerStart(program: Command): void {
       'frontend: the story file or component folder storybrokr boots, relative to the Storybook host',
     )
     .option('--join', 'work in the already-open effort on this area instead of refusing')
+    .option(
+      '--reset-db',
+      'fullstack/backend: drop and recreate the slot database before the services start (then seed)',
+    )
     .option('--no-sync', 'skip the fetch and merge from the base branch (reproducing something)')
     .option('--project-root <dir>', 'repository root (default: the main checkout of the cwd)')
     .option('--json', 'print the result as JSON')
@@ -55,6 +62,7 @@ export function registerStart(program: Command): void {
         scope?: string[];
         story?: string;
         join?: boolean;
+        resetDb?: boolean;
         sync: boolean;
         projectRoot?: string;
         json?: boolean;
@@ -70,6 +78,7 @@ export function registerStart(program: Command): void {
             story: o.story,
             join: o.join,
             sync: o.sync,
+            resetDb: o.resetDb,
           });
           if (o.json) printJson(r);
           else printStart(r);

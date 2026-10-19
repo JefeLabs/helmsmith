@@ -1,5 +1,13 @@
 # @helmsmith/workbrokr
 
+## 0.4.0
+
+### Minor Changes
+
+- Database reset on request. `work reset --area <a> [--task <t>]` (and the `work_reset` MCP tool) gives an open fullstack or backend effort a fresh database: it stops the app services the lease started (never postgres), runs `services.postgres.reset`, starts the services again with their health checks, then runs the new optional `services.postgres.seed`. `work start --reset-db` forces the same before the services boot. Refuses `EFFORT_NOT_FOUND`, `LEASE_NOT_FOUND` (no slot: promote first) and `MANIFEST_INVALID` (no reset command).
+- The automatic reset (the `db-reset` mark after a migration lands) now runs `services.postgres.seed` once the services are up, at start and at promote.
+- `work retire` runs the new optional `services.postgres.purge` in the area's worktree to drop the container and volume of the slot the area last held, but only when no effort holds that slot and none of its ports answer; the result says `purged: <slot>` or `purgeSkipped: <why>`. Efforts record `lastSlot` for this.
+
 ## 0.3.1
 
 ### Patch Changes

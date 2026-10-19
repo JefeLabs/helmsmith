@@ -8,6 +8,7 @@ import { registerMcp } from './commands/mcp.js';
 import { registerPr } from './commands/pr.js';
 import { registerPromote } from './commands/promote.js';
 import { registerReap } from './commands/reap.js';
+import { registerReset } from './commands/reset.js';
 import { registerRetire } from './commands/retire.js';
 import { registerStart } from './commands/start.js';
 import { registerStatus } from './commands/status.js';
@@ -16,7 +17,7 @@ import { VERSION } from './version.js';
 const { program } = createCli({
   name: 'work',
   version: VERSION,
-  description: 'Area-based work: start, promote, status, pr, finish, reap, retire, audit.',
+  description: 'Area-based work: start, promote, status, pr, reset, finish, reap, retire, audit.',
 });
 
 registerInit(program);
@@ -27,6 +28,7 @@ registerEnv(program);
 registerPr(program);
 registerFinish(program);
 registerReap(program);
+registerReset(program);
 registerRetire(program);
 registerAudit(program);
 registerHook(program);

@@ -11,6 +11,7 @@ import {
   prEffort,
   promoteEffort,
   reapLeases,
+  resetEffort,
   startEffort,
   statusFor,
 } from '../lib/effort.js';
@@ -71,10 +72,16 @@ export function buildMcpServer(ctxFactory: (projectRoot?: string) => Promise<Ctx
           .boolean()
           .optional()
           .describe('fetch and merge the base branch first (default true)'),
+        resetDb: z
+          .boolean()
+          .optional()
+          .describe(
+            'fullstack/backend: drop and recreate the slot database before the services start, then seed',
+          ),
         projectRoot: z.string().optional().describe('optional repository root path override'),
       },
     },
-    async ({ area, task, type, mode, scopes, story, join, sync, projectRoot }) =>
+    async ({ area, task, type, mode, scopes, story, join, sync, resetDb, projectRoot }) =>
       guard(async () =>
         startEffort(await ctxFactory(projectRoot), {
           area,
@@ -85,8 +92,24 @@ export function buildMcpServer(ctxFactory: (projectRoot?: string) => Promise<Ctx
           story,
           join,
           sync,
+          resetDb,
         }),
       ),
+  );
+
+  server.registerTool(
+    'work_reset',
+    {
+      description:
+        "Fresh database for an open fullstack/backend effort: stop its app services (not postgres), run the manifest's postgres reset, start them again with health checks, then seed. Refuses EFFORT_NOT_FOUND, LEASE_NOT_FOUND (no slot: promote first), MANIFEST_INVALID (no reset command).",
+      inputSchema: {
+        area: z.string(),
+        task: z.string().optional().describe('optional intra-area task slug'),
+        projectRoot: z.string().optional().describe('optional repository root path override'),
+      },
+    },
+    async ({ area, task, projectRoot }) =>
+      guard(async () => resetEffort(await ctxFactory(projectRoot), { area, task })),
   );
 
   server.registerTool(
