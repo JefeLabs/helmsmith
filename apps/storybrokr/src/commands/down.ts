@@ -1,5 +1,6 @@
 import type { Command } from 'commander';
-import type { DaemonClient } from '../client/index.js';
+import { DaemonClient } from '../client/index.js';
+import { StorybrokrError } from '../lib/errors.js';
 import { realpathOrResolve } from '../lib/host.js';
 import type { InstanceRecord } from '../types.js';
 import { fail, printJson, resolveTarget } from './_shared/output.js';
@@ -34,8 +35,25 @@ export async function runDown(
   }
   const [rawTarget] = selectDownTargets([], idOrPath, false);
   const target = resolveTarget(rawTarget, opts.host);
-  await client.down(target.idOrPath, { host: target.host, hint: target.hint });
+  // Destructive: STORYBROKR_HOST is the host, never a hint that falls through to another worktree.
+  await client.down(target.idOrPath, { host: target.host ?? target.hint, hint: undefined });
   return [target.idOrPath];
+}
+
+/** `down --if-running`: when no daemon is listening there is nothing to stop; never start one to find that out. */
+export async function downIfRunning(
+  connectNoStart: () => Promise<DaemonClient>,
+  idOrPath: string | undefined,
+  opts: { all?: boolean; host?: string },
+): Promise<string[]> {
+  let client: DaemonClient;
+  try {
+    client = await connectNoStart();
+  } catch (err) {
+    if (err instanceof StorybrokrError && err.code === 'DAEMON_UNAVAILABLE') return [];
+    throw err;
+  }
+  return runDown(client, idOrPath, opts);
 }
 
 export function registerDown(program: Command, connect: () => Promise<DaemonClient>): void {
@@ -47,12 +65,17 @@ export function registerDown(program: Command, connect: () => Promise<DaemonClie
       'host repo root (or stop all instances in <dir> when id-or-path is omitted)',
     )
     .option('--all', 'stop every instance (every instance in <dir> when combined with --host)')
+    .option('--if-running', 'do nothing (and start no daemon) when no daemon is listening')
     .option('--json', 'print JSON')
     .action(
-      async (idOrPath: string | undefined, o: { host?: string; all?: boolean; json?: boolean }) => {
+      async (
+        idOrPath: string | undefined,
+        o: { host?: string; all?: boolean; ifRunning?: boolean; json?: boolean },
+      ) => {
         try {
-          const client = await connect();
-          const stopped = await runDown(client, idOrPath, o);
+          const stopped = o.ifRunning
+            ? await downIfRunning(() => DaemonClient.connect({ autoStart: false }), idOrPath, o)
+            : await runDown(await connect(), idOrPath, o);
           if (o.json) printJson({ stopped });
           else console.log(`stopped ${stopped.length} instance${stopped.length === 1 ? '' : 's'}`);
         } catch (err) {

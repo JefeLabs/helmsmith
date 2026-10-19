@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DaemonClient } from '../client/index.js';
 import type { InstanceRecord } from '../types.js';
 import { runDown, selectDownTargets } from './down.js';
@@ -41,5 +41,35 @@ describe('runDown with --all and --host', () => {
     expect(list).not.toHaveBeenCalled();
     expect(down).not.toHaveBeenCalled();
     expect(stopped).toEqual(['a1']);
+  });
+});
+
+describe('S11 and --if-running', () => {
+  const saved = process.env.STORYBROKR_HOST;
+  afterEach(() => {
+    if (saved === undefined) delete process.env.STORYBROKR_HOST;
+    else process.env.STORYBROKR_HOST = saved;
+  });
+
+  it('down treats STORYBROKR_HOST as the host, never falling through to another worktree', async () => {
+    process.env.STORYBROKR_HOST = '/wt-a/app-ui';
+    const down = vi.fn(async () => undefined);
+    const client = { down } as unknown as DaemonClient;
+    await runDown(client, 'src/Button', {});
+    const { realpathOrResolve } = await import('../lib/host.js');
+    expect(down).toHaveBeenCalledWith('src/Button', {
+      host: realpathOrResolve('/wt-a/app-ui'),
+      hint: undefined,
+    });
+  });
+
+  it('--if-running reports nothing stopped when no daemon is listening, without starting one', async () => {
+    const { downIfRunning } = await import('./down.js');
+    const { StorybrokrError } = await import('../lib/errors.js');
+    const connect = vi.fn(async () => {
+      throw new StorybrokrError('DAEMON_UNAVAILABLE', 'none');
+    });
+    expect(await downIfRunning(connect, undefined, { host: '/wt-a' })).toEqual([]);
+    expect(connect).toHaveBeenCalledTimes(1);
   });
 });
