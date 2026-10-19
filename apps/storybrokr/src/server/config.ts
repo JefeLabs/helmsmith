@@ -42,5 +42,15 @@ export function loadConfig(home: string): DaemonConfig {
     }
     out[key] = value;
   }
+  if (
+    !Number.isInteger(out.checkConcurrency) ||
+    out.checkConcurrency < 1 ||
+    out.checkConcurrency > 64
+  ) {
+    throw new StorybrokrError(
+      'INTERNAL',
+      `config.json: checkConcurrency must be an integer from 1 to 64, got ${out.checkConcurrency}`,
+    );
+  }
   return out;
 }

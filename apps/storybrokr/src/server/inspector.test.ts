@@ -267,3 +267,47 @@ describe('inspector.screenshot', () => {
     });
   });
 });
+
+describe('S13: a failed worker stops the others', () => {
+  it('does not keep settling stories in the background after check has rejected', async () => {
+    const many: InstanceRecord = {
+      ...record,
+      stories: ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => ({
+        id: `panel--${id}`,
+        title: 'Panel',
+        name: id,
+        importPath: './x',
+        url: `http://127.0.0.1:6100/?path=/story/panel--${id}`,
+        iframeUrl: `http://127.0.0.1:6100/iframe.html?id=panel--${id}&viewMode=story`,
+      })),
+    };
+    const page = {
+      goto: async () => {},
+      evaluate: async () => [],
+      waitForLoadState: async () => {},
+    };
+    const ctx: InspectorContext = {
+      addInitScript: vi.fn(async () => {}),
+      newPage: async () => page as never,
+      close: vi.fn(async () => {}),
+    };
+    let acquires = 0;
+    const acquire = vi.fn(async () => {
+      acquires++;
+      if (acquires === 2) throw new Error('browser gone');
+      return ctx;
+    });
+    const settle = vi.fn(async () => {
+      await new Promise((r) => setTimeout(r, 40));
+      return { kind: 'pass', played: false } as SettleOutcome;
+    });
+    const inspector = createInspector({
+      pool: { acquire },
+      settle: settle as never,
+      writeFile: vi.fn(),
+    });
+    await expect(inspector.check(many, { concurrency: 2 })).rejects.toThrow(/browser gone/);
+    await new Promise((r) => setTimeout(r, 400));
+    expect(settle.mock.calls.length).toBeLessThan(6);
+  });
+});

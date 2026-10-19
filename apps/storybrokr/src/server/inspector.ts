@@ -99,12 +99,22 @@ export function createInspector(deps: InspectorDeps): Inspector {
           Math.min(stories.length, req.concurrency ?? defaultConcurrency),
         );
         let nextIdx = 0;
+        // one worker's failure fails the check; the others stop taking stories instead of
+        // settling on in the background behind a rejected promise
+        let failed = false;
         const workers = Array.from({ length: workerCount }, async () => {
-          const ctx = await deps.pool.acquire();
+          let ctx: InspectorContext;
+          try {
+            ctx = await deps.pool.acquire();
+          } catch (err) {
+            failed = true;
+            throw err;
+          }
           try {
             await ctx.addInitScript(RECORDER_SCRIPT);
             const page = await ctx.newPage();
             for (;;) {
+              if (failed) break;
               const i = nextIdx++;
               if (i >= stories.length) break;
               const story = stories[i];
@@ -150,6 +160,9 @@ export function createInspector(deps: InspectorDeps): Inspector {
                 };
               }
             }
+          } catch (err) {
+            failed = true;
+            throw err;
           } finally {
             await ctx.close();
           }

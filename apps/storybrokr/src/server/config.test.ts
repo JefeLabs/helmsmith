@@ -87,3 +87,14 @@ describe('loadConfig', () => {
     }
   });
 });
+
+describe('S13: checkConcurrency range', () => {
+  it('rejects 0 and absurd values', () => {
+    for (const v of [0, -1, 1000, 2.5]) {
+      const home = mkdtempSync(join(tmpdir(), 'sb-cfg-'));
+      writeFileSync(join(home, 'config.json'), JSON.stringify({ checkConcurrency: v }));
+      expect(() => loadConfig(home)).toThrow(/checkConcurrency/);
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+});
