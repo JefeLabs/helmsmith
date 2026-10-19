@@ -126,6 +126,10 @@ jobs:
         # Spawns the built CLI (bin/gittyup.mjs → Bun → dist/cli.js) against
         # temp workspaces and fixture git repos. Needs git on the runner, no
         # network. `pnpm -r test` above is unit-only for gittyup.
+        # Runs even when an earlier suite failed: independent e2e suites must
+        # not shadow each other (storybrokr's has been red on main since
+        # 2026-09, which would otherwise skip this step on every run).
+        if: ${{ !cancelled() }}
         run: pnpm --filter @helmsmith/gittyup test:e2e
 
   # ── Java stack — controlplane ─────────────────────────────────────────
