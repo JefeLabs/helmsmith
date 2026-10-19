@@ -4,7 +4,7 @@ import {
   ManifestSchema,
   ManifestSettingsSchema,
   RepoConfigSchema,
-} from '../../src/config/schema.js';
+} from './schema.js';
 
 describe('RepoConfig schema', () => {
   it('validates a minimal repo', () => {
