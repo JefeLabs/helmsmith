@@ -9,7 +9,6 @@ const home = homeDir();
 const config = loadConfig(home);
 const registry = new Registry({ home, config });
 const broker = new Broker({ registry, spawner: storybookSpawner, config });
-await broker.reconcile();
 const daemon = createDaemon({ home, broker, config });
 const info = await daemon.start(
   process.env.STORYBROKR_PORT ? Number(process.env.STORYBROKR_PORT) : 0,

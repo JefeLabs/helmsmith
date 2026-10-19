@@ -426,3 +426,27 @@ describe('daemon', () => {
     expect(statSync(join(home, 'daemon.json')).mode & 0o777).toBe(0o600);
   });
 });
+
+describe('S5: reconcile runs under the daemon lock', () => {
+  it('start() reconciles after taking the lock, and a second daemon never reconciles', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'sb-daemon-'));
+    const mk = () => {
+      const registry = new Registry({ home, config: DEFAULT_CONFIG });
+      const broker = new Broker({ registry, spawner: neverSpawner, config: DEFAULT_CONFIG });
+      const reconcile = vi.spyOn(broker, 'reconcile');
+      return { daemon: createDaemon({ home, broker, config: DEFAULT_CONFIG }), reconcile };
+    };
+    const first = mk();
+    const second = mk();
+    try {
+      await first.daemon.start(0);
+      expect(first.reconcile).toHaveBeenCalledTimes(1);
+      await expect(second.daemon.start(0)).rejects.toThrow(/already running/);
+      expect(second.reconcile).not.toHaveBeenCalled();
+    } finally {
+      await first.daemon.stop().catch(() => {});
+      await second.daemon.stop().catch(() => {});
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+});

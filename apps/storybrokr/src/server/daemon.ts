@@ -127,6 +127,8 @@ export function createDaemon(opts: DaemonOptions): Daemon {
     token,
     async start(port = 0) {
       acquireLock(opts.home);
+      // only the daemon that holds the lock may rewrite state.json or touch config dirs
+      await opts.broker.reconcile();
       const ctx = {
         broker: opts.broker,
         inspector,
