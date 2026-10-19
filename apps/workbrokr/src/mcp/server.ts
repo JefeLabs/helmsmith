@@ -109,7 +109,7 @@ export function buildMcpServer(ctxFactory: (projectRoot?: string) => Promise<Ctx
     'work_pr',
     {
       description:
-        "Open the effort's pull request through pritty: pushes the branch first, reuses a stored PR that is still open (updating its title/body when given), refuses with PR_CLOSED when it was merged or closed unless force, and stores { number, url, draft } on the effort. Pass title and bodyFile: the agent writes the words, pritty's AI path is only the fallback.",
+        "Open the effort's pull request through pritty: pushes the branch first, reuses a stored PR that is still open (updating its title/body when given), refuses with PR_CLOSED when it was merged or closed unless force, and stores { number, url, draft } on the effort. Pass title and body: the agent writes the words, pritty's AI path is only the fallback.",
       inputSchema: {
         area: z
           .string()
@@ -118,13 +118,17 @@ export function buildMcpServer(ctxFactory: (projectRoot?: string) => Promise<Ctx
         task: z.string().optional().describe('optional intra-area task slug'),
         draft: z.boolean().optional().describe('open a draft PR'),
         title: z.string().optional().describe('PR title'),
-        body: z.string().optional().describe('PR body text'),
-        bodyFile: z.string().optional().describe('path to a file holding the PR body'),
+        // body text only: a file path here would let any MCP caller have pritty read an
+        // arbitrary file and publish it as a PR body; read the file yourself and pass the text
+        body: z
+          .string()
+          .optional()
+          .describe('PR body text (read your body file and pass its text)'),
         force: z.boolean().optional().describe('open a new PR when the stored one was closed'),
         projectRoot: z.string().optional().describe('optional repository root path override'),
       },
     },
-    async ({ area, task, draft, title, body, bodyFile, force, projectRoot }) =>
+    async ({ area, task, draft, title, body, force, projectRoot }) =>
       guard(async () =>
         prEffort(await ctxFactory(projectRoot), {
           area,
@@ -133,7 +137,6 @@ export function buildMcpServer(ctxFactory: (projectRoot?: string) => Promise<Ctx
           draft,
           title,
           body,
-          bodyFile,
           force,
         }),
       ),

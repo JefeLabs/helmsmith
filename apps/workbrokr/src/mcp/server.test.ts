@@ -141,3 +141,20 @@ describe('MCP server', () => {
     expect(finished.mergedIntoArea).toBe(true);
   });
 });
+
+describe('work_pr input surface', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it("takes body text, never a file path to read on the caller's behalf", async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const client = await connected(f.main);
+    const tool = (await client.listTools()).tools.find((t) => t.name === 'work_pr');
+    const props = Object.keys(
+      (tool?.inputSchema as { properties?: Record<string, unknown> }).properties ?? {},
+    );
+    expect(props).toContain('body');
+    expect(props).not.toContain('bodyFile');
+  });
+});
