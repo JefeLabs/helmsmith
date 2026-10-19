@@ -1,5 +1,5 @@
-import { type ChildProcess, spawn } from 'node:child_process';
-import { createWriteStream } from 'node:fs';
+import { type ChildProcess, type SpawnOptions, spawn } from 'node:child_process';
+import { closeSync, openSync, readSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HostInfo } from '../types.js';
 import { LogBuffer } from './logbuffer.js';
@@ -27,30 +27,65 @@ export const STORYBOOK_ARGS = (configDir: string, port: number): string[] => [
   '--disable-telemetry',
 ];
 
-function wrap(child: ChildProcess, configDir: string): SpawnedProcess {
+/**
+ * Spawn with stdout+stderr going straight to <configDir>/storybook.log, not to pipes held by
+ * this process: a detached Storybook whose daemon exited used to die with EPIPE on its next
+ * log line. The daemon tails the file into the LogBuffer for readiness and `logs`.
+ */
+function spawnLogged(
+  command: string,
+  args: string[],
+  configDir: string,
+  opts: SpawnOptions,
+): SpawnedProcess {
+  const logPath = join(configDir, 'storybook.log');
+  const fd = openSync(logPath, 'a');
+  const startOffset = statSync(logPath).size;
+  let child: ChildProcess;
+  try {
+    child = spawn(command, args, { ...opts, stdio: ['ignore', fd, fd] });
+  } finally {
+    closeSync(fd);
+  }
+  if (opts.detached) child.unref();
+  return wrap(child, logPath, startOffset);
+}
+
+function wrap(child: ChildProcess, logPath: string, startOffset: number): SpawnedProcess {
   const log = new LogBuffer();
-  const file = createWriteStream(join(configDir, 'storybook.log'), { flags: 'a' });
-  file.once('error', (err) => {
-    log.push(`log file error: ${err.message}\n`);
-  });
-  const onData = (b: Buffer) => {
-    const s = b.toString();
-    log.push(s);
-    file.write(s);
+  let offset = startOffset;
+  const drain = (): void => {
+    let fd: number;
+    try {
+      fd = openSync(logPath, 'r');
+    } catch {
+      return;
+    }
+    try {
+      const size = statSync(logPath).size;
+      if (size <= offset) return;
+      const buf = Buffer.alloc(size - offset);
+      const n = readSync(fd, buf, 0, buf.length, offset);
+      offset += n;
+      log.push(buf.subarray(0, n).toString());
+    } finally {
+      closeSync(fd);
+    }
   };
-  child.stdout?.on('data', onData);
-  child.stderr?.on('data', onData);
+  const tail = setInterval(drain, 100);
+  tail.unref();
   let resolveExited!: (code: number | null) => void;
   const exited = new Promise<number | null>((resolve) => {
     resolveExited = resolve;
   });
   child.once('close', (code) => {
-    file.end();
+    clearInterval(tail);
+    drain();
     resolveExited(code);
   });
   child.once('error', (err) => {
+    clearInterval(tail);
     log.push(`spawn failed: ${err.message}\n`);
-    file.end();
     resolveExited(null);
   });
   return {
@@ -124,26 +159,23 @@ export async function terminate(pid: number, opts: TerminateOptions = {}): Promi
 export function commandSpawner(command: string, args: string[]): Spawner {
   return {
     spawn(host, configDir) {
-      const child = spawn(command, args, {
+      return spawnLogged(command, args, configDir, {
         cwd: host.hostRoot,
         env: { ...process.env, CI: '1', FORCE_COLOR: '0' },
-        stdio: ['ignore', 'pipe', 'pipe'],
       });
-      return wrap(child, configDir);
     },
   };
 }
 
-/** The real thing: the host's own node_modules/.bin/storybook. */
+/** The real thing: the host's own node_modules/.bin/storybook, in its own process group so it
+ * outlives the daemon (reconcile adopts it on the next start). */
 export const storybookSpawner: Spawner = {
   spawn(host, configDir, port) {
-    const child = spawn(host.storybookBin, STORYBOOK_ARGS(configDir, port), {
+    const proc = spawnLogged(host.storybookBin, STORYBOOK_ARGS(configDir, port), configDir, {
       cwd: host.hostRoot,
       env: { ...process.env, CI: '1', FORCE_COLOR: '0' },
-      stdio: ['ignore', 'pipe', 'pipe'],
       detached: true,
     });
-    child.unref();
-    return wrap(child, configDir);
+    return proc;
   },
 };

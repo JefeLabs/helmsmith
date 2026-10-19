@@ -118,3 +118,54 @@ describe('terminate', () => {
     expect(isAlivePid(pid)).toBe(false);
   });
 });
+
+describe('storybookSpawner (S4): a child outlives the daemon that spawned it', () => {
+  it('keeps running and keeps logging after its parent is SIGKILLed', async () => {
+    const { chmodSync, writeFileSync, existsSync } = await import('node:fs');
+    const { fileURLToPath } = await import('node:url');
+    const dir = mkdtempSync(join(tmpdir(), 'sb-orphan-'));
+    const configDir = join(dir, 'cfg');
+    const { mkdirSync } = await import('node:fs');
+    mkdirSync(configDir);
+    writeFileSync(
+      join(dir, 'bin.sh'),
+      `#!/bin/sh\nexec "${process.execPath}" -e "setInterval(() => console.log('tick'), 50)"\n`,
+    );
+    chmodSync(join(dir, 'bin.sh'), 0o755);
+    const tsx = fileURLToPath(new URL('../../../../node_modules/.bin/tsx', import.meta.url));
+    const fixture = fileURLToPath(new URL('./spawn-parent.fixture.ts', import.meta.url));
+    const parent = spawn(tsx, [fixture, dir, configDir], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const childPid = await new Promise<number>((resolve, reject) => {
+      let out = '';
+      parent.stdout.on('data', (b: Buffer) => {
+        out += b.toString();
+        const m = out.match(/^(\d+)\n/m);
+        if (m) resolve(Number(m[1]));
+      });
+      parent.once('exit', () => reject(new Error(`parent exited early: ${out}`)));
+      setTimeout(() => reject(new Error(`no pid from parent: ${out}`)), 15_000);
+    });
+    try {
+      await new Promise((r) => setTimeout(r, 300));
+      parent.kill('SIGKILL');
+      await new Promise((r) => setTimeout(r, 300));
+      const logFile = join(configDir, 'storybook.log');
+      expect(existsSync(logFile)).toBe(true);
+      const before = readFileSync(logFile, 'utf8').split('\n').length;
+      await new Promise((r) => setTimeout(r, 500));
+      let alive = true;
+      try {
+        process.kill(childPid, 0);
+      } catch {
+        alive = false;
+      }
+      expect(alive).toBe(true);
+      expect(readFileSync(logFile, 'utf8').split('\n').length).toBeGreaterThan(before);
+    } finally {
+      try {
+        process.kill(childPid, 'SIGKILL');
+      } catch {}
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 30_000);
+});
