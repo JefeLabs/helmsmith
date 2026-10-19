@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import simpleGit, { type SimpleGit, type StatusResult } from 'simple-git';
 import { APP_NAME } from '../config/branding.js';
 import type { ConflictFile, ConflictHunk, RepoBranchState, RepoState } from '../config/schema.js';
+import { checkResolution, ResolutionRejected } from './resolution-gate.js';
 
 /**
  * Low-level git operations for a single repository.
@@ -232,9 +233,16 @@ export class GitOperations {
 
   // ─── Resolution ───────────────────────────────────────────────────
 
-  async resolveFile(filePath: string, content: string): Promise<void> {
-    writeFileSync(join(this.repoPath, filePath), content, 'utf-8');
-    await this.git.add(filePath);
+  /**
+   * The only path that writes a resolved file. Runs the gate first and
+   * throws `ResolutionRejected` (file untouched, still conflicted) when
+   * it refuses; otherwise writes the content and stages the path.
+   */
+  async applyResolution(file: ConflictFile, content: string): Promise<void> {
+    const verdict = checkResolution(content, file);
+    if (!verdict.ok) throw new ResolutionRejected(file.path, verdict.reason);
+    writeFileSync(join(this.repoPath, file.path), content, 'utf-8');
+    await this.git.add(file.path);
   }
 
   /** Keep our side. When our side deleted the file, the resolution is the deletion. */

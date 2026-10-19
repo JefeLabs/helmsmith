@@ -112,3 +112,33 @@ describe('resolveUseOurs / resolveUseTheirs with a deleted side', () => {
     expect((await repo.git.status()).conflicted).toEqual([]);
   });
 });
+
+describe('applyResolution', () => {
+  it('writes and stages a gated resolution', async () => {
+    const repo = await conflictedRepo({
+      base: EIGHT('line4'),
+      ours: EIGHT('line4-ours'),
+      theirs: EIGHT('line4-theirs'),
+    });
+    const git = new GitOperations(repo.path);
+    const [file] = await git.getConflictedFiles();
+    await git.applyResolution(file, EIGHT('line4-merged'));
+    expect(await repo.read('f.txt')).toBe(EIGHT('line4-merged'));
+    expect((await repo.git.status()).conflicted).toEqual([]);
+  });
+
+  it('refuses a fragment and leaves the file untouched', async () => {
+    const repo = await conflictedRepo({
+      base: EIGHT('line4'),
+      ours: EIGHT('line4-ours'),
+      theirs: EIGHT('line4-theirs'),
+    });
+    const git = new GitOperations(repo.path);
+    const [file] = await git.getConflictedFiles();
+    await expect(git.applyResolution(file, 'line4-merged')).rejects.toMatchObject({
+      reason: 'single line where both sides are multi-line',
+    });
+    expect(await repo.read('f.txt')).toBe(file.markedContent);
+    expect((await repo.git.status()).conflicted).toEqual(['f.txt']);
+  });
+});
