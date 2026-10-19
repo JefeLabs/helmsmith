@@ -6,24 +6,67 @@ import type { ConflictFile } from '../config/schema.js';
  * construction, fence handling, and a line diff summary.
  */
 
-const OUTER_FENCE_RE = /^\s*```[^\n]*\n([\s\S]*?)\n?```\s*$/;
-const FENCED_BLOCK_RE = /```[^\n]*\n([\s\S]*?)```/g;
-
-/** Remove exactly one ``` wrapper around the whole text; anything else is returned unchanged. */
-export function stripOuterFence(text: string): string {
-  const m = text.match(OUTER_FENCE_RE);
-  if (!m) return text;
-  const inner = m[1];
-  return inner.endsWith('\n') ? inner : `${inner}\n`;
+/**
+ * CommonMark-style fence scanning, line-anchored: an opener of N backticks
+ * (or tildes) closes only on a line of at least N of the same character
+ * and nothing else. Regex pairing would split a Markdown file at its own
+ * ``` blocks, which is how a fragment could slip past the gate.
+ */
+interface FencedBlock {
+  /** index of the opening fence line */
+  open: number;
+  /** index of the closing fence line */
+  close: number;
+  /** content lines between the fences */
+  lines: string[];
 }
 
-/** The last fenced block in a reply plus the prose before it, or null when there is none. */
+const FENCE_OPEN_RE = /^ {0,3}(`{3,}|~{3,})([^`]*)$/;
+
+function scanFences(lines: string[]): FencedBlock[] {
+  const blocks: FencedBlock[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const m = lines[i].replace(/\r$/, '').match(FENCE_OPEN_RE);
+    if (!m) {
+      i++;
+      continue;
+    }
+    const fence = m[1];
+    const closeRe = new RegExp(`^ {0,3}${fence[0] === '`' ? '`' : '~'}{${fence.length},}\\s*$`);
+    let j = i + 1;
+    while (j < lines.length && !closeRe.test(lines[j].replace(/\r$/, ''))) j++;
+    if (j >= lines.length) break; // unclosed: not a block
+    blocks.push({ open: i, close: j, lines: lines.slice(i + 1, j) });
+    i = j + 1;
+  }
+  return blocks;
+}
+
+function joinLines(lines: string[]): string {
+  return lines.length === 0 ? '' : `${lines.join('\n')}\n`;
+}
+
+/** Remove exactly one fence wrapper around the whole text; anything else is returned unchanged. */
+export function stripOuterFence(text: string): string {
+  const lines = text.split('\n');
+  let first = 0;
+  while (first < lines.length && lines[first].trim() === '') first++;
+  let last = lines.length - 1;
+  while (last >= 0 && lines[last].trim() === '') last--;
+  if (first >= last) return text;
+  const [block] = scanFences(lines.slice(first, last + 1));
+  if (block?.open !== 0 || block.close !== last - first) return text;
+  return joinLines(block.lines);
+}
+
+/** The last closed fenced block in a reply plus the prose before it, or null when there is none. */
 export function extractLastFencedBlock(text: string): { rationale: string; code: string } | null {
-  let last: RegExpExecArray | null = null;
-  for (const m of text.matchAll(FENCED_BLOCK_RE)) last = m;
+  const lines = text.split('\n');
+  const blocks = scanFences(lines);
+  const last = blocks.at(-1);
   if (!last) return null;
-  const code = last[1].endsWith('\n') ? last[1] : `${last[1]}\n`;
-  return { rationale: text.slice(0, last.index).trim(), code };
+  return { rationale: lines.slice(0, last.open).join('\n').trim(), code: joinLines(last.lines) };
 }
 
 /** Approximate line diff: a multiset difference, not an alignment. */
@@ -46,7 +89,7 @@ const PREAMBLE =
 
 const SYSTEM: Record<'auto' | 'suggest', string> = {
   auto: `${PREAMBLE} Output the complete merged file and nothing else: no explanation, no code fence.`,
-  suggest: `${PREAMBLE} Explain your resolution in at most five lines, then output the complete merged file in one fenced code block. The code block must be the last thing in your reply.`,
+  suggest: `${PREAMBLE} Explain your resolution in at most five lines, then output the complete merged file in one fenced code block opened and closed with four backticks (\`\`\`\`), so any three-backtick fence inside the file does not end the block. The code block must be the last thing in your reply.`,
 };
 
 /** System + user messages for one conflicted file. */

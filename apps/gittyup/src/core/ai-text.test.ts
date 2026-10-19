@@ -19,6 +19,11 @@ describe('stripOuterFence', () => {
     const t = 'intro\n```\ncode\n```\n';
     expect(stripOuterFence(t)).toBe(t);
   });
+
+  it('strips a four-backtick outer fence around a file that contains three-backtick fences', () => {
+    const readme = '# Title\n\n```sh\nnpm test\n```\n\nMore text.\n';
+    expect(stripOuterFence(`\`\`\`\`markdown\n${readme}\`\`\`\`\n`)).toBe(readme);
+  });
 });
 
 describe('extractLastFencedBlock', () => {
@@ -37,6 +42,20 @@ describe('extractLastFencedBlock', () => {
 
   it('returns null when there is no block', () => {
     expect(extractLastFencedBlock('just prose')).toBeNull();
+  });
+
+  it('returns the whole file when a four-backtick block contains three-backtick fences', () => {
+    const readme = '# Title\n\n```sh\nnpm test\n```\n\nLine a\nLine b\nLine c\n';
+    const reply = `Kept both sections.\n\n\`\`\`\`markdown\n${readme}\`\`\`\``;
+    expect(extractLastFencedBlock(reply)).toEqual({
+      rationale: 'Kept both sections.',
+      code: readme,
+    });
+  });
+
+  it('closes a block only on a fence at least as long as the opener', () => {
+    const reply = '````\nouter\n```\ninner\n```\nstill outer\n````\n';
+    expect(extractLastFencedBlock(reply)?.code).toBe('outer\n```\ninner\n```\nstill outer\n');
   });
 });
 
@@ -71,9 +90,9 @@ describe('buildAiMessages', () => {
     expect(user.content).toContain('=== THEIRS (complete file) ===\n(deleted on this side)');
   });
 
-  it('asks suggest mode for a final fenced block', () => {
-    expect(buildAiMessages(file, 'suggest')[0].content).toContain(
-      'The code block must be the last thing in your reply.',
-    );
+  it('asks suggest mode for a final four-backtick fenced block', () => {
+    const sys = buildAiMessages(file, 'suggest')[0].content;
+    expect(sys).toContain('The code block must be the last thing in your reply.');
+    expect(sys).toContain('four backticks');
   });
 });

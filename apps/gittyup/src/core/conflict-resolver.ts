@@ -150,10 +150,10 @@ export class ConflictResolver {
 
     switch (action) {
       case 'ours':
-        await this.git.resolveUseOurs(file.path);
+        await this.git.resolveUseOurs(file);
         return true;
       case 'theirs':
-        await this.git.resolveUseTheirs(file.path);
+        await this.git.resolveUseTheirs(file);
         return true;
       case 'ai-auto':
         return this.aiAuto(file);

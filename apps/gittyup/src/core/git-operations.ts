@@ -246,28 +246,32 @@ export class GitOperations {
   }
 
   /** Keep our side. When our side deleted the file, the resolution is the deletion. */
-  async resolveUseOurs(filePath: string): Promise<void> {
-    await this.resolveUseSide(2, '--ours', filePath);
+  async resolveUseOurs(file: ConflictFile): Promise<void> {
+    await this.resolveUseSide(file, file.ours, '--ours');
   }
 
   /** Keep their side. When their side deleted the file, the resolution is the deletion. */
-  async resolveUseTheirs(filePath: string): Promise<void> {
-    await this.resolveUseSide(3, '--theirs', filePath);
+  async resolveUseTheirs(file: ConflictFile): Promise<void> {
+    await this.resolveUseSide(file, file.theirs, '--theirs');
   }
 
+  /**
+   * Branches on the ConflictFile already loaded by `getConflictedFiles`, never
+   * on a fresh `git show`: a transient git failure must not read as "deleted".
+   */
   private async resolveUseSide(
-    stage: 2 | 3,
+    file: ConflictFile,
+    side: string | undefined,
     flag: '--ours' | '--theirs',
-    filePath: string,
   ): Promise<void> {
-    if ((await this.showStage(stage, filePath)) === undefined) {
+    if (side === undefined) {
       // Resolve by deletion; git removes both the index entries and the
       // working-tree file, so no filesystem handling here.
-      await this.git.raw(['--literal-pathspecs', 'rm', '-q', '--', filePath]);
+      await this.git.raw(['--literal-pathspecs', 'rm', '-q', '--', file.path]);
       return;
     }
-    await this.git.raw(['--literal-pathspecs', 'checkout', flag, '--', filePath]);
-    await this.git.raw(['--literal-pathspecs', 'add', '--', filePath]);
+    await this.git.raw(['--literal-pathspecs', 'checkout', flag, '--', file.path]);
+    await this.git.raw(['--literal-pathspecs', 'add', '--', file.path]);
   }
 
   async commitResolution(message?: string): Promise<string> {

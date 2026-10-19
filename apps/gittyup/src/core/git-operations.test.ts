@@ -98,16 +98,30 @@ describe('parseConflictHunks', () => {
 describe('resolveUseOurs / resolveUseTheirs with a deleted side', () => {
   it('keeping the deleted side removes the file and stages the deletion', async () => {
     const repo = await deleteModifyRepo();
-    await new GitOperations(repo.path).resolveUseOurs('f.txt');
+    const git = new GitOperations(repo.path);
+    const [file] = await git.getConflictedFiles();
+    await git.resolveUseOurs(file);
     expect(await repo.exists('f.txt')).toBe(false);
     expect((await repo.git.status()).conflicted).toEqual([]);
     // HEAD (develop) already lacks the file, so "keep ours" leaves it untracked.
     expect((await repo.git.raw(['ls-files', 'f.txt'])).trim()).toBe('');
   });
 
+  it('trusts the loaded ConflictFile and never infers deletion from a git failure', async () => {
+    // Stage 2 is absent here; a ConflictFile that claims ours exists must make
+    // git fail loudly (checkout --ours), not silently delete the file.
+    const repo = await deleteModifyRepo();
+    const git = new GitOperations(repo.path);
+    const [file] = await git.getConflictedFiles();
+    await expect(git.resolveUseOurs({ ...file, ours: 'claimed\n' })).rejects.toThrow();
+    expect((await repo.git.status()).conflicted).toEqual(['f.txt']);
+  });
+
   it('keeping the surviving side restores its content and stages it', async () => {
     const repo = await deleteModifyRepo();
-    await new GitOperations(repo.path).resolveUseTheirs('f.txt');
+    const git = new GitOperations(repo.path);
+    const [file] = await git.getConflictedFiles();
+    await git.resolveUseTheirs(file);
     expect(await repo.read('f.txt')).toBe('x-main\n');
     expect((await repo.git.status()).conflicted).toEqual([]);
   });
@@ -154,7 +168,9 @@ describe('paths that look like globs', () => {
       checkout: 'develop',
     });
     await repo.git.merge(['main']).catch(() => {});
-    await new GitOperations(repo.path).resolveUseTheirs('a*.txt');
+    const git = new GitOperations(repo.path);
+    const [file] = await git.getConflictedFiles();
+    await git.resolveUseTheirs(file);
     expect(await repo.read('a*.txt')).toBe('x-theirs\n');
     expect(await repo.read('ab.txt')).toBe('keep\n');
     expect((await repo.git.status()).conflicted).toEqual([]);
