@@ -142,3 +142,21 @@ describe('applyResolution', () => {
     expect((await repo.git.status()).conflicted).toEqual(['f.txt']);
   });
 });
+
+describe('paths that look like globs', () => {
+  it('resolves exactly the named file, not a glob match', async () => {
+    const repo = await makeRepo({
+      commits: [
+        { message: 'base', files: { 'a*.txt': 'x\n', 'ab.txt': 'keep\n' } },
+        { branch: 'develop', message: 'ours', files: { 'a*.txt': 'x-ours\n' } },
+        { branch: 'main', message: 'theirs', files: { 'a*.txt': 'x-theirs\n' } },
+      ],
+      checkout: 'develop',
+    });
+    await repo.git.merge(['main']).catch(() => {});
+    await new GitOperations(repo.path).resolveUseTheirs('a*.txt');
+    expect(await repo.read('a*.txt')).toBe('x-theirs\n');
+    expect(await repo.read('ab.txt')).toBe('keep\n');
+    expect((await repo.git.status()).conflicted).toEqual([]);
+  });
+});

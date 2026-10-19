@@ -1,37 +1,46 @@
-import { confirm, editor, select } from '@inquirer/prompts';
 import chalk from 'chalk';
 import { APP_NAME } from '../config/branding.js';
 import type { AiMode, ConflictFile, ConflictSession, RepoConfig } from '../config/schema.js';
-import { GitOperations } from './git-operations.js';
+import { diffStat, extractLastFencedBlock, stripOuterFence } from './ai-text.js';
+import type { GitOperations } from './git-operations.js';
+import { checkResolution, ResolutionRejected } from './resolution-gate.js';
+import { inquirerPrompts, type ResolverPrompts } from './resolver-prompts.js';
 
-/** Callbacks for pluggable AI resolution and progress reporting. */
-export interface ResolutionCallbacks {
+/** Options for a resolution session; prompts and the AI callback are injectable. */
+export interface ResolverOptions {
+  /** Default: inquirer. Tests pass `scriptedPrompts(...)`. */
+  prompts?: ResolverPrompts;
+  /** Skip the confirmation before an AI auto resolution is written. */
+  yes?: boolean;
+  /** Shown in menu copy; default 'AI'. */
+  modelName?: string;
   onAiResolve?: (file: ConflictFile, mode: 'auto' | 'suggest') => Promise<string | null>;
   onFileResolved?: (repoName: string, filePath: string) => void;
   onSessionComplete?: (session: ConflictSession) => void;
 }
 
+type MenuAction = 'ai-auto' | 'ai-suggest' | 'ours' | 'theirs' | 'manual' | 'view-full' | 'skip';
+
+const PREVIEW_LINES = 8;
+
 /**
- * Interactive conflict resolution session.
- * Walks through each conflicted file and offers resolution strategies
- * including AI-assisted merge, ours/theirs, manual edit, and escalation.
+ * Interactive conflict resolution session. Walks each conflicted file and
+ * offers AI, ours/theirs, manual edit, or skip. Every write goes through
+ * `GitOperations.applyResolution`, so nothing here can write a fragment,
+ * markers, or prose.
  */
 export class ConflictResolver {
-  private git: GitOperations;
-  private repo: RepoConfig;
-  private aiMode: AiMode;
-  private callbacks: ResolutionCallbacks;
+  private readonly prompts: ResolverPrompts;
+  private readonly modelName: string;
 
   constructor(
-    git: GitOperations,
-    repo: RepoConfig,
-    aiMode: AiMode,
-    callbacks: ResolutionCallbacks = {},
+    private readonly git: GitOperations,
+    private readonly repo: RepoConfig,
+    private readonly aiMode: AiMode,
+    private readonly options: ResolverOptions = {},
   ) {
-    this.git = git;
-    this.repo = repo;
-    this.aiMode = aiMode;
-    this.callbacks = callbacks;
+    this.prompts = options.prompts ?? inquirerPrompts;
+    this.modelName = options.modelName ?? 'AI';
   }
 
   /** Start the interactive resolution session. */
@@ -67,7 +76,7 @@ export class ConflictResolver {
       const resolved = await this.resolveFile(file);
       if (resolved) {
         session.resolvedFiles.push(file.path);
-        this.callbacks.onFileResolved?.(this.repo.name, file.path);
+        this.options.onFileResolved?.(this.repo.name, file.path);
         console.log(chalk.green(`  ✓ Resolved: ${file.path}`));
       } else {
         console.log(chalk.red(`  ✗ Skipped: ${file.path}`));
@@ -79,7 +88,10 @@ export class ConflictResolver {
       session.status = 'resolved';
       console.log(chalk.green.bold('All conflicts resolved!'));
 
-      const shouldCommit = await confirm({ message: 'Commit the resolution?', default: true });
+      const shouldCommit = await this.prompts.confirm({
+        message: 'Commit the resolution?',
+        default: true,
+      });
       if (shouldCommit) {
         const hash = await this.git.commitResolution(
           `resolve: ${operation} ${sourceBranch} → ${targetBranch} via ${APP_NAME}`,
@@ -90,7 +102,7 @@ export class ConflictResolver {
       const unresolved = files.length - session.resolvedFiles.length;
       console.log(chalk.yellow(`${unresolved} file(s) still unresolved.`));
 
-      const action = await select({
+      const action = await this.prompts.select({
         message: 'How would you like to proceed?',
         choices: [
           { name: 'Continue resolving remaining files', value: 'retry' as const },
@@ -123,7 +135,7 @@ export class ConflictResolver {
       }
     }
 
-    this.callbacks.onSessionComplete?.(session);
+    this.options.onSessionComplete?.(session);
     return session;
   }
 
@@ -131,9 +143,10 @@ export class ConflictResolver {
 
   private async resolveFile(file: ConflictFile): Promise<boolean> {
     this.showConflictPreview(file);
-    const choices = this.buildResolutionChoices();
-
-    const action = await select({ message: `How to resolve ${chalk.bold(file.path)}?`, choices });
+    const action = await this.prompts.select<MenuAction>({
+      message: `How to resolve ${chalk.bold(file.path)}?`,
+      choices: this.buildResolutionChoices(file),
+    });
 
     switch (action) {
       case 'ours':
@@ -142,44 +155,12 @@ export class ConflictResolver {
       case 'theirs':
         await this.git.resolveUseTheirs(file.path);
         return true;
-      case 'ai-auto': {
-        const resolved = await this.callbacks.onAiResolve?.(file, 'auto');
-        if (resolved) {
-          await this.git.resolveFile(file.path, resolved);
-          return true;
-        }
-        console.log(chalk.yellow('  AI could not auto-resolve. Falling back to manual.'));
-        return this.resolveFile(file);
-      }
-      case 'ai-suggest': {
-        const suggestion = await this.callbacks.onAiResolve?.(file, 'suggest');
-        if (suggestion) {
-          console.log(chalk.dim('\n── AI Suggested Resolution ──'));
-          console.log(suggestion);
-          console.log(chalk.dim('── End Suggestion ──\n'));
-
-          const accept = await select({
-            message: 'Accept this suggestion?',
-            choices: [
-              { name: 'Accept as-is', value: 'accept' as const },
-              { name: 'Accept and edit', value: 'edit' as const },
-              { name: 'Reject, resolve manually', value: 'reject' as const },
-            ],
-          });
-          if (accept === 'accept') {
-            await this.git.resolveFile(file.path, suggestion);
-            return true;
-          }
-          if (accept === 'edit') return this.manualEdit(file, suggestion);
-          return this.resolveFile(file);
-        }
-        console.log(chalk.yellow('  AI did not return a suggestion.'));
-        return this.resolveFile(file);
-      }
+      case 'ai-auto':
+        return this.aiAuto(file);
+      case 'ai-suggest':
+        return this.aiSuggest(file);
       case 'manual':
-        return this.manualEdit(file);
-      case 'skip':
-        return false;
+        return this.manualEdit(file, file.markedContent);
       case 'view-full':
         this.showFullConflict(file);
         return this.resolveFile(file);
@@ -188,67 +169,143 @@ export class ConflictResolver {
     }
   }
 
+  /** AI writes the complete file; the user sees a line diff and confirms (unless `yes`). */
+  private async aiAuto(file: ConflictFile): Promise<boolean> {
+    const reply = await this.options.onAiResolve?.(file, 'auto');
+    if (!reply) {
+      console.log(chalk.yellow('  AI could not auto-resolve. Falling back to the menu.'));
+      return this.resolveFile(file);
+    }
+
+    const content = stripOuterFence(reply);
+    const verdict = checkResolution(content, file);
+    if (!verdict.ok) {
+      console.log(chalk.yellow(`  ✗ AI resolution refused: ${verdict.reason}`));
+      return this.resolveFile(file);
+    }
+
+    const { added, removed } = diffStat(file.ours ?? '', content);
+    console.log(chalk.dim(`  AI resolution: +${added} −${removed} lines vs OURS`));
+    if (!this.options.yes) {
+      const write = await this.prompts.confirm({
+        message: `Write this resolution to ${file.path}?`,
+        default: true,
+      });
+      if (!write) return this.resolveFile(file);
+    }
+    return this.tryApply(file, content);
+  }
+
+  /** AI explains, then proposes the complete file in a final fenced block. */
+  private async aiSuggest(file: ConflictFile): Promise<boolean> {
+    const reply = await this.options.onAiResolve?.(file, 'suggest');
+    const block = reply ? extractLastFencedBlock(reply) : null;
+    if (!block) {
+      console.log(chalk.yellow('  AI did not return a usable suggestion.'));
+      return this.resolveFile(file);
+    }
+
+    console.log(chalk.dim('\n── AI rationale ──'));
+    console.log(block.rationale || chalk.dim('(none)'));
+    console.log(chalk.dim('── Proposed file ──'));
+    console.log(block.code);
+    console.log(chalk.dim('── End ──\n'));
+
+    const accept = await this.prompts.select({
+      message: 'Accept this suggestion?',
+      choices: [
+        { name: 'Accept as-is', value: 'accept' as const },
+        { name: 'Accept and edit', value: 'edit' as const },
+        { name: 'Reject, back to the menu', value: 'reject' as const },
+      ],
+    });
+    if (accept === 'accept') {
+      return (await this.tryApply(file, block.code)) || this.resolveFile(file);
+    }
+    if (accept === 'edit') return this.manualEdit(file, block.code);
+    return this.resolveFile(file);
+  }
+
+  /** Open the editor on `initial`; refuse markers/fragments and offer to reopen. */
+  private async manualEdit(file: ConflictFile, initial: string): Promise<boolean> {
+    let content = initial;
+    while (true) {
+      content = await this.prompts.editor({
+        message: `Edit ${file.path} (will open your $EDITOR):`,
+        default: content,
+      });
+      if (await this.tryApply(file, content)) return true;
+      const reopen = await this.prompts.confirm({ message: 'Reopen the editor?', default: true });
+      if (!reopen) return false;
+    }
+  }
+
+  /** The single write; prints the gate's reason and returns false when refused. */
+  private async tryApply(file: ConflictFile, content: string): Promise<boolean> {
+    try {
+      await this.git.applyResolution(file, content);
+      return true;
+    } catch (err) {
+      if (err instanceof ResolutionRejected) {
+        console.log(chalk.yellow(`  ✗ Resolution refused: ${err.reason}`));
+        return false;
+      }
+      throw err;
+    }
+  }
+
   // ─── UI Helpers ───────────────────────────────────────────────────
 
   private showConflictPreview(file: ConflictFile): void {
-    const maxLines = 8;
-    const oursLines = file.oursContent.split('\n').slice(0, maxLines);
-    const theirsLines = file.theirsContent.split('\n').slice(0, maxLines);
-
-    console.log(chalk.red('  <<<< OURS (current branch):'));
-    for (const l of oursLines) console.log(chalk.red(`    ${l}`));
-    if (file.oursContent.split('\n').length > maxLines)
-      console.log(
-        chalk.dim(`    ... (${file.oursContent.split('\n').length - maxLines} more lines)`),
-      );
-
-    console.log(chalk.green('  >>>> THEIRS (incoming):'));
-    for (const l of theirsLines) console.log(chalk.green(`    ${l}`));
-    if (file.theirsContent.split('\n').length > maxLines)
-      console.log(
-        chalk.dim(`    ... (${file.theirsContent.split('\n').length - maxLines} more lines)`),
-      );
+    if (file.hunks.length === 0) {
+      console.log(chalk.dim('  (no textual conflict hunks: one side deleted the file, or binary)'));
+      console.log(chalk.dim(`  ours:   ${file.ours === undefined ? 'deleted' : 'present'}`));
+      console.log(chalk.dim(`  theirs: ${file.theirs === undefined ? 'deleted' : 'present'}\n`));
+      return;
+    }
+    file.hunks.forEach((hunk, i) => {
+      console.log(chalk.dim(`  ─── hunk ${i + 1}/${file.hunks.length} ───`));
+      printSide(chalk.red, '<<<< OURS (current branch):', hunk.ours);
+      printSide(chalk.green, '>>>> THEIRS (incoming):', hunk.theirs);
+    });
     console.log();
   }
 
   private showFullConflict(file: ConflictFile): void {
-    console.log(chalk.red('\n════ OURS (full) ════'));
-    console.log(file.oursContent);
-    console.log(chalk.blue('\n════ BASE ════'));
-    console.log(file.baseContent || chalk.dim('(no base available)'));
-    console.log(chalk.green('\n════ THEIRS (full) ════'));
-    console.log(file.theirsContent);
+    console.log(chalk.dim('\n════ CONFLICTED WORKING COPY ════'));
+    console.log(file.markedContent);
     console.log();
   }
 
-  private buildResolutionChoices(): Array<{ name: string; value: string }> {
-    const choices: Array<{ name: string; value: string }> = [];
-    if (this.aiMode === 'auto' || this.aiMode === 'suggest') {
+  private buildResolutionChoices(file: ConflictFile): Array<{ name: string; value: MenuAction }> {
+    const choices: Array<{ name: string; value: MenuAction }> = [];
+    const textual = file.hunks.length > 0;
+    if (textual && (this.aiMode === 'auto' || this.aiMode === 'suggest')) {
       choices.push(
-        { name: '🤖 AI auto-resolve (Claude merges both sides)', value: 'ai-auto' },
-        { name: '💡 AI suggest (Claude proposes, you approve)', value: 'ai-suggest' },
+        { name: `🤖 AI auto-resolve (${this.modelName} writes the merged file)`, value: 'ai-auto' },
+        { name: `💡 AI suggest (${this.modelName} proposes, you approve)`, value: 'ai-suggest' },
       );
     }
     choices.push(
       { name: '⬅️  Keep OURS (current branch version)', value: 'ours' },
       { name: '➡️  Keep THEIRS (incoming version)', value: 'theirs' },
-      { name: '✏️  Manual edit', value: 'manual' },
-      { name: '👁️  View full conflict', value: 'view-full' },
-      { name: '⏭️  Skip this file', value: 'skip' },
     );
+    if (textual) {
+      choices.push(
+        { name: '✏️  Manual edit', value: 'manual' },
+        { name: '👁️  View full conflict', value: 'view-full' },
+      );
+    }
+    choices.push({ name: '⏭️  Skip this file', value: 'skip' });
     return choices;
   }
+}
 
-  private async manualEdit(file: ConflictFile, startingContent?: string): Promise<boolean> {
-    const content = await editor({
-      message: `Edit ${file.path} (will open your $EDITOR):`,
-      default: startingContent ?? file.oursContent,
-    });
-    if (!content?.trim()) {
-      console.log(chalk.yellow('  Empty content, skipping.'));
-      return false;
-    }
-    await this.git.resolveFile(file.path, content);
-    return true;
+function printSide(color: (s: string) => string, header: string, text: string): void {
+  const lines = text.split('\n');
+  console.log(color(`  ${header}`));
+  for (const l of lines.slice(0, PREVIEW_LINES)) console.log(color(`    ${l}`));
+  if (lines.length > PREVIEW_LINES) {
+    console.log(chalk.dim(`    ... (${lines.length - PREVIEW_LINES} more lines)`));
   }
 }

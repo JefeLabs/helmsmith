@@ -242,7 +242,7 @@ export class GitOperations {
     const verdict = checkResolution(content, file);
     if (!verdict.ok) throw new ResolutionRejected(file.path, verdict.reason);
     writeFileSync(join(this.repoPath, file.path), content, 'utf-8');
-    await this.git.raw(['add', '--', file.path]);
+    await this.git.raw(['--literal-pathspecs', 'add', '--', file.path]);
   }
 
   /** Keep our side. When our side deleted the file, the resolution is the deletion. */
@@ -263,11 +263,11 @@ export class GitOperations {
     if ((await this.showStage(stage, filePath)) === undefined) {
       // Resolve by deletion; git removes both the index entries and the
       // working-tree file, so no filesystem handling here.
-      await this.git.raw(['rm', '-q', '--', filePath]);
+      await this.git.raw(['--literal-pathspecs', 'rm', '-q', '--', filePath]);
       return;
     }
-    await this.git.raw(['checkout', flag, '--', filePath]);
-    await this.git.raw(['add', '--', filePath]);
+    await this.git.raw(['--literal-pathspecs', 'checkout', flag, '--', filePath]);
+    await this.git.raw(['--literal-pathspecs', 'add', '--', filePath]);
   }
 
   async commitResolution(message?: string): Promise<string> {
