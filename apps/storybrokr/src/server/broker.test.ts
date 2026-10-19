@@ -523,3 +523,108 @@ describe('Broker', () => {
     await reconcileBroker.downAll();
   });
 });
+
+/** FAKE_SB that only starts serving (one story) after 1200 ms. */
+const SLOW_FAKE_SB_WITH_STORY = `
+const http = require('node:http');
+const port = Number(process.env.SB_PORT);
+setTimeout(() => {
+  http.createServer((req, res) => {
+    if (req.url === '/index.json') { res.writeHead(200, {'content-type': 'application/json'}); res.end(JSON.stringify({ v: 5, entries: { 'button--primary': { id: 'button--primary', type: 'story', title: 'Button', name: 'Primary', importPath: './src/Button/Button.stories.tsx' } } })); }
+    else { res.writeHead(200); res.end('<html></html>'); }
+  }).listen(port, '127.0.0.1', () => console.log('  - Local:   http://localhost:' + port + '/'));
+}, 1200);
+setInterval(() => {}, 1000);
+`;
+
+describe('Broker S4/S8/S10', () => {
+  const dirs: string[] = [];
+  const brokers: Broker[] = [];
+  afterEach(async () => {
+    for (const b of brokers) await b.downAll();
+    for (const d of dirs) rmSync(d, { recursive: true, force: true });
+    brokers.length = 0;
+  });
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  function pair(portStart: number, spawner: Spawner = fakeSpawner(), now?: () => Date) {
+    const home = mkdtempSync(join(tmpdir(), 'sb-home-'));
+    dirs.push(home);
+    const config = {
+      ...DEFAULT_CONFIG,
+      portRangeStart: portStart,
+      portRangeEnd: portStart + 1,
+      readinessTimeoutMs: 10_000,
+    };
+    const a = new Broker({ registry: new Registry({ home, config, now }), spawner, config });
+    const b = new Broker({ registry: new Registry({ home, config, now }), spawner, config });
+    brokers.push(a, b);
+    return { a, b };
+  }
+
+  it('S4b: an adopted instance whose process dies is dropped by the reaper', async () => {
+    const host = fakeHost();
+    dirs.push(host);
+    const { a, b } = pair(6184);
+    const first = await a.up({ component: 'src/Button', hostRoot: host });
+    await b.reconcile();
+    expect(b.list().map((r) => r.id)).toEqual([first.record.id]);
+    process.kill(first.record.pid as number, 'SIGKILL');
+    await sleep(300);
+    await b.reapIdle();
+    expect(b.list()).toEqual([]);
+  });
+
+  it('S4c: a mid-boot instance is adopted as starting and becomes ready with its stories, not ready with none', async () => {
+    const host = fakeHost();
+    dirs.push(host);
+    const slow: Spawner = {
+      spawn(h: HostInfo, configDir: string, port: number) {
+        process.env.SB_PORT = String(port);
+        return commandSpawner(process.execPath, ['-e', SLOW_FAKE_SB_WITH_STORY]).spawn(
+          h,
+          configDir,
+          port,
+        );
+      },
+    };
+    const { a, b } = pair(6192, slow);
+    const first = await a.up({ component: 'src/Button', hostRoot: host, wait: false });
+    expect(first.record.status).toBe('starting');
+    await b.reconcile();
+    const adopted = b.list().find((r) => r.id === first.record.id);
+    expect(adopted?.status).toBe('starting');
+    for (let i = 0; i < 40 && b.list()[0]?.status !== 'ready'; i++) await sleep(250);
+    const ready = b.list().find((r) => r.id === first.record.id);
+    expect(ready?.status).toBe('ready');
+    expect(ready?.stories.map((s) => s.id)).toEqual(['button--primary']);
+  });
+
+  it('S8: an up that races the idle reaper ends with one live instance that the caller was told about', async () => {
+    const host = fakeHost();
+    dirs.push(host);
+    let offsetMs = 0;
+    const { a } = pair(6194, fakeSpawner(), () => new Date(Date.now() + offsetMs));
+    await a.up({ component: 'src/Button', hostRoot: host });
+    offsetMs = 2 * 60 * 60_000; // idle past the TTL
+    const [, second] = await Promise.all([
+      a.reapIdle(),
+      a.up({ component: 'src/Button', hostRoot: host }),
+    ]);
+    const live = a.list();
+    expect(live).toHaveLength(1);
+    expect(live[0]?.id).toBe(second.record.id);
+    expect(live[0]?.status).toBe('ready');
+  });
+
+  it('S10: flipping includeChildren without a change in the story list keeps the instance', async () => {
+    const host = fakeHost();
+    dirs.push(host);
+    rmSync(join(host, 'src', 'Icon', 'Icon.stories.tsx'));
+    const { a } = pair(6198);
+    const first = await a.up({ component: 'src/Button', hostRoot: host });
+    const flipped = await a.up({ component: 'src/Button', hostRoot: host, includeChildren: true });
+    expect(flipped.created).toBe(false);
+    expect(flipped.record.pid).toBe(first.record.pid);
+    expect(flipped.record.includeChildren).toBe(true);
+  });
+});

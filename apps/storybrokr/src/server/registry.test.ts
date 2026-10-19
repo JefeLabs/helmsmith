@@ -148,7 +148,9 @@ describe('Registry', () => {
 
     // 1. Explicit host is authoritative
     expect(reg.resolve('src/Button', { host: '/wt-b/app-ui' }).id).toBe('b1');
-    expect(() => reg.resolve('src/Button', { host: '/wt-c/app-ui' })).toThrow(/INSTANCE_NOT_FOUND|no instance/);
+    expect(() => reg.resolve('src/Button', { host: '/wt-c/app-ui' })).toThrow(
+      /INSTANCE_NOT_FOUND|no instance/,
+    );
 
     // 2. Hint prefers matching host, but falls back to unique global match when hint misses
     expect(reg.resolve('src/Button', { hint: '/wt-b/app-ui' }).id).toBe('b1');
@@ -165,5 +167,22 @@ describe('Registry', () => {
       expect(err.message).toContain('a1 @ /wt-a/app-ui');
       expect(err.message).toContain('b1 @ /wt-b/app-ui');
     }
+  });
+});
+
+describe('S9: records written before includeChildren existed', () => {
+  it('load as includeChildren: true (decision 13)', async () => {
+    const { mkdirSync, writeFileSync } = await import('node:fs');
+    const { stateFile } = await import('../lib/paths.js');
+    const home = mkdtempSync(join(tmpdir(), 'sb-reg-'));
+    const file = stateFile(home);
+    mkdirSync(join(file, '..'), { recursive: true });
+    const legacy = rec('old') as Record<string, unknown>;
+    delete legacy.includeChildren;
+    writeFileSync(file, JSON.stringify({ version: 1, instances: [legacy] }));
+    const r = new Registry({ home, config: DEFAULT_CONFIG });
+    r.load();
+    expect(r.get('old')?.includeChildren).toBe(true);
+    rmSync(home, { recursive: true, force: true });
   });
 });

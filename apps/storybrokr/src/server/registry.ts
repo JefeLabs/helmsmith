@@ -49,8 +49,7 @@ export class Registry {
   resolve(idOrPath: string, scope?: ResolveScope | string): InstanceRecord {
     const byId = this.byId.get(idOrPath);
     if (byId) return byId;
-    const normScope: ResolveScope =
-      typeof scope === 'string' ? { host: scope } : (scope ?? {});
+    const normScope: ResolveScope = typeof scope === 'string' ? { host: scope } : (scope ?? {});
     const all = this.list();
     if (normScope.host !== undefined) {
       const targetHost = realpathOrResolve(normScope.host);
@@ -156,7 +155,9 @@ export class Registry {
     if (!Array.isArray(instances)) return;
     for (const r of instances) {
       if (r !== null && typeof r === 'object' && typeof (r as { id?: unknown }).id === 'string') {
-        this.byId.set((r as InstanceRecord).id, r as InstanceRecord);
+        const record = r as InstanceRecord;
+        // records written before includeChildren existed were made with children included (decision 13)
+        this.byId.set(record.id, { ...record, includeChildren: record.includeChildren ?? true });
       }
     }
   }

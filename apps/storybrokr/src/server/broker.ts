@@ -115,57 +115,77 @@ export class Broker {
     const id = instanceId(host.hostRoot, component);
     let effectiveIncludeChildren = req.includeChildren;
 
-    const existing = this.registry.find(host.hostRoot, component);
     // An explicit TTL on a repeat up applies to the reused instance: the caller's
     // lease decides how long it lives (spec: TTL equals the lease).
-    const applyTtl = (id: string): void => {
-      if (req.ttlMinutes !== undefined) this.registry.update(id, { ttlMinutes: req.ttlMinutes });
+    const applyTtl = (rid: string): void => {
+      if (req.ttlMinutes !== undefined) this.registry.update(rid, { ttlMinutes: req.ttlMinutes });
     };
-    if (existing?.status === 'starting') {
-      applyTtl(existing.id);
-      this.registry.touch(existing.id);
-      if (req.wait !== false) await this.awaitReady(existing.id);
-      return { record: this.registry.get(existing.id) as InstanceRecord, created: false };
-    }
-    if (existing?.status === 'ready') {
-      // A repeat `up` re-discovers so a newly added sibling story file is picked up (spec §7.4).
-      // When req.includeChildren is omitted, inherit the existing record's includeChildren setting.
-      effectiveIncludeChildren = req.includeChildren ?? existing.includeChildren ?? false;
-      const discovery = discoverStories(host.hostRoot, component, host.tsconfigPaths, {
-        includeChildren: effectiveIncludeChildren,
-      });
-      const unchanged =
-        Boolean(existing.includeChildren) === discovery.includedChildren &&
-        discovery.storyFiles.length === existing.storyFiles.length &&
-        discovery.storyFiles.every((f, i) => f === existing.storyFiles[i]);
-      if (unchanged) {
+    // Per-instance lock: an up never interleaves with a stop (reaper or down) on the same id.
+    const created = await this.withLock(id, async (): Promise<boolean | null> => {
+      const existing = this.registry.find(host.hostRoot, component);
+      if (existing?.status === 'starting') {
         applyTtl(existing.id);
         this.registry.touch(existing.id);
-        return { record: this.registry.get(existing.id) as InstanceRecord, created: false };
+        return false;
       }
-      await this.stop(existing);
-    } else if (existing) {
-      this.registry.remove(existing.id);
-    }
+      if (existing?.status === 'ready') {
+        // A repeat `up` re-discovers so a newly added sibling story file is picked up (spec §7.4).
+        // When req.includeChildren is omitted, inherit the existing record's includeChildren setting
+        // (records from before the flag existed were made with children: decision 13).
+        effectiveIncludeChildren = req.includeChildren ?? existing.includeChildren ?? true;
+        const discovery = discoverStories(host.hostRoot, component, host.tsconfigPaths, {
+          includeChildren: effectiveIncludeChildren,
+        });
+        const sameFiles =
+          discovery.storyFiles.length === existing.storyFiles.length &&
+          discovery.storyFiles.every((f, i) => f === existing.storyFiles[i]);
+        if (sameFiles) {
+          // the same stories are served whatever the flag says: record the flag, keep the instance
+          if ((existing.includeChildren ?? true) !== discovery.includedChildren) {
+            this.registry.update(existing.id, { includeChildren: discovery.includedChildren });
+          }
+          applyTtl(existing.id);
+          this.registry.touch(existing.id);
+          return false;
+        }
+        await this.stopUnlocked(existing);
+      } else if (existing) {
+        this.registry.remove(existing.id);
+      }
 
-    const running = this.inflight.get(id);
-    if (running) {
-      await running;
-      applyTtl(id);
-      if (req.wait !== false) await this.awaitReady(id);
-      return { record: this.registry.get(id) as InstanceRecord, created: false };
-    }
+      const running = this.inflight.get(id);
+      if (running) {
+        await running;
+        applyTtl(id);
+        return null;
+      }
 
-    const creation = this.createInstance(host, component, id, {
-      ...req,
-      includeChildren: effectiveIncludeChildren,
-    }).finally(() => {
-      this.inflight.delete(id);
+      const creation = this.createInstance(host, component, id, {
+        ...req,
+        includeChildren: effectiveIncludeChildren,
+      }).finally(() => {
+        this.inflight.delete(id);
+      });
+      this.inflight.set(id, creation);
+      await creation;
+      return true;
     });
-    this.inflight.set(id, creation);
-    await creation;
     if (req.wait !== false) await this.awaitReady(id);
-    return { record: this.registry.get(id) as InstanceRecord, created: true };
+    return { record: this.registry.get(id) as InstanceRecord, created: created === true };
+  }
+
+  private readonly locks = new Map<string, Promise<unknown>>();
+
+  /** Serialise work on one instance id; different ids run in parallel. */
+  private async withLock<T>(id: string, fn: () => Promise<T>): Promise<T> {
+    const previous = this.locks.get(id) ?? Promise.resolve();
+    const run = previous.catch(() => undefined).then(fn);
+    this.locks.set(id, run);
+    try {
+      return await run;
+    } finally {
+      if (this.locks.get(id) === run) this.locks.delete(id);
+    }
   }
 
   /** Cap check → discover → port → config dir → add → sidecar → spawn, tracked in `inflight`
@@ -286,7 +306,11 @@ export class Broker {
     for (const r of this.registry.list()) await this.stop(r);
   }
 
-  private async stop(r: InstanceRecord): Promise<void> {
+  private stop(r: InstanceRecord): Promise<void> {
+    return this.withLock(r.id, () => this.stopUnlocked(r));
+  }
+
+  private async stopUnlocked(r: InstanceRecord): Promise<void> {
     const proc = this.procs.get(r.id);
     if (proc) {
       await proc.kill();
@@ -306,7 +330,8 @@ export class Broker {
     if (this.registry.get(r.id)) this.registry.remove(r.id);
   }
 
-  /** Stop ready instances idle past their TTL and active instances whose hostRoot disappeared. */
+  /** Stop ready instances idle past their TTL, active instances whose hostRoot disappeared, and
+   * drop adopted instances whose process is gone (they have no exit watcher of their own). */
   async reapIdle(): Promise<InstanceRecord[]> {
     const idle = this.registry.idleInstances();
     const orphaned = this.registry
@@ -317,9 +342,81 @@ export class Broker {
           !existsSync(r.hostRoot) &&
           !idle.some((i) => i.id === r.id),
       );
-    const toStop = [...idle, ...orphaned];
-    for (const r of toStop) await this.stop(r);
-    return toStop;
+    const dead = this.registry
+      .list()
+      .filter(
+        (r) =>
+          (r.status === 'starting' || r.status === 'ready') &&
+          !this.procs.has(r.id) &&
+          !this.pending.has(r.id) &&
+          !isAlive(r.pid),
+      );
+    const stopped: InstanceRecord[] = [];
+    for (const r of [...idle, ...orphaned]) {
+      // re-check inside the lock: an up may have touched or recreated it meanwhile
+      await this.withLock(r.id, async () => {
+        const current = this.registry.get(r.id);
+        if (!current || current.createdAt !== r.createdAt) return;
+        const stillIdle =
+          current.status === 'ready' &&
+          current.ttlMinutes > 0 &&
+          this.now().getTime() - Date.parse(current.lastTouchedAt) > current.ttlMinutes * 60_000;
+        if (!stillIdle && existsSync(current.hostRoot)) return;
+        await this.stopUnlocked(current);
+        stopped.push(current);
+      });
+    }
+    for (const r of dead) {
+      await this.withLock(r.id, async () => {
+        if (!this.registry.get(r.id) || isAlive(r.pid)) return;
+        this.registry.remove(r.id);
+        try {
+          removeConfigDir(r.configDir);
+        } catch {
+          // nothing to clean
+        }
+        stopped.push(r);
+      });
+    }
+    return stopped;
+  }
+
+  /** An adopted instance still booting: poll its index until it is ready or the readiness timeout passes. */
+  private watchAdopted(id: string): void {
+    const record = this.registry.get(id);
+    if (!record) return;
+    const deadline = Date.now() + this.config.readinessTimeoutMs;
+    const p = (async () => {
+      for (;;) {
+        const current = this.registry.get(id);
+        if (!current) return;
+        if (!isAlive(current.pid)) {
+          this.registry.remove(id);
+          return;
+        }
+        const stories = await fetchStories(current.port);
+        if (stories) {
+          const updated = this.registry.update(id, {
+            status: 'ready',
+            stories,
+            lastTouchedAt: this.now().toISOString(),
+          });
+          writeSidecar(current.configDir, updated);
+          return;
+        }
+        if (Date.now() > deadline) {
+          this.registry.update(id, {
+            status: 'failed',
+            error: { code: 'BOOT_TIMEOUT', message: 'adopted instance never became ready' },
+          });
+          await terminate(current.pid as number);
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    })().finally(() => this.pending.delete(id));
+    this.pending.set(id, p);
+    p.catch(() => {});
   }
 
   /** On daemon start: adopt instances that are alive and answering, drop the rest. */
@@ -332,13 +429,17 @@ export class Broker {
     }
     for (const r of known.values()) {
       try {
-        const alive = isAlive(r.pid) && (await fetchStories(r.port)) !== null;
-        if (alive) {
+        const stories = isAlive(r.pid) ? await fetchStories(r.port) : null;
+        if (stories) {
           // adopt(), not add(): these instances were already live before this daemon process
           // (and its configured instanceCap) existed — asserting capacity here could reject a
           // legitimate reconcile and leave the daemon permanently unstartable (spec §7.5).
           if (!this.registry.get(r.id)) this.registry.adopt(r);
-          this.registry.update(r.id, { status: 'ready' });
+          this.registry.update(r.id, { status: 'ready', stories });
+        } else if (isAlive(r.pid) && r.status === 'starting') {
+          // still booting when the previous daemon died: adopt as starting and watch it
+          if (!this.registry.get(r.id)) this.registry.adopt(r);
+          this.watchAdopted(r.id);
         } else {
           if (this.registry.get(r.id)) this.registry.remove(r.id);
           try {
