@@ -10,6 +10,8 @@ import {
   type Ctx,
   effortEnv,
   finishEffort,
+  type PrittyClient,
+  prEffort,
   promoteEffort,
   reapLeases,
   retireArea,
@@ -86,11 +88,39 @@ const fakeSb = (): StorybrokrClient & {
   return s;
 };
 
+type FakePritty = PrittyClient & {
+  calls: Array<{ kind: 'check' | 'pr'; o: Record<string, unknown> }>;
+  open: { number: number; url: string; draft: boolean } | null;
+  versionString: string;
+};
+const fakePritty = (version = '0.1.1'): FakePritty => {
+  let n = 100;
+  const p: FakePritty = {
+    calls: [],
+    open: null,
+    versionString: version,
+    version: () => p.versionString,
+    check: async (o) => {
+      p.calls.push({ kind: 'check', o: o as unknown as Record<string, unknown> });
+      return p.open;
+    },
+    pr: async (o) => {
+      p.calls.push({ kind: 'pr', o: o as unknown as Record<string, unknown> });
+      if (p.open) return { ...p.open, created: false };
+      n++;
+      p.open = { number: n, url: `https://github.com/acme/app/pull/${n}`, draft: Boolean(o.draft) };
+      return { ...p.open, created: true };
+    },
+  };
+  return p;
+};
+
 function ctxFor(
   f: { main: string },
   runner: FakeRunner = fakeRunner(),
   storybrokr = fakeSb(),
-): Ctx & { runner: FakeRunner } {
+  pritty: FakePritty = fakePritty(),
+): Ctx & { runner: FakeRunner; pritty: FakePritty } {
   const home = mkdtempSync(join(tmpdir(), 'wk-eff-'));
   const registry = Registry.open(home);
   registry.upsertProject('demo', { root: f.main, ranges: {} });
@@ -102,6 +132,7 @@ function ctxFor(
     owner: currentOwner({ WORK_SESSION: 's1' }),
     runner,
     storybrokr,
+    pritty,
     log: () => {},
   };
 }
@@ -1013,5 +1044,123 @@ describe('§3.5: storybrokr sweeps', () => {
     await finishEffort(ctx, { area: 'shop/cart' });
     await retireArea(ctx, { area: 'shop/cart' });
     expect(sb.downHosts).toEqual([]);
+  });
+});
+
+describe('§18.3 work pr', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  async function started(f: { main: string }, pritty = fakePritty()) {
+    const ctx = ctxFor(f, fakeRunner(), fakeSb(), pritty);
+    const r = await startEffort(ctx, { area: 'shop/cart', type: 'feature', mode: 'frontend' });
+    commitFile(r.effort.worktree, 'app-ui/app/shop/cart/a.tsx', 'a', 'feat(cart): a');
+    return { ctx, r };
+  }
+
+  it('refuses a dirty worktree before anything is pushed or asked of pritty', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const { ctx, r } = await started(f);
+    writeFileSync(join(r.effort.worktree, 'dirty.txt'), 'x');
+    await expect(prEffort(ctx, { area: 'shop/cart', title: 't' })).rejects.toMatchObject({
+      code: 'DIRTY_WORKTREE',
+    });
+    expect(ctx.pritty.calls).toEqual([]);
+    expect(new Git(f.main).remoteBranchExists('feature/shop/cart')).toBe(false);
+  });
+
+  it('pushes first, then runs pritty with --no-push, the manifest base, the given words, and stores the PR', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const { ctx, r } = await started(f);
+    const out = await prEffort(ctx, {
+      area: 'shop/cart',
+      title: 'feat(cart): a',
+      bodyFile: '/tmp/body.md',
+      draft: true,
+    });
+    expect(new Git(f.main).remoteBranchExists('feature/shop/cart')).toBe(true);
+    expect(ctx.pritty.calls.map((c) => c.kind)).toEqual(['pr']);
+    expect(ctx.pritty.calls[0]?.o).toMatchObject({
+      cwd: r.effort.worktree,
+      base: 'develop',
+      title: 'feat(cart): a',
+      bodyFile: '/tmp/body.md',
+      draft: true,
+    });
+    expect(out.created).toBe(true);
+    expect(out.pr).toMatchObject({ number: 101, draft: true });
+    expect(ctx.registry.openEffortFor('demo', 'shop/cart')?.pr).toEqual(out.pr);
+    expect(statusFor(ctx, 'shop/cart').areas[0]?.effort?.pr).toEqual(out.pr);
+  });
+
+  it('a second call returns the stored open PR without creating another; given words update it in place', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const { ctx } = await started(f);
+    const first = await prEffort(ctx, { area: 'shop/cart', title: 't', body: 'b' });
+    ctx.pritty.calls.length = 0;
+    const again = await prEffort(ctx, { area: 'shop/cart' });
+    expect(again).toMatchObject({ created: false, pr: first.pr });
+    expect(ctx.pritty.calls.map((c) => c.kind)).toEqual(['check']);
+    ctx.pritty.calls.length = 0;
+    const updated = await prEffort(ctx, { area: 'shop/cart', title: 'new title' });
+    expect(updated.created).toBe(false);
+    expect(ctx.pritty.calls.map((c) => c.kind)).toEqual(['check', 'pr']);
+  });
+
+  it('a stored PR that is no longer open is refused with PR_CLOSED unless --force', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const { ctx } = await started(f);
+    const first = await prEffort(ctx, { area: 'shop/cart', title: 't', body: 'b' });
+    ctx.pritty.open = null; // merged or closed on GitHub
+    await expect(
+      prEffort(ctx, { area: 'shop/cart', title: 't2', body: 'b' }),
+    ).rejects.toMatchObject({
+      code: 'PR_CLOSED',
+    });
+    const forced = await prEffort(ctx, { area: 'shop/cart', title: 't2', body: 'b', force: true });
+    expect(forced.created).toBe(true);
+    expect(forced.pr.number).not.toBe(first.pr.number);
+    expect(ctx.registry.openEffortFor('demo', 'shop/cart')?.pr?.number).toBe(forced.pr.number);
+  });
+
+  it('warns, without refusing, when the branch is far behind the base', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const { ctx } = await started(f);
+    for (let i = 0; i < 21; i++) commitFile(f.main, `base-${i}.txt`, String(i), `base ${i}`);
+    new Git(f.main).push('develop');
+    const out = await prEffort(ctx, { area: 'shop/cart', title: 't', body: 'b' });
+    expect(out.behindBase).toBeGreaterThan(20);
+    expect(out.warnings.join('\n')).toMatch(/behind/);
+    expect(out.created).toBe(true);
+  });
+
+  it('refuses a pritty below 0.1.1 before touching anything', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const { ctx } = await started(f, fakePritty('0.1.0'));
+    await expect(prEffort(ctx, { area: 'shop/cart', title: 't' })).rejects.toMatchObject({
+      code: 'PRITTY_FAILED',
+    });
+    expect(new Git(f.main).remoteBranchExists('feature/shop/cart')).toBe(false);
+  });
+
+  it('finds the effort from a cwd inside its worktree when no area is given', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const { ctx, r } = await started(f);
+    const out = await prEffort(ctx, {
+      cwd: join(r.effort.worktree, 'app-ui'),
+      title: 't',
+      body: 'b',
+    });
+    expect(out.effort.area).toBe('shop/cart');
+    await expect(prEffort(ctx, { cwd: f.main, title: 't' })).rejects.toMatchObject({
+      code: 'EFFORT_NOT_FOUND',
+    });
   });
 });

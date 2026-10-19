@@ -20,7 +20,17 @@ const expiresIn = (iso: string) => {
 
 export function printStatus(r: StatusReport): void {
   console.log(chalk.bold(`${r.project}`));
-  const cols = ['AREA', 'TYPE/MODE', 'BRANCH', 'OWNER', 'STARTED', 'LEASES', 'BEHIND', 'NOTICES'];
+  const cols = [
+    'AREA',
+    'TYPE/MODE',
+    'BRANCH',
+    'OWNER',
+    'STARTED',
+    'LEASES',
+    'PR',
+    'BEHIND',
+    'NOTICES',
+  ];
   const rows = r.areas.map((a) => [
     a.area,
     a.effort ? `${a.effort.type}/${a.effort.mode}` : chalk.gray('-'),
@@ -28,6 +38,7 @@ export function printStatus(r: StatusReport): void {
     a.effort?.owner.session ?? chalk.gray('-'),
     a.effort ? age(a.effort.started) : chalk.gray('-'),
     a.leases.length ? a.leases.map((l) => `${l.kind}:${l.value}`).join(',') : chalk.gray('-'),
+    a.effort?.pr ? `#${a.effort.pr.number}${a.effort.pr.draft ? ' draft' : ''}` : chalk.gray('-'),
     a.behindBase > 0 ? chalk.yellow(String(a.behindBase)) : '0',
     a.notices.length ? chalk.yellow(String(a.notices.length)) : '0',
   ]);

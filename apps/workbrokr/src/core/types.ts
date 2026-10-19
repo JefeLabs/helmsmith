@@ -116,6 +116,8 @@ export interface Effort {
   started: string;
   lastActivity: string;
   parkedReason?: string;
+  /** The pull request `work pr` opened or adopted for this effort. */
+  pr?: { number: number; url: string; draft: boolean };
 }
 
 export interface ProjectEntry {

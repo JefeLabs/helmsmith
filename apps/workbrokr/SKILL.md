@@ -55,3 +55,13 @@ Every command takes `--project-root <dir>`; without it the repo is the main chec
 ## Error codes
 
 Refusals (exit 2): `MANIFEST_INVALID`, `AREA_UNKNOWN`, `TYPE_UNKNOWN`, `MODE_UNKNOWN`, `MAIN_CHECKOUT`, `PROTECTED_BRANCH`, `EFFORT_OPEN`, `EFFORT_NOT_FOUND`, `SCOPE_CONFLICT`, `COMMONS_LOCKED`, `NO_FREE_SLOT`, `LEASE_NOT_FOUND`, `PORT_RANGE_TAKEN`, `SYNC_CONFLICT`, `DIRTY_WORKTREE`, `UNPUSHED`. Faults (exit 1): `MANIFEST_NOT_FOUND`, `HEALTH_TIMEOUT` (the last probe output is attached), `SERVICE_FAILED`, `STORYBROKR_FAILED`, `GIT_FAILED`, `INTERNAL`.
+
+## Opening the pull request: `work pr`
+
+After the last commit on an effort, open its PR with the words you already know:
+
+```bash
+work pr <area> --title "feat(area): what changed" --body-file /tmp/pr-body.md   # --task <slug> for a task effort; --draft for a draft
+```
+
+`work pr` pushes the branch first, then opens the PR through `pritty pr --no-push --auto-approve --json` against the manifest's base branch, and stores `{ number, url, draft }` on the effort (`work status` shows it). Run it again and it returns the same PR; pass `--title`/`--body-file` again to update the PR's words in place. If the stored PR was merged or closed it refuses with `PR_CLOSED`; `--force` opens a new one. Write the body in the repository's PR conventions; the attribution footer comes from pritty's `prFooter`, not from you. Always pass a title and a body: pritty's AI path is the fallback, never the default. Needs `@helmsmith/pritty` 0.1.1 or newer on PATH.

@@ -1,6 +1,10 @@
 # @helmsmith/workbrokr
 
-## 0.2.1
+## 0.3.0
+
+### Minor Changes
+
+- `work pr [area] [--task] [--draft] [--title] [--body|--body-file] [--force] [--json]` and the `work_pr` MCP tool (spec §18.3): pushes the branch first, opens the PR through `pritty pr --no-push --auto-approve --json` (0.1.1 or newer) against the manifest base, reuses a stored PR that is still open (updating its title/body when words are given), refuses with `PR_CLOSED` when it was merged or closed unless `--force`, warns when the branch is more than 20 commits behind the base, and stores `{ number, url, draft }` on the effort; `work status` shows it. No area: the effort of the cwd worktree.
 
 ### Patch Changes
 

@@ -37,8 +37,10 @@ import {
   TASK_SLUG,
   WorkkitError,
 } from '../core/index.js';
+import { assertPrittyVersion, type PrittyClient, type PrRecord } from './pritty.js';
 import type { StorybrokrClient } from './storybrokr.js';
 
+export type { PrittyClient, PrRecord } from './pritty.js';
 export type { StorybrokrClient } from './storybrokr.js';
 
 export interface ServiceRunner {
@@ -71,6 +73,7 @@ export interface Ctx {
   owner: Owner;
   runner: ServiceRunner;
   storybrokr: StorybrokrClient;
+  pritty: PrittyClient;
   log: (line: string) => void;
 }
 
@@ -878,9 +881,7 @@ export interface StatusReport {
 
 function behindBase(ctx: Ctx, worktree: string): number {
   if (!existsSync(worktree)) return 0;
-  const g = new Git(worktree);
-  const r = g.tryRun(['rev-list', '--count', `HEAD..origin/${ctx.manifest.baseBranch}`]);
-  return r.code === 0 ? Number(r.out.trim()) || 0 : 0;
+  return new Git(worktree).behindCount(ctx.manifest.baseBranch);
 }
 
 /** Every area of the project (or one), with its open effort, leases, drift from the base branch and notices. Asking about one area counts as activity on it. */
@@ -1318,6 +1319,138 @@ export async function retireArea(ctx: Ctx, o: { area: string }): Promise<RetireR
   ctx.registry.clearNotices(m.project, o.area);
   ctx.registry.clearNoticesFrom(m.project, allAreaBranches);
   return { archived, removed: worktree, branchesDeleted, branchesKept };
+}
+
+// ── pr ───────────────────────────────────────────────────────────────────────
+
+export interface PrOptions {
+  area?: string;
+  task?: string;
+  /** Used when no area is given: the effort whose worktree contains this directory. */
+  cwd?: string;
+  draft?: boolean;
+  title?: string;
+  body?: string;
+  bodyFile?: string;
+  /** Open a new PR when the stored one is no longer open. */
+  force?: boolean;
+}
+
+export interface PrResult {
+  effort: Effort;
+  pr: PrRecord;
+  created: boolean;
+  behindBase: number;
+  warnings: string[];
+}
+
+/** The open or parked effort whose worktree contains `cwd` (never the main checkout). */
+function effortAt(ctx: Ctx, cwd: string): Effort | undefined {
+  const top = new Git(cwd).tryRun(['rev-parse', '--show-toplevel']);
+  if (top.code !== 0) return undefined;
+  const root = realpathOr(top.out.trim());
+  return ctx.registry
+    .efforts({ project: ctx.manifest.project })
+    .filter((e) => e.state === 'active' || e.state === 'starting' || e.state === 'parked')
+    .sort((a, b) => b.lastActivity.localeCompare(a.lastActivity))
+    .find((e) => realpathOr(e.worktree) === root);
+}
+
+/**
+ * Open (or adopt) the effort's pull request through pritty (spec §18.3): push first so the
+ * branch is on origin whatever pritty does next, reuse a stored PR that is still open, refuse
+ * when it was closed unless --force, store the result on the effort.
+ */
+export async function prEffort(ctx: Ctx, o: PrOptions): Promise<PrResult> {
+  const m = ctx.manifest;
+  assertPrittyVersion(ctx.pritty);
+  const effort = o.area
+    ? (ctx.registry.openEffortFor(m.project, o.area, o.task) ??
+      ctx.registry
+        .efforts({ project: m.project, area: o.area, state: 'parked' })
+        .filter((e) => (e.task ?? undefined) === (o.task ?? undefined))
+        .sort((a, b) => b.started.localeCompare(a.started))[0])
+    : effortAt(ctx, o.cwd ?? process.cwd());
+  if (!effort) {
+    throw new WorkkitError(
+      'EFFORT_NOT_FOUND',
+      o.area
+        ? `no open or parked effort on ${effortLabel(o.area, o.task)}`
+        : `${o.cwd ?? process.cwd()} is not inside an effort's worktree; pass the area`,
+      { area: o.area, task: o.task },
+    );
+  }
+  const label = effortLabel(effort.area, effort.task);
+  const g = new Git(effort.worktree);
+  if (g.isDirty()) {
+    throw new WorkkitError(
+      'DIRTY_WORKTREE',
+      `${effort.worktree} has uncommitted changes: commit them, or \`work finish --park\` to commit them as wip(${label}) and push`,
+      { worktree: effort.worktree },
+    );
+  }
+  fetchBaseOnce(ctx);
+  const warnings: string[] = [];
+  if (!g.hasUpstream() || g.unpushedCount(m.baseBranch) > 0) {
+    try {
+      g.push(effort.branch);
+    } catch (err) {
+      throw new WorkkitError(
+        'PUSH_REJECTED',
+        `push of ${effort.branch} was rejected (${err instanceof Error ? err.message : String(err)}); merge origin/${effort.branch} into the worktree and run \`work pr\` again`,
+        { branch: effort.branch, worktree: effort.worktree },
+      );
+    }
+  }
+  const behind = g.behindCount(m.baseBranch);
+  if (behind > BEHIND_LIMIT) {
+    warnings.push(
+      `${effort.branch} is ${behind} commits behind ${m.baseBranch}; consider merging origin/${m.baseBranch} before review`,
+    );
+  }
+  const given = o.title !== undefined || o.body !== undefined || o.bodyFile !== undefined;
+  const store = (pr: PrRecord): Effort => {
+    const updated = ctx.registry.updateEffort(effort.id, { pr, lastActivity: now() });
+    touchEffort(ctx, updated);
+    return updated;
+  };
+
+  if (effort.pr) {
+    const open = await ctx.pritty.check({ cwd: effort.worktree, base: m.baseBranch });
+    if (open) {
+      if (!given) {
+        return { effort: store(open), pr: open, created: false, behindBase: behind, warnings };
+      }
+      const updated = await ctx.pritty.pr({
+        cwd: effort.worktree,
+        base: m.baseBranch,
+        draft: o.draft,
+        title: o.title,
+        body: o.body,
+        bodyFile: o.bodyFile,
+      });
+      const pr = { number: updated.number, url: updated.url, draft: updated.draft };
+      return { effort: store(pr), pr, created: false, behindBase: behind, warnings };
+    }
+    if (!o.force) {
+      throw new WorkkitError(
+        'PR_CLOSED',
+        `PR #${effort.pr.number} for ${label} is no longer open (${effort.pr.url}); pass --force to open a new one`,
+        { pr: effort.pr },
+      );
+    }
+  }
+
+  const res = await ctx.pritty.pr({
+    cwd: effort.worktree,
+    base: m.baseBranch,
+    draft: o.draft,
+    title: o.title,
+    body: o.body,
+    bodyFile: o.bodyFile,
+  });
+  const pr = { number: res.number, url: res.url, draft: res.draft };
+  return { effort: store(pr), pr, created: res.created, behindBase: behind, warnings };
 }
 
 export type FindingKind =

@@ -8,6 +8,7 @@ import {
   type Ctx,
   effortEnv,
   finishEffort,
+  prEffort,
   promoteEffort,
   reapLeases,
   startEffort,
@@ -102,6 +103,40 @@ export function buildMcpServer(ctxFactory: (projectRoot?: string) => Promise<Ctx
     },
     async ({ area, task, mode, projectRoot }) =>
       guard(async () => promoteEffort(await ctxFactory(projectRoot), { area, task, mode })),
+  );
+
+  server.registerTool(
+    'work_pr',
+    {
+      description:
+        "Open the effort's pull request through pritty: pushes the branch first, reuses a stored PR that is still open (updating its title/body when given), refuses with PR_CLOSED when it was merged or closed unless force, and stores { number, url, draft } on the effort. Pass title and bodyFile: the agent writes the words, pritty's AI path is only the fallback.",
+      inputSchema: {
+        area: z
+          .string()
+          .optional()
+          .describe('the area of the effort (default: the effort of the cwd worktree)'),
+        task: z.string().optional().describe('optional intra-area task slug'),
+        draft: z.boolean().optional().describe('open a draft PR'),
+        title: z.string().optional().describe('PR title'),
+        body: z.string().optional().describe('PR body text'),
+        bodyFile: z.string().optional().describe('path to a file holding the PR body'),
+        force: z.boolean().optional().describe('open a new PR when the stored one was closed'),
+        projectRoot: z.string().optional().describe('optional repository root path override'),
+      },
+    },
+    async ({ area, task, draft, title, body, bodyFile, force, projectRoot }) =>
+      guard(async () =>
+        prEffort(await ctxFactory(projectRoot), {
+          area,
+          task,
+          cwd: process.cwd(),
+          draft,
+          title,
+          body,
+          bodyFile,
+          force,
+        }),
+      ),
   );
 
   server.registerTool(

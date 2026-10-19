@@ -104,6 +104,12 @@ export class Git {
     return this.lines(['rev-list', `${ref}..HEAD`]).length;
   }
 
+  /** Commits on origin/<base> that HEAD does not have (0 when the ref is unknown). */
+  behindCount(base: string): number {
+    const r = this.tryRun(['rev-list', '--count', `HEAD..origin/${base}`]);
+    return r.code === 0 ? Number(r.out.trim()) || 0 : 0;
+  }
+
   isDirty(): boolean {
     return this.run(['status', '--porcelain']).trim().length > 0;
   }

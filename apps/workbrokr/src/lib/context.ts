@@ -10,6 +10,7 @@ import {
   stopServices,
 } from '../core/index.js';
 import type { Ctx } from './effort.js';
+import { prittyCli } from './pritty.js';
 import { storybrokrCli } from './storybrokr.js';
 
 /** The repo root is the MAIN checkout of whatever checkout the caller stands in. */
@@ -35,6 +36,7 @@ export async function buildCtx(
     owner: currentOwner(),
     runner: { start: startServices, stop: stopServices },
     storybrokr: storybrokrCli,
+    pritty: prittyCli,
     log: opts.quiet ? () => {} : (line) => console.error(chalk.gray(line)),
   };
 }

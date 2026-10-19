@@ -26,6 +26,8 @@ export type ErrorCode =
   | 'STORYBROKR_FAILED'
   | 'GIT_FAILED'
   | 'PUSH_REJECTED'
+  | 'PRITTY_FAILED'
+  | 'PR_CLOSED'
   | 'INTERNAL';
 
 const REFUSALS = new Set<ErrorCode>([
@@ -50,6 +52,7 @@ const REFUSALS = new Set<ErrorCode>([
   'SYNC_CONFLICT',
   'DIRTY_WORKTREE',
   'UNPUSHED',
+  'PR_CLOSED',
 ]);
 
 /** 2 = refused (a rule said no), 1 = something broke. */

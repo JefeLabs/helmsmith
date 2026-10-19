@@ -46,7 +46,7 @@ describe('MCP server', () => {
   let cleanup = () => {};
   afterEach(() => cleanup());
 
-  it('exposes the seven tools including work_promote', async () => {
+  it('exposes the eight tools including work_promote and work_pr', async () => {
     const f = makeRepo();
     cleanup = f.cleanup;
     const client = await connected(f.main);
@@ -55,6 +55,7 @@ describe('MCP server', () => {
       'work_audit',
       'work_env',
       'work_finish',
+      'work_pr',
       'work_promote',
       'work_reap',
       'work_start',
