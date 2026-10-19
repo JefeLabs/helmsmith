@@ -1,5 +1,11 @@
 # @helmsmith/workbrokr
 
+## 0.2.1
+
+### Patch Changes
+
+- The remaining workbrokr findings of the 2026-10-18 tooling review (W2–W14; helmsmith `docs/superpowers/specs/2026-10-18-work-tooling-review.md` §3.1a), each with a test that failed first: `finish` pushes before it stops or releases anything; reap parks a start that died before its first lease; the pre-commit hook no longer refuses the commit that resolves a sync conflict; port probes see wildcard listeners; `work start` reaps expired leases first; `PORT_STORYBOOK` keeps the storybrokr instance port; tasks of one area share its commons; `promote` claims its slot before changing mode; an owed `db-reset` is kept until a start with a database runs it; `retire` refuses before touching Storybook; `finish --into-area` targets the area branch that exists; registry lock timings; port ranges re-checked on every command; the storybrokr sweep skips backend efforts and passes `--if-running` (needs storybrokr 0.3.0).
+
 ## 0.2.0
 
 ### Minor Changes

@@ -15,7 +15,7 @@ The three tools are in very different states.
 
 The pattern across all three is the same one the flow-spec review found in August: the surface (flags, config keys, spec sections) is wider than what the code does, and the gaps sit exactly where no test runs.
 
-**W1 is fixed in the commit that follows this review** (see the row). It had already run during the #5464 post-merge proof; worktrees created before the fix carry a borrowed gitfile that the next `work start` now replaces.
+**All findings in this review (W1–W14, S1–S13, P1–P12) are fixed on `main` as of 2026-10-18**; see §3.1a, §4.1a and §5.1a. Published: workbrokr 0.2.0 (W1 only) and pritty 0.1.0. Unpublished: workbrokr 0.2.1 (W2–W14) and storybrokr 0.3.0 (S1–S13); frontend `work start` stays gated until storybrokr 0.3.0 ships.
 
 ---
 
@@ -54,6 +54,22 @@ The pattern across all three is the same one the flow-spec review found in Augus
 | W12 | Low | `lib/effort.ts:987` | `finish --into-area` derives the parent branch from the **task's** type; a `fix/` task next to a `feature/` area effort targets the wrong branch or refuses with a misleading `EFFORT_OPEN`. | reviewer traced |
 | W13 | Low | `core/registry.ts:28-29` | Lock stale threshold 30 s, wait 5 s: after a holder dies every command fails for up to 30 s, and two waiters can both judge the lock stale. | reviewer traced |
 | W14 | Low | `commands/hook.ts:113-117`, `lib/effort.ts:765-766` | Commits extend registry leases but never storybrokr's TTL; promote's keep-alive is always skipped as "too recent". | reviewer traced |
+
+### 3.1a Fixed 2026-10-18 (commits on `main`, unpublished as 0.2.1)
+
+| # | Commit | What changed |
+|---|---|---|
+| W1 | 8716373, 271f560 | (earlier) submodule repair clones locally; name guard. Live in 0.2.0. |
+| W2, W5 | 55af711 | reap parks a lease-less `starting` effort past the grace period; port probes try loopback and both wildcards, answers probe tries `::1`. |
+| W3 | dd4fe2e | `finish` pushes before stopping or releasing anything (`PUSH_REJECTED` otherwise); `worktreeAdd`/`checkout` create a tracking branch from `origin/<branch>` when the remote has it. |
+| W4 | 2f1d5d8 | With a merge in progress, scope and commons checks look only at staged paths whose content differs from `MERGE_HEAD`. |
+| W6, W9, W10, W11, W12, §3.5 | d4b3a97 | pre-flight reap in `start`; `promote` claims its slot before changing mode (and drops the unread `--story`); an owed `db-reset` mark persists per worktree until a start or promote with a database runs it; `retire` sweeps Storybook only after its refusals; `--into-area` targets the area branch that exists; the storybrokr sweep skips backend efforts, passes `--if-running`, returns ids and logs failures; client gains `version()` and `--include-children`. |
+| W7 | 539b62c | `PORT_STORYBOOK` keeps the storybrokr instance port; the slot-derived port is the fallback. |
+| W8 | 1f93387 | Efforts of the same area share its commons lease. |
+| W13 | b7219b6 | Lock stale threshold 10 s, wait 15 s, stale lock claimed by rename; the no-free-slot message names `work status`, `finish` and `reap`. |
+| W14 | fa79b47 | `ensureRanges` refuses overlap on every command and re-registers changed ranges. |
+
+Not done: the launchd timer §8.4 mentions. The pre-flight reap in `start` covers the practical case; the timer stays a spec promise to drop or build.
 
 ### 3.2 Spec 2 §3.5 drift in `lib/storybrokr.ts`
 
@@ -103,8 +119,16 @@ The pattern across all three is the same one the flow-spec review found in Augus
 | S1 | 79b123f | `down --all --host <dir>` stops only that host's instances. |
 | S2 | 628e9f1 | `up` resolves its host as `--host`, then `STORYBROKR_HOST`, then the cwd walk, in both the CLI (`resolveUpTarget`) and the MCP tool. |
 | S3 | c39a189 | A repeat `up` with an explicit `ttlMinutes` applies it to the reused instance; omitting it keeps what was set. |
+| S4 | d04d7b6, 0a92473 | Children log to `<configDir>/storybook.log` instead of the daemon's pipes and survive its exit; adopted instances whose process died are dropped by the reaper; a mid-boot instance is adopted as `starting` and polled to ready with its stories. |
+| S5 | 9325ecb | `reconcile` runs inside `daemon.start()` after the lock. |
+| S6 | 76954c9 | `canBind` requires loopback and both wildcards. |
+| S7 | 46c7906 | A prefix-matched story file belongs to the leaf only when no module of that name exists beside it. |
+| S8, S9, S10 | 0a92473 | Per-instance lock around `up`/`stop`; reaper re-checks inside it; legacy records load as `includeChildren: true`; a flag-only flip keeps the instance. |
+| S11 | 1279da7 | `down` treats `STORYBROKR_HOST` as the host; new `--if-running`. |
+| S12 | 1076153 | `realpathOrResolve` canonicalises the nearest existing ancestor. |
+| S13 | 1181bee | A failed check worker stops the others; `checkConcurrency` range-checked 1..64. |
 
-Each landed with a test that failed first; unit suite 178, e2e 17 passed against the fixture Storybook. S4–S13 remain open. 0.3.0 is still unpublished.
+Each landed with a test that failed first; unit suite 193, e2e 17 passed against the fixture Storybook. All thirteen storybrokr findings are fixed. 0.3.0 is still unpublished.
 
 ### 4.2 Test gaps
 
