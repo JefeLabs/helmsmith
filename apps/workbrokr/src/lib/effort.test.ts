@@ -734,7 +734,7 @@ describe('parallel waves, promote, join ref-counting & squash-merge recovery', (
     expect(next.effort.branch).toBe('fix/shop/cart');
   });
 
-  it('emits 0 notices when an effort made no commits of its own, and clears notices from retired branches', async () => {
+  it('emits 0 notices when an effort made no commits of its own', async () => {
     const f = makeRepo();
     cleanup = f.cleanup;
     const ctx = ctxFor(f);
@@ -1222,5 +1222,35 @@ describe('finish and retire branch hygiene', () => {
       code: 'UNPUSHED',
     });
     expect(main.branchExists('feature/shop/team')).toBe(true);
+  });
+});
+
+describe('notices and retire', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('retiring an area clears the notices its branches left on other areas, and the ones it received', async () => {
+    const f = makeRepo();
+    cleanup = f.cleanup;
+    const ctx = ctxFor(f);
+    const a = await startEffort(ctx, { area: 'platform/auth', type: 'chore', mode: 'frontend' });
+    commitFile(a.effort.worktree, 'api/auth/x.ts', 'x', 'auth change');
+    const done = await finishEffort(ctx, { area: 'platform/auth' });
+    expect(done.notices).toBeGreaterThan(0);
+    const cartBefore = statusFor(ctx).areas.find((x) => x.area === 'shop/cart')?.notices ?? [];
+    expect(cartBefore).toHaveLength(1);
+    // and platform/auth itself received one from another branch
+    ctx.registry.addNotice('demo', 'platform/auth', {
+      from: 'feature/shop/team',
+      text: 'x',
+      at: new Date().toISOString(),
+    });
+
+    await retireArea(ctx, { area: 'platform/auth' });
+
+    const after = statusFor(ctx);
+    expect(after.areas.find((x) => x.area === 'shop/cart')?.notices).toEqual([]);
+    expect(after.areas.find((x) => x.area === 'shop/team')?.notices).toEqual([]);
+    expect(after.areas.find((x) => x.area === 'platform/auth')?.notices).toEqual([]);
   });
 });

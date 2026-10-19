@@ -245,7 +245,7 @@ Stops the runner (`storybrokr down`, or the service stop commands in reverse ord
 
 ### 8.4 `work reap [--dry-run]`
 
-Expires idle leases: stops the runner behind each (never a process the registry did not start), releases slots and ports, and marks the effort `parked` with the reason. Runs from a launchd timer and as a pre-flight inside `work start`. Defaults: slots 12 h idle, commons 4 h, Storybook 2 h; per-project override in the manifest. Idle is measured from the last registry touch (the runner's health poll, a `status` call, or a push through the hook).
+Expires idle leases: stops the runner behind each (never a process the registry did not start), releases slots and ports, and marks the effort `parked` with the reason; a `starting` effort that died before its first lease is parked too once the grace period has passed. Runs as a pre-flight inside `work start` and on every explicit `work reap` (CLI or MCP); there is no background timer (decision 16). Defaults: slots 12 h idle, commons 4 h, Storybook 2 h; per-project override in the manifest. Idle is measured from the last registry touch (the runner's health poll, a `status` call, or a push through the hook).
 
 ### 8.5 `work retire --area <area>`
 
@@ -329,8 +329,8 @@ Opens (or reports) the pull request for the effort's branch against the manifest
 ## 14. Phasing
 
 - **Phase 1 — core + workbrokr, make-backed fullstack.** Registry, leases, port blocks, worktree/branch ops, sync + refresh, scopes and commons locks, hooks, all verbs, CLI + MCP + skill, skoolscout-com adoption. This phase already removes every failure class from §1.
-- **Phase 2 — stackbrokr.** Daemon running the manifest's services on core leases, health watching, log tailing, the same `up/down/ls` shape as storybrokr. `work` switches runner; nothing else changes.
-- **Phase 3 — storybrokr on core.** Instance registry moves onto core leases; one reaper and one `status` for everything; CLI/MCP unchanged.
+- **Phase 2 — stackbrokr.** *Retired (decision 17).* The make-backed runner with pid-scoped stop, health polling and `work reap` covers what the daemon was for; no daemon is planned.
+- **Phase 3 — storybrokr on core.** *Retired (decision 14).* storybrokr keeps its own registry; Spec 2 aligned the two through `--host`, `STORYBROKR_HOST`, lease-driven TTLs and `downHost` at finish, reap and retire.
 - **Later, optional.** Impact notices from a real dependency graph service; `audit` posted to a channel. (`work pr` moved out of this bucket: amendment A, §18.)
 
 ## 15. Testing
@@ -357,12 +357,13 @@ Opens (or reports) the pull request for the effort's branch against the manifest
 13. (phase 1 execution) The emitted `.slot`, env file, log dir and the worktree root are excluded from git through the clone's `info/exclude`, not `.gitignore`, so `finish --park` never commits them.
 14. **No separate workkit package (owner, 2026-10-18).** storybrokr stays independent (phase 3 as written is dropped; `work audit` should instead warn when storybrokr's port range overlaps a claimed project range), so workbrokr is workkit's only consumer. The core is folded into `apps/workbrokr/src/core`; one package, one publish. A second consumer would be the trigger to extract it again.
 15. **PRs are opened by `work pr`, not by `work start`, and through pritty (amendment A, 2026-10-18).** A draft at start would give every effort a PR before it has a commit; a verb the agent calls when the branch is ready keeps the PR list honest. workbrokr does not grow its own GitHub client: `@helmsmith/pritty` already owns push, create, template, labels and reviewers, and gains the non-interactive, non-AI path workbrokr needs.
+16. **No background reap timer (agent, at the owner's request, 2026-10-19).** `work start` reaps before it leases anything and `work reap` is explicit; a launchd agent would add a per-machine install step and a second code path for one case the pre-flight already covers. Revisit only if idle slots are found held overnight with nobody starting work.
+17. **Phase 2 (stackbrokr) is retired (agent, at the owner's request, 2026-10-19).** Decision 14 already removed the daemon from the plan for storybrokr; the same reasoning holds for the stack: the make-backed runner, pid-scoped stop and health polling do the job, and a daemon would be a third registry to reconcile. Phase 3 was dropped by decision 14.
+18. **§17 resolved (agent, at the owner's request, 2026-10-19).** Idle expiry stays 12 h / 4 h / 2 h: they are the schema defaults, skoolscout's manifest sets the same values, and the live proofs showed a Storybook lease of 2 h and no slot held past a working session. Owner identity stays `WORK_SESSION`, then `CLAUDE_SESSION_NAME`, then `user@host:ppid`, as implemented and tested; a minted per-shell token would outlive nothing the ppid does not. Archive retention stays 30 days or the last 5 per area (schema defaults and skoolscout's values); the 18 GB found at review time predates this retention (`make worktree-remove` archives under `.slot-archive/<worktree>-<UTC>`), so a one-time cleanup of those legacy directories is the remaining action, not a different default.
 
 ## 17. Open questions
 
-- Idle-expiry defaults (12 h slot, 4 h commons, 2 h Storybook) are proposals; confirm against how long an e2e run or a review wait really takes here.
-- Session identity for `owner`: the Claude session name is available inside Claude Code; for a human shell the fallback is `user@host:pid`. Good enough, or should `work` mint a per-shell token?
-- Archive retention default (30 days or last 5 per area) against the 18 GB found today.
+None open. The three questions this section held (idle-expiry defaults, owner identity, archive retention) were resolved on 2026-10-19; see decision 18.
 
 ## 18. Amendment A (2026-10-18): `work pr` through pritty
 
