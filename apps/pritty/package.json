@@ -1,6 +1,6 @@
 {
   "name": "@helmsmith/pritty",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Pretty PRs, zero effort. AI-powered CLI that categorizes staged files, generates conventional commits, and creates pull requests with human-in-the-loop approval.",
   "type": "module",
   "bin": {

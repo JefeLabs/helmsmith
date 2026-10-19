@@ -169,7 +169,7 @@ the repo. \`pritty init\` scaffolds one. Common fields:
 
 \`\`\`jsonc
 {
-  "model": "gpt-4o",
+  "model": "claude-opus-5-5",
   "baseBranch": "main",
   "commitStyle": "conventional",
   "provider": "copilot",                    // or "anthropic" / "openai"

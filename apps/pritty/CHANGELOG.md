@@ -1,5 +1,11 @@
 # @helmsmith/pritty
 
+## 0.2.2
+
+### Patch Changes
+
+- The skill text that `pritty init` installs shows the current default model in its config example instead of `gpt-4o`; a test now ties that example to the provider default table.
+
 ## 0.2.1
 
 ### Patch Changes
