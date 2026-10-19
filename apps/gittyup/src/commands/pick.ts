@@ -20,6 +20,7 @@ export function registerPick(program: Command): void {
     .option('--push', 'Push after cherry-pick', false)
     .option('--pr', 'Create PRs', false)
     .option('--no-fetch', 'Skip fetching')
+    .option('-y, --yes', 'Skip the AI write confirmation', false)
     .action(
       async (opts: {
         group?: string;
@@ -32,6 +33,7 @@ export function registerPick(program: Command): void {
         push?: boolean;
         pr?: boolean;
         fetch?: boolean;
+        yes?: boolean;
       }) => {
         const manifest = new ManifestManager();
         const orchestrator = new Orchestrator(manifest);
@@ -95,6 +97,7 @@ export function registerPick(program: Command): void {
           push: opts.push,
           createPR: opts.pr,
           fetch: opts.fetch,
+          yes: opts.yes,
         });
       },
     );

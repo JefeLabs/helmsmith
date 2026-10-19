@@ -49,6 +49,12 @@ describe('AiMode schema', () => {
 });
 
 describe('ManifestSettings schema', () => {
+  it('accepts an optional ai_model', () => {
+    const r = ManifestSettingsSchema.safeParse({ ai_model: 'claude-sonnet-4' });
+    expect(r.success && r.data.ai_model).toBe('claude-sonnet-4');
+    expect(ManifestSettingsSchema.parse({}).ai_model).toBeUndefined();
+  });
+
   it('applies defaults', () => {
     const result = ManifestSettingsSchema.safeParse({});
     expect(result.success).toBe(true);

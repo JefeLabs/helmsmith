@@ -17,6 +17,7 @@ export function registerMerge(program: Command): void {
     .option('--push', 'Push after successful merge', false)
     .option('--pr', 'Create PRs after merge', false)
     .option('--no-fetch', 'Skip fetching before merge')
+    .option('-y, --yes', 'Skip the AI write confirmation', false)
     .action(
       async (
         source: string,
@@ -28,6 +29,7 @@ export function registerMerge(program: Command): void {
           push?: boolean;
           pr?: boolean;
           fetch?: boolean;
+          yes?: boolean;
         },
       ) => {
         const manifest = new ManifestManager();
@@ -60,6 +62,7 @@ export function registerMerge(program: Command): void {
           push: opts.push,
           createPR: opts.pr,
           fetch: opts.fetch,
+          yes: opts.yes,
         });
       },
     );

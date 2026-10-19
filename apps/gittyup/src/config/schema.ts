@@ -52,6 +52,8 @@ export type GitHubSettings = z.infer<typeof GitHubSettingsSchema>;
 
 export const ManifestSettingsSchema = z.object({
   ai_mode: AiModeSchema.default('suggest'),
+  /** Model id passed to the AI provider; default 'gpt-4o' when unset. */
+  ai_model: z.string().optional(),
   github: GitHubSettingsSchema.default(() => GitHubSettingsSchema.parse({})),
   conflict_branch_prefix: z.string().default('conflict-resolution'),
   pr_template: z.string().optional(),

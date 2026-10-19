@@ -14,8 +14,11 @@ import type {
 } from '../config/schema.js';
 import { GitHubClient } from '../github/client.js';
 import { Dashboard } from '../ui/dashboard.js';
+import { buildAiMessages } from './ai-text.js';
 import { ConflictResolver } from './conflict-resolver.js';
 import { RepoManager } from './repo-manager.js';
+
+const DEFAULT_AI_MODEL = 'gpt-4o';
 
 /**
  * Coordinates merge and cherry-pick flows across multiple repos.
@@ -35,6 +38,11 @@ export class Orchestrator {
     return this.repoManager;
   }
 
+  /** Model id for AI resolution (`settings.ai_model`, default gpt-4o). */
+  private get aiModel(): string {
+    return this.manifest.data.settings.ai_model ?? DEFAULT_AI_MODEL;
+  }
+
   private async getGitHub(): Promise<GitHubClient> {
     if (!this.github) {
       this.github = await GitHubClient.create();
@@ -46,7 +54,13 @@ export class Orchestrator {
 
   async executeMerge(
     targets: MergeTarget[],
-    options: { aiMode?: AiMode; createPR?: boolean; push?: boolean; fetch?: boolean } = {},
+    options: {
+      aiMode?: AiMode;
+      createPR?: boolean;
+      push?: boolean;
+      fetch?: boolean;
+      yes?: boolean;
+    } = {},
   ): Promise<OperationResult[]> {
     const results: OperationResult[] = [];
     const aiMode = options.aiMode ?? this.manifest.data.settings.ai_mode;
@@ -89,6 +103,8 @@ export class Orchestrator {
           spinner.warn(`  ${target.repo.name}: ${mergeResult.conflicts.length} conflict(s)`);
           const resolver = new ConflictResolver(git, target.repo, aiMode, {
             onAiResolve: this.createAiResolver(),
+            yes: options.yes,
+            modelName: this.aiModel,
           });
           const session = await resolver.startSession(
             'merge',
@@ -132,7 +148,13 @@ export class Orchestrator {
 
   async executeCherryPick(
     targets: CherryPickTarget[],
-    options: { aiMode?: AiMode; createPR?: boolean; push?: boolean; fetch?: boolean } = {},
+    options: {
+      aiMode?: AiMode;
+      createPR?: boolean;
+      push?: boolean;
+      fetch?: boolean;
+      yes?: boolean;
+    } = {},
   ): Promise<OperationResult[]> {
     const results: OperationResult[] = [];
     const aiMode = options.aiMode ?? this.manifest.data.settings.ai_mode;
@@ -176,6 +198,8 @@ export class Orchestrator {
           );
           const resolver = new ConflictResolver(git, target.repo, aiMode, {
             onAiResolve: this.createAiResolver(),
+            yes: options.yes,
+            modelName: this.aiModel,
           });
           const session = await resolver.startSession(
             'cherry-pick',
@@ -294,41 +318,13 @@ export class Orchestrator {
         return null;
       }
 
-      const systemPrompt =
-        mode === 'auto'
-          ? 'You are a git merge conflict resolver. Given the OURS (current branch), THEIRS (incoming branch), and BASE (common ancestor) versions of a file, produce the correctly merged output. Output ONLY the merged file contents, no explanation.'
-          : 'You are a git merge conflict resolver. Given the OURS (current branch), THEIRS (incoming branch), and BASE (common ancestor) versions of a file, suggest a merged resolution. Explain your reasoning briefly, then output the merged file contents in a code block.';
-
-      const userPrompt = [
-        `File: ${file.path}`,
-        '',
-        '=== OURS (current branch) ===',
-        file.oursContent,
-        '',
-        '=== THEIRS (incoming branch) ===',
-        file.theirsContent,
-        ...(file.baseContent ? ['', '=== BASE (common ancestor) ===', file.baseContent] : []),
-      ].join('\n');
-
       try {
         const spinner = ora(`  AI ${mode}: analyzing ${file.path}...`).start();
-        const response = await callCopilot(
-          [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt },
-          ],
-          'gpt-4o',
-        );
+        const response = await callCopilot(buildAiMessages(file, mode), this.aiModel);
         spinner.stop();
 
-        const content = response.choices?.[0]?.message?.content;
-        if (!content) return null;
-
-        if (mode === 'auto') {
-          // Strip any code fences if present
-          return content.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '');
-        }
-        return content;
+        // The resolver strips fences / extracts the block and runs the gate.
+        return response.choices?.[0]?.message?.content ?? null;
       } catch (err) {
         console.log(
           chalk.yellow(`  [AI] Copilot error: ${err instanceof Error ? err.message : String(err)}`),

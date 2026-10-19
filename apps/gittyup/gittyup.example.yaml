@@ -81,10 +81,12 @@ groups:
 # ─── Settings ─────────────────────────────────────────────────────────
 settings:
   # AI conflict resolution mode:
-  #   auto    — Claude attempts to auto-merge, falls back to manual
-  #   suggest — Claude proposes a resolution, you approve/reject/edit
-  #   manual  — Standard git resolution, AI only on explicit request
+  #   auto    — the model writes the complete merged file; you confirm a line diff
+  #   suggest — the model explains, then proposes the complete file; you accept/edit/reject
+  #   manual  — your editor opens the conflicted file; markers and fragments are refused
   ai_mode: suggest
+  # Model id sent to the AI provider (Copilot). Default: gpt-4o. See `gittyup auth models`.
+  ai_model: gpt-4o
 
   github:
     token_env: GITHUB_TOKEN    # env var containing your GitHub PAT
