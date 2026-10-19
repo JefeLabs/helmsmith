@@ -78,14 +78,27 @@ function importsOf(file: string): string[] {
   return [...out];
 }
 
-/** Sibling story files whose basename starts with the module's basename; index modules take the whole dir. */
+/**
+ * Sibling story files that belong to the module: `<base>.stories.*`, `<base>.<variant>.stories.*`,
+ * and `<base><Suffix>.stories.*` only when no `<base><Suffix>` module of its own exists beside it
+ * (`CalendarHeaderWithTabs.stories.tsx` is CalendarHeader's; `ButtonGroup.stories.tsx` is
+ * ButtonGroup's). Index modules take the whole dir.
+ */
 function storyFilesFor(file: string): string[] {
   const dir = dirname(file);
   const base = basename(file).replace(/\.(tsx|ts|jsx|js)$/, '');
-  return readdirSync(dir)
-    .filter(
-      (f) => STORY_RE.test(f) && (base === 'index' || f.replace(STORY_RE, '').startsWith(base)),
-    )
+  const entries = readdirSync(dir);
+  const modules = new Set(
+    entries.filter((f) => !STORY_RE.test(f)).map((f) => f.replace(/\.(tsx|ts|jsx|js)$/, '')),
+  );
+  return entries
+    .filter((f) => {
+      if (!STORY_RE.test(f)) return false;
+      if (base === 'index') return true;
+      const stem = f.replace(STORY_RE, '');
+      if (stem === base || stem.startsWith(`${base}.`)) return true;
+      return stem.startsWith(base) && !modules.has(stem);
+    })
     .map((f) => join(dir, f));
 }
 

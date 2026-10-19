@@ -154,3 +154,21 @@ describe('discoverStories', () => {
     }
   });
 });
+
+describe('S7: a leaf file takes only its own story files', () => {
+  it('matches Button.stories and Button.<variant>.stories, not ButtonGroup.stories', () => {
+    const root = tree({
+      'src/Button.tsx': 'export const Button = 1;\n',
+      'src/Button.stories.tsx': '',
+      'src/Button.variants.stories.tsx': '',
+      'src/ButtonGroup.tsx': 'export const ButtonGroup = 1;\n',
+      'src/ButtonGroup.stories.tsx': '',
+    });
+    const r = discoverStories(root, 'src/Button.tsx', {});
+    expect(r.storyFiles.sort()).toEqual([
+      'src/Button.stories.tsx',
+      'src/Button.variants.stories.tsx',
+    ]);
+    rmSync(root, { recursive: true, force: true });
+  });
+});
