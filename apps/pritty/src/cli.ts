@@ -28,7 +28,7 @@ import { runRebase } from './commands/rebase.js';
 // AuthProvider is reachable via cli-kit if a future handler needs it.
 const { program } = createCli({
   name: 'pritty',
-  version: '0.1.1',
+  version: '0.1.2',
   description: 'Pretty PRs, zero effort.',
   auth: prittyAuthProvider,
 });
@@ -117,8 +117,19 @@ program
   .option('--auto-approve', 'Skip the confirmation prompt before committing')
   .option('--dry-run', 'Show the plan without making any commits')
   .option('--commit-style <style>', 'conventional | gitmoji | angular | simple')
-  .action((options: { autoApprove?: boolean; dryRun?: boolean; commitStyle?: string }) =>
-    runCommit(options),
+  .option(
+    '--json',
+    'Print one JSON line { dryRun, commits: [{ category, message, files, sha }] } on stdout; implies --auto-approve',
+  )
+  .action(
+    async (options: {
+      autoApprove?: boolean;
+      dryRun?: boolean;
+      commitStyle?: string;
+      json?: boolean;
+    }) => {
+      await runCommit(options);
+    },
   );
 
 program

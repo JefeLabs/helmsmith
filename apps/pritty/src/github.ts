@@ -181,6 +181,39 @@ export async function listOpenPRs(
   }));
 }
 
+export interface ClosedPRSummary extends OpenPRSummary {
+  merged: boolean;
+}
+
+/** Closed PRs for `<owner>:<branch>` → `base`, most recently updated first, with whether each was merged. */
+export async function listClosedPRs(
+  owner: string,
+  repo: string,
+  branch: string,
+  base?: string,
+): Promise<ClosedPRSummary[]> {
+  const client = await octokit();
+  const result = await client.rest.pulls.list({
+    owner,
+    repo,
+    state: 'closed',
+    head: `${owner}:${branch}`,
+    ...(base ? { base } : {}),
+    sort: 'updated',
+    direction: 'desc',
+    per_page: 5,
+  });
+  return result.data.map((pr) => ({
+    number: pr.number,
+    url: pr.html_url,
+    title: pr.title,
+    head: pr.head.ref,
+    base: pr.base.ref,
+    draft: Boolean(pr.draft),
+    merged: pr.merged_at !== null,
+  }));
+}
+
 /** @deprecated use listOpenPRs; kept for the programmatic API. */
 export function listOpenPRsForHead(
   owner: string,

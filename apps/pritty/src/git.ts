@@ -43,6 +43,8 @@ export interface GitOps {
    * never checks it out), otherwise `base` itself.
    */
   resolveBaseRef(base: string): Promise<string>;
+  /** The commit HEAD points at. */
+  headSha(): Promise<string>;
   /** URL of the `origin` remote, or null if not set. */
   getRemoteUrl(): Promise<string | null>;
   /** Working tree is clean (no staged or unstaged changes, no untracked files). */
@@ -130,6 +132,10 @@ export function createGit(cwd: string = process.cwd()): GitOps {
         stdio: 'ignore',
       });
       return r.status === 0 ? `origin/${base}` : base;
+    },
+
+    async headSha(): Promise<string> {
+      return (await git.revparse(['HEAD'])).trim();
     },
 
     async getRemoteUrl(): Promise<string | null> {

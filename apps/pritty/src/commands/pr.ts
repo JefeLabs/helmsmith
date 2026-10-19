@@ -8,9 +8,11 @@ import { createGit, describeRemote, type GitOps, parseGitHubRemote } from '../gi
 import {
   addLabels,
   assertGitHubToken,
+  type ClosedPRSummary,
   type CreatePROptions,
   createPR,
   getDefaultBranch,
+  listClosedPRs,
   listOpenPRs,
   type OpenPRSummary,
   type PRPatch,
@@ -64,6 +66,12 @@ export interface PrDeps {
     assertToken(): Promise<void>;
     getDefaultBranch(owner: string, repo: string): Promise<string>;
     listOpenPRs(owner: string, repo: string, head: string, base?: string): Promise<OpenPRSummary[]>;
+    listClosedPRs(
+      owner: string,
+      repo: string,
+      head: string,
+      base?: string,
+    ): Promise<ClosedPRSummary[]>;
     createPR(o: CreatePROptions): Promise<PRResult>;
     updatePR(owner: string, repo: string, n: number, patch: PRPatch): Promise<void>;
     addLabels(owner: string, repo: string, n: number, labels: readonly string[]): Promise<void>;
@@ -100,6 +108,7 @@ function defaultDeps(): PrDeps {
       assertToken: assertGitHubToken,
       getDefaultBranch,
       listOpenPRs,
+      listClosedPRs,
       createPR,
       updatePR,
       addLabels,
@@ -211,8 +220,18 @@ export async function runPr(
           base: effectiveBase,
         }
       : undefined;
-    io.out(JSON.stringify({ open: outcome ?? null }));
-    return outcome;
+    if (outcome) {
+      io.out(JSON.stringify({ open: outcome }));
+      return outcome;
+    }
+    // nothing open: say what became of the last one, so a caller can tell merged from closed
+    const closed = await deps.github.listClosedPRs(repo.owner, repo.repo, branch, effectiveBase);
+    const lastPr = closed[0];
+    const last = lastPr
+      ? { number: lastPr.number, url: lastPr.url, state: lastPr.merged ? 'MERGED' : 'CLOSED' }
+      : null;
+    io.out(JSON.stringify({ open: null, last }));
+    return undefined;
   }
   if (open.length > 0) {
     const existing = open[0]!;

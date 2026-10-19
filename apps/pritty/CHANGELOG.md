@@ -1,5 +1,12 @@
 # @helmsmith/pritty
 
+## 0.1.2
+
+### Patch Changes
+
+- `pritty pr --check` reports what became of the last PR when none is open: `{ open: null, last: { number, url, state: "MERGED" | "CLOSED" } }`, so `work pr` can say which.
+- `pritty commit --json`: one JSON line `{ dryRun, commits: [{ category, message, files, sha }] }` on stdout, everything else on stderr; implies `--auto-approve`.
+
 ## 0.1.1
 
 ### Patch Changes

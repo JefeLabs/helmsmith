@@ -1,154 +1,194 @@
 import chalk from 'chalk';
 import ora from 'ora';
-import { type CommitMessage, generateCommitMessages } from '../ai.js';
+import { type CommitMessage, generateCommitMessages, type TicketContext } from '../ai.js';
 import { categorize, mergeCategories, UNKNOWN_CATEGORY } from '../categorizer.js';
-import { loadConfig } from '../config.js';
-import { createGit } from '../git.js';
+import { type Config, loadConfig } from '../config.js';
+import { createGit, type GitOps } from '../git.js';
 import { splitTitleBody } from './_shared/format.js';
 import { composeCommitMessage, reconcileCommitPlan } from './_shared/plan.js';
 import { confirm, editor } from './_shared/prompts.js';
-import { resolveTicketContext } from './_shared/ticket-context.js';
+import { resolveTicketContext, type TicketContextOptions } from './_shared/ticket-context.js';
 
 export interface CommitOptions {
   autoApprove?: boolean;
   dryRun?: boolean;
   commitStyle?: string;
+  /** One JSON line on stdout, everything else on stderr; implies autoApprove. */
+  json?: boolean;
 }
 
+export interface CommitOutcome {
+  dryRun: boolean;
+  commits: Array<{ category: string; message: string; files: string[]; sha?: string }>;
+}
+
+/** Everything `runCommit` touches outside its own logic, so tests can drive it without git or a model. */
+export interface CommitDeps {
+  git: GitOps;
+  config: Config;
+  ai: { generateCommitMessages: typeof generateCommitMessages };
+  ticket: (
+    config: Config,
+    branch: string,
+    git: GitOps,
+    opts?: TicketContextOptions,
+  ) => Promise<TicketContext | undefined>;
+  prompts: {
+    confirm(o: { message: string; default?: boolean }): Promise<boolean>;
+    editor(o: { message: string; default?: string }): Promise<string>;
+  };
+  io?: { out: (line: string) => void; err: (line: string) => void };
+}
+
+function defaultDeps(): CommitDeps {
+  return {
+    git: createGit(),
+    config: loadConfig(),
+    ai: { generateCommitMessages },
+    ticket: resolveTicketContext,
+    prompts: { confirm, editor },
+  };
+}
+
+const VALID_STYLES = ['conventional', 'gitmoji', 'angular', 'simple'] as const;
+
 /**
- * Generate AI commit messages per category and commit each group via
- * path-restricted commits. Resolves ticket context up front so
- * validation gates fail fast (before any AI call).
+ * Generate AI commit messages per category and commit each group from the
+ * index. Resolves ticket context up front so validation gates fail fast
+ * (before any AI call). Errors are thrown (the CLI prints them and exits 1).
  */
-export async function runCommit(options: CommitOptions = {}): Promise<void> {
-  const config = loadConfig();
-  const auto = options.autoApprove ?? config.autoApprove;
+export async function runCommit(
+  options: CommitOptions = {},
+  deps: CommitDeps = defaultDeps(),
+): Promise<CommitOutcome | undefined> {
+  const { git } = deps;
+  const config = { ...deps.config };
+  const io = deps.io ?? {
+    out: (l: string) => console.log(l),
+    err: (l: string) => console.error(l),
+  };
+  const say = options.json ? io.err : io.out;
+  const auto = Boolean(options.json) || (options.autoApprove ?? config.autoApprove);
   const dryRun = options.dryRun ?? config.dryRun;
-  // CLI flags override config
+  const finish = (o: CommitOutcome): CommitOutcome => {
+    if (options.json) io.out(JSON.stringify(o));
+    return o;
+  };
   if (options.commitStyle) {
-    const valid = ['conventional', 'gitmoji', 'angular', 'simple'];
-    if (!valid.includes(options.commitStyle)) {
-      console.error(chalk.red(`✗ Invalid --commit-style. Valid: ${valid.join(', ')}`));
-      process.exit(1);
+    if (!(VALID_STYLES as readonly string[]).includes(options.commitStyle)) {
+      throw new Error(`Invalid --commit-style. Valid: ${VALID_STYLES.join(', ')}`);
     }
-    config.commitStyle = options.commitStyle as typeof config.commitStyle;
+    config.commitStyle = options.commitStyle as Config['commitStyle'];
   }
 
-  const git = createGit();
-
-  // Resolve ticket context up front — gate fires (and exits) before
-  // any AI call when validate: true and branch lacks a ticket. Saves
-  // an API roundtrip and gives instant feedback.
+  // Ticket context first: the validation gate fires before any AI call.
   const branch = await git.getCurrentBranch();
-  const ticketCtx = await resolveTicketContext(config, branch, git, { interactive: !auto });
+  const ticketCtx = await deps.ticket(config, branch, git, { interactive: !auto });
 
-  // 1. Find staged files
+  // 1. Staged files
   const staged = await git.getStaged();
   if (staged.length === 0) {
-    console.log(chalk.dim('No staged files. Stage what you want to commit with `git add` first.'));
-    return;
+    say(chalk.dim('No staged files. Stage what you want to commit with `git add` first.'));
+    return finish({ dryRun, commits: [] });
   }
 
   // 2. Categorize
   const categories = mergeCategories(config.categories);
   const grouped = categorize(staged, categories);
   const nonEmpty = Object.entries(grouped).filter(([, files]) => files.length > 0);
-
-  console.log(chalk.cyan(`Staged files (${staged.length}) — by category:`));
+  say(chalk.cyan(`Staged files (${staged.length}) — by category:`));
   for (const [name, files] of nonEmpty) {
     const tag = name === UNKNOWN_CATEGORY ? chalk.yellow(name) : chalk.green(name);
-    console.log(`  ${tag} ${chalk.dim(`(${files.length})`)}`);
-    for (const f of files) console.log(`    ${chalk.dim(f)}`);
+    say(`  ${tag} ${chalk.dim(`(${files.length})`)}`);
+    for (const f of files) say(`    ${chalk.dim(f)}`);
   }
-  console.log('');
+  say('');
 
-  // 3. Generate AI commit messages
+  // 3. Messages from the model, files from the categorizer
   const spinner = ora({ text: 'Generating commit messages...', color: 'cyan' }).start();
   let plan: CommitMessage[];
   try {
     const diff = await git.getStagedDiff();
     plan = reconcileCommitPlan(
-      await generateCommitMessages(grouped, diff, config, ticketCtx),
+      await deps.ai.generateCommitMessages(grouped, diff, config, ticketCtx),
       grouped,
     );
     spinner.succeed(`Generated ${plan.length} commit message(s)`);
   } catch (err) {
     spinner.fail((err as Error).message);
-    process.exit(1);
+    throw err;
   }
 
-  // 4. Show plan
-  console.log('');
-  console.log(chalk.cyan('Commit plan:'));
+  // 4. Show the plan
+  say('');
+  say(chalk.cyan('Commit plan:'));
   for (const c of plan) {
-    console.log(`  ${chalk.bold(c.category)}  ${chalk.dim(`(${c.files.length} files)`)}`);
-    console.log(`    ${chalk.green(c.message)}`);
-    if (c.body) {
-      for (const line of c.body.split('\n')) {
-        console.log(`    ${chalk.dim(line)}`);
-      }
-    }
+    say(`  ${chalk.bold(c.category)}  ${chalk.dim(`(${c.files.length} files)`)}`);
+    say(`    ${chalk.green(c.message)}`);
+    if (c.body) for (const line of c.body.split('\n')) say(`    ${chalk.dim(line)}`);
   }
-  console.log('');
+  say('');
 
-  // 4.5. Optional per-commit editing — default N so the wrap-up
-  // stays fast. Skipped under --auto-approve and --dry-run.
+  // 4.5 Optional per-commit editing — default N so the wrap-up stays fast.
   if (!auto && !dryRun) {
     for (let i = 0; i < plan.length; i++) {
       const c = plan[i]!;
-      const wantEdit = await confirm({
+      const wantEdit = await deps.prompts.confirm({
         message: `Edit message for ${c.category}?`,
         default: false,
       });
       if (!wantEdit) continue;
-      const fullMessage = c.body ? `${c.message}\n\n${c.body}` : c.message;
-      const edited = await editor({
+      const edited = await deps.prompts.editor({
         message: `Editing ${c.category} commit message`,
-        default: fullMessage,
+        default: c.body ? `${c.message}\n\n${c.body}` : c.message,
       });
       const { title: nextMessage, body: nextBody } = splitTitleBody(edited);
       if (nextMessage.length === 0) {
-        console.log(chalk.yellow('⚠ Empty message — keeping original.'));
+        say(chalk.yellow('⚠ Empty message — keeping original.'));
         continue;
       }
-      plan[i] = {
-        ...c,
-        message: nextMessage,
-        body: nextBody.length > 0 ? nextBody : undefined,
-      };
+      plan[i] = { ...c, message: nextMessage, body: nextBody.length > 0 ? nextBody : undefined };
     }
   }
 
-  // 5. Dry-run exits here
+  // 5. Dry-run stops here
   if (dryRun) {
-    console.log(chalk.yellow('Dry-run — no commits made. Re-run without --dry-run to apply.'));
-    return;
+    say(chalk.yellow('Dry-run — no commits made. Re-run without --dry-run to apply.'));
+    return finish({
+      dryRun: true,
+      commits: plan.map((c) => ({ category: c.category, message: c.message, files: c.files })),
+    });
   }
 
-  // 6. Confirm (skippable)
+  // 6. Confirm
   if (!auto) {
-    const ok = await confirm({
+    const ok = await deps.prompts.confirm({
       message: `Create ${plan.length} commit(s) above?`,
       default: true,
     });
     if (!ok) {
-      console.log(chalk.dim('Aborted. No commits made.'));
-      return;
+      say(chalk.dim('Aborted. No commits made.'));
+      return undefined;
     }
   }
 
-  // 7. Commit each group via path-restricted commit
-  let committed = 0;
+  // 7. One commit per group, from the index
+  const commits: CommitOutcome['commits'] = [];
   for (const c of plan) {
     try {
       await git.commit(composeCommitMessage(c, config.commitTrailers), c.files);
-      committed++;
-      console.log(chalk.green(`✓ committed ${c.category}: ${c.message}`));
     } catch (err) {
-      console.error(chalk.red(`✗ failed to commit ${c.category}: ${(err as Error).message}`));
-      process.exit(1);
+      io.err(
+        chalk.red(
+          `✗ failed to commit ${c.category}: ${(err as Error).message} (${commits.length} commit(s) already made)`,
+        ),
+      );
+      throw err;
     }
+    const sha = await git.headSha();
+    commits.push({ category: c.category, message: c.message, files: c.files, sha });
+    say(chalk.green(`✓ committed ${c.category}: ${c.message} (${sha.slice(0, 7)})`));
   }
-
-  console.log(chalk.green(`\n✓ ${committed} commit(s) created.`));
+  say(chalk.green(`\n✓ ${commits.length} commit(s) created.`));
+  return finish({ dryRun: false, commits });
 }

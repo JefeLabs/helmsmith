@@ -54,6 +54,7 @@ function fakes(o: {
         if (o.listFails) throw new Error('404');
         return o.openPRs ?? [];
       },
+      listClosedPRs: async () => [],
       createPR: async (args) => {
         calls.push('createPR');
         createArgs.push(args);
@@ -346,9 +347,59 @@ describe('runPr --check', () => {
     const out: string[] = [];
     f.deps.io = { out: (s) => out.push(s), err: () => {} };
     expect(await runPr({ check: true }, f.deps)).toBeUndefined();
-    expect(JSON.parse(out[0]!)).toEqual({ open: null });
+    expect(JSON.parse(out[0]!)).toEqual({ open: null, last: null });
     const g = fakes({ remoteDefault: 'main' });
     g.deps.io = { out: () => {}, err: () => {} };
     await expect(runPr({ check: true }, g.deps)).rejects.toThrow(/--base/);
+  });
+});
+
+describe('runPr --check on a PR that is gone', () => {
+  it('reports the last PR for head and base with MERGED or CLOSED', async () => {
+    const merged = fakes({ config: { baseBranch: 'main' } });
+    merged.deps.github.listClosedPRs = async () => [
+      {
+        number: 5,
+        url: 'u5',
+        title: 't',
+        head: 'feature/x',
+        base: 'main',
+        draft: false,
+        merged: true,
+      },
+    ];
+    const out1: string[] = [];
+    merged.deps.io = { out: (s) => out1.push(s), err: () => {} };
+    await runPr({ check: true }, merged.deps);
+    expect(JSON.parse(out1[0]!)).toEqual({
+      open: null,
+      last: { number: 5, url: 'u5', state: 'MERGED' },
+    });
+
+    const closed = fakes({ config: { baseBranch: 'main' } });
+    closed.deps.github.listClosedPRs = async () => [
+      {
+        number: 6,
+        url: 'u6',
+        title: 't',
+        head: 'feature/x',
+        base: 'main',
+        draft: true,
+        merged: false,
+      },
+    ];
+    const out2: string[] = [];
+    closed.deps.io = { out: (s) => out2.push(s), err: () => {} };
+    await runPr({ check: true }, closed.deps);
+    expect(JSON.parse(out2[0]!)).toEqual({
+      open: null,
+      last: { number: 6, url: 'u6', state: 'CLOSED' },
+    });
+
+    const none = fakes({ config: { baseBranch: 'main' } });
+    const out3: string[] = [];
+    none.deps.io = { out: (s) => out3.push(s), err: () => {} };
+    await runPr({ check: true }, none.deps);
+    expect(JSON.parse(out3[0]!)).toEqual({ open: null, last: null });
   });
 });

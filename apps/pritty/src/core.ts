@@ -20,9 +20,11 @@ export { createGit, describeRemote, type GitOps, parseGitHubRemote } from './git
 export {
   addLabels,
   assertGitHubToken,
+  type ClosedPRSummary,
   type CreatePROptions,
   createPR,
   getDefaultBranch,
+  listClosedPRs,
   listOpenPRs,
   listOpenPRsForHead,
   type OpenPRSummary,
