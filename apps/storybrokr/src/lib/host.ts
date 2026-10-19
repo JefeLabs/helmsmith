@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import type { HostInfo } from '../types.js';
 import { StorybrokrError } from './errors.js';
 import { readTsconfigPaths } from './tsconfig.js';
@@ -9,13 +9,25 @@ const PREVIEW_EXTS = ['tsx', 'ts', 'jsx', 'js', 'mjs'];
 
 export const MIN_STORYBOOK_MAJOR = 7;
 
-/** Resolve symlinks when the path exists on disk; fall back to path.resolve otherwise. */
+/**
+ * Canonical absolute path: symlinks resolved for as much of the path as exists on disk,
+ * the rest appended as given. A deleted worktree under /tmp (→ /private/tmp) therefore
+ * still matches the hostRoot its records were stored with.
+ */
 export function realpathOrResolve(p: string): string {
   const abs = resolve(p);
-  try {
-    return realpathSync(abs);
-  } catch {
-    return abs;
+  const missing: string[] = [];
+  let dir = abs;
+  for (;;) {
+    try {
+      const real = realpathSync(dir);
+      return missing.length === 0 ? real : join(real, ...missing.reverse());
+    } catch {
+      const parent = dirname(dir);
+      if (parent === dir) return abs;
+      missing.push(basename(dir));
+      dir = parent;
+    }
   }
 }
 

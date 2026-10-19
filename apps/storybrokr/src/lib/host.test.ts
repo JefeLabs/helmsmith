@@ -142,3 +142,12 @@ describe('host', () => {
     expect(inspectHost(linkPath).hostRoot).toBe(expectedReal);
   });
 });
+
+describe('S12: realpathOrResolve for a path that no longer exists', () => {
+  it('canonicalises the nearest existing ancestor, so a deleted worktree under a symlinked parent still matches', async () => {
+    const { realpathOrResolve } = await import('./host.js');
+    const missing = join(tmpdir(), `sb-missing-${process.pid}-${Date.now()}`, 'app-ui');
+    const expected = join(realpathSync(tmpdir()), ...missing.split('/').slice(-2));
+    expect(realpathOrResolve(missing)).toBe(expected);
+  });
+});
