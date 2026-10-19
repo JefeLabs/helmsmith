@@ -237,3 +237,5 @@ screenshot tests, so it needs Playwright's browser installed once per
 machine:
 `pnpm --filter @helmsmith/storybrokr exec playwright install chromium`.
 CI runs the same install step before `test:e2e`.
+
+A component may be a folder, a story or module file, or a bare stem (`src/Button/Button`); a stem resolves to its module file, or to its stories file when that is all there is.

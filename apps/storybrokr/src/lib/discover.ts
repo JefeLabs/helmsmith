@@ -102,19 +102,40 @@ function storyFilesFor(file: string): string[] {
     .map((f) => join(dir, f));
 }
 
+const STEM_EXTS = ['tsx', 'ts', 'jsx', 'js'] as const;
+
+/**
+ * The path a component argument names, relative to the host root. A folder or an existing
+ * file is taken as is; a bare stem (`src/Button/Button`) resolves to its module file
+ * (`Button.tsx`, then .ts/.jsx/.js), or to its stories file when that is all there is, so the
+ * record and the instance id are the same whichever form the caller used.
+ */
+export function resolveComponentPath(hostRoot: string, component: string): string {
+  const abs = resolve(hostRoot, component);
+  if (existsSync(abs)) return component;
+  const tried: string[] = [];
+  for (const suffix of [
+    ...STEM_EXTS.map((e) => `.${e}`),
+    ...STEM_EXTS.map((e) => `.stories.${e}`),
+  ]) {
+    const candidate = `${component}${suffix}`;
+    tried.push(candidate);
+    if (existsSync(resolve(hostRoot, candidate))) return candidate;
+  }
+  throw new StorybrokrError(
+    'COMPONENT_NOT_FOUND',
+    `${component} does not exist under ${hostRoot} (also tried ${tried.slice(0, 4).join(', ')}, and the .stories.* forms)`,
+  );
+}
+
 export function discoverStories(
   hostRoot: string,
   component: string,
   tsconfigPaths: Record<string, string[]>,
   opts?: DiscoverOptions,
 ): DiscoveryResult {
+  component = resolveComponentPath(hostRoot, component);
   const abs = resolve(hostRoot, component);
-  if (!existsSync(abs)) {
-    throw new StorybrokrError(
-      'COMPONENT_NOT_FOUND',
-      `${component} does not exist under ${hostRoot}`,
-    );
-  }
   const isDir = statSync(abs).isDirectory();
   if (!isDir && STORY_RE.test(abs) && !opts?.includeChildren) {
     return {

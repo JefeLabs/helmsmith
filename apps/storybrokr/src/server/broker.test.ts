@@ -391,6 +391,17 @@ describe('Broker', () => {
     expect(third.record.ttlMinutes).toBe(120);
   });
 
+  it('up with a bare stem resolves to the module file and shares the instance with the full path', async () => {
+    const host = fakeHost();
+    dirs.push(host);
+    const { broker } = make({ portRangeStart: 6188, portRangeEnd: 6189 });
+    const stem = await broker.up({ component: 'src/Button/Button', hostRoot: host });
+    expect(stem.record.component).toBe('src/Button/Button.tsx');
+    const full = await broker.up({ component: 'src/Button/Button.tsx', hostRoot: host });
+    expect(full.created).toBe(false);
+    expect(full.record.id).toBe(stem.record.id);
+  });
+
   it('a repeat up re-discovers: an unchanged tree returns the same pid, a changed one respawns, and includeChildren is inherited unless explicitly flipped', async () => {
     const host = fakeHost();
     dirs.push(host);

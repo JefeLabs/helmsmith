@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
-import { discoverStories } from '../lib/discover.js';
+import { discoverStories, resolveComponentPath } from '../lib/discover.js';
 import { StorybrokrError, toErrorBody } from '../lib/errors.js';
 import { inspectHost as defaultInspect, realpathOrResolve, resolveHost } from '../lib/host.js';
 import {
@@ -49,7 +49,8 @@ function normalizeComponent(hostRoot: string, component: string): string {
   if (rel.startsWith('..')) {
     throw new StorybrokrError('COMPONENT_NOT_FOUND', `${component} is outside ${hostRoot}`);
   }
-  return rel;
+  // a bare stem becomes its file here, so the record and the id match the full-path form
+  return resolveComponentPath(hostRoot, rel);
 }
 
 export class Broker {

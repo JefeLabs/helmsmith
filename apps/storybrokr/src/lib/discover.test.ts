@@ -172,3 +172,17 @@ describe('S7: a leaf file takes only its own story files', () => {
     rmSync(root, { recursive: true, force: true });
   });
 });
+
+describe('a component given as a bare stem', () => {
+  it('resolves to the module file, or to the stories file when that is all there is', () => {
+    const root = tree({
+      'src/Button.tsx': 'export const Button = 1;\n',
+      'src/Button.stories.tsx': '',
+      'src/Only.stories.tsx': '',
+    });
+    expect(discoverStories(root, 'src/Button', {}).storyFiles).toEqual(['src/Button.stories.tsx']);
+    expect(discoverStories(root, 'src/Only', {}).storyFiles).toEqual(['src/Only.stories.tsx']);
+    expect(() => discoverStories(root, 'src/Missing', {})).toThrow(/src\/Missing.*\.tsx/);
+    rmSync(root, { recursive: true, force: true });
+  });
+});

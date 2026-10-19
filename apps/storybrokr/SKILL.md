@@ -57,3 +57,5 @@ Do not use it to browse a whole design system: that is what the host's full Stor
 ## Error codes
 
 `HOST_NOT_FOUND`, `HOST_INVALID`, `COMPONENT_NOT_FOUND`, `INSTANCE_CAP_REACHED`, `NO_FREE_PORT`, `BOOT_FAILED` (log tail attached), `BOOT_TIMEOUT` (log tail attached), `INSTANCE_NOT_FOUND`, `INSTANCE_AMBIGUOUS` (multiple worktrees match a bare component path — pass `--host <dir>`, `STORYBROKR_HOST`, or an instance id), `DAEMON_UNAVAILABLE`, `INSTANCE_NOT_READY`, `BROWSER_UNAVAILABLE` (installer/launch tail attached), `STORY_NOT_FOUND`, `STORY_FAILED`, `STORY_TIMEOUT`, `SCREENSHOT_WRITE_FAILED`. Run `storybrokr doctor <path>` when a host fails. Transport-level codes `BAD_REQUEST`, `UNAUTHORIZED`, and `NOT_FOUND` mean the request itself was malformed, the token is stale (the client re-reads it once and retries), or the route is unknown.
+
+A component may be a folder, a story or module file, or a bare stem (`src/Button/Button`); a stem resolves to its module file, or to its stories file when that is all there is.

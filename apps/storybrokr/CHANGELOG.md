@@ -5,6 +5,7 @@
 ### Patch Changes
 
 - `STORYBROKR_HOST` now scopes every verb like an explicit host: when the named host has no instance for the component, `get`, `check`, `screenshot`, `logs`, `touch` and `down` report `INSTANCE_NOT_FOUND` instead of falling through to another worktree's instance.
+- A component given as a bare stem (`src/Button/Button`, `components/…/charts/ChartSkeleton`) resolves to its module file, or to its stories file when that is all there is, instead of `COMPONENT_NOT_FOUND`; the record and the instance id are the same as for the full path.
 - `logs` for an instance adopted after a daemon restart reads `storybook.log` instead of returning an empty buffer.
 - The browser pool no longer lets a crashed browser's late context-close events lower the live context count, which could arm the idle close in the middle of a check.
 
