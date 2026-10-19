@@ -9,16 +9,18 @@ for the full convention.
 
 ## Gittyup-specific notes
 
-- **Multi-repo fixtures**: gittyup orchestrates across many repos.
-  E2E tests should construct a temp directory tree of fake git
-  repos (e.g. `mkdtemp` + `git init` per fixture) and point the
-  CLI at it via `GITTYUP_HOME=<temp-dir>` (or whatever env var
-  the CLI exposes).
-- **GitHub API mocking**: gittyup uses `octokit` for PR work.
-  Stub or mock the GitHub API in e2e tests — never hit the real
-  API. The `nock`-style approach (intercept HTTP) works since
-  octokit uses `fetch` under the hood.
-- **Rebrand awareness**: gittyup is rebrandable (`branding.yaml`).
-  E2E tests that assert specific output strings should reference
-  `APP_NAME` from `src/config/branding.ts` rather than hardcoding
-  the string `"gittyup"`.
+- **Isolation contract** (`helpers.ts`): `runCli(ws, args)` spawns
+  `bin/gittyup.mjs` with `cwd` = a temp workspace holding `gittyup.yaml`,
+  `HOME` and `AGENTX_HOME` = that same dir, and the whitelist env from
+  `src/test/git-fixture.ts` (`fixtureEnv`). Config, cache and auth never
+  touch the developer's home. Run via `pnpm test:e2e`
+  (`vitest.e2e.config.ts`; the global setup builds `dist/` first).
+- **Repos** come from `makeRepo(spec)` in `src/test/git-fixture.ts`: a
+  declarative list of commits per branch, optional bare `origin`, fixed
+  author and dates, no global git config. Put the repo's `path` in the
+  workspace manifest.
+- **GitHub is never hit.** `runCli` blanks `GITHUB_TOKEN`, `GH_TOKEN` and
+  `COPILOT_GITHUB_TOKEN`. A test that needs the API stubs `fetch`.
+- **Rebrand awareness**: gittyup is rebrandable (`branding.yaml`). Tests
+  that assert specific output strings should reference `APP_NAME` from
+  `src/config/branding.ts` rather than hardcoding `"gittyup"`.

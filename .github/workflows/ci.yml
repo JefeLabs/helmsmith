@@ -122,6 +122,12 @@ jobs:
         # 6100-6199 on the runner's loopback.
         run: pnpm --filter @helmsmith/storybrokr test:e2e
 
+      - name: gittyup end-to-end
+        # Spawns the built CLI (bin/gittyup.mjs → Bun → dist/cli.js) against
+        # temp workspaces and fixture git repos. Needs git on the runner, no
+        # network. `pnpm -r test` above is unit-only for gittyup.
+        run: pnpm --filter @helmsmith/gittyup test:e2e
+
   # ── Java stack — controlplane ─────────────────────────────────────────
   #
   # Spring Boot 4 + Spring Modulith + JDBI + Flyway. Tests include the
