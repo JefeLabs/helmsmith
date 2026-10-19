@@ -118,7 +118,6 @@ async function tryBuildProvider(
         binary,
         model: effectiveModel(config, 'claude'),
         timeoutMs: config.aiTimeoutMs,
-        cwd: process.cwd(),
       });
     }
     case 'openai': {

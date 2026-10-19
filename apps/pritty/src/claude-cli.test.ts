@@ -1,4 +1,4 @@
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -35,6 +35,7 @@ function fakeClaude(response: unknown): void {
       `printf '%s\\n' "$@" > "${dir}/argv"`,
       `cat > "${dir}/stdin"`,
       `env > "${dir}/env"`,
+      `pwd > "${dir}/cwd"`,
       'if [ -n "$FAKE_CLAUDE_EXIT" ]; then echo "boom from fake" >&2; exit "$FAKE_CLAUDE_EXIT"; fi',
       `cat "${dir}/response.json"`,
       '',
@@ -63,13 +64,14 @@ describe('findClaudeBinary', () => {
 
 describe('createClaudeCliAdapter', () => {
   it('sends the prompt on stdin and the model, system prompt and headless flags as arguments', async () => {
+    // The repository never reaches the child: its hooks, settings, CLAUDE.md and .mcp.json
+    // are untrusted input, so claude runs from the temp dir with user settings only.
     fakeClaude(RESULT_OK);
     process.env.CLAUDECODE = '1';
     const adapter = createClaudeCliAdapter({
       binary,
       model: 'claude-opus-5-5',
       timeoutMs: 10_000,
-      cwd: dir,
     });
     const result = await adapter.invoke({
       messages: [{ role: 'user', content: 'DIFF HERE' }],
@@ -87,6 +89,9 @@ describe('createClaudeCliAdapter', () => {
     expect(argv).toContain('--strict-mcp-config');
     expect(argv).toContain('--no-session-persistence');
     expect(argv).toContain('--tools');
+    expect(argv.slice(argv.indexOf('--setting-sources'))[1]).toBe('user');
+    expect(argv).not.toContain('--bare'); // bare mode never reads the OAuth login
+    expect(readFileSync(join(dir, 'cwd'), 'utf8').trim()).toBe(realpathSync(tmpdir()));
     expect(readFileSync(join(dir, 'stdin'), 'utf8')).toBe('DIFF HERE');
     // Runs from inside a Claude Code session too: the nesting guards are dropped.
     expect(readFileSync(join(dir, 'env'), 'utf8')).not.toMatch(/^CLAUDECODE=/m);
@@ -94,15 +99,13 @@ describe('createClaudeCliAdapter', () => {
 
   it('reports the adapter type claude-cli', () => {
     fakeClaude(RESULT_OK);
-    expect(createClaudeCliAdapter({ binary, model: 'm', timeoutMs: 1000, cwd: dir }).type).toBe(
-      'claude-cli',
-    );
+    expect(createClaudeCliAdapter({ binary, model: 'm', timeoutMs: 1000 }).type).toBe('claude-cli');
   });
 
   it('throws with stderr when the binary exits non-zero', async () => {
     fakeClaude(RESULT_OK);
     process.env.FAKE_CLAUDE_EXIT = '3';
-    const adapter = createClaudeCliAdapter({ binary, model: 'm', timeoutMs: 10_000, cwd: dir });
+    const adapter = createClaudeCliAdapter({ binary, model: 'm', timeoutMs: 10_000 });
     await expect(adapter.invoke({ messages: [{ role: 'user', content: 'x' }] })).rejects.toThrow(
       /claude exited with code 3[\s\S]*boom from fake/,
     );
@@ -112,7 +115,7 @@ describe('createClaudeCliAdapter', () => {
     fakeClaude([
       { type: 'result', subtype: 'error_during_execution', is_error: true, result: 'quota' },
     ]);
-    const adapter = createClaudeCliAdapter({ binary, model: 'm', timeoutMs: 10_000, cwd: dir });
+    const adapter = createClaudeCliAdapter({ binary, model: 'm', timeoutMs: 10_000 });
     await expect(adapter.invoke({ messages: [{ role: 'user', content: 'x' }] })).rejects.toThrow(
       /claude reported error_during_execution: quota/,
     );
@@ -120,7 +123,7 @@ describe('createClaudeCliAdapter', () => {
 
   it('throws when the output has no result message', async () => {
     fakeClaude([{ type: 'system', subtype: 'init' }]);
-    const adapter = createClaudeCliAdapter({ binary, model: 'm', timeoutMs: 10_000, cwd: dir });
+    const adapter = createClaudeCliAdapter({ binary, model: 'm', timeoutMs: 10_000 });
     await expect(adapter.invoke({ messages: [{ role: 'user', content: 'x' }] })).rejects.toThrow(
       /no result message/,
     );
@@ -131,7 +134,6 @@ describe('createClaudeCliAdapter', () => {
       binary: join(dir, 'missing'),
       model: 'm',
       timeoutMs: 10_000,
-      cwd: dir,
     });
     await expect(adapter.invoke({ messages: [{ role: 'user', content: 'x' }] })).rejects.toThrow(
       /missing/,

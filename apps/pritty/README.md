@@ -210,7 +210,7 @@ AI adapters, OpenTUI or inquirer.
 `provider` is one of:
 
 - `copilot` (default): `pritty auth login` runs the GitHub device flow.
-- `claude`: runs the `claude` binary on PATH headlessly (`claude -p`, one turn, no tools, no MCP servers, no session on disk) on whatever login that binary has. A claude.ai subscription works; no API key passes through pritty. Install Claude Code and run `claude` once to log in.
+- `claude`: runs the `claude` binary on PATH headlessly (`claude -p`, one turn, no tools, no MCP servers, no session on disk, user settings only, from the temp directory rather than the repository, so a cloned repository's hooks, settings, CLAUDE.md and `.mcp.json` never apply) on whatever login that binary has. A claude.ai subscription works; no API key passes through pritty. Install Claude Code and run `claude` once to log in.
 - `anthropic`: the Anthropic API with the key from `ANTHROPIC_API_KEY` (or the variable named by `anthropicKeyEnv`).
 - `openai`: `OPENAI_API_KEY` / `openaiKeyEnv`.
 

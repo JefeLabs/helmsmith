@@ -10,6 +10,7 @@
 
 import { spawn } from 'node:child_process';
 import { accessSync, constants, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import type { AgentInput, AgentInvocationResult } from '@helmsmith/agent-adapter';
 
@@ -36,7 +37,6 @@ export interface ClaudeCliOptions {
   model: string;
   /** The child is killed after this long; the caller's withTimeout fires first. */
   timeoutMs: number;
-  cwd: string;
 }
 
 export interface ClaudeCliAdapter {
@@ -44,9 +44,16 @@ export interface ClaudeCliAdapter {
   invoke(input: AgentInput): Promise<AgentInvocationResult>;
 }
 
-/** One answer, no tools, no MCP servers, no session on disk, no skills. */
+/**
+ * One answer, no tools, no MCP servers, no session on disk, no skills, and only
+ * the user's own settings: the repository's `.claude/settings*.json` hooks and
+ * permissions are untrusted input and never load. (`--bare` would be stricter
+ * but never reads the OAuth login, which is the point of this provider.)
+ */
 const HEADLESS_FLAGS = [
   '-p',
+  '--setting-sources',
+  'user',
   '--output-format',
   'json',
   '--max-turns',
@@ -110,8 +117,10 @@ export function createClaudeCliAdapter(options: ClaudeCliOptions): ClaudeCliAdap
       if (input.systemPrompt) args.push('--system-prompt', input.systemPrompt);
       args.push('--tools', '');
       return new Promise((resolve, reject) => {
+        // Not the repository: with the diff in the prompt the child needs no
+        // working tree, and from the temp dir no project CLAUDE.md or .mcp.json applies.
         const child = spawn(options.binary, args, {
-          cwd: options.cwd,
+          cwd: tmpdir(),
           env: childEnv(),
           stdio: ['pipe', 'pipe', 'pipe'],
           timeout: options.timeoutMs,
