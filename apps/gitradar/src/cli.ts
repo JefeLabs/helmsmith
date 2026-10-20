@@ -5,7 +5,7 @@ import * as yaml from 'js-yaml';
 import { runConnect } from './commands/connect.js';
 import { runMain } from './commands/run-main.js';
 import { detectGitRoot } from './config/git-root.js';
-import { loadConfig } from './config/loader.js';
+import { ConfigNotFoundError, loadConfig } from './config/loader.js';
 import { getAvailableWorkspaces, loadAllRegistries } from './config/repos-registry.js';
 import { getConfigPath, getDataDir } from './store/paths.js';
 import { DEFAULT_SETTINGS, SCORECARD_METRIC_KEYS } from './types/schema.js';
@@ -38,6 +38,7 @@ function globals() {
     prune?: number;
     storeStats?: boolean;
     reset?: boolean;
+    yes?: boolean;
     staleness?: number;
     workspace?: string;
     skipRework?: boolean;
@@ -60,7 +61,11 @@ function globalFilters() {
 async function loadSettings(configPath?: string) {
   try {
     return (await loadConfig(configPath)).settings;
-  } catch {
+  } catch (err) {
+    if (!(err instanceof ConfigNotFoundError)) {
+      console.error(`Warning: ${err instanceof Error ? err.message : String(err)}`);
+      console.error('  Using default settings.');
+    }
     return DEFAULT_SETTINGS;
   }
 }
@@ -85,7 +90,8 @@ program
   )
   .option('--prune <weeks>', 'Remove records older than N weeks', parseInt)
   .option('--store-stats', 'Print data file stats and exit')
-  .option('--reset', 'Delete data files and start fresh')
+  .option('--reset', 'Move the data files aside (keeping a .bak copy) and start fresh')
+  .option('--yes', 'Skip confirmation prompts (for --reset)')
   .option('--staleness <min>', 'Override staleness minutes', parseInt)
   .option('--workspace <name>', 'Select workspace by name (skips prompt)')
   .option('--skip-rework', 'Skip the blame-based rework pass');

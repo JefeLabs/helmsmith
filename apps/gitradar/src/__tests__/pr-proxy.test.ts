@@ -36,18 +36,26 @@ function authorMap(): AuthorMap {
   return m;
 }
 
+const H = (...f: string[]) => `\x00${f.join('\x00')}`;
 const LOG = [
   // merge commit: two parents; author is the merger (Bob); PR author is second parent tip (Alice)
-  'aaaaaa1|p1 p2|bob@co.com|Bob|2026-02-18T10:00:00Z|Merge pull request #12 from acme/feat',
+  H(
+    'aaaaaa1',
+    'p1 p2',
+    'bob@co.com',
+    'Bob',
+    '2026-02-18T10:00:00Z',
+    'Merge pull request #12 from acme/feat',
+  ),
   '100\t20\tsrc/a.ts',
   '500\t500\tpackage-lock.json',
   '',
   // squash commit with (#N) suffix
-  'bbbbbb2|p3|alice@co.com|Alice|2026-02-19T10:00:00Z|feat: thing (#13)',
+  H('bbbbbb2', 'p3', 'alice@co.com', 'Alice', '2026-02-19T10:00:00Z', 'feat: thing (#13)'),
   '30\t0\tsrc/b.ts',
   '',
   // direct push, not a PR
-  'cccccc3|p4|alice@co.com|Alice|2026-02-19T12:00:00Z|fix typo',
+  H('cccccc3', 'p4', 'alice@co.com', 'Alice', '2026-02-19T12:00:00Z', 'fix typo'),
   '1\t1\tREADME.md',
 ].join('\n');
 
@@ -65,10 +73,49 @@ describe('parseFirstParentLog', () => {
   });
   it('handles subjects containing pipes and binary numstat dashes', () => {
     const [c] = parseFirstParentLog(
-      'dddddd4|p9|a@x|A|2026-01-01T00:00:00Z|a | b (#1)\n-\t-\timg.png',
+      `${H('dddddd4', 'p9', 'a@x', 'A', '2026-01-01T00:00:00Z', 'a | b (#1)')}\n-\t-\timg.png`,
     );
     expect(c.subject).toBe('a | b (#1)');
     expect(c.files).toEqual([{ path: 'img.png', insertions: 0, deletions: 0 }]);
+  });
+});
+
+describe('parseFirstParentLog with hostile data (#70)', () => {
+  it('keeps a | in the author name inside the name field', () => {
+    const [c] = parseFirstParentLog(
+      H(
+        'eeeeee5',
+        'p1',
+        'jane@example.com',
+        'Jane Doe | Acme Contractors',
+        '2026-01-01T00:00:00Z',
+        'x (#2)',
+      ),
+    );
+    expect(c.email).toBe('jane@example.com');
+    expect(c.name).toBe('Jane Doe | Acme Contractors');
+    expect(c.date).toBe('2026-01-01T00:00:00Z');
+  });
+
+  it('drops a commit whose date does not parse so no NaN week is ever stored', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const commits = parseFirstParentLog(
+      [
+        H('ffffff6', 'p1', 'a@x', 'A', 'garbage', 'feat: a (#3)'),
+        '1\t0\ta.ts',
+        H('aaaaaa7', 'p2', 'b@x', 'B', '2026-01-02T00:00:00Z', 'feat: b (#4)'),
+        '2\t0\tb.ts',
+      ].join('\n'),
+    );
+    expect(commits.map((c) => c.hash)).toEqual(['aaaaaa7']);
+    expect(commits[0].files).toEqual([{ path: 'b.ts', insertions: 2, deletions: 0 }]);
+    log.mockRestore();
+  });
+
+  it('ignores a header whose hash is not hex', () => {
+    expect(parseFirstParentLog(H('zzz', 'p1', 'a@x', 'A', '2026-01-01T00:00:00Z', 'x'))).toEqual(
+      [],
+    );
   });
 });
 
@@ -125,8 +172,9 @@ describe('runPrProxy', () => {
   it('attributes merges to the second-parent author, sizes exclude ignored files, skips direct pushes', async () => {
     mockRaw
       .mockResolvedValueOnce('origin/main\n') // symbolic-ref
+      .mockResolvedValueOnce('1234567890abcdef1234567890abcdef12345678\n') // rev-parse main^{commit}
       .mockResolvedValueOnce(LOG) // first-parent log
-      .mockResolvedValueOnce('p2|alice@co.com|Alice\n'); // batched tip lookup for p2
+      .mockResolvedValueOnce(`${H('p2', 'alice@co.com', 'Alice')}\n`); // batched tip lookup for p2
 
     const result = await runPrProxy({
       repoPath: '/r',
@@ -148,14 +196,15 @@ describe('runPrProxy', () => {
     expect(rec.prsMergedGit).toBe(2);
     expect(rec.prSizes).toEqual([120, 30]);
     // the tip lookup was batched with --no-walk
-    expect(mockRaw.mock.calls[2][0]).toEqual(expect.arrayContaining(['log', '--no-walk', 'p2']));
+    expect(mockRaw.mock.calls[3][0]).toEqual(expect.arrayContaining(['log', '--no-walk', 'p2']));
   });
 
   it('skips hashes already in recentPrHashes and passes --since', async () => {
     mockRaw
       .mockResolvedValueOnce('origin/main\n')
+      .mockResolvedValueOnce('1234567890abcdef1234567890abcdef12345678\n')
       .mockResolvedValueOnce(LOG)
-      .mockResolvedValueOnce('p2|alice@co.com|Alice\n');
+      .mockResolvedValueOnce(`${H('p2', 'alice@co.com', 'Alice')}\n`);
     const result = await runPrProxy({
       repoPath: '/r',
       repoName: 'web',
@@ -167,7 +216,7 @@ describe('runPrProxy', () => {
     });
     expect(result.prCount).toBe(1);
     expect(result.newPrHashes).toEqual(['bbbbbb2', 'cccccc3']);
-    expect(mockRaw.mock.calls[1][0]).toEqual(expect.arrayContaining(['--since=2026-02-01']));
+    expect(mockRaw.mock.calls[2][0]).toEqual(expect.arrayContaining(['--since=2026-02-01']));
   });
 
   it('returns an empty result with branch null when no default branch exists', async () => {
@@ -181,5 +230,74 @@ describe('runPrProxy', () => {
       shouldIgnore: () => false,
     });
     expect(result).toEqual({ records: [], newPrHashes: [], prCount: 0, branch: null });
+  });
+
+  it('resolves the branch to a SHA and puts --end-of-options before every revision (#71)', async () => {
+    const sha = '1234567890abcdef1234567890abcdef12345678';
+    mockRaw
+      .mockResolvedValueOnce('origin/main\n') // symbolic-ref
+      .mockResolvedValueOnce(`${sha}\n`) // rev-parse
+      .mockResolvedValueOnce(LOG) // first-parent log
+      .mockResolvedValueOnce(`${H('p2', 'alice@co.com', 'Alice')}\n`); // tip lookup
+    await runPrProxy({
+      repoPath: '/r',
+      repoName: 'web',
+      group: 'default',
+      authorMap: authorMap(),
+      recentPrHashes: new Set(),
+      since: '2026-02-01',
+      shouldIgnore: () => false,
+    });
+
+    const revParse = mockRaw.mock.calls[1][0] as string[];
+    expect(revParse.slice(0, 3)).toEqual(['rev-parse', '--verify', '--end-of-options']);
+    expect(revParse[3]).toBe('main^{commit}');
+
+    const log = mockRaw.mock.calls[2][0] as string[];
+    expect(log).toContain('--format=%x00%H%x00%P%x00%ae%x00%an%x00%aI%x00%s'); // NUL-delimited (#70)
+    expect(log).not.toContain('main');
+    expect(log.indexOf('--end-of-options')).toBeGreaterThan(-1);
+    expect(log.indexOf('--end-of-options')).toBe(log.length - 2);
+    expect(log[log.length - 1]).toBe(sha);
+    expect(log.indexOf('--since=2026-02-01')).toBeLessThan(log.indexOf('--end-of-options'));
+
+    const tips = mockRaw.mock.calls[3][0] as string[];
+    expect(tips.indexOf('--end-of-options')).toBeLessThan(tips.indexOf('p2'));
+  });
+
+  it('refuses an option-like default branch with a warning and never runs git log (#71)', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    mockRaw
+      .mockResolvedValueOnce('origin/--output=/tmp/pwned\n') // hostile origin/HEAD
+      .mockRejectedValueOnce(new Error('no main'))
+      .mockRejectedValueOnce(new Error('no master'));
+    const result = await runPrProxy({
+      repoPath: '/r',
+      repoName: 'web',
+      group: 'default',
+      authorMap: authorMap(),
+      recentPrHashes: new Set(),
+      shouldIgnore: () => false,
+    });
+    expect(result).toEqual({ records: [], newPrHashes: [], prCount: 0, branch: null });
+    expect(mockRaw.mock.calls.map((c) => (c[0] as string[])[0])).not.toContain('log');
+    expect(log.mock.calls.flat().join('\n')).toMatch(/--output=\/tmp\/pwned/);
+    log.mockRestore();
+  });
+
+  it('skips the repo with a warning when the branch does not resolve to a 40-hex SHA (#71)', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    mockRaw.mockResolvedValueOnce('origin/main\n').mockResolvedValueOnce('not-a-sha\n');
+    const result = await runPrProxy({
+      repoPath: '/r',
+      repoName: 'web',
+      group: 'default',
+      authorMap: authorMap(),
+      recentPrHashes: new Set(),
+      shouldIgnore: () => false,
+    });
+    expect(result).toEqual({ records: [], newPrHashes: [], prCount: 0, branch: 'main' });
+    expect(mockRaw.mock.calls.map((c) => (c[0] as string[])[0])).not.toContain('log');
+    log.mockRestore();
   });
 });

@@ -1,5 +1,6 @@
 import { Database } from 'bun:sqlite';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, renameSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import type {
   AuthorRegistry,
   CommitsByFiletype,
@@ -33,6 +34,8 @@ export function getDB(): Database {
   if (_db) return _db;
 
   const dbPath = getSQLitePath();
+  // A fresh install has no data dir yet; `create: true` only creates the file (#96).
+  mkdirSync(dirname(dbPath), { recursive: true });
   let db: Database | undefined;
   try {
     // `strict: true` lets us bind named params with bare keys (e.g. `@member`
@@ -52,9 +55,14 @@ export function getDB(): Database {
     }
     _db = null;
     const reason = err instanceof Error ? err.message : String(err);
-    throw new Error(
-      `GitRadar database could not be opened (${dbPath}): ${reason}. If it is corrupt, run "gitradar --reset".`,
-    );
+    // Only a real corruption error gets the --reset advice; anything else (permissions,
+    // a locked file) would not be fixed by it (#96).
+    if (/not a database|NOTADB|CORRUPT|malformed/i.test(reason)) {
+      throw new Error(
+        `GitRadar database is corrupt (${dbPath}): ${reason}. Run "gitradar --reset" to move it aside and start fresh.`,
+      );
+    }
+    throw new Error(`GitRadar database could not be opened (${dbPath}): ${reason}`);
   }
 
   _db = db;
@@ -1430,15 +1438,30 @@ export function getStoreStatsSQLFull(): {
 // ── Reset ───────────────────────────────────────────────────────────────────
 
 /** Delete all data from all tables. Used by --reset. */
-export function resetAllData(): void {
-  const db = getDB();
-  db.transaction(() => {
-    db.prepare('DELETE FROM records').run();
-    db.prepare('DELETE FROM enrichments').run();
-    db.prepare('DELETE FROM scan_state').run();
-    db.prepare('DELETE FROM authors').run();
-    db.prepare('DELETE FROM meta').run();
-  })();
+/** The data files that exist right now: the DB plus its WAL/SHM sidecars, in that order. */
+export function listDataFiles(): string[] {
+  const dbPath = getSQLitePath();
+  return [dbPath, `${dbPath}-wal`, `${dbPath}-shm`].filter((f) => existsSync(f));
+}
+
+/**
+ * `--reset`: move the data files aside as `<file>.bak-<timestamp>` and return the new
+ * paths. The files are never opened, so this works on a corrupt DB too (#96). Returns an
+ * empty array when there was nothing to move.
+ */
+export function resetAllData(): string[] {
+  closeDB();
+  const stamp = new Date()
+    .toISOString()
+    .replace(/[-:]/g, '')
+    .replace(/\.\d{3}Z$/, 'Z');
+  const moved: string[] = [];
+  for (const file of listDataFiles()) {
+    const target = `${file}.bak-${stamp}`;
+    renameSync(file, target);
+    moved.push(target);
+  }
+  return moved;
 }
 
 /** Reset the DB connection (for test isolation). */

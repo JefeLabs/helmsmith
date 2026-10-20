@@ -1,9 +1,19 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import * as yaml from 'js-yaml';
+import { Document, isMap, isSeq, parseDocument, YAMLSeq } from 'yaml';
 import { ZodError } from 'zod';
 import { getConfigPath } from '../store/paths.js';
-import { Config, ConfigSchema } from '../types/schema.js';
+import { Config, ConfigSchema, type Org, OrgSchema } from '../types/schema.js';
+import { writeFileAtomically } from './atomic-write.js';
+
+/** config.yml does not exist. Callers may start from an empty config; any other load error means "do not write" (#113). */
+export class ConfigNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConfigNotFoundError';
+  }
+}
 
 /**
  * Load, parse, and validate the YAML config file.
@@ -21,7 +31,7 @@ export async function loadConfig(configPath?: string): Promise<Config> {
   try {
     raw = await readFile(resolvedConfigPath, 'utf-8');
   } catch {
-    throw new Error(`Config file not found at ${resolvedConfigPath}`);
+    throw new ConfigNotFoundError(`Config file not found at ${resolvedConfigPath}`);
   }
 
   // Parse YAML
@@ -60,10 +70,51 @@ export async function loadConfig(configPath?: string): Promise<Config> {
   return config;
 }
 
+async function fileExists(p: string): Promise<boolean> {
+  try {
+    await access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** True when the YAML node, validated as an org, equals `org` exactly. */
+function sameOrg(node: unknown, org: Org): boolean {
+  const parsed = OrgSchema.safeParse(
+    node && typeof (node as { toJSON?: unknown }).toJSON === 'function'
+      ? (node as { toJSON: () => unknown }).toJSON()
+      : node,
+  );
+  return parsed.success && JSON.stringify(parsed.data) === JSON.stringify(org);
+}
+
+/**
+ * Replace the `orgs:` list in `doc` with `orgs`, keeping the YAML node (and its
+ * comments) of every org whose content did not change, so an `org add` touches only
+ * the new org's lines (#113).
+ */
+function patchOrgs(doc: Document, orgs: Org[]): void {
+  const existing = doc.get('orgs', true);
+  const oldItems = isSeq(existing) ? existing.items : [];
+  const items = orgs.map((org, i) =>
+    i < oldItems.length && sameOrg(oldItems[i], org) ? oldItems[i] : doc.createNode(org),
+  );
+  if (isSeq(existing)) {
+    existing.items = items;
+  } else {
+    const seq = new YAMLSeq<unknown>(doc.schema);
+    seq.items = items;
+    doc.set('orgs', seq);
+  }
+}
+
 /**
  * Save configuration back to a YAML file.
- * Loads the existing file first (to preserve comments/ordering where possible),
- * patches the provided fields, and writes it back.
+ *
+ * Patches the existing document in place (comments and ordering survive), refuses to
+ * write over a file that is not valid YAML, keeps the previous file as `<file>.bak`,
+ * and writes through a temp file + rename (#113).
  */
 export async function saveConfig(
   configPath: string | undefined,
@@ -71,28 +122,29 @@ export async function saveConfig(
 ): Promise<void> {
   const resolvedPath = configPath ?? getConfigPath();
 
-  // Load existing content or start with empty object
-  let existing: Record<string, unknown> = {};
+  let doc: Document;
+  let raw: string | null = null;
   try {
-    const raw = await readFile(resolvedPath, 'utf-8');
-    const parsed = yaml.load(raw);
-    if (parsed && typeof parsed === 'object') {
-      existing = parsed as Record<string, unknown>;
-    }
+    raw = await readFile(resolvedPath, 'utf-8');
   } catch {
     // File doesn't exist yet — start fresh
   }
+  if (raw === null) {
+    doc = new Document({});
+  } else {
+    doc = parseDocument(raw);
+    if (doc.errors.length > 0) {
+      const first = doc.errors[0].message.split('\n')[0];
+      throw new Error(`Refusing to write ${resolvedPath}: it is not valid YAML (${first})`);
+    }
+    if (!isMap(doc.contents)) doc = new Document({});
+  }
 
-  // Patch the fields
-  if (patch.orgs !== undefined) existing.orgs = patch.orgs;
-  if (patch.settings !== undefined) existing.settings = patch.settings;
+  if (patch.orgs !== undefined) patchOrgs(doc, patch.orgs);
+  if (patch.settings !== undefined) doc.set('settings', doc.createNode(patch.settings));
 
-  // Write back
   await mkdir(path.dirname(resolvedPath), { recursive: true });
-  const content = yaml.dump(existing, {
-    lineWidth: 120,
-    noRefs: true,
-    quoteStyle: 'double',
+  await writeFileAtomically(resolvedPath, doc.toString({ lineWidth: 120 }), {
+    backup: await fileExists(resolvedPath),
   });
-  await writeFile(resolvedPath, content, 'utf-8');
 }

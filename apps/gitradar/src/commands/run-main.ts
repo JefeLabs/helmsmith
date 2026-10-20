@@ -21,7 +21,7 @@ export async function runMain(
 
   // ── Early exits ─────────────────────────────────────────────────────────
   if (opts.reset) {
-    await engine.handleReset();
+    await engine.handleReset({ yes: opts.yes });
     return;
   }
 
@@ -75,7 +75,8 @@ export async function runMain(
   }
 
   // ── Launch TUI ────────────────────────────────────────────────────────
-  const ctx = await engine.buildViewContext();
+  // Demo mode never touches the store (#93).
+  const ctx = opts.demo ? engine.buildDemoViewContext() : await engine.buildViewContext();
 
   const initial = opts.initialView === 'trends' ? trendsView : dashboardView;
 

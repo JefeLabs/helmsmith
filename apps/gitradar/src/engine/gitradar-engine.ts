@@ -19,7 +19,7 @@ import {
 } from '../collector/github.js';
 import { scanAllRepos } from '../collector/index.js';
 import { detectGitRoot } from '../config/git-root.js';
-import { loadConfig, saveConfig } from '../config/loader.js';
+import { ConfigNotFoundError, loadConfig, saveConfig } from '../config/loader.js';
 import type { LoadedWorkspace } from '../config/repos-registry.js';
 import {
   addReposToWorkspace,
@@ -39,6 +39,7 @@ import {
   getSQLitePath,
   getStoreStatsSQLFull,
   hasEnrichment,
+  listDataFiles,
   loadAuthorRegistrySQL,
   loadEnrichmentsSQL,
   loadScanStateSQL,
@@ -77,6 +78,7 @@ export interface RunOptions {
   prune?: number;
   storeStats?: boolean;
   reset?: boolean;
+  yes?: boolean;
   staleness?: number;
   workspace?: string;
   scanOnly?: boolean;
@@ -176,6 +178,8 @@ export class GitRadarEngine {
   authorRegistry?: AuthorRegistry;
   private selectedWorkspace?: LoadedWorkspace;
   private resolvedConfigPath?: string;
+  /** Set when config.yml exists but failed to load; blocks every config save (#113). */
+  private configLoadError?: Error;
   private dbWatcher?: DbWatcher;
 
   /** Clean up resources (file watchers, etc.) when the TUI exits. */
@@ -186,13 +190,41 @@ export class GitRadarEngine {
 
   // ── Early-exit commands ──────────────────────────────────────────────────
 
-  async handleReset(): Promise<void> {
-    try {
-      resetAllData();
-      console.log('All data cleared. Starting fresh.');
-    } catch {
-      console.log('No data to clear.');
+  /**
+   * `--reset`: move the data files aside without opening them (#96). Asks first unless
+   * `yes` is set; off a terminal it refuses rather than guessing. Exit code 1 when
+   * nothing was reset, so scripts can tell.
+   */
+  async handleReset(opts: { yes?: boolean }): Promise<void> {
+    const files = listDataFiles();
+    if (files.length === 0) {
+      console.log(
+        `No data to clear (${getSQLitePath()} does not exist). Run "gitradar scan" to collect data.`,
+      );
+      process.exitCode = 1;
+      return;
     }
+    if (!opts.yes) {
+      if (!process.stdin.isTTY) {
+        console.error('--reset needs confirmation: pass --yes when not running in a terminal.');
+        process.exitCode = 1;
+        return;
+      }
+      console.log(`Move ${files.join(', ')} aside and start fresh? (y/N) `);
+      try {
+        const answer = await readKey();
+        if (answer.name !== 'y') {
+          console.log('Cancelled.');
+          process.exitCode = 1;
+          return;
+        }
+      } catch {
+        process.exitCode = 1;
+        return; // Ctrl+C
+      }
+    }
+    const moved = resetAllData();
+    console.log(`Moved aside:\n  ${moved.join('\n  ')}\nStarting fresh.`);
   }
 
   async handleStoreStats(): Promise<void> {
@@ -221,8 +253,16 @@ export class GitRadarEngine {
       configSettings = baseConfig.settings;
       configWorkspace = baseConfig.workspace;
       this.resolvedConfigPath = opts.config;
-    } catch {
-      // config.yml missing or invalid — proceed with defaults
+    } catch (err) {
+      // config.yml missing: proceed with defaults. Invalid: say so, and remember it so the
+      // Manage tab cannot save the empty in-memory org list over the file (#113).
+      if (!(err instanceof ConfigNotFoundError)) {
+        this.configLoadError = err instanceof Error ? err : new Error(String(err));
+        console.error(`Warning: ${this.configLoadError.message}`);
+        console.error(
+          '  Using default orgs and settings; fix config.yml before saving from the Manage tab.',
+        );
+      }
     }
 
     const gitRoot = await detectGitRoot();
@@ -325,17 +365,7 @@ export class GitRadarEngine {
         saveScanStateSQL(state);
       },
       onAuthorsDiscovered: async (authors) => {
-        this.authorRegistry = mergeDiscoveredAuthors(
-          this.authorRegistry!,
-          authors.map((a) => ({
-            email: a.email,
-            name: a.name,
-            repoName: a.repoName,
-            commitCount: a.commitCount,
-            date: a.lastDate,
-          })),
-        );
-        saveAuthorRegistrySQL(this.authorRegistry!);
+        this.authorRegistry = this.mergeDiscoveredIntoStore(authors);
       },
       onRepoReset: async (name) => {
         deleteRecordsForRepo(name);
@@ -369,6 +399,36 @@ export class GitRadarEngine {
   }
 
   /**
+   * Merge discovered authors into the registry *as stored right now* and persist it.
+   *
+   * Merging into the in-memory snapshot lost every assignment made since the snapshot
+   * was taken, in this process (Manage-tab assignment, then rescan) and across
+   * processes (`scan --watch` next to the TUI) (#115).
+   */
+  private mergeDiscoveredIntoStore(
+    authors: Array<{
+      email: string;
+      name: string;
+      repoName: string;
+      commitCount: number;
+      lastDate: string;
+    }>,
+  ): AuthorRegistry {
+    const merged = mergeDiscoveredAuthors(
+      loadAuthorRegistrySQL(),
+      authors.map((a) => ({
+        email: a.email,
+        name: a.name,
+        repoName: a.repoName,
+        commitCount: a.commitCount,
+        date: a.lastDate,
+      })),
+    );
+    saveAuthorRegistrySQL(merged);
+    return merged;
+  }
+
+  /**
    * Drop a repo from the in-memory scan state, mirroring the `scan_state` row
    * `onRepoReset` just deleted.
    *
@@ -395,7 +455,10 @@ export class GitRadarEngine {
     if (!repoEntry) throw new Error(`Repo not found: ${repoName}`);
 
     const singleConfig = { ...this.config, repos: [repoEntry] };
-    const currentRegistry = this.authorRegistry ?? { version: 1 as const, authors: {} };
+    // Attribute with the registry as stored now, not the startup snapshot: a TUI
+    // assignment or another process may have changed it since (#115).
+    this.authorRegistry = loadAuthorRegistrySQL();
+    const currentRegistry = this.authorRegistry;
 
     const freshScanState: ScanState = {
       version: 1,
@@ -414,17 +477,7 @@ export class GitRadarEngine {
         saveScanStateSQL(state);
       },
       onAuthorsDiscovered: async (authors) => {
-        this.authorRegistry = mergeDiscoveredAuthors(
-          this.authorRegistry ?? { version: 1 as const, authors: {} },
-          authors.map((a) => ({
-            email: a.email,
-            name: a.name,
-            repoName: a.repoName,
-            commitCount: a.commitCount,
-            date: a.lastDate,
-          })),
-        );
-        saveAuthorRegistrySQL(this.authorRegistry);
+        this.authorRegistry = this.mergeDiscoveredIntoStore(authors);
       },
       onRepoReset: async (name) => {
         deleteRecordsForRepo(name);
@@ -817,6 +870,19 @@ export class GitRadarEngine {
 
   // ── ViewContext construction ─────────────────────────────────────────────
 
+  /**
+   * ViewContext for `--demo`: in-memory data only. Never opens the store or the DB
+   * watcher, and offers no persistence callbacks, so nothing the Manage tab does can
+   * reach the real config.yml or gitradar.db (#93).
+   */
+  buildDemoViewContext(): ViewContext {
+    return {
+      config: this.config,
+      records: this.records,
+      currentWeek: getCurrentWeek(),
+    };
+  }
+
   async buildViewContext(): Promise<ViewContext> {
     this.records = reattributeRecords(this.records, this.config, this.authorRegistry);
     const enrichmentStore = loadEnrichmentsSQL();
@@ -869,9 +935,17 @@ export class GitRadarEngine {
         ? (repoName: string) => this.removeRepo(repoName)
         : undefined,
       onAddOrg: async (_org: Org) => {
+        if (this.configLoadError) {
+          throw new Error(
+            `config.yml failed to load (${this.configLoadError.message.split('\n')[0]}); fix it before saving`,
+          );
+        }
         await saveConfig(this.resolvedConfigPath, { orgs: ctx.config.orgs });
       },
       onSaveAuthorRegistry: async (registry) => {
+        // The engine owns the registry: a TUI mutation must become the one every later
+        // rescan, refresh and reattribution uses (#115).
+        this.authorRegistry = registry;
         saveAuthorRegistrySQL(registry);
       },
       onReattributeRecords: async (updates) => reattributeRecordsSQL(updates),

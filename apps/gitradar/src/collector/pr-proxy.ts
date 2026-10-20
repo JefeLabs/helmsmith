@@ -22,8 +22,16 @@ export interface FirstParentCommit {
   files: Array<{ path: string; insertions: number; deletions: number }>;
 }
 
-const HEADER_RE = /^([0-9a-f]{6,40})\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|(.*)$/;
+/** NUL-delimited headers, for the same reason as the main scan (#70). */
+const FIRST_PARENT_FORMAT = '--format=%x00%H%x00%P%x00%ae%x00%an%x00%aI%x00%s';
+const TIP_FORMAT = '--format=%x00%H%x00%ae%x00%an';
 const NUMSTAT_RE = /^(\d+|-)\t(\d+|-)\t(.+)$/;
+
+/** Replace control characters (a `\r` or `\t` smuggled into a name) with spaces. */
+function sanitizeField(value: string): string {
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: that is the point
+  return value.replace(/[\x00-\x1f\x7f]/g, ' ').trim();
+}
 
 export function parseFirstParentLog(output: string): FirstParentCommit[] {
   const commits: FirstParentCommit[] = [];
@@ -31,15 +39,24 @@ export function parseFirstParentLog(output: string): FirstParentCommit[] {
   for (const raw of output.split('\n')) {
     const line = raw.trimEnd();
     if (!line) continue;
-    const h = HEADER_RE.exec(line);
-    if (h) {
+    if (line.startsWith('\x00')) {
+      const f = line.split('\x00');
+      const hash = f[1] ?? '';
+      const date = (f[5] ?? '').trim();
+      if (!/^[0-9a-f]{6,40}$/.test(hash) || Number.isNaN(Date.parse(date))) {
+        console.log(
+          `  Warning: PR proxy: skipping commit with an unparseable header (${hash || '?'}, date "${date}")`,
+        );
+        current = null; // and its numstat lines
+        continue;
+      }
       current = {
-        hash: h[1],
-        parents: h[2].split(' ').filter(Boolean),
-        email: h[3],
-        name: h[4],
-        date: h[5],
-        subject: h[6],
+        hash,
+        parents: (f[2] ?? '').split(' ').filter(Boolean),
+        email: sanitizeField(f[3] ?? ''),
+        name: sanitizeField(f[4] ?? ''),
+        date,
+        subject: sanitizeField(f.slice(6).join('\x00')),
         files: [],
       };
       commits.push(current);
@@ -73,7 +90,16 @@ export async function resolveDefaultBranch(repoPath: string): Promise<string | n
   const git = simpleGit(repoPath);
   try {
     const ref = (await git.raw(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'])).trim();
-    if (ref) return ref.replace(/^origin\//, '');
+    const name = ref.replace(/^origin\//, '');
+    // Git allows a ref component to start with `-`; such a name reaching `git log` as a bare
+    // argument is parsed as an option (#71). Refuse it and fall back to main/master.
+    if (name.startsWith('-')) {
+      console.log(
+        `  Warning: ${repoPath}: origin/HEAD points at "${name}", which looks like an option; ignoring it`,
+      );
+    } else if (name) {
+      return name;
+    }
   } catch {
     // fall through
   }
@@ -117,15 +143,30 @@ export async function runPrProxy(opts: PrProxyOptions): Promise<PrProxyResult> {
   if (!branch) return empty;
 
   const git = simpleGit(opts.repoPath);
-  const args = [
-    'log',
-    '--first-parent',
-    branch,
-    '-m',
-    '--format=%H|%P|%ae|%an|%aI|%s',
-    '--numstat',
-  ];
-  if (opts.since) args.splice(3, 0, `--since=${opts.since}`);
+
+  // Resolve the branch to a commit SHA first, and hand git log only that SHA behind
+  // `--end-of-options`, so no ref name is ever parsed as an option (#71).
+  let sha: string;
+  try {
+    sha = (
+      await git.raw(['rev-parse', '--verify', '--end-of-options', `${branch}^{commit}`])
+    ).trim();
+  } catch (error) {
+    const err = classifyGitError(error);
+    if (err.severity === 'fatal')
+      console.error(`  PR proxy error (${opts.repoName}): ${err.reason}`);
+    return { ...empty, branch };
+  }
+  if (!/^[0-9a-f]{40}$/.test(sha)) {
+    console.log(
+      `  Warning: PR proxy (${opts.repoName}): "${branch}" did not resolve to a commit; skipping`,
+    );
+    return { ...empty, branch };
+  }
+
+  const args = ['log', '--first-parent', '-m', FIRST_PARENT_FORMAT, '--numstat'];
+  if (opts.since) args.push(`--since=${opts.since}`);
+  args.push('--end-of-options', sha);
   let output: string;
   try {
     output = await git.raw(args);
@@ -144,10 +185,14 @@ export async function runPrProxy(opts: PrProxyOptions): Promise<PrProxyResult> {
   const tips = [...new Set(prs.filter((c) => c.parents.length >= 2).map((c) => c.parents[1]))];
   if (tips.length > 0) {
     try {
-      const out = await git.raw(['log', '--no-walk', '--format=%H|%ae|%an', ...tips]);
+      const out = await git.raw(['log', '--no-walk', TIP_FORMAT, '--end-of-options', ...tips]);
       for (const line of out.split('\n')) {
-        const [hash, email, ...name] = line.trim().split('|');
-        if (hash) tipAuthors.set(hash, { email, name: name.join('|') });
+        const [, hash, email, name] = line.trimEnd().split('\x00');
+        if (hash)
+          tipAuthors.set(hash, {
+            email: sanitizeField(email ?? ''),
+            name: sanitizeField(name ?? ''),
+          });
       }
     } catch (error) {
       const err = classifyGitError(error);

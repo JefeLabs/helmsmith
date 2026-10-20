@@ -1,16 +1,24 @@
+import { constants } from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  createWorkspace,
   getAvailableWorkspaces,
   loadAllRegistries,
   loadReposRegistry,
   type RegistrySource,
+  saveReposRegistry,
 } from '../config/repos-registry.js';
 
 // Mock fs/promises
 vi.mock('node:fs/promises', () => ({
   readFile: vi.fn(),
   access: vi.fn(),
+  copyFile: vi.fn(),
+  mkdir: vi.fn(),
+  rename: vi.fn(),
+  rm: vi.fn(),
+  writeFile: vi.fn(),
 }));
 
 // Mock store/paths to control expandTilde
@@ -27,10 +35,14 @@ vi.mock('node:os', () => ({
   homedir: vi.fn(() => '/home/user'),
 }));
 
-import { access, readFile } from 'node:fs/promises';
+import { access, copyFile, readFile, rename, rm, writeFile } from 'node:fs/promises';
 
 const mockReadFile = vi.mocked(readFile);
 const mockAccess = vi.mocked(access);
+const mockCopyFile = vi.mocked(copyFile);
+const mockRename = vi.mocked(rename);
+const mockWriteFile = vi.mocked(writeFile);
+const mockRm = vi.mocked(rm);
 
 // ── Test Fixtures ──────────────────────────────────────────────────────────
 
@@ -303,19 +315,13 @@ describe('loadAllRegistries', () => {
     expect(sources).toEqual([]);
   });
 
-  it('warns but continues when a registry is invalid', async () => {
-    // Global: file exists but has invalid YAML
+  it('throws when a registry is invalid instead of treating it as missing (#114)', async () => {
+    // Global: file exists but has invalid YAML. Swallowing this made the engine think there
+    // were no workspaces and offer to overwrite the file with an empty registry.
     mockAccess.mockResolvedValue(undefined);
     mockReadFile.mockResolvedValue(invalidYaml);
 
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-    const sources = await loadAllRegistries();
-
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Warning:'));
-    expect(sources).toEqual([]);
-
-    warnSpy.mockRestore();
+    await expect(loadAllRegistries()).rejects.toThrow(/Invalid YAML in .*repos\.yml/);
   });
 
   it('returns only project registry when global does not exist', async () => {
@@ -450,5 +456,77 @@ describe('getAvailableWorkspaces', () => {
     for (const ws of projectWorkspaces) {
       expect(ws.source).toBe(projectSource);
     }
+  });
+});
+
+// ── Writing (#114) ─────────────────────────────────────────────────────────
+
+describe('createWorkspace (#114)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('refuses to overwrite an existing registry file', async () => {
+    mockAccess.mockResolvedValue(undefined); // file exists
+    await expect(createWorkspace('/home/user/.agentx/repos.yml', 'default')).rejects.toThrow(
+      /already exists/,
+    );
+    expect(mockWriteFile).not.toHaveBeenCalled();
+    expect(mockRename).not.toHaveBeenCalled();
+  });
+
+  it('creates the registry when the file is missing', async () => {
+    mockAccess.mockRejectedValue(new Error('ENOENT'));
+    const { workspace } = await createWorkspace('~/.agentx/repos.yml', 'default');
+    expect(workspace.name).toBe('default');
+    expect(mockRename).toHaveBeenCalledWith(expect.any(String), '/home/user/.agentx/repos.yml');
+  });
+});
+
+describe('saveReposRegistry (#114)', () => {
+  beforeEach(() => vi.clearAllMocks());
+  const registry = { workspaces: { w: { repos: [] } }, groups: {}, tags: {} };
+
+  it('backs up the existing file, writes a temp file and renames it into place', async () => {
+    mockAccess.mockResolvedValue(undefined); // file exists
+    await saveReposRegistry('/home/user/.agentx/repos.yml', registry);
+
+    // The backup never follows a planted symlink: unlink the old .bak, then create exclusively.
+    expect(mockRm).toHaveBeenCalledWith('/home/user/.agentx/repos.yml.bak', { force: true });
+    expect(mockCopyFile).toHaveBeenCalledWith(
+      '/home/user/.agentx/repos.yml',
+      '/home/user/.agentx/repos.yml.bak',
+      constants.COPYFILE_EXCL,
+    );
+    const [tmpPath, content, options] = mockWriteFile.mock.calls[0];
+    expect(String(tmpPath)).not.toBe('/home/user/.agentx/repos.yml');
+    expect(path.dirname(String(tmpPath))).toBe('/home/user/.agentx');
+    expect(String(content)).toContain('workspaces:');
+    // The temp file is created exclusively under an unpredictable name.
+    expect(options).toMatchObject({ flag: 'wx' });
+    expect(path.basename(String(tmpPath))).toMatch(/^\.repos\.yml\.[A-Za-z0-9_-]{12,}\.tmp$/);
+    expect(mockRename).toHaveBeenCalledWith(tmpPath, '/home/user/.agentx/repos.yml');
+    // order: backup, write, rename
+    expect(mockRm.mock.invocationCallOrder[0]).toBeLessThan(
+      mockCopyFile.mock.invocationCallOrder[0],
+    );
+    expect(mockCopyFile.mock.invocationCallOrder[0]).toBeLessThan(
+      mockWriteFile.mock.invocationCallOrder[0],
+    );
+    expect(mockWriteFile.mock.invocationCallOrder[0]).toBeLessThan(
+      mockRename.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('uses a different temp name on every write', async () => {
+    mockAccess.mockRejectedValue(new Error('ENOENT'));
+    await saveReposRegistry('/home/user/.agentx/repos.yml', registry);
+    await saveReposRegistry('/home/user/.agentx/repos.yml', registry);
+    expect(mockWriteFile.mock.calls[0][0]).not.toBe(mockWriteFile.mock.calls[1][0]);
+  });
+
+  it('takes no backup when there is nothing to back up', async () => {
+    mockAccess.mockRejectedValue(new Error('ENOENT'));
+    await saveReposRegistry('/home/user/.agentx/repos.yml', registry);
+    expect(mockCopyFile).not.toHaveBeenCalled();
+    expect(mockRename).toHaveBeenCalledTimes(1);
   });
 });
