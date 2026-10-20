@@ -9,6 +9,7 @@
   "files": [
     "dist",
     "bin",
+    "bunfig.toml",
     "README.md",
     "docs"
   ],
@@ -18,7 +19,7 @@
     "test": "vitest run && bun run test:bun",
     "test:bun": "bun test src/__tests__/sqlite-store.test.ts src/__tests__/functional.test.ts && bun test src/__tests__/sqlite-active-days.test.ts && bun test src/__tests__/sqlite-scorecard.test.ts",
     "test:watch": "vitest",
-    "test:e2e": "vitest run tests/e2e",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "typecheck": "tsc --noEmit",
     "prepack": "tsup"
   },

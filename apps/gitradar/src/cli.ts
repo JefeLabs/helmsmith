@@ -1,6 +1,7 @@
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { createCli } from '@helmsmith/cli-kit';
+import * as yaml from 'js-yaml';
 import { runConnect } from './commands/connect.js';
 import { runMain } from './commands/run-main.js';
 import { detectGitRoot } from './config/git-root.js';
@@ -112,12 +113,12 @@ program
     }
 
     const reposPath = path.join(homedir(), '.agentx', 'repos.yml');
+    await mkdir(path.dirname(reposPath), { recursive: true });
     let reposCreated = false;
     try {
       await access(reposPath);
       console.log(`Repos registry already exists: ${reposPath}`);
     } catch {
-      const yaml = (await import('js-yaml')).default;
       await writeFile(reposPath, yaml.dump({ workspaces: {}, groups: {}, tags: {} }), 'utf-8');
       reposCreated = true;
       console.log(`Created repos registry: ${reposPath}`);

@@ -20,6 +20,12 @@ const { expandTilde, getConfigDir, getDataDir, getConfigPath, ensureDataDir } = 
 
 const { mkdir } = await import('node:fs/promises');
 
+// The vitest setup file sandboxes GITRADAR_HOME for every file; these tests
+// describe the *un-overridden* paths, so clear it before each test.
+beforeEach(() => {
+  delete process.env.GITRADAR_HOME;
+});
+
 // ── GITRADAR_HOME override ──────────────────────────────────────────────────
 
 describe('GITRADAR_HOME override', () => {
