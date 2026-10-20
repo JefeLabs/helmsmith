@@ -107,6 +107,8 @@ export interface ScanOptions {
   authorMap: AuthorMap;
   recentHashes: Set<string>;
   since?: string;
+  /** Scan `HEAD ^sinceRef` instead of a date window (#79). */
+  sinceRef?: string;
   /** Chunk first-time scans into N-month windows to bound memory usage. */
   chunkMonths?: number;
   /** Identifier prefix rules for pattern-based author resolution. */
@@ -153,6 +155,12 @@ export interface ScanResult {
   discoveredAuthors: RawAuthor[];
   /** Inputs for the blame-based rework post-pass (see collector/rework.ts). */
   reworkInputs: ReworkInput[];
+  /**
+   * Set when git failed (fatal or transient) for any range: the result carries no
+   * records and the caller must not advance the cursor, or the commits between the
+   * old cursor and the failure are lost for good (#112).
+   */
+  failed?: string;
 }
 
 /**
@@ -649,8 +657,8 @@ export function unassignedAuthor(name: string, email: string): ResolvedAuthor {
  * A date range for chunked scanning.
  */
 export interface DateRange {
-  since: string; // YYYY-MM-DD
-  until: string; // YYYY-MM-DD
+  since: string; // full ISO timestamp (#79: a bare date expands to "that day at now o'clock")
+  until: string; // full ISO timestamp
 }
 
 /**
@@ -665,10 +673,9 @@ export function generateDateChunks(startDate: Date, endDate: Date, months: numbe
   );
 
   while (cursor < endDate) {
-    const chunkSince = cursor.toISOString().slice(0, 10);
+    const chunkSince = cursor.toISOString();
     cursor.setUTCMonth(cursor.getUTCMonth() + months);
-    const chunkUntil =
-      cursor >= endDate ? endDate.toISOString().slice(0, 10) : cursor.toISOString().slice(0, 10);
+    const chunkUntil = cursor >= endDate ? endDate.toISOString() : cursor.toISOString();
     chunks.push({ since: chunkSince, until: chunkUntil });
   }
 
@@ -676,17 +683,20 @@ export function generateDateChunks(startDate: Date, endDate: Date, months: numbe
 }
 
 /**
- * Build the list of date ranges to scan.
+ * Build the list of ranges to scan.
  *
- * - Incremental scans (since is set): single open-ended range, no chunking.
+ * - Reachability scans (sinceRef is set): one range, `HEAD ^sinceRef`, no dates (#79).
+ * - Date-cursor scans (since is set, pre-#79 state): single open-ended range, no chunking.
  * - First-time scans with chunkMonths: generate N-month windows from 10 years
  *   ago to now. Empty windows are cheap (git returns instantly).
  * - First-time scans without chunkMonths: single open-ended range (original behavior).
  */
 function buildScanRanges(
   since: string | undefined,
+  sinceRef: string | undefined,
   chunkMonths: number | undefined,
-): Array<{ since?: string; until?: string }> {
+): Array<{ since?: string; until?: string; sinceRef?: string }> {
+  if (sinceRef) return [{ sinceRef }];
   if (since || !chunkMonths) {
     return [{ since }];
   }
@@ -877,6 +887,7 @@ export async function scanRepo(repoPath: string, options: ScanOptions): Promise<
     authorMap,
     recentHashes,
     since,
+    sinceRef,
     chunkMonths,
     identifierRules,
     ignorePatterns,
@@ -889,38 +900,56 @@ export async function scanRepo(repoPath: string, options: ScanOptions): Promise<
     replaceDefaults: ignorePatternsReplaceDefaults,
   });
   const classify = buildClassifier(classificationRules);
-  const ranges = buildScanRanges(since, chunkMonths);
+  const ranges = buildScanRanges(since, sinceRef, chunkMonths);
 
   // Shared state across all chunks — the recordMap is small (bounded by
   // members × weeks), so it's safe to keep in memory.
   const recordMap = new Map<string, UserWeekRepoRecord>();
   const activeDaysMap = new Map<string, Set<string>>();
   const rawAuthorsMap = new Map<string, RawAuthor>();
-  const newHashes: string[] = [];
+  // One hash list per range: ranges are walked oldest-first but the dedup window must
+  // keep the NEWEST hashes, so they are concatenated newest-range-first below (#110).
+  const hashesByRange: string[][] = [];
   const reworkInputs: ReworkInput[] = [];
   let totalCommitCount = 0;
   let ignoredCommitCount = 0;
   let skippedCount = 0;
 
-  const batchArgs = {
-    repoName,
-    group,
-    authorMap,
-    recentHashes,
-    recordMap,
-    activeDaysMap,
-    newHashes,
-    rawAuthorsMap,
-    identifierRules,
-    shouldIgnore,
-    classify,
-    reworkInputs: collectRework !== false ? reworkInputs : undefined,
-  };
+  const failedResult = (reason: string): ScanResult => ({
+    newRecords: [],
+    newHashes: [],
+    commitCount: 0,
+    skippedCount: 0,
+    ignoredCommitCount: 0,
+    discoveredAuthors: [],
+    reworkInputs: [],
+    failed: reason,
+  });
 
   for (const range of ranges) {
     const args = ['log', '--raw', '--numstat', '--no-merges', GIT_LOG_FORMAT];
     if (range.since) args.splice(1, 0, `--since=${range.since}`);
     if (range.until) args.splice(1, 0, `--until=${range.until}`);
+    // Everything reachable from HEAD that was not reachable from the last scanned tip,
+    // whatever its date (#79). Only SHAs follow --end-of-options.
+    if (range.sinceRef) args.push('--end-of-options', 'HEAD', `^${range.sinceRef}`);
+
+    const rangeHashes: string[] = [];
+    hashesByRange.push(rangeHashes);
+    const batchArgs = {
+      repoName,
+      group,
+      authorMap,
+      recentHashes,
+      recordMap,
+      activeDaysMap,
+      newHashes: rangeHashes,
+      rawAuthorsMap,
+      identifierRules,
+      shouldIgnore,
+      classify,
+      reworkInputs: collectRework !== false ? reworkInputs : undefined,
+    };
 
     try {
       const result = await streamGitLog(repoPath, args, batchArgs);
@@ -929,35 +958,17 @@ export async function scanRepo(repoPath: string, options: ScanOptions): Promise<
       ignoredCommitCount += result.ignoredCount;
     } catch (error) {
       const gitErr = classifyGitError(error);
-      if (gitErr.severity === 'fatal') {
-        console.error(`  Error: ${repoName}: ${gitErr.reason}`);
-        return {
-          newRecords: [],
-          newHashes: [],
-          commitCount: 0,
-          skippedCount: 0,
-          ignoredCommitCount: 0,
-          discoveredAuthors: [],
-          reworkInputs: [],
-        };
-      }
-      if (gitErr.severity === 'transient') {
-        console.log(`  Warning: git error in ${repoName}: ${gitErr.reason}`);
-      }
-      // 'expected' errors are silently skipped (e.g. empty repo, no commits in range)
-      if (ranges.length === 1) {
-        return {
-          newRecords: [],
-          newHashes: [],
-          commitCount: 0,
-          skippedCount: 0,
-          ignoredCommitCount: 0,
-          discoveredAuthors: [],
-          reworkInputs: [],
-        };
-      }
+      // 'expected' errors (empty repo, no commits in range) are not failures.
+      if (gitErr.severity === 'expected') continue;
+      // Anything else fails the whole repo: a chunk skipped now would never be retried
+      // once the cursor moved past it (#112).
+      if (gitErr.severity === 'fatal') console.error(`  Error: ${repoName}: ${gitErr.reason}`);
+      else console.log(`  Warning: git error in ${repoName}: ${gitErr.reason}`);
+      return failedResult(gitErr.reason);
     }
   }
+
+  const newHashes = hashesByRange.reverse().flat();
 
   // Finalize activeDays (and the weekday mask) from the tracked sets
   for (const [key, days] of activeDaysMap) {

@@ -3,6 +3,7 @@ import type { UserWeekRepoRecord } from '../types/schema.js';
 import type { AuthorMap, IdentifierRule, ResolvedAuthor } from './author-map.js';
 import { resolveAuthor } from './author-map.js';
 import { classifyGitError, getISOWeek, makeEmptyRecord, unassignedAuthor } from './git.js';
+import { isAncestor } from './refs.js';
 
 /**
  * Git-only merged-PR proxy.
@@ -127,6 +128,8 @@ export interface PrProxyOptions {
   identifierRules?: IdentifierRule[];
   recentPrHashes: Set<string>;
   since?: string;
+  /** Default-branch tip at the last pass: walk `tip ^sinceRef` instead of a date window (#79). */
+  sinceRef?: string;
   shouldIgnore: (filePath: string) => boolean;
 }
 
@@ -135,6 +138,8 @@ export interface PrProxyResult {
   newPrHashes: string[];
   prCount: number;
   branch: string | null;
+  /** The default-branch SHA this pass walked to; persist it as the next `sinceRef` (#79). */
+  tip?: string;
 }
 
 export async function runPrProxy(opts: PrProxyOptions): Promise<PrProxyResult> {
@@ -167,6 +172,11 @@ export async function runPrProxy(opts: PrProxyOptions): Promise<PrProxyResult> {
   const args = ['log', '--first-parent', '-m', FIRST_PARENT_FORMAT, '--numstat'];
   if (opts.since) args.push(`--since=${opts.since}`);
   args.push('--end-of-options', sha);
+  // Reachability cursor: only when the old tip is still on this line; otherwise the whole
+  // first-parent walk runs again and recentPrHashes dedups it (#79).
+  if (opts.sinceRef && (await isAncestor(opts.repoPath, opts.sinceRef, sha))) {
+    args.push(`^${opts.sinceRef}`);
+  }
   let output: string;
   try {
     output = await git.raw(args);
@@ -228,5 +238,6 @@ export async function runPrProxy(opts: PrProxyOptions): Promise<PrProxyResult> {
     newPrHashes: commits.map((c) => c.hash),
     prCount: prs.length,
     branch,
+    tip: sha,
   };
 }

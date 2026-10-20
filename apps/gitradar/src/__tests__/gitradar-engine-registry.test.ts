@@ -30,6 +30,18 @@ vi.mock('../store/sqlite-store.js', () => ({
   saveAuthorRegistrySQL: vi.fn(),
   saveEnrichmentBatchSQL: vi.fn(),
   saveScanStateSQL: vi.fn(),
+  subtractRepoFromAuthorCounts: vi.fn(),
+  updateRepoScanStateSQL: vi.fn(),
+  acquireScanLock: vi.fn(),
+  releaseScanLock: vi.fn(),
+  ScanInProgressError: class ScanInProgressError extends Error {
+    constructor(
+      public readonly pid: number,
+      public readonly startedAt: string,
+    ) {
+      super(`a scan is already in progress (pid ${pid}, since ${startedAt})`);
+    }
+  },
   upsertRecords: vi.fn(),
 }));
 
@@ -46,7 +58,14 @@ vi.mock('../collector/index.js', () => ({
 
 import { scanAllRepos } from '../collector/index.js';
 import { GitRadarEngine } from '../engine/gitradar-engine.js';
-import { loadAuthorRegistrySQL, saveAuthorRegistrySQL } from '../store/sqlite-store.js';
+import {
+  acquireScanLock,
+  loadAuthorRegistrySQL,
+  releaseScanLock,
+  saveAuthorRegistrySQL,
+  saveScanStateSQL,
+  updateRepoScanStateSQL,
+} from '../store/sqlite-store.js';
 
 const mockScanAllRepos = vi.mocked(scanAllRepos);
 const mockLoadRegistry = vi.mocked(loadAuthorRegistrySQL);
@@ -153,5 +172,136 @@ describe('author registry ownership (#115)', () => {
     expect(mockSaveRegistry).toHaveBeenCalledWith(assigned);
     expect(engine.authorRegistry).toBe(assigned);
     engine.close();
+  });
+});
+
+describe('scan exit status (#112)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.exitCode = undefined;
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  it('sets a non-zero exit code when any repo failed to scan', async () => {
+    const engine = makeEngine();
+    mockScanAllRepos.mockResolvedValue({
+      allNewRecords: [],
+      updatedScanState: { version: 1, repos: {} },
+      discoveredAuthors: [],
+      stats: {
+        totalCommits: 0,
+        totalRecords: 0,
+        reposScanned: 0,
+        reposSkipped: 0,
+        reposMissing: 0,
+        reposFailed: 1,
+        totalPrs: 0,
+        totalReworkCommits: 0,
+      },
+    } as never);
+    await engine.scan({});
+    expect(process.exitCode).toBe(1);
+    process.exitCode = undefined;
+  });
+});
+
+describe('scan lock and per-repo cursors (#111)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.exitCode = undefined;
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  const okResult = (state: ScanState) => ({
+    allNewRecords: [],
+    updatedScanState: state,
+    discoveredAuthors: [],
+    stats: {
+      totalCommits: 0,
+      totalRecords: 0,
+      reposScanned: 1,
+      reposSkipped: 0,
+      reposMissing: 0,
+      reposFailed: 0,
+      totalPrs: 0,
+      totalReworkCommits: 0,
+    },
+  });
+
+  it('takes the lock before scanning and releases it afterwards, even when the scan throws', async () => {
+    const engine = makeEngine();
+    mockScanAllRepos.mockRejectedValueOnce(new Error('boom'));
+    await expect(engine.scan({})).rejects.toThrow('boom');
+    expect(vi.mocked(acquireScanLock)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(releaseScanLock)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(acquireScanLock).mock.invocationCallOrder[0]).toBeLessThan(
+      mockScanAllRepos.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('skips the scan with a message and returns false when another scan holds the lock', async () => {
+    const engine = makeEngine();
+    const { ScanInProgressError } = await import('../store/sqlite-store.js');
+    vi.mocked(acquireScanLock).mockImplementationOnce(() => {
+      throw new ScanInProgressError(4242, '2026-10-20T10:00:00.000Z');
+    });
+    const scanned = await engine.scan({});
+    expect(scanned).toBe(false);
+    expect(mockScanAllRepos).not.toHaveBeenCalled();
+    expect(vi.mocked(releaseScanLock)).not.toHaveBeenCalled();
+    expect(vi.mocked(console.log).mock.calls.flat().join('\n')).toMatch(
+      /scan .*in progress.*pid 4242/i,
+    );
+  });
+
+  it('returns true after a scan it ran', async () => {
+    const engine = makeEngine();
+    mockScanAllRepos.mockResolvedValueOnce(okResult({ version: 1, repos: {} }) as never);
+    expect(await engine.scan({})).toBe(true);
+  });
+
+  it('persists only the scanned repo cursor instead of rewriting every repo from the snapshot', async () => {
+    const engine = makeEngine();
+    engine.scanState = {
+      version: 1,
+      repos: {
+        other: {
+          lastHash: 'o',
+          lastScanDate: '2026-01-01T00:00:00.000Z',
+          recentHashes: [],
+          recordCount: 1,
+        },
+      },
+    };
+    mockScanAllRepos.mockImplementation((async (
+      _c: unknown,
+      state: ScanState,
+      options?: Record<string, any>,
+    ) => {
+      const updated: ScanState = {
+        ...state,
+        repos: {
+          ...state.repos,
+          alpha: {
+            lastHash: 'a',
+            lastScanDate: '2026-02-01T00:00:00.000Z',
+            recentHashes: ['a'],
+            recordCount: 2,
+          },
+        },
+      };
+      await options?.onScanStateUpdated?.(updated, 'alpha');
+      return okResult(updated);
+    }) as never);
+
+    await engine.scan({});
+
+    expect(vi.mocked(saveScanStateSQL)).not.toHaveBeenCalled();
+    expect(vi.mocked(updateRepoScanStateSQL)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(updateRepoScanStateSQL)).toHaveBeenCalledWith(
+      'alpha',
+      expect.objectContaining({ lastHash: 'a' }),
+    );
+    expect(engine.scanState?.repos.alpha?.lastHash).toBe('a');
   });
 });

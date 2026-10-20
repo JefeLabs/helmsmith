@@ -32,6 +32,13 @@ vi.mock('../collector/rework.js', () => ({
   runRework: (...args: unknown[]) => mockRunRework(...args),
 }));
 
+const mockResolveHead = vi.fn();
+const mockIsAncestor = vi.fn();
+vi.mock('../collector/refs.js', () => ({
+  resolveHead: (...args: unknown[]) => mockResolveHead(...args),
+  isAncestor: (...args: unknown[]) => mockIsAncestor(...args),
+}));
+
 const { access } = await import('node:fs/promises');
 const mockAccess = vi.mocked(access);
 
@@ -123,6 +130,8 @@ describe('scanAllRepos', () => {
     // tests that don't care about it aren't affected.
     mockRunPrProxy.mockResolvedValue({ records: [], newPrHashes: [], prCount: 0, branch: 'main' });
     mockRunRework.mockResolvedValue({ records: [], commitsProcessed: 0, blames: 0 });
+    mockResolveHead.mockResolvedValue('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb');
+    mockIsAncestor.mockResolvedValue(true);
   });
 
   it('scans all repos and aggregates results', async () => {
@@ -150,6 +159,131 @@ describe('scanAllRepos', () => {
     expect(result.stats.reposScanned).toBe(2);
     expect(result.stats.reposSkipped).toBe(0);
     expect(result.stats.reposMissing).toBe(0);
+  });
+
+  it('a failed repo scan writes nothing, keeps its cursor, prints ✗ and is counted (#112)', async () => {
+    const state = makeScanState({
+      frontend: {
+        lastHash: 'old',
+        lastScanDate: '2026-02-20T10:00:00.000Z',
+        recentHashes: ['old'],
+        recordCount: 5,
+      },
+    });
+    mockScanRepo
+      .mockResolvedValueOnce(makeScanResult({ failed: 'not a git repository' }))
+      .mockResolvedValueOnce(makeScanResult({ newHashes: ['h2'], commitCount: 1 }));
+    const onRepoScanned = vi.fn();
+    const onScanStateUpdated = vi.fn();
+    const onAuthorsDiscovered = vi.fn();
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const result = await scanAllRepos(makeSampleConfig(), state, {
+      stalenessMinutes: 0,
+      onRepoScanned,
+      onScanStateUpdated,
+      onAuthorsDiscovered,
+    });
+
+    // frontend: untouched
+    expect(result.updatedScanState.repos.frontend).toEqual(state.repos.frontend);
+    expect(mockRunPrProxy).toHaveBeenCalledTimes(1); // only for backend
+    expect(onRepoScanned).toHaveBeenCalledTimes(1);
+    expect(onScanStateUpdated).toHaveBeenCalledTimes(1);
+    expect(onScanStateUpdated.mock.calls[0][0].repos.backend).toBeDefined();
+    expect(log.mock.calls.flat().join('\n')).toMatch(/✗ frontend: not a git repository/);
+    expect(result.stats.reposFailed).toBe(1);
+    expect(result.stats.reposScanned).toBe(1);
+    log.mockRestore();
+  });
+
+  it('scans by reachability from the stored tip and persists the new tips (#79)', async () => {
+    const state = makeScanState({
+      frontend: {
+        lastHash: 'old',
+        lastScanDate: '2026-02-20T10:00:00.000Z',
+        recentHashes: ['old'],
+        recordCount: 5,
+        lastTip: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        lastPrTip: 'cccccccccccccccccccccccccccccccccccccccc',
+      },
+    });
+    mockScanRepo.mockResolvedValue(makeScanResult({ newHashes: ['h1'], commitCount: 1 }));
+    mockRunPrProxy.mockResolvedValue({
+      records: [],
+      newPrHashes: [],
+      prCount: 0,
+      branch: 'main',
+      tip: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    });
+
+    const result = await scanAllRepos(makeSampleConfig(), state, { stalenessMinutes: 0 });
+
+    expect(mockIsAncestor).toHaveBeenCalledWith(
+      '/repos/frontend',
+      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    );
+    const scanOpts = mockScanRepo.mock.calls[0][1];
+    expect(scanOpts.sinceRef).toBe('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+    expect(scanOpts.since).toBeUndefined();
+    expect(mockRunPrProxy.mock.calls[0][0]).toMatchObject({
+      sinceRef: 'cccccccccccccccccccccccccccccccccccccccc',
+    });
+    expect(mockRunPrProxy.mock.calls[0][0].since).toBeUndefined();
+    expect(result.updatedScanState.repos.frontend.lastTip).toBe(
+      'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    );
+    expect(result.updatedScanState.repos.frontend.lastPrTip).toBe(
+      'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    );
+    expect(result.updatedScanState.repos.frontend.lastHash).toBe(
+      'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    );
+  });
+
+  it('re-walks the whole history with hash dedup when the stored tip is no longer reachable (#79)', async () => {
+    const state = makeScanState({
+      frontend: {
+        lastHash: 'old',
+        lastScanDate: '2026-02-20T10:00:00.000Z',
+        recentHashes: ['old'],
+        recordCount: 5,
+        lastTip: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      },
+    });
+    mockIsAncestor.mockResolvedValue(false);
+    mockScanRepo.mockResolvedValue(makeScanResult({}));
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await scanAllRepos(makeSampleConfig(), state, { stalenessMinutes: 0 });
+
+    const scanOpts = mockScanRepo.mock.calls[0][1];
+    expect(scanOpts.sinceRef).toBeUndefined();
+    expect(scanOpts.since).toBeUndefined();
+    expect(scanOpts.recentHashes).toEqual(new Set(['old']));
+    expect(log.mock.calls.flat().join('\n')).toMatch(/frontend: history rewritten/);
+    log.mockRestore();
+  });
+
+  it('a first scan has neither cursor, and records the tip (#79)', async () => {
+    mockScanRepo.mockResolvedValue(makeScanResult({}));
+    const result = await scanAllRepos(makeSampleConfig(), makeScanState());
+    const scanOpts = mockScanRepo.mock.calls[0][1];
+    expect(scanOpts.sinceRef).toBeUndefined();
+    expect(scanOpts.since).toBeUndefined();
+    expect(mockIsAncestor).not.toHaveBeenCalled();
+    expect(result.updatedScanState.repos.frontend.lastTip).toBe(
+      'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    );
+  });
+
+  it('an empty repo (no HEAD) still scans and keeps no tip (#79)', async () => {
+    mockResolveHead.mockResolvedValue(null);
+    mockScanRepo.mockResolvedValue(makeScanResult({}));
+    const result = await scanAllRepos(makeSampleConfig(), makeScanState());
+    expect(mockScanRepo).toHaveBeenCalledTimes(2);
+    expect(result.updatedScanState.repos.frontend.lastTip).toBeUndefined();
   });
 
   it('skips fresh repos (not stale)', async () => {
@@ -301,10 +435,16 @@ describe('scanAllRepos', () => {
     expect(reset).toEqual([]);
     expect(mockScanRepo).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ since: '2026-02-28', recentHashes: new Set(['old1']) }),
+      expect.objectContaining({
+        since: expect.stringMatching(/^2026-02-28T/), // pre-#79 state: a full timestamp, never a bare date
+        recentHashes: new Set(['old1']),
+      }),
     );
     expect(mockRunPrProxy).toHaveBeenCalledWith(
-      expect.objectContaining({ since: '2026-02-28', recentPrHashes: new Set(['m1']) }),
+      expect.objectContaining({
+        since: expect.stringMatching(/^2026-02-28T/),
+        recentPrHashes: new Set(['m1']),
+      }),
     );
     // Rotated (prepended), not replaced.
     expect(result.updatedScanState.repos.app.recentHashes).toEqual(['n1', 'old1']);
@@ -352,18 +492,19 @@ describe('scanAllRepos', () => {
 
     const frontendState = result.updatedScanState.repos.frontend;
     expect(frontendState).toBeDefined();
-    expect(frontendState.lastHash).toBe('new1');
+    // lastHash is the real tip (HEAD), not the newest hash of the oldest chunk (#110, #79)
+    expect(frontendState.lastHash).toBe('b'.repeat(40));
     expect(frontendState.recentHashes).toContain('new1');
     expect(frontendState.recentHashes).toContain('new2');
     expect(frontendState.recordCount).toBe(1);
 
     const backendState = result.updatedScanState.repos.backend;
     expect(backendState).toBeDefined();
-    expect(backendState.lastHash).toBe('new3');
+    expect(backendState.lastHash).toBe('b'.repeat(40));
     expect(backendState.recordCount).toBe(0);
   });
 
-  it('calculates since date as lastScanDate - 1 day', async () => {
+  it('falls back to a full-timestamp date cursor for state without a tip (pre-#79 rows)', async () => {
     const state = makeScanState({
       frontend: {
         lastHash: 'old',
@@ -379,9 +520,11 @@ describe('scanAllRepos', () => {
 
     await scanAllRepos(makeSampleConfig(), state);
 
-    // First call (frontend) should have since = "2026-02-19"
+    // First call (frontend): a state from before reachability cursors gets one last date
+    // walk — with a full timestamp, never a bare date that git expands to "now o'clock" (#79)
     const firstCallOptions = mockScanRepo.mock.calls[0][1];
-    expect(firstCallOptions.since).toBe('2026-02-19');
+    expect(firstCallOptions.since).toBe('2026-02-19T10:00:00.000Z');
+    expect(firstCallOptions.sinceRef).toBeUndefined();
 
     // Second call (backend) should have no since (first scan)
     const secondCallOptions = mockScanRepo.mock.calls[1][1];
@@ -479,6 +622,15 @@ describe('scanAllRepos', () => {
     // Stats should still be correct
     expect(result.stats.totalRecords).toBe(2);
     expect(result.stats.reposScanned).toBe(2);
+  });
+
+  it('passes the repo name to onScanStateUpdated so callers can persist one row (#111)', async () => {
+    mockScanRepo
+      .mockResolvedValueOnce(makeScanResult({ newHashes: ['h1'] }))
+      .mockResolvedValueOnce(makeScanResult({ newHashes: ['h2'] }));
+    const onScanStateUpdated = vi.fn();
+    await scanAllRepos(makeSampleConfig(), makeScanState(), { onScanStateUpdated });
+    expect(onScanStateUpdated.mock.calls.map((c) => c[1])).toEqual(['frontend', 'backend']);
   });
 
   it('calls onScanStateUpdated after each repo', async () => {

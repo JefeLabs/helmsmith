@@ -52,7 +52,9 @@ export async function runMain(
     }
 
     if (!opts.skipScan) {
-      await engine.scan(opts);
+      const scanned = await engine.scan(opts);
+      // A scan-only run that could not scan must say so to scripts (#111).
+      if (!scanned && opts.scanOnly) process.exitCode = 1;
 
       // Enrich after scan unless explicitly skipped
       if (!opts.skipEnrich) {

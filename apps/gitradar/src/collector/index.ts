@@ -13,6 +13,7 @@ import { buildIgnoreMatcher } from './classifier.js';
 import type { RawAuthor } from './git.js';
 import { scanRepo } from './git.js';
 import { runPrProxy } from './pr-proxy.js';
+import { isAncestor, resolveHead } from './refs.js';
 import { runRework } from './rework.js';
 
 /**
@@ -36,6 +37,8 @@ export interface ScanAllResult {
     reposScanned: number;
     reposSkipped: number;
     reposMissing: number;
+    /** Repos whose git run failed; nothing was written for them (#112). */
+    reposFailed: number;
     totalPrs: number;
     totalReworkCommits: number;
   };
@@ -67,7 +70,8 @@ export async function scanAllRepos(
     /** Called after each repo completes. Enables per-repo persistence to bound memory. */
     onRepoScanned?: (records: UserWeekRepoRecord[]) => Promise<void>;
     /** Called after each repo's scan state is updated. Enables crash-safe resumption. */
-    onScanStateUpdated?: (state: ScanState) => Promise<void>;
+    /** Called after each repo with the whole state and the repo just scanned, so callers can persist one row (#111). */
+    onScanStateUpdated?: (state: ScanState, repoName: string) => Promise<void>;
     /** Called after each repo with newly discovered authors. Enables per-repo author persistence. */
     onAuthorsDiscovered?: (authors: RepoDiscoveredAuthor[]) => Promise<void>;
     /**
@@ -91,6 +95,7 @@ export async function scanAllRepos(
   let reposScanned = 0;
   let reposSkipped = 0;
   let reposMissing = 0;
+  let reposFailed = 0;
   let totalPrs = 0;
   let totalReworkCommits = 0;
 
@@ -123,13 +128,30 @@ export async function scanAllRepos(
       await options?.onRepoReset?.(repoName);
     }
 
-    // Calculate "since" date: lastScanDate - 1 day overlap (or undefined for first
-    // scan, and always undefined for a forced scan — it re-walks full history).
+    // Cursor (#79). Resolved before the walk so a commit landing mid-scan is seen next time.
+    //  - sinceRef: the tip of the last scan, when it is still reachable from HEAD — the walk
+    //    is `HEAD ^lastTip`, so commits that reached the clone late (merged branches, pulls)
+    //    are counted whatever their dates.
+    //  - rewritten history (tip not reachable): full re-walk, recentHashes dedups it.
+    //  - state from before tips existed: one last date walk with a full timestamp.
+    //  - first or forced scan: no cursor at all.
+    const head = await resolveHead(repo.path);
     let since: string | undefined;
-    if (!forceScan && repoState?.lastScanDate) {
-      const lastScan = new Date(repoState.lastScanDate);
-      lastScan.setDate(lastScan.getDate() - 1);
-      since = lastScan.toISOString().slice(0, 10); // "YYYY-MM-DD"
+    let sinceRef: string | undefined;
+    if (!forceScan && repoState) {
+      if (repoState.lastTip) {
+        if (head && (await isAncestor(repo.path, repoState.lastTip, head))) {
+          sinceRef = repoState.lastTip;
+        } else {
+          console.log(
+            `  ${repoName}: history rewritten since the last scan; re-walking with hash dedup`,
+          );
+        }
+      } else if (repoState.lastScanDate) {
+        const lastScan = new Date(repoState.lastScanDate);
+        lastScan.setUTCDate(lastScan.getUTCDate() - 1);
+        since = lastScan.toISOString();
+      }
     }
 
     // Build the set of recent hashes for dedup (empty for a forced scan).
@@ -144,6 +166,7 @@ export async function scanAllRepos(
       authorMap,
       recentHashes,
       since,
+      sinceRef,
       chunkMonths: options?.chunkMonths,
       identifierRules,
       ignorePatterns: config.settings.ignore_patterns,
@@ -151,6 +174,14 @@ export async function scanAllRepos(
       classificationRules: config.classification,
       collectRework: reworkEnabled,
     });
+
+    // A failed git run: write nothing and leave the cursor where it was, so the next
+    // good scan still sees everything since then (#112).
+    if (result.failed) {
+      console.log(`✗ ${repoName}: ${result.failed}`);
+      reposFailed++;
+      continue;
+    }
 
     // ── Post-passes: rework (blame) and merged-PR proxy ───────────────────
     const shouldIgnore = buildIgnoreMatcher(config.settings.ignore_patterns, {
@@ -199,6 +230,7 @@ export async function scanAllRepos(
       identifierRules,
       recentPrHashes: new Set(forceScan ? [] : (repoState?.recentPrHashes ?? [])),
       since,
+      sinceRef: forceScan ? undefined : repoState?.lastPrTip,
       shouldIgnore,
     });
     if (pr.branch === null) console.log(`  PR proxy: no default branch found for ${repoName}`);
@@ -240,15 +272,17 @@ export async function scanAllRepos(
     const existingRecordCount = forceScan ? 0 : (repoState?.recordCount ?? 0);
 
     currentState = updateRepoState(currentState, repoName, {
-      lastHash: result.newHashes[0] ?? repoState?.lastHash ?? '',
+      lastHash: head ?? result.newHashes[0] ?? repoState?.lastHash ?? '',
       lastScanDate: new Date().toISOString(),
       recentHashes: newRecentHashes,
       recordCount: existingRecordCount + result.newRecords.length,
       recentPrHashes: newRecentPrHashes,
+      lastTip: head ?? repoState?.lastTip,
+      lastPrTip: pr.tip ?? repoState?.lastPrTip,
     });
 
     if (options?.onScanStateUpdated) {
-      await options.onScanStateUpdated(currentState);
+      await options.onScanStateUpdated(currentState, repoName);
     }
 
     const ignoredNote =
@@ -268,6 +302,7 @@ export async function scanAllRepos(
       reposScanned,
       reposSkipped,
       reposMissing,
+      reposFailed,
       totalPrs,
       totalReworkCommits,
     },
