@@ -232,6 +232,62 @@ describe('runPrProxy', () => {
     expect(result).toEqual({ records: [], newPrHashes: [], prCount: 0, branch: null });
   });
 
+  it('walks only commits reachable from the tip but not from sinceRef, and reports the tip (#79)', async () => {
+    const sha = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    mockRaw
+      .mockResolvedValueOnce('origin/main\n') // symbolic-ref
+      .mockResolvedValueOnce(`${sha}\n`) // rev-parse
+      .mockResolvedValueOnce('') // merge-base --is-ancestor: exit 0
+      .mockResolvedValueOnce(LOG) // first-parent log
+      .mockResolvedValueOnce(`${H('p2', 'alice@co.com', 'Alice')}\n`);
+    const result = await runPrProxy({
+      repoPath: '/r',
+      repoName: 'web',
+      group: 'default',
+      authorMap: authorMap(),
+      recentPrHashes: new Set(),
+      sinceRef: 'cccccccccccccccccccccccccccccccccccccccc',
+      shouldIgnore: () => false,
+    });
+    expect(mockRaw.mock.calls[2][0]).toEqual([
+      'merge-base',
+      '--is-ancestor',
+      'cccccccccccccccccccccccccccccccccccccccc',
+      sha,
+    ]);
+    const log = mockRaw.mock.calls[3][0] as string[];
+    expect(log.slice(-3)).toEqual([
+      '--end-of-options',
+      sha,
+      '^cccccccccccccccccccccccccccccccccccccccc',
+    ]);
+    expect(log.some((a) => a.startsWith('--since='))).toBe(false);
+    expect(result.tip).toBe(sha);
+  });
+
+  it('re-walks the whole first-parent line when sinceRef is not an ancestor of the tip (#79)', async () => {
+    const sha = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    mockRaw
+      .mockResolvedValueOnce('origin/main\n')
+      .mockResolvedValueOnce(`${sha}\n`)
+      .mockRejectedValueOnce(new Error('exit 1')) // not an ancestor
+      .mockResolvedValueOnce(LOG)
+      .mockResolvedValueOnce(`${H('p2', 'alice@co.com', 'Alice')}\n`);
+    const result = await runPrProxy({
+      repoPath: '/r',
+      repoName: 'web',
+      group: 'default',
+      authorMap: authorMap(),
+      recentPrHashes: new Set(['aaaaaa1']),
+      sinceRef: 'cccccccccccccccccccccccccccccccccccccccc',
+      shouldIgnore: () => false,
+    });
+    const log = mockRaw.mock.calls[3][0] as string[];
+    expect(log.slice(-2)).toEqual(['--end-of-options', sha]);
+    expect(result.prCount).toBe(1); // aaaaaa1 deduped by hash
+    expect(result.tip).toBe(sha);
+  });
+
   it('resolves the branch to a SHA and puts --end-of-options before every revision (#71)', async () => {
     const sha = '1234567890abcdef1234567890abcdef12345678';
     mockRaw

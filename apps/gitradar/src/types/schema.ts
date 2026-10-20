@@ -222,6 +222,10 @@ const RepoScanStateSchema = z.object({
   recordCount: z.number(),
   /** Dedup cursor for the first-parent PR proxy pass (separate from recentHashes). */
   recentPrHashes: z.array(z.string()).optional(),
+  /** HEAD at the last scan: the next scan walks `HEAD ^lastTip`, so commits that reach the clone late (merged branches, pulls) are never missed (#79). */
+  lastTip: z.string().optional(),
+  /** Default-branch tip at the last PR-proxy pass (#79). */
+  lastPrTip: z.string().optional(),
 });
 
 export const ScanStateSchema = z.object({
@@ -246,6 +250,8 @@ export const DiscoveredAuthorSchema = z.object({
   lastSeen: z.string(),
   reposSeenIn: z.array(z.string()),
   commitCount: z.number(),
+  /** Commits per repo, so a forced rescan of one repo can replace its share instead of adding to it (#116). */
+  commitsByRepo: z.record(z.string(), z.number()).optional(),
 });
 
 export const AuthorRegistrySchema = z.object({

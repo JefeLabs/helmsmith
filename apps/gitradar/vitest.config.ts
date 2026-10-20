@@ -30,6 +30,7 @@ export default defineConfig({
       'src/__tests__/functional.test.ts',
       'src/__tests__/sqlite-scorecard.test.ts',
       'src/__tests__/sqlite-reset.test.ts',
+      'src/__tests__/sqlite-authors.test.ts',
     ],
   },
 });

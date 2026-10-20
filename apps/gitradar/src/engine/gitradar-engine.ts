@@ -33,6 +33,7 @@ import { selectWorkspace } from '../config/workspace-selector.js';
 import { mergeDiscoveredAuthors } from '../store/author-registry.js';
 import { DbWatcher } from '../store/db-watcher.js';
 import {
+  acquireScanLock,
   deleteRecordsForRepo,
   deleteScanStateForRepo,
   getMetaTimestamps,
@@ -47,10 +48,13 @@ import {
   queryRecords,
   queryRollup,
   reattributeRecordsSQL,
+  releaseScanLock,
   resetAllData,
+  ScanInProgressError,
   saveAuthorRegistrySQL,
   saveEnrichmentBatchSQL,
-  saveScanStateSQL,
+  subtractRepoFromAuthorCounts,
+  updateRepoScanStateSQL,
   upsertRecords,
 } from '../store/sqlite-store.js';
 import type {
@@ -348,9 +352,31 @@ export class GitRadarEngine {
 
   // ── Scanning ─────────────────────────────────────────────────────────────
 
-  async scan(opts: RunOptions): Promise<void> {
+  /**
+   * Scan every stale repo. Returns false (and scans nothing) when another process
+   * holds the scan lock: two overlapping scans both read the old cursor and both
+   * insert, doubling every commit (#111).
+   */
+  async scan(opts: RunOptions): Promise<boolean> {
     console.log('');
+    try {
+      acquireScanLock();
+    } catch (err) {
+      if (err instanceof ScanInProgressError) {
+        console.log(`Scan skipped: ${err.message}.`);
+        return false;
+      }
+      throw err;
+    }
+    try {
+      await this.scanLocked(opts);
+    } finally {
+      releaseScanLock();
+    }
+    return true;
+  }
 
+  private async scanLocked(opts: RunOptions): Promise<void> {
     const result = await scanAllRepos(this.config, this.scanState!, {
       forceScan: opts.forceScan,
       stalenessMinutes: opts.staleness,
@@ -360,9 +386,11 @@ export class GitRadarEngine {
       onRepoScanned: async (repoRecords) => {
         upsertRecords(repoRecords);
       },
-      onScanStateUpdated: async (state) => {
+      onScanStateUpdated: async (state, repoName) => {
         this.scanState = state;
-        saveScanStateSQL(state);
+        // One row, not the whole snapshot: a whole-state save rewrote every other
+        // repo's cursor from what this process loaded at startup (#111).
+        updateRepoScanStateSQL(repoName, state.repos[repoName]);
       },
       onAuthorsDiscovered: async (authors) => {
         this.authorRegistry = this.mergeDiscoveredIntoStore(authors);
@@ -370,15 +398,22 @@ export class GitRadarEngine {
       onRepoReset: async (name) => {
         deleteRecordsForRepo(name);
         deleteScanStateForRepo(name);
+        subtractRepoFromAuthorCounts(name); // the rescan adds the repo's share back (#116)
         this.forgetRepoScanState(name);
       },
     });
 
     const newAuthors = Object.values(this.authorRegistry!.authors).filter((a) => !a.org).length;
+    if (result.stats.reposFailed > 0) {
+      // Scripts must be able to tell a partial scan from a clean one (#112).
+      process.exitCode = 1;
+    }
     console.log(
       `\nScan complete: ${result.stats.reposScanned} scanned, ` +
         `${result.stats.reposSkipped} fresh, ` +
-        `${result.stats.reposMissing} missing \u2192 ` +
+        `${result.stats.reposMissing} missing` +
+        (result.stats.reposFailed > 0 ? `, ${result.stats.reposFailed} failed` : '') +
+        ` \u2192 ` +
         `+${result.stats.totalRecords} new records` +
         ` \u00b7 ${result.stats.totalPrs} PRs` +
         (newAuthors > 0 ? ` \u00b7 ${newAuthors} unassigned authors` : ''),
@@ -466,25 +501,32 @@ export class GitRadarEngine {
     };
     delete freshScanState.repos[repoName];
 
-    const scanResult = await scanAllRepos(singleConfig, freshScanState, {
-      forceScan: true,
-      chunkMonths: 3,
-      authorRegistry: currentRegistry,
-      onRepoScanned: async (repoRecords) => {
-        upsertRecords(repoRecords);
-      },
-      onScanStateUpdated: async (state) => {
-        saveScanStateSQL(state);
-      },
-      onAuthorsDiscovered: async (authors) => {
-        this.authorRegistry = this.mergeDiscoveredIntoStore(authors);
-      },
-      onRepoReset: async (name) => {
-        deleteRecordsForRepo(name);
-        deleteScanStateForRepo(name);
-        this.forgetRepoScanState(name);
-      },
-    });
+    acquireScanLock(); // throws ScanInProgressError; the Manage tab shows it as "Scan failed" (#111)
+    let scanResult: Awaited<ReturnType<typeof scanAllRepos>>;
+    try {
+      scanResult = await scanAllRepos(singleConfig, freshScanState, {
+        forceScan: true,
+        chunkMonths: 3,
+        authorRegistry: currentRegistry,
+        onRepoScanned: async (repoRecords) => {
+          upsertRecords(repoRecords);
+        },
+        onScanStateUpdated: async (state, name) => {
+          updateRepoScanStateSQL(name, state.repos[name]);
+        },
+        onAuthorsDiscovered: async (authors) => {
+          this.authorRegistry = this.mergeDiscoveredIntoStore(authors);
+        },
+        onRepoReset: async (name) => {
+          deleteRecordsForRepo(name);
+          deleteScanStateForRepo(name);
+          subtractRepoFromAuthorCounts(name); // the rescan adds the repo's share back (#116)
+          this.forgetRepoScanState(name);
+        },
+      });
+    } finally {
+      releaseScanLock();
+    }
 
     const freshRecords = queryRecords({});
     this.scanState = scanResult.updatedScanState;

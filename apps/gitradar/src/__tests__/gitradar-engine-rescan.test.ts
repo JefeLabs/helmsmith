@@ -32,6 +32,18 @@ vi.mock('../store/sqlite-store.js', () => ({
   saveAuthorRegistrySQL: vi.fn(),
   saveEnrichmentBatchSQL: vi.fn(),
   saveScanStateSQL: vi.fn(),
+  subtractRepoFromAuthorCounts: vi.fn(),
+  updateRepoScanStateSQL: vi.fn(),
+  acquireScanLock: vi.fn(),
+  releaseScanLock: vi.fn(),
+  ScanInProgressError: class ScanInProgressError extends Error {
+    constructor(
+      public readonly pid: number,
+      public readonly startedAt: string,
+    ) {
+      super(`a scan is already in progress (pid ${pid}, since ${startedAt})`);
+    }
+  },
   upsertRecords: vi.fn(),
 }));
 
@@ -41,7 +53,12 @@ vi.mock('../collector/index.js', () => ({
 
 import { scanAllRepos } from '../collector/index.js';
 import { GitRadarEngine } from '../engine/gitradar-engine.js';
-import { deleteScanStateForRepo, saveScanStateSQL } from '../store/sqlite-store.js';
+import {
+  deleteScanStateForRepo,
+  saveScanStateSQL,
+  subtractRepoFromAuthorCounts,
+  updateRepoScanStateSQL,
+} from '../store/sqlite-store.js';
 
 const mockScanAllRepos = vi.mocked(scanAllRepos);
 const mockSaveScanState = vi.mocked(saveScanStateSQL);
@@ -96,7 +113,7 @@ function collectorThatFailsFor(failingRepo: string) {
       version: 1,
       repos: { ...scanState.repos, [name]: repoState(`fresh-${name}`) },
     };
-    await options?.onScanStateUpdated?.(updated);
+    await options?.onScanStateUpdated?.(updated, name);
     return {
       allNewRecords: [],
       updatedScanState: updated,
@@ -140,9 +157,22 @@ describe('GitRadarEngine.rescanRepo — a failed rescan cannot resurrect a delet
     await expect(engine.rescanRepo('alpha')).rejects.toThrow(/git log failed/);
     await engine.rescanRepo('beta');
 
-    const saved = mockSaveScanState.mock.calls.at(-1)?.[0] as ScanState;
-    expect(Object.keys(saved.repos).sort()).toEqual(['beta']);
-    expect(saved.repos.alpha).toBeUndefined();
+    // Cursors are persisted one repo at a time (#111): beta's row was written, alpha's never.
+    const written = vi.mocked(updateRepoScanStateSQL).mock.calls.map((c) => c[0]);
+    expect(written).toContain('beta');
+    expect(written).not.toContain('alpha');
+    expect(mockSaveScanState).not.toHaveBeenCalled();
     expect(engine.scanState?.repos.alpha).toBeUndefined();
+  });
+});
+
+describe('GitRadarEngine.rescanRepo — author counts (#116)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('subtracts the repo share from every author before re-walking it', async () => {
+    const engine = makeEngine();
+    mockScanAllRepos.mockImplementation(collectorThatFailsFor('none') as never);
+    await engine.rescanRepo('alpha');
+    expect(vi.mocked(subtractRepoFromAuthorCounts)).toHaveBeenCalledWith('alpha');
   });
 });

@@ -36,6 +36,8 @@ export function mergeDiscoveredAuthors(
       // Update existing entry
       const reposSet = new Set(existing.reposSeenIn);
       reposSet.add(d.repoName);
+      const commitsByRepo = { ...(existing.commitsByRepo ?? {}) };
+      commitsByRepo[d.repoName] = (commitsByRepo[d.repoName] ?? 0) + d.commitCount;
       authors[key] = {
         ...existing,
         // Keep the most recent name (may have changed)
@@ -44,6 +46,7 @@ export function mergeDiscoveredAuthors(
         lastSeen: d.date > existing.lastSeen ? d.date : existing.lastSeen,
         reposSeenIn: [...reposSet],
         commitCount: existing.commitCount + d.commitCount,
+        commitsByRepo,
       };
     } else {
       // New author
@@ -55,10 +58,35 @@ export function mergeDiscoveredAuthors(
         lastSeen: d.date,
         reposSeenIn: [d.repoName],
         commitCount: d.commitCount,
+        commitsByRepo: { [d.repoName]: d.commitCount },
       };
     }
   }
 
+  return { ...registry, authors };
+}
+
+/**
+ * Remove one repo's share from every author's commit count, for a forced rescan of
+ * that repo: the rescan adds the share back, so counts stop doubling (#116).
+ * Authors with no recorded share for the repo (rows written before shares existed)
+ * are left alone.
+ */
+export function subtractRepoFromRegistry(
+  registry: AuthorRegistry,
+  repoName: string,
+): AuthorRegistry {
+  const authors = { ...registry.authors };
+  for (const [key, author] of Object.entries(authors)) {
+    const share = author.commitsByRepo?.[repoName];
+    if (share === undefined) continue;
+    const { [repoName]: _removed, ...rest } = author.commitsByRepo ?? {};
+    authors[key] = {
+      ...author,
+      commitCount: Math.max(0, author.commitCount - share),
+      commitsByRepo: rest,
+    };
+  }
   return { ...registry, authors };
 }
 

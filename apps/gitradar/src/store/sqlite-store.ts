@@ -10,6 +10,7 @@ import type {
   ScanState,
   UserWeekRepoRecord,
 } from '../types/schema.js';
+import { subtractRepoFromRegistry } from './author-registry.js';
 import { getDataDir } from './paths.js';
 
 /**
@@ -162,7 +163,9 @@ function ensureSchema(db: Database): void {
       last_scan_date TEXT NOT NULL,
       recent_hashes TEXT NOT NULL DEFAULT '[]',
       record_count INTEGER NOT NULL DEFAULT 0,
-      recent_pr_hashes TEXT NOT NULL DEFAULT '[]'
+      recent_pr_hashes TEXT NOT NULL DEFAULT '[]',
+      last_tip TEXT,
+      last_pr_tip TEXT
     );
 
     CREATE TABLE IF NOT EXISTS authors (
@@ -175,7 +178,8 @@ function ensureSchema(db: Database): void {
       first_seen TEXT NOT NULL,
       last_seen TEXT NOT NULL,
       repos_seen_in TEXT NOT NULL DEFAULT '[]',
-      commit_count INTEGER NOT NULL DEFAULT 0
+      commit_count INTEGER NOT NULL DEFAULT 0,
+      commits_by_repo TEXT
     );
 
     CREATE TABLE IF NOT EXISTS meta (
@@ -190,6 +194,22 @@ function ensureSchema(db: Database): void {
   migrateRecordsActiveDayMask(db);
   migrateScorecardColumns(db);
   migrateEnrichmentRenames(db);
+  migrateAuthorShares(db);
+}
+
+/** Add the per-repo commit shares column to authors if missing (#116). */
+function migrateAuthorShares(db: Database): void {
+  const cols = (db.prepare('PRAGMA table_info(authors)').all() as Array<{ name: string }>).map(
+    (c) => c.name,
+  );
+  if (!cols.includes('commits_by_repo')) {
+    db.exec('ALTER TABLE authors ADD COLUMN commits_by_repo TEXT;');
+  }
+  const ss = (db.prepare('PRAGMA table_info(scan_state)').all() as Array<{ name: string }>).map(
+    (c) => c.name,
+  );
+  if (!ss.includes('last_tip')) db.exec('ALTER TABLE scan_state ADD COLUMN last_tip TEXT;');
+  if (!ss.includes('last_pr_tip')) db.exec('ALTER TABLE scan_state ADD COLUMN last_pr_tip TEXT;');
 }
 
 /**
@@ -1116,6 +1136,8 @@ export function loadScanStateSQL(): ScanState {
     recent_hashes: string;
     record_count: number;
     recent_pr_hashes: string;
+    last_tip: string | null;
+    last_pr_tip: string | null;
   }>;
 
   const repos: ScanState['repos'] = {};
@@ -1126,6 +1148,8 @@ export function loadScanStateSQL(): ScanState {
       recentHashes: JSON.parse(row.recent_hashes) as string[],
       recordCount: row.record_count,
       recentPrHashes: JSON.parse(row.recent_pr_hashes || '[]') as string[],
+      lastTip: row.last_tip ?? undefined,
+      lastPrTip: row.last_pr_tip ?? undefined,
     };
   }
 
@@ -1135,14 +1159,16 @@ export function loadScanStateSQL(): ScanState {
 export function saveScanStateSQL(state: ScanState): void {
   const db = getDB();
   const upsert = db.prepare(`
-    INSERT INTO scan_state (repo, last_hash, last_scan_date, recent_hashes, record_count, recent_pr_hashes)
-    VALUES (@repo, @last_hash, @last_scan_date, @recent_hashes, @record_count, @recent_pr_hashes)
+    INSERT INTO scan_state (repo, last_hash, last_scan_date, recent_hashes, record_count, recent_pr_hashes, last_tip, last_pr_tip)
+    VALUES (@repo, @last_hash, @last_scan_date, @recent_hashes, @record_count, @recent_pr_hashes, @last_tip, @last_pr_tip)
     ON CONFLICT (repo) DO UPDATE SET
       last_hash = excluded.last_hash,
       last_scan_date = excluded.last_scan_date,
       recent_hashes = excluded.recent_hashes,
       record_count = excluded.record_count,
-      recent_pr_hashes = excluded.recent_pr_hashes
+      recent_pr_hashes = excluded.recent_pr_hashes,
+      last_tip = excluded.last_tip,
+      last_pr_tip = excluded.last_pr_tip
   `);
 
   const saveAll = db.transaction((repos: Record<string, ScanState['repos'][string]>) => {
@@ -1154,6 +1180,8 @@ export function saveScanStateSQL(state: ScanState): void {
         recent_hashes: JSON.stringify(rs.recentHashes),
         record_count: rs.recordCount,
         recent_pr_hashes: JSON.stringify(rs.recentPrHashes ?? []),
+        last_tip: rs.lastTip ?? null,
+        last_pr_tip: rs.lastPrTip ?? null,
       });
     }
   });
@@ -1164,14 +1192,16 @@ export function saveScanStateSQL(state: ScanState): void {
 export function updateRepoScanStateSQL(repoName: string, rs: ScanState['repos'][string]): void {
   const db = getDB();
   db.prepare(`
-    INSERT INTO scan_state (repo, last_hash, last_scan_date, recent_hashes, record_count, recent_pr_hashes)
-    VALUES (@repo, @last_hash, @last_scan_date, @recent_hashes, @record_count, @recent_pr_hashes)
+    INSERT INTO scan_state (repo, last_hash, last_scan_date, recent_hashes, record_count, recent_pr_hashes, last_tip, last_pr_tip)
+    VALUES (@repo, @last_hash, @last_scan_date, @recent_hashes, @record_count, @recent_pr_hashes, @last_tip, @last_pr_tip)
     ON CONFLICT (repo) DO UPDATE SET
       last_hash = excluded.last_hash,
       last_scan_date = excluded.last_scan_date,
       recent_hashes = excluded.recent_hashes,
       record_count = excluded.record_count,
-      recent_pr_hashes = excluded.recent_pr_hashes
+      recent_pr_hashes = excluded.recent_pr_hashes,
+      last_tip = excluded.last_tip,
+      last_pr_tip = excluded.last_pr_tip
   `).run({
     repo: repoName,
     last_hash: rs.lastHash,
@@ -1179,6 +1209,8 @@ export function updateRepoScanStateSQL(repoName: string, rs: ScanState['repos'][
     recent_hashes: JSON.stringify(rs.recentHashes),
     record_count: rs.recordCount,
     recent_pr_hashes: JSON.stringify(rs.recentPrHashes ?? []),
+    last_tip: rs.lastTip ?? null,
+    last_pr_tip: rs.lastPrTip ?? null,
   });
 }
 
@@ -1202,6 +1234,7 @@ export function loadAuthorRegistrySQL(): AuthorRegistry {
     last_seen: string;
     repos_seen_in: string;
     commit_count: number;
+    commits_by_repo: string | null;
   }>;
 
   const authors: Record<string, DiscoveredAuthor> = {};
@@ -1217,6 +1250,9 @@ export function loadAuthorRegistrySQL(): AuthorRegistry {
       lastSeen: row.last_seen,
       reposSeenIn: JSON.parse(row.repos_seen_in) as string[],
       commitCount: row.commit_count,
+      commitsByRepo: row.commits_by_repo
+        ? (JSON.parse(row.commits_by_repo) as Record<string, number>)
+        : undefined,
     };
   }
 
@@ -1226,8 +1262,8 @@ export function loadAuthorRegistrySQL(): AuthorRegistry {
 export function saveAuthorRegistrySQL(registry: AuthorRegistry): void {
   const db = getDB();
   const upsert = db.prepare(`
-    INSERT INTO authors (email, name, identifier, github_handle, org, team, first_seen, last_seen, repos_seen_in, commit_count)
-    VALUES (@email, @name, @identifier, @github_handle, @org, @team, @first_seen, @last_seen, @repos_seen_in, @commit_count)
+    INSERT INTO authors (email, name, identifier, github_handle, org, team, first_seen, last_seen, repos_seen_in, commit_count, commits_by_repo)
+    VALUES (@email, @name, @identifier, @github_handle, @org, @team, @first_seen, @last_seen, @repos_seen_in, @commit_count, @commits_by_repo)
     ON CONFLICT (email) DO UPDATE SET
       name = excluded.name,
       identifier = COALESCE(excluded.identifier, authors.identifier),
@@ -1237,7 +1273,8 @@ export function saveAuthorRegistrySQL(registry: AuthorRegistry): void {
       first_seen = MIN(authors.first_seen, excluded.first_seen),
       last_seen = MAX(authors.last_seen, excluded.last_seen),
       repos_seen_in = excluded.repos_seen_in,
-      commit_count = excluded.commit_count
+      commit_count = excluded.commit_count,
+      commits_by_repo = excluded.commits_by_repo
   `);
 
   const saveAll = db.transaction((authors: Record<string, DiscoveredAuthor>) => {
@@ -1253,11 +1290,72 @@ export function saveAuthorRegistrySQL(registry: AuthorRegistry): void {
         last_seen: a.lastSeen,
         repos_seen_in: JSON.stringify(a.reposSeenIn),
         commit_count: a.commitCount,
+        commits_by_repo: a.commitsByRepo ? JSON.stringify(a.commitsByRepo) : null,
       });
     }
   });
 
   saveAll(registry.authors);
+}
+
+/** Drop one repo's share from every author's commit count before that repo is re-walked (#116). */
+export function subtractRepoFromAuthorCounts(repoName: string): void {
+  saveAuthorRegistrySQL(subtractRepoFromRegistry(loadAuthorRegistrySQL(), repoName));
+}
+
+// ── Scan lock (#111) ────────────────────────────────────────────────────────
+
+export class ScanInProgressError extends Error {
+  constructor(
+    public readonly pid: number,
+    public readonly startedAt: string,
+  ) {
+    super(`a scan is already in progress (pid ${pid}, since ${startedAt})`);
+    this.name = 'ScanInProgressError';
+  }
+}
+
+/** A holder older than this is assumed hung even if its pid is alive. */
+const SCAN_LOCK_MAX_AGE_MS = 2 * 60 * 60 * 1000;
+
+function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+/**
+ * Take the single scan lock, or throw `ScanInProgressError`. Two overlapping scans
+ * both read the old cursor and both insert, doubling every commit (#111). The lock
+ * is a `meta` row taken under `BEGIN IMMEDIATE`; a row left by a dead or ancient
+ * process is reclaimed.
+ */
+export function acquireScanLock(): void {
+  const db = getDB();
+  const take = db.transaction(() => {
+    const row = db.prepare("SELECT value FROM meta WHERE key = 'scan_lock'").get() as
+      | { value: string }
+      | undefined;
+    if (row) {
+      const held = JSON.parse(row.value) as { pid: number; startedAt: string };
+      const age = Date.now() - new Date(held.startedAt).getTime();
+      // Not re-entrant: this process holding it is as much "in progress" as any other.
+      if ((held.pid === process.pid || pidAlive(held.pid)) && age < SCAN_LOCK_MAX_AGE_MS) {
+        throw new ScanInProgressError(held.pid, held.startedAt);
+      }
+    }
+    db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('scan_lock', ?)").run(
+      JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }),
+    );
+  });
+  take.immediate();
+}
+
+export function releaseScanLock(): void {
+  getDB().prepare("DELETE FROM meta WHERE key = 'scan_lock'").run();
 }
 
 // ── Record management ───────────────────────────────────────────────────────

@@ -596,6 +596,26 @@ describe('scanRepo', () => {
     expect(result.newHashes).toContain('bbb222');
   });
 
+  it('walks HEAD ^<lastTip> when sinceRef is set: no date filter, no chunking (#79)', async () => {
+    spawnQueue.push('');
+    await scanRepo('/repos/frontend', {
+      repoName: 'frontend',
+      group: 'web',
+      authorMap: makeAuthorMap(),
+      recentHashes: new Set(),
+      sinceRef: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      chunkMonths: 3,
+    });
+    expect(spawnCalls).toHaveLength(1);
+    const args = spawnCalls[0].args;
+    expect(args.slice(-3)).toEqual([
+      '--end-of-options',
+      'HEAD',
+      '^aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    ]);
+    expect(args.some((a) => a.startsWith('--since=') || a.startsWith('--until='))).toBe(false);
+  });
+
   it('does not chunk when since is set (incremental scan)', async () => {
     spawnQueue.push('');
 
@@ -613,7 +633,7 @@ describe('scanRepo', () => {
     expect(spawnCalls[0].args).toContain('--since=2026-02-01');
   });
 
-  it('continues scanning remaining chunks when one chunk errors', async () => {
+  it('reports a failed scan when a chunk errors, so the cursor is not advanced past the gap (#112)', async () => {
     spawnQueue.push(new Error('transient failure'));
     spawnQueue.push(
       '\x00ccc333\x00alice@acme.com\x00Alice Johnson\x002024-06-15T10:00:00Z\n2\t0\tsrc/c.ts',
@@ -630,10 +650,64 @@ describe('scanRepo', () => {
       chunkMonths: 3,
     });
 
-    // Should still get records from the successful chunk
-    expect(result.commitCount).toBe(1);
-    expect(result.newHashes).toContain('ccc333');
+    // A skipped chunk would never be retried once the cursor moved: the whole scan is failed.
+    expect(result.failed).toMatch(/unexpected git error/);
+    expect(result.newRecords).toEqual([]);
+    expect(result.newHashes).toEqual([]);
+    expect(result.commitCount).toBe(0);
     consoleSpy.mockRestore();
+  });
+
+  it('reports a failed scan on a fatal git error (#112)', async () => {
+    spawnQueue.push(new Error('fatal: not a git repository'));
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const result = await scanRepo('/repos/frontend', {
+      repoName: 'frontend',
+      group: 'web',
+      authorMap: makeAuthorMap(),
+      recentHashes: new Set(),
+      since: '2026-02-01',
+    });
+    expect(result.failed).toBe('not a git repository');
+    expect(result.newRecords).toEqual([]);
+    errSpy.mockRestore();
+  });
+
+  it('an expected error (empty repo) is not a failure', async () => {
+    spawnQueue.push(new Error("fatal: your current branch 'main' does not have any commits yet"));
+    const result = await scanRepo('/repos/frontend', {
+      repoName: 'frontend',
+      group: 'web',
+      authorMap: makeAuthorMap(),
+      recentHashes: new Set(),
+      since: '2026-02-01',
+    });
+    expect(result.failed).toBeUndefined();
+    expect(result.commitCount).toBe(0);
+  });
+
+  it('returns chunked hashes newest-first so the dedup window keeps the newest commits (#110)', async () => {
+    // Chunks are walked oldest-first; git prints newest-first inside each chunk.
+    spawnQueue.push(
+      [
+        '\x00aaa002\x00alice@acme.com\x00Alice Johnson\x002024-02-15T10:00:00Z\n1\t0\tsrc/a.ts',
+        '\x00aaa001\x00alice@acme.com\x00Alice Johnson\x002024-01-15T10:00:00Z\n1\t0\tsrc/a.ts',
+      ].join('\n'),
+    );
+    spawnQueue.push(
+      [
+        '\x00bbb002\x00alice@acme.com\x00Alice Johnson\x002024-05-15T10:00:00Z\n1\t0\tsrc/b.ts',
+        '\x00bbb001\x00alice@acme.com\x00Alice Johnson\x002024-04-15T10:00:00Z\n1\t0\tsrc/b.ts',
+      ].join('\n'),
+    );
+    const result = await scanRepo('/repos/frontend', {
+      repoName: 'frontend',
+      group: 'web',
+      authorMap: makeAuthorMap(),
+      recentHashes: new Set(),
+      chunkMonths: 3,
+    });
+    expect(result.newHashes).toEqual(['bbb002', 'bbb001', 'aaa002', 'aaa001']);
   });
 
   it('collects rework inputs for counted commits that delete lines', async () => {
@@ -702,10 +776,11 @@ describe('generateDateChunks', () => {
     const chunks = generateDateChunks(start, end, 3);
 
     expect(chunks).toHaveLength(4);
-    expect(chunks[0].since).toBe('2025-01-01');
-    expect(chunks[0].until).toBe('2025-04-01');
-    expect(chunks[3].since).toBe('2025-10-01');
-    expect(chunks[3].until).toBe('2026-01-01');
+    // Full timestamps: a bare date expands to "that day at the current clock time" (#79).
+    expect(chunks[0].since).toBe('2025-01-01T00:00:00.000Z');
+    expect(chunks[0].until).toBe('2025-04-01T00:00:00.000Z');
+    expect(chunks[3].since).toBe('2025-10-01T00:00:00.000Z');
+    expect(chunks[3].until).toBe('2026-01-01T00:00:00.000Z');
   });
 
   it('handles range shorter than chunk size', () => {
@@ -714,7 +789,7 @@ describe('generateDateChunks', () => {
     const chunks = generateDateChunks(start, end, 3);
 
     expect(chunks).toHaveLength(1);
-    expect(chunks[0].since).toBe('2026-01-01');
+    expect(chunks[0].since).toBe('2026-01-01T00:00:00.000Z');
   });
 
   it('returns empty array when start equals end', () => {

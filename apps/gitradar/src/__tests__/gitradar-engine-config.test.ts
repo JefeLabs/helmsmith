@@ -23,6 +23,18 @@ vi.mock('../store/sqlite-store.js', () => ({
   saveAuthorRegistrySQL: vi.fn(),
   saveEnrichmentBatchSQL: vi.fn(),
   saveScanStateSQL: vi.fn(),
+  subtractRepoFromAuthorCounts: vi.fn(),
+  updateRepoScanStateSQL: vi.fn(),
+  acquireScanLock: vi.fn(),
+  releaseScanLock: vi.fn(),
+  ScanInProgressError: class ScanInProgressError extends Error {
+    constructor(
+      public readonly pid: number,
+      public readonly startedAt: string,
+    ) {
+      super(`a scan is already in progress (pid ${pid}, since ${startedAt})`);
+    }
+  },
   upsertRecords: vi.fn(),
 }));
 

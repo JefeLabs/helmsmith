@@ -7,6 +7,7 @@ import {
   getIdentifierPrefixes,
   getUnassignedAuthors,
   mergeDiscoveredAuthors,
+  subtractRepoFromRegistry,
 } from '../store/author-registry.js';
 import type { AuthorRegistry } from '../types/schema.js';
 
@@ -316,5 +317,55 @@ describe('getIdentifierPrefixes', () => {
     expect(prefixes.get('AC')).toEqual({ count: 2, assigned: 1, unassigned: 1 });
     expect(prefixes.get('IN')).toEqual({ count: 1, assigned: 0, unassigned: 1 });
     expect(prefixes.has('D')).toBeFalsy(); // no identifier
+  });
+});
+
+// ── Per-repo commit shares (#116) ──────────────────────────────────────────
+
+describe('per-repo commit shares (#116)', () => {
+  const d = (repoName: string, commitCount: number) => ({
+    email: 'ann@example.com',
+    name: 'Ann',
+    repoName,
+    commitCount,
+    date: '2026-02-01T00:00:00Z',
+  });
+
+  it('mergeDiscoveredAuthors tracks the share of each repo', () => {
+    let reg = mergeDiscoveredAuthors({ version: 1, authors: {} }, [d('gamma', 100)]);
+    reg = mergeDiscoveredAuthors(reg, [d('delta', 5)]);
+    reg = mergeDiscoveredAuthors(reg, [d('gamma', 2)]); // incremental scan of gamma
+    const ann = reg.authors['ann@example.com'];
+    expect(ann.commitCount).toBe(107);
+    expect(ann.commitsByRepo).toEqual({ gamma: 102, delta: 5 });
+  });
+
+  it('subtractRepoFromRegistry removes a repo share before that repo is re-walked', () => {
+    let reg = mergeDiscoveredAuthors({ version: 1, authors: {} }, [d('gamma', 100), d('delta', 5)]);
+    reg = subtractRepoFromRegistry(reg, 'gamma');
+    const ann = reg.authors['ann@example.com'];
+    expect(ann.commitCount).toBe(5);
+    expect(ann.commitsByRepo).toEqual({ delta: 5 });
+    // a forced rescan then adds the repo back: the count is the truth again, not doubled
+    reg = mergeDiscoveredAuthors(reg, [d('gamma', 100)]);
+    expect(reg.authors['ann@example.com'].commitCount).toBe(105);
+  });
+
+  it('subtractRepoFromRegistry leaves authors without a recorded share alone (legacy rows)', () => {
+    const reg = {
+      version: 1 as const,
+      authors: {
+        'bob@example.com': {
+          email: 'bob@example.com',
+          name: 'Bob',
+          firstSeen: '2026-01-01',
+          lastSeen: '2026-01-01',
+          reposSeenIn: ['gamma'],
+          commitCount: 7,
+        },
+      },
+    };
+    const out = subtractRepoFromRegistry(reg, 'gamma');
+    expect(out.authors['bob@example.com'].commitCount).toBe(7);
   });
 });
