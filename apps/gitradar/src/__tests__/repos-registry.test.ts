@@ -1,3 +1,4 @@
+import { constants } from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -16,6 +17,7 @@ vi.mock('node:fs/promises', () => ({
   copyFile: vi.fn(),
   mkdir: vi.fn(),
   rename: vi.fn(),
+  rm: vi.fn(),
   writeFile: vi.fn(),
 }));
 
@@ -33,13 +35,14 @@ vi.mock('node:os', () => ({
   homedir: vi.fn(() => '/home/user'),
 }));
 
-import { access, copyFile, readFile, rename, writeFile } from 'node:fs/promises';
+import { access, copyFile, readFile, rename, rm, writeFile } from 'node:fs/promises';
 
 const mockReadFile = vi.mocked(readFile);
 const mockAccess = vi.mocked(access);
 const mockCopyFile = vi.mocked(copyFile);
 const mockRename = vi.mocked(rename);
 const mockWriteFile = vi.mocked(writeFile);
+const mockRm = vi.mocked(rm);
 
 // ── Test Fixtures ──────────────────────────────────────────────────────────
 
@@ -486,22 +489,38 @@ describe('saveReposRegistry (#114)', () => {
     mockAccess.mockResolvedValue(undefined); // file exists
     await saveReposRegistry('/home/user/.agentx/repos.yml', registry);
 
+    // The backup never follows a planted symlink: unlink the old .bak, then create exclusively.
+    expect(mockRm).toHaveBeenCalledWith('/home/user/.agentx/repos.yml.bak', { force: true });
     expect(mockCopyFile).toHaveBeenCalledWith(
       '/home/user/.agentx/repos.yml',
       '/home/user/.agentx/repos.yml.bak',
+      constants.COPYFILE_EXCL,
     );
-    const [tmpPath, content] = mockWriteFile.mock.calls[0];
+    const [tmpPath, content, options] = mockWriteFile.mock.calls[0];
     expect(String(tmpPath)).not.toBe('/home/user/.agentx/repos.yml');
     expect(path.dirname(String(tmpPath))).toBe('/home/user/.agentx');
     expect(String(content)).toContain('workspaces:');
+    // The temp file is created exclusively under an unpredictable name.
+    expect(options).toMatchObject({ flag: 'wx' });
+    expect(path.basename(String(tmpPath))).toMatch(/^\.repos\.yml\.[A-Za-z0-9_-]{12,}\.tmp$/);
     expect(mockRename).toHaveBeenCalledWith(tmpPath, '/home/user/.agentx/repos.yml');
     // order: backup, write, rename
+    expect(mockRm.mock.invocationCallOrder[0]).toBeLessThan(
+      mockCopyFile.mock.invocationCallOrder[0],
+    );
     expect(mockCopyFile.mock.invocationCallOrder[0]).toBeLessThan(
       mockWriteFile.mock.invocationCallOrder[0],
     );
     expect(mockWriteFile.mock.invocationCallOrder[0]).toBeLessThan(
       mockRename.mock.invocationCallOrder[0],
     );
+  });
+
+  it('uses a different temp name on every write', async () => {
+    mockAccess.mockRejectedValue(new Error('ENOENT'));
+    await saveReposRegistry('/home/user/.agentx/repos.yml', registry);
+    await saveReposRegistry('/home/user/.agentx/repos.yml', registry);
+    expect(mockWriteFile.mock.calls[0][0]).not.toBe(mockWriteFile.mock.calls[1][0]);
   });
 
   it('takes no backup when there is nothing to back up', async () => {

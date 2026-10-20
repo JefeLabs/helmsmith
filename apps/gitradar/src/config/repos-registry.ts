@@ -1,10 +1,11 @@
-import { access, copyFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import * as yaml from 'js-yaml';
 import { ZodError } from 'zod';
 import { expandTilde } from '../store/paths.js';
 import { type ReposRegistry, ReposRegistrySchema, type WorkspaceRepo } from '../types/schema.js';
+import { writeFileAtomically } from './atomic-write.js';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -178,8 +179,8 @@ export async function createWorkspace(
 /**
  * Save a repos registry back to a YAML file.
  * Creates parent directories if needed. Keeps the previous file as `<file>.bak` and
- * writes through a temp file + rename, so a crash mid-write cannot leave a truncated
- * registry behind (#114).
+ * writes through an exclusively created temp file + rename (see `writeFileAtomically`),
+ * so a crash mid-write cannot leave a truncated registry behind (#114).
  */
 export async function saveReposRegistry(
   registryPath: string,
@@ -192,12 +193,7 @@ export async function saveReposRegistry(
     noRefs: true,
     quoteStyle: 'double',
   });
-  if (await fileExists(resolved)) {
-    await copyFile(resolved, `${resolved}.bak`);
-  }
-  const tmp = path.join(path.dirname(resolved), `.${path.basename(resolved)}.${process.pid}.tmp`);
-  await writeFile(tmp, content, 'utf-8');
-  await rename(tmp, resolved);
+  await writeFileAtomically(resolved, content, { backup: await fileExists(resolved) });
 }
 
 /**

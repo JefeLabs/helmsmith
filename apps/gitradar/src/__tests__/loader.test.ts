@@ -8,6 +8,7 @@ vi.mock('node:fs/promises', () => ({
   copyFile: vi.fn(),
   mkdir: vi.fn(),
   rename: vi.fn(),
+  rm: vi.fn(),
   writeFile: vi.fn(),
 }));
 
@@ -21,13 +22,15 @@ vi.mock('../store/paths.js', () => ({
   }),
 }));
 
-import { access, copyFile, readFile, rename, writeFile } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { access, copyFile, readFile, rename, rm, writeFile } from 'node:fs/promises';
 
 const mockReadFile = vi.mocked(readFile);
 const mockAccess = vi.mocked(access);
 const mockCopyFile = vi.mocked(copyFile);
 const mockRename = vi.mocked(rename);
 const mockWriteFile = vi.mocked(writeFile);
+const mockRm = vi.mocked(rm);
 
 const validYaml = `
 orgs:
@@ -253,9 +256,17 @@ describe('saveConfig (#113)', () => {
     mockReadFile.mockResolvedValue(COMMENTED);
     mockAccess.mockResolvedValue(undefined);
     await saveConfig(undefined, { orgs: [acme, beta] });
-    expect(mockCopyFile).toHaveBeenCalledWith(CONFIG_PATH, `${CONFIG_PATH}.bak`);
-    const tmp = String(mockWriteFile.mock.calls[0][0]);
+    expect(mockRm).toHaveBeenCalledWith(`${CONFIG_PATH}.bak`, { force: true });
+    expect(mockCopyFile).toHaveBeenCalledWith(
+      CONFIG_PATH,
+      `${CONFIG_PATH}.bak`,
+      constants.COPYFILE_EXCL,
+    );
+    const [tmpPath, , options] = mockWriteFile.mock.calls[0];
+    const tmp = String(tmpPath);
     expect(tmp).not.toBe(CONFIG_PATH);
+    expect(options).toMatchObject({ flag: 'wx' });
+    expect(tmp).toMatch(/\/\.config\.yml\.[A-Za-z0-9_-]{12,}\.tmp$/);
     expect(mockRename).toHaveBeenCalledWith(tmp, CONFIG_PATH);
   });
 

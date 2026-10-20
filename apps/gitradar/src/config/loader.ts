@@ -1,10 +1,11 @@
-import { access, copyFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import * as yaml from 'js-yaml';
 import { Document, isMap, isSeq, parseDocument, YAMLSeq } from 'yaml';
 import { ZodError } from 'zod';
 import { getConfigPath } from '../store/paths.js';
 import { Config, ConfigSchema, type Org, OrgSchema } from '../types/schema.js';
+import { writeFileAtomically } from './atomic-write.js';
 
 /** config.yml does not exist. Callers may start from an empty config; any other load error means "do not write" (#113). */
 export class ConfigNotFoundError extends Error {
@@ -143,13 +144,7 @@ export async function saveConfig(
   if (patch.settings !== undefined) doc.set('settings', doc.createNode(patch.settings));
 
   await mkdir(path.dirname(resolvedPath), { recursive: true });
-  if (await fileExists(resolvedPath)) {
-    await copyFile(resolvedPath, `${resolvedPath}.bak`);
-  }
-  const tmp = path.join(
-    path.dirname(resolvedPath),
-    `.${path.basename(resolvedPath)}.${process.pid}.tmp`,
-  );
-  await writeFile(tmp, doc.toString({ lineWidth: 120 }), 'utf-8');
-  await rename(tmp, resolvedPath);
+  await writeFileAtomically(resolvedPath, doc.toString({ lineWidth: 120 }), {
+    backup: await fileExists(resolvedPath),
+  });
 }
