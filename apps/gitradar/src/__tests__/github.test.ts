@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -777,6 +777,41 @@ describe('cache read — legacy field names', () => {
 });
 
 // ── Cache key sanitization ──────────────────────────────────────────────────
+
+describe('cache write with skipCache (#74)', () => {
+  let tmpHome: string;
+  const originalOverride = process.env.GITRADAR_HOME;
+
+  beforeEach(async () => {
+    tmpHome = await mkdtemp(join(tmpdir(), 'gitradar-ghskip-'));
+    process.env.GITRADAR_HOME = tmpHome;
+  });
+
+  afterEach(async () => {
+    if (originalOverride === undefined) delete process.env.GITRADAR_HOME;
+    else process.env.GITRADAR_HOME = originalOverride;
+    await rm(tmpHome, { recursive: true, force: true });
+  });
+
+  it('writes nothing to the cache directory when skipCache is true', async () => {
+    const octokit = {
+      graphql: vi.fn().mockResolvedValueOnce({
+        prs: { issueCount: 0, pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] },
+        reviews: { issueCount: 0 },
+      }),
+    };
+    await fetchGitHubMetrics({
+      octokit: octokit as any,
+      owner: 'acme',
+      repo: 'frontend',
+      githubHandle: 'jdoe',
+      since: '2026-03-01',
+      until: '2026-03-07',
+      skipCache: true,
+    });
+    await expect(readdir(join(tmpHome, 'cache'))).rejects.toThrow();
+  });
+});
 
 describe('cache key sanitization', () => {
   it('strips path traversal characters', () => {

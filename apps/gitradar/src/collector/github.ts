@@ -467,7 +467,7 @@ export async function fetchGitHubMetricsBatch(options: {
               since,
               until,
               rateLimiter,
-              skipCache: true,
+              skipCache,
               cacheStats,
             });
             results.push({ handle: githubHandle, metrics: full });
@@ -637,9 +637,11 @@ async function fetchGitHubMetricsStrict(options: SingleFetchOptions): Promise<Gi
   const branchCounts = countBranchTypes(allPRs);
   Object.assign(result, branchCounts);
 
-  // Write to cache
-  const key = cacheKey(owner, repo, githubHandle, since, until);
-  await writeCache(key, result);
+  // Write to cache (never when the caller asked to bypass it — same contract as the batch path)
+  if (!skipCache) {
+    const key = cacheKey(owner, repo, githubHandle, since, until);
+    await writeCache(key, result);
+  }
 
   return result;
 }

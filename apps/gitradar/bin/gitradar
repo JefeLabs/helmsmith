@@ -14,4 +14,8 @@ while [ -L "$self" ]; do
   esac
 done
 dir="$(cd "$(dirname "$self")/.." && pwd)"
-exec "$dir/node_modules/.bin/bun" "$dir/dist/cli.js" "$@"
+# --no-env-file / --config: Bun would otherwise auto-load `.env` and `bunfig.toml`
+# (including `preload` scripts) from the *current directory*, which for gitradar is
+# routinely a cloned repo — i.e. code execution from whatever repo the user is in.
+# The package ships its own empty bunfig.toml so Bun never looks in the cwd.
+exec "$dir/node_modules/.bin/bun" --no-env-file --config="$dir/bunfig.toml" "$dir/dist/cli.js" "$@"

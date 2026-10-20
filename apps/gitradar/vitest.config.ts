@@ -12,6 +12,10 @@ export default defineConfig({
     },
   },
   test: {
+    // Sandbox HOME and GITRADAR_HOME for every test file (#74).
+    setupFiles: ['./src/__tests__/setup-sandbox.ts'],
+    // tests/e2e/** runs under vitest.e2e.config.ts (builds dist first, spawns the bin).
+    include: ['src/**/*.test.ts'],
     // Run test files sequentially to prevent SQLITE_BUSY errors when
     // multiple test suites open the same SQLite databases concurrently.
     pool: 'forks',

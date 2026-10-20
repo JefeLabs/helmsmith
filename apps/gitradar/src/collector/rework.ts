@@ -148,6 +148,9 @@ export async function runRework(inputs: ReworkInput[], opts: ReworkOptions): Pro
             'diff',
             '-U0',
             '--no-color',
+            // Never let a repo's or the environment's diff driver run (#69).
+            '--no-ext-diff',
+            '--no-textconv',
             '--diff-filter=MD',
             `${c.hash}^`,
             c.hash,

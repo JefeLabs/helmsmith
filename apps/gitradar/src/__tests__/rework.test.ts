@@ -176,6 +176,34 @@ describe('runRework', () => {
     );
   });
 
+  it('runs the diff with external diff drivers and textconv disabled (#69)', async () => {
+    mockRaw.mockResolvedValueOnce(DIFF).mockResolvedValueOnce('');
+    await runRework(
+      [
+        {
+          hash: 'c1',
+          authorEmail: 'bob@co.com',
+          authorName: 'Bob',
+          authorDate: '2026-02-18T10:00:00Z',
+          week: '2026-W08',
+          files: [{ path: 'src/a.ts', deletions: 4 }],
+        },
+      ],
+      {
+        repoPath: '/r',
+        repoName: 'web',
+        group: 'default',
+        authorMap: authorMap(),
+        windowDays: 21,
+        concurrency: 1,
+      },
+    );
+    const diffArgs = mockRaw.mock.calls[0][0] as string[];
+    expect(diffArgs[0]).toBe('diff');
+    expect(diffArgs).toContain('--no-ext-diff');
+    expect(diffArgs).toContain('--no-textconv');
+  });
+
   it('counts self-rework when the deleter is the original author', async () => {
     const t = Date.parse('2026-02-18T10:00:00Z') / 1000 - 86400;
     mockRaw

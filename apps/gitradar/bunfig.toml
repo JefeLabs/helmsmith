@@ -1,0 +1,2 @@
+# Intentionally empty. bin/gitradar passes `--config=<this file>` so Bun never
+# reads a bunfig.toml (and its `preload` scripts) from the current directory.
