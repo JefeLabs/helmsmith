@@ -1,5 +1,4 @@
 import { spawn } from 'node:child_process';
-import { createInterface } from 'node:readline';
 import type { UserWeekRepoRecord } from '../types/schema.js';
 import type { AuthorMap, ResolvedAuthor } from './author-map.js';
 import { resolveAuthor } from './author-map.js';
@@ -200,13 +199,53 @@ export function parseConventionalCommit(subject: string): ParsedIntent {
 }
 
 /**
- * Detect whether a line is a commit header (hash|email|name|date|subject).
- * A header line has 5+ pipe-separated parts and the first part is a hex hash.
- * Falls back to 4-part headers for backwards compatibility.
+ * Header lines are NUL-delimited: `\0hash\0email\0name\0date\0subject` (#70).
+ *
+ * Git lets an author name contain `|`, `\r` and `\t`, so a pipe-delimited header split
+ * on `|` shifted fields (and crashed on the date), and a `\r` in a name let one commit
+ * forge a second header for any member. NUL cannot appear inside any field, raw/numstat
+ * lines never start with NUL, and lines are split on `\n` only.
  */
+export const GIT_LOG_FORMAT = '--format=%x00%H%x00%ae%x00%an%x00%aI%x00%s';
+
 function isHeaderLine(line: string): boolean {
-  const parts = line.split('|');
-  return parts.length >= 4 && /^[0-9a-f]{6,40}$/.test(parts[0]);
+  return line.startsWith('\x00');
+}
+
+/** Replace control characters (a `\r` or `\t` smuggled into a name) with spaces. */
+function sanitizeField(value: string): string {
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: that is the point
+  return value.replace(/[\x00-\x1f\x7f]/g, ' ').trim();
+}
+
+interface ParsedHeader {
+  hash: string;
+  email: string;
+  name: string;
+  date: string;
+  subject: string;
+}
+
+/**
+ * Parse a NUL-delimited header line. Returns null (with one warning line) when the
+ * hash is not hex or the date does not parse; the caller then ignores the commit's
+ * diff lines instead of attaching them to the previous commit.
+ */
+function parseHeaderLine(line: string): ParsedHeader | null {
+  const parts = line.split('\x00');
+  // parts[0] is the empty string before the leading NUL
+  const hash = parts[1] ?? '';
+  const email = sanitizeField(parts[2] ?? '');
+  const name = sanitizeField(parts[3] ?? '');
+  const date = (parts[4] ?? '').trim();
+  const subject = sanitizeField(parts.slice(5).join('\x00'));
+  if (!/^[0-9a-f]{6,40}$/.test(hash) || Number.isNaN(Date.parse(date))) {
+    console.log(
+      `  Warning: skipping commit with an unparseable header (${hash || '?'}, date "${date}")`,
+    );
+    return null;
+  }
+  return { hash, email, name, date, subject };
 }
 
 /** Raw diff line: :old_mode new_mode old_hash new_hash STATUS\tpath */
@@ -263,38 +302,20 @@ export function parseGitLogOutput(output: string): ParsedCommit[] {
       // Push the previous commit if any
       pushCurrent();
 
-      const parts = trimmed.split('|');
-      // Format: hash|email|name|date|subject (subject may contain |)
-      // Backwards-compatible with old 4-field format (hash|email|name|date)
-      const hash = parts[0];
-      const email = parts[1];
-      let name: string;
-      let date: string;
-      let subject: string;
-      if (parts.length >= 5) {
-        // New format: hash|email|name|date|subject...
-        name = parts[2];
-        date = parts[3];
-        subject = parts.slice(4).join('|'); // subject may contain |
-      } else {
-        // Old format: hash|email|name|date (name may contain |)
-        name = parts.slice(2, -1).join('|');
-        date = parts[parts.length - 1];
-        subject = '';
+      const head = parseHeaderLine(trimmed);
+      statusMap = new Map();
+      if (!head) {
+        current = null; // skip this commit's diff lines too
+        continue;
       }
-      const parsed = parseConventionalCommit(subject);
+      const parsed = parseConventionalCommit(head.subject);
       current = {
-        hash,
-        email,
-        name,
-        date,
-        subject,
+        ...head,
         intent: parsed.intent,
         scope: parsed.scope,
         breaking: parsed.breaking,
         files: [],
       };
-      statusMap = new Map();
       continue;
     }
 
@@ -373,34 +394,20 @@ export class GitLogLineParser {
     if (isHeaderLine(trimmed)) {
       const completed = this.finalizeCurrent();
 
-      const parts = trimmed.split('|');
-      const hash = parts[0];
-      const email = parts[1];
-      let name: string;
-      let date: string;
-      let subject: string;
-      if (parts.length >= 5) {
-        name = parts[2];
-        date = parts[3];
-        subject = parts.slice(4).join('|');
-      } else {
-        name = parts.slice(2, -1).join('|');
-        date = parts[parts.length - 1];
-        subject = '';
+      const head = parseHeaderLine(trimmed);
+      this.statusMap = new Map();
+      if (!head) {
+        this.current = null; // skip this commit's diff lines too
+        return completed;
       }
-      const parsed = parseConventionalCommit(subject);
+      const parsed = parseConventionalCommit(head.subject);
       this.current = {
-        hash,
-        email,
-        name,
-        date,
-        subject,
+        ...head,
         intent: parsed.intent,
         scope: parsed.scope,
         breaking: parsed.breaking,
         files: [],
       };
-      this.statusMap = new Map();
       return completed;
     }
 
@@ -515,11 +522,22 @@ async function streamGitLog(
       ignoredCount += outcome.ignored;
     };
 
-    const rl = createInterface({ input: child.stdout!, crlfDelay: Infinity });
-
-    rl.on('line', (line) => {
+    // Split on `\n` only. readline would also split on a lone `\r`, which let a `\r`
+    // inside an author name start a forged commit header (#70).
+    let pending = '';
+    const feed = (line: string) => {
       const commit = parser.processLine(line);
       if (commit) handleCommit(commit);
+    };
+    child.stdout!.setEncoding('utf8');
+    child.stdout!.on('data', (chunk: string) => {
+      pending += chunk;
+      let nl = pending.indexOf('\n');
+      while (nl !== -1) {
+        feed(pending.slice(0, nl));
+        pending = pending.slice(nl + 1);
+        nl = pending.indexOf('\n');
+      }
     });
 
     child.stderr!.on('data', (chunk: Buffer) => {
@@ -527,11 +545,14 @@ async function streamGitLog(
     });
 
     child.on('error', (err) => {
-      rl.close();
       reject(err);
     });
 
     child.on('close', (code) => {
+      if (pending) {
+        feed(pending);
+        pending = '';
+      }
       // Flush the last commit from the parser
       const last = parser.flush();
       if (last) handleCommit(last);
@@ -897,7 +918,7 @@ export async function scanRepo(repoPath: string, options: ScanOptions): Promise<
   };
 
   for (const range of ranges) {
-    const args = ['log', '--raw', '--numstat', '--no-merges', '--format=%H|%ae|%an|%aI|%s'];
+    const args = ['log', '--raw', '--numstat', '--no-merges', GIT_LOG_FORMAT];
     if (range.since) args.splice(1, 0, `--since=${range.since}`);
     if (range.until) args.splice(1, 0, `--until=${range.until}`);
 

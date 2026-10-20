@@ -108,6 +108,9 @@ importers:
       simple-git:
         specifier: ^3.36.0
         version: 3.36.0
+      yaml:
+        specifier: 2.9.0
+        version: 2.9.0
       zod:
         specifier: ^4.5.4
         version: 4.5.4
@@ -3579,6 +3582,7 @@ packages:
 
   bun@1.4.2:
     resolution: {integrity: sha512-TrSXo6HJfIEaczpb3kjX82I2pL47vK1QUNmHRCUdz9IzaOwa9lzOXSWwu2l18YHE3sNfGRapVLd4nNm+22vVVA==}
+    cpu: [arm64, x64]
     os: [darwin, linux, android, freebsd, win32]
     hasBin: true
 

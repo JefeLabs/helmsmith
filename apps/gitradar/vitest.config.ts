@@ -29,6 +29,7 @@ export default defineConfig({
       'src/__tests__/sqlite-active-days.test.ts',
       'src/__tests__/functional.test.ts',
       'src/__tests__/sqlite-scorecard.test.ts',
+      'src/__tests__/sqlite-reset.test.ts',
     ],
   },
 });

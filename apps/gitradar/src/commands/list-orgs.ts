@@ -1,4 +1,4 @@
-import { loadConfig } from '../config/loader.js';
+import { ConfigNotFoundError, loadConfig } from '../config/loader.js';
 
 export interface ListOrgsOptions {
   config?: string;
@@ -10,13 +10,18 @@ export async function listOrgs(options: ListOrgsOptions = {}): Promise<void> {
   let config;
   try {
     config = await loadConfig(options.config);
-  } catch {
-    console.log('No config found. Run "gitradar add-org" to create one.');
+  } catch (err) {
+    if (err instanceof ConfigNotFoundError) {
+      console.log('No config found. Run "gitradar init", then "gitradar org add" to create one.');
+      return;
+    }
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exitCode = 1;
     return;
   }
 
   if (config.orgs.length === 0) {
-    console.log('No organizations configured. Run "gitradar add-org" to create one.');
+    console.log('No organizations configured. Run "gitradar org add" to create one.');
     return;
   }
 

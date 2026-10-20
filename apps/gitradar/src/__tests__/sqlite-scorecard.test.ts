@@ -733,7 +733,7 @@ describe('getDB() on a corrupt database file', () => {
   it('throws a friendly error naming the path and "gitradar --reset"', async () => {
     await writeFile(store.getSQLitePath(), 'not a sqlite database, just garbage bytes');
 
-    expect(() => store.getDB()).toThrow(/could not be opened .*gitradar --reset/);
+    expect(() => store.getDB()).toThrow(/is corrupt .*gitradar --reset/);
   });
 
   it('closeDB() afterwards does not throw (never-opened DB)', async () => {

@@ -122,7 +122,7 @@ function makeAuthorMap(): AuthorMap {
 describe('parseGitLogOutput', () => {
   it('parses a single commit with numstat lines', () => {
     const output = [
-      'abc123|alice@acme.com|Alice Johnson|2026-02-20T10:00:00Z',
+      '\x00abc123\x00alice@acme.com\x00Alice Johnson\x002026-02-20T10:00:00Z',
       '10\t2\tsrc/index.ts',
       '5\t1\tsrc/utils.ts',
     ].join('\n');
@@ -151,10 +151,10 @@ describe('parseGitLogOutput', () => {
 
   it('parses multiple commits separated by blank lines', () => {
     const output = [
-      'aaa111|alice@acme.com|Alice|2026-02-20T10:00:00Z',
+      '\x00aaa111\x00alice@acme.com\x00Alice\x002026-02-20T10:00:00Z',
       '10\t2\tsrc/a.ts',
       '',
-      'bbb222|bob@acme.com|Bob|2026-02-21T10:00:00Z',
+      '\x00bbb222\x00bob@acme.com\x00Bob\x002026-02-21T10:00:00Z',
       '3\t1\tsrc/b.ts',
     ].join('\n');
 
@@ -166,9 +166,10 @@ describe('parseGitLogOutput', () => {
   });
 
   it('handles binary files (- for insertions/deletions)', () => {
-    const output = ['ccc333|alice@acme.com|Alice|2026-02-22T10:00:00Z', '-\t-\timage.png'].join(
-      '\n',
-    );
+    const output = [
+      '\x00ccc333\x00alice@acme.com\x00Alice\x002026-02-22T10:00:00Z',
+      '-\t-\timage.png',
+    ].join('\n');
 
     const commits = parseGitLogOutput(output);
 
@@ -188,9 +189,9 @@ describe('parseGitLogOutput', () => {
 
   it('handles commits with no file changes', () => {
     const output = [
-      'ddd444|alice@acme.com|Alice|2026-02-23T10:00:00Z',
+      '\x00ddd444\x00alice@acme.com\x00Alice\x002026-02-23T10:00:00Z',
       '',
-      'eee555|bob@acme.com|Bob|2026-02-24T10:00:00Z',
+      '\x00eee555\x00bob@acme.com\x00Bob\x002026-02-24T10:00:00Z',
     ].join('\n');
 
     const commits = parseGitLogOutput(output);
@@ -202,7 +203,7 @@ describe('parseGitLogOutput', () => {
 
   it('handles trailing newline', () => {
     const output = [
-      'fff666|alice@acme.com|Alice|2026-02-25T10:00:00Z',
+      '\x00fff666\x00alice@acme.com\x00Alice\x002026-02-25T10:00:00Z',
       '1\t0\tsrc/file.ts',
       '',
     ].join('\n');
@@ -215,7 +216,7 @@ describe('parseGitLogOutput', () => {
 
   it('parses --raw + --numstat combined output with file status', () => {
     const output = [
-      'abc123|alice@acme.com|Alice|2026-02-20T10:00:00Z',
+      '\x00abc123\x00alice@acme.com\x00Alice\x002026-02-20T10:00:00Z',
       '',
       ':100644 000000 47ee3d55 00000000 D\t.changeset/old.md',
       ':000000 100644 00000000 aabb1122 A\tsrc/new-file.ts',
@@ -292,7 +293,7 @@ describe('scanRepo', () => {
   it('produces records for resolved authors', async () => {
     spawnQueue.push(
       [
-        'aaa111|alice@acme.com|Alice Johnson|2026-02-20T10:00:00Z',
+        '\x00aaa111\x00alice@acme.com\x00Alice Johnson\x002026-02-20T10:00:00Z',
         '10\t2\tsrc/index.ts',
         '5\t1\tsrc/utils.test.ts',
       ].join('\n'),
@@ -326,12 +327,12 @@ describe('scanRepo', () => {
     spawnQueue.push(
       [
         // Lockfile-only commit on a Friday: must not add a commit or an active day
-        'aaa111|alice@acme.com|Alice Johnson|2026-02-20T10:00:00Z',
+        '\x00aaa111\x00alice@acme.com\x00Alice Johnson\x002026-02-20T10:00:00Z',
         '500\t500\tpackage-lock.json',
         '9000\t0\tnode_modules/lodash/index.js',
         '',
         // Real commit on a Thursday
-        'bbb222|alice@acme.com|Alice Johnson|2026-02-19T10:00:00Z',
+        '\x00bbb222\x00alice@acme.com\x00Alice Johnson\x002026-02-19T10:00:00Z',
         '10\t2\tsrc/index.ts',
       ].join('\n'),
     );
@@ -378,13 +379,13 @@ describe('scanRepo', () => {
     // 2026-02-16 is a Monday; 2026-02-18 is a Wednesday (both ISO week 2026-W08).
     spawnQueue.push(
       [
-        'aaa001|alice@acme.com|Alice Johnson|2026-02-18T10:00:00Z',
+        '\x00aaa001\x00alice@acme.com\x00Alice Johnson\x002026-02-18T10:00:00Z',
         '1\t0\tsrc/a.ts',
         '',
-        'aaa002|alice@acme.com|Alice Johnson|2026-02-18T15:00:00Z',
+        '\x00aaa002\x00alice@acme.com\x00Alice Johnson\x002026-02-18T15:00:00Z',
         '1\t0\tsrc/b.ts',
         '',
-        'aaa003|alice@acme.com|Alice Johnson|2026-02-16T09:00:00Z',
+        '\x00aaa003\x00alice@acme.com\x00Alice Johnson\x002026-02-16T09:00:00Z',
         '1\t0\tsrc/c.ts',
       ].join('\n'),
     );
@@ -406,10 +407,10 @@ describe('scanRepo', () => {
   it('skips commits already in recentHashes', async () => {
     spawnQueue.push(
       [
-        'aaa111|alice@acme.com|Alice Johnson|2026-02-20T10:00:00Z',
+        '\x00aaa111\x00alice@acme.com\x00Alice Johnson\x002026-02-20T10:00:00Z',
         '10\t2\tsrc/index.ts',
         '',
-        'bbb222|bob@acme.com|Bob Smith|2026-02-21T10:00:00Z',
+        '\x00bbb222\x00bob@acme.com\x00Bob Smith\x002026-02-21T10:00:00Z',
         '3\t1\tsrc/other.ts',
       ].join('\n'),
     );
@@ -431,7 +432,7 @@ describe('scanRepo', () => {
   it("assigns unresolved authors to 'unassigned' org/team", async () => {
     spawnQueue.push(
       [
-        'ccc333|unknown@nowhere.com|Unknown Person|2026-02-22T10:00:00Z',
+        '\x00ccc333\x00unknown@nowhere.com\x00Unknown Person\x002026-02-22T10:00:00Z',
         '10\t2\tsrc/mystery.ts',
       ].join('\n'),
     );
@@ -454,10 +455,10 @@ describe('scanRepo', () => {
   it('aggregates multiple commits by same author in same week', async () => {
     spawnQueue.push(
       [
-        'aaa111|alice@acme.com|Alice Johnson|2026-02-23T10:00:00Z',
+        '\x00aaa111\x00alice@acme.com\x00Alice Johnson\x002026-02-23T10:00:00Z',
         '10\t2\tsrc/a.ts',
         '',
-        'bbb222|alice@acme.com|Alice Johnson|2026-02-24T14:00:00Z',
+        '\x00bbb222\x00alice@acme.com\x00Alice Johnson\x002026-02-24T14:00:00Z',
         '5\t1\tsrc/b.ts',
       ].join('\n'),
     );
@@ -565,8 +566,12 @@ describe('scanRepo', () => {
 
   it('scans in time-based chunks when chunkMonths is set and no since', async () => {
     // Each spawn call returns different commits; fill queue with enough entries
-    spawnQueue.push('aaa111|alice@acme.com|Alice Johnson|2024-03-15T10:00:00Z\n5\t1\tsrc/a.ts');
-    spawnQueue.push('bbb222|alice@acme.com|Alice Johnson|2024-06-20T10:00:00Z\n3\t0\tsrc/b.ts');
+    spawnQueue.push(
+      '\x00aaa111\x00alice@acme.com\x00Alice Johnson\x002024-03-15T10:00:00Z\n5\t1\tsrc/a.ts',
+    );
+    spawnQueue.push(
+      '\x00bbb222\x00alice@acme.com\x00Alice Johnson\x002024-06-20T10:00:00Z\n3\t0\tsrc/b.ts',
+    );
     // Remaining chunks return empty output (default in mock)
 
     const result = await scanRepo('/repos/frontend', {
@@ -610,7 +615,9 @@ describe('scanRepo', () => {
 
   it('continues scanning remaining chunks when one chunk errors', async () => {
     spawnQueue.push(new Error('transient failure'));
-    spawnQueue.push('ccc333|alice@acme.com|Alice Johnson|2024-06-15T10:00:00Z\n2\t0\tsrc/c.ts');
+    spawnQueue.push(
+      '\x00ccc333\x00alice@acme.com\x00Alice Johnson\x002024-06-15T10:00:00Z\n2\t0\tsrc/c.ts',
+    );
     // Remaining chunks return empty output (default in mock)
 
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -632,7 +639,7 @@ describe('scanRepo', () => {
   it('collects rework inputs for counted commits that delete lines', async () => {
     spawnQueue.push(
       [
-        'aaa111|alice@acme.com|Alice Johnson|2026-02-20T10:00:00Z|feat: x',
+        '\x00aaa111\x00alice@acme.com\x00Alice Johnson\x002026-02-20T10:00:00Z\x00feat: x',
         '10\t2\tsrc/index.ts',
         '3\t0\tsrc/new.ts',
       ].join('\n'),
@@ -657,7 +664,7 @@ describe('scanRepo', () => {
 
   it('does not collect rework inputs when collectRework is false', async () => {
     spawnQueue.push(
-      'aaa111|alice@acme.com|Alice Johnson|2026-02-20T10:00:00Z|feat: x\n10\t2\tsrc/index.ts',
+      '\x00aaa111\x00alice@acme.com\x00Alice Johnson\x002026-02-20T10:00:00Z\x00feat: x\n10\t2\tsrc/index.ts',
     );
     const result = await scanRepo('/repos/frontend', {
       repoName: 'frontend',
@@ -672,7 +679,7 @@ describe('scanRepo', () => {
   it('active-day bit and week bucket agree for a commit near the UTC week boundary', async () => {
     // Sunday 2026-02-22 23:30 in UTC-8 = Monday 2026-02-23 07:30Z → ISO week 2026-W09, Monday bit
     spawnQueue.push(
-      'aaa111|alice@acme.com|Alice Johnson|2026-02-22T23:30:00-08:00|feat: x\n1\t0\tsrc/a.ts',
+      '\x00aaa111\x00alice@acme.com\x00Alice Johnson\x002026-02-22T23:30:00-08:00\x00feat: x\n1\t0\tsrc/a.ts',
     );
     const result = await scanRepo('/repos/frontend', {
       repoName: 'frontend',
@@ -794,7 +801,7 @@ describe('parseIntent', () => {
 describe('parseGitLogOutput with subject', () => {
   it('parses 5-field format and extracts intent', () => {
     const output = [
-      'abc123|alice@acme.com|Alice|2026-02-20T10:00:00Z|feat: add button',
+      '\x00abc123\x00alice@acme.com\x00Alice\x002026-02-20T10:00:00Z\x00feat: add button',
       '10\t2\tsrc/button.ts',
     ].join('\n');
 
@@ -806,7 +813,7 @@ describe('parseGitLogOutput with subject', () => {
 
   it('handles subject with pipe characters', () => {
     const output = [
-      'abc123|alice@acme.com|Alice|2026-02-20T10:00:00Z|fix: handle a|b case',
+      '\x00abc123\x00alice@acme.com\x00Alice\x002026-02-20T10:00:00Z\x00fix: handle a|b case',
       '5\t1\tsrc/utils.ts',
     ].join('\n');
 
@@ -817,7 +824,7 @@ describe('parseGitLogOutput with subject', () => {
 
   it('falls back to other for non-conventional subject', () => {
     const output = [
-      'abc123|alice@acme.com|Alice|2026-02-20T10:00:00Z|Update styling',
+      '\x00abc123\x00alice@acme.com\x00Alice\x002026-02-20T10:00:00Z\x00Update styling',
       '3\t0\tsrc/style.css',
     ].join('\n');
 
@@ -825,9 +832,9 @@ describe('parseGitLogOutput with subject', () => {
     expect(commits[0].intent).toBe('other');
   });
 
-  it('still parses old 4-field format', () => {
+  it('treats a missing subject field as an empty subject', () => {
     const output = [
-      'abc123|alice@acme.com|Alice Johnson|2026-02-20T10:00:00Z',
+      '\x00abc123\x00alice@acme.com\x00Alice Johnson\x002026-02-20T10:00:00Z\x00',
       '10\t2\tsrc/index.ts',
     ].join('\n');
 
@@ -846,12 +853,16 @@ describe('GitLogLineParser', () => {
 
     // First commit lines
     expect(
-      parser.processLine('abc123|alice@acme.com|Alice|2026-02-20T10:00:00Z|feat: add button'),
+      parser.processLine(
+        '\x00abc123\x00alice@acme.com\x00Alice\x002026-02-20T10:00:00Z\x00feat: add button',
+      ),
     ).toBeNull();
     expect(parser.processLine('10\t2\tsrc/button.ts')).toBeNull();
 
     // Second header finalizes first commit
-    const commit = parser.processLine('def456|bob@acme.com|Bob|2026-02-21T10:00:00Z|fix: typo');
+    const commit = parser.processLine(
+      '\x00def456\x00bob@acme.com\x00Bob\x002026-02-21T10:00:00Z\x00fix: typo',
+    );
     expect(commit).not.toBeNull();
     expect(commit!.hash).toBe('abc123');
     expect(commit!.intent).toBe('feat');
@@ -873,11 +884,11 @@ describe('GitLogLineParser', () => {
 
   it('produces identical results to parseGitLogOutput', () => {
     const output = [
-      'aaa111|alice@acme.com|Alice|2026-02-20T10:00:00Z|feat: add feature',
+      '\x00aaa111\x00alice@acme.com\x00Alice\x002026-02-20T10:00:00Z\x00feat: add feature',
       ':100644 100644 abcdef 123456 A\tsrc/new.ts',
       '10\t0\tsrc/new.ts',
       '',
-      'bbb222|bob@acme.com|Bob|2026-02-21T10:00:00Z|fix: bug',
+      '\x00bbb222\x00bob@acme.com\x00Bob\x002026-02-21T10:00:00Z\x00fix: bug',
       ':100644 100644 abcdef 123456 M\tsrc/old.ts',
       '3\t1\tsrc/old.ts',
     ].join('\n');
@@ -998,5 +1009,108 @@ describe('classifyGitError', () => {
     const msg = "fatal: Unable to create '/repo/.git/index.lock': File exists.";
     const info = classifyGitError(new Error(msg));
     expect(info.original).toBe(msg);
+  });
+});
+
+// ── Hostile author names (#70) ───────────────────────────────────────────────
+
+// The payload from #70, exactly as git stores it: `|`, `\r` and `\t` are legal in a name,
+// NUL is not — so with NUL-delimited headers it can only ever be one (ugly) name.
+const MALLORY_NAME =
+  'Mallory\rdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef|ceo@example.com|Carol CEO|2026-10-12T09:00:00Z|feat: forged\r999999\t0\tsrc/forged.ts\rX';
+
+function header(hash: string, email: string, name: string, date: string, subject: string): string {
+  return `\x00${hash}\x00${email}\x00${name}\x00${date}\x00${subject}`;
+}
+
+describe('hostile author names (#70)', () => {
+  it('attributes a commit by "Jane Doe | Acme Contractors" to Jane', () => {
+    const output = [
+      header(
+        'abc123',
+        'jane@example.com',
+        'Jane Doe | Acme Contractors',
+        '2026-02-20T10:00:00Z',
+        'feat: x',
+      ),
+      '10\t2\tsrc/a.ts',
+    ].join('\n');
+    const commits = parseGitLogOutput(output);
+    expect(commits).toHaveLength(1);
+    expect(commits[0].email).toBe('jane@example.com');
+    expect(commits[0].name).toBe('Jane Doe | Acme Contractors');
+    expect(commits[0].date).toBe('2026-02-20T10:00:00Z');
+    expect(commits[0].files).toHaveLength(1);
+  });
+
+  it('a CR-laden name cannot forge a second commit (batch parser)', () => {
+    const output = [
+      header('abc123', 'mallory@example.com', MALLORY_NAME, '2026-02-20T10:00:00Z', 'feat: change'),
+      '1\t0\tsrc/real.ts',
+    ].join('\n');
+    const commits = parseGitLogOutput(output);
+    expect(commits).toHaveLength(1);
+    expect(commits[0].email).toBe('mallory@example.com');
+    expect(commits[0].files).toEqual([
+      expect.objectContaining({ path: 'src/real.ts', insertions: 1, deletions: 0 }),
+    ]);
+    expect(commits.map((c) => c.email)).toEqual(['mallory@example.com']); // the payload is just her name
+  });
+
+  it('a CR-laden name cannot forge a second commit (streaming scan)', async () => {
+    const output = [
+      header('abc123', 'mallory@example.com', MALLORY_NAME, '2026-02-20T10:00:00Z', 'feat: change'),
+      '1\t0\tsrc/real.ts',
+    ].join('\n');
+    spawnQueue = [output];
+    const result = await scanRepo('/repos/x', {
+      repoName: 'x',
+      group: 'default',
+      authorMap: makeAuthorMap(),
+      recentHashes: new Set(),
+      since: '2026-02-01',
+    });
+    const emails = result.newRecords.map((r) => r.email);
+    expect(emails).toContain('mallory@example.com');
+    expect(emails).not.toContain('ceo@example.com');
+    expect(result.newRecords).toHaveLength(1);
+    expect(result.newRecords[0].filetype.app.insertions).toBe(1);
+  });
+
+  it('skips a commit whose date does not parse, with one warning, and keeps scanning', () => {
+    const warn = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const output = [
+      header('abc123', 'a@example.com', 'A', 'not-a-date', 'feat: x'),
+      '10\t2\tsrc/a.ts',
+      header('def456', 'b@example.com', 'B', '2026-02-21T10:00:00Z', 'fix: y'),
+      '3\t1\tsrc/b.ts',
+    ].join('\n');
+    const commits = parseGitLogOutput(output);
+    expect(commits.map((c) => c.hash)).toEqual(['def456']);
+    expect(commits[0].files).toHaveLength(1); // the skipped commit's numstat did not leak into B
+    expect(warn.mock.calls.flat().join('\n')).toMatch(/abc123/);
+    warn.mockRestore();
+  });
+
+  it('skips a header whose hash is not hex', () => {
+    const output = [
+      header('nothex!', 'a@example.com', 'A', '2026-02-20T10:00:00Z', 'feat: x'),
+      '10\t2\tsrc/a.ts',
+    ].join('\n');
+    expect(parseGitLogOutput(output)).toEqual([]);
+  });
+
+  it('asks git for NUL-delimited headers', async () => {
+    spawnQueue = [''];
+    spawnCalls.length = 0;
+    await scanRepo('/repos/x', {
+      repoName: 'x',
+      group: 'default',
+      authorMap: makeAuthorMap(),
+      recentHashes: new Set(),
+      since: '2026-02-01',
+    });
+    const fmt = spawnCalls[0].args.find((a) => a.startsWith('--format='));
+    expect(fmt).toBe('--format=%x00%H%x00%ae%x00%an%x00%aI%x00%s');
   });
 });

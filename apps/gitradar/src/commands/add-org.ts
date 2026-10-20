@@ -1,4 +1,4 @@
-import { loadConfig, saveConfig } from '../config/loader.js';
+import { ConfigNotFoundError, loadConfig, saveConfig } from '../config/loader.js';
 import type { Org } from '../types/schema.js';
 import { DEFAULT_SETTINGS } from '../types/schema.js';
 
@@ -16,7 +16,14 @@ export async function addOrg(options: AddOrgOptions): Promise<void> {
   let config;
   try {
     config = await loadConfig(options.config);
-  } catch {
+  } catch (err) {
+    if (!(err instanceof ConfigNotFoundError)) {
+      // Never write after a failed load: saving now would replace every org with this one (#113).
+      console.error(err instanceof Error ? err.message : String(err));
+      console.error('Fix config.yml before adding organizations.');
+      process.exitCode = 1;
+      return;
+    }
     config = { repos: [], orgs: [], groups: {}, tags: {}, settings: { ...DEFAULT_SETTINGS } };
   }
 
@@ -63,8 +70,13 @@ export async function addTeamToOrg(options: AddTeamOptions): Promise<void> {
   let config;
   try {
     config = await loadConfig(options.config);
-  } catch {
-    console.error('No config found. Run "gitradar init" first.');
+  } catch (err) {
+    if (err instanceof ConfigNotFoundError) {
+      console.error('No config found. Run "gitradar init" first.');
+    } else {
+      console.error(err instanceof Error ? err.message : String(err));
+      console.error('Fix config.yml before adding teams.');
+    }
     process.exitCode = 1;
     return;
   }

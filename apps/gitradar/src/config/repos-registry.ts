@@ -1,4 +1,4 @@
-import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, copyFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import * as yaml from 'js-yaml';
@@ -76,31 +76,27 @@ export async function loadReposRegistry(registryPath: string): Promise<ReposRegi
 
 /**
  * Load registries from global (~/.agentx/repos.yml) and optionally project-level paths.
+ *
+ * A missing file is simply absent from the result. An invalid file throws: treating it
+ * as missing led the engine to offer "Create one?" and overwrite a hand-curated
+ * registry with an empty one (#114).
  */
 export async function loadAllRegistries(gitRoot?: string): Promise<RegistrySource[]> {
   const sources: RegistrySource[] = [];
 
   // Global registry
   const globalPath = path.join(homedir(), '.agentx', 'repos.yml');
-  try {
-    const globalRegistry = await loadReposRegistry(globalPath);
-    if (globalRegistry) {
-      sources.push({ type: 'global', path: globalPath, registry: globalRegistry });
-    }
-  } catch (err) {
-    console.warn(`Warning: ${err instanceof Error ? err.message : String(err)}`);
+  const globalRegistry = await loadReposRegistry(globalPath);
+  if (globalRegistry) {
+    sources.push({ type: 'global', path: globalPath, registry: globalRegistry });
   }
 
   // Project-level registry
   if (gitRoot) {
     const projectPath = path.join(gitRoot, '.agentx', 'repos.yml');
-    try {
-      const projectRegistry = await loadReposRegistry(projectPath);
-      if (projectRegistry) {
-        sources.push({ type: 'project', path: projectPath, registry: projectRegistry });
-      }
-    } catch (err) {
-      console.warn(`Warning: ${err instanceof Error ? err.message : String(err)}`);
+    const projectRegistry = await loadReposRegistry(projectPath);
+    if (projectRegistry) {
+      sources.push({ type: 'project', path: projectPath, registry: projectRegistry });
     }
   }
 
@@ -130,14 +126,28 @@ export function getAvailableWorkspaces(registries: RegistrySource[]): LoadedWork
 
 // ── Creating ──────────────────────────────────────────────────────────────
 
+async function fileExists(p: string): Promise<boolean> {
+  try {
+    await access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Create a new empty workspace registry and save it to disk.
  * Returns the registry source and loaded workspace.
+ * Refuses when the file already exists: this is only for a missing registry (#114).
  */
 export async function createWorkspace(
   registryPath: string,
   workspaceName: string,
 ): Promise<{ source: RegistrySource; workspace: LoadedWorkspace }> {
+  const resolved = expandTilde(registryPath);
+  if (await fileExists(resolved)) {
+    throw new Error(`Refusing to create a registry: ${resolved} already exists`);
+  }
   const registry: ReposRegistry = {
     workspaces: {
       [workspaceName]: { repos: [] },
@@ -167,7 +177,9 @@ export async function createWorkspace(
 
 /**
  * Save a repos registry back to a YAML file.
- * Creates parent directories if needed.
+ * Creates parent directories if needed. Keeps the previous file as `<file>.bak` and
+ * writes through a temp file + rename, so a crash mid-write cannot leave a truncated
+ * registry behind (#114).
  */
 export async function saveReposRegistry(
   registryPath: string,
@@ -180,7 +192,12 @@ export async function saveReposRegistry(
     noRefs: true,
     quoteStyle: 'double',
   });
-  await writeFile(resolved, content, 'utf-8');
+  if (await fileExists(resolved)) {
+    await copyFile(resolved, `${resolved}.bak`);
+  }
+  const tmp = path.join(path.dirname(resolved), `.${path.basename(resolved)}.${process.pid}.tmp`);
+  await writeFile(tmp, content, 'utf-8');
+  await rename(tmp, resolved);
 }
 
 /**
