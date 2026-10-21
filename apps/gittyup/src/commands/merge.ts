@@ -1,9 +1,9 @@
-import { confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
 import type { Command } from 'commander';
 import { ManifestManager } from '../config/manifest.js';
 import type { AiMode, MergeTarget } from '../config/schema.js';
 import { Orchestrator } from '../core/orchestrator.js';
+import { confirmGate } from '../ui/confirm.js';
 
 export function registerMerge(program: Command): void {
   program
@@ -51,9 +51,8 @@ export function registerMerge(program: Command): void {
         for (const t of targets)
           console.log(chalk.dim(`    ${t.repo.name}: ${t.sourceBranch} → ${t.targetBranch}`));
 
-        const ok = await confirm({
-          message: `Proceed with merge across ${targets.length} repo(s)?`,
-          default: true,
+        const ok = await confirmGate(`Proceed with merge across ${targets.length} repo(s)?`, {
+          yes: opts.yes,
         });
         if (!ok) return;
 

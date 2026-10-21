@@ -38,7 +38,7 @@ export function registerInit(program: Command): void {
           targetDir = APP_CONFIG_DIR;
         }
 
-        const mgr = ManifestManager.init(targetDir);
+        const mgr = ManifestManager.init(targetDir, gitRoot ?? process.cwd());
         console.log(chalk.green(`\n✓ Created ${mgr.manifestPath}`));
 
         // ── AI tool context installation ────────────────────────

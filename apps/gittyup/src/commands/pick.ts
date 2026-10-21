@@ -1,9 +1,9 @@
-import { confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
 import type { Command } from 'commander';
 import { ManifestManager } from '../config/manifest.js';
 import type { AiMode, CherryPickTarget } from '../config/schema.js';
 import { Orchestrator } from '../core/orchestrator.js';
+import { confirmGate } from '../ui/confirm.js';
 
 export function registerPick(program: Command): void {
   program
@@ -86,9 +86,8 @@ export function registerPick(program: Command): void {
           for (const c of t.commits) console.log(chalk.dim(`      ${c.substring(0, 8)}`));
         }
 
-        const ok = await confirm({
-          message: `Proceed with cherry-pick across ${targets.length} repo(s)?`,
-          default: true,
+        const ok = await confirmGate(`Proceed with cherry-pick across ${targets.length} repo(s)?`, {
+          yes: opts.yes,
         });
         if (!ok) return;
 

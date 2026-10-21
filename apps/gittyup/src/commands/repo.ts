@@ -1,3 +1,4 @@
+import { isAbsolute, resolve } from 'node:path';
 import { checkbox, input, select } from '@inquirer/prompts';
 import chalk from 'chalk';
 import type { Command } from 'commander';
@@ -28,7 +29,9 @@ export function registerRepo(program: Command): void {
           : { dev: 'develop', staging: 'staging', prod: 'main' };
         const repo: RepoConfig = {
           name,
-          path: repoPath,
+          // Store an absolute path resolved against where the command runs, so the repo is
+          // found later regardless of the manifest's workspace (C3).
+          path: isAbsolute(repoPath) ? repoPath : resolve(process.cwd(), repoPath),
           remote: opts.remote,
           url: opts.url,
           branches,
