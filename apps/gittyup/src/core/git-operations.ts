@@ -57,6 +57,24 @@ export class GitOperations {
     }
   }
 
+  /**
+   * Switch HEAD to a real branch. A bare `git checkout <name>` also accepts a *path*, so a
+   * target that happens to match a tracked file/directory (but is not a branch) would
+   * restore those paths and leave HEAD where it was — and the subsequent merge/pick would
+   * land on the *current* branch while the result row still showed success (G2). Verify
+   * HEAD actually moved to the named branch, or refuse.
+   */
+  private async switchToBranch(target: string): Promise<void> {
+    this.assertSafeRef(target);
+    await this.git.checkout(target);
+    const current = await this.getCurrentBranch();
+    if (current !== target) {
+      throw new Error(
+        `"${target}" is not a branch (checkout left HEAD on ${current}); refusing to operate on the wrong branch`,
+      );
+    }
+  }
+
   // ─── State Inspection ──────────────────────────────────────────────
 
   async getStatus(): Promise<StatusResult> {
@@ -165,7 +183,9 @@ export class GitOperations {
 
   async fetch(remote = 'origin'): Promise<void> {
     this.assertSafeRef(remote);
-    await this.git.fetch(remote, { '--prune': null });
+    // `raw`, not simple-git's `.fetch()`: the latter resolves even when git exits non-zero
+    // (e.g. the remote does not exist), so a failed fetch was reported as success (C8).
+    await this.git.raw(['fetch', '--prune', '--end-of-options', remote]);
   }
 
   // ─── Merge Operations ─────────────────────────────────────────────
@@ -175,8 +195,7 @@ export class GitOperations {
     targetBranch: string,
   ): Promise<{ success: boolean; conflicts: string[] }> {
     this.assertSafeRef(sourceBranch);
-    this.assertSafeRef(targetBranch);
-    await this.git.checkout(targetBranch);
+    await this.switchToBranch(targetBranch);
     try {
       await this.git.merge(['--no-ff', '--end-of-options', sourceBranch]);
       return { success: true, conflicts: [] };
@@ -195,9 +214,8 @@ export class GitOperations {
     commits: string[],
     targetBranch: string,
   ): Promise<{ success: boolean; applied: string[]; failedAt?: string; conflicts: string[] }> {
-    this.assertSafeRef(targetBranch);
     for (const sha of commits) this.assertSafeRef(sha);
-    await this.git.checkout(targetBranch);
+    await this.switchToBranch(targetBranch);
     const applied: string[] = [];
 
     for (const sha of commits) {

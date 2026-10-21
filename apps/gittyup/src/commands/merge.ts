@@ -57,13 +57,18 @@ export function registerMerge(program: Command): void {
         });
         if (!ok) return;
 
-        await orchestrator.executeMerge(targets, {
+        const results = await orchestrator.executeMerge(targets, {
           aiMode: (opts.ai as AiMode) ?? undefined,
           push: opts.push,
           createPR: opts.pr,
           fetch: opts.fetch,
           yes: opts.yes,
         });
+        // A repo that errored or was left conflicted is not a success: fail the process
+        // so scripts and CI can tell (G5/C2).
+        if (results.some((r) => r.status === 'error' || r.status === 'conflict')) {
+          process.exitCode = 1;
+        }
       },
     );
 }
