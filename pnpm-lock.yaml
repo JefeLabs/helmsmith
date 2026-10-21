@@ -133,12 +133,6 @@ importers:
 
   apps/gittyup:
     dependencies:
-      '@helmsmith/cli-kit':
-        specifier: workspace:*
-        version: link:../../platform/core/cli-kit-lib
-      '@helmsmith/tui-view-components':
-        specifier: workspace:*
-        version: link:../../platform/core/tui-view-components-lib
       '@inquirer/ansi':
         specifier: ^2.0.8
         version: 2.0.8
@@ -151,6 +145,12 @@ importers:
       '@inquirer/prompts':
         specifier: ^8.7.1
         version: 8.7.1(@types/node@24.13.3)
+      '@opentui/core':
+        specifier: ^0.5.10
+        version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.0)
+      '@opentui/react':
+        specifier: ^0.5.10
+        version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.8)(typescript@7.0.2)(web-tree-sitter@0.27.0)(ws@8.21.3)
       bun:
         specifier: ^1.4.2
         version: 1.4.2
@@ -172,6 +172,9 @@ importers:
       ora:
         specifier: ^9.4.1
         version: 9.4.1
+      react:
+        specifier: 19.2.8
+        version: 19.2.8
       simple-git:
         specifier: ^3.36.0
         version: 3.36.0
@@ -179,6 +182,12 @@ importers:
         specifier: ^4.5.4
         version: 4.5.4
     devDependencies:
+      '@helmsmith/cli-kit':
+        specifier: workspace:*
+        version: link:../../platform/core/cli-kit-lib
+      '@helmsmith/tui-view-components':
+        specifier: workspace:*
+        version: link:../../platform/core/tui-view-components-lib
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3
