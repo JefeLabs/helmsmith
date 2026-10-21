@@ -15,12 +15,15 @@ export class GitOperations {
 
   constructor(repoPath: string) {
     this.repoPath = repoPath;
-    // Neutralise every repo-config vector that would run a command when gittyup inspects
-    // or operates on a repository it did not create (S1). gittyup is routinely pointed at
-    // cloned repos, and `core.fsmonitor`, hooks and an external diff/pager driver all
-    // execute code straight from the repo's own config. `-c key=val` here prefixes every
-    // command simple-git runs. fsmonitor is only a cache; hooks and external drivers are
-    // not wanted for an automation tool driving many repos.
+    // Neutralise the repo-config vectors that run a command when gittyup *inspects* a
+    // repository it did not create (S1): `core.fsmonitor`, hooks, the pager, an external
+    // diff driver and the askpass helper all execute code straight from the repo's own
+    // config, and gittyup is routinely pointed at cloned repos. `-c key=val` here prefixes
+    // every command simple-git runs. This is not a complete sandbox: write/network-time
+    // vectors that are also legitimate (gpg.program via signing, core.sshCommand,
+    // credential.helper, merge/filter drivers) are NOT blanket-overridden here because
+    // doing so breaks signing, ssh remotes and private-repo auth; they are handled by
+    // refusing a repo whose local config defines them (tracked separately).
     // simple-git refuses to put these config keys on the command line unless the matching
     // `allowUnsafe*` flag is set. Here the values are fixed constants that *disable* each
     // vector (never untrusted input), so enabling the flags only lets our own override
@@ -31,12 +34,14 @@ export class GitOperations {
         'core.hooksPath=/dev/null',
         'core.pager=cat',
         'diff.external=',
+        'core.askpass=',
       ],
       unsafe: {
         allowUnsafeFsMonitor: true,
         allowUnsafeHooksPath: true,
         allowUnsafePager: true,
         allowUnsafeDiffExternal: true,
+        allowUnsafeAskPass: true,
       },
     });
   }
@@ -418,6 +423,7 @@ export class GitOperations {
     branch: string,
     maxCount = 50,
   ): Promise<Array<{ hash: string; date: string; message: string; author: string }>> {
+    this.assertSafeRef(branch);
     const log = await this.git.log({ maxCount, from: branch });
     return log.all.map((c) => ({
       hash: c.hash,
@@ -430,8 +436,10 @@ export class GitOperations {
   // ─── Branch Operations ────────────────────────────────────────────
 
   async branchExists(name: string): Promise<boolean> {
+    // An option-like name is not a branch; return false rather than let it reach git.
+    if (name.startsWith('-')) return false;
     try {
-      await this.git.raw(['rev-parse', '--verify', name]);
+      await this.git.raw(['rev-parse', '--verify', '--end-of-options', name]);
       return true;
     } catch {
       return false;
@@ -439,11 +447,14 @@ export class GitOperations {
   }
 
   async checkout(branch: string): Promise<void> {
+    this.assertSafeRef(branch);
     await this.git.checkout(branch);
   }
 
   async push(remote = 'origin', branch?: string): Promise<void> {
+    this.assertSafeRef(remote);
     const b = branch ?? (await this.getCurrentBranch());
+    this.assertSafeRef(b);
     await this.git.push(remote, b, ['--set-upstream']);
   }
 
