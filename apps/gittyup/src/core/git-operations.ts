@@ -15,7 +15,41 @@ export class GitOperations {
 
   constructor(repoPath: string) {
     this.repoPath = repoPath;
-    this.git = simpleGit(repoPath);
+    // Neutralise every repo-config vector that would run a command when gittyup inspects
+    // or operates on a repository it did not create (S1). gittyup is routinely pointed at
+    // cloned repos, and `core.fsmonitor`, hooks and an external diff/pager driver all
+    // execute code straight from the repo's own config. `-c key=val` here prefixes every
+    // command simple-git runs. fsmonitor is only a cache; hooks and external drivers are
+    // not wanted for an automation tool driving many repos.
+    // simple-git refuses to put these config keys on the command line unless the matching
+    // `allowUnsafe*` flag is set. Here the values are fixed constants that *disable* each
+    // vector (never untrusted input), so enabling the flags only lets our own override
+    // through; it does not relax anything for the repo's own config.
+    this.git = simpleGit(repoPath, {
+      config: [
+        'core.fsmonitor=false',
+        'core.hooksPath=/dev/null',
+        'core.pager=cat',
+        'diff.external=',
+      ],
+      unsafe: {
+        allowUnsafeFsMonitor: true,
+        allowUnsafeHooksPath: true,
+        allowUnsafePager: true,
+        allowUnsafeDiffExternal: true,
+      },
+    });
+  }
+
+  /**
+   * Reject a ref that git would parse as an option (starts with `-`). Branch names and
+   * aliases come from the manifest and the CLI; `git log --output=…`, `git merge
+   * --upload-pack=…` and friends would otherwise write files or run commands (S5).
+   */
+  private assertSafeRef(ref: string): void {
+    if (ref.startsWith('-')) {
+      throw new Error(`refusing an option-like ref: ${JSON.stringify(ref)}`);
+    }
   }
 
   // ─── State Inspection ──────────────────────────────────────────────
@@ -31,6 +65,8 @@ export class GitOperations {
 
   /** Get detailed state for a single branch (ahead/behind, dirty, last commit). */
   async getBranchState(branchName: string, trackingBranch?: string): Promise<RepoBranchState> {
+    this.assertSafeRef(branchName);
+    if (trackingBranch) this.assertSafeRef(trackingBranch);
     try {
       const log = await this.git.log({ maxCount: 1, from: branchName });
       const latest = log.latest;
@@ -132,9 +168,11 @@ export class GitOperations {
     sourceBranch: string,
     targetBranch: string,
   ): Promise<{ success: boolean; conflicts: string[] }> {
+    this.assertSafeRef(sourceBranch);
+    this.assertSafeRef(targetBranch);
     await this.git.checkout(targetBranch);
     try {
-      await this.git.merge([sourceBranch, '--no-ff']);
+      await this.git.merge(['--no-ff', '--end-of-options', sourceBranch]);
       return { success: true, conflicts: [] };
     } catch {
       const status = await this.git.status();
@@ -151,12 +189,14 @@ export class GitOperations {
     commits: string[],
     targetBranch: string,
   ): Promise<{ success: boolean; applied: string[]; failedAt?: string; conflicts: string[] }> {
+    this.assertSafeRef(targetBranch);
+    for (const sha of commits) this.assertSafeRef(sha);
     await this.git.checkout(targetBranch);
     const applied: string[] = [];
 
     for (const sha of commits) {
       try {
-        await this.git.raw(['cherry-pick', sha]);
+        await this.git.raw(['cherry-pick', '--end-of-options', sha]);
         applied.push(sha);
       } catch {
         const status = await this.git.status();
