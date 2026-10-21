@@ -63,3 +63,16 @@ describe('option-like refs refused on the remaining ref-taking methods (S5 follo
     expect(await (await repo()).branchExists('--output=/tmp/pwned')).toBe(false);
   });
 });
+
+describe('ref guard parity on fetch and conflict-branch creation (S5 follow-up 2)', () => {
+  async function repo() {
+    const r = await makeRepo({ commits: [{ message: 'base', files: { 'f.txt': 'x\n' } }] });
+    return new GitOperations(r.path);
+  }
+  it('fetch rejects an option-like remote', async () => {
+    await expect((await repo()).fetch('--upload-pack=evil')).rejects.toThrow(/option-like/);
+  });
+  it('createConflictBranch rejects an option-like branch name', async () => {
+    await expect((await repo()).createConflictBranch('--foo', 'x')).rejects.toThrow(/option-like/);
+  });
+});
