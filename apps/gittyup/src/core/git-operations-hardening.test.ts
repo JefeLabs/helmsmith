@@ -42,3 +42,24 @@ describe('option-like refs are refused (S5)', () => {
     await expect(git.merge('--upload-pack=evil', 'main')).rejects.toThrow(/refus|invalid|option/i);
   });
 });
+
+describe('option-like refs refused on the remaining ref-taking methods (S5 follow-up)', () => {
+  async function repo() {
+    const r = await makeRepo({ commits: [{ message: 'base', files: { 'f.txt': 'x\n' } }] });
+    return new GitOperations(r.path);
+  }
+  it('listCommits rejects an option-like branch', async () => {
+    await expect((await repo()).listCommits('--output=/tmp/pwned')).rejects.toThrow(/option-like/);
+  });
+  it('checkout rejects an option-like branch', async () => {
+    await expect((await repo()).checkout('--foo')).rejects.toThrow(/option-like/);
+  });
+  it('push rejects an option-like remote or branch', async () => {
+    const git = await repo();
+    await expect(git.push('--upload-pack=evil', 'main')).rejects.toThrow(/option-like/);
+    await expect(git.push('origin', '--foo')).rejects.toThrow(/option-like/);
+  });
+  it('branchExists returns false for an option-like name without executing it', async () => {
+    expect(await (await repo()).branchExists('--output=/tmp/pwned')).toBe(false);
+  });
+});
