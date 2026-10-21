@@ -10,8 +10,17 @@ import type { ConflictFile } from '../config/schema.js';
 
 export type GateVerdict = { ok: true } | { ok: false; reason: string };
 
-/** A conflict marker at the start of a line, tolerant of CRLF. */
-export const MARKER_RE = /^(<{7}|={7}|>{7}|\|{7})( |\r|$)/m;
+/**
+ * A leftover conflict marker at the start of a line.
+ *
+ * Matches the *opening* (`<<<<<<<`), *base* (`|||||||`) and *closing* (`>>>>>>>`)
+ * markers only — never a lone `=======` separator, which is indistinguishable from a
+ * Setext/RST heading underline and which git never leaves without the surrounding
+ * `<<<<<<<`/`>>>>>>>` (G18). Seven-or-more of the character so a non-default
+ * `conflict-marker-size` is still caught (G7). git always writes a space and a label
+ * after these three, but a bare marker at end-of-line is accepted as one too.
+ */
+export const MARKER_RE = /^(?:<{7,}|>{7,}|\|{7,})(?: |\t|\r|$)/m;
 
 export function checkResolution(
   content: string,

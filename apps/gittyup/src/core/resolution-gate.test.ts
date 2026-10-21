@@ -16,7 +16,20 @@ describe('checkResolution', () => {
   });
 
   it('sees markers on CRLF lines', () => {
-    expect(checkResolution('a\r\n=======\r\nc\r\n', sides).ok).toBe(false);
+    expect(checkResolution('a\r\n>>>>>>> main\r\nc\r\n', sides).ok).toBe(false);
+  });
+
+  it('rejects markers larger than the default size (conflict-marker-size > 7) (G7)', () => {
+    const marked = 'a\n<<<<<<<< ours\nb\n========\nB\n>>>>>>>> main\nc\n';
+    expect(checkResolution(marked, sides)).toEqual({
+      ok: false,
+      reason: 'still contains conflict markers',
+    });
+  });
+
+  it('accepts a Setext/RST heading underline of exactly seven = signs (G18)', () => {
+    const doc = 'Title\n=======\n\nbody line two\n';
+    expect(checkResolution(doc, sides)).toEqual({ ok: true });
   });
 
   it('rejects an empty resolution when both sides have content', () => {
