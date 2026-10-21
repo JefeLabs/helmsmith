@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { lstatSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join, sep } from 'node:path';
 import { promisify } from 'node:util';
 import simpleGit, { type SimpleGit, type StatusResult } from 'simple-git';
@@ -223,14 +223,19 @@ export class GitOperations {
 
     for (const sha of commits) {
       try {
-        await this.git.raw(['cherry-pick', '--end-of-options', sha]);
+        // `--empty=drop`: a commit whose change is already present on the target becomes
+        // empty and is dropped instead of stopping the sequence with a dangling
+        // CHERRY_PICK_HEAD — common in back-publish where a fix reached the branch another
+        // way (G15). Default behaviour is to stop, which read as a hard failure.
+        await this.git.raw(['cherry-pick', '--empty=drop', '--end-of-options', sha]);
         applied.push(sha);
-      } catch {
+      } catch (err) {
         const status = await this.git.status();
         if (status.conflicted.length > 0) {
           return { success: false, applied, failedAt: sha, conflicts: status.conflicted };
         }
-        throw new Error(`cherry-pick failed on ${sha}`);
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new Error(`cherry-pick failed on ${sha}: ${msg.split('\n')[0]}`);
       }
     }
     return { success: true, applied, conflicts: [] };
@@ -520,6 +525,48 @@ export class GitOperations {
     await this.git.push(remote, b, ['--set-upstream']);
   }
 
+  /** True when `git rev-parse -q --verify <ref>` succeeds (the ref/pseudo-ref exists). */
+  private async refExists(ref: string): Promise<boolean> {
+    try {
+      // No `-q`: it suppresses stderr, and simple-git resolves (rather than rejects) a
+      // non-zero exit with empty stderr, which would make every ref look present.
+      await this.git.raw(['rev-parse', '--verify', ref]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Refuse to start an operation on a repo that is already mid-merge, mid-cherry-pick,
+   * mid-revert, mid-rebase, or carrying an unmerged index — operating on top of that state
+   * compounds the mess rather than doing what the user asked (G12). The message names the
+   * state and how to clear it.
+   */
+  private async assertNoOperationInProgress(): Promise<void> {
+    for (const [ref, hint] of [
+      ['MERGE_HEAD', 'git merge --abort'],
+      ['CHERRY_PICK_HEAD', 'git cherry-pick --abort'],
+      ['REVERT_HEAD', 'git revert --abort'],
+    ] as const) {
+      if (await this.refExists(ref)) {
+        throw new Error(
+          `a ${ref} operation is already in progress — resolve it or run \`${hint}\``,
+        );
+      }
+    }
+    const gitDir = (await this.git.raw(['rev-parse', '--absolute-git-dir'])).trim();
+    if (existsSync(join(gitDir, 'rebase-merge')) || existsSync(join(gitDir, 'rebase-apply'))) {
+      throw new Error('a rebase is already in progress — resolve it or run `git rebase --abort`');
+    }
+    const status = await this.git.status();
+    if (status.conflicted.length > 0) {
+      throw new Error(
+        `the repo has unmerged paths (${status.conflicted.length}) — resolve them before starting`,
+      );
+    }
+  }
+
   /**
    * Run an operation and return the repo to the branch and working tree it started on
    * (spec §3.2). Uncommitted changes are stashed on the start branch *before* the
@@ -529,6 +576,7 @@ export class GitOperations {
    * is left in place and named rather than popped onto the wrong tree.
    */
   async withRepoGuard<T>(label: string, fn: () => Promise<T>): Promise<T> {
+    await this.assertNoOperationInProgress();
     const startBranch = await this.getCurrentBranch();
     const stashed = await this.stash();
     let error: unknown;

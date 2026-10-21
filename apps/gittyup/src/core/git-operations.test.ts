@@ -1,4 +1,4 @@
-import { readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanupFixtures, makeRepo } from '../test/git-fixture.js';
@@ -352,5 +352,49 @@ describe('withRepoGuard restores the start branch and stash (spec §1.4/§3.2)',
     // the merge landed on staging (g.txt from develop is present there)
     await repo.git.checkout('staging');
     expect((await repo.git.raw(['ls-files', 'g.txt'])).trim()).toBe('g.txt');
+  });
+});
+
+describe('cherry-pick of an already-present change is skipped, not failed (G15)', () => {
+  it('returns success and leaves no cherry-pick in progress', async () => {
+    const repo = await makeRepo({
+      commits: [
+        { message: 'base', files: { 'file.txt': 'base\n' } },
+        { branch: 'develop', message: 'X', files: { 'file.txt': 'X\n' } },
+        // branchB independently arrives at the same content as develop's X commit
+        { branch: 'branchB', from: 'main', message: 'same-as-X', files: { 'file.txt': 'X\n' } },
+      ],
+      checkout: 'main',
+    });
+    const git = new GitOperations(repo.path);
+    const sx = (await repo.git.revparse(['develop'])).trim();
+    const result = await git.cherryPick([sx], 'branchB');
+    expect(result.success).toBe(true);
+    // the empty pick was dropped, not left dangling mid-cherry-pick
+    expect(existsSync(join(repo.path, '.git', 'CHERRY_PICK_HEAD'))).toBe(false);
+    expect((await repo.git.status()).conflicted).toEqual([]);
+  });
+});
+
+describe('refuses to start on a repo mid-operation (G12)', () => {
+  it('withRepoGuard throws and does not run the operation when a merge is in progress', async () => {
+    const repo = await makeRepo({
+      commits: [
+        { message: 'base', files: { 'f.txt': 'a\n' } },
+        { branch: 'develop', message: 'ours', files: { 'f.txt': 'b\n' } },
+        { branch: 'main', message: 'theirs', files: { 'f.txt': 'c\n' } },
+      ],
+      checkout: 'main',
+    });
+    // leave a real conflicted merge in progress (MERGE_HEAD + unmerged index)
+    await repo.git.merge(['develop']).catch(() => {});
+    const git = new GitOperations(repo.path);
+    let ran = false;
+    await expect(
+      git.withRepoGuard('x', async () => {
+        ran = true;
+      }),
+    ).rejects.toThrow(/in progress|unmerged|MERGE_HEAD/i);
+    expect(ran).toBe(false);
   });
 });
