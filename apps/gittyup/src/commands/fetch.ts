@@ -20,5 +20,7 @@ export function registerFetch(program: Command): void {
           ? chalk.green(`\n✓ Fetched ${results.length} repos`)
           : chalk.yellow(`\n⚠ ${failed.length}/${results.length} failed`),
       );
+      // A failed fetch must fail the command, not just warn (G5/C2/C8).
+      if (failed.length > 0) process.exitCode = 1;
     });
 }

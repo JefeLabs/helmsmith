@@ -92,13 +92,16 @@ export function registerPick(program: Command): void {
         });
         if (!ok) return;
 
-        await orchestrator.executeCherryPick(targets, {
+        const results = await orchestrator.executeCherryPick(targets, {
           aiMode: (opts.ai as AiMode) ?? undefined,
           push: opts.push,
           createPR: opts.pr,
           fetch: opts.fetch,
           yes: opts.yes,
         });
+        if (results.some((r) => r.status === 'error' || r.status === 'conflict')) {
+          process.exitCode = 1;
+        }
       },
     );
 }

@@ -256,3 +256,34 @@ describe('keep-side on a gitlink (submodule) conflict (G6)', () => {
     expect(entry).toMatch(/^160000 /); // still a gitlink, not removed
   });
 });
+
+describe('merge/pick refuse the wrong branch (G2)', () => {
+  it('merge throws when the target matches a directory but no branch, leaving HEAD put', async () => {
+    const repo = await makeRepo({
+      commits: [
+        { message: 'base', files: { 'staging/x.txt': 'x\n' } },
+        { branch: 'feature', message: 'feat', files: { 'f.txt': 'y\n' } },
+      ],
+      checkout: 'main',
+    });
+    const git = new GitOperations(repo.path);
+    const before = await git.getCurrentBranch();
+    // `staging` is a tracked directory, not a branch: a bare `git checkout staging`
+    // restores its files and leaves HEAD on main; the merge must not land on main.
+    await expect(git.merge('feature', 'staging')).rejects.toThrow(/not a branch/i);
+    expect(await git.getCurrentBranch()).toBe(before);
+  });
+
+  it('cherryPick throws when the target is not a branch', async () => {
+    const repo = await makeRepo({
+      commits: [
+        { message: 'base', files: { 'staging/x.txt': 'x\n' } },
+        { branch: 'feature', message: 'feat', files: { 'f.txt': 'y\n' } },
+      ],
+      checkout: 'main',
+    });
+    const git = new GitOperations(repo.path);
+    const sha = (await repo.git.revparse(['feature'])).trim();
+    await expect(git.cherryPick([sha], 'staging')).rejects.toThrow(/not a branch/i);
+  });
+});

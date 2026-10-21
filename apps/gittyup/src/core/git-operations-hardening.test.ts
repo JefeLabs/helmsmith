@@ -76,3 +76,11 @@ describe('ref guard parity on fetch and conflict-branch creation (S5 follow-up 2
     await expect((await repo()).createConflictBranch('--foo', 'x')).rejects.toThrow(/option-like/);
   });
 });
+
+describe('fetch surfaces git failure (C8)', () => {
+  it('rejects when the remote does not exist', async () => {
+    const r = await makeRepo({ commits: [{ message: 'base', files: { 'f.txt': 'x\n' } }] });
+    const git = new GitOperations(r.path);
+    await expect(git.fetch('origin')).rejects.toThrow();
+  });
+});
