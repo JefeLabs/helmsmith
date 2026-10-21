@@ -164,6 +164,7 @@ export class GitOperations {
   // ─── Fetch ─────────────────────────────────────────────────────────
 
   async fetch(remote = 'origin'): Promise<void> {
+    this.assertSafeRef(remote);
     await this.git.fetch(remote, { '--prune': null });
   }
 
@@ -227,6 +228,7 @@ export class GitOperations {
   async createConflictBranch(prefix: string, label: string): Promise<string> {
     const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const branchName = `${prefix}/${label}-${ts}`;
+    this.assertSafeRef(branchName);
     await this.git.checkoutLocalBranch(branchName);
     return branchName;
   }
