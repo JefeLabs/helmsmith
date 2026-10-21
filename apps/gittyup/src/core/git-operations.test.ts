@@ -287,3 +287,40 @@ describe('merge/pick refuse the wrong branch (G2)', () => {
     await expect(git.cherryPick([sha], 'staging')).rejects.toThrow(/not a branch/i);
   });
 });
+
+describe('compare correctness (G1, G3)', () => {
+  it('hasMergeConflicts: true for a real conflict, false for a clean merge (G1)', async () => {
+    const conflict = await makeRepo({
+      commits: [
+        { message: 'base', files: { 'f.txt': 'a\n', 'g.txt': 'g\n' } },
+        { branch: 'develop', message: 'ours', files: { 'f.txt': 'b\n' } },
+        { branch: 'main', message: 'theirs', files: { 'f.txt': 'c\n' } },
+      ],
+      checkout: 'main',
+    });
+    expect(await new GitOperations(conflict.path).hasMergeConflicts('main', 'develop')).toBe(true);
+
+    const clean = await makeRepo({
+      commits: [
+        { message: 'base', files: { 'f.txt': 'a\n', 'g.txt': 'g\n' } },
+        { branch: 'develop', message: 'ours', files: { 'f.txt': 'b\n' } },
+        { branch: 'main', message: 'theirs', files: { 'g.txt': 'h\n' } },
+      ],
+      checkout: 'main',
+    });
+    expect(await new GitOperations(clean.path).hasMergeConflicts('main', 'develop')).toBe(false);
+  });
+
+  it('listCommits reads the named branch, not a range against HEAD (G3)', async () => {
+    const repo = await makeRepo({
+      commits: [
+        { message: 'c1', files: { 'f.txt': '1\n' } },
+        { branch: 'feature', message: 'c2', files: { 'g.txt': '2\n' } },
+      ],
+      checkout: 'main',
+    });
+    // Standing on main, the commits of `feature` are c2 then c1 — not `feature...HEAD` (just c2).
+    const commits = await new GitOperations(repo.path).listCommits('feature', 50);
+    expect(commits.map((c) => c.message)).toEqual(['c2', 'c1']);
+  });
+});

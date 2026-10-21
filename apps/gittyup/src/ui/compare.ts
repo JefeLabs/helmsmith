@@ -108,33 +108,11 @@ async function checkConflicts(
   sourceBranch: string,
   targetBranch: string,
 ): Promise<boolean> {
-  try {
-    try {
-      await git.instance.raw([
-        'merge-tree',
-        '--write-tree',
-        '--no-messages',
-        targetBranch,
-        sourceBranch,
-      ]);
-      return false;
-    } catch {
-      try {
-        const revList = await git.instance.raw([
-          'rev-list',
-          '--left-right',
-          '--count',
-          `${targetBranch}...${sourceBranch}`,
-        ]);
-        const [left, right] = revList.trim().split(/\s+/).map(Number);
-        return (left ?? 0) > 0 && (right ?? 0) > 0;
-      } catch {
-        return false;
-      }
-    }
-  } catch {
-    return false;
-  }
+  // Delegate to GitOperations, which reads merge-tree's real exit code. The previous
+  // inline check ran merge-tree through simple-git, which reports exit 1 (conflicts) as
+  // success, so compare never saw a conflict (G1). A genuine merge-tree failure (bad ref,
+  // old git) now throws and surfaces as the row's error instead of a guessed boolean.
+  return git.hasMergeConflicts(targetBranch, sourceBranch);
 }
 
 // ─── Render ─────────────────────────────────────────────────────────
