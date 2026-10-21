@@ -101,6 +101,8 @@ export interface ChatCompletionResponse {
     message: {
       content: string;
     };
+    /** "stop" when complete; "length" when the model hit its output limit (truncated). */
+    finish_reason?: string;
   }>;
   usage?: TokenUsage;
 }

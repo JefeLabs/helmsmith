@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { dirname } from 'node:path';
 import chalk from 'chalk';
 import { APP_CONFIG_DIR_DISPLAY, CLI_BIN_NAME } from '../config/branding.js';
@@ -49,12 +50,16 @@ export async function readAuthCredentials(): Promise<AuthCredentials | null> {
  * Write credentials to auth.json. Creates parent directory if needed.
  */
 export async function writeAuthCredentials(creds: AuthCredentials): Promise<void> {
+  await writeAuthJson(JSON.stringify(creds, null, 2));
+}
+
+/** Write auth.json with owner-only permissions (it holds a token) (S6). */
+async function writeAuthJson(content: string): Promise<void> {
   const authPath = getAuthPath();
-  const dir = dirname(authPath);
-  if (!existsSync(dir)) {
-    await mkdir(dir, { recursive: true });
-  }
-  await writeFile(authPath, JSON.stringify(creds, null, 2), 'utf-8');
+  await mkdir(dirname(authPath), { recursive: true, mode: 0o700 });
+  await writeFile(authPath, content, { encoding: 'utf-8', mode: 0o600 });
+  // writeFile's mode only applies on create; enforce it on an existing file too.
+  await chmod(authPath, 0o600).catch(() => {});
 }
 
 /**
@@ -111,12 +116,7 @@ export async function readAuthFile(): Promise<AuthFile> {
  * Write auth.json in multi-provider format. Creates parent directory if needed.
  */
 export async function writeAuthFile(authFile: AuthFile): Promise<void> {
-  const authPath = getAuthPath();
-  const dir = dirname(authPath);
-  if (!existsSync(dir)) {
-    await mkdir(dir, { recursive: true });
-  }
-  await writeFile(authPath, JSON.stringify(authFile, null, 2), 'utf-8');
+  await writeAuthJson(JSON.stringify(authFile, null, 2));
 }
 
 /**
@@ -147,7 +147,10 @@ export async function resolveGitHubToken(): Promise<TokenSource | null> {
  * Fetch a Copilot API token using the GitHub OAuth token.
  * Caches the result in auth.json. Proactively refreshes if < 5 min remaining.
  */
-export async function getCopilotToken(githubToken: string): Promise<string> {
+export async function getCopilotToken(
+  githubToken: string,
+  opts: { fromEnv?: boolean } = {},
+): Promise<string> {
   // Check cached token
   const creds = await readAuthCredentials();
   if (creds?.copilot_token && creds.copilot_token_expires_at) {
@@ -175,14 +178,19 @@ export async function getCopilotToken(githubToken: string): Promise<string> {
 
   const data = (await response.json()) as CopilotTokenResponse;
 
-  // Cache in auth.json
-  const updatedCreds: AuthCredentials = {
-    ...(creds ?? { github_token: githubToken }),
-    github_token: githubToken,
-    copilot_token: data.token,
-    copilot_token_expires_at: data.expires_at,
-  };
-  await writeAuthCredentials(updatedCreds);
+  // Never persist a token that came from the environment: writing it to auth.json
+  // replaced the `auth login` token on disk and left a CI token behind (A1/S6). The env
+  // token is present every run anyway, so there is nothing to cache.
+  if (!opts.fromEnv) {
+    const updatedCreds: AuthCredentials = {
+      ...(creds ?? {}),
+      // keep the stored login token; only adopt the passed token if none is stored
+      github_token: creds?.github_token ?? githubToken,
+      copilot_token: data.token,
+      copilot_token_expires_at: data.expires_at,
+    };
+    await writeAuthCredentials(updatedCreds);
+  }
 
   return data.token;
 }
@@ -216,7 +224,8 @@ export async function callCopilot(
     });
   };
 
-  let copilotToken = await getCopilotToken(tokenSource.token);
+  const fromEnv = tokenSource.source !== 'auth.json';
+  let copilotToken = await getCopilotToken(tokenSource.token, { fromEnv });
   let response = await doRequest(copilotToken);
 
   // Reactive retry on 401 (token may have been revoked or clock skew)
@@ -228,7 +237,7 @@ export async function callCopilot(
       creds.copilot_token_expires_at = undefined;
       await writeAuthCredentials(creds);
     }
-    copilotToken = await getCopilotToken(tokenSource.token);
+    copilotToken = await getCopilotToken(tokenSource.token, { fromEnv });
     response = await doRequest(copilotToken);
   }
 
@@ -245,7 +254,15 @@ export async function callCopilot(
     throw new Error(`Copilot API error (${response.status}): ${body || response.statusText}`);
   }
 
-  return (await response.json()) as ChatCompletionResponse;
+  const result = (await response.json()) as ChatCompletionResponse;
+  // A completion cut off at the model's output limit is truncated: reject it so a
+  // half-written file never passes the resolution gate and gets committed (A2).
+  if (result.choices?.[0]?.finish_reason === 'length') {
+    throw new Error(
+      'Copilot response was truncated (hit the model output limit); refusing to use a partial result',
+    );
+  }
+  return result;
 }
 
 /**
@@ -260,7 +277,9 @@ export async function fetchCopilotModels(): Promise<CopilotModelEntry[] | null> 
   }
 
   try {
-    const copilotToken = await getCopilotToken(tokenSource.token);
+    const copilotToken = await getCopilotToken(tokenSource.token, {
+      fromEnv: tokenSource.source !== 'auth.json',
+    });
     const response = await fetch(COPILOT_MODELS_URL, {
       headers: {
         Authorization: `Bearer ${copilotToken}`,
@@ -312,14 +331,21 @@ export async function requireGitHubToken(): Promise<TokenSource> {
 
   // Try git credential helper
   const gitToken = await new Promise<string | null>((resolve) => {
-    const child = execFile('git', ['credential', 'fill'], { timeout: 5000 }, (err, stdout) => {
-      if (err) {
-        resolve(null);
-        return;
-      }
-      const match = stdout.match(/password=(.+)/);
-      resolve(match ? match[1].trim() : null);
-    });
+    // Run from a neutral directory with prompting disabled, so a repo-local
+    // `credential.helper` in the current repo cannot execute or block (S4).
+    const child = execFile(
+      'git',
+      ['credential', 'fill'],
+      { timeout: 5000, cwd: tmpdir(), env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } },
+      (err, stdout) => {
+        if (err) {
+          resolve(null);
+          return;
+        }
+        const match = stdout.match(/password=(.+)/);
+        resolve(match ? match[1].trim() : null);
+      },
+    );
     child.stdin?.write('protocol=https\nhost=github.com\n\n');
     child.stdin?.end();
   });
@@ -343,7 +369,7 @@ export async function printAuthStatus(): Promise<void> {
 
     // Check Copilot access
     try {
-      await getCopilotToken(tokenSource.token);
+      await getCopilotToken(tokenSource.token, { fromEnv: tokenSource.source !== 'auth.json' });
       console.log(chalk.green('    Copilot:      ✓ accessible'));
     } catch {
       console.log(chalk.yellow('    Copilot:      ✗ not accessible'));
