@@ -324,3 +324,33 @@ describe('compare correctness (G1, G3)', () => {
     expect(commits.map((c) => c.message)).toEqual(['c2', 'c1']);
   });
 });
+
+describe('withRepoGuard restores the start branch and stash (spec §1.4/§3.2)', () => {
+  it('a dirty start branch is restored, with its stash, after a merge onto another branch', async () => {
+    const repo = await makeRepo({
+      commits: [
+        { message: 'base', files: { 'f.txt': 'base\n' } },
+        { branch: 'staging', message: 's', files: { 's.txt': 's\n' } },
+        { branch: 'develop', from: 'main', message: 'd', files: { 'g.txt': 'd\n' } },
+      ],
+      checkout: 'main',
+    });
+    const git = new GitOperations(repo.path);
+    // uncommitted edit to a tracked file on the start branch (main)
+    writeFileSync(join(repo.path, 'f.txt'), 'DIRTY-ON-MAIN\n');
+
+    await git.withRepoGuard('merge develop → staging', async () => {
+      await git.merge('develop', 'staging');
+    });
+
+    // back on the branch we started on
+    expect(await git.getCurrentBranch()).toBe('main');
+    // the uncommitted edit came back on main, not on staging
+    expect(readFileSync(join(repo.path, 'f.txt'), 'utf-8')).toBe('DIRTY-ON-MAIN\n');
+    // nothing left stashed
+    expect((await repo.git.stashList()).all.length).toBe(0);
+    // the merge landed on staging (g.txt from develop is present there)
+    await repo.git.checkout('staging');
+    expect((await repo.git.raw(['ls-files', 'g.txt'])).trim()).toBe('g.txt');
+  });
+});
