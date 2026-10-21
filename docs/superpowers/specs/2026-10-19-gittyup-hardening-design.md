@@ -244,7 +244,7 @@ The Copilot OAuth token is never offered to octokit. `GitHubClient.create()` use
 ## 7. Testing
 
 - **Unit** (co-located, vitest, `makeRepo` fixtures): parser, gate, suggest extraction, guard restore/stash paths, cherry-pick resume/abort, escalation tree, template substitution, remote URL parsing, token cascade order, config validation. Target: every bug in §1 has a test that failed before its slice and passes after.
-- **E2E** (`tests/e2e/`, built CLI via `bin/gittyup.mjs`): `init`, `config --ai bad`, `merge --no-fetch` on a two-repo fixture driven by stdin answers, `npm pack --dry-run` contents.
+- **E2E** (`tests/e2e/`, built CLI via `bin/gittyup.mjs`): `init`, `config --ai bad`, `npm pack --dry-run` contents. Resolver flows are unit-tested through the `ResolverPrompts` seam with scripted answers: stdin-driven prompts are not viable (inquirer drops keystrokes after the first prompt once stdin is at EOF, verified 2026-10-19).
 - **Manual once per release:** `auth login` → `auth status` shows Copilot ✓ and GitHub API source `gh-cli`; `merge --branch --push --pr` against a scratch GitHub repo opens one PR with a fully substituted body.
 - CI: the `js` job runs `pnpm -r test` (unit only once the configs split) plus a dedicated `pnpm --filter @helmsmith/gittyup test:e2e` step beside storybrokr's; it needs `git` on the runner (present) and no network.
 

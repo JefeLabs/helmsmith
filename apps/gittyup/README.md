@@ -68,6 +68,7 @@ groups:
           prod: main
 settings:
   ai_mode: suggest
+  ai_model: gpt-4o
   github:
     token_env: GITHUB_TOKEN
 ```
@@ -257,8 +258,8 @@ When a merge or cherry-pick hits conflicts, gittyup drops you into an **interact
     export const API_URL = "https://api.example.com";
 
 ? How to resolve src/config.ts?
-  🤖 AI auto-resolve (Claude merges both sides)
-  💡 AI suggest (Claude proposes, you approve)
+  🤖 AI auto-resolve (gpt-4o writes the merged file)
+  💡 AI suggest (gpt-4o proposes, you approve)
   ⬅️  Keep OURS (current branch version)
   ➡️  Keep THEIRS (incoming version)
   ✏️  Manual edit
@@ -270,11 +271,13 @@ When a merge or cherry-pick hits conflicts, gittyup drops you into an **interact
 
 | Mode | Behavior |
 |------|----------|
-| `auto` | Claude attempts merge automatically. Falls back to manual on failure. |
-| `suggest` | Claude proposes a resolution. You accept, edit, or reject. |
-| `manual` | Standard manual resolution. AI options available on request. |
+| `auto` | The model writes the complete merged file. You see a line diff against OURS and confirm (skip the confirmation with `--yes`). |
+| `suggest` | The model explains its resolution, then proposes the complete file in a code block. Accept, edit, or reject. |
+| `manual` | Your editor opens the conflicted file with its markers. A resolution that still has markers, is empty, or is a one-line fragment is refused and the editor reopens. |
 
-Set the mode globally (`gittyup config --ai suggest`) or per-operation (`--ai auto`).
+Every resolution, AI or manual, passes one gate before it is written: no conflict markers, never a fragment in place of the whole file. The model receives the complete OURS, THEIRS and BASE versions, not just the conflicting hunks.
+
+Set the mode globally (`gittyup config --ai suggest`) or per-operation (`--ai auto`). Set the model with `gittyup config --model <id>` (`settings.ai_model`, default `gpt-4o`); `gittyup auth models` lists what your Copilot plan offers.
 
 ### Escalation
 

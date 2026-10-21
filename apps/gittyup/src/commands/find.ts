@@ -215,7 +215,7 @@ export function registerFind(program: Command): void {
             while (true) {
               const result = await groupAssigner({
                 message: 'Assign repos to groups (press 0-9 to assign):',
-                repos: selected.map((r) => ({ name: r.name, path: r.relativePath })),
+                repos: selected.map((r) => ({ name: r.name, path: r.absolutePath })),
                 groups: groupsList,
                 assignments: currentAssignments,
                 pageSize: 20,
@@ -276,7 +276,7 @@ export function registerFind(program: Command): void {
             while (true) {
               const result = await tagAssigner({
                 message: 'Assign tags to repos (press 0-9 to toggle):',
-                repos: selected.map((r) => ({ name: r.name, path: r.relativePath })),
+                repos: selected.map((r) => ({ name: r.name, path: r.absolutePath })),
                 tags: tagsList,
                 assignments: currentTagAssignments,
                 pageSize: 20,
@@ -329,7 +329,7 @@ export function registerFind(program: Command): void {
         const targetGroup = repoGroupMap.get(repo.name) ?? 'default';
         const repoConfig: RepoConfig = {
           name: repo.name,
-          path: repo.relativePath,
+          path: repo.absolutePath,
           remote: 'origin',
           url: repo.remoteUrl,
           branches: { dev: 'develop', staging: 'staging', prod: 'main' },

@@ -41,6 +41,9 @@ export function registerCompare(program: Command): void {
         cache.prune();
 
         const cacheKey = CliCache.buildKey('compare', {
+          // Namespace by the resolved manifest, so one workspace is never served another
+          // workspace's cached compare rows (G24).
+          manifest: manifest.manifestPath,
           left,
           right,
           group: opts.group,

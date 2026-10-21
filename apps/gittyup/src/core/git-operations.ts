@@ -1,20 +1,82 @@
-import { readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { execFile } from 'node:child_process';
+import { existsSync, lstatSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { dirname, join, sep } from 'node:path';
+import { promisify } from 'node:util';
 import simpleGit, { type SimpleGit, type StatusResult } from 'simple-git';
 import { APP_NAME } from '../config/branding.js';
-import type { ConflictFile, RepoBranchState, RepoState } from '../config/schema.js';
+import type { ConflictFile, ConflictHunk, RepoBranchState, RepoState } from '../config/schema.js';
+import { checkResolution, ResolutionRejected } from './resolution-gate.js';
 
 /**
  * Low-level git operations for a single repository.
  * Wraps simple-git with methods for merge, cherry-pick, conflict detection, and resolution.
  */
+const execFileAsync = promisify(execFile);
+
 export class GitOperations {
   private git: SimpleGit;
   private repoPath: string;
 
   constructor(repoPath: string) {
     this.repoPath = repoPath;
-    this.git = simpleGit(repoPath);
+    // Neutralise the repo-config vectors that run a command when gittyup *inspects* a
+    // repository it did not create (S1): `core.fsmonitor`, hooks, the pager, an external
+    // diff driver and the askpass helper all execute code straight from the repo's own
+    // config, and gittyup is routinely pointed at cloned repos. `-c key=val` here prefixes
+    // every command simple-git runs. This is not a complete sandbox: write/network-time
+    // vectors that are also legitimate (gpg.program via signing, core.sshCommand,
+    // credential.helper, merge/filter drivers) are NOT blanket-overridden here because
+    // doing so breaks signing, ssh remotes and private-repo auth; they are handled by
+    // refusing a repo whose local config defines them (tracked separately).
+    // simple-git refuses to put these config keys on the command line unless the matching
+    // `allowUnsafe*` flag is set. Here the values are fixed constants that *disable* each
+    // vector (never untrusted input), so enabling the flags only lets our own override
+    // through; it does not relax anything for the repo's own config.
+    this.git = simpleGit(repoPath, {
+      config: [
+        'core.fsmonitor=false',
+        'core.hooksPath=/dev/null',
+        'core.pager=cat',
+        'diff.external=',
+        'core.askpass=',
+      ],
+      unsafe: {
+        allowUnsafeFsMonitor: true,
+        allowUnsafeHooksPath: true,
+        allowUnsafePager: true,
+        allowUnsafeDiffExternal: true,
+        allowUnsafeAskPass: true,
+      },
+    });
+  }
+
+  /**
+   * Reject a ref that git would parse as an option (starts with `-`). Branch names and
+   * aliases come from the manifest and the CLI; `git log --output=…`, `git merge
+   * --upload-pack=…` and friends would otherwise write files or run commands (S5).
+   */
+  private assertSafeRef(ref: string): void {
+    if (ref.startsWith('-')) {
+      throw new Error(`refusing an option-like ref: ${JSON.stringify(ref)}`);
+    }
+  }
+
+  /**
+   * Switch HEAD to a real branch. A bare `git checkout <name>` also accepts a *path*, so a
+   * target that happens to match a tracked file/directory (but is not a branch) would
+   * restore those paths and leave HEAD where it was — and the subsequent merge/pick would
+   * land on the *current* branch while the result row still showed success (G2). Verify
+   * HEAD actually moved to the named branch, or refuse.
+   */
+  private async switchToBranch(target: string): Promise<void> {
+    this.assertSafeRef(target);
+    await this.git.checkout(target);
+    const current = await this.getCurrentBranch();
+    if (current !== target) {
+      throw new Error(
+        `"${target}" is not a branch (checkout left HEAD on ${current}); refusing to operate on the wrong branch`,
+      );
+    }
   }
 
   // ─── State Inspection ──────────────────────────────────────────────
@@ -30,9 +92,10 @@ export class GitOperations {
 
   /** Get detailed state for a single branch (ahead/behind, dirty, last commit). */
   async getBranchState(branchName: string, trackingBranch?: string): Promise<RepoBranchState> {
+    this.assertSafeRef(branchName);
+    if (trackingBranch) this.assertSafeRef(trackingBranch);
     try {
-      const log = await this.git.log({ maxCount: 1, from: branchName });
-      const latest = log.latest;
+      const latest = (await this.listCommits(branchName, 1))[0];
       const tracking = trackingBranch ?? `origin/${branchName}`;
 
       let ahead = 0;
@@ -122,7 +185,10 @@ export class GitOperations {
   // ─── Fetch ─────────────────────────────────────────────────────────
 
   async fetch(remote = 'origin'): Promise<void> {
-    await this.git.fetch(remote, { '--prune': null });
+    this.assertSafeRef(remote);
+    // `raw`, not simple-git's `.fetch()`: the latter resolves even when git exits non-zero
+    // (e.g. the remote does not exist), so a failed fetch was reported as success (C8).
+    await this.git.raw(['fetch', '--prune', '--end-of-options', remote]);
   }
 
   // ─── Merge Operations ─────────────────────────────────────────────
@@ -131,9 +197,10 @@ export class GitOperations {
     sourceBranch: string,
     targetBranch: string,
   ): Promise<{ success: boolean; conflicts: string[] }> {
-    await this.git.checkout(targetBranch);
+    this.assertSafeRef(sourceBranch);
+    await this.switchToBranch(targetBranch);
     try {
-      await this.git.merge([sourceBranch, '--no-ff']);
+      await this.git.merge(['--no-ff', '--end-of-options', sourceBranch]);
       return { success: true, conflicts: [] };
     } catch {
       const status = await this.git.status();
@@ -150,19 +217,25 @@ export class GitOperations {
     commits: string[],
     targetBranch: string,
   ): Promise<{ success: boolean; applied: string[]; failedAt?: string; conflicts: string[] }> {
-    await this.git.checkout(targetBranch);
+    for (const sha of commits) this.assertSafeRef(sha);
+    await this.switchToBranch(targetBranch);
     const applied: string[] = [];
 
     for (const sha of commits) {
       try {
-        await this.git.raw(['cherry-pick', sha]);
+        // `--empty=drop`: a commit whose change is already present on the target becomes
+        // empty and is dropped instead of stopping the sequence with a dangling
+        // CHERRY_PICK_HEAD — common in back-publish where a fix reached the branch another
+        // way (G15). Default behaviour is to stop, which read as a hard failure.
+        await this.git.raw(['cherry-pick', '--empty=drop', '--end-of-options', sha]);
         applied.push(sha);
-      } catch {
+      } catch (err) {
         const status = await this.git.status();
         if (status.conflicted.length > 0) {
           return { success: false, applied, failedAt: sha, conflicts: status.conflicted };
         }
-        throw new Error(`cherry-pick failed on ${sha}`);
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new Error(`cherry-pick failed on ${sha}: ${msg.split('\n')[0]}`);
       }
     }
     return { success: true, applied, conflicts: [] };
@@ -181,65 +254,213 @@ export class GitOperations {
   async createConflictBranch(prefix: string, label: string): Promise<string> {
     const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const branchName = `${prefix}/${label}-${ts}`;
+    this.assertSafeRef(branchName);
     await this.git.checkoutLocalBranch(branchName);
     return branchName;
   }
 
   // ─── Conflict Inspection ──────────────────────────────────────────
 
+  /**
+   * Every conflicted path with the complete file from each index stage
+   * (:1 base, :2 ours, :3 theirs) plus the marked working copy. A stage
+   * that does not exist (the side deleted the file) is `undefined`.
+   */
   async getConflictedFiles(): Promise<ConflictFile[]> {
     const status = await this.git.status();
     const files: ConflictFile[] = [];
 
     for (const filePath of status.conflicted) {
       const fullPath = join(this.repoPath, filePath);
-      let content = '';
+      let markedContent = '';
       try {
-        content = readFileSync(fullPath, 'utf-8');
+        // Never dereference a symlinked worktree path, or one reached through a
+        // symlinked directory: a theirs/ours side that replaced the file (or a parent)
+        // with a symlink would otherwise read a file from OUTSIDE the repo into
+        // markedContent, which is then sent to the AI (S3). The index stage blobs below
+        // are the trustworthy source.
+        if (!lstatSync(fullPath).isSymbolicLink() && this.resolvesInsideRepo(fullPath)) {
+          markedContent = readFileSync(fullPath, 'utf-8');
+        }
       } catch {
-        continue;
+        /* absent on disk (deleted by one side) */
       }
-
-      const { ours, theirs, base } = this.parseConflictMarkers(content);
-      files.push({ path: filePath, oursContent: ours, theirsContent: theirs, baseContent: base });
+      const [base, ours, theirs] = await Promise.all([
+        this.showStage(1, filePath),
+        this.showStage(2, filePath),
+        this.showStage(3, filePath),
+      ]);
+      files.push({
+        path: filePath,
+        markedContent,
+        ours,
+        theirs,
+        base,
+        hunks: parseConflictHunks(markedContent),
+      });
     }
     return files;
   }
 
-  private parseConflictMarkers(content: string): { ours: string; theirs: string; base: string } {
-    const lines = content.split('\n');
-    let ours = '',
-      theirs = '',
-      base = '';
-    let section: 'none' | 'ours' | 'base' | 'theirs' = 'none';
-
-    for (const line of lines) {
-      if (line.startsWith('<<<<<<<')) section = 'ours';
-      else if (line.startsWith('|||||||')) section = 'base';
-      else if (line.startsWith('=======')) section = 'theirs';
-      else if (line.startsWith('>>>>>>>')) section = 'none';
-      else if (section === 'ours') ours += `${line}\n`;
-      else if (section === 'base') base += `${line}\n`;
-      else if (section === 'theirs') theirs += `${line}\n`;
+  /** `git show :<stage>:<path>`, or undefined when that stage is absent. */
+  private async showStage(stage: 1 | 2 | 3, filePath: string): Promise<string | undefined> {
+    try {
+      return await this.git.show([`:${stage}:${filePath}`]);
+    } catch {
+      return undefined;
     }
-    return { ours: ours.trimEnd(), theirs: theirs.trimEnd(), base: base.trimEnd() };
+  }
+
+  /**
+   * Whether merging `sourceRef` into `targetRef` would conflict, via `git merge-tree`.
+   * merge-tree reports conflicts by *exit code 1* (writing the tree/conflicts to stdout),
+   * which simple-git treats as success — so the old check never saw a conflict (G1). This
+   * reads the real exit code with execFile: 0 = clean, 1 = conflicts, anything else is a
+   * genuine error (bad ref, git < 2.38) and is thrown, not guessed.
+   */
+  async hasMergeConflicts(targetRef: string, sourceRef: string): Promise<boolean> {
+    this.assertSafeRef(targetRef);
+    this.assertSafeRef(sourceRef);
+    try {
+      await execFileAsync('git', [
+        '-C',
+        this.repoPath,
+        'merge-tree',
+        '--write-tree',
+        '--no-messages',
+        '--end-of-options',
+        targetRef,
+        sourceRef,
+      ]);
+      return false;
+    } catch (err) {
+      if ((err as { code?: number }).code === 1) return true;
+      throw err;
+    }
   }
 
   // ─── Resolution ───────────────────────────────────────────────────
 
-  async resolveFile(filePath: string, content: string): Promise<void> {
-    writeFileSync(join(this.repoPath, filePath), content, 'utf-8');
-    await this.git.add(filePath);
+  /**
+   * The only path that writes a resolved file. Runs the gate first and
+   * throws `ResolutionRejected` (file untouched, still conflicted) when
+   * it refuses; otherwise writes the content and stages the path.
+   */
+  async applyResolution(file: ConflictFile, content: string): Promise<void> {
+    const verdict = checkResolution(content, file);
+    if (!verdict.ok) throw new ResolutionRejected(file.path, verdict.reason);
+    this.assertSafeWriteTarget(file.path);
+    writeFileSync(join(this.repoPath, file.path), content, 'utf-8');
+    await this.git.raw(['--literal-pathspecs', 'add', '--', file.path]);
   }
 
-  async resolveUseOurs(filePath: string): Promise<void> {
-    await this.git.raw(['checkout', '--ours', filePath]);
-    await this.git.add(filePath);
+  /**
+   * Refuse to write a resolution through a symlink or to a path that escapes the repo
+   * (S2/G21). A theirs/ours side that turned the file into a symlink would otherwise
+   * send the resolution to wherever it points — `~/.ssh/authorized_keys`, a sibling
+   * repo's hooks, a file outside the repo. The index keeps the symlink; the fix is the
+   * user's to make with ours/theirs, not a whole-file write.
+   */
+  private assertSafeWriteTarget(filePath: string): void {
+    const target = join(this.repoPath, filePath);
+    if (lstatSync(target, { throwIfNoEntry: false })?.isSymbolicLink()) {
+      throw new ResolutionRejected(filePath, 'refusing to write through a symlink');
+    }
+    if (!this.resolvesInsideRepo(target)) {
+      throw new ResolutionRejected(filePath, 'refusing to write outside the repository');
+    }
   }
 
-  async resolveUseTheirs(filePath: string): Promise<void> {
-    await this.git.raw(['checkout', '--theirs', filePath]);
-    await this.git.add(filePath);
+  /**
+   * True when `target` (a path under the repo) stays inside the repo once every path
+   * component is resolved — so neither the final component nor an intermediate directory
+   * is a symlink escaping the repo. Used on both the resolution write and the conflict
+   * read, so a symlinked path can neither be written through nor read from (S2/S3/G21).
+   */
+  private resolvesInsideRepo(target: string): boolean {
+    const root = realpathSync(this.repoPath);
+    try {
+      // realpath the directory (the file itself may be a symlink we want to detect, or
+      // may legitimately not exist yet on the write path); dirname resolution still
+      // catches a symlinked intermediate directory.
+      const dir = realpathSync(dirname(target));
+      return dir === root || dir.startsWith(root + sep);
+    } catch {
+      return false;
+    }
+  }
+
+  /** Keep our side. When our side deleted the file, the resolution is the deletion. */
+  async resolveUseOurs(file: ConflictFile): Promise<void> {
+    await this.resolveUseSide(file, file.ours, '--ours');
+  }
+
+  /** Keep their side. When their side deleted the file, the resolution is the deletion. */
+  async resolveUseTheirs(file: ConflictFile): Promise<void> {
+    await this.resolveUseSide(file, file.theirs, '--theirs');
+  }
+
+  /**
+   * Keep one side. Whether the side was *deleted* is decided from `git ls-files -u`
+   * (authoritative), not from whether `git show` printed it: a gitlink (submodule) or
+   * other non-blob stage is present but unprintable, and treating it as deleted used to
+   * `git rm` the submodule when the user asked to keep it (G6). A stage that is genuinely
+   * absent is resolved by deletion; a present stage is checked out and staged.
+   */
+  private async resolveUseSide(
+    file: ConflictFile,
+    side: string | undefined,
+    flag: '--ours' | '--theirs',
+  ): Promise<void> {
+    const stage = flag === '--ours' ? 2 : 3;
+    const entry = await this.stageEntry(stage, file.path);
+    if (!entry) {
+      if (side === undefined) {
+        // Genuinely deleted on this side → resolve by deletion; git removes the index
+        // entries and the working-tree file, so no filesystem handling here.
+        await this.git.raw(['--literal-pathspecs', 'rm', '-q', '--', file.path]);
+        return;
+      }
+      // The loaded ConflictFile claims this side has content, but the index has no such
+      // stage — refuse loudly rather than silently delete.
+      throw new ResolutionRejected(
+        file.path,
+        `keep-${flag === '--ours' ? 'ours' : 'theirs'} but stage ${stage} is not in the index`,
+      );
+    }
+    if (entry.mode === '160000') {
+      // A gitlink (submodule): resolve it in the index directly. `git checkout <flag>`
+      // would try to populate the submodule working tree and fail; treating it as a
+      // deletion used to git-rm the submodule (G6). Keep the gitlink by collapsing the
+      // conflicted stages to a resolved stage-0 entry at the same commit.
+      await this.git.raw(['update-index', '--cacheinfo', `160000,${entry.sha},${file.path}`]);
+      return;
+    }
+    // A normal blob present on this side: check it out and stage it.
+    await this.git.raw(['--literal-pathspecs', 'checkout', flag, '--', file.path]);
+    await this.git.raw(['--literal-pathspecs', 'add', '--', file.path]);
+  }
+
+  /**
+   * The `git ls-files -u` entry for a stage of a path, or null when that stage is absent.
+   * Lines look like `<mode> <sha> <stage>\t<path>`; this reads the index and so is
+   * authoritative where `git show` is not — a gitlink stage is present but unprintable.
+   */
+  private async stageEntry(
+    stage: 1 | 2 | 3,
+    filePath: string,
+  ): Promise<{ mode: string; sha: string } | null> {
+    // `--literal-pathspecs` so a glob-magic filename is not treated as a pattern, `-z`
+    // so the path is unquoted and NUL-delimited, and an exact path-field match so a
+    // stray record can never point the caller's index write at a different file.
+    const out = await this.git.raw(['--literal-pathspecs', 'ls-files', '-u', '-z', '--', filePath]);
+    for (const record of out.split('\0')) {
+      const m = record.match(/^(\d{6}) ([0-9a-f]+) (\d)\t(.*)$/s);
+      if (m && Number(m[3]) === stage && m[4] === filePath) {
+        return { mode: m[1], sha: m[2] };
+      }
+    }
+    return null;
   }
 
   async commitResolution(message?: string): Promise<string> {
@@ -258,20 +479,34 @@ export class GitOperations {
     branch: string,
     maxCount = 50,
   ): Promise<Array<{ hash: string; date: string; message: string; author: string }>> {
-    const log = await this.git.log({ maxCount, from: branch });
-    return log.all.map((c) => ({
-      hash: c.hash,
-      date: c.date,
-      message: c.message,
-      author: c.author_name,
-    }));
+    this.assertSafeRef(branch);
+    // Read the named branch's own history, not a `branch...HEAD` range: simple-git turns
+    // `log({ from })` into a symmetric range against HEAD, so the dashboard, compare and
+    // `pick -i` all showed commits relative to whatever was checked out (G3).
+    const US = '\x1f';
+    const out = await this.git.raw([
+      'log',
+      `-n${maxCount}`,
+      `--format=%H${US}%aI${US}%an${US}%s`,
+      '--end-of-options',
+      branch,
+    ]);
+    return out
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => {
+        const [hash, date, author, message] = line.split(US);
+        return { hash, date, message, author };
+      });
   }
 
   // ─── Branch Operations ────────────────────────────────────────────
 
   async branchExists(name: string): Promise<boolean> {
+    // An option-like name is not a branch; return false rather than let it reach git.
+    if (name.startsWith('-')) return false;
     try {
-      await this.git.raw(['rev-parse', '--verify', name]);
+      await this.git.raw(['rev-parse', '--verify', '--end-of-options', name]);
       return true;
     } catch {
       return false;
@@ -279,12 +514,101 @@ export class GitOperations {
   }
 
   async checkout(branch: string): Promise<void> {
+    this.assertSafeRef(branch);
     await this.git.checkout(branch);
   }
 
   async push(remote = 'origin', branch?: string): Promise<void> {
+    this.assertSafeRef(remote);
     const b = branch ?? (await this.getCurrentBranch());
+    this.assertSafeRef(b);
     await this.git.push(remote, b, ['--set-upstream']);
+  }
+
+  /** True when `git rev-parse -q --verify <ref>` succeeds (the ref/pseudo-ref exists). */
+  private async refExists(ref: string): Promise<boolean> {
+    try {
+      // No `-q`: it suppresses stderr, and simple-git resolves (rather than rejects) a
+      // non-zero exit with empty stderr, which would make every ref look present.
+      await this.git.raw(['rev-parse', '--verify', ref]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Refuse to start an operation on a repo that is already mid-merge, mid-cherry-pick,
+   * mid-revert, mid-rebase, or carrying an unmerged index — operating on top of that state
+   * compounds the mess rather than doing what the user asked (G12). The message names the
+   * state and how to clear it.
+   */
+  private async assertNoOperationInProgress(): Promise<void> {
+    for (const [ref, hint] of [
+      ['MERGE_HEAD', 'git merge --abort'],
+      ['CHERRY_PICK_HEAD', 'git cherry-pick --abort'],
+      ['REVERT_HEAD', 'git revert --abort'],
+    ] as const) {
+      if (await this.refExists(ref)) {
+        throw new Error(
+          `a ${ref} operation is already in progress — resolve it or run \`${hint}\``,
+        );
+      }
+    }
+    const gitDir = (await this.git.raw(['rev-parse', '--absolute-git-dir'])).trim();
+    if (existsSync(join(gitDir, 'rebase-merge')) || existsSync(join(gitDir, 'rebase-apply'))) {
+      throw new Error('a rebase is already in progress — resolve it or run `git rebase --abort`');
+    }
+    const status = await this.git.status();
+    if (status.conflicted.length > 0) {
+      throw new Error(
+        `the repo has unmerged paths (${status.conflicted.length}) — resolve them before starting`,
+      );
+    }
+  }
+
+  /**
+   * Run an operation and return the repo to the branch and working tree it started on
+   * (spec §3.2). Uncommitted changes are stashed on the start branch *before* the
+   * operation (so a branch switch can happen) and popped back there afterwards — not onto
+   * whatever branch the operation left checked out (spec §1.4). If the start branch can't
+   * be restored (the operation left the repo mid-conflict and the user kept it), the stash
+   * is left in place and named rather than popped onto the wrong tree.
+   */
+  async withRepoGuard<T>(label: string, fn: () => Promise<T>): Promise<T> {
+    await this.assertNoOperationInProgress();
+    const startBranch = await this.getCurrentBranch();
+    const stashed = await this.stash();
+    let error: unknown;
+    let result: T | undefined;
+    try {
+      result = await fn();
+    } catch (err) {
+      error = err;
+    }
+    let restored = true;
+    try {
+      await this.git.checkout(startBranch);
+    } catch {
+      restored = false;
+    }
+    if (stashed) {
+      if (restored) {
+        try {
+          await this.stashPop();
+        } catch {
+          console.error(
+            `  ${label}: stash kept on ${startBranch} (pop conflicted) — "git stash pop"`,
+          );
+        }
+      } else {
+        console.error(
+          `  ${label}: could not return to ${startBranch}; your changes are stashed — "git stash list"`,
+        );
+      }
+    }
+    if (error) throw error;
+    return result as T;
   }
 
   async stash(): Promise<boolean> {
@@ -300,4 +624,42 @@ export class GitOperations {
   get instance(): SimpleGit {
     return this.git;
   }
+}
+
+/**
+ * Split a marked file into its conflict regions. Lines are joined with
+ * `\n` regardless of the file's line endings; `base` is present only for
+ * diff3-style markers. Non-conflicting lines are dropped — this is for
+ * preview, never for writing.
+ */
+export function parseConflictHunks(marked: string): ConflictHunk[] {
+  const hunks: ConflictHunk[] = [];
+  let section: 'none' | 'ours' | 'base' | 'theirs' = 'none';
+  let ours: string[] = [];
+  let base: string[] | undefined;
+  let theirs: string[] = [];
+
+  for (const line of marked.split(/\r?\n/)) {
+    if (line.startsWith('<<<<<<<')) {
+      section = 'ours';
+      ours = [];
+      base = undefined;
+      theirs = [];
+    } else if (line.startsWith('|||||||') && section === 'ours') {
+      section = 'base';
+      base = [];
+    } else if (line.startsWith('=======') && (section === 'ours' || section === 'base')) {
+      section = 'theirs';
+    } else if (line.startsWith('>>>>>>>') && section === 'theirs') {
+      section = 'none';
+      hunks.push({
+        ours: ours.join('\n'),
+        theirs: theirs.join('\n'),
+        ...(base !== undefined ? { base: base.join('\n') } : {}),
+      });
+    } else if (section === 'ours') ours.push(line);
+    else if (section === 'base') base?.push(line);
+    else if (section === 'theirs') theirs.push(line);
+  }
+  return hunks;
 }

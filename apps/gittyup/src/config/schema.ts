@@ -52,6 +52,8 @@ export type GitHubSettings = z.infer<typeof GitHubSettingsSchema>;
 
 export const ManifestSettingsSchema = z.object({
   ai_mode: AiModeSchema.default('suggest'),
+  /** Model id passed to the AI provider; default 'gpt-4o' when unset. */
+  ai_model: z.string().optional(),
   github: GitHubSettingsSchema.default(() => GitHubSettingsSchema.parse({})),
   conflict_branch_prefix: z.string().default('conflict-resolution'),
   pr_template: z.string().optional(),
@@ -118,12 +120,25 @@ export interface RepoState {
 
 // ─── Conflict Types ────────────────────────────────────────────────
 
+/** One `<<<<<<< … >>>>>>>` region of a conflicted file, for preview only. */
+export interface ConflictHunk {
+  ours: string;
+  theirs: string;
+  /** Present only for diff3-style markers (`|||||||`). */
+  base?: string;
+}
+
 export interface ConflictFile {
   path: string;
-  oursContent: string;
-  theirsContent: string;
-  baseContent: string;
-  mergedContent?: string;
+  /** Working-tree content with markers; '' when the file is absent on disk. */
+  markedContent: string;
+  /** Complete file from index stage 2; undefined when this side deleted it. */
+  ours?: string;
+  /** Complete file from index stage 3; undefined when that side deleted it. */
+  theirs?: string;
+  /** Complete file from index stage 1; undefined for add/add conflicts. */
+  base?: string;
+  hunks: ConflictHunk[];
 }
 
 export interface ConflictSession {

@@ -1,9 +1,9 @@
-import { confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
 import type { Command } from 'commander';
 import { ManifestManager } from '../config/manifest.js';
 import type { AiMode, CherryPickTarget } from '../config/schema.js';
 import { Orchestrator } from '../core/orchestrator.js';
+import { confirmGate } from '../ui/confirm.js';
 
 export function registerPick(program: Command): void {
   program
@@ -20,6 +20,7 @@ export function registerPick(program: Command): void {
     .option('--push', 'Push after cherry-pick', false)
     .option('--pr', 'Create PRs', false)
     .option('--no-fetch', 'Skip fetching')
+    .option('-y, --yes', 'Skip the AI write confirmation', false)
     .action(
       async (opts: {
         group?: string;
@@ -32,6 +33,7 @@ export function registerPick(program: Command): void {
         push?: boolean;
         pr?: boolean;
         fetch?: boolean;
+        yes?: boolean;
       }) => {
         const manifest = new ManifestManager();
         const orchestrator = new Orchestrator(manifest);
@@ -84,18 +86,21 @@ export function registerPick(program: Command): void {
           for (const c of t.commits) console.log(chalk.dim(`      ${c.substring(0, 8)}`));
         }
 
-        const ok = await confirm({
-          message: `Proceed with cherry-pick across ${targets.length} repo(s)?`,
-          default: true,
+        const ok = await confirmGate(`Proceed with cherry-pick across ${targets.length} repo(s)?`, {
+          yes: opts.yes,
         });
         if (!ok) return;
 
-        await orchestrator.executeCherryPick(targets, {
+        const results = await orchestrator.executeCherryPick(targets, {
           aiMode: (opts.ai as AiMode) ?? undefined,
           push: opts.push,
           createPR: opts.pr,
           fetch: opts.fetch,
+          yes: opts.yes,
         });
+        if (results.some((r) => r.status === 'error' || r.status === 'conflict')) {
+          process.exitCode = 1;
+        }
       },
     );
 }

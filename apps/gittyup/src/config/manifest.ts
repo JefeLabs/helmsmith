@@ -124,7 +124,7 @@ export class ManifestManager {
   // ─── Init ─────────────────────────────────────────────────────────
 
   /** Create a new manifest file. Throws if one already exists. */
-  static init(dir?: string): ManifestManager {
+  static init(dir?: string, workspace?: string): ManifestManager {
     const targetDir = dir ?? APP_CONFIG_DIR;
     mkdirSync(targetDir, { recursive: true });
     const filePath = join(targetDir, MANIFEST_FILENAME);
@@ -134,7 +134,9 @@ export class ManifestManager {
     }
 
     const manifest = ManifestSchema.parse({
-      workspace: targetDir,
+      // The base for relative repo paths — where the user works, not the config directory
+      // (storing the config dir made every relative repo path resolve to nothing) (C3).
+      workspace: workspace ?? process.cwd(),
       settings: { pr_template: DEFAULT_PR_TEMPLATE },
     });
 
