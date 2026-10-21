@@ -15,6 +15,7 @@
   },
   "files": [
     "bin",
+    "bunfig.toml",
     "dist",
     "catalog.json",
     ".claude/commands",

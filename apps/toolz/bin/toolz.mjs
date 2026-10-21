@@ -17,9 +17,16 @@ if (!process.versions.bun) {
     bun = 'bun'; // no vendored bun resolvable — try a system Bun on PATH
   }
   const entry = fileURLToPath(new URL('../dist/cli.js', import.meta.url));
-  const { status, error } = spawnSync(bun, [entry, ...process.argv.slice(2)], {
-    stdio: 'inherit',
-  });
+  // --no-env-file / --config: Bun would otherwise auto-load `.env*` files and `bunfig.toml`
+  // (including its `preload` scripts) from the *current directory*, which is routinely a
+  // cloned repo — i.e. that repo's code would run. The package ships its own empty
+  // bunfig.toml so Bun never looks in the cwd.
+  const bunfig = fileURLToPath(new URL('../bunfig.toml', import.meta.url));
+  const { status, error } = spawnSync(
+    bun,
+    ['--no-env-file', `--config=${bunfig}`, entry, ...process.argv.slice(2)],
+    { stdio: 'inherit' },
+  );
   if (error) {
     console.error('This CLI requires the Bun runtime — install it from https://bun.sh');
     process.exit(1);
@@ -27,4 +34,6 @@ if (!process.versions.bun) {
   process.exit(status ?? 1);
 }
 
+// Already running under Bun (e.g. `bun x`): Bun has read the cwd's bunfig.toml and .env
+// before this file ran, and nothing here can undo that. The Node entry above is the guard.
 await import('../dist/cli.js');

@@ -9,6 +9,7 @@
   "main": "./dist/cli.js",
   "files": [
     "bin",
+    "bunfig.toml",
     "dist",
     "branding.yaml",
     "gittyup.example.yaml",

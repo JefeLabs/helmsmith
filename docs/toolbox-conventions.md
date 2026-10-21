@@ -262,22 +262,34 @@ missing script means that app silently doesn't get tested.
 
 ## Bin stub pattern
 
-`apps/<name>/bin/<name>.mjs`:
+`apps/<name>/bin/<name>.mjs` is a self-contained Node launcher that re-execs the bundle
+with the app's vendored Bun (copy it from an existing app, e.g. `apps/gittyup/bin/gittyup.mjs`):
 
 ```js
-#!/usr/bin/env bun
-import('../dist/cli.js');
+#!/usr/bin/env node
+// … resolve `bun` from require.resolve('bun/package.json'), fall back to `bun` on PATH …
+const entry = fileURLToPath(new URL('../dist/cli.js', import.meta.url));
+const bunfig = fileURLToPath(new URL('../bunfig.toml', import.meta.url));
+spawnSync(bun, ['--no-env-file', `--config=${bunfig}`, entry, ...process.argv.slice(2)], {
+  stdio: 'inherit',
+});
 ```
 
-Source lives in `src/cli.ts`. The stub exists so `npm run build` (tsup)
-can rewrite the import target without touching what npm publishes as
-the bin entry. **Don't** put TS source in `bin/` — npm consumers don't
+**Always pass `--no-env-file` and `--config=<package>/bunfig.toml`.** Without them Bun
+auto-loads `.env*` files and `bunfig.toml` from the *current directory* — and a
+`bunfig.toml` `preload` runs arbitrary code. Toolbox CLIs are routinely run inside cloned
+repos, so a missing flag means running a repo's code just by invoking the tool there.
+Ship an intentionally empty `bunfig.toml` at the package root and list it in `files`.
+An app that genuinely wants a `.env` reads it explicitly (see timetracker's
+`loadDotEnv`), never through Bun's auto-load. Every launcher has a
+`tests/e2e/launcher.test.ts` that plants a hostile `bunfig.toml` and `.env` in the cwd and
+asserts neither takes effect — copy it with the bin.
+
+Source lives in `src/cli.ts`. **Don't** put TS source in `bin/` — npm consumers don't
 get tsx/Bun for free, and the stub keeps the bin tiny and transparent.
 
-For apps without a separate `bin/` stub (gitradar today), tsup injects
-the shebang via the `banner.js` config option. Either pattern is fine;
-pick the stub pattern for new apps so the bin entry stays inspectable
-without a build step.
+gitradar uses a POSIX `sh` launcher (`apps/gitradar/bin/gitradar`) with the same two
+flags. Either is fine; pick the Node launcher for new apps.
 
 ## Bun distribution
 

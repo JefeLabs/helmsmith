@@ -1,0 +1,2 @@
+# Intentionally empty. bin/ starts Bun with `--config=<this file>` so that Bun never reads a
+# bunfig.toml (whose `preload` scripts run arbitrary code) from the directory the CLI is run in.
