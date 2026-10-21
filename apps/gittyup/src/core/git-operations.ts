@@ -520,6 +520,49 @@ export class GitOperations {
     await this.git.push(remote, b, ['--set-upstream']);
   }
 
+  /**
+   * Run an operation and return the repo to the branch and working tree it started on
+   * (spec §3.2). Uncommitted changes are stashed on the start branch *before* the
+   * operation (so a branch switch can happen) and popped back there afterwards — not onto
+   * whatever branch the operation left checked out (spec §1.4). If the start branch can't
+   * be restored (the operation left the repo mid-conflict and the user kept it), the stash
+   * is left in place and named rather than popped onto the wrong tree.
+   */
+  async withRepoGuard<T>(label: string, fn: () => Promise<T>): Promise<T> {
+    const startBranch = await this.getCurrentBranch();
+    const stashed = await this.stash();
+    let error: unknown;
+    let result: T | undefined;
+    try {
+      result = await fn();
+    } catch (err) {
+      error = err;
+    }
+    let restored = true;
+    try {
+      await this.git.checkout(startBranch);
+    } catch {
+      restored = false;
+    }
+    if (stashed) {
+      if (restored) {
+        try {
+          await this.stashPop();
+        } catch {
+          console.error(
+            `  ${label}: stash kept on ${startBranch} (pop conflicted) — "git stash pop"`,
+          );
+        }
+      } else {
+        console.error(
+          `  ${label}: could not return to ${startBranch}; your changes are stashed — "git stash list"`,
+        );
+      }
+    }
+    if (error) throw error;
+    return result as T;
+  }
+
   async stash(): Promise<boolean> {
     const result = await this.git.stash();
     return !result.includes('No local changes');

@@ -85,50 +85,50 @@ export class Orchestrator {
 
       try {
         const git = this.repoManager.getGit(target.repo);
-        const hadStash = await git.stash();
-        const mergeResult = await git.merge(target.sourceBranch, target.targetBranch);
+        await git.withRepoGuard(
+          `merge ${target.sourceBranch} → ${target.targetBranch} (${target.repo.name})`,
+          async () => {
+            const mergeResult = await git.merge(target.sourceBranch, target.targetBranch);
 
-        if (mergeResult.success) {
-          spinner.succeed(`  ${target.repo.name}: Merged cleanly`);
-          if (options.push) {
-            await git.push(target.repo.remote, target.targetBranch);
-            console.log(chalk.dim(`    Pushed to ${target.repo.remote}/${target.targetBranch}`));
-          }
-          results.push({
-            repo: target.repo.name,
-            status: 'success',
-            message: `Merged ${target.sourceBranch} → ${target.targetBranch}`,
-          });
-        } else {
-          spinner.warn(`  ${target.repo.name}: ${mergeResult.conflicts.length} conflict(s)`);
-          const resolver = new ConflictResolver(git, target.repo, aiMode, {
-            onAiResolve: this.createAiResolver(),
-            yes: options.yes,
-            modelName: this.aiModel,
-          });
-          const session = await resolver.startSession(
-            'merge',
-            target.sourceBranch,
-            target.targetBranch,
-          );
-          if (session.status === 'resolved' && options.push)
-            await git.push(target.repo.remote, target.targetBranch);
-          results.push({
-            repo: target.repo.name,
-            status: session.status === 'resolved' ? 'success' : 'conflict',
-            message:
-              session.status === 'resolved'
-                ? 'Conflicts resolved'
-                : `${session.files.length - session.resolvedFiles.length} unresolved`,
-            conflictSession: session,
-          });
-        }
-
-        if (hadStash) {
-          try {
-            await git.stashPop();
-          } catch {}
-        }
+            if (mergeResult.success) {
+              spinner.succeed(`  ${target.repo.name}: Merged cleanly`);
+              if (options.push) {
+                await git.push(target.repo.remote, target.targetBranch);
+                console.log(
+                  chalk.dim(`    Pushed to ${target.repo.remote}/${target.targetBranch}`),
+                );
+              }
+              results.push({
+                repo: target.repo.name,
+                status: 'success',
+                message: `Merged ${target.sourceBranch} → ${target.targetBranch}`,
+              });
+            } else {
+              spinner.warn(`  ${target.repo.name}: ${mergeResult.conflicts.length} conflict(s)`);
+              const resolver = new ConflictResolver(git, target.repo, aiMode, {
+                onAiResolve: this.createAiResolver(),
+                yes: options.yes,
+                modelName: this.aiModel,
+              });
+              const session = await resolver.startSession(
+                'merge',
+                target.sourceBranch,
+                target.targetBranch,
+              );
+              if (session.status === 'resolved' && options.push)
+                await git.push(target.repo.remote, target.targetBranch);
+              results.push({
+                repo: target.repo.name,
+                status: session.status === 'resolved' ? 'success' : 'conflict',
+                message:
+                  session.status === 'resolved'
+                    ? 'Conflicts resolved'
+                    : `${session.files.length - session.resolvedFiles.length} unresolved`,
+                conflictSession: session,
+              });
+            }
+          },
+        );
       } catch (err) {
         spinner.fail(`  ${target.repo.name}: Error`);
         results.push({
@@ -179,51 +179,49 @@ export class Orchestrator {
 
       try {
         const git = this.repoManager.getGit(target.repo);
-        const hadStash = await git.stash();
-        const cpResult = await git.cherryPick(target.commits, target.targetBranch);
+        await git.withRepoGuard(
+          `cherry-pick → ${target.targetBranch} (${target.repo.name})`,
+          async () => {
+            const cpResult = await git.cherryPick(target.commits, target.targetBranch);
 
-        if (cpResult.success) {
-          spinner.succeed(
-            `  ${target.repo.name}: Applied ${cpResult.applied.length} commit(s) cleanly`,
-          );
-          if (options.push) await git.push(target.repo.remote, target.targetBranch);
-          results.push({
-            repo: target.repo.name,
-            status: 'success',
-            message: `Applied ${cpResult.applied.length} commits to ${target.targetBranch}`,
-          });
-        } else {
-          spinner.warn(
-            `  ${target.repo.name}: Conflict at commit ${cpResult.failedAt?.substring(0, 8)}`,
-          );
-          const resolver = new ConflictResolver(git, target.repo, aiMode, {
-            onAiResolve: this.createAiResolver(),
-            yes: options.yes,
-            modelName: this.aiModel,
-          });
-          const session = await resolver.startSession(
-            'cherry-pick',
-            target.sourceBranch,
-            target.targetBranch,
-          );
-          if (session.status === 'resolved' && options.push)
-            await git.push(target.repo.remote, target.targetBranch);
-          results.push({
-            repo: target.repo.name,
-            status: session.status === 'resolved' ? 'success' : 'conflict',
-            message:
-              session.status === 'resolved'
-                ? `Resolved and applied ${target.commits.length} commits`
-                : `Conflict at ${cpResult.failedAt?.substring(0, 8)}`,
-            conflictSession: session,
-          });
-        }
-
-        if (hadStash) {
-          try {
-            await git.stashPop();
-          } catch {}
-        }
+            if (cpResult.success) {
+              spinner.succeed(
+                `  ${target.repo.name}: Applied ${cpResult.applied.length} commit(s) cleanly`,
+              );
+              if (options.push) await git.push(target.repo.remote, target.targetBranch);
+              results.push({
+                repo: target.repo.name,
+                status: 'success',
+                message: `Applied ${cpResult.applied.length} commits to ${target.targetBranch}`,
+              });
+            } else {
+              spinner.warn(
+                `  ${target.repo.name}: Conflict at commit ${cpResult.failedAt?.substring(0, 8)}`,
+              );
+              const resolver = new ConflictResolver(git, target.repo, aiMode, {
+                onAiResolve: this.createAiResolver(),
+                yes: options.yes,
+                modelName: this.aiModel,
+              });
+              const session = await resolver.startSession(
+                'cherry-pick',
+                target.sourceBranch,
+                target.targetBranch,
+              );
+              if (session.status === 'resolved' && options.push)
+                await git.push(target.repo.remote, target.targetBranch);
+              results.push({
+                repo: target.repo.name,
+                status: session.status === 'resolved' ? 'success' : 'conflict',
+                message:
+                  session.status === 'resolved'
+                    ? `Resolved and applied ${target.commits.length} commits`
+                    : `Conflict at ${cpResult.failedAt?.substring(0, 8)}`,
+                conflictSession: session,
+              });
+            }
+          },
+        );
       } catch (err) {
         spinner.fail(`  ${target.repo.name}: Error`);
         results.push({
