@@ -1,5 +1,7 @@
+import { execFile } from 'node:child_process';
 import { lstatSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join, sep } from 'node:path';
+import { promisify } from 'node:util';
 import simpleGit, { type SimpleGit, type StatusResult } from 'simple-git';
 import { APP_NAME } from '../config/branding.js';
 import type { ConflictFile, ConflictHunk, RepoBranchState, RepoState } from '../config/schema.js';
@@ -9,6 +11,8 @@ import { checkResolution, ResolutionRejected } from './resolution-gate.js';
  * Low-level git operations for a single repository.
  * Wraps simple-git with methods for merge, cherry-pick, conflict detection, and resolution.
  */
+const execFileAsync = promisify(execFile);
+
 export class GitOperations {
   private git: SimpleGit;
   private repoPath: string;
@@ -91,8 +95,7 @@ export class GitOperations {
     this.assertSafeRef(branchName);
     if (trackingBranch) this.assertSafeRef(trackingBranch);
     try {
-      const log = await this.git.log({ maxCount: 1, from: branchName });
-      const latest = log.latest;
+      const latest = (await this.listCommits(branchName, 1))[0];
       const tracking = trackingBranch ?? `origin/${branchName}`;
 
       let ahead = 0;
@@ -303,6 +306,34 @@ export class GitOperations {
     }
   }
 
+  /**
+   * Whether merging `sourceRef` into `targetRef` would conflict, via `git merge-tree`.
+   * merge-tree reports conflicts by *exit code 1* (writing the tree/conflicts to stdout),
+   * which simple-git treats as success — so the old check never saw a conflict (G1). This
+   * reads the real exit code with execFile: 0 = clean, 1 = conflicts, anything else is a
+   * genuine error (bad ref, git < 2.38) and is thrown, not guessed.
+   */
+  async hasMergeConflicts(targetRef: string, sourceRef: string): Promise<boolean> {
+    this.assertSafeRef(targetRef);
+    this.assertSafeRef(sourceRef);
+    try {
+      await execFileAsync('git', [
+        '-C',
+        this.repoPath,
+        'merge-tree',
+        '--write-tree',
+        '--no-messages',
+        '--end-of-options',
+        targetRef,
+        sourceRef,
+      ]);
+      return false;
+    } catch (err) {
+      if ((err as { code?: number }).code === 1) return true;
+      throw err;
+    }
+  }
+
   // ─── Resolution ───────────────────────────────────────────────────
 
   /**
@@ -444,13 +475,24 @@ export class GitOperations {
     maxCount = 50,
   ): Promise<Array<{ hash: string; date: string; message: string; author: string }>> {
     this.assertSafeRef(branch);
-    const log = await this.git.log({ maxCount, from: branch });
-    return log.all.map((c) => ({
-      hash: c.hash,
-      date: c.date,
-      message: c.message,
-      author: c.author_name,
-    }));
+    // Read the named branch's own history, not a `branch...HEAD` range: simple-git turns
+    // `log({ from })` into a symmetric range against HEAD, so the dashboard, compare and
+    // `pick -i` all showed commits relative to whatever was checked out (G3).
+    const US = '\x1f';
+    const out = await this.git.raw([
+      'log',
+      `-n${maxCount}`,
+      `--format=%H${US}%aI${US}%an${US}%s`,
+      '--end-of-options',
+      branch,
+    ]);
+    return out
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => {
+        const [hash, date, author, message] = line.split(US);
+        return { hash, date, message, author };
+      });
   }
 
   // ─── Branch Operations ────────────────────────────────────────────
