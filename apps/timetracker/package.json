@@ -32,7 +32,7 @@
   "dependencies": {
     "@helmsmith/cli-kit": "workspace:*",
     "@helmsmith/tui-view-components": "workspace:*",
-    "@inquirer/prompts": "^8.7.1",
+    "@inquirer/prompts": "^8.7.4",
     "@opentui/core": "^0.5.10",
     "@opentui/react": "^0.5.10",
     "commander": "^15.0.0",
