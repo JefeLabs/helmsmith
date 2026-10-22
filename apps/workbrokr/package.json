@@ -43,7 +43,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
-    "@types/picomatch": "^4.0.2",
+    "@types/picomatch": "^4.0.3",
     "tsup": "^8.5.1",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2",
