@@ -37,7 +37,7 @@
     "@opentui/react": "^0.5.10",
     "commander": "^15.0.0",
     "discord.js": "^14.27.0",
-    "react": "^19.2.8",
+    "react": "^19.2.9",
     "zod": "^4.5.4"
   },
   "optionalDependencies": {

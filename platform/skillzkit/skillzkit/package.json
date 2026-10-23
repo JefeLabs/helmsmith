@@ -43,7 +43,7 @@
     "commander": "^15.0.0",
     "gray-matter": "^4.0.3",
     "hono": "^4.13.7",
-    "react": "^19.2.8",
+    "react": "^19.2.9",
     "react-reconciler": "^0.33.0"
   },
   "devDependencies": {
