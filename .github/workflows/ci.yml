@@ -38,12 +38,15 @@ jobs:
   # ── TypeScript stack ──────────────────────────────────────────────────
   #
   # Lints + formats (Biome), typechecks (tsc -b across packages), runs
-  # the Vitest suite across all packages. Fast — typical end-to-end is
-  # under 2 minutes on the GH-hosted runner.
+  # the Vitest suite across all packages, then the e2e suites. Typical
+  # end-to-end is ~4–5 minutes on the GH-hosted runner.
   js:
     name: js — biome + typecheck + vitest
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # A normal run takes ~5 min. The headroom is for slow network steps:
+    # hitting this limit cancels every remaining step, `if: !cancelled()`
+    # ones included, so it must stay well above the step limits below.
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
@@ -113,6 +116,12 @@ jobs:
       - name: Install Chromium for storybrokr
         # check/screenshot drive a headless Chromium; the e2e suite (and the
         # daemon's lazy installer, which this pre-empts) need it present.
+        # Normally ~20s. --with-deps apt-installs ~26 MB from the Ubuntu mirror,
+        # which has crawled at ~47 kB/s (9+ min, 2026-10-23) and once ran the
+        # whole job out of time. Its own limit makes a slow mirror fail this
+        # step (skipping storybrokr's e2e, which needs it), while the gittyup
+        # and pritty e2e steps below still run.
+        timeout-minutes: 5
         run: pnpm --filter @helmsmith/storybrokr exec playwright install --with-deps chromium
 
       - name: storybrokr end-to-end
