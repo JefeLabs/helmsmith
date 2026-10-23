@@ -1265,6 +1265,12 @@ describe('loop v2 (3.5)', () => {
 
   it('parallel mode is a per-slot pool: a slow item does not stall its neighbors', async () => {
     const finished: string[] = [];
+    // `slow` holds its slot until q3 finishes, so the order is decided by the pool, not by
+    // racing timers (a 150ms-vs-3×10ms race flaked whenever the event loop stalled >~120ms).
+    let releaseSlow!: () => void;
+    const slowGate = new Promise<void>((resolve) => {
+      releaseSlow = resolve;
+    });
     await runLoop(
       {
         source: 'collection',
@@ -1273,8 +1279,13 @@ describe('loop v2 (3.5)', () => {
         concurrency: 2,
       },
       async (s) => {
-        await new Promise((r) => setTimeout(r, s.output === 'slow' ? 150 : 10));
+        if (s.output === 'slow') {
+          // The fallback only matters for a regression: a chunked pool can't start q2/q3
+          // until slow returns, so without it the test would hang instead of failing.
+          await Promise.race([slowGate, new Promise((r) => setTimeout(r, 1_000))]);
+        }
         finished.push(s.output);
+        if (s.output === 'q3') releaseSlow();
         return { output: s.output, lastExit: { nodeId: 'work', kind: 'success' } };
       },
     );
