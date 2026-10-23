@@ -4,9 +4,10 @@
 # `changeset publish`, which does NOT publish only what has changesets. It
 # publishes every non-private package whose local version is absent from the
 # registry — including @helmsmith/* names that have never been released and
-# would not even install: gitradar, gittyup, mech-pencil, pritty, taskmaster,
-# timetracker, toolz, and skillzkit all depend on the private
-# tui-view-components (`pnpm release:plan` prints the current BLOCKED list).
+# would not even install: gitradar, mech-pencil, taskmaster, timetracker,
+# toolz, and skillzkit all depend on the private tui-view-components
+# (`pnpm release:plan` prints the current BLOCKED list). gittyup bundles its
+# workspace libraries into dist, so it ships like the others on the list.
 # Claiming a name on npm is irreversible, so publishing goes through an
 # explicit allowlist instead. @helmsmith/workspace has no blockers but stays
 # off the list until it is meant to ship.
@@ -21,7 +22,7 @@
 # dependent first leaves it briefly unresolvable.
 #   flow-spec → flow-designer
 #   cli-kit   → storybrokr
-PUBLISH_PKGS ?= @helmsmith/flow-spec @helmsmith/flow-designer @helmsmith/cli-kit @helmsmith/storybrokr @helmsmith/workbrokr @helmsmith/pritty
+PUBLISH_PKGS ?= @helmsmith/flow-spec @helmsmith/flow-designer @helmsmith/cli-kit @helmsmith/storybrokr @helmsmith/workbrokr @helmsmith/pritty @helmsmith/gittyup
 
 PACK_DIR ?= /tmp/helmsmith-pack
 

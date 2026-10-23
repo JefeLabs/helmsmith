@@ -1,5 +1,14 @@
 # @helmsmith/pritty
 
+## 0.3.1
+
+### Patch Changes
+
+- Dependency upgrades, including a security fix:
+  
+  - `simple-git` ^3.36 → ^4.0.2, closing critical advisories in simple-git < 4.0.1. simple-git 4 removes inherited `GIT_*` variables from the git processes it starts, so the commit and push pritty runs through it no longer see an ambient `GIT_SSH_COMMAND` or `GIT_AUTHOR_*`/`GIT_COMMITTER_*`; SSH agents and identity/credentials from git config are unaffected.
+  - `@anthropic-ai/sdk` ^0.137.0, `openai` ^7.43.0, `@inquirer/prompts` ^8.7.4, `js-yaml` ^5.5.0, `zod` ^4.6.7, `chalk` ^6.0.1.
+
 ## 0.3.0
 
 ### Minor Changes

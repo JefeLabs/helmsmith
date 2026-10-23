@@ -1,6 +1,6 @@
 {
   "name": "@helmsmith/mech-pencil",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "mech-pencil — generates Pencil .pen design systems and base mockups from framework adapters (HeroUI v3). Part of the agentx-toolbox monorepo.",
   "type": "module",
   "bin": {

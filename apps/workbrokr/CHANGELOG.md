@@ -8,6 +8,10 @@
 - The automatic reset (the `db-reset` mark after a migration lands) now runs `services.postgres.seed` once the services are up, at start and at promote.
 - `work retire` runs the new optional `services.postgres.purge` in the area's worktree to drop the container and volume of the slot the area last held, but only when no effort holds that slot and none of its ports answer; the result says `purged: <slot>` or `purgeSkipped: <why>`. Efforts record `lastSlot` for this.
 
+### Patch Changes
+
+- Dependency upgrades: `@modelcontextprotocol/sdk` ^1.32.1 (closes high-severity advisories in < 1.32, and its express/ajv dependencies now resolve to patched versions), `picomatch` ^4.0.7, `zod` ^4.6.7, `chalk` ^6.0.1.
+
 ## 0.3.1
 
 ### Patch Changes

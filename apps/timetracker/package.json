@@ -1,6 +1,6 @@
 {
   "name": "@helmsmith/timetracker",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Admin-only Discord bot that tracks per-user daily activity (start/end of day, presence, CI submissions, channel engagement) with a TUI for daily/weekly summaries. Part of the agentx-toolbox monorepo.",
   "type": "module",
   "bin": {

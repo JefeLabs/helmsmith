@@ -1,6 +1,6 @@
 {
   "name": "@helmsmith/skillzkit",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "AgentX skillzkit — commands, skills, and workflows for Claude Code. Part of the agentx-toolbox monorepo.",
   "type": "module",
   "bin": {

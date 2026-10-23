@@ -1,5 +1,11 @@
 # @helmsmith/storybrokr
 
+## 0.3.2
+
+### Patch Changes
+
+- Dependency upgrades: `@modelcontextprotocol/sdk` ^1.32.1 (closes high-severity advisories in < 1.32, and its express/ajv dependencies now resolve to patched versions), `playwright` ^1.64.1 (a newer Chromium build — the first `check`/`screenshot` after upgrading downloads it), `zod` ^4.6.7, `chalk` ^6.0.1.
+
 ## 0.3.1
 
 ### Patch Changes

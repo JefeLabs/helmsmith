@@ -1,6 +1,6 @@
 {
   "name": "@helmsmith/taskmaster",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "CLI-based project task generator with complexity scoring and auto-decomposition. Part of the agentx-toolbox monorepo.",
   "type": "module",
   "bin": {
