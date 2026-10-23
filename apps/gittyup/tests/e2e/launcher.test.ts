@@ -5,7 +5,15 @@
  * (same class as helmsmith#69). These tests spawn the real launcher from a hostile cwd.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -65,6 +73,15 @@ describe('gittyup launcher', () => {
     expect(r.status).toBe(0);
     expect(r.stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
     expect(existsSync(marker)).toBe(false);
+  }, 60_000);
+
+  it('reports the version from package.json, not a hard-coded one', () => {
+    const { version } = JSON.parse(readFileSync(join(APP, 'package.json'), 'utf8')) as {
+      version: string;
+    };
+    const r = run(sb, ['--version']);
+    expect(r.status).toBe(0);
+    expect(r.stdout.trim()).toBe(version);
   }, 60_000);
 
   it('does not load a .env from the current directory', () => {

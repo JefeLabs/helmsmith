@@ -19,6 +19,7 @@ import {
 } from './commands/index.js';
 import { APP_NAME } from './config/branding.js';
 import { resolveManifestPath } from './config/manifest.js';
+import { VERSION } from './version.js';
 
 // No `auth` wired — gittyup's `src/auth/` handles its own GitHub
 // OAuth/PAT flow inside the auth subcommand. cli-kit's AuthProvider
@@ -26,7 +27,7 @@ import { resolveManifestPath } from './config/manifest.js';
 // model is per-command.
 const { program } = createCli({
   name: APP_NAME,
-  version: '0.1.0',
+  version: VERSION,
   description: 'Multi-repo orchestration CLI with interactive conflict resolution',
 });
 

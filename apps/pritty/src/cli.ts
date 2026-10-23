@@ -22,13 +22,14 @@ import { runCommit } from './commands/commit.js';
 import { runInit } from './commands/init.js';
 import { runPr } from './commands/pr.js';
 import { runRebase } from './commands/rebase.js';
+import { VERSION } from './version.js';
 
 // Only destructure `program` — `auth` is already used below as the
 // commander subcommand variable for `pritty auth ...`. The injected
 // AuthProvider is reachable via cli-kit if a future handler needs it.
 const { program } = createCli({
   name: 'pritty',
-  version: '0.3.0',
+  version: VERSION,
   description: 'Pretty PRs, zero effort.',
   auth: prittyAuthProvider,
 });
