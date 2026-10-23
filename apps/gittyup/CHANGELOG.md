@@ -1,5 +1,12 @@
 # @helmsmith/gittyup
 
+## 0.3.1
+
+### Patch Changes
+
+- b884cb7: `GIT_SSH_COMMAND` from your environment reaches git again. 0.3.0's move to simple-git 4 stripped every inherited `GIT_*` variable, so a `GIT_SSH_COMMAND` that picks a key, a ProxyJump or other ssh options was silently ignored by fetch, push and the remote side of merge/pick. It is now allow-listed; every other guarded variable (`GIT_SSH`, `GIT_ASKPASS`, `GIT_CONFIG_*`, `GIT_AUTHOR_*`, `PAGER`, …) is still stripped.
+- fbf2816: `gittyup --version` reports the installed version — every release so far printed `0.1.0` because the version was a literal in `src/cli.ts`. It is now read from package.json at runtime, like storybrokr and workbrokr.
+
 ## 0.3.0
 
 ### Minor Changes

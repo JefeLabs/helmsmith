@@ -1,6 +1,6 @@
 {
   "name": "@helmsmith/gittyup",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Multi-repo orchestration CLI with interactive conflict resolution. Part of the agentx-toolbox monorepo.",
   "type": "module",
   "bin": {
