@@ -39,10 +39,10 @@
     "@helmsmith/tui-view-components": "workspace:*",
     "@opentui/core": "^0.5.10",
     "@opentui/react": "^0.5.10",
-    "bun": "^1.4.2",
+    "bun": "^1.4.4",
     "commander": "^15.0.0",
     "gray-matter": "^4.0.3",
-    "hono": "^4.13.7",
+    "hono": "^4.13.13",
     "react": "^19.2.9",
     "react-reconciler": "^0.33.0"
   },
@@ -50,7 +50,7 @@
     "@types/node": "^24.13.3",
     "esbuild": "^0.28.2",
     "tsup": "^8.5.1",
-    "tsx": "^4.23.13",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"
   },
