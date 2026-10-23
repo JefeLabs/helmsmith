@@ -109,7 +109,8 @@ function fakePage(
     networkIdleRejects?: boolean;
     waitForFails?: boolean;
     gotoRejects?: unknown;
-    evaluateRejectsAt?: number;
+    evaluateRejectsAt?: number | number[];
+    evaluateError?: unknown;
   } = {},
 ) {
   const calls: string[] = [];
@@ -123,14 +124,18 @@ function fakePage(
     },
     evaluate: async () => {
       const at = i++;
-      if (opts.evaluateRejectsAt !== undefined && at === opts.evaluateRejectsAt) {
-        throw new Error('Execution context was destroyed');
+      const rejectAt = opts.evaluateRejectsAt;
+      if (
+        rejectAt !== undefined &&
+        (Array.isArray(rejectAt) ? rejectAt.includes(at) : at === rejectAt)
+      ) {
+        throw opts.evaluateError ?? new Error('Target page, context or browser has been closed');
       }
       return snapshots[Math.min(at, snapshots.length - 1)] ?? [];
     },
     waitForLoadState: async (state) => {
       calls.push(`load ${state}`);
-      if (opts.networkIdleRejects) throw new Error('Timeout');
+      if (state === 'networkidle' && opts.networkIdleRejects) throw new Error('Timeout');
     },
     waitForSelector: async (sel) => {
       calls.push(`selector ${sel}`);
@@ -238,7 +243,48 @@ describe('settleStory', () => {
     expect(out).toMatchObject({
       kind: 'fail',
       event: 'driver',
-      reason: 'driver error: Execution context was destroyed',
+      reason: 'driver error: Target page, context or browser has been closed',
+    });
+  });
+
+  // Vite fully reloads every open page when it re-optimizes dependencies ("optimized
+  // dependencies changed. reloading") — routinely on the first story load after the dep
+  // cache went stale. The recorder is an init script, so the reloaded page records afresh.
+  const RELOAD = new Error(
+    'page.evaluate: Execution context was destroyed, most likely because of a navigation',
+  );
+
+  it('waits out a page reload mid-poll instead of failing the story', async () => {
+    const { page, calls } = fakePage([[phase('loading')], [], [phase('completed')]], {
+      evaluateRejectsAt: 1,
+      evaluateError: RELOAD,
+    });
+    const out = await settleStory(page, { iframeUrl: 'u', timeoutMs: 5000, ...fast });
+    expect(out).toEqual({ kind: 'pass', played: false });
+    expect(calls).toEqual(['goto u', 'load load', 'load networkidle']);
+  });
+
+  it('waits out a reload that interrupts the initial navigation', async () => {
+    const { page, calls } = fakePage([[phase('completed')]], {
+      gotoRejects: new Error(
+        'page.goto: Navigation to "u" is interrupted by another navigation to "u"',
+      ),
+    });
+    const out = await settleStory(page, { iframeUrl: 'u', timeoutMs: 5000, ...fast });
+    expect(out).toEqual({ kind: 'pass', played: false });
+    expect(calls).toEqual(['goto u', 'load load', 'load networkidle']);
+  });
+
+  it('fails with a clear reason when the page keeps reloading', async () => {
+    const { page } = fakePage([[]], {
+      evaluateRejectsAt: [0, 1, 2, 3, 4, 5, 6, 7],
+      evaluateError: RELOAD,
+    });
+    const out = await settleStory(page, { iframeUrl: 'u', timeoutMs: 5000, ...fast });
+    expect(out).toEqual({
+      kind: 'fail',
+      event: 'driver',
+      reason: 'driver error: the page reloaded 4 times before the story settled',
     });
   });
 

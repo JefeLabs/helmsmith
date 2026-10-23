@@ -20,6 +20,21 @@ function isError(e: SettleEvent): e is Extract<SettleEvent, { kind: 'error' }> {
   return e.kind === 'error';
 }
 
+/**
+ * True when a Playwright call failed because the page navigated under it — in practice Vite's
+ * full reload after it re-optimizes dependencies ("optimized dependencies changed. reloading"),
+ * which happens on the first story load whenever its dep cache is stale and hits every page
+ * open at that moment. Reported by `page.evaluate` mid-poll, or by `page.goto` when the reload
+ * lands during the initial navigation.
+ */
+function isNavigationError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /Execution context was destroyed|interrupted by another navigation/.test(message);
+}
+
+/** Reloads tolerated per story; a page that keeps reloading is a failure, not a slow story. */
+const MAX_RELOADS = 3;
+
 /** True for a Playwright `TimeoutError` rejection (an object with `name === 'TimeoutError'`). */
 function isTimeoutError(err: unknown): boolean {
   return (
@@ -113,7 +128,7 @@ export const RECORDER_SCRIPT = `(() => {
 export interface SettlePage {
   goto(url: string, opts: { timeout: number }): Promise<unknown>;
   evaluate(expression: string): Promise<unknown>;
-  waitForLoadState(state: 'networkidle', opts: { timeout: number }): Promise<void>;
+  waitForLoadState(state: 'load' | 'networkidle', opts: { timeout: number }): Promise<void>;
   waitForSelector(selector: string, opts: { timeout: number }): Promise<unknown>;
   getByText(text: string): { waitFor(opts: { timeout: number }): Promise<void> };
 }
@@ -137,9 +152,12 @@ const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
  * including the initial navigation, which is passed `remaining()` as its own timeout rather than
  * relying on Playwright's 30s default.
  * The caller must have installed RECORDER_SCRIPT on the page's context.
- * Driver failures (navigation or evaluation errors, e.g. the page navigating away or its frame
- * being detached mid-poll) are reported as `fail` with event `driver` rather than thrown, so a
- * single story's transient driver error surfaces as a result row, not a request-level exception.
+ * A page reload (see isNavigationError) is waited out: the recorder is an init script, so the
+ * reloaded page records the story's events from scratch, and polling continues within the same
+ * budget; more than MAX_RELOADS reloads fail the story. Other driver failures (navigation or
+ * evaluation errors, e.g. the page closing or its frame being detached mid-poll) are reported
+ * as `fail` with event `driver` rather than thrown, so a single story's transient driver error
+ * surfaces as a result row, not a request-level exception.
  * A navigation or evaluation rejection whose `name` is `'TimeoutError'` is reported as `timeout`
  * instead, so a slow first load is not misreported as a story failure.
  */
@@ -150,18 +168,39 @@ export async function settleStory(page: SettlePage, opts: SettleOptions): Promis
   const deadline = now() + opts.timeoutMs;
   const remaining = () => Math.max(1, deadline - now());
   let lastPhase: string | undefined;
+  let reloads = 0;
+  const timedOut = (): SettleOutcome =>
+    lastPhase === undefined ? { kind: 'timeout' } : { kind: 'timeout', lastPhase };
+  const driverFail = (err: unknown): SettleOutcome => ({
+    kind: 'fail',
+    reason: `driver error: ${err instanceof Error ? err.message : String(err)}`,
+    event: 'driver',
+  });
+  /** Wait for the reloaded page to load; returns an outcome only when the story must stop. */
+  const awaitReload = async (): Promise<SettleOutcome | undefined> => {
+    reloads++;
+    if (reloads > MAX_RELOADS) {
+      return {
+        kind: 'fail',
+        reason: `driver error: the page reloaded ${reloads} times before the story settled`,
+        event: 'driver',
+      };
+    }
+    try {
+      await page.waitForLoadState('load', { timeout: remaining() });
+    } catch (err) {
+      return isTimeoutError(err) ? timedOut() : driverFail(err);
+    }
+    return undefined;
+  };
 
   try {
     await page.goto(opts.iframeUrl, { timeout: remaining() });
   } catch (err) {
-    if (isTimeoutError(err)) {
-      return lastPhase === undefined ? { kind: 'timeout' } : { kind: 'timeout', lastPhase };
-    }
-    return {
-      kind: 'fail',
-      reason: `driver error: ${err instanceof Error ? err.message : String(err)}`,
-      event: 'driver',
-    };
+    if (isTimeoutError(err)) return timedOut();
+    if (!isNavigationError(err)) return driverFail(err);
+    const stop = await awaitReload();
+    if (stop) return stop;
   }
   let state: SettleState = { kind: 'pending' };
   for (;;) {
@@ -169,20 +208,16 @@ export async function settleStory(page: SettlePage, opts: SettleOptions): Promis
     try {
       events = (await page.evaluate(EVENTS_EXPRESSION)) as SettleEvent[];
     } catch (err) {
-      if (isTimeoutError(err)) {
-        return lastPhase === undefined ? { kind: 'timeout' } : { kind: 'timeout', lastPhase };
-      }
-      return {
-        kind: 'fail',
-        reason: `driver error: ${err instanceof Error ? err.message : String(err)}`,
-        event: 'driver',
-      };
+      if (isTimeoutError(err)) return timedOut();
+      if (!isNavigationError(err)) return driverFail(err);
+      const stop = await awaitReload();
+      if (stop) return stop;
+      continue;
     }
     for (const e of events) if (e.kind === 'phase') lastPhase = e.phase;
     state = reduceSettle(events);
     if (state.kind !== 'pending') break;
-    if (now() >= deadline)
-      return lastPhase === undefined ? { kind: 'timeout' } : { kind: 'timeout', lastPhase };
+    if (now() >= deadline) return timedOut();
     await sleep(pollMs);
   }
   if (state.kind === 'fail') return state;
