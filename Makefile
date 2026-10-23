@@ -15,7 +15,11 @@
 #   make status                 what would publish, local vs npm
 #   make version                apply changesets + build (pre-publish)
 #   make publish-dry            pack and inspect, no upload
-#   make publish OTP=123456     publish the allowlist, in order
+#   make publish-web            publish, authorizing via a browser link
+#   make publish [OTP=123456]   publish with a one-time password
+#
+# Both publish targets skip a package whose exact local version is already on
+# the registry, so after a partial failure you just run the same command again.
 
 # Order matters: a dependency before its dependents. pnpm rewrites
 # `workspace:*` to the exact local version at pack time, so publishing the
@@ -27,7 +31,24 @@ PUBLISH_PKGS ?= @helmsmith/flow-spec @helmsmith/flow-designer @helmsmith/cli-kit
 PACK_DIR ?= /tmp/helmsmith-pack
 
 .DEFAULT_GOAL := help
-.PHONY: help status version build publish publish-web publish-dry require-otp
+.PHONY: help status version build publish publish-web publish-dry
+
+# Shell fragment for the publish loops (which bind $$p): sets local_v, and skips
+# the package when that exact version is already on the registry. Asks for the
+# exact version rather than comparing against `latest`, and --prefer-online so
+# npm's local metadata cache can't report a just-published version as missing.
+# A *staged* version (npm 11: published, awaiting 2FA approval) is invisible
+# here; npm then fails with E409 and the loop prints how to approve it.
+SKIP_IF_PUBLISHED = local_v=$$(pnpm --filter $$p exec node -p "require('./package.json').version" 2>/dev/null | tail -1); \
+	if [ -z "$$local_v" ]; then echo "==> cannot read the local version of $$p"; exit 1; fi; \
+	if [ -n "$$(npm view "$$p@$$local_v" version --prefer-online 2>/dev/null)" ]; then \
+		echo "==> skip $$p ($$local_v is already on npm)"; \
+		continue; \
+	fi;
+
+PUBLISH_FAILED_HINT = echo "    publish of $$p $$local_v failed. E409 \"previously staged\" means an earlier run"; \
+	echo "    uploaded it and it awaits approval: npm stage list $$p, then npm stage approve <id>."; \
+	echo "    Otherwise fix the cause and re-run; packages already on npm are skipped."
 
 help:
 	@echo "helmsmith release targets"
@@ -35,8 +56,10 @@ help:
 	@echo "  make status              show local vs published versions"
 	@echo "  make version             apply pending changesets, then build"
 	@echo "  make publish-dry         pack each package and list contents"
-	@echo "  make publish OTP=123456  publish the allowlist below, in order"
-	@echo "  make publish-web         same, but authorize via a browser link"
+	@echo "  make publish-web         publish the allowlist, authorizing via a browser link"
+	@echo "  make publish [OTP=…]     same, with a one-time password (prompted after the build if omitted)"
+	@echo
+	@echo "  Publishing skips versions already on npm; narrow it with PUBLISH_PKGS=\"…\"."
 	@echo
 	@echo "  allowlist: $(PUBLISH_PKGS)"
 
@@ -45,7 +68,7 @@ status:
 	@echo "-------------------------------- ---------- ----------"
 	@for p in $(PUBLISH_PKGS); do \
 		local_v=$$(pnpm --filter $$p exec node -p "require('./package.json').version" 2>/dev/null | tail -1); \
-		npm_v=$$(npm view $$p version 2>/dev/null || echo "-"); \
+		npm_v=$$(npm view $$p version --prefer-online 2>/dev/null || echo "-"); \
 		printf "%-32s %-10s %-10s\n" "$$p" "$$local_v" "$$npm_v"; \
 	done
 	@echo
@@ -55,10 +78,14 @@ version:
 	pnpm changeset:version
 	$(MAKE) build
 
+# `build:lib` too where a package has one: flow-designer's `build` is its demo
+# app, while what npm users import (dist-lib) only comes from build:lib — and
+# pack does not run prepublishOnly, so nothing else would rebuild it.
 build:
 	@for p in $(PUBLISH_PKGS); do \
 		echo "==> build $$p"; \
 		pnpm --filter $$p run build || exit 1; \
+		pnpm --filter $$p run --if-present build:lib || exit 1; \
 	done
 
 publish-dry: build
@@ -72,15 +99,6 @@ publish-dry: build
 	@echo
 	@echo "tarballs in $(PACK_DIR):"
 	@ls -la $(PACK_DIR)/*.tgz 2>/dev/null || true
-
-# Guard runs BEFORE build so a missing OTP fails in a second, not after a
-# full rebuild. Listed first among the prerequisites, which make runs in order.
-require-otp:
-	@test -n "$(OTP)" || { \
-		echo "OTP is required — 2FA is enabled on this npm account."; \
-		echo "Usage: make publish OTP=123456   (codes expire in ~30s)"; \
-		exit 1; \
-	}
 
 # Browser authorization instead of a typed OTP.
 #
@@ -101,6 +119,7 @@ require-otp:
 publish-web: build
 	@mkdir -p $(PACK_DIR)
 	@for p in $(PUBLISH_PKGS); do \
+		$(SKIP_IF_PUBLISHED) \
 		rm -f $(PACK_DIR)/*.tgz; \
 		dir=$$(pnpm --filter $$p exec pwd | grep -v WARN | tail -1); \
 		echo "==> pack $$p"; \
@@ -108,24 +127,27 @@ publish-web: build
 		tgz=$$(ls $(PACK_DIR)/*.tgz | head -1); \
 		echo "==> publish $$(basename $$tgz)"; \
 		echo "    npm will print a browser link below — open it to authorize"; \
-		npm publish "$$tgz" --access public || exit 1; \
+		npm publish "$$tgz" --access public || { $(PUBLISH_FAILED_HINT); exit 1; }; \
 	done
 	@echo
 	@$(MAKE) --no-print-directory status
 
-# A release rarely bumps every package on the allowlist, and npm refuses to
-# publish over an existing version — so a package whose local version is
-# already on the registry is skipped rather than aborting the whole loop.
+# One-time password: pass OTP=123456, or leave it out and you're asked once the
+# build is done, right before the first upload. Codes live ~30s, so a code
+# typed before a multi-package build is often stale by the time npm checks it.
+# One code is reused for the remaining packages; if it expires mid-run, run the
+# command again — what's already published is skipped.
 publish: build
-	@for p in $(PUBLISH_PKGS); do \
-		local_v=$$(pnpm --filter $$p exec node -p "require('./package.json').version" 2>/dev/null | tail -1); \
-		npm_v=$$(npm view $$p version 2>/dev/null || echo "-"); \
-		if [ "$$local_v" = "$$npm_v" ]; then \
-			echo "==> skip $$p ($$local_v is already on npm)"; \
-			continue; \
+	@otp="$(OTP)"; \
+	for p in $(PUBLISH_PKGS); do \
+		$(SKIP_IF_PUBLISHED) \
+		if [ -z "$$otp" ]; then \
+			printf "npm one-time password: "; \
+			read -r otp || true; \
+			if [ -z "$$otp" ]; then echo; echo "==> no one-time password given — nothing published from here on"; exit 1; fi; \
 		fi; \
 		echo "==> publish $$p $$local_v"; \
-		pnpm --filter $$p publish --access public --no-git-checks || exit 1; \
+		pnpm --filter $$p publish --access public --no-git-checks --otp="$$otp" || { $(PUBLISH_FAILED_HINT); exit 1; }; \
 	done
 	@echo
 	@$(MAKE) --no-print-directory status
