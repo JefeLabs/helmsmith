@@ -21,7 +21,7 @@
     "@opentui/react": "^0.5.10",
     "react": "^19.2.9",
     "react-devtools-core": "^7.0.1",
-    "ws": "^8.21.3",
+    "ws": "^8.22.0",
     "yaml": "^2.9.1"
   },
   "devDependencies": {
