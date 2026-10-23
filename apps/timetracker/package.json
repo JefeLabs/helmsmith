@@ -41,8 +41,8 @@
     "zod": "^4.5.4"
   },
   "optionalDependencies": {
-    "@aws-sdk/client-dynamodb": "^3.1127.0",
-    "@aws-sdk/lib-dynamodb": "^3.1127.0"
+    "@aws-sdk/client-dynamodb": "^3.1156.0",
+    "@aws-sdk/lib-dynamodb": "^3.1156.0"
   },
   "devDependencies": {
     "@types/bun": "^1.4.3",
