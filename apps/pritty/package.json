@@ -33,7 +33,7 @@
     "typecheck": "tsc --noEmit --allowImportingTsExtensions"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.124.0",
+    "@anthropic-ai/sdk": "^0.137.0",
     "@helmsmith/cli-kit": "workspace:*",
     "@inquirer/prompts": "^8.7.4",
     "chalk": "^6.0.1",

@@ -67,7 +67,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 5.0.3
-        version: 5.0.3(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 5.0.3(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
       yaml:
         specifier: ^2.9.1
         version: 2.9.1
@@ -131,7 +131,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 5.0.3
-        version: 5.0.3(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 5.0.3(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   apps/gittyup:
     dependencies:
@@ -204,7 +204,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 5.0.3
-        version: 5.0.3(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 5.0.3(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   apps/mech-pencil:
     dependencies:
@@ -247,13 +247,13 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 5.0.3
-        version: 5.0.3(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 5.0.3(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   apps/pritty:
     dependencies:
       '@anthropic-ai/sdk':
-        specifier: ^0.124.0
-        version: 0.124.0(zod@4.6.7)
+        specifier: ^0.137.0
+        version: 0.137.0(zod@4.6.7)
       '@helmsmith/cli-kit':
         specifier: workspace:*
         version: link:../../platform/core/cli-kit-lib
@@ -308,7 +308,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 5.0.3
-        version: 5.0.3(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 5.0.3(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   apps/storybrokr:
     dependencies:
@@ -345,7 +345,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 5.0.3
-        version: 5.0.3(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 5.0.3(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   apps/storybrokr/tests/e2e/fixtures/host-react-vite:
     devDependencies:
@@ -445,7 +445,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 5.0.3
-        version: 5.0.3(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 5.0.3(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   apps/timetracker:
     dependencies:
@@ -504,7 +504,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 5.0.3
-        version: 5.0.3(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 5.0.3(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   apps/toolz:
     dependencies:
@@ -544,7 +544,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 5.0.3
-        version: 5.0.3(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 5.0.3(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   apps/workbrokr:
     dependencies:
@@ -584,7 +584,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 5.0.3
-        version: 5.0.3(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 5.0.3(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   platform/context/context-loader-cli:
     dependencies:
@@ -715,10 +715,10 @@ importers:
         version: link:../agent-adapter-lib
       '@langchain/core':
         specifier: ^1.3.0
-        version: 1.3.0(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)
+        version: 1.3.0(@opentelemetry/api@1.10.0)(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)
       '@langchain/langgraph':
         specifier: ^1.5.2
-        version: 1.5.2(@langchain/core@1.3.0(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0))(react-dom@19.2.9(react@19.2.9))(react@19.2.9)(zod@4.6.7)
+        version: 1.5.2(@langchain/core@1.3.0(@opentelemetry/api@1.10.0)(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0))(react-dom@19.2.9(react@19.2.9))(react@19.2.9)(zod@4.6.7)
     devDependencies:
       '@types/node':
         specifier: ^24.19.2
@@ -728,16 +728,16 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 5.0.3
-        version: 5.0.3(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 5.0.3(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   platform/core/agent-adapter-lib:
     devDependencies:
       '@anthropic-ai/claude-agent-sdk':
         specifier: ^0.3.309
-        version: 0.3.309(@anthropic-ai/sdk@0.124.0(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7))(zod@4.6.7)
+        version: 0.3.309(@anthropic-ai/sdk@0.137.0(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7))(zod@4.6.7)
       '@anthropic-ai/sdk':
-        specifier: ^0.124.0
-        version: 0.124.0(zod@4.6.7)
+        specifier: ^0.137.0
+        version: 0.137.0(zod@4.6.7)
       '@aws-sdk/client-bedrock-runtime':
         specifier: ^3.1156.0
         version: 3.1156.0
@@ -755,7 +755,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 5.0.3
-        version: 5.0.3(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 5.0.3(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   platform/core/agent-auth-lib:
     devDependencies:
@@ -767,7 +767,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 5.0.3
-        version: 5.0.3(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 5.0.3(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   platform/core/cli-kit-lib:
     devDependencies:
@@ -788,7 +788,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 5.0.3
-        version: 5.0.3(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 5.0.3(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   platform/core/tui-view-components-lib:
     devDependencies:
@@ -815,7 +815,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 5.0.3
-        version: 5.0.3(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 5.0.3(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   platform/harness/flow-designer:
     dependencies:
@@ -858,7 +858,7 @@ importers:
         version: 8.3.5(@types/node@25.9.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
       vitest:
         specifier: 5.0.3
-        version: 5.0.3(@types/node@25.9.4)(vite@8.3.5(@types/node@25.9.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 5.0.3(@opentelemetry/api@1.10.0)(@types/node@25.9.4)(vite@8.3.5(@types/node@25.9.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   platform/harness/flow-spec:
     devDependencies:
@@ -870,7 +870,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 5.0.3
-        version: 5.0.3(@types/node@25.9.4)(vite@8.3.5(@types/node@25.9.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 5.0.3(@opentelemetry/api@1.10.0)(@types/node@25.9.4)(vite@8.3.5(@types/node@25.9.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   platform/harness/harness-cli:
     dependencies:
@@ -931,10 +931,10 @@ importers:
         version: link:../flow-spec
       '@langchain/core':
         specifier: ^1.3.0
-        version: 1.3.0(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)
+        version: 1.3.0(@opentelemetry/api@1.10.0)(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)
       '@langchain/langgraph':
         specifier: ^1.5.2
-        version: 1.5.2(@langchain/core@1.3.0(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0))(react-dom@19.2.9(react@19.2.9))(react@19.2.9)(zod@4.6.7)
+        version: 1.5.2(@langchain/core@1.3.0(@opentelemetry/api@1.10.0)(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0))(react-dom@19.2.9(react@19.2.9))(react@19.2.9)(zod@4.6.7)
     devDependencies:
       '@types/node':
         specifier: ^24.19.2
@@ -944,7 +944,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 5.0.3
-        version: 5.0.3(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 5.0.3(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   platform/harness/harness-pipeline-cli:
     dependencies:
@@ -981,13 +981,13 @@ importers:
         version: link:../harness-pipeline-cli
       '@langchain/core':
         specifier: ^1.3.0
-        version: 1.3.0(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)
+        version: 1.3.0(@opentelemetry/api@1.10.0)(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)
       '@langchain/langgraph':
         specifier: ^1.5.2
-        version: 1.5.2(@langchain/core@1.3.0(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0))(react-dom@19.2.9(react@19.2.9))(react@19.2.9)(zod@4.6.7)
+        version: 1.5.2(@langchain/core@1.3.0(@opentelemetry/api@1.10.0)(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0))(react-dom@19.2.9(react@19.2.9))(react@19.2.9)(zod@4.6.7)
       '@langchain/langgraph-checkpoint-sqlite':
         specifier: ^1.1.0
-        version: 1.1.0(@langchain/core@1.3.0(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0))(@langchain/langgraph-checkpoint@1.2.1(@langchain/core@1.3.0(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)))
+        version: 1.1.0(@langchain/core@1.3.0(@opentelemetry/api@1.10.0)(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0))(@langchain/langgraph-checkpoint@1.2.1(@langchain/core@1.3.0(@opentelemetry/api@1.10.0)(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)))
       yaml:
         specifier: ^2.9.1
         version: 2.9.1
@@ -1124,7 +1124,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 5.0.3
-        version: 5.0.3(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 5.0.3(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   platform/skillzkit/skillzkit-types-lib:
     devDependencies:
@@ -1139,7 +1139,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 5.0.3
-        version: 5.0.3(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 5.0.3(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
 packages:
 
@@ -1212,8 +1212,8 @@ packages:
       '@modelcontextprotocol/sdk': ^1.29.0
       zod: ^4.0.0
 
-  '@anthropic-ai/sdk@0.124.0':
-    resolution: {integrity: sha512-cN5O8i9UVxHeOQAzj/XjshWXG8KiibJDw9OGpH2Z/eR3n/RBxdoLxDJOcfqAJWvjaMDFfHTBADU04hWRJVkDyA==}
+  '@anthropic-ai/sdk@0.137.0':
+    resolution: {integrity: sha512-YpEnbPz8kWF1BWthwUCnRhci7OvDLSUO8NFKoevoPkjNkK9CJeibZITgxr9vhqOP8Le61e5tNDHFTxw1dc6Png==}
     hasBin: true
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
@@ -2156,6 +2156,10 @@ packages:
   '@octokit/webhooks@14.2.0':
     resolution: {integrity: sha512-da6KbdNCV5sr1/txD896V+6W0iamFWrvVl8cHkBSPT+YlvmT3DwXa4jxZnQc+gnuTEqSWbBeoSZYTayXH9wXcw==}
     engines: {node: '>= 20'}
+
+  '@opentelemetry/api@1.10.0':
+    resolution: {integrity: sha512-lMkyes8iHrG+mk6WH7X70MdCLI2RS0FwNBY1PyQ8UemaijE2m5mv5A0Niy3HtbYTFrgkUEQjFMXmSAk2hQDuPQ==}
+    engines: {node: '>=8.0.0'}
 
   '@opentui/core-darwin-arm64@0.5.10':
     resolution: {integrity: sha512-Vyb+nTbhab8ZcRy5gg1loEEGwRcIbjAeVRIBfHBcbFDqmITBOg7x2gqJ+x/TnoOy4uwMhCmICUN2wiyREw3r1Q==}
@@ -5801,9 +5805,9 @@ snapshots:
   '@anthropic-ai/claude-agent-sdk-win32-x64@0.3.309':
     optional: true
 
-  '@anthropic-ai/claude-agent-sdk@0.3.309(@anthropic-ai/sdk@0.124.0(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7))(zod@4.6.7)':
+  '@anthropic-ai/claude-agent-sdk@0.3.309(@anthropic-ai/sdk@0.137.0(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7))(zod@4.6.7)':
     dependencies:
-      '@anthropic-ai/sdk': 0.124.0(zod@4.6.7)
+      '@anthropic-ai/sdk': 0.137.0(zod@4.6.7)
       '@modelcontextprotocol/sdk': 1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7)
       zod: 4.6.7
     optionalDependencies:
@@ -5816,8 +5820,9 @@ snapshots:
       '@anthropic-ai/claude-agent-sdk-win32-arm64': 0.3.309
       '@anthropic-ai/claude-agent-sdk-win32-x64': 0.3.309
 
-  '@anthropic-ai/sdk@0.124.0(zod@4.6.7)':
+  '@anthropic-ai/sdk@0.137.0(zod@4.6.7)':
     dependencies:
+      '@opentelemetry/api': 1.10.0
       json-schema-to-ts: 3.1.1
       standardwebhooks: 1.1.1
     optionalDependencies:
@@ -6705,12 +6710,12 @@ snapshots:
 
   '@kwsites/promise-deferred@1.1.1': {}
 
-  '@langchain/core@1.3.0(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)':
+  '@langchain/core@1.3.0(@opentelemetry/api@1.10.0)(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)':
     dependencies:
       '@cfworker/json-schema': 4.1.1
       '@standard-schema/spec': 1.1.0
       js-tiktoken: 1.0.21
-      langsmith: 0.11.0(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)
+      langsmith: 0.11.0(@opentelemetry/api@1.10.0)(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)
       mustache: 4.2.0
       p-queue: 6.6.2
       zod: 4.6.7
@@ -6721,19 +6726,19 @@ snapshots:
       - openai
       - ws
 
-  '@langchain/langgraph-checkpoint-sqlite@1.1.0(@langchain/core@1.3.0(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0))(@langchain/langgraph-checkpoint@1.2.1(@langchain/core@1.3.0(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)))':
+  '@langchain/langgraph-checkpoint-sqlite@1.1.0(@langchain/core@1.3.0(@opentelemetry/api@1.10.0)(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0))(@langchain/langgraph-checkpoint@1.2.1(@langchain/core@1.3.0(@opentelemetry/api@1.10.0)(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)))':
     dependencies:
-      '@langchain/core': 1.3.0(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)
-      '@langchain/langgraph-checkpoint': 1.2.1(@langchain/core@1.3.0(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0))
+      '@langchain/core': 1.3.0(@opentelemetry/api@1.10.0)(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)
+      '@langchain/langgraph-checkpoint': 1.2.1(@langchain/core@1.3.0(@opentelemetry/api@1.10.0)(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0))
       better-sqlite3: 12.11.1
 
-  '@langchain/langgraph-checkpoint@1.2.1(@langchain/core@1.3.0(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0))':
+  '@langchain/langgraph-checkpoint@1.2.1(@langchain/core@1.3.0(@opentelemetry/api@1.10.0)(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0))':
     dependencies:
-      '@langchain/core': 1.3.0(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)
+      '@langchain/core': 1.3.0(@opentelemetry/api@1.10.0)(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)
 
-  '@langchain/langgraph-sdk@1.12.7(@langchain/core@1.3.0(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0))(react-dom@19.2.9(react@19.2.9))(react@19.2.9)':
+  '@langchain/langgraph-sdk@1.12.7(@langchain/core@1.3.0(@opentelemetry/api@1.10.0)(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0))(react-dom@19.2.9(react@19.2.9))(react@19.2.9)':
     dependencies:
-      '@langchain/core': 1.3.0(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)
+      '@langchain/core': 1.3.0(@opentelemetry/api@1.10.0)(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)
       '@langchain/protocol': 0.0.20
       '@types/json-schema': 7.0.15
       p-queue: 9.3.3
@@ -6742,11 +6747,11 @@ snapshots:
       react: 19.2.9
       react-dom: 19.2.9(react@19.2.9)
 
-  '@langchain/langgraph@1.5.2(@langchain/core@1.3.0(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0))(react-dom@19.2.9(react@19.2.9))(react@19.2.9)(zod@4.6.7)':
+  '@langchain/langgraph@1.5.2(@langchain/core@1.3.0(@opentelemetry/api@1.10.0)(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0))(react-dom@19.2.9(react@19.2.9))(react@19.2.9)(zod@4.6.7)':
     dependencies:
-      '@langchain/core': 1.3.0(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)
-      '@langchain/langgraph-checkpoint': 1.2.1(@langchain/core@1.3.0(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0))
-      '@langchain/langgraph-sdk': 1.12.7(@langchain/core@1.3.0(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0))(react-dom@19.2.9(react@19.2.9))(react@19.2.9)
+      '@langchain/core': 1.3.0(@opentelemetry/api@1.10.0)(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)
+      '@langchain/langgraph-checkpoint': 1.2.1(@langchain/core@1.3.0(@opentelemetry/api@1.10.0)(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0))
+      '@langchain/langgraph-sdk': 1.12.7(@langchain/core@1.3.0(@opentelemetry/api@1.10.0)(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0))(react-dom@19.2.9(react@19.2.9))(react@19.2.9)
       '@langchain/protocol': 0.0.20
       '@standard-schema/spec': 1.1.0
       zod: 4.6.7
@@ -6976,6 +6981,8 @@ snapshots:
       '@octokit/openapi-webhooks-types': 12.1.0
       '@octokit/request-error': 7.1.2
       '@octokit/webhooks-methods': 6.0.0
+
+  '@opentelemetry/api@1.10.0': {}
 
   '@opentui/core-darwin-arm64@0.5.10':
     optional: true
@@ -8888,10 +8895,11 @@ snapshots:
 
   kind-of@6.0.3: {}
 
-  langsmith@0.11.0(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0):
+  langsmith@0.11.0(@opentelemetry/api@1.10.0)(openai@7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0):
     dependencies:
       p-queue: 6.6.2
     optionalDependencies:
+      '@opentelemetry/api': 1.10.0
       openai: 7.43.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(google-auth-library@10.9.1)(undici@6.28.1)(ws@8.22.0)(zod@4.6.7)
       ws: 8.22.0
 
@@ -10169,7 +10177,7 @@ snapshots:
       tsx: 4.23.15
       yaml: 2.9.1
 
-  vitest@5.0.3(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)):
+  vitest@5.0.3(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)):
     dependencies:
       '@types/chai': 5.2.3
       '@vitest/mocker': 5.0.3(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
@@ -10186,11 +10194,12 @@ snapshots:
       vite: 8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
       why-is-node-running: 3.2.1
     optionalDependencies:
+      '@opentelemetry/api': 1.10.0
       '@types/node': 24.19.2
     transitivePeerDependencies:
       - msw
 
-  vitest@5.0.3(@types/node@25.9.4)(vite@8.3.5(@types/node@25.9.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)):
+  vitest@5.0.3(@opentelemetry/api@1.10.0)(@types/node@25.9.4)(vite@8.3.5(@types/node@25.9.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)):
     dependencies:
       '@types/chai': 5.2.3
       '@vitest/mocker': 5.0.3(vite@8.3.5(@types/node@25.9.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
@@ -10207,6 +10216,7 @@ snapshots:
       vite: 8.3.5(@types/node@25.9.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
       why-is-node-running: 3.2.1
     optionalDependencies:
+      '@opentelemetry/api': 1.10.0
       '@types/node': 25.9.4
     transitivePeerDependencies:
       - msw
