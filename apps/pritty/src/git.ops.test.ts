@@ -95,6 +95,41 @@ describe('GitOps.commit with a file subset commits index content, never the work
   });
 });
 
+describe('GitOps from a subdirectory speaks repository-root paths', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('commits a staged subset named by root-relative paths', async () => {
+    const r = makeRepo();
+    cleanup = r.cleanup;
+    write(r.dir, 'src/a.ts', 'A\n');
+    write(r.dir, 'src/b.ts', 'B\n');
+    gitIn(r.dir, 'add', 'src/a.ts', 'src/b.ts');
+    const git = createGit(join(r.dir, 'src'));
+
+    const staged = await git.getStaged();
+    expect(staged).toEqual(['src/a.ts', 'src/b.ts']);
+    await git.commit('feat: a', ['src/a.ts']);
+
+    expect(headFile(r.dir, 'src/a.ts')).toBe('A\n');
+    expect(stagedPaths(r.dir)).toEqual(['src/b.ts']);
+  });
+
+  it('lists every changed and untracked file, inside and outside the subdirectory', async () => {
+    const r = makeRepo();
+    cleanup = r.cleanup;
+    write(r.dir, 'src/staged.ts', 's\n');
+    gitIn(r.dir, 'add', 'src/staged.ts');
+    write(r.dir, 'README.md', 'changed\n');
+    write(r.dir, 'src/new.ts', 'n\n');
+    write(r.dir, 'notes.txt', 'n\n');
+
+    const all = await createGit(join(r.dir, 'src')).getAllChanged();
+
+    expect(all.sort()).toEqual(['README.md', 'notes.txt', 'src/new.ts', 'src/staged.ts']);
+  });
+});
+
 describe('GitOps.rebaseWithPlan', () => {
   let cleanup = () => {};
   const savedEnv = { GIT_EDITOR: process.env.GIT_EDITOR, PAGER: process.env.PAGER };

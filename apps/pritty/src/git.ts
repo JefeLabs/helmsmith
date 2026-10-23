@@ -11,6 +11,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { type SimpleGit, simpleGit } from 'simple-git';
+import { repoRoot } from './repo-root.js';
 
 export interface GitOps {
   /** Files staged for commit (subset of `git status`). */
@@ -70,7 +71,15 @@ export interface GitOps {
   ): Promise<Array<{ hash: string; subject: string; dateISO: string }>>;
 }
 
-export function createGit(cwd: string = process.cwd()): GitOps {
+/**
+ * Git operations for the repository containing `dir`. Every path GitOps takes
+ * or returns is relative to the repository root, whichever subdirectory pritty
+ * runs from: git runs at the top level, because from a subdirectory pathspecs
+ * and `ls-files` output are relative to the subdirectory while `diff
+ * --name-only` output is not.
+ */
+export function createGit(dir: string = process.cwd()): GitOps {
+  const cwd = repoRoot(dir) ?? dir;
   // simple-git 4 strips every GIT_* variable inherited from the invoking shell before spawning
   // git. Let GIT_SSH_COMMAND back through so push uses the user's ssh key/ProxyJump/options —
   // it comes from their environment, not the repository. No `allowUnsafeSshCommand`: that
