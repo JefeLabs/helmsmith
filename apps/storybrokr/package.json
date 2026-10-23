@@ -1,6 +1,6 @@
 {
   "name": "@helmsmith/storybrokr",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Broker ephemeral single-component Storybook instances from an existing host Storybook — daemon, CLI, and MCP server.",
   "type": "module",
   "license": "Apache-2.0",
