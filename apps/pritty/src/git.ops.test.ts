@@ -1,6 +1,7 @@
-import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createGit } from './git.js';
 import { commitFile, gitIn, headFile, makeRepo, stagedPaths, write } from './testing/repo.js';
 
@@ -255,5 +256,56 @@ describe('GitOps and staged renames', () => {
     expect(headFile(r.dir, 'new.txt')).toBe('same\n');
     expect(headFile(r.dir, 'old.txt')).toBeNull();
     expect(gitIn(r.dir, 'status', '--porcelain').trim()).toBe('');
+  });
+});
+
+describe('GitOps.push and the inherited environment (simple-git 4 env guard)', () => {
+  const cleanups: Array<() => void> = [];
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    for (const done of cleanups.splice(0)) done();
+  });
+
+  // A stand-in for `ssh`: records that it ran, then runs the command git asked the "remote" to
+  // run (`git-receive-pack '<path>'`) locally. The remote host is `.invalid`, so the push can
+  // only succeed if git used this GIT_SSH_COMMAND — real ssh would fail to resolve the host.
+  function sshRemote(): { repo: string; bare: string; ssh: string; marker: string } {
+    const dir = mkdtempSync(join(tmpdir(), 'pritty-ssh-'));
+    cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
+    const bare = join(dir, 'upstream.git');
+    gitIn(dir, 'init', '-q', '--bare', bare);
+    const marker = join(dir, 'fake-ssh-ran');
+    const ssh = join(dir, 'fake-ssh.sh');
+    writeFileSync(
+      ssh,
+      `#!/bin/sh\ntouch '${marker}'\nfor last; do :; done\nexec sh -c "git \${last#git-}"\n`,
+    );
+    chmodSync(ssh, 0o755);
+    const r = makeRepo();
+    cleanups.push(r.cleanup);
+    gitIn(r.dir, 'remote', 'add', 'origin', `ssh://pritty-fake-host.invalid${bare}`);
+    return { repo: r.dir, bare, ssh, marker };
+  }
+
+  it('push honours a GIT_SSH_COMMAND inherited from the invoking shell', async () => {
+    const { repo, bare, ssh, marker } = sshRemote();
+    vi.stubEnv('GIT_SSH_COMMAND', ssh);
+
+    await createGit(repo).push('main');
+
+    expect(existsSync(marker)).toBe(true);
+    expect(gitIn(bare, 'rev-parse', 'refs/heads/main').trim()).toBe(
+      gitIn(repo, 'rev-parse', 'HEAD').trim(),
+    );
+  });
+
+  it('keeps every other guarded variable out — the legacy GIT_SSH is not honoured', async () => {
+    const { repo, ssh, marker } = sshRemote();
+    vi.stubEnv('GIT_SSH_COMMAND', undefined);
+    vi.stubEnv('GIT_SSH', ssh);
+
+    // simple-git strips GIT_SSH, so git falls back to real ssh and cannot reach the host
+    await expect(createGit(repo).push('main')).rejects.toThrow();
+    expect(existsSync(marker)).toBe(false);
   });
 });

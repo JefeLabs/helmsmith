@@ -71,7 +71,12 @@ export interface GitOps {
 }
 
 export function createGit(cwd: string = process.cwd()): GitOps {
-  const git: SimpleGit = simpleGit(cwd);
+  // simple-git 4 strips every GIT_* variable inherited from the invoking shell before spawning
+  // git. Let GIT_SSH_COMMAND back through so push uses the user's ssh key/ProxyJump/options —
+  // it comes from their environment, not the repository. No `allowUnsafeSshCommand`: that
+  // flag covers ssh commands passed explicitly, and we pass none. Everything else guarded
+  // (GIT_SSH, GIT_ASKPASS, GIT_AUTHOR_*, PAGER, …) stays stripped. Same as gittyup.
+  const git: SimpleGit = simpleGit(cwd, { allowEnvironment: ['GIT_SSH_COMMAND'] });
 
   return {
     async getStaged(): Promise<string[]> {
