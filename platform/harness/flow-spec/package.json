@@ -19,7 +19,7 @@
   },
   "devDependencies": {
     "typescript": "^7.0.2",
-    "vitest": "^5.0.5",
+    "vitest": "^5.0.3",
     "ts-json-schema-generator": "^2.9.0"
   },
   "description": "The Helmsmith flow wire contract: flow/step/edge types, catalog validator (join-hazard analysis included), expression evaluator, JSON-Schema subset, conformance fixtures, and the generated schema artifact. Browser-safe, zero runtime dependencies.",
