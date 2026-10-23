@@ -1,5 +1,17 @@
 # @helmsmith/flow-designer
 
+## 0.3.0
+
+### Minor Changes
+
+- - Requires Node.js >= 24 (was >= 18), matching the rest of the toolbox. No API changes.
+  - Built with the current toolchain (Vite 8.3) and bundles `@xyflow/react` 12.12.
+
+### Patch Changes
+
+- Updated dependencies
+  - @helmsmith/flow-spec@0.3.0
+
 ## 0.2.1
 
 ### Patch Changes

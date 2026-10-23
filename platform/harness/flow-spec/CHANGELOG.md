@@ -1,5 +1,12 @@
 # @helmsmith/flow-spec
 
+## 0.3.0
+
+### Minor Changes
+
+- - New subpath export `@helmsmith/flow-spec/schema` → the JSON Schema (`schema/flow-spec.schema.json`), so tools can load it without reaching into the package's file layout.
+  - Requires Node.js >= 24 (was >= 18), matching the rest of the toolbox. No API changes.
+
 ## 0.2.0
 
 ### Minor Changes
