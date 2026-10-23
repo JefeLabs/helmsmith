@@ -57,7 +57,7 @@
   "devDependencies": {
     "@helmsmith/cli-kit": "workspace:*",
     "@helmsmith/tui-view-components": "workspace:*",
-    "@types/node": "^24.13.3",
+    "@types/node": "^24.19.2",
     "tsup": "^8.5.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
