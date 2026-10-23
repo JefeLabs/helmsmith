@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { existsSync, lstatSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join, sep } from 'node:path';
 import { promisify } from 'node:util';
-import simpleGit, { type SimpleGit, type StatusResult } from 'simple-git';
+import { type SimpleGit, type StatusResult, simpleGit } from 'simple-git';
 import { APP_NAME } from '../config/branding.js';
 import type { ConflictFile, ConflictHunk, RepoBranchState, RepoState } from '../config/schema.js';
 import { checkResolution, ResolutionRejected } from './resolution-gate.js';

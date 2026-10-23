@@ -11,7 +11,7 @@
 import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import simpleGit, { type SimpleGit } from 'simple-git';
+import { type SimpleGit, simpleGit } from 'simple-git';
 
 export interface CommitSpec {
   /** Branch to commit on; created if missing. Default: `spec.defaultBranch`. */
@@ -89,10 +89,18 @@ export function fixtureEnv(extra: Record<string, string> = {}): Record<string, s
  * never reads the developer's `~/.config/git/{ignore,attributes}` — those
  * are default file paths, not config, and GIT_CONFIG_GLOBAL does not
  * disable them.
+ *
+ * simple-git 4 rejects any `GIT_*` variable passed via `.env()` unless it is
+ * listed in `allowEnvironment`, so the fixture's own isolation keys are
+ * allow-listed explicitly.
  */
 function fixtureGit(baseDir: string, root: string): SimpleGit {
   const env = fixtureEnv({ HOME: root, XDG_CONFIG_HOME: join(root, 'xdg') });
-  return simpleGit({ baseDir, unsafe: { allowUnsafeConfigPaths: true } }).env(env);
+  return simpleGit({
+    baseDir,
+    allowEnvironment: Object.keys(FIXTURE_GIT_ENV),
+    unsafe: { allowUnsafeConfigPaths: true },
+  }).env(env);
 }
 
 const created = new Set<string>();

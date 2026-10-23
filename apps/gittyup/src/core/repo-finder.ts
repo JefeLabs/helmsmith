@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
-import simpleGit from 'simple-git';
+import { simpleGit } from 'simple-git';
 
 /**
  * Represents a discovered git repository.
