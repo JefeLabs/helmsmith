@@ -114,6 +114,13 @@ export async function makeRepo(spec: RepoSpec): Promise<FixtureRepo> {
   await mkdir(path);
   const git = fixtureGit(path, root);
   await git.init(['-b', defaultBranch]);
+  // Repo-local identity, so git processes the fixture doesn't control (e.g.
+  // GitOperations' merge/commit, which run with the ambient env minus the
+  // GIT_* vars simple-git 4 strips) can still commit. Without it, hosts with no
+  // global identity and no passwd full name (CI runners) fail with
+  // "Author identity unknown".
+  await git.addConfig('user.name', FIXTURE_GIT_ENV.GIT_AUTHOR_NAME);
+  await git.addConfig('user.email', FIXTURE_GIT_ENV.GIT_AUTHOR_EMAIL);
 
   const known = new Set<string>();
   // After `init -b`, HEAD already points at the (unborn) default branch.
