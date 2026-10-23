@@ -40,6 +40,13 @@ export class GitOperations {
         'diff.external=',
         'core.askpass=',
       ],
+      // simple-git 4 strips every GIT_* variable inherited from the invoking shell before
+      // spawning git. Let GIT_SSH_COMMAND back through: it is how users pick a key, a
+      // ProxyJump or other ssh options for their remotes, and it comes from their own
+      // environment, not from the repository. No `allowUnsafeSshCommand` is needed — that
+      // flag governs ssh commands we pass ourselves, and we pass none. Everything else
+      // guarded (GIT_ASKPASS, GIT_SSH, GIT_CONFIG_*, PAGER, …) stays stripped.
+      allowEnvironment: ['GIT_SSH_COMMAND'],
       unsafe: {
         allowUnsafeFsMonitor: true,
         allowUnsafeHooksPath: true,

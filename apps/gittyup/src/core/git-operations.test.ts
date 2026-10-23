@@ -1,6 +1,15 @@
-import { existsSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanupFixtures, makeRepo } from '../test/git-fixture.js';
 import { GitOperations, parseConflictHunks } from './git-operations.js';
 
@@ -396,5 +405,64 @@ describe('refuses to start on a repo mid-operation (G12)', () => {
       }),
     ).rejects.toThrow(/in progress|unmerged|MERGE_HEAD/i);
     expect(ran).toBe(false);
+  });
+});
+
+describe('the inherited environment reaching git (simple-git 4 env guard)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  // A stand-in for `ssh`: records that it ran, then runs the command git asked the
+  // "remote" to run (`git-upload-pack '<path>'`) locally. The remote host is
+  // `.invalid`, so the fetch can only succeed if git used this GIT_SSH_COMMAND —
+  // real ssh would fail to resolve the host.
+  function fakeSsh(dir: string): { command: string; marker: string } {
+    const marker = join(dir, 'fake-ssh-ran');
+    const command = join(dir, 'fake-ssh.sh');
+    writeFileSync(
+      command,
+      `#!/bin/sh\ntouch '${marker}'\nfor last; do :; done\nexec sh -c "git \${last#git-}"\n`,
+    );
+    chmodSync(command, 0o755);
+    return { command, marker };
+  }
+
+  it('fetch honours a GIT_SSH_COMMAND inherited from the invoking shell', async () => {
+    const upstream = await makeRepo({ commits: [{ message: 'up', files: { 'u.txt': 'u\n' } }] });
+    const local = await makeRepo({ commits: [{ message: 'base', files: { 'f.txt': 'a\n' } }] });
+    await local.git.addRemote('origin', `ssh://gittyup-fake-host.invalid${upstream.path}`);
+    const dir = mkdtempSync(join(tmpdir(), 'gittyup-ssh-'));
+    try {
+      const ssh = fakeSsh(dir);
+      vi.stubEnv('GIT_SSH_COMMAND', ssh.command);
+
+      await new GitOperations(local.path).fetch('origin');
+
+      expect(existsSync(ssh.marker)).toBe(true);
+      expect(await local.git.revparse(['--verify', 'refs/remotes/origin/main'])).toBe(
+        await upstream.sha('main'),
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps every other guarded variable out — the legacy GIT_SSH is not honoured', async () => {
+    const upstream = await makeRepo({ commits: [{ message: 'up', files: { 'u.txt': 'u\n' } }] });
+    const local = await makeRepo({ commits: [{ message: 'base', files: { 'f.txt': 'a\n' } }] });
+    await local.git.addRemote('origin', `ssh://gittyup-fake-host.invalid${upstream.path}`);
+    const dir = mkdtempSync(join(tmpdir(), 'gittyup-ssh-'));
+    try {
+      const ssh = fakeSsh(dir);
+      vi.stubEnv('GIT_SSH_COMMAND', undefined);
+      vi.stubEnv('GIT_SSH', ssh.command);
+
+      // simple-git strips GIT_SSH, so git falls back to real ssh and cannot reach the host
+      await expect(new GitOperations(local.path).fetch('origin')).rejects.toThrow();
+      expect(existsSync(ssh.marker)).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
