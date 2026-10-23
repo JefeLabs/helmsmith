@@ -1,55 +1,63 @@
 # pritty e2e tests
 
-End-to-end tests that spawn the built `pritty` CLI as a subprocess.
-Verify the full request → response flow including:
+End-to-end tests that spawn the published entry point, `node bin/pritty.mjs`,
+against throwaway git repositories. Run with `pnpm test:e2e`
+(`vitest.e2e.config.ts`); `pnpm test` stays unit-only (`src/**/*.test.ts`).
+`global-setup.ts` builds `dist/` with tsup first.
 
-- Bin stub launches via Bun and resolves `dist/cli.js`
-- Commander parses real arguments correctly
-- Auth wiring through `prittyAuthProvider` works against a temp auth file
-- Subcommands (`init`, `commit`, `pr`, etc.) produce the expected
-  filesystem effects and exit codes
+| File             | Covers                                                                                                                  |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `cli.test.ts`    | `--help`, unknown commands, `categorize` (config found from a subdirectory), `pr` failing before it pushes              |
+| `home.test.ts`   | `auth` and `cache` keep their files under `PRITTY_HOME` and never print a token                                         |
+| `init.test.ts`   | starter config + Claude Code / Copilot files, skip-unless-`--force`, outside a repo                                     |
+| `commit.test.ts` | one commit per category, `--dry-run`, from a subdirectory, redacted prompt, model failure, incomplete plan, no provider |
+| `rebase.test.ts` | `--dry-run` plan, no history rewrite without a terminal, refusing `main`                                                |
 
-## Convention
+## Hermetic by construction
 
-Run via `npm run test:e2e`. Tests must:
+`runCli` (helpers.ts) builds the child's environment from scratch instead of
+inheriting it:
+- `PATH` is the sandbox `bin/` plus `/usr/bin:/bin`. `bin/` holds `git` and,
+  when a test calls `installFakeClaude`, a fake `claude`. The developer's real
+  Claude Code, `gh` login and tokens are unreachable, so no test can call a
+  model or GitHub.
+- `HOME` and `PRITTY_HOME` point into the sandbox; git runs with no global or
+  system config (each repo carries its own identity).
+- stdin is closed at once, so a prompt fails fast instead of hanging.
+- No `CI`/`GITHUB_ACTIONS`, so output has no colour codes on CI either.
 
-1. Build the CLI first (`tsup`) — typically wired in a vitest
-   `globalSetup` hook (see `apps/taskmaster/tests/e2e/global-setup.ts`
-   for the canonical example).
-2. Use `execFile` from `node:child_process` to spawn `dist/cli.js`.
-   Test assertions check stdout/stderr/exitCode.
-3. Isolate state — each test gets a fresh temp directory (typically
-   via `mkdtemp(tmpdir() + '/pritty-e2e-')`) and sets
-   `PRITTY_HOME=<temp-dir>` in the spawned env.
-4. Clean up after themselves in `afterEach`.
+## The fake `claude`
 
-## Why segregated from co-located unit tests
+AI-driven commands run with `provider: "claude"`, which executes the first
+`claude` on `PATH`. `installFakeClaude(sb)` installs a stand-in that records
+each call's argv, stdin (the prompt) and cwd, and answers with the envelope
+`claude -p --output-format json` prints:
 
-Co-located `src/**/*.test.ts` tests run in milliseconds and exercise
-single units. E2E tests spawn subprocesses, hit the filesystem, and
-take seconds. Segregating them by directory:
-
-- Lets `npm run test` stay fast (unit only)
-- Lets CI run e2e in parallel job(s) without slowing the inner loop
-- Makes the cost-vs-coverage trade-off explicit at file location
+```ts
+const fake = installFakeClaude(sb);
+fake.answer(JSON.stringify([{ category: 'app', message: 'feat: x', files: [] }]));
+// or: fake.fail(1, 'not logged in');
+const r = await runCli(sb, repo, ['commit', '--json']);
+expect(fake.calls()[0]!.stdin).not.toContain(secret);
+```
 
 ## Adding a test
 
 ```ts
-// pritty.help.test.ts
-import { describe, it, expect } from 'vitest';
-import { execFile as execFileCb } from 'node:child_process';
-import { promisify } from 'node:util';
-import { resolve } from 'node:path';
+let sb: Sandbox | undefined;
+afterEach(() => {
+  sb?.cleanup();
+  sb = undefined;
+});
 
-const execFile = promisify(execFileCb);
-const CLI = resolve(import.meta.dirname, '../../dist/cli.js');
-
-describe('pritty --help', () => {
-  it('prints usage', async () => {
-    const { stdout, stderr } = await execFile('node', [CLI, '--help']);
-    expect(stdout).toContain('pritty');
-    expect(stderr).toBe('');
-  });
+it('does the thing', async () => {
+  sb = makeSandbox();
+  const repo = makeRepo(sb, { config: { provider: 'claude' } });
+  const r = await runCli(sb, repo, ['categorize']);
+  expect(r.exitCode, r.stderr).toBe(0);
 });
 ```
+
+Assert on exit code, stdout/stderr and the repository afterwards (`head`,
+`gitIn`, `stagedPaths`). `--json` runs must print exactly one stdout line;
+`jsonLine(r)` enforces that.

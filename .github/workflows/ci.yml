@@ -132,6 +132,13 @@ jobs:
         if: ${{ !cancelled() }}
         run: pnpm --filter @helmsmith/gittyup test:e2e
 
+      - name: pritty end-to-end
+        # Spawns the built CLI (bin/pritty.mjs → dist/cli.js) against temp git
+        # repos, with a fake `claude` on PATH for commit/rebase. Needs git, no
+        # network, no model. `pnpm -r test` above is unit-only for pritty.
+        if: ${{ !cancelled() }}
+        run: pnpm --filter @helmsmith/pritty test:e2e
+
   # ── Java stack — controlplane ─────────────────────────────────────────
   #
   # Spring Boot 4 + Spring Modulith + JDBI + Flyway. Tests include the
