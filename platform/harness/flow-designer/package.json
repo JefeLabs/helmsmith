@@ -20,7 +20,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.2",
-    "@xyflow/react": "^12.11.6",
+    "@xyflow/react": "^12.12.0",
     "react": "19.2.9",
     "react-dom": "19.2.9",
     "tailwindcss": "^4.3.3",
