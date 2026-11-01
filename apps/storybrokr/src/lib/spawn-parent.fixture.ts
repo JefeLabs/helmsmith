@@ -1,5 +1,5 @@
 // Fixture for spawn.test.ts: a stand-in daemon that spawns one Storybook through the real
-// spawner, prints the child's pid, then idles until it is killed.
+// spawner, prints its own pid and the child's ("<daemon> <child>"), then idles until killed.
 import { join } from 'node:path';
 import type { HostInfo } from '../types.js';
 import { storybookSpawner } from './spawn.js';
@@ -17,5 +17,5 @@ const host: HostInfo = {
   tsconfigPaths: {},
 };
 const proc = storybookSpawner.spawn(host, configDir, 6199);
-console.log(String(proc.pid));
+console.log(`${process.pid} ${proc.pid}`);
 setInterval(() => {}, 1000);
