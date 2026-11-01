@@ -132,23 +132,31 @@ describe('storybookSpawner (S4): a child outlives the daemon that spawned it', (
       `#!/bin/sh\nexec "${process.execPath}" -e "setInterval(() => console.log('tick'), 50)"\n`,
     );
     chmodSync(join(dir, 'bin.sh'), 0o755);
-    const tsx = fileURLToPath(new URL('../../../../node_modules/.bin/tsx', import.meta.url));
     const fixture = fileURLToPath(new URL('./spawn-parent.fixture.ts', import.meta.url));
-    const parent = spawn(tsx, [fixture, dir, configDir], { stdio: ['ignore', 'pipe', 'pipe'] });
-    const childPid = await new Promise<number>((resolve, reject) => {
-      let out = '';
-      parent.stdout.on('data', (b: Buffer) => {
-        out += b.toString();
-        const m = out.match(/^(\d+)\n/m);
-        if (m) resolve(Number(m[1]));
-      });
-      parent.once('exit', () => reject(new Error(`parent exited early: ${out}`)));
-      setTimeout(() => reject(new Error(`no pid from parent: ${out}`)), 15_000);
+    // The daemon is this one process. The tsx CLI would run the fixture in a child of its own,
+    // and SIGKILLing the CLI would leave that child (the real daemon) running forever.
+    const parent = spawn(process.execPath, ['--import', 'tsx', fixture, dir, configDir], {
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
+    // Everything this test started, killed in `finally` even when it fails before the pids arrive.
+    const started: (number | undefined)[] = [parent.pid];
     try {
+      const [daemonPid, childPid] = await new Promise<[number, number]>((resolve, reject) => {
+        let out = '';
+        parent.stdout.on('data', (b: Buffer) => {
+          out += b.toString();
+          const m = out.match(/^(\d+) (\d+)\n/m);
+          if (m) resolve([Number(m[1]), Number(m[2])]);
+        });
+        parent.once('exit', () => reject(new Error(`parent exited early: ${out}`)));
+        setTimeout(() => reject(new Error(`no pid from parent: ${out}`)), 15_000);
+      });
+      started.push(daemonPid, childPid);
       await new Promise((r) => setTimeout(r, 300));
       parent.kill('SIGKILL');
       await new Promise((r) => setTimeout(r, 300));
+      // The premise: the daemon itself is dead, so the child really is an orphan.
+      expect(isAlivePid(daemonPid)).toBe(false);
       const logFile = join(configDir, 'storybook.log');
       expect(existsSync(logFile)).toBe(true);
       const before = readFileSync(logFile, 'utf8').split('\n').length;
@@ -162,9 +170,12 @@ describe('storybookSpawner (S4): a child outlives the daemon that spawned it', (
       expect(alive).toBe(true);
       expect(readFileSync(logFile, 'utf8').split('\n').length).toBeGreaterThan(before);
     } finally {
-      try {
-        process.kill(childPid, 'SIGKILL');
-      } catch {}
+      for (const pid of started) {
+        if (pid === undefined) continue;
+        try {
+          process.kill(pid, 'SIGKILL');
+        } catch {}
+      }
       rmSync(dir, { recursive: true, force: true });
     }
   }, 30_000);
