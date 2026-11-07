@@ -167,7 +167,7 @@ if [ -n "$WEBHOOK_URL" ]; then
     -X POST "$WEBHOOK_URL" \
     -d '{
       "content": "Build succeeded for main",
-      "username": "AgentX Bot",
+      "username": "Helmsmith Bot",
       "embeds": [...]
     }'
 fi
@@ -187,7 +187,7 @@ and one-way automation.
 
 📋 SkoolScout Engineering
    Members: 12 · Channels: 8
-   Bot role: AgentX Bot
+   Bot role: Helmsmith Bot
    Permissions: Read Messages, Send Messages, Manage Threads
    
    Text channels:

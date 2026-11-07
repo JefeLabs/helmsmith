@@ -1,4 +1,4 @@
-# AgentX Taskmaster — Feature Tour
+# Helmsmith Taskmaster — Feature Tour
 
 A hands-on walkthrough of every major capability. Follow along in order for the full experience, or jump to any section that interests you.
 
@@ -29,7 +29,7 @@ A hands-on walkthrough of every major capability. Follow along in order for the 
 
 ```bash
 # Clone and install
-git clone <repo-url> && cd agentx-taskmaster
+git clone <repo-url> && cd helmsmith-taskmaster
 npm install
 
 # Build the CLI
@@ -39,10 +39,10 @@ npm run build
 npm link
 
 # Verify it works
-agentx-taskmaster --help
+helmsmith-taskmaster --help
 ```
 
-All runtime state lives in `~/.agentx-userdata/taskmaster/` — your repositories stay clean with no dotfolders.
+All runtime state lives in `~/.helmsmith-userdata/taskmaster/` — your repositories stay clean with no dotfolders.
 
 ---
 
@@ -51,14 +51,14 @@ All runtime state lives in `~/.agentx-userdata/taskmaster/` — your repositorie
 The `init` command launches an interactive wizard that walks you through every configuration choice. On first run, it prompts for everything. On subsequent runs, your previous selections appear as pre-selected defaults — just press Enter to accept.
 
 ```bash
-agentx-taskmaster init
+helmsmith-taskmaster init
 ```
 
 The wizard prompts for:
 
 | Step | What You Choose | Why It Matters |
 |------|----------------|----------------|
-| **Project name** | e.g., `api-backend` | Creates an isolated workspace under `~/.agentx-userdata/taskmaster/api-backend/` |
+| **Project name** | e.g., `api-backend` | Creates an isolated workspace under `~/.helmsmith-userdata/taskmaster/api-backend/` |
 | **Project style** | `agile-full`, `story-driven`, `task-only`, or `flat` | Controls hierarchy depth and naming (Epic > Story > Task > Subtask, or simpler) |
 | **Status preset** | `simple`, `standard`, `kanban`, or `custom` | Defines available task states and transition rules |
 | **Skill vocabulary** | e.g., `backend`, `frontend`, `database` | Skills that can be assigned to tasks for agent delegation |
@@ -68,10 +68,10 @@ The wizard prompts for:
 For scripting or CI, skip the wizard entirely:
 
 ```bash
-agentx-taskmaster init --name api-backend --style task-only --no-interactive
+helmsmith-taskmaster init --name api-backend --style task-only --no-interactive
 ```
 
-**Smart defaults**: Every selection is saved to `~/.agentx-userdata/taskmaster/defaults.yaml`. Next time you create a project, your last choices are pre-selected. The tool learns your preferences over time.
+**Smart defaults**: Every selection is saved to `~/.helmsmith-userdata/taskmaster/defaults.yaml`. Next time you create a project, your last choices are pre-selected. The tool learns your preferences over time.
 
 ---
 
@@ -81,23 +81,23 @@ Taskmaster supports multiple projects with fully isolated state. One project is 
 
 ```bash
 # Create additional projects
-agentx-taskmaster projects create mobile-app --description "React Native client"
-agentx-taskmaster projects create auth-service
+helmsmith-taskmaster projects create mobile-app --description "React Native client"
+helmsmith-taskmaster projects create auth-service
 
 # List all projects
-agentx-taskmaster projects list
+helmsmith-taskmaster projects list
 
 # Switch the active project
-agentx-taskmaster projects switch mobile-app
+helmsmith-taskmaster projects switch mobile-app
 
 # Target a specific project without switching
-agentx-taskmaster list --project api-backend
+helmsmith-taskmaster list --project api-backend
 
 # Remove a project (prompts for confirmation)
-agentx-taskmaster projects remove auth-service
+helmsmith-taskmaster projects remove auth-service
 ```
 
-Each project gets its own directory under `~/.agentx-userdata/taskmaster/<project>/` with isolated `tasks.json`, `config.yaml`, task files, and templates. The `AGENTX_USERDATA` environment variable overrides the base directory for team sharing or CI environments.
+Each project gets its own directory under `~/.helmsmith-userdata/taskmaster/<project>/` with isolated `tasks.json`, `config.yaml`, task files, and templates. The `HELMSMITH_USERDATA` environment variable overrides the base directory for team sharing or CI environments.
 
 ---
 
@@ -109,13 +109,13 @@ Feed any implementation plan into Taskmaster and it generates a structured task 
 
 ```bash
 # Markdown (most common)
-agentx-taskmaster parse plan.md
+helmsmith-taskmaster parse plan.md
 
 # YAML with structured metadata
-agentx-taskmaster parse features.yaml
+helmsmith-taskmaster parse features.yaml
 
 # Plain text
-agentx-taskmaster parse notes.txt
+helmsmith-taskmaster parse notes.txt
 ```
 
 The parser auto-detects the format and extracts:
@@ -133,7 +133,7 @@ When authenticated with GitHub Copilot, the parser uses AI to intelligently extr
 Already have tasks? Append new ones from a follow-up PRD without disrupting existing state:
 
 ```bash
-agentx-taskmaster parse features-v2.md --append
+helmsmith-taskmaster parse features-v2.md --append
 ```
 
 Append mode:
@@ -152,16 +152,16 @@ Every task gets scored on a 1–10 scale across five weighted dimensions.
 
 ```bash
 # Score all unscored tasks
-agentx-taskmaster score
+helmsmith-taskmaster score
 
 # Re-score everything
-agentx-taskmaster score --all --recalculate
+helmsmith-taskmaster score --all --recalculate
 
 # Heuristic-only (no AI, works offline)
-agentx-taskmaster score --heuristic-only
+helmsmith-taskmaster score --heuristic-only
 
 # Machine-readable output
-agentx-taskmaster score --format json
+helmsmith-taskmaster score --format json
 ```
 
 ### Scoring Dimensions
@@ -192,19 +192,19 @@ High-complexity tasks are automatically broken down into actionable subtasks.
 
 ```bash
 # Expand a single task
-agentx-taskmaster expand T-5
+helmsmith-taskmaster expand T-5
 
 # Expand all tasks above the threshold
-agentx-taskmaster expand-all
+helmsmith-taskmaster expand-all
 
 # Preview what would be expanded (no changes)
-agentx-taskmaster expand-all --dry-run
+helmsmith-taskmaster expand-all --dry-run
 
 # Override the threshold
-agentx-taskmaster expand-all --threshold 4
+helmsmith-taskmaster expand-all --threshold 4
 
 # Control subtask count
-agentx-taskmaster expand T-5 --max-subtasks 8
+helmsmith-taskmaster expand T-5 --max-subtasks 8
 ```
 
 ### Style-Aware Expansion
@@ -230,42 +230,42 @@ Full CRUD operations with interactive prompts and flag-based equivalents.
 
 ```bash
 # List all tasks
-agentx-taskmaster list
+helmsmith-taskmaster list
 
 # Filter by status
-agentx-taskmaster list --status in-progress
+helmsmith-taskmaster list --status in-progress
 
 # Filter by category (open, active, closed)
-agentx-taskmaster list --category active
+helmsmith-taskmaster list --category active
 
 # Filter by required skills
-agentx-taskmaster list --skills backend,database
+helmsmith-taskmaster list --skills backend,database
 
 # Compact view
-agentx-taskmaster list --compact
+helmsmith-taskmaster list --compact
 
 # Machine-readable
-agentx-taskmaster list --format json
+helmsmith-taskmaster list --format json
 ```
 
 ### Viewing Task Details
 
 ```bash
 # Show full details for a task
-agentx-taskmaster show T-5
+helmsmith-taskmaster show T-5
 
 # Include the full subtask tree
-agentx-taskmaster show T-5 --with-children
+helmsmith-taskmaster show T-5 --with-children
 ```
 
 ### Adding Tasks
 
 ```bash
 # Interactive guided creation
-agentx-taskmaster add
+helmsmith-taskmaster add
 
 # Flag-based creation
-agentx-taskmaster add task --title "Add rate limiting" --priority high --skills backend,api-design
+helmsmith-taskmaster add task --title "Add rate limiting" --priority high --skills backend,api-design
 ```
 
 The interactive prompt walks through: title, type (based on style), priority, required skills (from your vocabulary), parent task, and tags.
@@ -274,10 +274,10 @@ The interactive prompt walks through: title, type (based on style), priority, re
 
 ```bash
 # Remove with confirmation prompt
-agentx-taskmaster remove T-12
+helmsmith-taskmaster remove T-12
 
 # Skip confirmation
-agentx-taskmaster remove T-12 --force
+helmsmith-taskmaster remove T-12 --force
 ```
 
 Removal cascades to children and cleans up any dependency references pointing to the removed task.
@@ -286,13 +286,13 @@ Removal cascades to children and cleans up any dependency references pointing to
 
 ```bash
 # Set a task's status
-agentx-taskmaster set-status T-3 done
+helmsmith-taskmaster set-status T-3 done
 
 # Cascade status to all children
-agentx-taskmaster set-status T-3 done --cascade
+helmsmith-taskmaster set-status T-3 done --cascade
 
 # Bypass transition rules
-agentx-taskmaster set-status T-3 done --force
+helmsmith-taskmaster set-status T-3 done --force
 ```
 
 ---
@@ -366,10 +366,10 @@ Tasks can declare dependencies that define execution order and control readiness
 
 ```bash
 # Check the entire dependency graph
-agentx-taskmaster validate
+helmsmith-taskmaster validate
 
 # Auto-fix detected issues
-agentx-taskmaster validate --fix
+helmsmith-taskmaster validate --fix
 ```
 
 The validator catches:
@@ -400,13 +400,13 @@ The `ready` command outputs everything a Team Lead agent needs to assign work:
 
 ```bash
 # Terminal display
-agentx-taskmaster ready
+helmsmith-taskmaster ready
 
 # Machine-readable for agent workflows
-agentx-taskmaster ready --format json
+helmsmith-taskmaster ready --format json
 
 # Filter by skill
-agentx-taskmaster ready --skills backend
+helmsmith-taskmaster ready --skills backend
 ```
 
 The manifest includes:
@@ -417,7 +417,7 @@ The manifest includes:
 ### The Next Task
 
 ```bash
-agentx-taskmaster next
+helmsmith-taskmaster next
 ```
 
 Returns the single highest-priority ready task with all context needed for immediate execution. This is the primary command a Team Lead agent calls to decide what to delegate next.
@@ -460,10 +460,10 @@ The `validate` command warns when a task uses a skill not in the vocabulary and 
 
 ```bash
 # List tasks requiring specific skills
-agentx-taskmaster list --skills frontend,ui-ux
+helmsmith-taskmaster list --skills frontend,ui-ux
 
 # Delegation manifest filtered by skill
-agentx-taskmaster ready --skills backend
+helmsmith-taskmaster ready --skills backend
 ```
 
 ---
@@ -474,20 +474,20 @@ Four built-in report types, all rendered through Handlebars templates.
 
 ```bash
 # Summary report (default)
-agentx-taskmaster report
+helmsmith-taskmaster report
 
 # Specific report type
-agentx-taskmaster report --type complexity
-agentx-taskmaster report --type progress
-agentx-taskmaster report --type dependencies
+helmsmith-taskmaster report --type complexity
+helmsmith-taskmaster report --type progress
+helmsmith-taskmaster report --type dependencies
 
 # Output formats
-agentx-taskmaster report --format json
-agentx-taskmaster report --format yaml
-agentx-taskmaster report --format md
+helmsmith-taskmaster report --format json
+helmsmith-taskmaster report --format yaml
+helmsmith-taskmaster report --format md
 
 # Use a custom template
-agentx-taskmaster report --template my-custom-report
+helmsmith-taskmaster report --template my-custom-report
 ```
 
 ### Report Types
@@ -519,13 +519,13 @@ Taskmaster uses a hybrid data strategy: **JSON for machines, YAML for humans**.
 
 ```bash
 # Write individual YAML files from tasks.json
-agentx-taskmaster generate
+helmsmith-taskmaster generate
 
 # Overwrite existing files
-agentx-taskmaster generate --force
+helmsmith-taskmaster generate --force
 ```
 
-This creates one `.yaml` file per task in `~/.agentx-userdata/taskmaster/<project>/tasks/`.
+This creates one `.yaml` file per task in `~/.helmsmith-userdata/taskmaster/<project>/tasks/`.
 
 ### Syncing Edits Back
 
@@ -533,13 +533,13 @@ Edit a YAML task file in your editor, then merge changes back into `tasks.json`:
 
 ```bash
 # Preview what would change
-agentx-taskmaster sync --dry-run
+helmsmith-taskmaster sync --dry-run
 
 # Show a diff of changes
-agentx-taskmaster sync --diff
+helmsmith-taskmaster sync --diff
 
 # Apply changes
-agentx-taskmaster sync
+helmsmith-taskmaster sync
 ```
 
 The sync command detects edits in YAML files and patches `tasks.json` with conflict detection. `tasks.json` always remains the source of truth.
@@ -552,18 +552,18 @@ AI features (enhanced parsing, scoring refinement, skill inference, subtask gene
 
 ```bash
 # Authenticate
-agentx-taskmaster auth login
+helmsmith-taskmaster auth login
 ```
 
-This opens your browser to `github.com/login/device` where you enter a one-time code. Once authorized, the token is stored in `~/.agentx-userdata/taskmaster/auth.json`.
+This opens your browser to `github.com/login/device` where you enter a one-time code. Once authorized, the token is stored in `~/.helmsmith-userdata/taskmaster/auth.json`.
 
 ```bash
 # Check auth status
-agentx-taskmaster auth status
-agentx-taskmaster auth status --verbose
+helmsmith-taskmaster auth status
+helmsmith-taskmaster auth status --verbose
 
 # Revoke credentials
-agentx-taskmaster auth logout
+helmsmith-taskmaster auth logout
 ```
 
 ### What AI Enhances
@@ -594,17 +594,17 @@ Every interactive prompt has a flag-based equivalent. The `--no-interactive` fla
 
 ```bash
 # Fully scripted project setup
-agentx-taskmaster init --name api-v2 --style task-only --no-interactive
+helmsmith-taskmaster init --name api-v2 --style task-only --no-interactive
 
 # Parse and score in one pipeline
-agentx-taskmaster parse plan.md --no-interactive
-agentx-taskmaster score --heuristic-only
+helmsmith-taskmaster parse plan.md --no-interactive
+helmsmith-taskmaster score --heuristic-only
 
 # Expand without confirmation prompts
-agentx-taskmaster expand-all --force
+helmsmith-taskmaster expand-all --force
 
 # Get delegation manifest as JSON for agent consumption
-agentx-taskmaster ready --format json
+helmsmith-taskmaster ready --format json
 ```
 
 When `--no-interactive` is used, the CLI reads from `defaults.yaml` for any missing values. If `defaults.yaml` doesn't exist, it errors with a message to run `init` interactively first.
@@ -630,7 +630,7 @@ All output is rendered through Handlebars templates. Override any built-in templ
 
 1. Copy the built-in template from `src/templates/` to your project's template directory:
    ```
-   ~/.agentx-userdata/taskmaster/<project>/templates/
+   ~/.helmsmith-userdata/taskmaster/<project>/templates/
    ```
 2. Edit the copy — your version takes precedence over the built-in.
 
@@ -649,8 +649,8 @@ All output is rendered through Handlebars templates. Override any built-in templ
 ### Using Custom Templates with Commands
 
 ```bash
-agentx-taskmaster report --template my-custom-report
-agentx-taskmaster generate --template my-task-format
+helmsmith-taskmaster report --template my-custom-report
+helmsmith-taskmaster generate --template my-task-format
 ```
 
 ---
@@ -661,31 +661,31 @@ Here's a typical workflow from zero to delegation-ready tasks:
 
 ```bash
 # 1. Set up
-agentx-taskmaster init
+helmsmith-taskmaster init
 
 # 2. Feed in a plan
-agentx-taskmaster parse implementation-plan.md
+helmsmith-taskmaster parse implementation-plan.md
 
 # 3. Score complexity
-agentx-taskmaster score
+helmsmith-taskmaster score
 
 # 4. Auto-expand complex tasks
-agentx-taskmaster expand-all
+helmsmith-taskmaster expand-all
 
 # 5. Validate the dependency graph
-agentx-taskmaster validate
+helmsmith-taskmaster validate
 
 # 6. See what's ready to delegate
-agentx-taskmaster ready --format json
+helmsmith-taskmaster ready --format json
 
 # 7. Get the next task for an agent
-agentx-taskmaster next
+helmsmith-taskmaster next
 
 # 8. Mark work as done (triggers readiness recomputation)
-agentx-taskmaster set-status T-1 done
+helmsmith-taskmaster set-status T-1 done
 
 # 9. Check progress
-agentx-taskmaster report --type progress
+helmsmith-taskmaster report --type progress
 ```
 
 Each `set-status` call recomputes readiness across the entire dependency graph, so `ready` and `next` always reflect the current state. Multiple CLI sessions and agents can operate against the same project concurrently — file locking prevents corruption.

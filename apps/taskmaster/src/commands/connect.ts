@@ -20,7 +20,7 @@ export async function runConnect(): Promise<void> {
   // `react-reconciler/constants` that crashes at load (tracked separately).
   const { noopConnection, runConnectView } = await import('@helmsmith/tui-view-components');
   await runConnectView({
-    appName: 'agentx-taskmaster',
+    appName: 'helmsmith-taskmaster',
     optional: [
       noopConnection({
         id: 'github-copilot',

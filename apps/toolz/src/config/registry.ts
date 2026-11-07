@@ -1,5 +1,5 @@
 /**
- * Registry CRUD — `~/.agentx/toolz/registry.yaml`. Records which
+ * Registry CRUD — `~/.helmsmith/toolz/registry.yaml`. Records which
  * tools are installed, what version, where, by which manager, and
  * when. Persists across sessions; consumed by `toolz list`,
  * `toolz doctor`, and (Phase 5) the `ensureTool` flow to short-circuit

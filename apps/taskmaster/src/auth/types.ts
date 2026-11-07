@@ -11,7 +11,7 @@ export const COPILOT_TOKEN_URL = 'https://api.github.com/copilot_internal/v2/tok
 export const COPILOT_CHAT_URL = 'https://api.githubcopilot.com/chat/completions';
 export const COPILOT_MODELS_URL = 'https://api.githubcopilot.com/models';
 
-export const EDITOR_VERSION = 'AgentX-Taskmaster/0.1.0';
+export const EDITOR_VERSION = 'Helmsmith-Taskmaster/0.1.0';
 
 /** Proactive refresh threshold in seconds (5 minutes). */
 export const TOKEN_REFRESH_THRESHOLD = 5 * 60;

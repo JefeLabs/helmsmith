@@ -34,7 +34,7 @@ services:
     build:
       context: ./central-data
       dockerfile: Dockerfile
-    image: agentx/central-data:dev
+    image: helmsmith/central-data:dev
     environment:
       NEO4J_AUTH: neo4j/controlplane
       NEO4J_server_memory_heap_initial__size: 512m
@@ -65,7 +65,7 @@ services:
   # Model Runner attachment (local Qwen variants) or pure env-var
   # configuration (OpenAI / Bedrock cloud APIs).
   #
-  # The base compose.yaml leaves AGENTX_EMBEDDER_URL/MODEL/DIMENSION
+  # The base compose.yaml leaves HELMSMITH_EMBEDDER_URL/MODEL/DIMENSION
   # unset; the controlplane Spring app boots fine but its query path
   # surfaces a 503 until an overlay provides the embedder config.
   #
@@ -81,7 +81,7 @@ services:
     build:
       context: ../../..
       dockerfile: platform/controlplane/service/Dockerfile
-    image: agentx/controlplane:dev
+    image: helmsmith/controlplane:dev
     ports:
       - "8080:8080"
     environment:
@@ -90,19 +90,19 @@ services:
       # @ConditionalOnMissingBean(DataSource.class) fires before Spring
       # Boot's DataSourceAutoConfiguration has materialized the bean —
       # the conditional sees no DataSource yet and starts embedded.
-      AGENTX_EMBEDDED_POSTGRES_ENABLED: "false"
+      HELMSMITH_EMBEDDED_POSTGRES_ENABLED: "false"
       SPRING_DATASOURCE_URL: jdbc:postgresql://central-data:5432/controlplane
       SPRING_DATASOURCE_USERNAME: controlplane
       SPRING_DATASOURCE_PASSWORD: controlplane
       # Neo4j in central-data (same container; reachable via compose DNS).
-      AGENTX_NEO4J_URI: bolt://central-data:7687
-      AGENTX_NEO4J_USER: neo4j
-      AGENTX_NEO4J_PASSWORD: controlplane
-      # AGENTX_EMBEDDER_URL / AGENTX_EMBEDDER_MODEL / AGENTX_EMBEDDER_DIMENSION
+      HELMSMITH_NEO4J_URI: bolt://central-data:7687
+      HELMSMITH_NEO4J_USER: neo4j
+      HELMSMITH_NEO4J_PASSWORD: controlplane
+      # HELMSMITH_EMBEDDER_URL / HELMSMITH_EMBEDDER_MODEL / HELMSMITH_EMBEDDER_DIMENSION
       # land via per-variant overlay files (see comment above).
-      # Disable refresh-poller in container by default (no agentx-load
+      # Disable refresh-poller in container by default (no helmsmith-load
       # binary baked into the image yet — that's a follow-up).
-      AGENTX_CONTEXT_LOADER_REFRESH_POLLER_ENABLED: "false"
+      HELMSMITH_CONTEXT_LOADER_REFRESH_POLLER_ENABLED: "false"
     depends_on:
       central-data:
         condition: service_healthy
@@ -122,7 +122,7 @@ services:
     build:
       context: ../../..
       dockerfile: platform/controlplane/service/harness-server/Dockerfile
-    image: agentx/harness-server:dev
+    image: helmsmith/harness-server:dev
     environment:
       HARNESS_SOCKET: /run/harness/harness.sock
       EDGE_SOCKETS_DIR: /run/edge
@@ -131,10 +131,10 @@ services:
       # CONTROLPLANE_URL to point at a hosted controlplane (e.g.,
       # https://controlplane.prod.example.com) for hybrid setups
       # where the harness is local but the controlplane is deployed.
-      # AGENTX_ORG_ID picks which tenant's catalog to load. Phase 7
+      # HELMSMITH_ORG_ID picks which tenant's catalog to load. Phase 7
       # swaps to a system-token-scoped endpoint.
       CONTROLPLANE_URL: ${CONTROLPLANE_URL:-http://controlplane:8080}
-      AGENTX_ORG_ID: ${AGENTX_ORG_ID:-dev-org}
+      HELMSMITH_ORG_ID: ${HELMSMITH_ORG_ID:-dev-org}
       # Self-register with controlplane's HarnessRegistry on startup +
       # heartbeat every HARNESS_HEARTBEAT_INTERVAL_MS. HARNESS_ID needs
       # to be stable across restarts so the controlplane doesn't
@@ -168,7 +168,7 @@ services:
     build:
       context: ../../..
       dockerfile: platform/controlplane/service/edge-server/Dockerfile
-    image: agentx/edge-server:dev
+    image: helmsmith/edge-server:dev
     environment:
       NEO4J_AUTH: neo4j/edgepassword
       EDGE_NEO4J_URL: bolt://localhost:7687

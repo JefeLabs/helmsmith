@@ -136,13 +136,13 @@ resolveManifestPath()
   ├─ detectGitRoot() → git rev-parse --show-toplevel
   │   │
   │   └─ If in git repo:
-  │       Check <gitRoot>/.agentx/gittyup/gittyup.yaml
+  │       Check <gitRoot>/.helmsmith/gittyup/gittyup.yaml
   │       Found? → location: 'repo'
   │
   ├─ Walk up from CWD looking for bare gittyup.yaml
   │   Found? → location: 'home' (backwards compat)
   │
-  └─ Fall back to ~/.agentx/gittyup/gittyup.yaml
+  └─ Fall back to ~/.helmsmith/gittyup/gittyup.yaml
       → location: 'home'
 ```
 
@@ -207,7 +207,7 @@ type ConfigLocation = 'home' | 'repo';
 
 interface ResolvedConfig {
   location: ConfigLocation;
-  configDir: string;          // e.g. ~/.agentx/gittyup or <repo>/.agentx/gittyup
+  configDir: string;          // e.g. ~/.helmsmith/gittyup or <repo>/.helmsmith/gittyup
   manifestPath: string;       // Full path to gittyup.yaml
   gitRoot: string | null;
 }

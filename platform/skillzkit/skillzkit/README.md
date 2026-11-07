@@ -1,7 +1,7 @@
 # skillzkit
 
 A catalog of slash commands, agent skills, and multi-phase workflows
-for [Claude Code](https://claude.com/claude-code) and the AgentX
+for [Claude Code](https://claude.com/claude-code) and the Helmsmith
 platform — opinionated playbooks for product, engineering, and
 marketing work, organized as installable artifacts a project can pull
 selectively.
@@ -103,8 +103,8 @@ offers an opt-in branch + commit + push + `gh pr create` step.
 Manual flow:
 
 ```bash
-git clone https://github.com/ecruz165/agentx-skillzkit
-cd agentx-skillzkit
+git clone https://github.com/JefeLabs/helmsmith
+cd helmsmith/platform/skillzkit/skillzkit
 git checkout -b feat/<persona>-<slug>
 # author .claude/commands/<path>.md
 npm run catalog          # regenerate index
@@ -147,4 +147,4 @@ npm run build            # catalog + tsc to dist/
 
 ## License
 
-UNLICENSED — internal AgentX use.
+UNLICENSED — internal Helmsmith use.

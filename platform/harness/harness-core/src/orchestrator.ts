@@ -185,7 +185,7 @@ export interface RunJobDeps {
    * Optional override for how local-provider endpoints are resolved when
    * `bindingToAdapter` returns a local binding. Forwarded to
    * `bindingToAdapter` as `options.localEndpoint`. Defaults to env-var
-   * lookup (`AGENTX_LOCAL_QWEN_ENDPOINT` etc.).
+   * lookup (`HELMSMITH_LOCAL_QWEN_ENDPOINT` etc.).
    */
   localEndpoint?: BindingToAdapterOptions['localEndpoint'];
   /**

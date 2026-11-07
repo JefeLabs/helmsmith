@@ -22,17 +22,17 @@ import {
 
 /**
  * Path conventions (per prd-workspace-template):
- *   - Auth file is per-user, lives at ~/.agentx/auth.json (decision #5).
+ *   - Auth file is per-user, lives at ~/.helmsmith/auth.json (decision #5).
  *   - Sockets are workspace-scoped at <workspace>/.harness/run/<service>.sock.
  *     In containerized deployment (MVP-1+), the host's `<workspace>/.harness/run/`
  *     bind-mounts to `~/.harness/run/` inside the container.
- *   - Session is per-user at ~/.agentx/session.json.
+ *   - Session is per-user at ~/.helmsmith/session.json.
  *
  * Workspace discovery: walk up from CWD looking for a `.harness/` directory
  * (the standard "anchor" pattern, like git's `.git/`). Containers (MVP-1+)
  * set HARNESS_WORKSPACE explicitly at spawn so this fallback isn't needed.
  */
-const ORG_DIR = join(homedir(), '.agentx');
+const ORG_DIR = join(homedir(), '.helmsmith');
 const AUTH_PATH = join(ORG_DIR, 'auth.json');
 const SESSION_PATH = join(ORG_DIR, 'session.json');
 const WORKSPACE_ROOT = findWorkspaceRoot();
@@ -106,12 +106,12 @@ async function main() {
  *
  * Falls back gracefully:
  *   - tmux not installed → clear error
- *   - no agentx tmux session → clear error
+ *   - no helmsmith tmux session → clear error
  *   - no matching pane → attach to the loaders window anyway,
  *     log a "couldn't find pane <jobId>" warning
  */
 async function handleAttach(args: string[]) {
-  const session = process.env.AGENTX_TMUX_SESSION ?? 'agentx';
+  const session = process.env.HELMSMITH_TMUX_SESSION ?? 'helmsmith';
   const window = 'loaders';
   const jobId = args[0]; // optional positional
 
@@ -1050,16 +1050,16 @@ async function loadSingleSource(
     return loadViaHarnessServer(jobId, flags, productId, exitOnComplete);
   }
 
-  // Auto-tmux: when running inside an `agentx` tmux session, spawn the
+  // Auto-tmux: when running inside a `helmsmith` tmux session, spawn the
   // loader in its own pane in the `loaders` window. Each concurrent
   // load gets a dedicated pane with native scrollback + the live
   // --output progress bar redrawing in place. UDS events still flow to
   // the parent so any TUI subscribers see structured updates too.
   // Outside tmux, fall back to direct spawn (current behavior).
   const tmuxPane =
-    process.env.TMUX && (process.env.AGENTX_TMUX_SESSION ?? 'agentx')
+    process.env.TMUX && (process.env.HELMSMITH_TMUX_SESSION ?? 'helmsmith')
       ? {
-          session: process.env.AGENTX_TMUX_SESSION ?? 'agentx',
+          session: process.env.HELMSMITH_TMUX_SESSION ?? 'helmsmith',
           window: 'loaders',
         }
       : undefined;
@@ -1078,7 +1078,7 @@ async function loadSingleSource(
   });
 
   // Render progress to stderr so stdout stays clean for the final summary.
-  // Same shape as agentx-load's --output progress mode but driven from
+  // Same shape as helmsmith-load's --output progress mode but driven from
   // events arriving over the UDS instead of in-process emission.
   const counts = {
     files: 0,

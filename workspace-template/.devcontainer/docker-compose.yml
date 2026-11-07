@@ -14,9 +14,9 @@
 #                           side-by-side quality measurement.
 #
 # Workers are spawned per-job via @devcontainers/cli — NOT in this compose
-# file. Worker containers should attach to `agentx-harness-net` by name so
+# file. Worker containers should attach to `helmsmith-harness-net` by name so
 # they can reach the model sidecars + UDS-mount the shared run dir.
-# (Note: spawn-worker.ts does not currently add `--network agentx-harness-net`
+# (Note: spawn-worker.ts does not currently add `--network helmsmith-harness-net`
 # to its runArgs; workers reach Neo4j transitively through the host triad's
 # UDS bind-mount, and reach the model sidecars via host-port mappings.)
 #
@@ -47,7 +47,7 @@
 # `depends_on` the model service to receive the injected
 # `<NAME>_URL` env var (e.g., depend on `embedder` → `EMBEDDER_URL`).
 
-name: agentx-sidecars
+name: helmsmith-sidecars
 
 services:
   # ─── off-the-shelf model sidecars (Docker Model Runner) ──────
@@ -72,7 +72,7 @@ services:
   # can also rely on the injected env vars per their own depends_on.
 
   # Text embedder — used by edge-memory + edge-context to vectorize
-  # content, and by @agentx/context-loader-core to index source content
+  # content, and by @helmsmith/context-loader-core to index source content
   # into the local `neo4j-edge` graph store.
   #
   # Default: ai/qwen3-embedding:0.6B-F16 (1024-dim native, no MRL
@@ -136,7 +136,7 @@ services:
   # before sharing the workspace with anyone outside your machine.
   neo4j-edge:
     image: neo4j:5-community
-    container_name: agentx-neo4j-edge
+    container_name: helmsmith-neo4j-edge
     environment:
       NEO4J_AUTH: ${NEO4J_AUTH:-neo4j/devpassword}
       # JVM tuning — see https://neo4j.com/docs/operations-manual/current/performance/memory-configuration/
@@ -150,7 +150,7 @@ services:
       - neo4j-edge-logs:/logs
     networks:
       - harness-net
-    # Publish Bolt + HTTP on the host. Bolt is needed by `agentx-load`
+    # Publish Bolt + HTTP on the host. Bolt is needed by `helmsmith-load`
     # invocations from outside the network (CI scripts, host shell).
     # HTTP serves Neo4j Browser at localhost:7474 (handy for ad-hoc Cypher).
     # In production / ECS these stay closed — siblings reach Neo4j via
@@ -186,11 +186,11 @@ services:
   # Usage (writes prefix-isolated nodes into a single Neo4j; query with
   # `MATCH (n:Section_qwen_06) ...` style label suffixes):
   #   docker compose --profile bench up
-  #   agentx-load --embedder-url $EMBEDDER_QWEN_SMALL_URL \
+  #   helmsmith-load --embedder-url $EMBEDDER_QWEN_SMALL_URL \
   #               --backend bolt://neo4j-edge:7687 --label-suffix _qwen_06 <repo>
-  #   agentx-load --embedder-url $EMBEDDER_QWEN_LARGE_URL \
+  #   helmsmith-load --embedder-url $EMBEDDER_QWEN_LARGE_URL \
   #               --backend bolt://neo4j-edge:7687 --label-suffix _qwen_4  <repo>
-  #   agentx-load --embedder-url http://embedder-bedrock:4000/v1 \
+  #   helmsmith-load --embedder-url http://embedder-bedrock:4000/v1 \
   #               --backend bolt://neo4j-edge:7687 --label-suffix _bedrock <repo>
   #
   # The Qwen lanes use Compose's `provider: { type: model }` syntax
@@ -217,7 +217,7 @@ services:
 
   embedder-bedrock:
     image: ghcr.io/berriai/litellm:main-stable
-    container_name: agentx-embedder-bedrock
+    container_name: helmsmith-embedder-bedrock
     command: ["--config", "/app/litellm.config.yaml", "--port", "4000"]
     volumes:
       - ./litellm.config.yaml:/app/litellm.config.yaml:ro
@@ -231,13 +231,13 @@ services:
 networks:
   harness-net:
     driver: bridge
-    name: agentx-harness-net
+    name: helmsmith-harness-net
 
 volumes:
   # Neo4j Community on edge — graph data + logs persisted across container
   # restarts. Drop the volume to start fresh (`docker volume rm
-  # agentx-neo4j-edge-data agentx-neo4j-edge-logs`).
+  # helmsmith-neo4j-edge-data helmsmith-neo4j-edge-logs`).
   neo4j-edge-data:
-    name: agentx-neo4j-edge-data
+    name: helmsmith-neo4j-edge-data
   neo4j-edge-logs:
-    name: agentx-neo4j-edge-logs
+    name: helmsmith-neo4j-edge-logs

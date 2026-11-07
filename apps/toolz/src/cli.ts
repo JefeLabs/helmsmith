@@ -1,7 +1,7 @@
 /**
  * ToolZ CLI entry. Thin commander wiring — each verb's logic lives
  * in `src/commands/<verb>.ts`. Matches gitradar's per-verb-file
- * pattern across the agentx-toolbox monorepo.
+ * pattern across the helmsmith monorepo.
  */
 
 import { readFileSync } from 'node:fs';
@@ -43,7 +43,7 @@ function readVersion(): string {
 const { program } = createCli({
   name: 'toolz',
   version: readVersion(),
-  description: 'ToolZ — cross-platform tool manager for AgentX',
+  description: 'ToolZ — cross-platform tool manager for Helmsmith',
 });
 
 program

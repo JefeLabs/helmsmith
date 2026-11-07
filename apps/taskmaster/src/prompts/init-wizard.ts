@@ -4,6 +4,7 @@ import { getProvider } from '../auth/provider-registry.js';
 import { PRESET_NAMES, STATE_PRESETS } from '../config/state-presets.js';
 import { PROJECT_STYLES, STYLE_NAMES } from '../config/styles.js';
 import { AI_TOOLING_CHOICES, type AITooling, INSTRUCTION_FILES } from '../context/index.js';
+import { GITIGNORE_ENTRY } from '../utils/gitignore.js';
 import type { ProjectLocation } from '../utils/location.js';
 import { listAllProjects } from '../utils/projects.js';
 import {
@@ -200,10 +201,10 @@ export async function runInitWizard(
   } else if (gitRoot) {
     const locationChoices = [
       {
-        name: `In this repository (${gitRoot}/.agentx/taskmaster/)`,
+        name: `In this repository (${gitRoot}/.helmsmith/taskmaster/)`,
         value: 'repo' as ProjectLocation,
       },
-      { name: 'In user home (~/.agentx/taskmaster/)', value: 'home' as ProjectLocation },
+      { name: 'In user home (~/.helmsmith/taskmaster/)', value: 'home' as ProjectLocation },
     ];
     location = await listWithDefault(
       '__storageLocation',
@@ -220,7 +221,7 @@ export async function runInitWizard(
     gitignore = opts.gitignore;
   } else if (location === 'repo' && gitRoot) {
     const gitignoreChoices = [
-      { name: 'No \u2014 add .agentx/ to .gitignore (private to you)', value: 'yes' },
+      { name: `No \u2014 add ${GITIGNORE_ENTRY} to .gitignore (private to you)`, value: 'yes' },
       { name: 'Yes \u2014 track in git (shared with team)', value: 'no' },
     ];
     const choice = await listWithDefault(

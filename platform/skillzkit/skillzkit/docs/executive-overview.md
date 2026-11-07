@@ -4,7 +4,7 @@
 
 **skillzkit** is a curated catalog of slash commands, agent skills, and
 multi-phase workflows for [Claude Code](https://claude.com/claude-code)
-and the [AgentX](https://github.com/ecruz165/agentx-platform) platform —
+and the [Helmsmith](https://github.com/JefeLabs/helmsmith) platform —
 opinionated playbooks for product, engineering, and marketing work,
 organized as installable artifacts a project can pull selectively.
 
@@ -63,17 +63,17 @@ authoring, anyone who just wants the curated catalog locally.
 ### Team mode
 
 The catalog lives in a centralized **skillzkit API** deployed alongside
-your AgentX controlplane (or as a serverless function on AWS Lambda).
+your Helmsmith controlplane (or as a serverless function on AWS Lambda).
 The CLI/TUI on each user's machine fetches from the shared catalog;
 new contributions are submitted via API and validated server-side.
 **Best for:** teams growing their own playbook, organizations that
 want a single source of truth, anyone who needs an audit trail of
 who-contributed-what-when.
 
-## Integration with agentx-platform
+## Integration with helmsmith
 
 When deployed in team mode, skillzkit integrates with the broader
-AgentX platform:
+Helmsmith platform:
 
 - **Authentication** is handled by `@helmsmith/agent-auth` — the same
   credential broker the rest of the platform uses. skillzkit never

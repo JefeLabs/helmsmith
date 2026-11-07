@@ -1,12 +1,12 @@
 {
   "name": "@helmsmith/workspace",
   "version": "0.0.1",
-  "description": "Procure a new agentx project workspace from the workspace-template — the front door for setting up agent flows on a new product.",
+  "description": "Procure a new helmsmith project workspace from the workspace-template — the front door for setting up agent flows on a new product.",
   "type": "module",
   "main": "./dist/bin.js",
   "bin": {
     "workspace": "./dist/bin.js",
-    "agentx-workspace": "./dist/bin.js"
+    "helmsmith-workspace": "./dist/bin.js"
   },
   "files": [
     "dist",
@@ -39,7 +39,7 @@
     "yaml": "^2.9.1"
   },
   "keywords": [
-    "agentx",
+    "helmsmith",
     "agent",
     "workflow",
     "scaffolding",
@@ -48,7 +48,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ecruz165/agentx-platform.git",
+    "url": "https://github.com/JefeLabs/helmsmith.git",
     "directory": "platform/harness/workspace-cli"
   }
 }

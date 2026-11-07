@@ -70,15 +70,15 @@ project's manifest, NOT duplicated per integration:
           },
           "MS_GRAPH_CLIENT_SECRET": {
             "storage": "keychain",
-            "keychainAccount": "agentx-skillzkit-msgraph-client-secret"
+            "keychainAccount": "helmsmith-skillzkit-msgraph-client-secret"
           },
           "MS_GRAPH_ACCESS_TOKEN": {
             "storage": "keychain",
-            "keychainAccount": "agentx-skillzkit-msgraph-access-token"
+            "keychainAccount": "helmsmith-skillzkit-msgraph-access-token"
           },
           "MS_GRAPH_REFRESH_TOKEN": {
             "storage": "keychain",
-            "keychainAccount": "agentx-skillzkit-msgraph-refresh-token"
+            "keychainAccount": "helmsmith-skillzkit-msgraph-refresh-token"
           }
         },
         "scopes": [
@@ -251,7 +251,7 @@ refresh:
 
 ```bash
 refresh_with_lock() {
-  local LOCK_FILE="/tmp/agentx-skillzkit-msgraph.lock"
+  local LOCK_FILE="/tmp/helmsmith-skillzkit-msgraph.lock"
   local LOCK_TIMEOUT=10
   
   exec 200>"$LOCK_FILE"

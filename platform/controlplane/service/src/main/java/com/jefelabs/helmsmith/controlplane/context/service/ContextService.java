@@ -3,7 +3,7 @@ package com.jefelabs.helmsmith.controlplane.context.service;
 import com.jefelabs.helmsmith.controlplane.context.domain.ContextSource;
 import com.jefelabs.helmsmith.controlplane.context.domain.IngestionJob;
 import com.jefelabs.helmsmith.controlplane.context.domain.IngestionStatus;
-import com.jefelabs.helmsmith.controlplane.context.integration.AgentxLoadRunner;
+import com.jefelabs.helmsmith.controlplane.context.integration.HelmsmithLoadRunner;
 import com.jefelabs.helmsmith.controlplane.context.persistence.ContextSourceDao;
 import com.jefelabs.helmsmith.controlplane.context.persistence.ContextSourceDaoRow;
 import com.jefelabs.helmsmith.controlplane.context.persistence.IngestionJobDao;
@@ -27,9 +27,9 @@ public class ContextService {
 
     private final Jdbi jdbi;
     private final ObjectMapper objectMapper;
-    private final AgentxLoadRunner ingestionRunner;
+    private final HelmsmithLoadRunner ingestionRunner;
 
-    public ContextService(Jdbi jdbi, ObjectMapper objectMapper, AgentxLoadRunner ingestionRunner) {
+    public ContextService(Jdbi jdbi, ObjectMapper objectMapper, HelmsmithLoadRunner ingestionRunner) {
         this.jdbi = jdbi;
         this.objectMapper = objectMapper;
         this.ingestionRunner = ingestionRunner;
@@ -80,7 +80,7 @@ public class ContextService {
 
     /**
      * Trigger an ingestion run for a source. Creates an ingestion_jobs row
-     * (status=pending), kicks off the async {@link AgentxLoadRunner}, and
+     * (status=pending), kicks off the async {@link HelmsmithLoadRunner}, and
      * returns the new job record. Caller polls the ingestions list to
      * observe progress.
      */

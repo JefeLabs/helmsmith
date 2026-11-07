@@ -10,7 +10,7 @@
  *
  * Sequencing inside runInit():
  *   1. Validate every field. Bail fast on bad input — partial writes
- *      to ~/.agentx/skillzkit/config.json would leave the user in a
+ *      to ~/.helmsmith/skillzkit/config.json would leave the user in a
  *      half-initialized state.
  *   2. For team mode, encrypt the API key. The crypto module's
  *      built-in round-trip self-test catches any pipeline bug here

@@ -19,7 +19,7 @@ Existing tools require browser-based dashboards, SaaS subscriptions, or complex 
 
 ## How It Works
 
-1. **Configure once** — Define your orgs, teams, and members in a single `config.yml`, and register repos with `gitradar repo add` (they live in the workspace registry, `~/.agentx/repos.yml`). Or use the built-in Manage tab to set up everything interactively.
+1. **Configure once** — Define your orgs, teams, and members in a single `config.yml`, and register repos with `gitradar repo add` (they live in the workspace registry, `~/.helmsmith/repos.yml`). Or use the built-in Manage tab to set up everything interactively.
 2. **Scan incrementally** — GitRadar runs `git log` across all repos, classifies every changed file, and stores results in a local SQLite database. Subsequent scans are incremental (only new commits).
 3. **Enrich with GitHub data** — Optionally pull PR metrics (opened, merged, median cycle time, PRs reviewed) via the GitHub API.
 4. **Discover authors** — Unknown git authors are captured in an author registry and can be assigned to orgs/teams from the TUI or CLI.
@@ -75,7 +75,7 @@ This grain supports rollup by any dimension: org, team, tag, repo group, week, o
 
 - **TypeScript** on **Bun** — single `npm install`, no external services required; GitRadar requires the Bun runtime (`bun:sqlite`), vendored via the `bun` npm dependency
 - **SQLite** via `bun:sqlite` — durable local storage with WAL mode for crash safety
-- **Zero cloud dependencies** — all data stays local in `~/.agentx/gitradar/`
+- **Zero cloud dependencies** — all data stays local in `~/.helmsmith/gitradar/`
 - **Optional GitHub API** — enrichment features use `octokit` for PR and review data
 - **Sub-second scans** for incremental updates on warm repos
 

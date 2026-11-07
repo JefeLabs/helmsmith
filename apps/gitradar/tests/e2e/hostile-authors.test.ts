@@ -46,9 +46,9 @@ describe('scan with hostile author names', () => {
     await commitBy(repo, 'Jane Doe | Acme Contractors', 'jane@example.com', 'a.ts', 'feat: a');
     await commitBy(repo, MALLORY_NAME, 'mallory@example.com', 'b.ts', 'feat: change');
 
-    await mkdir(join(sb.home, '.agentx'), { recursive: true });
+    await mkdir(join(sb.home, '.helmsmith'), { recursive: true });
     await writeFile(
-      join(sb.home, '.agentx', 'repos.yml'),
+      join(sb.home, '.helmsmith', 'repos.yml'),
       [
         'workspaces:',
         '  t:',

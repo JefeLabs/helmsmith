@@ -20,9 +20,9 @@
 #   docker compose -f compose.yaml -f compose.bedrock.yaml up -d
 
 x-cloud-env: &cloud-env
-  AGENTX_EMBEDDER_URL: http://litellm:4000/v1
-  AGENTX_EMBEDDER_MODEL: embedder
-  AGENTX_EMBEDDER_DIMENSION: ${BEDROCK_EMBED_DIM:-1024}
+  HELMSMITH_EMBEDDER_URL: http://litellm:4000/v1
+  HELMSMITH_EMBEDDER_MODEL: embedder
+  HELMSMITH_EMBEDDER_DIMENSION: ${BEDROCK_EMBED_DIM:-1024}
 
 services:
   litellm:

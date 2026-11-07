@@ -20,11 +20,11 @@
 
 import { createElement, type ReactElement } from 'react';
 import { KeyboardProvider } from '../keyboard/registry.tsx';
-import { AgentxThemeProvider } from '../theme/AgentxThemeProvider.tsx';
+import { HelmsmithThemeProvider } from '../theme/HelmsmithThemeProvider.tsx';
 
 export interface RunTuiViewOptions {
   appName: string;
-  /** Override the theme directory. Default: `~/.agentx/theme/`. */
+  /** Override the theme directory. Default: `~/.helmsmith/theme/`. */
   themeDir?: string;
   /** Theme to use if no `default.*` file exists yet. Default: rose-pine. */
   fallbackThemeName?: string;
@@ -71,7 +71,7 @@ export async function runTuiView(
     // children as the 3rd createElement arg (what JSX desugars to;
     // satisfies biome's noChildrenProp).
     const tree = createElement(
-      AgentxThemeProvider,
+      HelmsmithThemeProvider,
       {
         appName: opts.appName,
         fallbackThemeName: opts.fallbackThemeName,

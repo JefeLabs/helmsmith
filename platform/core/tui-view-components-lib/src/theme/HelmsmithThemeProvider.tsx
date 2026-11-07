@@ -1,12 +1,12 @@
 /**
- * `<AgentxThemeProvider>` — agentx-flavored ThemeProvider.
+ * `<HelmsmithThemeProvider>` — helmsmith-flavored ThemeProvider.
  *
- * Resolves the active theme from the standard agentx layout:
+ * Resolves the active theme from the standard helmsmith layout:
  *
- *   built-in fallback → ~/.agentx/theme/default.* → ~/.agentx/theme/<appName>.*
+ *   built-in fallback → ~/.helmsmith/theme/default.* → ~/.helmsmith/theme/<appName>.*
  *
  * Persistence: when the user changes themes via the in-TUI switcher,
- * the chosen theme overwrites `~/.agentx/theme/default.json`.
+ * the chosen theme overwrites `~/.helmsmith/theme/default.json`.
  *
  * Hot reload: edits to either the default or the app override file
  * re-resolve and re-render automatically.
@@ -17,14 +17,19 @@
  */
 
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
-import { agentxThemeDir, loadAgentxTheme, persistAgentxTheme, watchAgentxTheme } from './agentx.ts';
 import { ThemeContext, type ThemeContextValue } from './context.tsx';
+import {
+  helmsmithThemeDir,
+  loadHelmsmithTheme,
+  persistHelmsmithTheme,
+  watchHelmsmithTheme,
+} from './helmsmith.ts';
 import { builtInThemes, defaultThemeName } from './themes/index.ts';
 import type { Theme, ThemeAppearance } from './types.ts';
 
-export interface AgentxThemeProviderProps {
+export interface HelmsmithThemeProviderProps {
   /** React children. Marked optional so consumers can use either JSX
-   *  (`<AgentxThemeProvider>{...}</AgentxThemeProvider>`) or createElement
+   *  (`<HelmsmithThemeProvider>{...}</HelmsmithThemeProvider>`) or createElement
    *  with the third-arg children form. */
   children?: ReactNode;
 
@@ -37,7 +42,7 @@ export interface AgentxThemeProviderProps {
   /** Override the directory (mostly for tests). */
   themeDir?: string;
 
-  /** Subscribe to file changes in the agentx dir. Default: true. */
+  /** Subscribe to file changes in the helmsmith dir. Default: true. */
   watch?: boolean;
 
   /**
@@ -47,15 +52,15 @@ export interface AgentxThemeProviderProps {
   extraThemes?: Record<string, Theme>;
 }
 
-export function AgentxThemeProvider({
+export function HelmsmithThemeProvider({
   children,
   appName,
   fallbackThemeName = defaultThemeName,
   themeDir,
   watch = true,
   extraThemes,
-}: AgentxThemeProviderProps) {
-  const dir = themeDir ?? agentxThemeDir();
+}: HelmsmithThemeProviderProps) {
+  const dir = themeDir ?? helmsmithThemeDir();
   const fallback = builtInThemes[fallbackThemeName] ?? builtInThemes[defaultThemeName]!;
 
   // Static registry available to the picker — built-ins plus extras.
@@ -66,13 +71,13 @@ export function AgentxThemeProvider({
 
   // Initial resolution
   const [resolved, setResolved] = useState<Theme>(
-    () => loadAgentxTheme({ appName, fallback, themeDir: dir }).theme,
+    () => loadHelmsmithTheme({ appName, fallback, themeDir: dir }).theme,
   );
 
   // Hot reload
   useEffect(() => {
     if (!watch) return;
-    return watchAgentxTheme({ appName, fallback, themeDir: dir }, ({ theme: next }) =>
+    return watchHelmsmithTheme({ appName, fallback, themeDir: dir }, ({ theme: next }) =>
       setResolved(next),
     );
   }, [watch, appName, dir, fallback]);
@@ -83,12 +88,12 @@ export function AgentxThemeProvider({
     (name: string) => {
       const target = themes[name];
       if (!target) return;
-      persistAgentxTheme(target, { themeDir: dir });
+      persistHelmsmithTheme(target, { themeDir: dir });
       // Re-resolve so the per-app override re-applies on top.
       let next = target;
       if (appName) {
         try {
-          const candidate = loadAgentxTheme({ appName, fallback: target, themeDir: dir });
+          const candidate = loadHelmsmithTheme({ appName, fallback: target, themeDir: dir });
           next = candidate.theme;
         } catch {
           // fall back to the picked theme as-is

@@ -6,7 +6,7 @@
 files by purpose, generates conventional commits, and creates pull
 requests — with pluggable hooks and human-in-the-loop approval.
 
-Part of the [agentx-toolbox](../..) monorepo. Auth + multi-agent
+Part of the [helmsmith](../..) monorepo. Auth + multi-agent
 adapters live in shared packages (`@helmsmith/agent-auth`,
 `@helmsmith/agent-adapter`) so pritty doesn't reinvent OAuth or LLM
 provider routing.
@@ -14,7 +14,7 @@ provider routing.
 ## Status
 
 This is a **phased build** following the
-[implementation plan](../../../agentx-pritty/pritty-implementation-plan.md).
+[implementation plan](../../../helmsmith-pritty/pritty-implementation-plan.md).
 
 | Phase | Status |
 |---|---|
@@ -94,7 +94,7 @@ Pritty's auth layer is a thin wrapper around `@helmsmith/agent-auth`:
 - `pritty auth logout` removes the file.
 
 Override the storage path with `PRITTY_HOME=<dir>`. The same primitive
-backs gittyup, future AgentX CLIs, etc. — change auth in one place,
+backs gittyup, future Helmsmith CLIs, etc. — change auth in one place,
 every consumer inherits the change.
 
 ## AI providers
@@ -137,7 +137,7 @@ to be present.
 
 ## Stack
 
-Per [agentx-toolbox stack conventions](../../README.md):
+Per [helmsmith stack conventions](../../README.md):
 
 - TypeScript ESM
 - Commander.js for CLI parsing
@@ -191,6 +191,28 @@ conventional commit types. An open PR for the same head and base is returned
 (`created: false`) and, when a title or body was given, updated in place.
 `--no-push` is for callers that already pushed with upstream tracking.
 Every prompt fails with instructions when stdin is not a terminal.
+
+Every command takes `--json`. stdout then carries exactly one JSON line, the
+result; every human line moves to stderr. A failure prints no JSON: a message
+on stderr and exit code 1.
+
+| Command | JSON line |
+|---|---|
+| `commit` | `{ dryRun, commits: [{ category, message, files, sha }] }` (implies `--auto-approve`) |
+| `pr` | `{ number, url, created, draft, head, base }` (implies `--auto-approve`, needs a base) |
+| `pr --check` | `{ open, last }` |
+| `rebase` | `{ dryRun, branch, base, strategy, commits: [{ hash, subject }], steps: [{ hash, action, message?, rationale? }], summary, rebased }`; commits oldest first; `steps: []` and `summary: null` when fewer than two commits |
+| `categorize` | `{ all, categories: [{ category, files }] }` (empty categories left out) |
+| `init` | `{ written, skipped, gitRepo }` (absolute paths; implies `--no-aliases`) |
+| `auth login` | `{ provider, scope, path }` (the device-flow URL and code go to stderr) |
+| `auth status` | `{ providers: [{ id, scope, createdAt, expiresAt }] }` (never the token) |
+| `auth logout` | `{ path, removed }` |
+| `cache path` | `{ path }` |
+| `cache clear` | `{ path, removed }` |
+
+`--json` approves nothing on `rebase`: without `--dry-run` it still asks
+before rewriting history, so without a terminal it fails before calling the
+model. `rebase --dry-run --json` is the unattended form.
 
 `pritty commit` commits only the index content of each category's files
 (never the working tree) and appends `commitTrailers`; `pritty pr` appends

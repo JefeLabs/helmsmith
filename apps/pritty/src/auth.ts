@@ -70,11 +70,16 @@ export async function readAuth(): Promise<AuthFile> {
   return await getAuthStore().read();
 }
 
-/** Remove the auth file entirely. AuthStore has no delete(); unlink directly. */
-export async function logout(): Promise<void> {
+/**
+ * Remove the auth file entirely. AuthStore has no delete(); unlink directly.
+ * Resolves false when there was no file to remove.
+ */
+export async function logout(): Promise<boolean> {
   try {
     await unlink(getAuthPath());
+    return true;
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+    return false;
   }
 }

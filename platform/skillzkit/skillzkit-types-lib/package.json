@@ -2,7 +2,7 @@
   "name": "@helmsmith/skillzkit-types",
   "version": "0.0.1",
   "private": true,
-  "description": "TypeScript types for the skillzkit catalog. Source of truth for apps/skillzkit/schema/catalog.schema.json (generated via ts-json-schema-generator). Consumed by skillzkit itself and by agentx-platform's controlplane-ui.",
+  "description": "TypeScript types for the skillzkit catalog. Source of truth for apps/skillzkit/schema/catalog.schema.json (generated via ts-json-schema-generator). Consumed by skillzkit itself and by helmsmith's controlplane-ui.",
   "type": "module",
   "main": "./src/index.ts",
   "exports": {
@@ -29,7 +29,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ecruz165/agentx-toolbox.git",
+    "url": "git+https://github.com/JefeLabs/helmsmith.git",
     "directory": "platform/skillzkit/skillzkit-types-lib"
   },
   "license": "UNLICENSED"

@@ -323,7 +323,7 @@ Routing:       Hootsuite (delegated)
 Hootsuite ID:  msg_xyz789
 
 Content preview:
-  "Excited to share our latest update on the AgentX
+  "Excited to share our latest update on the Helmsmith
    ecosystem..."
 
 Send time: immediate
@@ -340,7 +340,7 @@ Author:    @helmsmith
 Post URN:  urn:li:share:7234567890
 
 Content preview:
-  "Excited to share our latest update on the AgentX
+  "Excited to share our latest update on the Helmsmith
    ecosystem..."
 
 Visibility: PUBLIC

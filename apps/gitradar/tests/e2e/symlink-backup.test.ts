@@ -20,7 +20,7 @@ describe('backups never follow a planted symlink', () => {
   });
 
   it('repos.yml: `workspace create` leaves the symlink target alone', async () => {
-    const dir = join(sb.home, '.agentx');
+    const dir = join(sb.home, '.helmsmith');
     await mkdir(dir, { recursive: true });
     await writeFile(join(dir, 'repos.yml'), 'workspaces:\n  a:\n    repos: []\n');
     await symlink(victim, join(dir, 'repos.yml.bak'));

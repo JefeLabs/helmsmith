@@ -41,17 +41,26 @@ const authCmd = program.command('auth').description('Manage GitHub Copilot authe
 authCmd
   .command('login')
   .description('Run the GitHub Device Flow and persist credentials')
-  .action(() => runAuthLogin());
+  .option(
+    '--json',
+    'Print one JSON line { provider, scope, path } on stdout; the device-flow prompt goes to stderr',
+  )
+  .action((options: { json?: boolean }) => runAuthLogin(options));
 
 authCmd
   .command('logout')
   .description('Remove the local auth file')
-  .action(() => runAuthLogout());
+  .option('--json', 'Print one JSON line { path, removed } on stdout')
+  .action((options: { json?: boolean }) => runAuthLogout(options));
 
 authCmd
   .command('status')
   .description('Show authentication status')
-  .action(() => runAuthStatus());
+  .option(
+    '--json',
+    'Print one JSON line { providers: [{ id, scope, createdAt, expiresAt }] } on stdout (never the token)',
+  )
+  .action((options: { json?: boolean }) => runAuthStatus(options));
 
 // ─── init ─────────────────────────────────────────────────────────────
 
@@ -65,6 +74,10 @@ program
   .option('--no-copilot', 'Skip writing .github/prompts/{commit,pr}.prompt.md')
   .option('--no-aliases', 'Skip the shell-alias prompt for `commit` / `pr`')
   .option('--no-skill', 'Skip writing .claude/skills/pritty/SKILL.md')
+  .option(
+    '--json',
+    'Print one JSON line { written, skipped, gitRepo } on stdout; implies --no-aliases',
+  )
   .action(
     (options: {
       force?: boolean;
@@ -72,6 +85,7 @@ program
       copilot?: boolean;
       aliases?: boolean;
       skill?: boolean;
+      json?: boolean;
     }) => runInit(options),
   );
 
@@ -81,7 +95,8 @@ program
   .command('categorize')
   .description('Categorize staged files (read-only — does not commit)')
   .option('--all', 'Include unstaged + untracked files too')
-  .action((options: { all?: boolean }) => runCategorize(options));
+  .option('--json', 'Print one JSON line { all, categories: [{ category, files }] } on stdout')
+  .action((options: { all?: boolean; json?: boolean }) => runCategorize(options));
 
 // ─── cache ────────────────────────────────────────────────────────────
 
@@ -92,12 +107,14 @@ const cache = program
 cache
   .command('clear')
   .description('Wipe the validated-ticket cache')
-  .action(() => runCacheClear());
+  .option('--json', 'Print one JSON line { path, removed } on stdout')
+  .action((options: { json?: boolean }) => runCacheClear(options));
 
 cache
   .command('path')
   .description('Print the cache file path (useful for inspection / scripting)')
-  .action(() => runCachePath());
+  .option('--json', 'Print one JSON line { path } on stdout')
+  .action((options: { json?: boolean }) => runCachePath(options));
 
 // ─── commit / pr / rebase ─────────────────────────────────────────────
 
@@ -176,7 +193,13 @@ program
   )
   .option('--base <branch>', 'Base ref to rebase onto (default: config.baseBranch or main)')
   .option('--dry-run', 'Show the plan; do NOT touch git')
-  .action((options: { strategy?: string; base?: string; dryRun?: boolean }) => runRebase(options));
+  .option(
+    '--json',
+    'Print one JSON line { dryRun, branch, base, strategy, commits, steps, summary, rebased } on stdout; still asks before rewriting history',
+  )
+  .action((options: { strategy?: string; base?: string; dryRun?: boolean; json?: boolean }) =>
+    runRebase(options),
+  );
 
 program.parseAsync(process.argv).catch((err) => {
   console.error(chalk.red(err instanceof Error ? err.message : String(err)));

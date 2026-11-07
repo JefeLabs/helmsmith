@@ -77,7 +77,7 @@ describe('ControlplaneGitHubResolver', () => {
           JSON.stringify({
             token: 'ghs_xxx',
             expiresAt: '2026-05-11T12:00:00Z',
-            appSlug: 'agentx-bot',
+            appSlug: 'helmsmith-bot',
           }),
           {
             status: 200,
@@ -91,7 +91,7 @@ describe('ControlplaneGitHubResolver', () => {
       token: 'ghs_xxx',
       source: 'controlplane-app',
       expiresAt: '2026-05-11T12:00:00Z',
-      actor: 'agentx-bot',
+      actor: 'helmsmith-bot',
     });
   });
 

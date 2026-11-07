@@ -56,7 +56,7 @@ export interface WorkerSpawnSpec {
    * Use cases:
    *   - HTTPS + token: `{ GIT_ASKPASS: '/path/to/token-script' }`
    *     OR set the URL to `https://<token>@github.com/...` directly
-   *   - Non-default SSH key: `{ GIT_SSH_COMMAND: 'ssh -i ~/.ssh/agentx_id_ed25519' }`
+   *   - Non-default SSH key: `{ GIT_SSH_COMMAND: 'ssh -i ~/.ssh/helmsmith_id_ed25519' }`
    *   - Production / ECS: credentials pulled from Secrets Manager
    *     and shaped into a credential-helper config or token URL
    *
@@ -248,7 +248,9 @@ export async function spawnWorker(spec: WorkerSpawnSpec): Promise<SpawnResult> {
   }
 
   const containerName =
-    subagentId === 'main' ? `agentx-job-${spec.jobId}` : `agentx-job-${spec.jobId}-${subagentId}`;
+    subagentId === 'main'
+      ? `helmsmith-job-${spec.jobId}`
+      : `helmsmith-job-${spec.jobId}-${subagentId}`;
 
   // Slice 9d-6: optional SSH agent socket mount for in-container git
   // auth. Resolves to undefined when forwardSshAgent is false/unset,
@@ -272,7 +274,7 @@ export async function spawnWorker(spec: WorkerSpawnSpec): Promise<SpawnResult> {
 
   const overrideConfig = {
     name: containerName,
-    image: 'agentx/worker:0.0.0',
+    image: 'helmsmith/worker:0.0.0',
     runArgs: [
       '--label',
       'harness-worker=true',

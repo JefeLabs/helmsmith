@@ -10,12 +10,12 @@ describe('merged catalog', () => {
 
   beforeEach(() => {
     tmp = mkdtempSync(join(tmpdir(), 'toolz-catalog-test-'));
-    process.env.AGENTX_TOOLZ_DIR = tmp;
+    process.env.HELMSMITH_TOOLZ_DIR = tmp;
     _resetCatalogCache();
   });
 
   afterEach(() => {
-    delete process.env.AGENTX_TOOLZ_DIR;
+    delete process.env.HELMSMITH_TOOLZ_DIR;
     _resetCatalogCache();
     rmSync(tmp, { recursive: true, force: true });
   });

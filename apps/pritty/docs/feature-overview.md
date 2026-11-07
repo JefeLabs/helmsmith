@@ -358,7 +358,7 @@ phases land.
 
 ## Stack
 
-Per agentx-toolbox conventions:
+Per helmsmith conventions:
 
 - TypeScript ESM
 - Commander.js for CLI parsing

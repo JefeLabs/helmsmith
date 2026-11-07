@@ -14,21 +14,21 @@ import {
   scaffoldProjectDir,
 } from '../src/utils/home.js';
 
-const TEST_DIR = join(tmpdir(), `agentx-test-home-${Date.now()}`);
+const TEST_DIR = join(tmpdir(), `helmsmith-test-home-${Date.now()}`);
 
 describe('home manager', () => {
   beforeEach(() => {
-    process.env.AGENTX_HOME = TEST_DIR;
+    process.env.HELMSMITH_HOME = TEST_DIR;
   });
 
   afterEach(() => {
-    delete process.env.AGENTX_HOME;
+    delete process.env.HELMSMITH_HOME;
     if (existsSync(TEST_DIR)) {
       rmSync(TEST_DIR, { recursive: true, force: true });
     }
   });
 
-  it('respects AGENTX_HOME env var', () => {
+  it('respects HELMSMITH_HOME env var', () => {
     expect(getConfigRoot()).toBe(TEST_DIR);
   });
 
@@ -43,7 +43,7 @@ describe('home manager', () => {
 
   it('returns project directory path for repo location', () => {
     const gitRoot = '/tmp/fake-repo';
-    const expected = join(gitRoot, '.agentx', 'taskmaster', 'my-app');
+    const expected = join(gitRoot, '.helmsmith', 'taskmaster', 'my-app');
     expect(getProjectDir('my-app', 'repo', gitRoot)).toBe(expected);
   });
 
@@ -96,11 +96,11 @@ describe('home manager', () => {
 
 describe('getTaskmasterHomeFor', () => {
   beforeEach(() => {
-    process.env.AGENTX_HOME = TEST_DIR;
+    process.env.HELMSMITH_HOME = TEST_DIR;
   });
 
   afterEach(() => {
-    delete process.env.AGENTX_HOME;
+    delete process.env.HELMSMITH_HOME;
   });
 
   it('returns global home for home location', () => {
@@ -109,7 +109,7 @@ describe('getTaskmasterHomeFor', () => {
 
   it('returns repo-local home for repo location', () => {
     const gitRoot = '/tmp/fake-repo';
-    expect(getTaskmasterHomeFor('repo', gitRoot)).toBe(join(gitRoot, '.agentx', 'taskmaster'));
+    expect(getTaskmasterHomeFor('repo', gitRoot)).toBe(join(gitRoot, '.helmsmith', 'taskmaster'));
   });
 
   it('throws when repo location is used without gitRoot', () => {
@@ -122,7 +122,7 @@ describe('bootstrapRepoHome', () => {
   let repoDir: string;
 
   beforeEach(() => {
-    repoDir = join(tmpdir(), `agentx-test-repo-${Date.now()}`);
+    repoDir = join(tmpdir(), `helmsmith-test-repo-${Date.now()}`);
     mkdirSync(repoDir, { recursive: true });
   });
 
@@ -135,7 +135,7 @@ describe('bootstrapRepoHome', () => {
   it('creates repo-local taskmaster home and returns true', async () => {
     const created = await bootstrapRepoHome(repoDir);
     expect(created).toBe(true);
-    expect(existsSync(join(repoDir, '.agentx', 'taskmaster'))).toBe(true);
+    expect(existsSync(join(repoDir, '.helmsmith', 'taskmaster'))).toBe(true);
   });
 
   it('returns false if already exists', async () => {

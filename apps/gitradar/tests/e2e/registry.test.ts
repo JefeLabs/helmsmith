@@ -15,8 +15,8 @@ describe('invalid repos.yml', () => {
   let registryPath: string;
   beforeEach(async () => {
     sb = await createSandbox();
-    registryPath = join(sb.home, '.agentx', 'repos.yml');
-    await mkdir(join(sb.home, '.agentx'), { recursive: true });
+    registryPath = join(sb.home, '.helmsmith', 'repos.yml');
+    await mkdir(join(sb.home, '.helmsmith'), { recursive: true });
     await writeFile(registryPath, INVALID);
   });
   afterEach(async () => {

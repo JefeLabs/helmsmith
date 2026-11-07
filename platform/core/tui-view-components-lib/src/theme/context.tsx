@@ -1,6 +1,6 @@
 /**
  * ThemeContext + value type. The actual provider lives in
- * `AgentxThemeProvider.tsx`; this file just exports the context so
+ * `HelmsmithThemeProvider.tsx`; this file just exports the context so
  * any consumer (`useTheme()` hook, future custom providers) can hook
  * into the same value.
  */

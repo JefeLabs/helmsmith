@@ -3,7 +3,7 @@ Show the branch state dashboard for all repos managed by gittyup.
 Run the following command and report the results:
 
 ```
-agentx-gittyup status --fetch
+helmsmith-gittyup status --fetch
 ```
 
 Options:

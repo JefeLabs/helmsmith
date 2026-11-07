@@ -6,7 +6,7 @@
 # nesting docker daemons. The harness-server uses this to launch the
 # per-job runtime containers documented in prd-harness-module.md.
 #
-# Build context is the agentx-platform repo root (compose passes
+# Build context is the helmsmith repo root (compose passes
 # context: ..) so the bun bundler stage can reach the workspace +
 # lockfile.
 #

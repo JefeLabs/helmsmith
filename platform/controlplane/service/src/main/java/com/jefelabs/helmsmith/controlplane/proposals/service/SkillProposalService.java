@@ -183,7 +183,7 @@ public class SkillProposalService {
      * status; if status is terminal-accepted ({@code accepted} or
      * {@code promoted}), also drops the local catalog_items draft and
      * clears the proposal's {@code catalog_item_id} pointer — the
-     * next agentx-load sync will resurrect the canonical entry from
+     * next helmsmith-load sync will resurrect the canonical entry from
      * skillzkit.
      *
      * <p>{@code rejected} updates remote_status but keeps the local
@@ -242,7 +242,7 @@ public class SkillProposalService {
                 dao.recordRemoteSubmission(orgId, id, null, "failed", null, f.error());
             case SkillzkitClient.SubmitResult.Skipped __ ->
                 dao.recordRemoteSubmission(orgId, id, null, "failed", null,
-                    "skillzkit is not configured (agentx.skillzkit.url is empty)");
+                    "skillzkit is not configured (helmsmith.skillzkit.url is empty)");
         }
         return dao.findById(orgId, id).map(this::toDomain);
     }

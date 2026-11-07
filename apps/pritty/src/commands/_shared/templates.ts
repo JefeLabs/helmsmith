@@ -28,7 +28,7 @@ The command will:
 5. Optionally let the user edit each message
 6. Create one commit per category using path-restricted \`git commit -- <files>\`
 
-If pritty isn't installed, suggest \`npm install -g @helmsmith/pritty\` (or workspace-link from agentx-toolbox).
+If pritty isn't installed, suggest \`npm install -g @helmsmith/pritty\` (or workspace-link from helmsmith).
 `,
 
   pr: `---
@@ -108,6 +108,10 @@ Don't fire when:
 | \`pritty rebase\` | AI-planned interactive rebase to clean up history. Mandatory confirm; no \`--auto-approve\` |
 | \`pritty init\` | Set up a project — writes \`.pritty.json\`, slash commands, this skill |
 | \`pritty auth login\` | GitHub Copilot Device Flow → \`~/.pritty/auth.json\` |
+
+Every command takes \`--json\`: one JSON line on stdout (the result),
+everything else on stderr. \`rebase --json\` still asks before rewriting
+history; use \`rebase --dry-run --json\` for the plan.
 
 ## Pre-conditions to verify before invoking
 
@@ -199,7 +203,7 @@ the repo. \`pritty init\` scaffolds one. Common fields:
 }
 \`\`\`
 
-See \`apps/pritty/README.md\` in the agentx-toolbox repo for the full
+See \`apps/pritty/README.md\` in the helmsmith repo for the full
 config reference.
 `;
 

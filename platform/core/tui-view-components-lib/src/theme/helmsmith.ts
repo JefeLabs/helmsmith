@@ -1,17 +1,17 @@
 /**
- * agentx-specific theme integration.
+ * helmsmith-specific theme integration.
  *
  * Directory layout:
  *
- *   ~/.agentx/theme/
+ *   ~/.helmsmith/theme/
  *   ├── default.{yaml,yml,json}        ← the active default theme
  *   └── <appName>.{yaml,yml,json}      ← optional per-app overrides
  *
  * Resolution layers (each deep-merged onto the previous):
  *
  *   1. Built-in fallback Theme           (e.g. rosePine)
- *   2. ~/.agentx/theme/default.*         (full theme, replaces #1)
- *   3. ~/.agentx/theme/<appName>.*       (partial override, deep-merged)
+ *   2. ~/.helmsmith/theme/default.*         (full theme, replaces #1)
+ *   3. ~/.helmsmith/theme/<appName>.*       (partial override, deep-merged)
  *
  * The default file is the single source of truth for the user's
  * choice. When the in-app theme switcher selects a different theme,
@@ -40,9 +40,9 @@ type SupportedExt = (typeof SUPPORTED_EXTS)[number];
 
 export const DEFAULT_FILE_BASENAME = 'default';
 
-/** `~/.agentx/theme` — overridable for tests via `AGENTX_THEME_DIR`. */
-export function agentxThemeDir(): string {
-  return process.env.AGENTX_THEME_DIR ?? join(homedir(), '.agentx', 'theme');
+/** `~/.helmsmith/theme` — overridable for tests via `HELMSMITH_THEME_DIR`. */
+export function helmsmithThemeDir(): string {
+  return process.env.HELMSMITH_THEME_DIR ?? join(homedir(), '.helmsmith', 'theme');
 }
 
 /**
@@ -64,7 +64,7 @@ export function findThemeFile(
 // Loading
 // ────────────────────────────────────────────────────────────────────
 
-export interface AgentxLoadOptions {
+export interface HelmsmithLoadOptions {
   /** App identifier. When set, `<appName>.{yaml,json}` overrides apply. */
   appName?: string;
   /** Theme used when no `default.*` file exists. */
@@ -73,18 +73,18 @@ export interface AgentxLoadOptions {
   themeDir?: string;
 }
 
-export interface AgentxLoadResult {
+export interface HelmsmithLoadResult {
   theme: Theme;
   /** Source paths that contributed to the resolved theme. */
   sources: string[];
 }
 
 /**
- * Resolve the effective theme for an agentx app:
+ * Resolve the effective theme for a helmsmith app:
  *   fallback → default.* → <appName>.*
  */
-export function loadAgentxTheme(opts: AgentxLoadOptions = {}): AgentxLoadResult {
-  const dir = opts.themeDir ?? agentxThemeDir();
+export function loadHelmsmithTheme(opts: HelmsmithLoadOptions = {}): HelmsmithLoadResult {
+  const dir = opts.themeDir ?? helmsmithThemeDir();
   const fallback = opts.fallback ?? rosePine;
   const sources: string[] = [];
 
@@ -97,7 +97,9 @@ export function loadAgentxTheme(opts: AgentxLoadOptions = {}): AgentxLoadResult 
       theme = loadThemeFile(defaultFile.path);
       sources.push(defaultFile.path);
     } catch (err) {
-      console.warn(`[agentx-theme] Could not load ${defaultFile.path}: ${(err as Error).message}`);
+      console.warn(
+        `[helmsmith-theme] Could not load ${defaultFile.path}: ${(err as Error).message}`,
+      );
     }
   }
 
@@ -109,7 +111,9 @@ export function loadAgentxTheme(opts: AgentxLoadOptions = {}): AgentxLoadResult 
         theme = applyOverrideFile(theme, appFile.path);
         sources.push(appFile.path);
       } catch (err) {
-        console.warn(`[agentx-theme] Could not apply ${appFile.path}: ${(err as Error).message}`);
+        console.warn(
+          `[helmsmith-theme] Could not apply ${appFile.path}: ${(err as Error).message}`,
+        );
       }
     }
   }
@@ -132,12 +136,12 @@ export function loadAgentxTheme(opts: AgentxLoadOptions = {}): AgentxLoadResult 
  * prefer YAML over — so we delete the YAML when persisting. This
  * keeps the "default file IS the choice" invariant.
  */
-export interface PersistAgentxThemeOptions {
+export interface PersistHelmsmithThemeOptions {
   themeDir?: string;
 }
 
-export function persistAgentxTheme(theme: Theme, opts: PersistAgentxThemeOptions = {}): void {
-  const dir = opts.themeDir ?? agentxThemeDir();
+export function persistHelmsmithTheme(theme: Theme, opts: PersistHelmsmithThemeOptions = {}): void {
+  const dir = opts.themeDir ?? helmsmithThemeDir();
   try {
     mkdirSync(dir, { recursive: true });
 
@@ -160,7 +164,7 @@ export function persistAgentxTheme(theme: Theme, opts: PersistAgentxThemeOptions
       }
     }
   } catch (err) {
-    console.warn(`[agentx-theme] Could not persist theme: ${(err as Error).message}`);
+    console.warn(`[helmsmith-theme] Could not persist theme: ${(err as Error).message}`);
   }
 }
 
@@ -189,20 +193,20 @@ function themeToDefinition(theme: Theme): Record<string, unknown> {
 // Watching
 // ────────────────────────────────────────────────────────────────────
 
-export interface WatchAgentxOptions extends AgentxLoadOptions {
+export interface WatchHelmsmithOptions extends HelmsmithLoadOptions {
   debounceMs?: number;
 }
 
 /**
- * Watch the agentx theme directory. Whenever a relevant file changes
+ * Watch the helmsmith theme directory. Whenever a relevant file changes
  * (default.* or <appName>.*), the callback fires with the freshly
  * resolved theme.
  */
-export function watchAgentxTheme(
-  opts: WatchAgentxOptions,
-  onChange: (result: AgentxLoadResult) => void,
+export function watchHelmsmithTheme(
+  opts: WatchHelmsmithOptions,
+  onChange: (result: HelmsmithLoadResult) => void,
 ): () => void {
-  const dir = opts.themeDir ?? agentxThemeDir();
+  const dir = opts.themeDir ?? helmsmithThemeDir();
   const debounceMs = opts.debounceMs ?? 100;
 
   // Make sure the directory exists so fs.watch doesn't throw.
@@ -226,9 +230,9 @@ export function watchAgentxTheme(
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => {
       try {
-        onChange(loadAgentxTheme(opts));
+        onChange(loadHelmsmithTheme(opts));
       } catch (err) {
-        console.warn(`[agentx-theme] Reload failed: ${(err as Error).message}`);
+        console.warn(`[helmsmith-theme] Reload failed: ${(err as Error).message}`);
       }
     }, debounceMs);
   };
@@ -238,7 +242,7 @@ export function watchAgentxTheme(
       reload(filename ? String(filename) : null);
     });
   } catch (err) {
-    console.warn(`[agentx-theme] Could not watch ${dir}: ${(err as Error).message}`);
+    console.warn(`[helmsmith-theme] Could not watch ${dir}: ${(err as Error).message}`);
     return () => {};
   }
 
@@ -259,11 +263,11 @@ export interface DiscoveredFile {
 }
 
 /**
- * List every YAML/JSON file in the agentx theme dir. Useful if you
+ * List every YAML/JSON file in the helmsmith theme dir. Useful if you
  * want to surface all customizations in a debug panel.
  */
-export function listAgentxThemeFiles(themeDir?: string): DiscoveredFile[] {
-  const dir = themeDir ?? agentxThemeDir();
+export function listHelmsmithThemeFiles(themeDir?: string): DiscoveredFile[] {
+  const dir = themeDir ?? helmsmithThemeDir();
   if (!existsSync(dir)) return [];
   const out: DiscoveredFile[] = [];
   for (const entry of readdirSync(dir)) {

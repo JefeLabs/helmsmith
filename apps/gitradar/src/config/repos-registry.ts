@@ -76,7 +76,7 @@ export async function loadReposRegistry(registryPath: string): Promise<ReposRegi
 }
 
 /**
- * Load registries from global (~/.agentx/repos.yml) and optionally project-level paths.
+ * Load registries from global (~/.helmsmith/repos.yml) and optionally project-level paths.
  *
  * A missing file is simply absent from the result. An invalid file throws: treating it
  * as missing led the engine to offer "Create one?" and overwrite a hand-curated
@@ -86,7 +86,7 @@ export async function loadAllRegistries(gitRoot?: string): Promise<RegistrySourc
   const sources: RegistrySource[] = [];
 
   // Global registry
-  const globalPath = path.join(homedir(), '.agentx', 'repos.yml');
+  const globalPath = path.join(homedir(), '.helmsmith', 'repos.yml');
   const globalRegistry = await loadReposRegistry(globalPath);
   if (globalRegistry) {
     sources.push({ type: 'global', path: globalPath, registry: globalRegistry });
@@ -94,7 +94,7 @@ export async function loadAllRegistries(gitRoot?: string): Promise<RegistrySourc
 
   // Project-level registry
   if (gitRoot) {
-    const projectPath = path.join(gitRoot, '.agentx', 'repos.yml');
+    const projectPath = path.join(gitRoot, '.helmsmith', 'repos.yml');
     const projectRegistry = await loadReposRegistry(projectPath);
     if (projectRegistry) {
       sources.push({ type: 'project', path: projectPath, registry: projectRegistry });

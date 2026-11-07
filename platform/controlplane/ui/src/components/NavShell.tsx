@@ -22,7 +22,7 @@ export default function NavShell({ children }: { children: ReactNode }) {
       <nav className="sticky top-0 z-40 w-full border-b border-separator bg-background/70 backdrop-blur-lg">
         <header className="flex h-16 items-center justify-between px-6">
           <div className="flex items-center">
-            <span className="font-semibold tracking-wide">agentx</span>
+            <span className="font-semibold tracking-wide">helmsmith</span>
             <span className="ml-2 text-muted">control plane</span>
           </div>
           <ul className="flex items-center gap-4">

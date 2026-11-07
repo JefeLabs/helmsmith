@@ -49,7 +49,7 @@ export interface BindingToSpecOptions {
  */
 export function defaultLocalEndpointResolver(providerId: string): string | undefined {
   if (providerId === 'local-qwen') {
-    return process.env.AGENTX_LOCAL_QWEN_ENDPOINT;
+    return process.env.HELMSMITH_LOCAL_QWEN_ENDPOINT;
   }
   return undefined;
 }
@@ -96,7 +96,7 @@ function localOpenCodeSpec(
   if (!endpoint) {
     throw new Error(
       `bindingToSpec: no endpoint configured for local provider "${providerId}". ` +
-        `Set AGENTX_LOCAL_QWEN_ENDPOINT or pass options.localEndpoint.`,
+        `Set HELMSMITH_LOCAL_QWEN_ENDPOINT or pass options.localEndpoint.`,
     );
   }
   const localModelId = modelIdOf(binding);

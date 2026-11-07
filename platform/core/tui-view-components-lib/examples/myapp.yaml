@@ -1,4 +1,4 @@
-# Sample ~/.agentx/theme/myapp.yaml
+# Sample ~/.helmsmith/theme/myapp.yaml
 #
 # Per-app overrides. Structure mirrors the resolved Theme — touch
 # only the tokens you want to change. The loader rejects this file

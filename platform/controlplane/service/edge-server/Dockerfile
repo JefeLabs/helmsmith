@@ -1,7 +1,7 @@
 # edge-server — bundles the per-workspace edge servers (context + memory)
 # alongside a private Neo4j cache.
 #
-# Build context is the agentx-platform repo root (compose passes context: ..)
+# Build context is the helmsmith repo root (compose passes context: ..)
 # so the bun bundler stage can reach the workspace + lockfile.
 #
 # Three stages:

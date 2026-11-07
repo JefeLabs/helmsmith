@@ -14,7 +14,7 @@ spring:
   #   2. spring-boot-docker-compose detects a postgres service in compose.yaml → uses it
   #   3. Neither → core/config/EmbeddedPostgresConfig spawns embedded Postgres (default for local dev)
   #
-  # To force-disable embedded Postgres: set agentx.embedded-postgres.enabled=false
+  # To force-disable embedded Postgres: set helmsmith.embedded-postgres.enabled=false
 
   flyway:
     enabled: true
@@ -38,7 +38,7 @@ server:
 
 # Neo4j connection for the context module (Phase 4).
 # Defaults match controlplane/compose.yaml's neo4j service.
-agentx:
+helmsmith:
   neo4j:
     uri: bolt://localhost:7687
     user: neo4j
@@ -54,11 +54,11 @@ agentx:
     model: ai/qwen3-embedding:8B
     dimension: 4096
   context-loader:
-    # Comma-separated argv prefix for the agentx-load CLI subprocess. In dev,
+    # Comma-separated argv prefix for the helmsmith-load CLI subprocess. In dev,
     # this runs the TS source via Bun from the workspace root. In prod, the
-    # multi-stage Dockerfile bundles a static binary at /opt/agentx (per the
+    # multi-stage Dockerfile bundles a static binary at /opt/helmsmith (per the
     # project_controlplane_bundles_bun memory); override via env, e.g.
-    # AGENTX_CONTEXT_LOADER_COMMAND=agentx-load.
+    # HELMSMITH_CONTEXT_LOADER_COMMAND=helmsmith-load.
     #
     # Stored as CSV (not a YAML list) because Spring's @Value placeholder
     # resolver cannot bind a YAML list directly into List<String>; the runner

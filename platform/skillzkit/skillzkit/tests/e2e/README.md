@@ -18,6 +18,6 @@ for the full convention.
   `skillzkit serve` should pin to `memory:` or a temp `fs:` path —
   never the user's home or a shared bucket.
 - **Team mode**: tests for the `contribute` flow need a team-mode
-  config. Use a temp `~/.agentx/skillzkit/config.json` via a
+  config. Use a temp `~/.helmsmith/skillzkit/config.json` via a
   `SKILLZKIT_HOME=<temp-dir>` override (or whatever env var the CLI
   honors).

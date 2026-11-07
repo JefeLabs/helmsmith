@@ -2,7 +2,7 @@
 
 This document describes how pritty is organized internally — what
 modules do what, how data flows through the tool, and how the shared
-agentx-platform packages plug in.
+helmsmith packages plug in.
 
 ## High-level view
 
@@ -68,7 +68,7 @@ implementation. Three operations:
 - `pritty auth logout` — removes the file.
 
 The same `@helmsmith/agent-auth` primitive backs the rest of the
-AgentX ecosystem (skillzkit, future tools). Auth improvements ship
+Helmsmith ecosystem (skillzkit, future tools). Auth improvements ship
 once and every consumer inherits them.
 
 ### Config (`src/config.ts`)
@@ -276,7 +276,7 @@ not every time they look at a config.
 
 ### Why GitHub Copilot is the default provider
 
-Most AgentX users already have Copilot subscriptions through their
+Most Helmsmith users already have Copilot subscriptions through their
 employers. Reusing the same Device Flow they're used to (and that
 their IDE already uses) is the lowest-friction onboarding path.
 Anthropic and OpenAI are first-class alternates for users with their
@@ -308,7 +308,7 @@ showing up in `git blame` six months later.
 ### Why a programmatic API alongside the CLI
 
 Auth, config, and categorization are useful primitives outside the
-specific "draft my PR" flow. Other AgentX tools that need to
+specific "draft my PR" flow. Other Helmsmith tools that need to
 "figure out which files are tests" or "load the user's pritty config"
 should reuse pritty's primitives, not reimplement them.
 

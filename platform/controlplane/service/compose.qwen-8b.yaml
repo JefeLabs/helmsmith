@@ -9,18 +9,18 @@
 services:
   controlplane:
     environment:
-      AGENTX_EMBEDDER_DIMENSION: "4096"
+      HELMSMITH_EMBEDDER_DIMENSION: "4096"
     models:
       embedder:
-        endpoint_var: AGENTX_EMBEDDER_URL
-        model_var: AGENTX_EMBEDDER_MODEL
+        endpoint_var: HELMSMITH_EMBEDDER_URL
+        model_var: HELMSMITH_EMBEDDER_MODEL
   edge-server:
     environment:
-      AGENTX_EMBEDDER_DIMENSION: "4096"
+      HELMSMITH_EMBEDDER_DIMENSION: "4096"
     models:
       embedder:
-        endpoint_var: AGENTX_EMBEDDER_URL
-        model_var: AGENTX_EMBEDDER_MODEL
+        endpoint_var: HELMSMITH_EMBEDDER_URL
+        model_var: HELMSMITH_EMBEDDER_MODEL
 
 models:
   embedder:

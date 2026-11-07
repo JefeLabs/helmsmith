@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Package: `apps/gitradar`. Run commands from that directory unless stated. Tests: `npx vitest run <file>`; bun suites: `bun test <file>` (each store suite in its own invocation — see `package.json` `test:bun`); full: `npm test`; typecheck `npx tsc --noEmit`; lint/format from repo root `npx biome check --write apps/gitradar`.
-- Store tests that open a DB MUST set `process.env.GITRADAR_HOME` to a temp dir and guard on `getSQLitePath()` (pattern: `src/__tests__/sqlite-scorecard.test.ts`). Never run `scan`, `--reset`, or `enrich` against the real `~/.agentx`.
+- Store tests that open a DB MUST set `process.env.GITRADAR_HOME` to a temp dir and guard on `getSQLitePath()` (pattern: `src/__tests__/sqlite-scorecard.test.ts`). Never run `scan`, `--reset`, or `enrich` against the real `~/.helmsmith`.
 - Never stage or modify `Makefile` (unrelated user edit in the working tree).
 - TDD for every code change: failing test first, then the fix. Commit messages conventional (`fix(gitradar): …`), ending with `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`.
 - Naming: camelCase TS, snake_case SQLite/CSV. Exact new names: `median_cycle_hrs` (was `avg_cycle_hrs`), `prs_reviewed_touched` (was `reviews_given`); `churn_rate_pct` is retired (column kept, value no longer computed or shown).

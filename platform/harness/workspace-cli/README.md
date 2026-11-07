@@ -1,6 +1,6 @@
 # @helmsmith/workspace
 
-The front door for setting up agentx project workspaces. Procure a fresh
+The front door for setting up helmsmith project workspaces. Procure a fresh
 project from the canonical `workspace-template`, with optional repo
 clones and skillzkit catalog installs.
 
@@ -22,7 +22,7 @@ bunx @helmsmith/workspace setup my-project
 
 # Or install globally and invoke directly
 bun install -g @helmsmith/workspace
-agentx-workspace setup my-project
+helmsmith-workspace setup my-project
 ```
 
 ## Quickstart
@@ -44,7 +44,7 @@ templates, and your repos cloned alongside.
 ## What you get
 
 - `.harness/config/flows.json` — starter flow with planner, implementer,
-  reviewer agents (in [phases shorthand](https://github.com/ecruz165/agentx-platform/blob/main/.plans/2026-05-07-prd-flow-designer.md#workspace-shorthand))
+  reviewer agents (in phases shorthand)
 - `harness-workspace.yml` — workspace + product declaration
 - `.devcontainer/` — DevContainer scaffolds for harness/memory/context servers
 - Cloned repos into `<workspace>/<repo-name>/`
@@ -61,10 +61,10 @@ templates, and your repos cloned alongside.
 
 ## Documentation
 
-- Flow Designer spec: [`.plans/2026-05-07-prd-flow-designer.md`](https://github.com/ecruz165/agentx-platform/blob/main/.plans/2026-05-07-prd-flow-designer.md)
-- Workspace template PRD: [`.plans/2026-04-30-prd-workspace-template.md`](https://github.com/ecruz165/agentx-platform/blob/main/.plans/2026-04-30-prd-workspace-template.md)
-- Source: [github.com/ecruz165/agentx-platform](https://github.com/ecruz165/agentx-platform)
+- Flow Designer spec: `.plans/2026-05-07-prd-flow-designer.md` (pre-merge planning doc; not carried into this repo)
+- Workspace template PRD: `.plans/2026-04-30-prd-workspace-template.md` (pre-merge planning doc; not carried into this repo)
+- Source: [github.com/JefeLabs/helmsmith](https://github.com/JefeLabs/helmsmith/tree/main/platform/harness/workspace-cli)
 
 ## License
 
-MIT — see [LICENSE](https://github.com/ecruz165/agentx-platform/blob/main/LICENSE).
+MIT — see [LICENSE](https://github.com/JefeLabs/helmsmith/blob/main/LICENSE).

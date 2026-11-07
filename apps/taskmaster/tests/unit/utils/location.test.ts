@@ -63,8 +63,8 @@ describe('ResolvedProject interface', () => {
     const resolved: ResolvedProject = {
       name: 'test-project',
       location: 'home',
-      projectDir: '/home/user/.agentx/taskmaster/test-project',
-      taskmasterHome: '/home/user/.agentx/taskmaster',
+      projectDir: '/home/user/.helmsmith/taskmaster/test-project',
+      taskmasterHome: '/home/user/.helmsmith/taskmaster',
       gitRoot: null,
     };
     expect(resolved.name).toBe('test-project');
@@ -76,8 +76,8 @@ describe('ResolvedProject interface', () => {
     const resolved: ResolvedProject = {
       name: 'repo-project',
       location: 'repo',
-      projectDir: '/repo/.agentx/taskmaster/repo-project',
-      taskmasterHome: '/repo/.agentx/taskmaster',
+      projectDir: '/repo/.helmsmith/taskmaster/repo-project',
+      taskmasterHome: '/repo/.helmsmith/taskmaster',
       gitRoot: '/repo',
     };
     expect(resolved.location).toBe('repo');

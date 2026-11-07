@@ -1,4 +1,4 @@
-# Sample ~/.agentx/theme/default.yaml
+# Sample ~/.helmsmith/theme/default.yaml
 #
 # This is a "rich" theme file: a base16 palette plus optional
 # overrides. You can also drop a standard flat base16 scheme here

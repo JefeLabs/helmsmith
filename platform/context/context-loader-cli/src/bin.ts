@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * agentx-load — CLI for the context loader.
+ * helmsmith-load — CLI for the context loader.
  *
  * Phase F (this file): minimum viable standalone mode. Runs ingest()
  * end-to-end against either Neo4j (bolt://...) or an in-memory backend
@@ -33,21 +33,21 @@ import { connectUdsEmitter, type UdsEmitter } from './uds-event-emitter.ts';
 
 function printUsage(): void {
   process.stdout.write(
-    `agentx-load — load context sources into a graph backend.
+    `helmsmith-load — load context sources into a graph backend.
 
 Usage:
-  agentx-load <target> [flags]
-  agentx-load types
-  agentx-load --help | --version
+  helmsmith-load <target> [flags]
+  helmsmith-load types
+  helmsmith-load --help | --version
 
 Primary action — ingest a target:
-  agentx-load ./packages/harness-core --type code-full \\
+  helmsmith-load ./packages/harness-core --type code-full \\
     --backend bolt://localhost:7687 --backend-password devpassword \\
     --embedder-url http://localhost:8080/v1
 
 Required flags:
   --type <id>                  Source type (e.g., 'code-full', 'prose-markdown').
-                               See \`agentx-load types\` for the catalog.
+                               See \`helmsmith-load types\` for the catalog.
   --backend <url>              bolt://host:port  (Neo4j)
                                inmem://          (in-memory; lossy, for dry runs)
   --embedder-url <url>         OpenAI-compatible /v1 endpoint
@@ -85,7 +85,7 @@ Job mode (used by harness-server's spawnWorker; not for direct invocation):
                                tagged with { jobId, ts, ... }.
 
 Catalog:
-  agentx-load types            List the built-in source type ids.
+  helmsmith-load types            List the built-in source type ids.
 
 See:
   .plans/2026-05-05-prd-context-loader-core.md
@@ -105,7 +105,7 @@ function printTypes(): void {
 }
 
 function printVersion(): void {
-  process.stdout.write(`agentx-load 0.0.0 (Phase F)\n`);
+  process.stdout.write(`helmsmith-load 0.0.0 (Phase F)\n`);
 }
 
 // ─── Argv parsing ─────────────────────────────────────────────────────────
@@ -464,11 +464,11 @@ try {
   process.exit(code);
 } catch (err) {
   if (err instanceof CliError) {
-    process.stderr.write(`agentx-load: ${err.message}\n\n`);
+    process.stderr.write(`helmsmith-load: ${err.message}\n\n`);
     if (err.exitCode === 2) printUsage();
     process.exit(err.exitCode);
   }
-  process.stderr.write(`agentx-load: unexpected error: ${(err as Error).message}\n`);
+  process.stderr.write(`helmsmith-load: unexpected error: ${(err as Error).message}\n`);
   if (process.env.DEBUG) {
     process.stderr.write(`${(err as Error).stack ?? ''}\n`);
   }

@@ -14,10 +14,10 @@ import { udsRequest } from './uds-client.ts';
 import { type PipelineConfig, readPipelines } from './workspace-config.ts';
 
 /**
- * agentx ops dashboard — OpenTUI port of the original ANSI/readline TUI.
+ * helmsmith ops dashboard — OpenTUI port of the original ANSI/readline TUI.
  *
  * Behaviors preserved:
- *   - Auth status (~/.agentx/auth.json); peer-server socket presence;
+ *   - Auth status (~/.helmsmith/auth.json); peer-server socket presence;
  *     active product (session.json); workspace product list (yml); pipeline
  *     catalog (.harness/config/pipelines.json); recent submissions.
  *   - Modes: menu / pipeline-pick / intent / product-pick / login-return /
@@ -43,7 +43,7 @@ function findWorkspaceRoot(): string {
   }
 }
 
-const ORG_DIR = join(homedir(), '.agentx');
+const ORG_DIR = join(homedir(), '.helmsmith');
 const AUTH_PATH = join(ORG_DIR, 'auth.json');
 const SESSION_PATH = join(ORG_DIR, 'session.json');
 const WORKSPACE_ROOT = findWorkspaceRoot();
@@ -565,7 +565,7 @@ function Header() {
       <text fg="#06b6d4">╭──────────────────────────────────╮</text>
       <text>
         <span fg="#06b6d4">│ </span>
-        <span fg="#f3f4f6">agentx ops dashboard</span>
+        <span fg="#f3f4f6">helmsmith ops dashboard</span>
         <span fg="#06b6d4"> │</span>
       </text>
       <text fg="#06b6d4">╰──────────────────────────────────╯</text>

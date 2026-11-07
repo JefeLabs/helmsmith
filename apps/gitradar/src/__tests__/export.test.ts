@@ -32,7 +32,7 @@ const mockSelect = vi.mocked(select);
 function makeSource(overrides: Partial<RegistrySource> = {}): RegistrySource {
   return {
     type: 'global',
-    path: '/home/user/.agentx/repos.yml',
+    path: '/home/user/.helmsmith/repos.yml',
     registry: {
       workspaces: {},
       groups: {},
@@ -267,7 +267,7 @@ describe('exportWorkspace', () => {
     await exportWorkspace();
 
     expect(stderrSpy).toHaveBeenCalledWith(
-      'No workspaces found. Create ~/.agentx/repos.yml first.',
+      'No workspaces found. Create ~/.helmsmith/repos.yml first.',
     );
     expect(process.exitCode).toBe(1);
     expect(stdoutSpy).not.toHaveBeenCalled();

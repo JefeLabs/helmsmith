@@ -17,7 +17,7 @@ beforeEach(() => {
   resetEngine();
   tempDir = join(
     tmpdir(),
-    `agentx-test-engine-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    `helmsmith-test-engine-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   );
   mkdirSync(tempDir, { recursive: true });
 });

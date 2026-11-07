@@ -13,9 +13,9 @@
 # Prerequisites:
 #   - harness-server running and listening on <workspace>/.harness/run/harness.sock
 #     (start with: pnpm dev:harness, or via scripts/dev-tmux.sh)
-#   - AGENTX_USE_CONTAINER=1 set on the harness-server (controls the
+#   - HELMSMITH_USE_CONTAINER=1 set on the harness-server (controls the
 #     container path vs in-process path)
-#   - Worker image built: `docker build -t agentx/worker:0.0.0 workspace-template/.devcontainer/worker`
+#   - Worker image built: `docker build -t helmsmith/worker:0.0.0 workspace-template/.devcontainer/worker`
 #
 # Exit codes: 0 success, 1 assertion failure, 2 usage error, 3 timeout
 
@@ -24,7 +24,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-PRODUCT="${SMOKE_PRODUCT:-agentx-dev}"
+PRODUCT="${SMOKE_PRODUCT:-helmsmith-dev}"
 CHANGE="${SMOKE_CHANGE:-Gate 1 smoke: no-op verification}"
 TIMEOUT_S="${SMOKE_TIMEOUT:-60}"
 DO_CLEANUP=0

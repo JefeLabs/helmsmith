@@ -69,18 +69,18 @@ interface InterpreterPlan {
 /**
  * Resolve the interpreter for a given language. Honors env-var
  * overrides so operators can point at a vendored binary (e.g.,
- * `AGENTX_NODE_BIN=/opt/node/bin/node`) without rebuilding the
+ * `HELMSMITH_NODE_BIN=/opt/node/bin/node`) without rebuilding the
  * harness. Defaults are the canonical names on POSIX systems.
  */
 function pickInterpreter(language: ScriptConfig['language']): InterpreterPlan {
   const env = process.env;
   switch (language) {
     case 'bash':
-      return { bin: env.AGENTX_BASH_BIN ?? '/bin/bash', ext: '.sh' };
+      return { bin: env.HELMSMITH_BASH_BIN ?? '/bin/bash', ext: '.sh' };
     case 'node':
-      return { bin: env.AGENTX_NODE_BIN ?? 'node', ext: '.mjs' };
+      return { bin: env.HELMSMITH_NODE_BIN ?? 'node', ext: '.mjs' };
     case 'python':
-      return { bin: env.AGENTX_PYTHON_BIN ?? 'python3', ext: '.py' };
+      return { bin: env.HELMSMITH_PYTHON_BIN ?? 'python3', ext: '.py' };
   }
 }
 
@@ -137,7 +137,7 @@ export function makeScriptExecutor(node: TaskStep, deps: ScriptExecutorDeps = {}
 
     let workdir: string | undefined;
     try {
-      workdir = await mkdtemp(join(tmpdir(), `agentx-script-${nodeId}-`));
+      workdir = await mkdtemp(join(tmpdir(), `helmsmith-script-${nodeId}-`));
       const scriptPath = join(workdir, `script${plan.ext}`);
       await writeFile(scriptPath, config.source, 'utf8');
 

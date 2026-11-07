@@ -57,16 +57,22 @@ describe('pritty rebase (claude provider)', () => {
     );
   });
 
-  it('never rewrites history without a confirmation it can read', async () => {
+  it('never rewrites history without a confirmation it can read, and says so before calling the model', async () => {
     sb = makeSandbox();
     const { repo, oldest, newest } = featureBranch(sb);
-    installFakeClaude(sb).answer(fixupPlan(oldest, newest));
+    const fake = installFakeClaude(sb);
+    fake.answer(fixupPlan(oldest, newest));
     const before = head(repo);
 
-    const r = await runCli(sb, repo, ['rebase', '--base', 'main', '--strategy', 'auto']);
-    expect(r.timedOut).toBe(false);
-    expect(r.exitCode).toBe(1);
-    expect(r.stdout + r.stderr).toContain('This step needs a terminal to ask a question');
+    for (const args of [[], ['--json']]) {
+      const r = await runCli(sb, repo, ['rebase', '--base', 'main', '--strategy', 'auto', ...args]);
+      expect(r.timedOut).toBe(false);
+      expect(r.exitCode).toBe(1);
+      expect(r.stdout).toBe('');
+      expect(r.stderr).toContain('pritty rebase always asks before rewriting history');
+      expect(r.stderr).toContain('--dry-run');
+    }
+    expect(fake.calls()).toHaveLength(0);
     expect(head(repo)).toBe(before);
     expect(gitIn(repo, 'rev-list', '--count', 'main..HEAD').trim()).toBe('2');
   });

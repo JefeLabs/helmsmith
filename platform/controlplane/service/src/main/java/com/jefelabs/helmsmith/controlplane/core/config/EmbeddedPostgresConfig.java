@@ -29,10 +29,10 @@ import java.io.IOException;
  * upstream {@code DataSource} bean, which is exactly the behavior we want.
  *
  * <p><b>Disabling embedded explicitly:</b> set
- * {@code agentx.embedded-postgres.enabled=false} (e.g., in production).
+ * {@code helmsmith.embedded-postgres.enabled=false} (e.g., in production).
  */
 @Configuration
-@ConditionalOnProperty(name = "agentx.embedded-postgres.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "helmsmith.embedded-postgres.enabled", havingValue = "true", matchIfMissing = true)
 public class EmbeddedPostgresConfig {
 
     private static final Logger log = LoggerFactory.getLogger(EmbeddedPostgresConfig.class);

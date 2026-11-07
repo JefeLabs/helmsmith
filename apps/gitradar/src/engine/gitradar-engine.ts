@@ -274,7 +274,7 @@ export class GitRadarEngine {
     const workspaces = getAvailableWorkspaces(registries);
 
     if (workspaces.length === 0) {
-      const registryPath = path.join(homedir(), '.agentx', 'repos.yml');
+      const registryPath = path.join(homedir(), '.helmsmith', 'repos.yml');
       console.log('No workspaces found.');
       console.log(`Create one at ${registryPath}? (y/n) `);
 

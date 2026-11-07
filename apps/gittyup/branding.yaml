@@ -1,5 +1,5 @@
 # Rebrand configuration — change these values and run `npm run rebrand`
-appGroupName: agentx
+appGroupName: helmsmith
 appGroupInitials: ax
 appName: gittyup
 
@@ -26,5 +26,5 @@ files_to_update:
 
 # Files to rename (use {{appGroupName}} and {{appName}} placeholders)
 files_to_rename:
-  - from: "bin/agentx-gittyup.js"
+  - from: "bin/helmsmith-gittyup.js"
     to: "bin/{{appGroupName}}-{{appName}}.js"

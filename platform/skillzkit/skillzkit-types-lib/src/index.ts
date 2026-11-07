@@ -5,7 +5,7 @@
  * (`@pattern`, `@format`, `@minimum`, etc.) are picked up by
  * `ts-json-schema-generator` to produce the canonical
  * `apps/skillzkit/schema/catalog.schema.json` — that JSON Schema in
- * turn drives Java POJO codegen on agentx-platform's side via
+ * turn drives Java POJO codegen on helmsmith's side via
  * `jsonschema2pojo`.
  *
  * Pipeline:
@@ -13,12 +13,12 @@
  *   src/index.ts (this file)
  *      ↓ ts-json-schema-generator (npm run build:schema)
  *   apps/skillzkit/schema/catalog.schema.json
- *      ↓ jsonschema2pojo (in agentx-platform CI)
+ *      ↓ jsonschema2pojo (in helmsmith CI)
  *   Java POJOs
  *
  * Zero runtime deps. Consumed by:
  *   - `@helmsmith/skillzkit` (this repo) — internally
- *   - `agentx-platform/packages/controlplane-ui` — for rendering catalog data
+ *   - `helmsmith/packages/controlplane-ui` — for rendering catalog data
  */
 
 /** Distinguishes runnable commands, multi-phase workflows, and context-only artifacts. */

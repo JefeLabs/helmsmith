@@ -7,8 +7,8 @@ import { getRepoTaskmasterHome } from './git.js';
 import type { ProjectLocation } from './location.js';
 
 /**
- * Returns the root config directory (e.g. ~/.agentx).
- * Respects the AGENTX_HOME env var override.
+ * Returns the root config directory (e.g. ~/.helmsmith).
+ * Respects the HELMSMITH_HOME env var override.
  */
 export function getConfigRoot(): string {
   return process.env[ENV_CONFIG_OVERRIDE] ?? join(homedir(), CONFIG_PARENT_DIR);
@@ -16,7 +16,7 @@ export function getConfigRoot(): string {
 
 /**
  * Returns the global (home) tool-specific home directory path.
- * e.g. ~/.agentx/taskmaster/
+ * e.g. ~/.helmsmith/taskmaster/
  */
 export function getTaskmasterHome(): string {
   return join(getConfigRoot(), CONFIG_DIR_NAME);
@@ -24,8 +24,8 @@ export function getTaskmasterHome(): string {
 
 /**
  * Returns the taskmaster home for a given location.
- * - 'home' → ~/.agentx/taskmaster/
- * - 'repo' → {gitRoot}/.agentx/taskmaster/
+ * - 'home' → ~/.helmsmith/taskmaster/
+ * - 'repo' → {gitRoot}/.helmsmith/taskmaster/
  */
 export function getTaskmasterHomeFor(location: ProjectLocation, gitRoot?: string | null): string {
   if (location === 'repo') {
@@ -74,7 +74,7 @@ export async function bootstrapHome(): Promise<boolean> {
 
 /**
  * Bootstrap the repo-local home directory.
- * Creates {gitRoot}/.agentx/taskmaster/ if it doesn't exist.
+ * Creates {gitRoot}/.helmsmith/taskmaster/ if it doesn't exist.
  * Returns true if newly created.
  */
 export async function bootstrapRepoHome(gitRoot: string): Promise<boolean> {

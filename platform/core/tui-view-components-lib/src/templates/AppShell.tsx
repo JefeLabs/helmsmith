@@ -5,13 +5,13 @@
  *
  * Without AppShell:
  *
- *   <AgentxThemeProvider appName="myapp" watch>
+ *   <HelmsmithThemeProvider appName="myapp" watch>
  *     <KeyboardProvider>
  *       <FocusManager>
  *         <App />
  *       </FocusManager>
  *     </KeyboardProvider>
- *   </AgentxThemeProvider>
+ *   </HelmsmithThemeProvider>
  *
  * With AppShell:
  *
@@ -27,12 +27,12 @@
 import type { ReactNode } from 'react';
 import { FocusManager } from '../focus/manager.tsx';
 import { KeyboardProvider } from '../keyboard/registry.tsx';
-import { AgentxThemeProvider } from '../theme/AgentxThemeProvider.tsx';
+import { HelmsmithThemeProvider } from '../theme/HelmsmithThemeProvider.tsx';
 
 export interface AppShellProps {
   /** App identifier — drives the per-app theme override filename. */
   appName: string;
-  /** Theme used when no `~/.agentx/theme/default.*` exists. */
+  /** Theme used when no `~/.helmsmith/theme/default.*` exists. */
   fallbackThemeName?: string;
   /** Override the theme directory (mostly for tests). */
   themeDir?: string;
@@ -52,7 +52,7 @@ export function AppShell({
   children,
 }: AppShellProps) {
   return (
-    <AgentxThemeProvider
+    <HelmsmithThemeProvider
       appName={appName}
       fallbackThemeName={fallbackThemeName}
       themeDir={themeDir}
@@ -61,6 +61,6 @@ export function AppShell({
       <KeyboardProvider>
         <FocusManager initialFocus={initialFocus}>{children}</FocusManager>
       </KeyboardProvider>
-    </AgentxThemeProvider>
+    </HelmsmithThemeProvider>
   );
 }

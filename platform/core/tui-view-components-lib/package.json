@@ -2,7 +2,7 @@
   "name": "@helmsmith/tui-view-components",
   "version": "0.0.1",
   "private": true,
-  "description": "Reusable TUI view components for the AgentX ecosystem. Built on openTUI + React. Provides primitives, components, and pre-composed views (ConnectView, etc.) consumed by every toolbox CLI.",
+  "description": "Reusable TUI view components for the Helmsmith ecosystem. Built on openTUI + React. Provides primitives, components, and pre-composed views (ConnectView, etc.) consumed by every toolbox CLI.",
   "type": "module",
   "main": "./src/index.ts",
   "exports": {
@@ -47,7 +47,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ecruz165/agentx-toolbox.git",
+    "url": "git+https://github.com/JefeLabs/helmsmith.git",
     "directory": "platform/core/tui-view-components-lib"
   },
   "license": "UNLICENSED"

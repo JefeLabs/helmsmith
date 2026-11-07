@@ -10,9 +10,9 @@ const saved: Record<string, string | undefined> = {};
 
 beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), 'gittyup-auth-'));
-  for (const k of ['AGENTX_HOME', 'GITHUB_TOKEN', 'COPILOT_GITHUB_TOKEN'])
+  for (const k of ['HELMSMITH_HOME', 'GITHUB_TOKEN', 'COPILOT_GITHUB_TOKEN'])
     saved[k] = process.env[k];
-  process.env.AGENTX_HOME = join(home, '.agentx');
+  process.env.HELMSMITH_HOME = join(home, '.helmsmith');
   process.env.GITHUB_TOKEN = undefined;
   process.env.COPILOT_GITHUB_TOKEN = undefined;
   delete process.env.GITHUB_TOKEN;
@@ -21,14 +21,14 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  for (const k of ['AGENTX_HOME', 'GITHUB_TOKEN', 'COPILOT_GITHUB_TOKEN']) {
+  for (const k of ['HELMSMITH_HOME', 'GITHUB_TOKEN', 'COPILOT_GITHUB_TOKEN']) {
     if (saved[k] === undefined) delete process.env[k];
     else process.env[k] = saved[k];
   }
   rmSync(home, { recursive: true, force: true });
 });
 
-const authPath = () => join(process.env.AGENTX_HOME as string, 'gittyup', 'auth.json');
+const authPath = () => join(process.env.HELMSMITH_HOME as string, 'gittyup', 'auth.json');
 const stubTokenFetch = (chat?: unknown) =>
   vi.stubGlobal(
     'fetch',

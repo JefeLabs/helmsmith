@@ -3,8 +3,8 @@ import { join } from 'node:path';
 import { CONFIG_DIR_NAME, CONFIG_PARENT_DIR, ENV_CONFIG_OVERRIDE } from '../config/branding.js';
 
 /**
- * Returns the root config directory (e.g. ~/.agentx).
- * Respects the AGENTX_HOME env var override.
+ * Returns the root config directory (e.g. ~/.helmsmith).
+ * Respects the HELMSMITH_HOME env var override.
  */
 export function getConfigRoot(): string {
   return process.env[ENV_CONFIG_OVERRIDE] ?? join(homedir(), CONFIG_PARENT_DIR);
@@ -12,7 +12,7 @@ export function getConfigRoot(): string {
 
 /**
  * Returns the global tool-specific home directory path.
- * e.g. ~/.agentx/gittyup/
+ * e.g. ~/.helmsmith/gittyup/
  */
 export function getGittyupHome(): string {
   return join(getConfigRoot(), CONFIG_DIR_NAME);

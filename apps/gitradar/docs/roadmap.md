@@ -69,7 +69,7 @@ from `package.json` is the one exception, folded into this wave's packaging pass
 ## Tier 2 — the app says things that aren't true
 
 - [x] **`config.yml` `repos:` is dead** — parsed by `config/loader.ts:16-73`, discarded by
-      `engine/gitradar-engine.ts:148-211,891-907` (repos come only from `~/.agentx/repos.yml`). Wire it in or
+      `engine/gitradar-engine.ts:148-211,891-907` (repos come only from `~/.helmsmith/repos.yml`). Wire it in or
       remove it from schema + README.
 - [x] **Getting-started dead ends**: `gitradar data enrich` (real: `gitradar enrich`), `workspace use`,
       `repo add --name`, `max_scan_age_weeks`. README links `docs/feature-tour.md` (file is
@@ -101,7 +101,7 @@ Delete (zero callers confirmed): `loadCommitsDataSQL`, `saveCommitsDataSQL`, `re
 `saveEnrichmentSQL` (`store/sqlite-store.ts`); `views/repo-activity.ts` (`repoActivityView`, 418 lines);
 `computeRunningAvgByOrg` (`aggregator/trends.ts:129`); `parseGitLogOutput` from production
 (`collector/git.ts:235-360`, test-only oracle); `commander` from `package.json`. Remove the legacy
-`*.json` stores left in `~/.agentx/gitradar/data/` on `--reset`.
+`*.json` stores left in `~/.helmsmith/gitradar/data/` on `--reset`.
 
 Consolidate: ~90 inlined `ins + del` filetype sums while `aggregator/metrics.ts` exists and
 `calculateDerived` has zero callers; one glob compiler for `buildIgnoreMatcher`/`buildClassifier`

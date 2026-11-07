@@ -1,7 +1,7 @@
-# AgentX Toolbox — Conventions
+# Helmsmith Toolbox — Conventions
 
 This document is the source of truth for cross-app conventions in the
-`agentx-toolbox` monorepo. New apps and PRs should match this spec; any
+`toolbox` monorepo. New apps and PRs should match this spec; any
 deviation needs a written reason in the PR description.
 
 The spec is **enforced by import** wherever possible (shared packages,
@@ -27,7 +27,7 @@ the override will win, but the inconsistency is noise.
 
 ## Repo relationship
 
-`agentx-toolbox` (this repo) and `agentx-platform` (sibling repo) form
+`toolbox` (this repo) and `platform` (sibling repo) form
 a **package-level DAG with cross-repo references in both directions**.
 There is no circular dependency at the package level.
 
@@ -52,7 +52,7 @@ convention: **directory name ends in `-lib`, package name drops the
 
 For example: directory `agent-auth-lib/` publishes as `@ecruz165/agent-auth`
 (not `@ecruz165/agent-auth-lib`). This matches the existing pattern in
-`agentx-platform/packages/`.
+`platform/packages/`.
 
 | Package                       | Directory                       | Use for                                           |
 | ----------------------------- | ------------------------------- | ------------------------------------------------- |
@@ -91,7 +91,7 @@ packages/skillzkit-types-lib/src/index.ts  (canonical, hand-authored TS)
     │ npm run build:schema  →  ts-json-schema-generator
     ▼
 apps/skillzkit/schema/catalog.schema.json  (generated, checked in)
-    │ jsonschema2pojo  (in agentx-platform CI)
+    │ jsonschema2pojo  (in platform CI)
     ▼
 Java POJOs
 ```
@@ -101,10 +101,10 @@ Java POJOs
   are expressed via JSDoc tags so they propagate to the generated
   schema.
 - **Generated artifact**: `apps/skillzkit/schema/catalog.schema.json`.
-  Checked into the repo so agentx-platform can read it without
+  Checked into the repo so platform can read it without
   depending on the TS package. CI runs `npm run verify:schema` to
   ensure it's not out of sync with the TS source.
-- **Java side**: agentx-platform consumes the generated schema via
+- **Java side**: platform consumes the generated schema via
   `jsonschema2pojo` to produce POJOs.
 
 **Don't edit `catalog.schema.json` by hand.** Edit the TS source,
@@ -127,10 +127,10 @@ package published externally (where end consumers won't have a TS toolchain).
 ### Migration plan (auth + agent-adapter, in flight as of 2026-05-09)
 
 **Scope-preserving migration.** Source code moves from
-`agentx-platform/packages/agent-auth-lib/` and
-`agentx-platform/packages/agent-adapter-lib/` to
-`agentx-toolbox/packages/agent-auth-lib/` and
-`agentx-toolbox/packages/agent-adapter-lib/`. The published package
+`platform/packages/agent-auth-lib/` and
+`platform/packages/agent-adapter-lib/` to
+`toolbox/packages/agent-auth-lib/` and
+`toolbox/packages/agent-adapter-lib/`. The published package
 names — `@ecruz165/agent-auth` and `@ecruz165/agent-adapter` — stay
 exactly the same. Only the source location and the publishing repo
 change.
@@ -172,12 +172,12 @@ Migration sequence:
    and `@ecruz165/agent-adapter`.
 4. Publish `@ecruz165/agent-auth@<v>` and `@ecruz165/agent-adapter@<v>`
    from toolbox.
-5. Update agentx-platform's 6 internal-consumer `package.json` files:
+5. Update platform's 6 internal-consumer `package.json` files:
    change `"@ecruz165/agent-auth": "workspace:*"` to
    `"@ecruz165/agent-auth": "^<v>"` (and same for agent-adapter).
    Source imports require **no changes** — names match.
 6. Remove `packages/agent-auth-lib/` and `packages/agent-adapter-lib/`
-   from agentx-platform's `pnpm-workspace.yaml` and delete the now-
+   from platform's `pnpm-workspace.yaml` and delete the now-
    empty directories from platform. Stop platform's release pipeline
    from publishing those package names.
 7. Delete the empty npm-link shell at toolbox's `packages/agent-adapter/`
@@ -448,14 +448,14 @@ launches the TUI; the TUI module owns the screen.
       context-loader-core, plus self-references inside agent-adapter-lib).
       ~30 source files. Toolbox: 3 apps (pritty, taskmaster, skillzkit)
       consume the same two packages.
-- [x] **Correct toolbox publishing scope: `@agentx/*` → `@ecruz165/*`.**
+- [x] **Correct toolbox publishing scope: `@helmsmith/*` → `@ecruz165/*`.**
       Completed 2026-05-09. All 5 app `package.json` `name` fields
       renamed. Functional code updated (`apps/toolz/src/cli.ts`
       version-detection comparison; `apps/toolz/src/core/built-in-catalog.ts`
       install identifiers for apt/brew/winget; pritty + toolz public-API
       JSDoc; pritty's command-template strings). 14 doc files updated
       via sed. Root `package.json` workspace script refs updated. The
-      `@agentx/*` references that remain in `CONVENTIONS.md` are
+      `@helmsmith/*` references that remain in `CONVENTIONS.md` are
       intentional — they describe the rename's from-state.
 - [x] **Migrate `@ecruz165/agent-auth` source from platform into
       toolbox** at `packages/agent-auth-lib/`. Completed 2026-05-10.
@@ -480,7 +480,7 @@ launches the TUI; the TUI module owns the screen.
       the TS source. Completed 2026-05-10. **TS-first pipeline locked:**
       `src/index.ts` (canonical) → `ts-json-schema-generator` → JSON
       Schema (generated, checked in) → `jsonschema2pojo` (in
-      agentx-platform CI) → Java POJOs.
+      platform CI) → Java POJOs.
       `npm run build:schema --workspace=@ecruz165/skillzkit-types`
       regenerates; `npm run verify:schema` is the CI gate that fails
       the PR if the file is out of sync.
@@ -495,7 +495,7 @@ launches the TUI; the TUI module owns the screen.
       and platform-side adoption (opt-in for the 6 platform CLIs).
 - [ ] **Pin shared dep versions** via `overrides` in root `package.json`
       (commander, vitest, typescript, tsup, inquirer, @types/bun).
-- [ ] **Update agentx-platform `package.json` files**:
+- [ ] **Update platform `package.json` files**:
       - 6 packages drop `workspace:*` reference to `@ecruz165/agent-auth`
         / `@ecruz165/agent-adapter`; replace with external semver range
         pointing at the toolbox-published versions.

@@ -1,7 +1,7 @@
 /**
  * skillzkit user config — schema and filesystem io.
  *
- * Lives at `~/.agentx/skillzkit/config.json` (overridable via the
+ * Lives at `~/.helmsmith/skillzkit/config.json` (overridable via the
  * SKILLZKIT_CONFIG env var for tests). Captures the user's choice of
  * standalone vs team mode, their email (for local artifact attribution
  * in both modes; matches controlplane identity in team mode), and the
@@ -95,13 +95,13 @@ export type SkillzkitConfig = StandaloneConfig | TeamConfig;
 
 /**
  * Resolve the config file path. Default is
- * `~/.agentx/skillzkit/config.json`. Overridable via the
+ * `~/.helmsmith/skillzkit/config.json`. Overridable via the
  * SKILLZKIT_CONFIG env var, which lets tests point at a temp file
  * without polluting the real config directory.
  */
 export function configPath(): string {
   if (process.env.SKILLZKIT_CONFIG) return process.env.SKILLZKIT_CONFIG;
-  return join(homedir(), '.agentx', 'skillzkit', 'config.json');
+  return join(homedir(), '.helmsmith', 'skillzkit', 'config.json');
 }
 
 export function configExists(): boolean {

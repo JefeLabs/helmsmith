@@ -119,7 +119,7 @@ Step 1 of 4: Identify the decision
 
 What architectural decision is being made?
   Examples:
-    - "Choose orchestration framework for AgentX agents"
+    - "Choose orchestration framework for Helmsmith agents"
     - "Decide whether to use ECS Fargate or EKS"
     - "Define multi-tenant data isolation strategy"
 

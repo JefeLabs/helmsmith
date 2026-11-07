@@ -110,7 +110,7 @@ public class SkillProposalController {
      *
      * <p>Authentication: this endpoint trusts the
      * {@link TenantContext}-resolved user; the actual skillzkit token
-     * is server-side ({@code agentx.skillzkit.token}). The compose
+     * is server-side ({@code helmsmith.skillzkit.token}). The compose
      * caller never sees the upstream credential.
      */
     @PostMapping("/compose")
@@ -152,7 +152,7 @@ public class SkillProposalController {
             .body(new ApiErrorEnvelopeDTO(
                 "skillzkit_unavailable",
                 "skillzkit is not configured on this controlplane",
-                Map.of("setting", "agentx.skillzkit.url")
+                Map.of("setting", "helmsmith.skillzkit.url")
             ));
     }
 

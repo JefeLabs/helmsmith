@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * `workspace` — control-plane lifecycle CLI for the agentx platform.
+ * `workspace` — control-plane lifecycle CLI for the helmsmith platform.
  *
  * Subcommands:
  *   workspace setup <name>    procure a new project (clone repos + scaffold)
@@ -22,12 +22,12 @@ import { runWeb } from './web.ts';
 
 const program = new Command()
   .name('workspace')
-  .description('agentx — workspace + platform lifecycle CLI')
+  .description('helmsmith — workspace + platform lifecycle CLI')
   .showHelpAfterError();
 
 program
   .command('setup [name]')
-  .description('procure a new agentx project from workspace-template/')
+  .description('procure a new helmsmith project from workspace-template/')
   .option('--name <name>', 'product name (doubles as workspace dir + product id)')
   .option('--repos <urls...>', 'repository clone URLs (HTTPS or SSH)')
   .option('--dest <dir>', 'destination directory (default: ./workspace-<name>)')
@@ -68,7 +68,7 @@ program
   .option('--skip-worker', 'skip building the worker devcontainer image entirely')
   .option(
     '--platform-root <dir>',
-    'override the agentx-platform repo root (env: AGENTX_PLATFORM_ROOT)',
+    'override the helmsmith repo root (env: HELMSMITH_PLATFORM_ROOT)',
   )
   .action(async (opts) => {
     await runStart(opts);
@@ -126,12 +126,12 @@ bench
 
 program
   .command('build-worker')
-  .description('build (or rebuild) the per-job worker devcontainer image (agentx/worker:dev)')
+  .description('build (or rebuild) the per-job worker devcontainer image (helmsmith/worker:dev)')
   .option('--force', 'rebuild even if the image already exists locally')
-  .option('--tag <tag>', 'override the image tag (default: agentx/worker:dev)')
+  .option('--tag <tag>', 'override the image tag (default: helmsmith/worker:dev)')
   .option(
     '--platform-root <dir>',
-    'override the agentx-platform repo root (env: AGENTX_PLATFORM_ROOT)',
+    'override the helmsmith repo root (env: HELMSMITH_PLATFORM_ROOT)',
   )
   .action(async (opts) => {
     await runBuildWorker(opts);
@@ -148,12 +148,12 @@ program
 
 program
   .command('tmux')
-  .description('launch the agentx ops dashboard (TUI + server log panes) in tmux')
+  .description('launch the helmsmith ops dashboard (TUI + server log panes) in tmux')
   .option(
     '--platform-root <dir>',
-    'override the agentx-platform repo root (env: AGENTX_PLATFORM_ROOT)',
+    'override the helmsmith repo root (env: HELMSMITH_PLATFORM_ROOT)',
   )
-  .option('--session <name>', 'tmux session name (default: agentx)')
+  .option('--session <name>', 'tmux session name (default: helmsmith)')
   .action(async (opts) => {
     await runTmux(opts);
   });

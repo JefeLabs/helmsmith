@@ -1,7 +1,7 @@
 # Getting Started — Team Mode
 
 Team mode runs the skillzkit catalog as a centrally-deployed REST API,
-hosted alongside your AgentX controlplane. Each team member's CLI/TUI
+hosted alongside your Helmsmith controlplane. Each team member's CLI/TUI
 fetches from the shared API; new contributions are submitted via API
 and validated server-side.
 
@@ -33,20 +33,20 @@ Both options use the same Hono app — just different runtime adapters.
 
 ### 1.2 Docker against controlplane (recommended)
 
-In your `agentx-platform/controlplane/compose.yaml` (or equivalent):
+In your `platform/controlplane/service/compose.yaml` (or equivalent):
 
 ```yaml
 services:
   controlplane:
-    image: agentx/controlplane:latest
+    image: helmsmith/controlplane:latest
     environment:
       # so controlplane's UI can render skillzkit links
       SKILLZKIT_API_URL: http://skillzkit-api:3000
 
   skillzkit-api:
-    build: ../../agentx-toolbox/apps/skillzkit
+    build: ../../skillzkit/skillzkit
     # OR use a published image:
-    # image: agentx/skillzkit-api:latest
+    # image: helmsmith/skillzkit-api:latest
     environment:
       SKILLZKIT_STORAGE: fs-persistent:/data
       PORT: "3000"
@@ -159,7 +159,7 @@ instead of the skillzkit container directly.
 
 ### 1.7 Issue API keys to team members
 
-API key issuance lives in the agentx-controlplane UI — the skillzkit
+API key issuance lives in the helmsmith-controlplane UI — the skillzkit
 API doesn't manage keys itself. Once a team member signs in to
 controlplane, they generate a key from the controlplane UI and use it
 in `skillzkit init` (see Part 2 below).
@@ -209,10 +209,10 @@ Walk through the prompts:
 Mode? (1) standalone — use bundled skills  (2) team — connect to a shared API: 2
 Email: you@example.com
 API URL (e.g. https://skillz.example.com): https://controlplane.example.com/api/skillz
-API key (from agentx-controlplane): ********************
+API key (from helmsmith-controlplane): ********************
 PIN (min 6 chars, used to encrypt key at rest): ******
 
-✓ Created /Users/you/.agentx/skillzkit/config.json
+✓ Created /Users/you/.helmsmith/skillzkit/config.json
 
 Mode: team
 API:  https://controlplane.example.com/api/skillz
@@ -250,7 +250,7 @@ team.apiUrl    = https://...
 team.keyMasked = ...4f92
 ```
 
-The API key is **encrypted** in `~/.agentx/skillzkit/config.json` —
+The API key is **encrypted** in `~/.helmsmith/skillzkit/config.json` —
 the stored form is AES-256-GCM ciphertext keyed by your email + PIN.
 Even with read access to your home directory, an attacker can't use
 the key without your PIN.

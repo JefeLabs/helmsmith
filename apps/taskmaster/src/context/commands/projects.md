@@ -27,8 +27,8 @@ npx taskmaster projects create <name> --repo
 npx taskmaster projects create <name> --home
 ```
 
-- `--repo`: store in repository's `.agentx/` directory
-- `--home`: store in global `~/.agentx-userdata/taskmaster/`
+- `--repo`: store in repository's `.helmsmith/` directory
+- `--home`: store in global `~/.helmsmith-userdata/taskmaster/`
 
 ### Switch
 

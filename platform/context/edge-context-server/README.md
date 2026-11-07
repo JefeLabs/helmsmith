@@ -15,11 +15,11 @@ Per-workspace knowledge-graph server backing GraphRAG queries. Ingests workspace
                               ▲                              ▲
                               │ programmatic                 │ direct (bypass)
                               │                              │
-                         harness-core                    agentx-load CLI
+                         harness-core                    helmsmith-load CLI
                          (phase enrichment)              (operator workflows)
 ```
 
-Single source of truth: Neo4j. Two write paths converge there — server-mediated ingest (observable, cancellable) and `agentx-load` direct (offline, ad-hoc).
+Single source of truth: Neo4j. Two write paths converge there — server-mediated ingest (observable, cancellable) and `helmsmith-load` direct (offline, ad-hoc).
 
 ## Quick start
 
@@ -164,7 +164,7 @@ RUN_NEO4J_INTEGRATION=1 \
 
 ## SKILL files
 
-The agent-facing SKILL files ship **with the CLI** — `@helmsmith/edge-context-cli/skills/` — not with the server. The CLI is what agents invoke, so its manual travels with it, keeping the server + CLI usable independently of the AgentX harness. (The harness, when it provisions a workspace, installs the equivalent into `~/.harness/skills/` / `~/.claude/skills/`.)
+The agent-facing SKILL files ship **with the CLI** — `@helmsmith/edge-context-cli/skills/` — not with the server. The CLI is what agents invoke, so its manual travels with it, keeping the server + CLI usable independently of the Helmsmith harness. (The harness, when it provisions a workspace, installs the equivalent into `~/.harness/skills/` / `~/.claude/skills/`.)
 
 - `edge-context-cli/skills/graphrag.md` — default agent SKILL covering reads + ingestion.
 - `edge-context-cli/skills/graphrag-briefs.md` — task-shaped retrieval: the `--mode` presets (code/plan/impact/debug/analysis) + the brief templates the agent synthesizes from the hits. The mode router is deterministic (server-side); the brief synthesis is the agent's job.
@@ -174,5 +174,5 @@ The agent-facing SKILL files ship **with the CLI** — `@helmsmith/edge-context-
 
 - `@helmsmith/edge-context-cli` — the agent + human CLI (`edge-context` binary)
 - `@helmsmith/context-loader-core` — ingest pipeline (tree-sitter + chunkers + embedder + Neo4jBackend)
-- `@helmsmith/context-loader-cli` (`agentx-load`) — operator CLI that bypasses the server, writing direct to Neo4j
+- `@helmsmith/context-loader-cli` (`helmsmith-load`) — operator CLI that bypasses the server, writing direct to Neo4j
 - `@helmsmith/edge-memory-server` — peer edge server (SQLite-vec, agent memory)

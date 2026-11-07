@@ -1,4 +1,4 @@
-# AgentX Taskmaster — Executive Overview
+# Helmsmith Taskmaster — Executive Overview
 
 **Version:** 0.1.0 | **Status:** Active Development | **License:** MIT
 
@@ -6,7 +6,7 @@
 
 ## What It Is
 
-AgentX Taskmaster is a command-line tool that converts implementation plans into structured, prioritized task hierarchies — automatically scoring complexity, breaking down large work items, and surfacing what's ready to be worked on next.
+Helmsmith Taskmaster is a command-line tool that converts implementation plans into structured, prioritized task hierarchies — automatically scoring complexity, breaking down large work items, and surfacing what's ready to be worked on next.
 
 It is the engine that powers intelligent task delegation for AI agent teams.
 
@@ -39,7 +39,7 @@ When teams — human or AI — tackle a large implementation plan, the same bott
 
 ---
 
-## How It Fits Into the AgentX Ecosystem
+## How It Fits Into the Helmsmith Ecosystem
 
 ```
 Implementation Plan (.md)
@@ -126,4 +126,4 @@ Taskmaster answers *"what needs to be done and in what order?"* — the Team Lea
 
 ## Contact
 
-For questions about AgentX Taskmaster, reach out to the development team or review the full implementation plan at `.plans/agentx-taskmaster-implementation-plan.md`.
+For questions about Helmsmith Taskmaster, reach out to the development team or review the full implementation plan at `.plans/helmsmith-taskmaster-implementation-plan.md`.

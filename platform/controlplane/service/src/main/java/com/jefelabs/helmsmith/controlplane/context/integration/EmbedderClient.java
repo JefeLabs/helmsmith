@@ -14,12 +14,12 @@ import java.util.List;
  * compose-provided huggingface/text-embeddings-inference service speaks
  * this protocol; so do Bedrock proxies, OpenAI direct, hosted TEI, etc.
  *
- * <p>Configured via {@code agentx.embedder.*} in application.yml; the
+ * <p>Configured via {@code helmsmith.embedder.*} in application.yml; the
  * URL points at the {@code /v1} root (the {@code /embeddings} suffix is
  * appended by this client).
  *
  * <p>Phase 4.2 uses this for query-time embedding only; Phase 4.3's
- * agentx-load CLI handles ingestion-time embedding directly via its own
+ * helmsmith-load CLI handles ingestion-time embedding directly via its own
  * embedder client (passed in via --embedder-url), so this class doesn't
  * need to be on the ingestion hot path.
  */
@@ -33,9 +33,9 @@ public class EmbedderClient {
     private final int expectedDim;
 
     public EmbedderClient(
-        @Value("${agentx.embedder.url:http://localhost:8081}") String baseUrl,
-        @Value("${agentx.embedder.model:BAAI/bge-small-en-v1.5}") String model,
-        @Value("${agentx.embedder.dimension:384}") int expectedDim
+        @Value("${helmsmith.embedder.url:http://localhost:8081}") String baseUrl,
+        @Value("${helmsmith.embedder.model:BAAI/bge-small-en-v1.5}") String model,
+        @Value("${helmsmith.embedder.dimension:384}") int expectedDim
     ) {
         this.restClient = RestClient.builder().baseUrl(baseUrl).build();
         this.model = model;

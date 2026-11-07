@@ -250,7 +250,7 @@
     "id": "skill-readme",
     "name": "skill-readme",
     "version": "1.0.0",
-    "description": "README template for AgentX skills",
+    "description": "README template for Helmsmith skills",
     "topic": null,
     "tags": ["documentation", "readme"],
     "runtime": null,
@@ -258,7 +258,7 @@
       "name": "skill-readme",
       "type": "template",
       "version": "1.0.0",
-      "description": "README template for AgentX skills",
+      "description": "README template for Helmsmith skills",
       "tags": ["documentation", "readme"],
       "format": "handlebars",
       "variables": [
@@ -276,7 +276,7 @@
           "name": "author",
           "description": "Author name",
           "required": false,
-          "default": "AgentX"
+          "default": "Helmsmith"
         }
       ]
     }

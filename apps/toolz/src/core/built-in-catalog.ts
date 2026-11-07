@@ -74,12 +74,12 @@ export const BUILT_IN_CATALOG: Record<string, CatalogEntry> = {
   },
   pritty: {
     description:
-      'AI-powered commit & PR CLI — categorize staged files, generate conventional commits, open PRs, all with human-in-the-loop. Part of agentx-toolbox.',
+      'AI-powered commit & PR CLI — categorize staged files, generate conventional commits, open PRs, all with human-in-the-loop. Part of helmsmith.',
     packages: {
       // Once @helmsmith/pritty is published to npm, all package
       // managers can install it via npm. Today this entry is a
       // forward-compatible declaration; before publish, users
-      // workspace-link from agentx-toolbox.
+      // workspace-link from helmsmith.
       brew: '@helmsmith/pritty',
       apt: '@helmsmith/pritty',
       winget: '@helmsmith/pritty',

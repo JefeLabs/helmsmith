@@ -6,12 +6,12 @@
  *   )}
  *
  * Renders a centered list of all registered themes (bundled + extras
- * from `<AgentxThemeProvider extraThemes>`). Arrow keys (or j/k)
+ * from `<HelmsmithThemeProvider extraThemes>`). Arrow keys (or j/k)
  * navigate, Enter applies, Esc cancels. The active theme starts
  * focused.
  *
  * On Enter:
- *   - calls `setTheme(name)` (which persists via AgentxThemeProvider)
+ *   - calls `setTheme(name)` (which persists via HelmsmithThemeProvider)
  *   - calls the optional `onApply` callback (e.g. to close the overlay)
  */
 

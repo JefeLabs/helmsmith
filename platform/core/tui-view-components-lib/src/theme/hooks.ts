@@ -17,7 +17,7 @@ export function useTheme(): ThemeContextValue {
   const ctx = useContext(ThemeContext);
   if (!ctx) {
     throw new Error(
-      'useTheme() called outside <ThemeProvider>. Wrap your app in <AgentxThemeProvider> (or a custom provider that supplies ThemeContext).',
+      'useTheme() called outside <ThemeProvider>. Wrap your app in <HelmsmithThemeProvider> (or a custom provider that supplies ThemeContext).',
     );
   }
   return ctx;

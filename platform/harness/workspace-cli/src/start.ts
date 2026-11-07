@@ -1,5 +1,5 @@
 /**
- * `workspace start` — boot the local agentx platform via docker compose.
+ * `workspace start` — boot the local helmsmith platform via docker compose.
  *
  * Composes the base controlplane/compose.yaml with one per-variant
  * embedder overlay (compose.<variant>.yaml). The base brings up
@@ -9,7 +9,7 @@
  * (OpenAI / Bedrock cloud APIs).
  *
  * Same root-resolution rules as `workspace tmux` — respects
- * AGENTX_PLATFORM_ROOT, falls back to cwd, errors with a clear message
+ * HELMSMITH_PLATFORM_ROOT, falls back to cwd, errors with a clear message
  * if neither has a `controlplane/compose.yaml`.
  *
  * Foreground vs detached: `docker compose up -d` always; the daemon
@@ -27,7 +27,7 @@ export type EmbedderVariant = 'qwen-0.6b' | 'qwen-4b' | 'qwen-8b' | 'openai' | '
 export interface StartOptions {
   /** Embedder variant; default 'qwen-0.6b'. */
   embedder?: EmbedderVariant;
-  /** Override the platform root (default: env AGENTX_PLATFORM_ROOT or cwd). */
+  /** Override the platform root (default: env HELMSMITH_PLATFORM_ROOT or cwd). */
   platformRoot?: string;
   /** Skip detached mode; tail logs after up. */
   follow?: boolean;
@@ -45,7 +45,7 @@ export interface StartOptions {
   rebuildWorker?: boolean;
   /**
    * Skip the worker image build entirely. Useful when you already have
-   * agentx/worker:dev present and want a faster start.
+   * helmsmith/worker:dev present and want a faster start.
    */
   skipWorker?: boolean;
 }
@@ -68,7 +68,7 @@ export async function runStart(opts: StartOptions): Promise<void> {
 
   if (!existsSync(baseFile)) {
     console.error(`error: ${baseFile} not found.`);
-    console.error('set AGENTX_PLATFORM_ROOT or cd to the agentx-platform repo root.');
+    console.error('set HELMSMITH_PLATFORM_ROOT or cd to the helmsmith repo root.');
     process.exit(2);
   }
   if (!existsSync(overlayFile)) {
@@ -104,7 +104,7 @@ export async function runStart(opts: StartOptions): Promise<void> {
   await runDocker(args, composeDir, envOverrides);
 
   // Pre-build the per-job worker devcontainer image (build-once-locally
-  // pattern). Each job's devcontainer references agentx/worker:dev
+  // pattern). Each job's devcontainer references helmsmith/worker:dev
   // rather than rebuilding from workspace-template/.devcontainer/worker/
   // Dockerfile every time. Idempotent: skips when the image already exists.
   if (!opts.skipWorker) {
@@ -126,7 +126,7 @@ export async function runStart(opts: StartOptions): Promise<void> {
 
 function resolveRoot(override?: string): string {
   if (override) return override;
-  if (process.env.AGENTX_PLATFORM_ROOT) return process.env.AGENTX_PLATFORM_ROOT;
+  if (process.env.HELMSMITH_PLATFORM_ROOT) return process.env.HELMSMITH_PLATFORM_ROOT;
   return process.cwd();
 }
 

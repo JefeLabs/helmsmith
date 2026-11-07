@@ -1,5 +1,5 @@
 /**
- * Public API for `@helmsmith/toolz`. Other AgentX packages import from
+ * Public API for `@helmsmith/toolz`. Other Helmsmith packages import from
  * here:
  *
  *   import { checkTool, detectPlatform } from "@helmsmith/toolz";

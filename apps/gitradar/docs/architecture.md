@@ -77,7 +77,7 @@ In demo mode, the engine uses in-memory records from `generateDemoData()` and sk
 
 ### Config Layer (`src/config/loader.ts`)
 
-Reads `config.yml` and validates it against Zod schemas. A leftover `repos:` key is ignored with a warning — repos come from the workspace registry (`~/.agentx/repos.yml`), loaded separately by `src/config/repos-registry.ts`.
+Reads `config.yml` and validates it against Zod schemas. A leftover `repos:` key is ignored with a warning — repos come from the workspace registry (`~/.helmsmith/repos.yml`), loaded separately by `src/config/repos-registry.ts`.
 
 ```
 config.yml (YAML)
@@ -168,7 +168,7 @@ This means a typical session re-scans only repos with new commits.
 SQLite-based persistence with WAL mode for crash safety and concurrent access.
 
 ```
-~/.agentx/gitradar/
+~/.helmsmith/gitradar/
 ├── config.yml                          # User configuration
 └── data/
     ├── gitradar.db                     # SQLite database (records, enrichments, scan state, meta)

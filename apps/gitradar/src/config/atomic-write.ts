@@ -8,7 +8,7 @@ import path from 'node:path';
  *
  * - With `backup`, the previous file is kept as `<target>.bak`: the old `.bak` is
  *   unlinked first (unlink does not follow symlinks) and the copy is created
- *   exclusively, so a `.bak` symlink dropped into a project's `.agentx/` cannot make
+ *   exclusively, so a `.bak` symlink dropped into a project's `.helmsmith/` cannot make
  *   gitradar overwrite the file it points at.
  * - The new content goes to an exclusively created temp file with an unpredictable
  *   name next to the target, then is renamed over it, so a crash mid-write can never

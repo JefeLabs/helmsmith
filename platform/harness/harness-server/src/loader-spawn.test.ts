@@ -1,7 +1,7 @@
 /**
  * Integration tests for `spawnLoaderJob`.
  *
- * Exercises the full G.2 path: harness-server spawns agentx-load as a
+ * Exercises the full G.2 path: harness-server spawns helmsmith-load as a
  * child, listens on a UDS, parses newline-delimited JSON, and fans events
  * out to subscribers. No real backend or embedder needed (uses inmem://
  * + mock://).
@@ -32,7 +32,7 @@ afterEach(() => {
 });
 
 describe('spawnLoaderJob', () => {
-  it('spawns agentx-load, streams events, and resolves on completion', async () => {
+  it('spawns helmsmith-load, streams events, and resolves on completion', async () => {
     const handle = await spawnLoaderJob({
       jobId: 'job-001',
       target: HARNESS_CORE,
