@@ -93,14 +93,16 @@ export function setCachedTicket(
 
 /**
  * Wipe the cache file. Used by `pritty cache clear` and by tests.
- * No-op if the file doesn't exist.
+ * No-op if the file doesn't exist; returns whether a file was removed.
  */
-export function clearCache(): void {
+export function clearCache(): boolean {
   const path = getCachePath();
   try {
     unlinkSync(path);
+    return true;
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+    return false;
   }
 }
 

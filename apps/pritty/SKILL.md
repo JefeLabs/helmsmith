@@ -49,6 +49,10 @@ Don't fire when:
 | `pritty init` | Set up a project — writes `.pritty.json`, slash commands, this skill |
 | `pritty auth login` | GitHub Copilot Device Flow → `~/.pritty/auth.json` |
 
+Every command takes `--json`: one JSON line on stdout (the result),
+everything else on stderr. `rebase --json` still asks before rewriting
+history; use `rebase --dry-run --json` for the plan.
+
 ## Pre-conditions to verify before invoking
 
 Before running any pritty command, check:
