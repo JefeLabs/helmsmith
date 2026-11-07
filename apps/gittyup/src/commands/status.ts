@@ -4,23 +4,17 @@ import { ManifestManager } from '../config/manifest.js';
 import type { RepoState } from '../config/schema.js';
 import { Orchestrator } from '../core/orchestrator.js';
 import {
-  type FetchRow,
   type ManifestRef,
   manifestRef,
   type StatusBranchDocument,
   type StatusDocument,
   type StatusRepoDocument,
+  toFetchRows,
 } from '../output/contract.js';
 import { emitJson } from '../output/json.js';
 import { Dashboard } from '../ui/dashboard.js';
 
 type FetchResult = { repo: string; success: boolean; error?: string };
-
-export function toFetchRows(results: FetchResult[]): FetchRow[] {
-  return results.map((r) =>
-    r.success ? { repo: r.repo, ok: true } : { repo: r.repo, ok: false, error: r.error },
-  );
-}
 
 /** Build the `status --json` document (spec §4 "status"); unknown values are `null`. */
 export function toStatusDocument(

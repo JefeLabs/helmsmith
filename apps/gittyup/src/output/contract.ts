@@ -139,6 +139,14 @@ export interface FetchRow {
   error?: string;
 }
 
+export function toFetchRows(
+  results: Array<{ repo: string; success: boolean; error?: string }>,
+): FetchRow[] {
+  return results.map((r) =>
+    r.success ? { repo: r.repo, ok: true } : { repo: r.repo, ok: false, error: r.error },
+  );
+}
+
 export interface StatusDocument {
   generatedAt: string;
   manifest: ManifestRef;
@@ -180,4 +188,30 @@ export interface CompareDocument {
   repos: CompareRepoDocument[];
   prLookup: { ran: boolean; error?: string };
   summary: { repos: number; withConflicts: number; clean: number };
+}
+
+// ─── prs, fetch, find ──────────────────────────────────────────────
+
+export interface PrsDocument {
+  repos: Array<{
+    name: string;
+    prs: Array<{ number: number; title: string; head: string; base: string; url: string }>;
+    error?: string;
+  }>;
+}
+
+export interface FetchDocument {
+  repos: FetchRow[];
+}
+
+export interface FindDocument {
+  root: string;
+  repos: Array<{
+    name: string;
+    absolutePath: string;
+    relativePath: string;
+    remoteUrl: string | null;
+    currentBranch: string | null;
+    isDirty: boolean | null;
+  }>;
 }

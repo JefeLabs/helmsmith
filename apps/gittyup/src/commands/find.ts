@@ -15,6 +15,9 @@ import {
   selectWithBack,
   tagAssigner,
 } from '../ui/prompts.js';
+import { GittyupError } from '../core/errors.js';
+import type { FindDocument } from '../output/contract.js';
+import { emitJson } from '../output/json.js';
 
 export function registerFind(program: Command): void {
   program
@@ -23,10 +26,16 @@ export function registerFind(program: Command): void {
     .argument('[directory]', 'Directory to search (default: current directory)', '.')
     .option('-d, --depth <n>', 'Maximum search depth', '5')
     .option('--no-metadata', 'Skip fetching repo metadata (faster)')
-    .action(async (directory: string, opts: { depth: string; metadata?: boolean }) => {
+    .option('--json', 'Print { root, repos } as one JSON line (discovery only, nothing is added)')
+    .action(async (directory: string, opts: { depth: string; metadata?: boolean; json?: boolean }) => {
       const searchDir = directory.startsWith('/') ? directory : `${process.cwd()}/${directory}`;
 
       if (!existsSync(searchDir)) {
+        if (opts.json) {
+          throw new GittyupError('PATH_NOT_FOUND', `No such file or directory: ${directory}`, {
+            path: directory,
+          });
+        }
         console.error(chalk.red(`No such file or directory: ${directory}`));
         process.exit(1);
       }
@@ -44,6 +53,22 @@ export function registerFind(program: Command): void {
       });
 
       spinner.stop();
+
+      if (opts.json) {
+        return emitJson({
+          root: searchDir,
+          repos: [...repos]
+            .sort((a, b) => a.relativePath.localeCompare(b.relativePath))
+            .map((r) => ({
+              name: r.name,
+              absolutePath: r.absolutePath,
+              relativePath: r.relativePath,
+              remoteUrl: r.remoteUrl ?? null,
+              currentBranch: r.currentBranch ?? null,
+              isDirty: r.isDirty ?? null,
+            })),
+        } satisfies FindDocument);
+      }
 
       if (repos.length === 0) {
         console.log(chalk.yellow('\n  No git repositories found.\n'));

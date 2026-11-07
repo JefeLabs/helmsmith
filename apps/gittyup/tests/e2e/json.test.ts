@@ -3,10 +3,11 @@
  * one JSON line on stdout on success; on failure an empty stdout, a JSON error
  * body as stderr's last line, exit 2 (refused) or 1 (broken).
  */
-import { readFile, rm } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanupFixtures, makeRepo } from '../../src/test/git-fixture.js';
+import { cleanupFixtures, fixtureEnv, makeRepo } from '../../src/test/git-fixture.js';
 import { createWorkspace, parseErrorLine, parseJsonLine, runCli, type Workspace } from './helpers.js';
 
 let ws: Workspace | undefined;
@@ -430,5 +431,72 @@ describe('--json contract: compare', () => {
     expect(r.exitCode).toBe(0);
     expect(r.stdout).toContain('GITTYUP');
     expect(r.stdout).toMatch(/\d{4}-\d{2}-\d{2}\s/);
+  });
+});
+
+async function plainRepo(dir: string): Promise<void> {
+  const git = (args: string[]) => execFileSync('git', args, { cwd: dir, env: fixtureEnv(), stdio: 'pipe' });
+  await mkdir(dir, { recursive: true });
+  git(['init', '-q', '-b', 'main']);
+  await writeFile(join(dir, 'f.txt'), 'x\n');
+  git(['add', '.']);
+  git(['commit', '-qm', 'base']);
+}
+
+describe('--json contract: prs, fetch, find', () => {
+  it('prs --json with no GitHub repos is an empty list', async () => {
+    ws = await createWorkspace({ workspace: '.', groups: { app: { repos: [{ name: 'a', path: '/x/a' }] } } });
+    const r = await runCli(ws, ['prs', '--json']);
+    expect(r.exitCode).toBe(0);
+    expect(parseJsonLine(r.stdout)).toStrictEqual({ repos: [] });
+  });
+
+  it('prs --json without a token is AUTH_REQUIRED', async () => {
+    ws = await createWorkspace({
+      workspace: '.',
+      groups: { app: { repos: [{ name: 'a', path: '/x/a', url: 'https://github.com/o/r.git' }] } },
+    });
+    const r = await runCli(ws, ['prs', '--json']);
+    expect([r.exitCode, r.stdout, parseErrorLine(r.stderr).code]).toEqual([2, '', 'AUTH_REQUIRED']);
+  });
+
+  it('fetch --json reports a failed fetch and exits 1 with the report on stdout', async () => {
+    ws = await createWorkspace();
+    const repoPath = join(ws.dir, 'repoA');
+    await plainRepo(repoPath);
+    await ws.writeManifest({ workspace: ws.dir, groups: { g: { repos: [{ name: 'repoA', path: repoPath }] } } });
+    const r = await runCli(ws, ['fetch', '-g', 'g', '--json']);
+    expect(r.exitCode).toBe(1);
+    expect(parseJsonLine(r.stdout)).toStrictEqual({
+      repos: [{ repo: 'repoA', ok: false, error: expect.any(String) }],
+    });
+  });
+
+  it('fetch --json succeeds against a real remote', async () => {
+    const repo = await makeRepo({ commits: [{ message: 'base', files: { 'f.txt': 'x\n' } }], remote: true });
+    ws = await createWorkspace({ workspace: '.', groups: { g: { repos: [{ name: 'fx', path: repo.path }] } } });
+    const r = await runCli(ws, ['fetch', '--json']);
+    expect(r.exitCode).toBe(0);
+    expect(parseJsonLine(r.stdout)).toStrictEqual({ repos: [{ repo: 'fx', ok: true }] });
+  });
+
+  it('find --json lists repos without prompting to add them', async () => {
+    ws = await createWorkspace();
+    await plainRepo(join(ws.dir, 'projects', 'b'));
+    await plainRepo(join(ws.dir, 'projects', 'a'));
+    const r = await runCli(ws, ['find', 'projects', '--json']);
+    expect(r.exitCode).toBe(0);
+    const doc = parseJsonLine(r.stdout);
+    expect(doc.root).toBe(`${ws.dir}/projects`);
+    expect(doc.repos).toMatchObject([
+      { name: 'a', relativePath: 'a', currentBranch: 'main', isDirty: false },
+      { name: 'b', relativePath: 'b', currentBranch: 'main', isDirty: false },
+    ]);
+  });
+
+  it('find --json on a missing directory is PATH_NOT_FOUND', async () => {
+    ws = await createWorkspace();
+    const r = await runCli(ws, ['find', '/no/such/dir', '--json']);
+    expect([r.exitCode, r.stdout, parseErrorLine(r.stderr).code]).toEqual([2, '', 'PATH_NOT_FOUND']);
   });
 });
