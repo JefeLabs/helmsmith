@@ -22,6 +22,7 @@ import {
   TOKEN_REFRESH_THRESHOLD,
   type TokenSource,
 } from './types.js';
+import { GittyupError } from '../core/errors.js';
 
 const AUTH_FILE = 'auth.json';
 
@@ -354,7 +355,10 @@ export async function requireGitHubToken(): Promise<TokenSource> {
     return { token: gitToken, source: 'auth.json' as const };
   }
 
-  throw new Error(`No GitHub token found. Run "${CLI_BIN_NAME} auth login" or set GITHUB_TOKEN.`);
+  throw new GittyupError(
+    'AUTH_REQUIRED',
+    `No GitHub token found. Run "${CLI_BIN_NAME} auth login" or set GITHUB_TOKEN.`,
+  );
 }
 
 /**

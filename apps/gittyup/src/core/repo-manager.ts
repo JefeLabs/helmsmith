@@ -3,6 +3,7 @@ import { APP_NAME } from '../config/branding.js';
 import { ManifestManager } from '../config/manifest.js';
 import type { RepoConfig, RepoGroup, RepoState } from '../config/schema.js';
 import { GitOperations } from './git-operations.js';
+import { GittyupError } from './errors.js';
 
 /**
  * Manages loaded repos and their git instances.
@@ -52,8 +53,10 @@ export class RepoManager {
     const repo = allRepos.find((r) => r.name === target);
     if (repo) return [repo];
 
-    throw new Error(
+    throw new GittyupError(
+      'TARGET_UNKNOWN',
       `"${target}" is not a known group or repo. Run "${APP_NAME} repo list" to see available repos and groups.`,
+      { target },
     );
   }
 

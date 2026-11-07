@@ -5,6 +5,30 @@ import type { Command } from 'commander';
 import { APP_NAME } from '../config/branding.js';
 import { ManifestManager } from '../config/manifest.js';
 import type { RepoConfig } from '../config/schema.js';
+import { GittyupError } from '../core/errors.js';
+import { type RepoAddDocument, type RepoRemoveDocument, toRepoDocument } from '../output/contract.js';
+import { emitJson } from '../output/json.js';
+
+/** `--branches` must be a JSON object of alias → branch name. */
+function parseBranches(raw: string): Record<string, string> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    parsed = undefined;
+  }
+  const ok =
+    parsed !== null &&
+    typeof parsed === 'object' &&
+    !Array.isArray(parsed) &&
+    Object.values(parsed).every((v) => typeof v === 'string');
+  if (!ok) {
+    throw new GittyupError('USAGE', '--branches must be a JSON object of alias → branch name', {
+      branches: raw,
+    });
+  }
+  return parsed as Record<string, string>;
+}
 
 export function registerRepo(program: Command): void {
   const repoCmd = program.command('repo').description('Manage repos and groups');
@@ -16,16 +40,23 @@ export function registerRepo(program: Command): void {
     .option('-u, --url <url>', 'GitHub clone URL')
     .option('--branches <json>', 'Branch aliases as JSON')
     .option('--group-desc <desc>', 'Description for a new group')
+    .option('--json', 'Print { added: { group, groupCreated, repo } } as one JSON line')
     .action(
       async (
         group: string,
         name: string,
         repoPath: string,
-        opts: { remote: string; url?: string; branches?: string; groupDesc?: string },
+        opts: {
+          remote: string;
+          url?: string;
+          branches?: string;
+          groupDesc?: string;
+          json?: boolean;
+        },
       ) => {
         const manifest = new ManifestManager();
         const branches = opts.branches
-          ? JSON.parse(opts.branches)
+          ? parseBranches(opts.branches)
           : { dev: 'develop', staging: 'staging', prod: 'main' };
         const repo: RepoConfig = {
           name,
@@ -37,8 +68,14 @@ export function registerRepo(program: Command): void {
           branches,
           tags: [],
         };
+        const groupCreated = manifest.getGroup(group) === undefined;
         manifest.addRepo(group, repo, opts.groupDesc);
         manifest.save();
+        if (opts.json) {
+          return emitJson({
+            added: { group, groupCreated, repo: toRepoDocument(repo) },
+          } satisfies RepoAddDocument);
+        }
         console.log(chalk.green(`✓ Added ${name} to group "${group}"`));
       },
     );
@@ -46,10 +83,14 @@ export function registerRepo(program: Command): void {
   repoCmd
     .command('remove <group> <name>')
     .description('Remove a repo from a group')
-    .action(async (group: string, name: string) => {
+    .option('--json', 'Print { removed: { group, repo } } as one JSON line')
+    .action(async (group: string, name: string, opts: { json?: boolean }) => {
       const manifest = new ManifestManager();
       manifest.removeRepo(group, name);
       manifest.save();
+      if (opts.json) {
+        return emitJson({ removed: { group, repo: name } } satisfies RepoRemoveDocument);
+      }
       console.log(chalk.green(`✓ Removed ${name} from group "${group}"`));
     });
 

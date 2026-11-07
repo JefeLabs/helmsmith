@@ -3,6 +3,7 @@
  * one JSON line on stdout on success; on failure an empty stdout, a JSON error
  * body as stderr's last line, exit 2 (refused) or 1 (broken).
  */
+import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanupFixtures } from '../../src/test/git-fixture.js';
 import { createWorkspace, parseErrorLine, parseJsonLine, runCli, type Workspace } from './helpers.js';
@@ -59,5 +60,68 @@ describe('--json contract: usage errors', () => {
     const r = await runCli(ws, ['cache', 'clear']);
     expect(r.exitCode).toBe(0);
     expect(r.stdout).toContain(`config: ${ws.manifestPath}`);
+  });
+});
+
+describe('--json contract: manifest CRUD', () => {
+  it('group create/remove round trip and refusals', async () => {
+    ws = await createWorkspace();
+    let r = await runCli(ws, ['group', 'create', 'web', '--desc', 'Web apps', '--json']);
+    expect(parseJsonLine(r.stdout)).toStrictEqual({
+      created: { group: 'web', description: 'Web apps' },
+    });
+    r = await runCli(ws, ['group', 'create', 'web', '--json']);
+    expect([r.exitCode, r.stdout, parseErrorLine(r.stderr).code]).toEqual([2, '', 'GROUP_EXISTS']);
+    r = await runCli(ws, ['group', 'remove', 'web', '--json']);
+    expect(parseJsonLine(r.stdout)).toStrictEqual({ removed: { group: 'web' } });
+    r = await runCli(ws, ['group', 'remove', 'web', '--json']);
+    expect([r.exitCode, parseErrorLine(r.stderr).code]).toEqual([2, 'GROUP_NOT_FOUND']);
+  });
+
+  it('repo add/remove with branches, groupCreated and refusals', async () => {
+    ws = await createWorkspace();
+    let r = await runCli(ws, [
+      'repo', 'add', 'web', 'app', './app', '--branches', '{"dev":"develop"}', '--json',
+    ]);
+    expect(parseJsonLine(r.stdout)).toStrictEqual({
+      added: {
+        group: 'web',
+        groupCreated: true,
+        repo: {
+          name: 'app',
+          path: join(ws.dir, 'app'),
+          remote: 'origin',
+          url: null,
+          branches: { dev: 'develop' },
+          tags: [],
+        },
+      },
+    });
+    r = await runCli(ws, ['repo', 'add', 'web', 'app', './app', '--json']);
+    expect([r.exitCode, parseErrorLine(r.stderr).code]).toEqual([2, 'REPO_EXISTS']);
+    r = await runCli(ws, ['repo', 'add', 'web', 'b', './b', '--branches', 'nope', '--json']);
+    expect([r.exitCode, parseErrorLine(r.stderr).code]).toEqual([2, 'USAGE']);
+    r = await runCli(ws, ['repo', 'remove', 'web', 'app', '--json']);
+    expect(parseJsonLine(r.stdout)).toStrictEqual({ removed: { group: 'web', repo: 'app' } });
+    r = await runCli(ws, ['repo', 'remove', 'web', 'app', '--json']);
+    expect([r.exitCode, parseErrorLine(r.stderr).code]).toEqual([2, 'REPO_NOT_FOUND']);
+  });
+
+  it('an invalid manifest is MANIFEST_INVALID', async () => {
+    ws = await createWorkspace({ groups: 5 });
+    const r = await runCli(ws, ['group', 'create', 'x', '--json']);
+    expect([r.exitCode, r.stdout]).toEqual([2, '']);
+    expect(parseErrorLine(r.stderr)).toMatchObject({
+      code: 'MANIFEST_INVALID',
+      details: { path: ws.manifestPath },
+    });
+  });
+
+  it('text mode keeps its wording and exit 1', async () => {
+    ws = await createWorkspace();
+    await runCli(ws, ['group', 'create', 'web']);
+    const r = await runCli(ws, ['group', 'create', 'web']);
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain('Group "web" already exists');
   });
 });
