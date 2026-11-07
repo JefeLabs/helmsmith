@@ -35,3 +35,16 @@ describe('applyFooter', () => {
     expect(applyFooter('Body.', '')).toBe('Body.');
   });
 });
+
+describe('applyFooter with a footer of several lines', () => {
+  const MULTI = '---\n🤖 Generated with [Claude Code](https://claude.com/claude-code)';
+
+  it('keeps one copy when the body already ends with it', () => {
+    expect(applyFooter(`Body.\n\n${MULTI}`, MULTI)).toBe(`Body.\n\n${MULTI}`);
+    expect(applyFooter(applyFooter('Body.', MULTI), MULTI)).toBe(`Body.\n\n${MULTI}`);
+  });
+
+  it('moves an earlier copy to the end', () => {
+    expect(applyFooter(`Body.\n\n${MULTI}\n\nMore.`, MULTI)).toBe(`Body.\n\nMore.\n\n${MULTI}`);
+  });
+});

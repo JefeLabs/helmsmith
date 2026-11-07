@@ -50,6 +50,27 @@ describe('reconcileCommitPlan', () => {
     ).toThrow(/app/);
   });
 
+  it("orders the plan code first, then test, then storybook, in the categorizer's order, never the model's", () => {
+    // DEFAULT_CATEGORIES order: test and storybook come first so they win the glob match
+    const g = {
+      test: ['src/a.test.ts'],
+      storybook: ['src/A.stories.tsx'],
+      config: ['package.json'],
+      app: ['src/a.ts'],
+      unknown: ['notes/x.md'],
+    };
+    const steps = Object.keys(g).map((category) => ({ category, message: 'm', files: [] }));
+    for (const modelOrder of [steps, [...steps].reverse()]) {
+      expect(reconcileCommitPlan(modelOrder, g).map((p) => p.category)).toEqual([
+        'config',
+        'app',
+        'unknown',
+        'test',
+        'storybook',
+      ]);
+    }
+  });
+
   it('drops a step for a category that has no staged files', () => {
     const plan = reconcileCommitPlan(
       [

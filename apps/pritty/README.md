@@ -216,9 +216,38 @@ model. `rebase --dry-run --json` is the unattended form.
 
 `pritty commit` commits only the index content of each category's files
 (never the working tree) and appends `commitTrailers`; `pritty pr` appends
-`prFooter` to every body, once. The diff sent to the model is redacted
+`prFooter` to every body, once (a body that already ends with it keeps one
+copy; `--no-footer` leaves it out). The diff sent to the model is redacted
 (secret files omitted, keys and tokens masked) and every model call is
 bounded by `aiTimeoutMs`.
+
+`pritty commit` details that make its output reviewable:
+- **The dry run is what gets committed.** A run keeps the plan it showed in
+  `<git dir>/pritty/commit-plan.json`, keyed by HEAD, the staged tree
+  (`git write-tree`), the branch, the categories and the commit style. The
+  next real run with the same key commits that plan without asking the model
+  again (`"reusedPlan": true` under `--json`); a successful run deletes it, a
+  refused commit keeps it for the retry. A dry run always asks the model, so
+  a fresh draft is one `--dry-run` away.
+- **Order is fixed:** code categories first (in category order), then
+  `test`, then `storybook`, whatever order the model answered in, so no commit
+  is red against its own tests.
+- **The branch types fixes.** The model is told the branch name. On a
+  `fix/…` (also `bugfix/`, `hotfix/`) branch, a code commit the model typed
+  `feat`, `build` or `chore` becomes `fix`; `test` and `storybook` commits,
+  docs, refactors and the rest keep their type.
+- **`--no-verify`** passes `--no-verify` to `git commit`, for when a hook
+  refuses and bypassing it was approved.
+
+The model drafting a PR sees each commit's subject and body (without the
+Co-Authored-By and Commit-Message-By lines of its closing trailer block) plus the files the
+branch changed, capped at 12,000 characters like the commit diff: every subject
+stays, long bodies share the room evenly, and the file list is cut first. It is
+told to take the why from the bodies rather than invent one. `pritty pr` opens a
+drafted title with the commits' conventional prefix: the
+branch's type when a commit carries it, else the most significant commit type
+(feat, fix, perf, refactor, revert, build, ci, docs, style, test, chore), with
+the scope that type's commits share. A `--title` is always used verbatim.
 
 ## Programmatic use
 
