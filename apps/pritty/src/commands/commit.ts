@@ -4,8 +4,11 @@ import { type CommitMessage, generateCommitMessages, type TicketContext } from '
 import { categorize, mergeCategories, UNKNOWN_CATEGORY } from '../categorizer.js';
 import { type Config, loadConfig } from '../config.js';
 import { createGit, type GitOps } from '../git.js';
+import { VERSION } from '../version.js';
+import { retypeForBranch } from './_shared/conventional.js';
 import { splitTitleBody } from './_shared/format.js';
 import { composeCommitMessage, reconcileCommitPlan } from './_shared/plan.js';
+import { filePlanCache, type PlanCache, planKey } from './_shared/plan-cache.js';
 import { confirm, editor } from './_shared/prompts.js';
 import { resolveTicketContext, type TicketContextOptions } from './_shared/ticket-context.js';
 
@@ -15,11 +18,15 @@ export interface CommitOptions {
   commitStyle?: string;
   /** One JSON line on stdout, everything else on stderr; implies autoApprove. */
   json?: boolean;
+  /** Pass `--no-verify` to every `git commit` (skips the pre-commit and commit-msg hooks). */
+  noVerify?: boolean;
 }
 
 export interface CommitOutcome {
   dryRun: boolean;
   commits: Array<{ category: string; message: string; files: string[]; sha?: string }>;
+  /** Present when the plan came from the previous run (a dry run, or a refused commit), not a new model call. */
+  reusedPlan?: true;
 }
 
 /** Everything `runCommit` touches outside its own logic, so tests can drive it without git or a model. */
@@ -38,15 +45,22 @@ export interface CommitDeps {
     editor(o: { message: string; default?: string }): Promise<string>;
   };
   io?: { out: (line: string) => void; err: (line: string) => void };
+  /** Where a shown plan waits for the run that commits it; without one, every run asks the model. */
+  planCache?: PlanCache;
 }
 
+/** The plan file lives in the worktree's git directory: untracked, one per index. */
+export const PLAN_CACHE_FILE = 'pritty/commit-plan.json';
+
 function defaultDeps(): CommitDeps {
+  const git = createGit();
   return {
-    git: createGit(),
+    git,
     config: loadConfig(),
     ai: { generateCommitMessages },
     ticket: resolveTicketContext,
     prompts: { confirm, editor },
+    planCache: filePlanCache(() => git.gitPath(PLAN_CACHE_FILE)),
   };
 }
 
@@ -104,19 +118,61 @@ export async function runCommit(
   }
   say('');
 
-  // 3. Messages from the model, files from the categorizer
-  const spinner = ora({ text: 'Generating commit messages...', color: 'cyan' }).start();
-  let plan: CommitMessage[];
-  try {
-    const diff = await git.getStagedDiff();
-    plan = reconcileCommitPlan(
-      await deps.ai.generateCommitMessages(grouped, diff, config, ticketCtx),
-      grouped,
+  // 3. Messages: the plan the last run showed for exactly this HEAD and index
+  //    (a dry run, or a run whose commit was refused), else the model's. A dry
+  //    run always asks the model, so a fresh draft is one dry run away. Files
+  //    and order come from the categorizer either way.
+  const cache = deps.planCache;
+  const stagedState = cache ? await git.stagedState() : null;
+  const key =
+    cache && stagedState
+      ? planKey({
+          stagedState,
+          branch,
+          commitStyle: config.commitStyle,
+          categories,
+          version: VERSION,
+        })
+      : null;
+  let plan: CommitMessage[] | undefined;
+  if (cache && key && !dryRun) {
+    const saved = await cache.read(key);
+    if (saved) {
+      try {
+        plan = reconcileCommitPlan(saved, grouped);
+        say(
+          chalk.dim('Reusing the plan the last run showed: HEAD and the staged changes match it.'),
+        );
+      } catch {
+        plan = undefined;
+      }
+    }
+  }
+  const reused = plan !== undefined;
+  if (!plan) {
+    const spinner = ora({ text: 'Generating commit messages...', color: 'cyan' }).start();
+    try {
+      const diff = await git.getStagedDiff();
+      plan = reconcileCommitPlan(
+        await deps.ai.generateCommitMessages(grouped, diff, config, ticketCtx, { branch }),
+        grouped,
+      );
+      spinner.succeed(`Generated ${plan.length} commit message(s)`);
+    } catch (err) {
+      spinner.fail((err as Error).message);
+      throw err;
+    }
+  }
+
+  // 3.5 On a fix/ branch the code commit is a fix, whatever the diff made the model say
+  const typed = retypeForBranch(plan, branch, config.commitStyle);
+  plan = typed.plan;
+  for (const r of typed.retyped) {
+    say(
+      chalk.dim(
+        `  ${r.category}: typed fix for ${branch} (the model said ${r.from.split(':')[0]})`,
+      ),
     );
-    spinner.succeed(`Generated ${plan.length} commit message(s)`);
-  } catch (err) {
-    spinner.fail((err as Error).message);
-    throw err;
   }
 
   // 4. Show the plan
@@ -151,6 +207,19 @@ export async function runCommit(
     }
   }
 
+  // 4.6 Keep the plan as shown (and edited) for the run that commits it
+  if (cache && key) {
+    try {
+      await cache.write(key, plan);
+    } catch (err) {
+      io.err(
+        chalk.yellow(
+          `⚠ Couldn't keep this plan for the next run (${(err as Error).message}); it will ask the model again.`,
+        ),
+      );
+    }
+  }
+
   // 5. Dry-run stops here
   if (dryRun) {
     say(chalk.yellow('Dry-run — no commits made. Re-run without --dry-run to apply.'));
@@ -176,7 +245,11 @@ export async function runCommit(
   const commits: CommitOutcome['commits'] = [];
   for (const c of plan) {
     try {
-      await git.commit(composeCommitMessage(c, config.commitTrailers), c.files);
+      await git.commit(
+        composeCommitMessage(c, config.commitTrailers),
+        c.files,
+        options.noVerify ? { noVerify: true } : undefined,
+      );
     } catch (err) {
       io.err(
         chalk.red(
@@ -190,5 +263,6 @@ export async function runCommit(
     say(chalk.green(`✓ committed ${c.category}: ${c.message} (${sha.slice(0, 7)})`));
   }
   say(chalk.green(`\n✓ ${commits.length} commit(s) created.`));
-  return finish({ dryRun: false, commits });
+  if (cache && key) await cache.clear().catch(() => undefined);
+  return finish({ dryRun: false, commits, ...(reused ? { reusedPlan: true as const } : {}) });
 }

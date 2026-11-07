@@ -23,6 +23,7 @@ import {
 import { findPullRequestTemplate, type PullRequestTemplate } from '../pr-template.js';
 import { applyFooter } from './_shared/attribution.js';
 import { resolveBaseBranch } from './_shared/base.js';
+import { conventionalPrTitle } from './_shared/conventional.js';
 import { splitTitleBody } from './_shared/format.js';
 import { inferLabels } from './_shared/labels.js';
 import { confirm, editor } from './_shared/prompts.js';
@@ -46,6 +47,8 @@ export interface PrOptions {
   noPush?: boolean;
   /** Only report the open PR for this head and base (one JSON line `{ open }`); create, push and generate nothing. */
   check?: boolean;
+  /** Leave `prFooter` out of this body (a caller that appends its own, or a preview to paste elsewhere). */
+  noFooter?: boolean;
 }
 
 export interface PrOutcome {
@@ -147,6 +150,7 @@ export async function runPr(
     return o;
   };
   const given = resolveGivenText(options);
+  const footer = options.noFooter ? undefined : config.prFooter;
 
   // 1. Branch + remote → owner/repo
   const branch = await git.getCurrentBranch();
@@ -243,7 +247,7 @@ export async function runPr(
     if (given) {
       const patch: PRPatch = {
         ...(given.title !== undefined ? { title: given.title } : {}),
-        ...(given.body !== undefined ? { body: applyFooter(given.body, config.prFooter) } : {}),
+        ...(given.body !== undefined ? { body: applyFooter(given.body, footer) } : {}),
       };
       await deps.github.updatePR(repo.owner, repo.repo, existing.number, patch);
       say(chalk.dim('  Updated its title/body in place.'));
@@ -274,6 +278,7 @@ export async function runPr(
 
   // 6. The words: given verbatim (no model, no ticket flow), or drafted by the model
   let draft: PRDraft;
+  let changedFiles: string[] | undefined;
   if (given) {
     draft = { title: given.title ?? '', body: given.body ?? '', labels: inferLabels(commits) };
     if (draft.title.length === 0) {
@@ -289,11 +294,12 @@ export async function runPr(
         ),
       );
     }
+    changedFiles = await git.changedFilesBetween(baseRef);
     const spinner = ora({ text: 'Generating PR description...', color: 'cyan' }).start();
     try {
       draft = await deps.ai.generatePR(
         commits,
-        { branch, base: effectiveBase, owner: repo.owner, repo: repo.repo },
+        { branch, base: effectiveBase, owner: repo.owner, repo: repo.repo, files: changedFiles },
         config,
         ticketCtx,
         template,
@@ -303,9 +309,19 @@ export async function runPr(
       spinner.fail((err as Error).message);
       throw err;
     }
+    // The model writes the summary; the commits decide the `type(scope):` it opens with.
+    draft = {
+      ...draft,
+      title: conventionalPrTitle(
+        draft.title,
+        commits.map((c) => c.subject),
+        branch,
+        config.commitStyle,
+      ),
+    };
   }
 
-  draft = { ...draft, body: applyFooter(draft.body, config.prFooter) };
+  draft = { ...draft, body: applyFooter(draft.body, footer) };
 
   // 7. Preview
   say('');
@@ -335,7 +351,7 @@ export async function runPr(
       if (nextTitle.length === 0) {
         say(chalk.yellow('⚠ Empty title — keeping original.'));
       } else {
-        draft = { ...draft, title: nextTitle, body: applyFooter(nextBody, config.prFooter) };
+        draft = { ...draft, title: nextTitle, body: applyFooter(nextBody, footer) };
       }
     }
   }
@@ -405,8 +421,10 @@ export async function runPr(
   const codeownersContent = deps.codeowners();
   if (codeownersContent) {
     const rules = parseCodeowners(codeownersContent);
-    const changedFiles = await git.changedFilesBetween(baseRef);
-    const reviewers = resolveReviewers(changedFiles, rules);
+    const reviewers = resolveReviewers(
+      changedFiles ?? (await git.changedFilesBetween(baseRef)),
+      rules,
+    );
     if (reviewers.users.length > 0 || reviewers.teams.length > 0) {
       try {
         await deps.github.requestReviewers(

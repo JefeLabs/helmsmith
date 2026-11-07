@@ -403,3 +403,145 @@ describe('runPr --check on a PR that is gone', () => {
     expect(JSON.parse(out3[0]!)).toEqual({ open: null, last: null });
   });
 });
+
+describe('runPr conventional title', () => {
+  function drafted(
+    subjects: string[],
+    title: string,
+    o: { branch?: string; config?: Record<string, unknown> } = {},
+  ) {
+    const f = fakes({ config: { baseBranch: 'main', ...o.config } });
+    if (o.branch) f.deps.git.getCurrentBranch = async () => o.branch!;
+    f.deps.git.log = async () =>
+      subjects.map((subject, i) => ({ hash: String(i).repeat(40), subject }));
+    f.deps.ai.generatePR = async () => ({ title, body: 'body', labels: [] });
+    return f;
+  }
+  const titleOf = (f: ReturnType<typeof fakes>) => (f.createArgs[0] as { title: string }).title;
+
+  it("prefixes the model's title with the commits' type and shared scope", async () => {
+    const f = drafted(
+      ['test(phone): cover country codes', 'fix(phone): refuse a typed country code'],
+      'Reject phone numbers typed with their own country code',
+    );
+    await runPr({ autoApprove: true }, f.deps);
+    expect(titleOf(f)).toBe('fix(phone): reject phone numbers typed with their own country code');
+  });
+
+  it('prefers the type the branch names when a commit carries it', async () => {
+    const f = drafted(
+      ['feat(phone): add kenya', 'fix(phone): store one dial code'],
+      'Phone fixes',
+      {
+        branch: 'fix/family/my-profile--phone-kenya',
+      },
+    );
+    await runPr({ autoApprove: true }, f.deps);
+    expect(titleOf(f)).toBe('fix(phone): phone fixes');
+  });
+
+  it('otherwise ranks feat over fix over the rest, and test and chore last', async () => {
+    const f = drafted(
+      ['test(a): cover', 'chore(a): tidy', 'docs(issues): report', 'fix(a): repair'],
+      'Repair a',
+      { branch: 'main' },
+    );
+    await runPr({ autoApprove: true }, f.deps);
+    expect(titleOf(f)).toBe('fix(a): repair a');
+
+    const g = drafted(['docs(issues): report the bug', 'test(x): cover'], 'Report the bug', {
+      branch: 'fix/family/my-profile',
+    });
+    await runPr({ autoApprove: true }, g.deps);
+    expect(titleOf(g)).toBe('docs(issues): report the bug');
+  });
+
+  it('replaces a prefix the model wrote and drops the scope when the commits disagree', async () => {
+    const f = drafted(['fix(auth): a', 'fix(phone): b'], 'feat(app): Fix two things');
+    await runPr({ autoApprove: true }, f.deps);
+    expect(titleOf(f)).toBe('fix: fix two things');
+  });
+
+  it('keeps a capitalised acronym and the breaking-change mark', async () => {
+    const f = drafted(['feat(api)!: drop v1', 'test(api): cover'], 'API v1 is gone');
+    await runPr({ autoApprove: true }, f.deps);
+    expect(titleOf(f)).toBe('feat(api)!: API v1 is gone');
+  });
+
+  it('leaves the title alone when no commit is conventional, or the style is not', async () => {
+    const f = drafted(["Merge branch 'develop'", 'update stuff'], 'Update stuff');
+    await runPr({ autoApprove: true }, f.deps);
+    expect(titleOf(f)).toBe('Update stuff');
+
+    const g = drafted(['fix(a): b'], 'Fix b', { config: { commitStyle: 'simple' } });
+    await runPr({ autoApprove: true }, g.deps);
+    expect(titleOf(g)).toBe('Fix b');
+  });
+
+  it('never touches a --title given verbatim', async () => {
+    const f = drafted(['fix(a): b'], 'unused');
+    await runPr({ autoApprove: true, title: 'Fix b, as written', body: 'b' }, f.deps);
+    expect(titleOf(f)).toBe('Fix b, as written');
+  });
+
+  it('shows the prefixed title in the dry run', async () => {
+    const f = drafted(['fix(a): b'], 'Fix b');
+    const out: string[] = [];
+    f.deps.io = { out: (s) => out.push(s), err: () => {} };
+    await runPr({ dryRun: true }, f.deps);
+    expect(out.some((l) => l.includes('fix(a): fix b'))).toBe(true);
+  });
+});
+
+describe('runPr --no-footer', () => {
+  const FOOTER = '🤖 Generated with [Claude Code](https://claude.com/claude-code)';
+
+  it('leaves the configured footer out of a created PR and of the dry-run preview', async () => {
+    const f = fakes({ config: { baseBranch: 'main', prFooter: FOOTER } });
+    await runPr({ autoApprove: true, noFooter: true }, f.deps);
+    expect(f.createArgs[0]).toMatchObject({ body: 'body' });
+
+    const g = fakes({ config: { baseBranch: 'main', prFooter: FOOTER } });
+    const out: string[] = [];
+    g.deps.io = { out: (s) => out.push(s), err: () => {} };
+    await runPr({ dryRun: true, noFooter: true }, g.deps);
+    expect(out.join('\n')).not.toContain('Generated with');
+  });
+
+  it('leaves it out of an in-place update too', async () => {
+    const f = fakes({
+      config: { baseBranch: 'main', prFooter: FOOTER },
+      openPRs: [
+        { number: 7, url: 'u', title: 'old', head: 'feature/x', base: 'main', draft: false },
+      ],
+    });
+    const updates: unknown[] = [];
+    f.deps.github.updatePR = async (_o, _r, _n, patch) => {
+      updates.push(patch);
+    };
+    await runPr({ autoApprove: true, title: 't', body: 'New.', noFooter: true }, f.deps);
+    expect(updates).toEqual([{ title: 't', body: 'New.' }]);
+  });
+});
+
+describe('runPr gives the model commit bodies and changed files (item 9)', () => {
+  it('passes the bodies from git log and the files changed since the base', async () => {
+    const f = fakes({ config: { baseBranch: 'main' } });
+    f.deps.git.log = async () => [
+      { hash: 'a'.repeat(40), subject: 'fix(a): b', body: 'Why: c was broken.' },
+    ];
+    f.deps.git.changedFilesBetween = async () => ['src/a.ts', 'src/a.test.ts'];
+    const seen: unknown[] = [];
+    f.deps.ai.generatePR = async (commits, meta) => {
+      seen.push({ commits, files: meta.files });
+      return { title: 'fix(a): b', body: 'body', labels: [] };
+    };
+    await runPr({ autoApprove: true }, f.deps);
+    expect(seen).toEqual([
+      {
+        commits: [{ hash: 'a'.repeat(40), subject: 'fix(a): b', body: 'Why: c was broken.' }],
+        files: ['src/a.ts', 'src/a.test.ts'],
+      },
+    ]);
+  });
+});

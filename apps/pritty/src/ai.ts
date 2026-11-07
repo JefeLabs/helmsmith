@@ -176,6 +176,50 @@ function unwrapJson(raw: string): string {
   return raw.trim();
 }
 
+/** Model input past this many characters is cut, so a huge diff or history can't blow the context or the timeout. */
+const PROMPT_INPUT_LIMIT = 12_000;
+
+function capPromptInput(text: string): string {
+  return text.length > PROMPT_INPUT_LIMIT
+    ? `${text.slice(0, PROMPT_INPUT_LIMIT)}\n... (truncated)`
+    : text;
+}
+
+/** Who wrote a commit, not what it changed: left out of the PR prompt. */
+const ATTRIBUTION_TRAILER = /^(co-authored-by|commit-message-by|signed-off-by):/i;
+
+/** A commit body for the PR prompt: attribution trailers dropped, everything else (Refs included) kept. */
+function promptBody(body: string | undefined): string {
+  return (body ?? '')
+    .split('\n')
+    .filter((l) => !ATTRIBUTION_TRAILER.test(l.trim()))
+    .join('\n')
+    .trim();
+}
+
+function indentBody(body: string): string {
+  if (body.length === 0) return '';
+  return body
+    .split('\n')
+    .map((l) => (l.length > 0 ? `      ${l}` : ''))
+    .join('\n');
+}
+
+/** Room per commit for the newline before its body and a "… (body truncated)" marker. */
+const BODY_OVERHEAD = 24;
+
+/** Split `budget` characters over items of `lengths`: short ones keep everything, long ones share the rest evenly. */
+function shareBudget(lengths: readonly number[], budget: number): number[] {
+  const out = lengths.map(() => 0);
+  const order = lengths.map((len, i) => ({ len, i })).sort((a, b) => a.len - b.len);
+  let left = Math.max(0, budget);
+  order.forEach(({ len, i }, k) => {
+    out[i] = Math.min(len, Math.floor(left / (order.length - k)));
+    left -= out[i]!;
+  });
+  return out;
+}
+
 const COMMIT_STYLE_GUIDES: Record<Config['commitStyle'], string> = {
   conventional:
     'Format: `<type>(<scope>): <subject>` where type is one of feat|fix|refactor|test|docs|chore|build|ci|perf|style and scope is the affected area in lowercase. Subject is imperative mood, lowercase, no trailing period, max 70 chars.',
@@ -197,6 +241,7 @@ export async function generateCommitMessages(
   diff: string,
   config: Config,
   ticket?: TicketContext,
+  context: { branch?: string } = {},
 ): Promise<CommitMessage[]> {
   const adapter = await buildAdapter(config);
 
@@ -221,21 +266,22 @@ export async function generateCommitMessages(
     `Produce one commit message per file category. ${styleGuide}`,
     'Return strict JSON: an array of objects with keys `category`, `message`, `body` (optional), `files` (the input files for that category).',
     'Do not wrap the output in markdown code fences. Do not include any prose before or after the JSON.',
+    context.branch
+      ? 'The branch name is the developer’s intent: on a `fix/…` branch the code change repairs a bug, so type it `fix` (not feat, build or chore) and say in the body what was broken; tests and stories keep their own type.'
+      : '',
     ticketGuidance,
   ]
     .filter((s) => s.length > 0)
     .join('\n');
 
   const user = [
+    ...(context.branch ? [`Branch: ${context.branch}`, ''] : []),
     'Here are the categorized files:',
     filesByCategory,
     '',
     'Here is the staged diff (secrets redacted):',
     '```diff',
-    (() => {
-      const safe = redactDiff(diff);
-      return safe.length > 12000 ? `${safe.slice(0, 12000)}\n... (truncated)` : safe;
-    })(),
+    capPromptInput(redactDiff(diff)),
     '```',
   ].join('\n');
 
@@ -255,10 +301,18 @@ export async function generateCommitMessages(
       `AI returned non-JSON output:\n${cleaned}\n\nParse error: ${(err as Error).message}`,
     );
   }
+  // A one-category plan sometimes comes back as the bare object instead of a one-element array.
+  if (isCommitShaped(parsed)) return [parsed as CommitMessage];
   if (!Array.isArray(parsed)) {
     throw new Error(`AI returned non-array output: ${cleaned}`);
   }
   return parsed as CommitMessage[];
+}
+
+function isCommitShaped(v: unknown): boolean {
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return false;
+  const o = v as Record<string, unknown>;
+  return typeof o.category === 'string' && typeof o.message === 'string';
 }
 
 export interface PRDraft {
@@ -270,6 +324,8 @@ export interface PRDraft {
 export interface CommitSummary {
   hash: string;
   subject: string;
+  /** The message after the subject line; where the why usually is. */
+  body?: string;
 }
 
 /**
@@ -281,7 +337,14 @@ export interface CommitSummary {
  */
 export async function generatePR(
   commits: readonly CommitSummary[],
-  meta: { branch: string; base: string; owner: string; repo: string },
+  meta: {
+    branch: string;
+    base: string;
+    owner: string;
+    repo: string;
+    /** Files the branch changed since its merge base with `base`. */
+    files?: readonly string[];
+  },
   config: Config,
   ticket?: TicketContext,
   template?: PullRequestTemplate | null,
@@ -292,7 +355,26 @@ export async function generatePR(
 
   const adapter = await buildAdapter(config);
 
-  const commitList = commits.map((c) => `  - ${c.hash.slice(0, 7)}  ${c.subject}`).join('\n');
+  // Subjects alone made the model guess the why; the bodies usually state it. Every subject
+  // goes in; the bodies share what the cap leaves (a short body whole, long ones evenly); the
+  // file list comes last, so the final cap cuts it before any commit.
+  const heads = commits.map((c) => `  - ${c.hash.slice(0, 7)}  ${c.subject}`);
+  const bodies = commits.map((c) => indentBody(promptBody(c.body)));
+  const allowed = shareBudget(
+    bodies.map((b) => b.length),
+    PROMPT_INPUT_LIMIT - heads.join('\n').length - BODY_OVERHEAD * commits.length,
+  );
+  const history = [
+    ...heads.map((head, i) => {
+      const body = bodies[i]!;
+      const keep = allowed[i]!;
+      if (body.length === 0 || keep === 0) return head;
+      return `${head}\n${body.length > keep ? `${body.slice(0, keep)}… (body truncated)` : body}`;
+    }),
+    ...(meta.files && meta.files.length > 0
+      ? ['', `Changed files (${meta.files.length}):`, ...meta.files.map((f) => `  - ${f}`)]
+      : []),
+  ].join('\n');
 
   const ticketGuidance = ticket
     ? ticketPromptGuidance(ticket.ticket, ticket.link, ticket.title)
@@ -305,13 +387,14 @@ export async function generatePR(
   // we just fill them in.
   const bodyInstruction = template
     ? 'Body: markdown. Use the PR template provided below as the structure — keep its headings, fill its sections.'
-    : 'Body: markdown. Open with a one-paragraph summary of the change. Add a `## Why` section explaining motivation. Add a `## Test plan` checklist when there are non-trivial code changes.';
+    : 'Body: markdown. Open with a one-paragraph summary of the change. Add a `## Why` section explaining motivation. Add a `## Test plan` section when there are non-trivial code changes: plain bullets naming how to verify the change, no `- [ ]` checkboxes (you cannot know which checks already ran).';
 
   const system = [
     'You are an expert engineer writing a pull-request description.',
     'Return strict JSON: { title: string, body: string, labels: string[] }.',
     'Title: short imperative summary, max 70 chars, no trailing period.',
     bodyInstruction,
+    'The commit bodies are the facts: take what changed and why from them and the changed files; do not invent motivation, issue links or test results they do not state.',
     'Labels: lowercase, kebab-case, derived from commit types when present (feat → enhancement; fix → bug; docs → documentation; refactor → refactor; test → testing). Empty array is fine.',
     'Do not wrap output in markdown code fences. Do not include any prose outside the JSON.',
     ticketGuidance,
@@ -323,8 +406,8 @@ export async function generatePR(
   const user = [
     `Repository: ${meta.owner}/${meta.repo}`,
     `Branch: ${meta.branch} → ${meta.base}`,
-    `Commits (${commits.length}):`,
-    commitList,
+    `Commits (${commits.length}, newest first, each with its body):`,
+    capPromptInput(history),
   ].join('\n');
 
   const result = await withTimeout(
