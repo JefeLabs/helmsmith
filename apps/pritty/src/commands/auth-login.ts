@@ -1,25 +1,46 @@
 import chalk from 'chalk';
 import { login as authLogin, getAuthPath } from '../auth.js';
+import { consoleIo, type Io, output } from './_shared/output.js';
 
-export async function runAuthLogin(): Promise<void> {
+export interface AuthLoginOptions {
+  /** One JSON line { provider, scope, path } on stdout; the device-flow prompt goes to stderr. */
+  json?: boolean;
+}
+
+export interface AuthLoginDeps {
+  login: (o: {
+    onPrompt: (info: { verificationUri: string; userCode: string; expiresIn: number }) => void;
+  }) => Promise<{ provider: string; scope?: string }>;
+  authPath: () => string;
+  io?: Io;
+}
+
+export async function runAuthLogin(
+  options: AuthLoginOptions = {},
+  deps: AuthLoginDeps = { login: authLogin, authPath: getAuthPath },
+): Promise<void> {
+  const io = deps.io ?? consoleIo;
+  const { say, result } = output(options.json, io);
   try {
-    const result = await authLogin({
+    const r = await deps.login({
       onPrompt: ({ verificationUri, userCode }) => {
-        console.log('');
-        console.log(chalk.cyan('Open this URL in a browser:'));
-        console.log(`  ${chalk.bold(verificationUri)}`);
-        console.log('');
-        console.log(chalk.cyan('Enter this code:'));
-        console.log(`  ${chalk.bold.yellow(userCode)}`);
-        console.log('');
-        console.log(chalk.dim('Waiting for authorization...'));
+        say('');
+        say(chalk.cyan('Open this URL in a browser:'));
+        say(`  ${chalk.bold(verificationUri)}`);
+        say('');
+        say(chalk.cyan('Enter this code:'));
+        say(`  ${chalk.bold.yellow(userCode)}`);
+        say('');
+        say(chalk.dim('Waiting for authorization...'));
       },
     });
-    console.log(chalk.green(`✓ Logged in (provider: ${result.provider})`));
-    console.log(chalk.dim(`  scope:  ${result.scope ?? '(default)'}`));
-    console.log(chalk.dim(`  stored: ${getAuthPath()}`));
+    const path = deps.authPath();
+    say(chalk.green(`✓ Logged in (provider: ${r.provider})`));
+    say(chalk.dim(`  scope:  ${r.scope ?? '(default)'}`));
+    say(chalk.dim(`  stored: ${path}`));
+    result({ provider: r.provider, scope: r.scope ?? null, path });
   } catch (err) {
-    console.error(chalk.red(`✗ Login failed: ${(err as Error).message}`));
+    io.err(chalk.red(`✗ Login failed: ${(err as Error).message}`));
     process.exit(1);
   }
 }

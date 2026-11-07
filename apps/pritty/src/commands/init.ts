@@ -4,6 +4,7 @@ import { confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
 import { defaultStarterConfig } from '../config.js';
 import { detectShell, installShellAliases } from '../shell-aliases.js';
+import { output } from './_shared/output.js';
 import { CLAUDE_COMMANDS, COPILOT_PROMPTS, PRITTY_SKILL } from './_shared/templates.js';
 
 export interface InitOptions {
@@ -12,6 +13,11 @@ export interface InitOptions {
   copilot?: boolean;
   aliases?: boolean;
   skill?: boolean;
+  /**
+   * One JSON line { written, skipped, gitRepo } (absolute paths); implies
+   * --no-aliases, since an unattended run should not edit a shell rc file.
+   */
+  json?: boolean;
 }
 
 /**
@@ -19,26 +25,27 @@ export interface InitOptions {
  * slash commands. Skips integration files outside a git repo.
  */
 export async function runInit(options: InitOptions = {}): Promise<void> {
+  const { say, result } = output(options.json);
   const cwd = process.cwd();
   const force = options.force ?? false;
   const includeClaude = options.claude !== false;
   const includeCopilot = options.copilot !== false;
-  const includeAliases = options.aliases !== false;
+  const includeAliases = options.aliases !== false && !options.json;
   const includeSkill = options.skill !== false;
   const inGitRepo = existsSync(join(cwd, '.git'));
 
-  let written = 0;
-  let skipped = 0;
+  const written: string[] = [];
+  const skipped: string[] = [];
 
   // 1. .pritty.json (always)
   const configPath = join(cwd, '.pritty.json');
   if (existsSync(configPath) && !force) {
-    console.log(chalk.dim(`· skipped ${configPath} (exists; --force to overwrite)`));
-    skipped++;
+    say(chalk.dim(`· skipped ${configPath} (exists; --force to overwrite)`));
+    skipped.push(configPath);
   } else {
     writeFileSync(configPath, `${JSON.stringify(defaultStarterConfig(), null, 2)}\n`);
-    console.log(chalk.green(`✓ ${configPath}`));
-    written++;
+    say(chalk.green(`✓ ${configPath}`));
+    written.push(configPath);
   }
 
   // 2. Claude Code slash commands (in git repos only)
@@ -47,14 +54,14 @@ export async function runInit(options: InitOptions = {}): Promise<void> {
     for (const [name, body] of Object.entries(CLAUDE_COMMANDS)) {
       const path = join(claudeDir, `${name}.md`);
       if (existsSync(path) && !force) {
-        console.log(chalk.dim(`· skipped ${path} (exists; --force to overwrite)`));
-        skipped++;
+        say(chalk.dim(`· skipped ${path} (exists; --force to overwrite)`));
+        skipped.push(path);
         continue;
       }
       mkdirSync(claudeDir, { recursive: true });
       writeFileSync(path, body);
-      console.log(chalk.green(`✓ ${path}`));
-      written++;
+      say(chalk.green(`✓ ${path}`));
+      written.push(path);
     }
   }
 
@@ -63,13 +70,13 @@ export async function runInit(options: InitOptions = {}): Promise<void> {
     const skillDir = join(cwd, '.claude', 'skills', 'pritty');
     const skillPath = join(skillDir, 'SKILL.md');
     if (existsSync(skillPath) && !force) {
-      console.log(chalk.dim(`· skipped ${skillPath} (exists; --force to overwrite)`));
-      skipped++;
+      say(chalk.dim(`· skipped ${skillPath} (exists; --force to overwrite)`));
+      skipped.push(skillPath);
     } else {
       mkdirSync(skillDir, { recursive: true });
       writeFileSync(skillPath, PRITTY_SKILL);
-      console.log(chalk.green(`✓ ${skillPath}`));
-      written++;
+      say(chalk.green(`✓ ${skillPath}`));
+      written.push(skillPath);
     }
   }
 
@@ -79,14 +86,14 @@ export async function runInit(options: InitOptions = {}): Promise<void> {
     for (const [name, body] of Object.entries(COPILOT_PROMPTS)) {
       const path = join(promptDir, `${name}.prompt.md`);
       if (existsSync(path) && !force) {
-        console.log(chalk.dim(`· skipped ${path} (exists; --force to overwrite)`));
-        skipped++;
+        say(chalk.dim(`· skipped ${path} (exists; --force to overwrite)`));
+        skipped.push(path);
         continue;
       }
       mkdirSync(promptDir, { recursive: true });
       writeFileSync(path, body);
-      console.log(chalk.green(`✓ ${path}`));
-      written++;
+      say(chalk.green(`✓ ${path}`));
+      written.push(path);
     }
   }
 
@@ -100,22 +107,22 @@ export async function runInit(options: InitOptions = {}): Promise<void> {
       });
       if (wantAliases) {
         try {
-          const result = installShellAliases(shell);
-          console.log(
+          const installed = installShellAliases(shell);
+          say(
             chalk.green(
-              `✓ ${result.replaced ? 'Updated' : 'Added'} shell aliases in ${result.rcPath}`,
+              `✓ ${installed.replaced ? 'Updated' : 'Added'} shell aliases in ${installed.rcPath}`,
             ),
           );
-          console.log(
-            chalk.dim(`  Run \`source ${result.rcPath}\` or open a new terminal to use them.`),
+          say(
+            chalk.dim(`  Run \`source ${installed.rcPath}\` or open a new terminal to use them.`),
           );
-          written++;
+          written.push(installed.rcPath);
         } catch (err) {
           console.error(chalk.red(`✗ ${(err as Error).message}`));
         }
       }
     } else {
-      console.log(
+      say(
         chalk.dim(
           `\nUnrecognized shell ($SHELL=${process.env.SHELL ?? '(unset)'}); skipping alias prompt. Add manually: \`alias commit="pritty commit"\` \`alias pr="pritty pr"\``,
         ),
@@ -125,22 +132,23 @@ export async function runInit(options: InitOptions = {}): Promise<void> {
 
   // 5. Summary
   if (!inGitRepo && (includeClaude || includeCopilot)) {
-    console.log(
+    say(
       chalk.dim(
         `\nNot a git repository (no .git/ found) — skipped Claude Code & Copilot integration files.`,
       ),
     );
   }
-  console.log('');
-  console.log(
+  say('');
+  say(
     chalk.cyan(
-      `${written} written, ${skipped} skipped${force ? ' (force overwrites enabled)' : ''}`,
+      `${written.length} written, ${skipped.length} skipped${force ? ' (force overwrites enabled)' : ''}`,
     ),
   );
   if (inGitRepo && (includeClaude || includeCopilot)) {
-    console.log('');
-    console.log(chalk.dim('Try it:'));
-    if (includeClaude) console.log(chalk.dim('  Claude Code:  /commit  /pr'));
-    if (includeCopilot) console.log(chalk.dim('  VS Code Chat: /commit  /pr'));
+    say('');
+    say(chalk.dim('Try it:'));
+    if (includeClaude) say(chalk.dim('  Claude Code:  /commit  /pr'));
+    if (includeCopilot) say(chalk.dim('  VS Code Chat: /commit  /pr'));
   }
+  result({ written, skipped, gitRepo: inGitRepo });
 }

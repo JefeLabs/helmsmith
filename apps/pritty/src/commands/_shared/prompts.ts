@@ -20,8 +20,14 @@ export function guardPrompt<A extends unknown[], R>(
   };
 }
 
+/** Inquirer's prompt context; `output: process.stderr` keeps a prompt off a --json stdout. */
+export interface PromptContext {
+  output?: NodeJS.WritableStream;
+}
+
 export const confirm = guardPrompt(
-  (o: { message: string; default?: boolean }): Promise<boolean> => inquirerConfirm(o),
+  (o: { message: string; default?: boolean }, ctx?: PromptContext): Promise<boolean> =>
+    inquirerConfirm(o, ctx),
 );
 export const editor = guardPrompt(
   (o: { message: string; default?: string }): Promise<string> => inquirerEditor(o),
