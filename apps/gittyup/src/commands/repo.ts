@@ -6,7 +6,15 @@ import { APP_NAME } from '../config/branding.js';
 import { ManifestManager } from '../config/manifest.js';
 import type { RepoConfig } from '../config/schema.js';
 import { GittyupError } from '../core/errors.js';
-import { type RepoAddDocument, type RepoRemoveDocument, toRepoDocument } from '../output/contract.js';
+import {
+  manifestRef,
+  type RepoAddDocument,
+  type RepoListDocument,
+  type RepoRemoveDocument,
+  type RepoTagDocument,
+  type RepoTagsDocument,
+  toRepoDocument,
+} from '../output/contract.js';
 import { emitJson } from '../output/json.js';
 
 /** `--branches` must be a JSON object of alias → branch name. */
@@ -98,9 +106,20 @@ export function registerRepo(program: Command): void {
     .command('list')
     .description('List all repos and groups')
     .option('--tags', 'Show tags for each repo')
-    .action(async (opts: { tags?: boolean }) => {
+    .option('--json', 'Print { manifest, groups } as one JSON line (tags always included)')
+    .action(async (opts: { tags?: boolean; json?: boolean }) => {
       const manifest = new ManifestManager();
       const groups = manifest.getGroups();
+      if (opts.json) {
+        return emitJson({
+          manifest: manifestRef(manifest),
+          groups: groups.map((g) => ({
+            name: g.name,
+            description: g.description ?? null,
+            repos: g.repos.map(toRepoDocument),
+          })),
+        } satisfies RepoListDocument);
+      }
       if (groups.length === 0) {
         console.log(
           chalk.yellow(`No repos configured. Use: ${APP_NAME} repo add <group> <name> <path>`),
@@ -132,13 +151,17 @@ export function registerRepo(program: Command): void {
     .option('-g, --group <name>', 'Filter by group')
     .option('-a, --add <tags>', 'Tags to add (comma-separated)')
     .option('-r, --remove <tags>', 'Tags to remove (comma-separated)')
-    .action(async (opts: { group?: string; add?: string; remove?: string }) => {
+    .option('--json', 'Print { updated, added, removed } as one JSON line (needs --add/--remove)')
+    .action(async (opts: { group?: string; add?: string; remove?: string; json?: boolean }) => {
+      if (opts.json && !opts.add && !opts.remove) {
+        throw new GittyupError('INTERACTIVE_ONLY', 'repo tag needs --add or --remove with --json');
+      }
       const manifest = new ManifestManager();
       const allRepos = opts.group
         ? (manifest.getGroup(opts.group)?.repos.map((r) => ({ ...r, group: opts.group! })) ?? [])
         : manifest.getAllRepos();
 
-      if (allRepos.length === 0) {
+      if (allRepos.length === 0 && !opts.json) {
         console.log(chalk.yellow('No repos found.'));
         return;
       }
@@ -228,6 +251,7 @@ export function registerRepo(program: Command): void {
             .map((t) => t.trim())
             .filter((t) => t) ?? [];
 
+        const updated: RepoTagDocument['updated'] = [];
         for (const repo of allRepos) {
           const group = manifest.data.groups[repo.group];
           const repoConfig = group?.repos.find((r) => r.name === repo.name);
@@ -240,9 +264,17 @@ export function registerRepo(program: Command): void {
           if (removeTags.length > 0) {
             repoConfig.tags = repoConfig.tags.filter((t) => !removeTags.includes(t));
           }
+          updated.push({ repo: repoConfig.name, tags: repoConfig.tags });
         }
 
         manifest.save();
+        if (opts.json) {
+          return emitJson({
+            updated,
+            added: addTags,
+            removed: removeTags,
+          } satisfies RepoTagDocument);
+        }
         console.log(chalk.green(`✓ Updated tags for ${allRepos.length} repo(s)`));
         if (addTags.length > 0) console.log(chalk.dim(`  Added: ${addTags.join(', ')}`));
         if (removeTags.length > 0) console.log(chalk.dim(`  Removed: ${removeTags.join(', ')}`));
@@ -252,7 +284,8 @@ export function registerRepo(program: Command): void {
   repoCmd
     .command('tags')
     .description('List all tags in use')
-    .action(async () => {
+    .option('--json', 'Print { tags: [{ tag, repos }] } as one JSON line')
+    .action(async (opts: { json?: boolean }) => {
       const manifest = new ManifestManager();
       const allRepos = manifest.getAllRepos();
       const tagCounts = new Map<string, number>();
@@ -261,6 +294,14 @@ export function registerRepo(program: Command): void {
         for (const tag of repo.tags) {
           tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
         }
+      }
+
+      if (opts.json) {
+        return emitJson({
+          tags: Array.from(tagCounts.entries())
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([tag, repos]) => ({ tag, repos })),
+        } satisfies RepoTagsDocument);
       }
 
       if (tagCounts.size === 0) {

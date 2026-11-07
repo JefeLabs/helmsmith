@@ -4,7 +4,20 @@
  * While gittyup is 0.x a shape may change when a hardening slice lands; each
  * such change is listed in the CHANGELOG under "JSON contract" (spec §3.6).
  */
+import { existsSync } from 'node:fs';
+import type { ManifestManager } from '../config/manifest.js';
 import type { RepoConfig } from '../config/schema.js';
+
+// ─── shared ────────────────────────────────────────────────────────
+
+export interface ManifestRef {
+  path: string;
+  exists: boolean;
+}
+
+export function manifestRef(m: ManifestManager): ManifestRef {
+  return { path: m.manifestPath, exists: existsSync(m.manifestPath) };
+}
 
 // ─── cache ─────────────────────────────────────────────────────────
 
@@ -52,4 +65,19 @@ export interface RepoAddDocument {
 
 export interface RepoRemoveDocument {
   removed: { group: string; repo: string };
+}
+
+export interface RepoListDocument {
+  manifest: ManifestRef;
+  groups: Array<{ name: string; description: string | null; repos: RepoDocument[] }>;
+}
+
+export interface RepoTagsDocument {
+  tags: Array<{ tag: string; repos: number }>;
+}
+
+export interface RepoTagDocument {
+  updated: Array<{ repo: string; tags: string[] }>;
+  added: string[];
+  removed: string[];
 }

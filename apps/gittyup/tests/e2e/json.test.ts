@@ -3,6 +3,7 @@
  * one JSON line on stdout on success; on failure an empty stdout, a JSON error
  * body as stderr's last line, exit 2 (refused) or 1 (broken).
  */
+import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanupFixtures } from '../../src/test/git-fixture.js';
@@ -123,5 +124,66 @@ describe('--json contract: manifest CRUD', () => {
     const r = await runCli(ws, ['group', 'create', 'web']);
     expect(r.exitCode).toBe(1);
     expect(r.stderr).toContain('Group "web" already exists');
+  });
+});
+
+describe('--json contract: repo list / tags / tag', () => {
+  it('repo list --json with no manifest anywhere is empty, not an error', async () => {
+    ws = await createWorkspace();
+    await rm(ws.manifestPath);
+    const r = await runCli(ws, ['repo', 'list', '--json']);
+    expect(r.exitCode).toBe(0);
+    expect(parseJsonLine(r.stdout)).toStrictEqual({
+      manifest: { path: expect.stringMatching(/gittyup\.yaml$/), exists: false },
+      groups: [],
+    });
+  });
+
+  it('repo list --json always includes tags; repo tags counts them sorted', async () => {
+    ws = await createWorkspace({
+      workspace: '.',
+      groups: {
+        web: {
+          description: 'Web',
+          repos: [
+            { name: 'a', path: '/x/a', branches: { dev: 'develop' }, tags: ['web', 'api'] },
+            { name: 'b', path: '/x/b', url: 'https://github.com/o/b.git', branches: {}, tags: ['api'] },
+          ],
+        },
+      },
+    });
+    const list = parseJsonLine((await runCli(ws, ['repo', 'list', '--json'])).stdout);
+    expect(list.manifest).toStrictEqual({ path: ws.manifestPath, exists: true });
+    expect(list.groups).toStrictEqual([
+      {
+        name: 'web',
+        description: 'Web',
+        repos: [
+          { name: 'a', path: '/x/a', remote: 'origin', url: null, branches: { dev: 'develop' }, tags: ['web', 'api'] },
+          { name: 'b', path: '/x/b', remote: 'origin', url: 'https://github.com/o/b.git', branches: {}, tags: ['api'] },
+        ],
+      },
+    ]);
+    expect(parseJsonLine((await runCli(ws, ['repo', 'tags', '--json'])).stdout)).toStrictEqual({
+      tags: [
+        { tag: 'api', repos: 2 },
+        { tag: 'web', repos: 1 },
+      ],
+    });
+  });
+
+  it('repo tag --json needs --add or --remove (no prompt)', async () => {
+    ws = await createWorkspace({
+      workspace: '.',
+      groups: { web: { repos: [{ name: 'a', path: '/x/a', tags: ['old'] }] } },
+    });
+    let r = await runCli(ws, ['repo', 'tag', '--json']);
+    expect([r.exitCode, r.stdout, parseErrorLine(r.stderr).code]).toEqual([2, '', 'INTERACTIVE_ONLY']);
+    r = await runCli(ws, ['repo', 'tag', '-g', 'web', '--add', 'api,core', '--remove', 'old', '--json']);
+    expect(parseJsonLine(r.stdout)).toStrictEqual({
+      updated: [{ repo: 'a', tags: ['api', 'core'] }],
+      added: ['api', 'core'],
+      removed: ['old'],
+    });
   });
 });
