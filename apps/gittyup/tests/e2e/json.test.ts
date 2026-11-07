@@ -343,3 +343,92 @@ describe('--json contract: status', () => {
     expect(r.stdout).toContain('–');
   });
 });
+
+async function compareWorkspace(): Promise<Workspace> {
+  const clean = await makeRepo({
+    commits: [
+      { message: 'base', files: { 'f.txt': 'x\n' } },
+      { branch: 'develop', message: 'dev', files: { 'g.txt': 'dev\n' } },
+      { branch: 'main', message: 'main', files: { 'h.txt': 'main\n' } },
+    ],
+  });
+  const clash = await makeRepo({
+    commits: [
+      { message: 'base', files: { 'f.txt': 'x\n' } },
+      { branch: 'develop', message: 'dev', files: { 'f.txt': 'dev\n' } },
+      { branch: 'main', message: 'main', files: { 'f.txt': 'main\n' } },
+    ],
+  });
+  const branches = { dev: 'develop', prod: 'main' };
+  return createWorkspace({
+    workspace: '.',
+    groups: {
+      app: {
+        repos: [
+          { name: 'clean', path: clean.path, branches },
+          { name: 'clash', path: clash.path, branches },
+        ],
+      },
+    },
+  });
+}
+
+describe('--json contract: compare', () => {
+  it('compare --json reports refs, conflicts, raw side info and no cache hit', async () => {
+    ws = await compareWorkspace();
+    const r = await runCli(ws, ['compare', 'dev', 'prod', '--no-pr', '--json']);
+    expect(r.exitCode).toBe(0);
+    const doc = parseJsonLine(r.stdout);
+    expect([doc.left, doc.right]).toEqual(['dev', 'prod']);
+    expect(doc.cache).toStrictEqual({ hit: false, ageMs: null });
+    expect(doc.prLookup).toStrictEqual({ ran: false });
+    expect(doc.summary).toStrictEqual({ repos: 2, withConflicts: 1, clean: 1 });
+    expect(doc.repos.find((x: { name: string }) => x.name === 'clash')).toMatchObject({
+      group: 'app',
+      leftRef: 'develop',
+      rightRef: 'main',
+      hasConflicts: true,
+      url: null,
+      pr: null,
+      left: {
+        lastCommitDate: expect.stringMatching(/T/),
+        author: 'gittyup-fixture',
+        commitCount: expect.any(Number),
+      },
+    });
+  });
+
+  it('a cache hit still prints exactly one line on stdout', async () => {
+    ws = await compareWorkspace();
+    await runCli(ws, ['compare', 'dev', 'prod', '--no-pr', '--json']);
+    const r = await runCli(ws, ['compare', 'dev', 'prod', '--no-pr', '--json']);
+    const doc = parseJsonLine(r.stdout);
+    expect(doc.cache.hit).toBe(true);
+    expect(doc.cache.ageMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('--no-conflicts reports hasConflicts as null', async () => {
+    ws = await compareWorkspace();
+    const r = await runCli(ws, ['compare', 'dev', 'prod', '--no-conflicts', '--no-pr', '--json', '-f']);
+    const doc = parseJsonLine(r.stdout);
+    expect(doc.repos.map((x: { hasConflicts: unknown }) => x.hasConflicts)).toEqual([null, null]);
+  });
+
+  it('a PR lookup without a token is reported, not fatal', async () => {
+    ws = await compareWorkspace();
+    const r = await runCli(ws, ['compare', 'dev', 'prod', '--json', '-f']);
+    expect(r.exitCode).toBe(0);
+    expect(parseJsonLine(r.stdout).prLookup).toMatchObject({
+      ran: true,
+      error: expect.stringMatching(/No GitHub token/),
+    });
+  });
+
+  it('text compare keeps the short uppercase author and the YYYY-MM-DD date', async () => {
+    ws = await compareWorkspace();
+    const r = await runCli(ws, ['compare', 'dev', 'prod', '--no-pr', '-f']);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain('GITTYUP');
+    expect(r.stdout).toMatch(/\d{4}-\d{2}-\d{2}\s/);
+  });
+});

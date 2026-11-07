@@ -146,3 +146,38 @@ export interface StatusDocument {
   repos: StatusRepoDocument[];
   summary: { repos: number; withConflicts: number; withErrors: number };
 }
+
+// ─── compare ───────────────────────────────────────────────────────
+
+export interface CompareSideDocument {
+  /** ISO-8601. */
+  lastCommitDate: string;
+  author: string;
+  sinceDays: number;
+  /** Commits reachable from the branch (whole history, capped at 9999). Hardening §3.9's
+   *  "only on this side" counts will arrive as new fields. */
+  commitCount: number;
+}
+
+export interface CompareRepoDocument {
+  name: string;
+  group: string;
+  url: string | null;
+  leftRef: string;
+  rightRef: string;
+  /** `null` with `--no-conflicts`. */
+  hasConflicts: boolean | null;
+  left: CompareSideDocument | null;
+  right: CompareSideDocument | null;
+  pr: { number: number; state: 'open' | 'closed' | 'merged'; url: string; date?: string } | null;
+  error?: string;
+}
+
+export interface CompareDocument {
+  left: string;
+  right: string;
+  cache: { hit: boolean; ageMs: number | null };
+  repos: CompareRepoDocument[];
+  prLookup: { ran: boolean; error?: string };
+  summary: { repos: number; withConflicts: number; clean: number };
+}
