@@ -6,7 +6,7 @@
 import { readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanupFixtures } from '../../src/test/git-fixture.js';
+import { cleanupFixtures, makeRepo } from '../../src/test/git-fixture.js';
 import { createWorkspace, parseErrorLine, parseJsonLine, runCli, type Workspace } from './helpers.js';
 
 let ws: Workspace | undefined;
@@ -244,5 +244,102 @@ describe('--json contract: config and auth', () => {
     });
     const r = await runCli(ws, ['auth', 'models', '--json']);
     expect([r.exitCode, parseErrorLine(r.stderr).code]).toEqual([2, 'AUTH_REQUIRED']);
+  });
+});
+
+async function devProdRepo() {
+  return makeRepo({
+    commits: [
+      { message: 'base', files: { 'f.txt': 'x\n' } },
+      { branch: 'develop', message: 'dev', files: { 'f.txt': 'y\n' } },
+    ],
+  });
+}
+
+describe('--json contract: status', () => {
+  it('reports untracked branches as null ahead/behind with full sha and ISO date', async () => {
+    const repo = await devProdRepo();
+    ws = await createWorkspace({
+      workspace: '.',
+      groups: { app: { repos: [{ name: 'fx', path: repo.path, branches: { dev: 'develop', prod: 'main' } }] } },
+    });
+    const r = await runCli(ws, ['status', '--json']);
+    expect(r.exitCode).toBe(0);
+    const doc = parseJsonLine(r.stdout);
+    expect(doc.manifest).toStrictEqual({ path: ws.manifestPath, exists: true });
+    expect(doc.repos[0].branches.dev).toMatchObject({
+      branch: 'develop',
+      tracking: false,
+      ahead: null,
+      behind: null,
+      lastCommit: {
+        sha: expect.stringMatching(/^[0-9a-f]{40}$/),
+        date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+      },
+    });
+    expect(doc.summary).toStrictEqual({ repos: 1, withConflicts: 0, withErrors: 0 });
+  });
+
+  it('a repo path that does not exist is an error row, not a failure', async () => {
+    const repo = await devProdRepo();
+    ws = await createWorkspace({
+      workspace: '.',
+      groups: {
+        app: {
+          repos: [
+            { name: 'fx', path: repo.path, branches: { dev: 'develop' } },
+            { name: 'gone', path: join(repo.path, 'no-such-dir'), branches: { dev: 'develop' } },
+          ],
+        },
+      },
+    });
+    const r = await runCli(ws, ['status', '--json']);
+    expect(r.exitCode).toBe(0);
+    const doc = parseJsonLine(r.stdout);
+    expect(doc.repos).toHaveLength(2);
+    expect(doc.repos[1]).toMatchObject({
+      name: 'gone',
+      currentBranch: null,
+      error: expect.stringMatching(/not found/),
+      branches: {},
+    });
+    expect(doc.summary.withErrors).toBe(1);
+  });
+
+  it('an unknown group is TARGET_UNKNOWN', async () => {
+    ws = await createWorkspace();
+    const r = await runCli(ws, ['status', '-g', 'nope', '--json']);
+    expect([r.exitCode, r.stdout]).toEqual([2, '']);
+    expect(parseErrorLine(r.stderr)).toMatchObject({ code: 'TARGET_UNKNOWN', details: { target: 'nope' } });
+  });
+
+  it('no manifest anywhere is an empty report', async () => {
+    ws = await createWorkspace();
+    await rm(ws.manifestPath);
+    const r = await runCli(ws, ['status', '--json']);
+    expect(r.exitCode).toBe(0);
+    expect(parseJsonLine(r.stdout)).toMatchObject({ repos: [], manifest: { exists: false } });
+  });
+
+  it('status --fetch --json reports a failed fetch and still exits 0', async () => {
+    const repo = await devProdRepo();
+    ws = await createWorkspace({
+      workspace: '.',
+      groups: { app: { repos: [{ name: 'fx', path: repo.path, branches: { dev: 'develop' } }] } },
+    });
+    const r = await runCli(ws, ['status', '--fetch', '--json']);
+    expect(r.exitCode).toBe(0);
+    expect(parseJsonLine(r.stdout).fetch).toEqual([{ repo: 'fx', ok: false, error: expect.any(String) }]);
+  });
+
+  it('text status shows – for an untracked ahead/behind', async () => {
+    const repo = await devProdRepo();
+    ws = await createWorkspace({
+      workspace: '.',
+      groups: { app: { repos: [{ name: 'fx', path: repo.path, branches: { dev: 'develop' } }] } },
+    });
+    const r = await runCli(ws, ['status']);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain('–');
   });
 });

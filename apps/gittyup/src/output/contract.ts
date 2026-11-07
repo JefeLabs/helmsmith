@@ -109,3 +109,40 @@ export interface AuthStatusDocument {
 export interface AuthModelsDocument {
   models: Array<{ id: string; maxPromptTokens: number | null; maxOutputTokens: number | null }>;
 }
+
+// ─── status ────────────────────────────────────────────────────────
+
+export interface StatusBranchDocument {
+  branch: string;
+  trackingBranch: string | null;
+  tracking: boolean;
+  ahead: number | null;
+  behind: number | null;
+  isDirty: boolean;
+  hasConflicts: boolean;
+  lastCommit: { sha: string; date: string } | null;
+}
+
+export interface StatusRepoDocument {
+  name: string;
+  group: string;
+  path: string;
+  currentBranch: string | null;
+  hasUnresolved: boolean;
+  error?: string;
+  branches: Record<string, StatusBranchDocument>;
+}
+
+export interface FetchRow {
+  repo: string;
+  ok: boolean;
+  error?: string;
+}
+
+export interface StatusDocument {
+  generatedAt: string;
+  manifest: ManifestRef;
+  fetch: FetchRow[] | null;
+  repos: StatusRepoDocument[];
+  summary: { repos: number; withConflicts: number; withErrors: number };
+}

@@ -87,13 +87,25 @@ export class Dashboard {
               state.branch === repo.currentBranch
                 ? chalk.cyan.bold(`${alias} (${state.branch}) ●`)
                 : chalk.dim(`${alias} (${state.branch})`);
-            const aheadStr = state.ahead > 0 ? chalk.green(`+${state.ahead}`) : chalk.dim('0');
-            const behindStr = state.behind > 0 ? chalk.red(`-${state.behind}`) : chalk.dim('0');
+            // `–` when there is no tracking ref: unknown is not "in sync" (spec §7).
+            const aheadStr =
+              state.ahead === null
+                ? chalk.dim('–')
+                : state.ahead > 0
+                  ? chalk.green(`+${state.ahead}`)
+                  : chalk.dim('0');
+            const behindStr =
+              state.behind === null
+                ? chalk.dim('–')
+                : state.behind > 0
+                  ? chalk.red(`-${state.behind}`)
+                  : chalk.dim('0');
 
             const icons: string[] = [];
             if (state.hasConflicts) icons.push(chalk.red('⚡conflict'));
             if (state.isDirty) icons.push(chalk.yellow('●dirty'));
-            if (state.ahead > 0 && state.behind > 0) icons.push(chalk.magenta('↕diverged'));
+            if ((state.ahead ?? 0) > 0 && (state.behind ?? 0) > 0)
+              icons.push(chalk.magenta('↕diverged'));
             if (icons.length === 0) icons.push(chalk.green('✓'));
 
             table.push([
