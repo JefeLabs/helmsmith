@@ -185,16 +185,26 @@ function capPromptInput(text: string): string {
     : text;
 }
 
-/** Who wrote a commit, not what it changed: left out of the PR prompt. */
-const ATTRIBUTION_TRAILER = /^(co-authored-by|commit-message-by|signed-off-by):/i;
+/** Who drafted or co-wrote a commit, not what it changed: left out of the PR prompt. */
+const ATTRIBUTION_TRAILER = /^(co-authored-by|commit-message-by):/i;
+/** A git trailer line, `Key: value`. */
+const TRAILER_LINE = /^[A-Za-z][A-Za-z0-9-]*:\s/;
 
-/** A commit body for the PR prompt: attribution trailers dropped, everything else (Refs included) kept. */
+/**
+ * A commit body for the PR prompt. Only the closing trailer block (the last
+ * paragraph, when every line in it is a `Key: value` trailer) loses its
+ * Co-Authored-By and Commit-Message-By lines; Signed-off-by, Refs and the rest
+ * stay, and so does any such line written in the body's own text.
+ */
 function promptBody(body: string | undefined): string {
-  return (body ?? '')
-    .split('\n')
-    .filter((l) => !ATTRIBUTION_TRAILER.test(l.trim()))
-    .join('\n')
-    .trim();
+  const lines = (body ?? '').trimEnd().split('\n');
+  let start = lines.length;
+  while (start > 0 && lines[start - 1].trim() !== '') start--;
+  const block = lines.slice(start);
+  const isTrailerBlock = block.length > 0 && block.every((l) => TRAILER_LINE.test(l.trim()));
+  if (!isTrailerBlock) return lines.join('\n').trim();
+  const kept = block.filter((l) => !ATTRIBUTION_TRAILER.test(l.trim()));
+  return [...lines.slice(0, start), ...kept].join('\n').trim();
 }
 
 function indentBody(body: string): string {

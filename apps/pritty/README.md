@@ -218,7 +218,7 @@ bounded by `aiTimeoutMs`.
   refuses and bypassing it was approved.
 
 The model drafting a PR sees each commit's subject and body (without the
-Co-Authored-By, Commit-Message-By and Signed-off-by trailers) plus the files the
+Co-Authored-By and Commit-Message-By lines of its closing trailer block) plus the files the
 branch changed, capped at 12,000 characters like the commit diff: every subject
 stays, long bodies share the room evenly, and the file list is cut first. It is
 told to take the why from the bodies rather than invent one. `pritty pr` opens a
