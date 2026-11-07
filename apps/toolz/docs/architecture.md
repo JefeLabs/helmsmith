@@ -35,7 +35,7 @@ detector, package-manager adapters, registry, and ensure-tool API.
    │ (YAML)   │              │ + Catalog│              │   detect /    │
    │          │              │          │              │   adapters    │
    └──────────┘              └──────────┘              └───────────────┘
-   ~/.agentx/toolz/         catalog.yaml +              brew / apt /
+   ~/.helmsmith/toolz/         catalog.yaml +              brew / apt /
    registry.yaml             built-in defaults          winget / etc.
 ```
 
@@ -101,7 +101,7 @@ tool's version-parsing approach.
 
 ### Registry (`src/config/`)
 
-Persistent state at `~/.agentx/toolz/registry.yaml`:
+Persistent state at `~/.helmsmith/toolz/registry.yaml`:
 
 ```yaml
 version: 1
@@ -156,7 +156,7 @@ const builtInCatalog = {
 }
 ```
 
-Users override or extend via `~/.agentx/toolz/catalog.yaml`. Merge
+Users override or extend via `~/.helmsmith/toolz/catalog.yaml`. Merge
 order: user catalog wins over built-in for any conflicting key.
 
 ### Tool resolver (`src/core/tool-resolver.ts`)
@@ -247,7 +247,7 @@ ensureTool("jq", { minVersion: "1.7" })
 
 ### Persistent state
 
-`~/.agentx/toolz/` (override with `AGENTX_TOOLZ_DIR=/path` for tests
+`~/.helmsmith/toolz/` (override with `HELMSMITH_TOOLZ_DIR=/path` for tests
 and CI):
 
 - `registry.yaml` — cached "what's installed where" state
@@ -257,7 +257,7 @@ and CI):
 
 | Var | Purpose |
 |---|---|
-| `AGENTX_TOOLZ_DIR` | Override the `~/.agentx/toolz/` location |
+| `HELMSMITH_TOOLZ_DIR` | Override the `~/.helmsmith/toolz/` location |
 
 ### CLI flags
 
@@ -271,7 +271,7 @@ and CI):
 
 ### Why a registry cache (instead of always re-probing)
 
-When 5 AgentX packages each call `ensureTool` at startup, re-probing
+When 5 Helmsmith packages each call `ensureTool` at startup, re-probing
 the filesystem every time is wasteful. The registry trades a small
 correctness risk (registry could drift from reality) for a meaningful
 startup-time win. `toolz doctor` is the explicit reconciliation

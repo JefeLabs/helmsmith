@@ -82,7 +82,7 @@ describe('inferLayerFromPath', () => {
   });
 
   it('detects bin/ directory', () => {
-    expect(inferLayerFromPath('bin/agentx.js')).toBe('cli');
+    expect(inferLayerFromPath('bin/helmsmith.js')).toBe('cli');
   });
 
   // --- api ---

@@ -10,11 +10,11 @@ describe('runDoctor', () => {
 
   beforeEach(() => {
     tmp = mkdtempSync(join(tmpdir(), 'toolz-doctor-test-'));
-    process.env.AGENTX_TOOLZ_DIR = tmp;
+    process.env.HELMSMITH_TOOLZ_DIR = tmp;
   });
 
   afterEach(() => {
-    delete process.env.AGENTX_TOOLZ_DIR;
+    delete process.env.HELMSMITH_TOOLZ_DIR;
     rmSync(tmp, { recursive: true, force: true });
   });
 

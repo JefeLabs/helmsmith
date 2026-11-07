@@ -1,7 +1,7 @@
 /**
  * Resolve the directory and file paths ToolZ uses for persistent
- * state. Defaults to `~/.agentx/toolz/`, overridable via the
- * `AGENTX_TOOLZ_DIR` env var (used by tests for isolation, and by CI
+ * state. Defaults to `~/.helmsmith/toolz/`, overridable via the
+ * `HELMSMITH_TOOLZ_DIR` env var (used by tests for isolation, and by CI
  * to keep state per-run).
  *
  * Cross-platform: `os.homedir()` resolves correctly on macOS, Linux,
@@ -14,11 +14,11 @@ import { mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-/** Resolve the ToolZ root directory — env override or `~/.agentx/toolz/`. */
+/** Resolve the ToolZ root directory — env override or `~/.helmsmith/toolz/`. */
 export function getToolzDir(): string {
-  const override = process.env.AGENTX_TOOLZ_DIR;
+  const override = process.env.HELMSMITH_TOOLZ_DIR;
   if (override) return override;
-  return join(homedir(), '.agentx', 'toolz');
+  return join(homedir(), '.helmsmith', 'toolz');
 }
 
 /** Path to the registry YAML — installed tools + metadata. */

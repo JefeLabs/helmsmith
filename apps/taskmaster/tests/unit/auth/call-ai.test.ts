@@ -10,7 +10,7 @@ vi.mock('../../../src/auth/token-manager.js', () => ({
 }));
 
 vi.mock('../../../src/utils/home.js', () => ({
-  getTaskmasterHome: vi.fn().mockReturnValue('/tmp/test-agentx/taskmaster'),
+  getTaskmasterHome: vi.fn().mockReturnValue('/tmp/test-helmsmith/taskmaster'),
 }));
 
 vi.mock('node:fs', async (importOriginal) => {

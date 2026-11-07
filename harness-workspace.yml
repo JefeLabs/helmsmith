@@ -1,11 +1,11 @@
-# agentx repo's own workspace declaration — used for development testing
+# helmsmith repo's own workspace declaration — used for development testing
 # of the harness CLI flows. Real workspaces (cloned from workspace-template)
 # follow the same shape.
 #
 # Per prd-workspace-template.md §7.1.
 
 workspace:
-  id: agentx-dev
+  id: helmsmith-dev
 
   # Three peer servers. v1: bound to UDS sockets in <workspace>/.harness/run/.
   servers:
@@ -20,9 +20,9 @@ workspace:
 
   # Worker DevContainer template (instantiated per job — MVP-2+).
   worker:
-    image: agentx/worker:0.0.0
+    image: helmsmith/worker:0.0.0
     devcontainerPath: workspace-template/.devcontainer/worker
-    namingPattern: "agentx-job-${jobId}"     # decision #1: named container per job
+    namingPattern: "helmsmith-job-${jobId}"     # decision #1: named container per job
     defaultResources:
       memory: 4Gi
       cpu: 2
@@ -38,14 +38,14 @@ workspace:
 
   # Products: every `harness submit` runs against exactly one (decision #4).
   products:
-    - id: agentx-dev
-      description: "agentx monorepo — self-reference for development testing"
+    - id: helmsmith-dev
+      description: "helmsmith monorepo — self-reference for development testing"
       repos:
-        - name: agentx
+        - name: helmsmith
           cloneUrl: ./
           baseRef: main
-          path: /workspace/agentx
-      # Context sources for graphRAG. `harness context load --product agentx-dev`
+          path: /workspace/helmsmith
+      # Context sources for graphRAG. `harness context load --product helmsmith-dev`
       # walks this list and spawns one loader per entry; each loader's emitted
       # nodes/edges/vectors get tagged with this product's id so query-time
       # scoping (decision #4) keeps results inside the product boundary.

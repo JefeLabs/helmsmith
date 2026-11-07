@@ -6,7 +6,7 @@
  */
 
 // ── Three root primitives ────────────────────────────────────
-export const APP_GROUP_NAME = 'agentx';
+export const APP_GROUP_NAME = 'helmsmith';
 export const APP_GROUP_INITIALS = 'ax';
 export const APP_NAME = 'taskmaster';
 

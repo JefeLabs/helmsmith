@@ -73,7 +73,7 @@ import type { ReportFormat } from './reports/types.js';
 import { getEffectiveVocabulary } from './skills/index.js';
 import { writeDefaults } from './utils/defaults.js';
 import { detectGitRoot } from './utils/git.js';
-import { ensureGitignoreEntry } from './utils/gitignore.js';
+import { ensureGitignoreEntry, GITIGNORE_ENTRY } from './utils/gitignore.js';
 import { bootstrapHome, bootstrapRepoHome } from './utils/home.js';
 import type { ProjectLocation } from './utils/location.js';
 import { createProject, switchProject } from './utils/projects.js';
@@ -191,7 +191,7 @@ program
           ),
         );
         if (wizardResult.location === 'repo' && wizardResult.gitignore) {
-          console.log(chalk.dim(`  .agentx/ added to .gitignore`));
+          console.log(chalk.dim(`  ${GITIGNORE_ENTRY} added to .gitignore`));
         }
         if (installedInstructions.length > 0) {
           console.log(chalk.dim(`  Agent instructions (${wizardResult.aiTooling}):`));

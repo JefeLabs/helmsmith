@@ -293,7 +293,7 @@ describe('token-manager', () => {
       const chatOpts = chatCall[1] as RequestInit;
       const headers = chatOpts.headers as Record<string, string>;
       expect(headers.Authorization).toContain('Bearer');
-      expect(headers['Editor-Version']).toBe('AgentX-Taskmaster/0.1.0');
+      expect(headers['Editor-Version']).toBe('Helmsmith-Taskmaster/0.1.0');
       expect(headers['Openai-Intent']).toBe('conversation-panel');
 
       // Verify body

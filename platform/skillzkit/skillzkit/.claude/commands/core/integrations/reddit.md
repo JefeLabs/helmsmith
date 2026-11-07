@@ -398,7 +398,7 @@ documentationUrl: https://www.reddit.com/dev/api/
 notes: |
   User-Agent header is mandatory and must be unique per app.
   Format: <platform>:<app-name>:<version> (by /u/<username>)
-  Example: linux:agentx-skillzkit:v1.0.0 (by /u/jefelabs)
+  Example: linux:helmsmith-skillzkit:v1.0.0 (by /u/jefelabs)
 ```
 
 ## Credentials

@@ -9,7 +9,7 @@
  *     from pre-resolved bindings, runs runJob from harness-core, exits
  *
  * The auth boundary is sharp: this runtime has no FileBroker, no resolver,
- * no access to ~/.agentx/auth.json. It receives credentials only through
+ * no access to ~/.helmsmith/auth.json. It receives credentials only through
  * spec.bindings, which harness-server populated.
  *
  * v1 phase 1 (this slice): in-process exposure of `runHarnessPipeline(spec)`.

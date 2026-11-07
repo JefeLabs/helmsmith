@@ -133,5 +133,5 @@ the repo. `pritty init` scaffolds one. Common fields:
 }
 ```
 
-See `apps/pritty/README.md` in the agentx-toolbox repo for the full
+See `apps/pritty/README.md` in the helmsmith repo for the full
 config reference.

@@ -145,7 +145,7 @@ your decision.
 
 ## Programmatic API
 
-The library is the primary consumer surface. Other AgentX packages
+The library is the primary consumer surface. Other Helmsmith packages
 that have CLI dependencies use these functions at startup.
 
 ### `ensureTool(name, options?)`
@@ -246,7 +246,7 @@ Each entry knows:
 ### User catalog extensions
 
 Add tools toolz doesn't know about (or override built-in entries) via
-`~/.agentx/toolz/catalog.yaml`:
+`~/.helmsmith/toolz/catalog.yaml`:
 
 ```yaml
 tools:
@@ -269,7 +269,7 @@ User entries win over built-in entries by name.
 
 ### Storage location
 
-`~/.agentx/toolz/` by default. Contents:
+`~/.helmsmith/toolz/` by default. Contents:
 
 - `registry.yaml` — installed tools cache
 - `catalog.yaml` — user catalog extensions (optional)
@@ -278,10 +278,10 @@ User entries win over built-in entries by name.
 
 | Var | Purpose |
 |---|---|
-| `AGENTX_TOOLZ_DIR` | Override storage directory (used by tests + CI) |
+| `HELMSMITH_TOOLZ_DIR` | Override storage directory (used by tests + CI) |
 
-Tests use a unique `AGENTX_TOOLZ_DIR` per test run so the user's real
-`~/.agentx/toolz/` is never touched.
+Tests use a unique `HELMSMITH_TOOLZ_DIR` per test run so the user's real
+`~/.helmsmith/toolz/` is never touched.
 
 ## Multi-platform support
 
@@ -334,7 +334,7 @@ toolz install git jq fd ripgrep gh pandoc
 
 ```bash
 # Inside a project that depends on tools:
-grep -r "ensureTool\|ensureTools" node_modules/@agentx | sort -u
+grep -r "ensureTool\|ensureTools" node_modules/@helmsmith | sort -u
 ```
 
 Combined with `toolz list --catalog`, this shows you the full set of
@@ -342,7 +342,7 @@ tools your stack expects.
 
 ## Testing utilities
 
-`AGENTX_TOOLZ_DIR=<tmpdir>` makes toolz state-isolated for tests.
+`HELMSMITH_TOOLZ_DIR=<tmpdir>` makes toolz state-isolated for tests.
 Combined with the package-manager adapters (which can be mocked),
 you can write tests that exercise the full ensure logic without
 touching the real filesystem or running real installs.
@@ -352,7 +352,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 
 beforeEach(() => {
-  process.env.AGENTX_TOOLZ_DIR = mkdtempSync(`${tmpdir()}/toolz-test-`);
+  process.env.HELMSMITH_TOOLZ_DIR = mkdtempSync(`${tmpdir()}/toolz-test-`);
 });
 ```
 

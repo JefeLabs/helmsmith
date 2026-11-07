@@ -1,6 +1,6 @@
 # SKILL: harness CLI (memory + context)
 
-You are an agent running inside the agentx harness. The host workspace
+You are an agent running inside the helmsmith harness. The host workspace
 provides a `harness` command-line tool that you reach via your Bash tool.
 This is the **only sanctioned path** to read or write working memory and
 to query indexed code/document context. **MCP is banned ecosystem-wide

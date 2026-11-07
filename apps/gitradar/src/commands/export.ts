@@ -15,7 +15,7 @@ export async function exportWorkspace(): Promise<void> {
   const workspaces = getAvailableWorkspaces(registries);
 
   if (workspaces.length === 0) {
-    console.error('No workspaces found. Create ~/.agentx/repos.yml first.');
+    console.error('No workspaces found. Create ~/.helmsmith/repos.yml first.');
     process.exitCode = 1;
     return;
   }

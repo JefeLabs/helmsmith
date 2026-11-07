@@ -40,7 +40,7 @@ export interface ProductConfig {
   resources?: { memory?: string; cpu?: number };
   pipelines?: Array<{ id: string }>;
   /** Sources to ingest into the context graph for this product. Each
-   *  entry maps to one `harness context load` call (or one `agentx-load`
+   *  entry maps to one `harness context load` call (or one `helmsmith-load`
    *  invocation in standalone mode). When `harness context load
    *  --product <id>` is invoked, every entry here gets loaded in
    *  parallel; nodes/edges/vectors are tagged with this product's id

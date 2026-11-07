@@ -1,4 +1,4 @@
-# AgentX Taskmaster
+# Helmsmith Taskmaster
 
 CLI-based project task generator with complexity scoring and auto-decomposition.
 
@@ -15,22 +15,22 @@ npm run build
 npm link
 
 # Initialize a project
-agentx-taskmaster init --name my-project --no-interactive
+helmsmith-taskmaster init --name my-project --no-interactive
 
 # Parse an implementation plan
-agentx-taskmaster parse plan.md
+helmsmith-taskmaster parse plan.md
 
 # Score tasks by complexity
-agentx-taskmaster score --heuristic-only
+helmsmith-taskmaster score --heuristic-only
 
 # Expand high-complexity tasks into subtasks
-agentx-taskmaster expand-all
+helmsmith-taskmaster expand-all
 
 # View ready tasks
-agentx-taskmaster ready
+helmsmith-taskmaster ready
 
 # Get the next task to work on
-agentx-taskmaster next
+helmsmith-taskmaster next
 ```
 
 ## Features
@@ -101,7 +101,7 @@ npm run build
 
 ## Architecture
 
-State is stored under `~/.agentx-userdata/taskmaster/` with per-project directories containing `tasks.json`, `config.yaml`, and generated task files. The `AGENTX_USERDATA` environment variable overrides the base directory.
+State is stored under `~/.helmsmith-userdata/taskmaster/` with per-project directories containing `tasks.json`, `config.yaml`, and generated task files. The `HELMSMITH_USERDATA` environment variable overrides the base directory.
 
 ## License
 

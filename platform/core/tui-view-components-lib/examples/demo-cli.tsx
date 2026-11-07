@@ -886,7 +886,7 @@ function ConfirmOverview() {
         {open ? (
           <Confirm
             title="Delete configuration?"
-            message="This will remove ~/.agentx/myapp.yaml. Are you sure?"
+            message="This will remove ~/.helmsmith/myapp.yaml. Are you sure?"
             defaultAnswer="no"
             onConfirm={() => {
               setResult('yes');

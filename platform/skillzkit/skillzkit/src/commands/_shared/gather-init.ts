@@ -48,7 +48,8 @@ export async function gatherInitOptions(
   }
 
   const apiUrl = cli.apiUrl ?? (await prompt('API URL (e.g. https://skillz.example.com): ')).trim();
-  const apiKey = cli.apiKey ?? (await promptHidden('API key (from agentx-controlplane): ')).trim();
+  const apiKey =
+    cli.apiKey ?? (await promptHidden('API key (from helmsmith-controlplane): ')).trim();
   const pin = cli.pin ?? (await promptHidden('PIN (min 6 chars, used to encrypt key at rest): '));
 
   return { mode, email, apiUrl, apiKey, pin };

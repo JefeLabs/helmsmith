@@ -1,7 +1,7 @@
 {
   "name": "@helmsmith/gitradar",
   "version": "0.1.1",
-  "description": "Terminal-based TUI analytics tool for git contribution data. Part of the agentx-toolbox monorepo.",
+  "description": "Terminal-based TUI analytics tool for git contribution data. Part of the helmsmith monorepo.",
   "type": "module",
   "bin": {
     "gitradar": "bin/gitradar"
@@ -25,7 +25,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ecruz165/agentx-toolbox.git",
+    "url": "git+https://github.com/JefeLabs/helmsmith.git",
     "directory": "apps/gitradar"
   },
   "license": "UNLICENSED",

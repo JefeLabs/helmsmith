@@ -1,6 +1,6 @@
 /**
  * Bundled themes — always available in the picker. Apps can add more
- * via the `extraThemes` prop on `<AgentxThemeProvider>`.
+ * via the `extraThemes` prop on `<HelmsmithThemeProvider>`.
  */
 
 import type { Theme } from '../types.ts';

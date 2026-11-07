@@ -22,7 +22,7 @@ export function detectGitRoot(cwd?: string): string | null {
 
 /**
  * Returns the repo-local config home directory path.
- * e.g. {gitRoot}/.agentx/gittyup/
+ * e.g. {gitRoot}/.helmsmith/gittyup/
  */
 export function getRepoConfigHome(gitRoot: string): string {
   return join(gitRoot, CONFIG_PARENT_DIR, CONFIG_DIR_NAME);

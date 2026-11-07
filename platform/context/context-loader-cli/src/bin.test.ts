@@ -1,9 +1,9 @@
 /**
- * CLI shape tests for `agentx-load`.
+ * CLI shape tests for `helmsmith-load`.
  *
  * Spawns the bin script as a subprocess (so we exercise the same code
  * path users hit) and asserts on stdout/stderr/exit-code. Uses Bun
- * since `agentx-load`'s shebang is `#!/usr/bin/env bun`.
+ * since `helmsmith-load`'s shebang is `#!/usr/bin/env bun`.
  *
  * The end-to-end ingest path (chunker → backend → embedder) is covered
  * by `@helmsmith/context-loader-core`'s tests; this file is the CLI-shape
@@ -28,18 +28,18 @@ function run(args: string[]): { stdout: string; stderr: string; code: number } {
   };
 }
 
-describe('agentx-load CLI shape', () => {
+describe('helmsmith-load CLI shape', () => {
   it('--help prints usage and exits 0', () => {
     const r = run(['--help']);
     expect(r.code).toBe(0);
-    expect(r.stdout).toContain('agentx-load — load context sources');
+    expect(r.stdout).toContain('helmsmith-load — load context sources');
     expect(r.stdout).toContain('Usage:');
   });
 
   it('--version prints a version line', () => {
     const r = run(['--version']);
     expect(r.code).toBe(0);
-    expect(r.stdout).toMatch(/^agentx-load \d+\.\d+\.\d+/);
+    expect(r.stdout).toMatch(/^helmsmith-load \d+\.\d+\.\d+/);
   });
 
   it('types prints the catalog ids', () => {

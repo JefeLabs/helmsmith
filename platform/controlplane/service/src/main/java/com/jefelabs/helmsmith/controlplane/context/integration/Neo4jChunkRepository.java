@@ -13,7 +13,7 @@ import java.util.List;
 /**
  * Vector-search reader against the central Neo4j graph. Mirrors the schema
  * produced by {@code @helmsmith/context-loader-core} (the same chunker the
- * edge-context-server + Phase 4.3's agentx-load CLI populate from):
+ * edge-context-server + Phase 4.3's helmsmith-load CLI populate from):
  *
  * <ul>
  *   <li>{@code (:Chunk)} nodes with {@code text}, {@code sourceId},

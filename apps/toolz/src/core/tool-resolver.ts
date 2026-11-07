@@ -1,7 +1,7 @@
 /**
  * Map a canonical tool name to its platform-specific package name.
  * Looks at the merged catalog (built-in ∪ user extensions). User
- * extensions live at `~/.agentx/toolz/catalog.yaml` and override the
+ * extensions live at `~/.helmsmith/toolz/catalog.yaml` and override the
  * built-in for any same-name tool.
  */
 

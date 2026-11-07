@@ -9,11 +9,11 @@ A walkthrough of gittyup's features with practical examples.
 Start by initializing a workspace. Inside a git repo, you'll be asked where to store the config:
 
 ```
-$ agentx-gittyup init
+$ helmsmith-gittyup init
 
 ? Where should the config be stored?
-❯ Project  /home/user/myproject/.agentx/gittyup
-  Global   ~/.agentx/gittyup
+❯ Project  /home/user/myproject/.helmsmith/gittyup
+  Global   ~/.helmsmith/gittyup
 
 ? Install agent & command context files for an AI coding tool?
 ❯ Anthropic Claude Code
@@ -24,7 +24,7 @@ $ agentx-gittyup init
 ? Which agent roles to install?
 ◉ Release Coordinator — Orchestrates branch flow across repos
 
-✓ Created /home/user/myproject/.agentx/gittyup/gittyup.yaml
+✓ Created /home/user/myproject/.helmsmith/gittyup/gittyup.yaml
 ✓ Installed 7 context file(s):
     .claude/agents/gittyup-release-coordinator.md
     .claude/commands/ax/gittyup/compare.md
@@ -35,7 +35,7 @@ $ agentx-gittyup init
     .claude/commands/ax/gittyup/sync.md
 ```
 
-Outside a git repo, config defaults to `~/.agentx/gittyup/`.
+Outside a git repo, config defaults to `~/.helmsmith/gittyup/`.
 
 ---
 
@@ -44,7 +44,7 @@ Outside a git repo, config defaults to `~/.agentx/gittyup/`.
 Instead of manually adding repos one by one, scan a directory tree:
 
 ```
-$ agentx-gittyup find ~/projects --depth 3
+$ helmsmith-gittyup find ~/projects --depth 3
 
   Found 12 git repositories in 3 folder(s):
 
@@ -96,7 +96,7 @@ This means `gittyup merge dev staging` resolves to the correct branch names per 
 See branch states across all repos at a glance:
 
 ```
-$ agentx-gittyup status --fetch
+$ helmsmith-gittyup status --fetch
 
   frontend
   ┌──────────────┬──────────┬───────┬────────┬────────────┐
@@ -129,7 +129,7 @@ Use `--compact` for a condensed single-line-per-repo view.
 Before merging, compare branches to see what's changed:
 
 ```
-$ agentx-gittyup compare dev staging --fetch
+$ helmsmith-gittyup compare dev staging --fetch
 
   ⚡ Repos with conflicts (2)
 
@@ -160,7 +160,7 @@ Results are cached for 5 minutes. Use `-f` to force a fresh check.
 Merge a branch across all repos in a group:
 
 ```
-$ agentx-gittyup merge dev staging --group backend --push --pr
+$ helmsmith-gittyup merge dev staging --group backend --push --pr
 
   Merge Plan:
     api-gateway:  develop → staging
@@ -194,7 +194,7 @@ With `--ai auto`, all conflicts are resolved by AI without prompts. With `--ai s
 For hotfixes or selective promotion, cherry-pick specific commits:
 
 ```
-$ agentx-gittyup pick --group backend --source dev --target prod --interactive
+$ helmsmith-gittyup pick --group backend --source dev --target prod --interactive
 
   Select commits for api-gateway:
     ☐ a1b2c3d Fix: rate limiter bypass (2h ago)
@@ -218,7 +218,7 @@ You can also pass explicit SHAs: `--commits a1b2c3d e4f5g6h`.
 List open PRs across all repos:
 
 ```
-$ agentx-gittyup prs --group backend
+$ helmsmith-gittyup prs --group backend
 
   api-gateway (2 open)
     #45 Add rate limiting middleware (dev → staging) https://...
@@ -239,11 +239,11 @@ PRs are also shown inline during `compare` output.
 Repos can be tagged for cross-group filtering:
 
 ```
-$ agentx-gittyup repo tag --group backend --add api,critical
+$ helmsmith-gittyup repo tag --group backend --add api,critical
 ✓ Updated tags for 5 repo(s)
   Added: api, critical
 
-$ agentx-gittyup repo tags
+$ helmsmith-gittyup repo tags
   Tags:
     api (5 repos)
     critical (5 repos)
@@ -251,7 +251,7 @@ $ agentx-gittyup repo tags
     ui (4 repos)
 ```
 
-Interactive tagging is available via `agentx-gittyup repo tag` (no `--add/--remove` flags).
+Interactive tagging is available via `helmsmith-gittyup repo tag` (no `--add/--remove` flags).
 
 ---
 
@@ -260,7 +260,7 @@ Interactive tagging is available via `agentx-gittyup repo tag` (no `--add/--remo
 Gittyup supports three AI providers for conflict resolution. The CLI `auth login` command currently handles **GitHub Copilot** authentication via OAuth device flow:
 
 ```
-$ agentx-gittyup auth login
+$ helmsmith-gittyup auth login
 
   Visit: https://github.com/login/device
   Enter code: ABCD-1234
@@ -269,12 +269,12 @@ $ agentx-gittyup auth login
 ✓ Authenticated as @username
   Copilot token will be fetched on first AI call.
 
-$ agentx-gittyup auth status
+$ helmsmith-gittyup auth status
     GitHub Token: ✓ (source: auth.json)
-    Config: ~/.agentx/gittyup/auth.json
+    Config: ~/.helmsmith/gittyup/auth.json
     Copilot:      ✓ accessible
 
-$ agentx-gittyup auth models
+$ helmsmith-gittyup auth models
   Available Copilot Models (6):
     gpt-4o (128000/16384 tokens)
     gpt-4.1 (1000000/32768 tokens)
@@ -293,18 +293,18 @@ $ agentx-gittyup auth models
 The `compare` command caches results for 5 minutes to speed up repeated checks:
 
 ```
-$ agentx-gittyup compare dev staging
+$ helmsmith-gittyup compare dev staging
   ⚡ Cached result (45s ago, expires in 255s). Use -f to force refresh.
   ...
 
-$ agentx-gittyup compare dev staging -f   # Force fresh data
+$ helmsmith-gittyup compare dev staging -f   # Force fresh data
 ```
 
 Manage the cache directly:
 
 ```
-$ agentx-gittyup cache prune   # Remove expired entries
-$ agentx-gittyup cache clear   # Remove all entries
+$ helmsmith-gittyup cache prune   # Remove expired entries
+$ helmsmith-gittyup cache clear   # Remove all entries
 ```
 
 ---
@@ -335,13 +335,13 @@ Also supports GitHub Copilot (`.github/instructions/` + `.github/prompts/`) and 
 Every command prints the active config path at the end:
 
 ```
-$ agentx-gittyup status
+$ helmsmith-gittyup status
   ...
-  config: /home/user/myproject/.agentx/gittyup/gittyup.yaml [repo]
+  config: /home/user/myproject/.helmsmith/gittyup/gittyup.yaml [repo]
 
-$ agentx-gittyup prs
+$ helmsmith-gittyup prs
   ...
-  config: /home/user/.agentx/gittyup/gittyup.yaml [home]
+  config: /home/user/.helmsmith/gittyup/gittyup.yaml [home]
 ```
 
 The `[repo]` or `[home]` tag tells you whether you're using project-local or global config.
@@ -353,11 +353,11 @@ The `[repo]` or `[home]` tag tells you whether you're using project-local or glo
 Gittyup is built on a rebrandable foundation. The `branding.yaml` file at project root defines three primitives:
 
 ```yaml
-appGroupName: agentx
+appGroupName: helmsmith
 appGroupInitials: ax
 appName: gittyup
 ```
 
-Running `agentx-gittyup rebrand` updates all references across the codebase — CLI name, config paths, constants, package.json — making it possible to fork and rebrand the tool for a different suite. Use `--dry-run` to preview changes without writing.
+Running `helmsmith-gittyup rebrand` updates all references across the codebase — CLI name, config paths, constants, package.json — making it possible to fork and rebrand the tool for a different suite. Use `--dry-run` to preview changes without writing.
 
 > **Note:** The `rebrand` command is hidden from the CLI help output since it's a developer/fork workflow, not a day-to-day user command.

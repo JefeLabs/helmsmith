@@ -36,9 +36,9 @@ describe('GITRADAR_HOME override', () => {
     else process.env.GITRADAR_HOME = original;
   });
 
-  it('uses ~/.agentx/gitradar when GITRADAR_HOME is unset', () => {
+  it('uses ~/.helmsmith/gitradar when GITRADAR_HOME is unset', () => {
     delete process.env.GITRADAR_HOME;
-    expect(getConfigDir()).toBe(join(MOCK_HOME, '.agentx', 'gitradar'));
+    expect(getConfigDir()).toBe(join(MOCK_HOME, '.helmsmith', 'gitradar'));
   });
 
   it('redirects every path under GITRADAR_HOME when set (tests, sandboxes, CI)', () => {
@@ -50,7 +50,7 @@ describe('GITRADAR_HOME override', () => {
 
   it('ignores an empty GITRADAR_HOME', () => {
     process.env.GITRADAR_HOME = '';
-    expect(getConfigDir()).toBe(join(MOCK_HOME, '.agentx', 'gitradar'));
+    expect(getConfigDir()).toBe(join(MOCK_HOME, '.helmsmith', 'gitradar'));
   });
 });
 
@@ -85,20 +85,20 @@ describe('expandTilde', () => {
 // ── Path getters ────────────────────────────────────────────────────────────
 
 describe('getConfigDir', () => {
-  it('returns ~/.agentx/gitradar/', () => {
-    expect(getConfigDir()).toBe(join(MOCK_HOME, '.agentx', 'gitradar'));
+  it('returns ~/.helmsmith/gitradar/', () => {
+    expect(getConfigDir()).toBe(join(MOCK_HOME, '.helmsmith', 'gitradar'));
   });
 });
 
 describe('getDataDir', () => {
-  it('returns ~/.agentx/gitradar/data/', () => {
-    expect(getDataDir()).toBe(join(MOCK_HOME, '.agentx', 'gitradar', 'data'));
+  it('returns ~/.helmsmith/gitradar/data/', () => {
+    expect(getDataDir()).toBe(join(MOCK_HOME, '.helmsmith', 'gitradar', 'data'));
   });
 });
 
 describe('getConfigPath', () => {
-  it('returns ~/.agentx/gitradar/config.yml', () => {
-    expect(getConfigPath()).toBe(join(MOCK_HOME, '.agentx', 'gitradar', 'config.yml'));
+  it('returns ~/.helmsmith/gitradar/config.yml', () => {
+    expect(getConfigPath()).toBe(join(MOCK_HOME, '.helmsmith', 'gitradar', 'config.yml'));
   });
 });
 
@@ -111,7 +111,7 @@ describe('ensureDataDir', () => {
 
   it('creates the data directory recursively', async () => {
     await ensureDataDir();
-    expect(mkdir).toHaveBeenCalledWith(join(MOCK_HOME, '.agentx', 'gitradar', 'data'), {
+    expect(mkdir).toHaveBeenCalledWith(join(MOCK_HOME, '.helmsmith', 'gitradar', 'data'), {
       recursive: true,
     });
   });

@@ -16,7 +16,7 @@ onto the same underlying code.
                           │   └────┬─────┘   └────────┬─────────┘  │
                           │        │                  │            │
                           │   ┌────▼──────────────────▼──────────┐ │
-                          │   │   Local config (.agentx/...)     │ │
+                          │   │   Local config (.helmsmith/...)     │ │
                           │   │   + bundled catalog.json         │ │
                           │   └────────────────┬─────────────────┘ │
                           └────────────────────┼───────────────────┘
@@ -215,7 +215,7 @@ to going live.
 
 ### Local (per-user)
 
-Lives at `~/.agentx/skillzkit/config.json` (mode `0600`):
+Lives at `~/.helmsmith/skillzkit/config.json` (mode `0600`):
 
 ```json
 {
@@ -250,7 +250,7 @@ Selected entirely via environment variables:
 
 Provider credentials for the optional layer-3 review are resolved by
 the host's existing `CredentialBroker` configuration (typically
-`~/.agentx/auth.json` or controlplane's credential system) — not
+`~/.helmsmith/auth.json` or controlplane's credential system) — not
 duplicated in skillzkit's env.
 
 ## Security model
@@ -281,7 +281,7 @@ duplicated in skillzkit's env.
 
 ### Trust boundary
 
-skillzkit's API trusts API keys minted by `agentx-controlplane`. It
+skillzkit's API trusts API keys minted by `helmsmith-controlplane`. It
 does NOT issue keys, manage user identity, or store passwords. This
 keeps skillzkit's surface area small and lets the platform handle
 identity uniformly across services.

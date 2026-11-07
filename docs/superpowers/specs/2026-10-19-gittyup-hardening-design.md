@@ -31,7 +31,7 @@ Gittyup's manifest, dashboard, `find`, and tagging code work. The orchestration 
 
 10. **The Copilot login token is used for the GitHub API.** The device flow requests scope `read:user` (`src/auth/device-flow.ts:26`). `requireGitHubToken` prefers that token over `gh auth token` and `git credential fill`. After `auth login`, PR creation and private-repo listing use a token that can do neither. `GH_TOKEN` is documented in the README and honored only by `connect`.
 
-11. **Packaging omits what `init` needs, and the installed commands call a binary that does not exist.** `package.json#files` ships `bin`, `dist`, `branding.yaml`; `getContextDir` (`src/context/index.ts:68`) looks for `src/context`, which is not in the tarball. The bundled command files invoke `agentx-gittyup`; the bin is `gittyup`. The `codex` installer overwrites an existing `AGENTS.md` wholesale when it already contains the gittyup heading (`src/context/index.ts:280`).
+11. **Packaging omits what `init` needs, and the installed commands call a binary that does not exist.** `package.json#files` ships `bin`, `dist`, `branding.yaml`; `getContextDir` (`src/context/index.ts:68`) looks for `src/context`, which is not in the tarball. The bundled command files invoke `helmsmith-gittyup`; the bin is `gittyup`. The `codex` installer overwrites an existing `AGENTS.md` wholesale when it already contains the gittyup heading (`src/context/index.ts:280`).
 
 12. **Dashboards read stale or wrong refs.** `compare --fetch` fetches `origin/<b>` then inspects local `<b>`; `getBranchState` assumes the tracking remote is `origin` regardless of `repo.remote` (`git-operations.ts:36`); `getRepoOwner` truncates repo names containing a dot (`client.ts:126`); `getSideInfo` walks 9,999 commits per side per repo to compute a total that is not a diff.
 
@@ -207,7 +207,7 @@ The Copilot OAuth token is never offered to octokit. `GitHubClient.create()` use
 ## 4. Alternatives considered
 
 - **Finish the provider layer instead of deleting it.** Rejected for this spec: no caller exists, `auth login` only knows Copilot, and the migration trap is live today. Deletion is the smallest change that removes the hazard; a provider seam can return with a caller.
-- **Commit conflict markers on escalation vs. store the merge state out of band** (patch files under `~/.agentx/gittyup/escalations/`). Committing markers is the convention most teams already recognize (`git grep '<<<<<<<'`), survives machine changes, and makes `--pr` meaningful. Chosen.
+- **Commit conflict markers on escalation vs. store the merge state out of band** (patch files under `~/.helmsmith/gittyup/escalations/`). Committing markers is the convention most teams already recognize (`git grep '<<<<<<<'`), survives machine changes, and makes `--pr` meaningful. Chosen.
 - **Replay the AI's answer as a 3-way merge (`git merge-file`) instead of whole-file output.** More robust against the model truncating a long file, but the model would have to emit per-hunk resolutions aligned to git's hunks, which it cannot do reliably. Whole-file plus the gate and the diff-stat confirmation is chosen; a hunk-wise mode can follow.
 - **Keep `--pr` after a plain merge by opening a PR from target to prod.** That is a different workflow (promotion), already served by `pick`. Refusing with an explanation is honest; `--branch` gives the review workflow a real home.
 

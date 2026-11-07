@@ -117,7 +117,7 @@ Each tab's own letter (`C`, `R`, `P`, `K`, `M`) jumps straight to that tab from 
 
 ## Configuration
 
-GitRadar stores data in `~/.agentx/gitradar/`. Configuration is a single YAML file:
+GitRadar stores data in `~/.helmsmith/gitradar/`. Configuration is a single YAML file:
 
 Repos are managed through the workspace registry (`gitradar repo add`), never
 in `config.yml` — a `repos:` key here is ignored (with a warning) if present.
@@ -144,7 +144,7 @@ Lock files, `node_modules/`, `vendor/`, build output, snapshots, and other
 generated files are ignored out of the box; a commit that touches only ignored
 files is not counted at all. Add your own patterns with `ignore_patterns`
 (additive), or set `ignore_patterns_replace_defaults: true` to start from an
-empty list. `GITRADAR_HOME` relocates the whole `~/.agentx/gitradar` directory.
+empty list. `GITRADAR_HOME` relocates the whole `~/.helmsmith/gitradar` directory.
 
 Or skip the YAML and configure everything from the **Manage tab** in the TUI.
 

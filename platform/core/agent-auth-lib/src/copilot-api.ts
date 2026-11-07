@@ -19,7 +19,7 @@ const TOKEN_REFRESH_THRESHOLD_S = 5 * 60;
 
 const COPILOT_CLIENT_HEADERS = {
   'User-Agent': 'GithubCopilot/1.155.0',
-  'Editor-Version': 'agentx/0.0.0',
+  'Editor-Version': 'helmsmith/0.0.0',
   'Editor-Plugin-Version': 'copilot.vim/1.16.0',
   'Copilot-Integration-Id': 'vscode-chat',
   'Openai-Intent': 'conversation-panel',

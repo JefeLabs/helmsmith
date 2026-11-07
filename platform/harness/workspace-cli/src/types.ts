@@ -46,7 +46,7 @@ export interface ProcureSpec {
   /**
    * Command used to invoke skillzkit. Default: `npx -y @helmsmith/skillzkit`
    * (installs from GitHub Packages — user must be authenticated). Override
-   * for local-dev testing, e.g. `tsx /path/to/agentx-skillzkit/bin/cli.ts`
+   * for local-dev testing, e.g. `tsx /path/to/helmsmith-skillzkit/bin/cli.ts`
    * to run against an unpublished checkout.
    */
   skillzkitBin?: string;

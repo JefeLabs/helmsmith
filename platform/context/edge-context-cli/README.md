@@ -8,7 +8,7 @@ translator, kept as a peer package (not folded into the monolithic
 calls it dozens of times per task).
 
 This CLI + `edge-context-server` form a **self-contained unit** usable
-independently of the AgentX harness — which is why the agent-facing SKILLs
+independently of the Helmsmith harness — which is why the agent-facing SKILLs
 live here, with the CLI, rather than in the harness.
 
 ## Commands

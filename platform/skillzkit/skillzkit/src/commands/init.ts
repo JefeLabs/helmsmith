@@ -7,7 +7,7 @@ export interface InitCliOptions extends Partial<InitOptions> {
 }
 
 /**
- * First-run setup — creates ~/.agentx/skillzkit/config.json.
+ * First-run setup — creates ~/.helmsmith/skillzkit/config.json.
  * Interactive when called without args; pass flags to skip prompts.
  */
 export async function runInitCommand(options: InitCliOptions): Promise<void> {

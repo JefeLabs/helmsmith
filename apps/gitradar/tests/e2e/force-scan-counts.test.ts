@@ -29,9 +29,9 @@ describe('force-scan and author counts', () => {
       git(repo, ['add', '.']);
       git(repo, ['commit', '-q', '-m', `feat: ${i}`]);
     }
-    await mkdir(join(sb.home, '.agentx'), { recursive: true });
+    await mkdir(join(sb.home, '.helmsmith'), { recursive: true });
     await writeFile(
-      join(sb.home, '.agentx', 'repos.yml'),
+      join(sb.home, '.helmsmith', 'repos.yml'),
       [
         'workspaces:',
         '  t:',

@@ -63,7 +63,7 @@ export class MockReviewer implements ContributionReviewer {
  * Subset of the platform's `AgentAdapter` interface we depend on.
  * Re-declared locally rather than imported so this module compiles
  * even when `@helmsmith/agent-adapter` isn't installed (it's a
- * workspace link from agentx-platform that may be absent in some
+ * workspace link from helmsmith that may be absent in some
  * dev environments). At runtime, the caller passes a real
  * AgentAdapter instance — duck typing ensures compatibility. The shape
  * mirrors the new surface: `invoke(AgentInput) → AgentInvocationResult`

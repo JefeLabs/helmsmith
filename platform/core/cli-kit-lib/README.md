@@ -1,6 +1,6 @@
 # @helmsmith/cli-kit
 
-Shared CLI bootstrap for the AgentX ecosystem. Consumed by every
+Shared CLI bootstrap for the Helmsmith ecosystem. Consumed by every
 toolbox app (skillzkit, toolz, gitradar, pritty, taskmaster) and by
 platform CLIs (workspace-cli, harness-cli, harness-pipeline-cli,
 context-loader-cli, edge-context-cli, edge-memory-cli) — 11 CLIs in

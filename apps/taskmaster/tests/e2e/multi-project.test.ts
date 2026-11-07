@@ -7,7 +7,7 @@ describe('E2E: Multi-project isolation', () => {
 
   beforeEach(async () => {
     tempHome = await createTempHome();
-    env = { AGENTX_HOME: tempHome };
+    env = { HELMSMITH_HOME: tempHome };
   });
 
   afterEach(async () => {

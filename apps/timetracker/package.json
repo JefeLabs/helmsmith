@@ -1,7 +1,7 @@
 {
   "name": "@helmsmith/timetracker",
   "version": "0.1.1",
-  "description": "Admin-only Discord bot that tracks per-user daily activity (start/end of day, presence, CI submissions, channel engagement) with a TUI for daily/weekly summaries. Part of the agentx-toolbox monorepo.",
+  "description": "Admin-only Discord bot that tracks per-user daily activity (start/end of day, presence, CI submissions, channel engagement) with a TUI for daily/weekly summaries. Part of the helmsmith monorepo.",
   "type": "module",
   "bin": {
     "timetracker": "./bin/timetracker.mjs"
@@ -62,7 +62,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ecruz165/agentx-toolbox.git",
+    "url": "git+https://github.com/JefeLabs/helmsmith.git",
     "directory": "apps/timetracker"
   },
   "license": "UNLICENSED"

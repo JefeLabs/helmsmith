@@ -1,4 +1,4 @@
-=== agentx ops shell ===
+=== helmsmith ops shell ===
 
 The "dash" window has an interactive TUI in the left pane —
 auth status, intent submit, product picker. Use that for the
@@ -48,4 +48,4 @@ Inside the jobs viewer
   q          quit (window auto-closes)
 
 Tear-down
-  tmux kill-session -t agentx        # all server panes get SIGHUP
+  tmux kill-session -t helmsmith        # all server panes get SIGHUP

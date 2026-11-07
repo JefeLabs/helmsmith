@@ -2,34 +2,14 @@
  * Theme subsystem — public API.
  *
  * Pipeline: 16-color palette → semantic colors → typography +
- * components. `defineTheme()` runs the pipeline; `<AgentxThemeProvider>`
- * resolves files from `~/.agentx/theme/`; hooks consume the active
+ * components. `defineTheme()` runs the pipeline; `<HelmsmithThemeProvider>`
+ * resolves files from `~/.helmsmith/theme/`; hooks consume the active
  * theme.
  *
- * See `theme/README.md` (TODO) and the AGENTX_THEME_DIR docs for the
+ * See `theme/README.md` (TODO) and the HELMSMITH_THEME_DIR docs for the
  * full file-resolution model.
  */
 
-export type { AgentxThemeProviderProps } from './AgentxThemeProvider.tsx';
-// React provider
-export { AgentxThemeProvider } from './AgentxThemeProvider.tsx';
-export type {
-  AgentxLoadOptions,
-  AgentxLoadResult,
-  DiscoveredFile,
-  PersistAgentxThemeOptions,
-  WatchAgentxOptions,
-} from './agentx.ts';
-// AgentX file-resolution layer
-export {
-  agentxThemeDir,
-  DEFAULT_FILE_BASENAME,
-  findThemeFile,
-  listAgentxThemeFiles,
-  loadAgentxTheme,
-  persistAgentxTheme,
-  watchAgentxTheme,
-} from './agentx.ts';
 // File loading + base16
 export {
   applyOverride,
@@ -45,6 +25,26 @@ export {
 export type { ThemeContextValue } from './context.tsx';
 // Context (for advanced consumers building custom providers)
 export { ThemeContext } from './context.tsx';
+export type { HelmsmithThemeProviderProps } from './HelmsmithThemeProvider.tsx';
+// React provider
+export { HelmsmithThemeProvider } from './HelmsmithThemeProvider.tsx';
+export type {
+  DiscoveredFile,
+  HelmsmithLoadOptions,
+  HelmsmithLoadResult,
+  PersistHelmsmithThemeOptions,
+  WatchHelmsmithOptions,
+} from './helmsmith.ts';
+// Helmsmith file-resolution layer
+export {
+  DEFAULT_FILE_BASENAME,
+  findThemeFile,
+  helmsmithThemeDir,
+  listHelmsmithThemeFiles,
+  loadHelmsmithTheme,
+  persistHelmsmithTheme,
+  watchHelmsmithTheme,
+} from './helmsmith.ts';
 export type {
   KeyEvent,
   KeyMatcher,

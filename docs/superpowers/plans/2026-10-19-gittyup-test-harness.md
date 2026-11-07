@@ -4,7 +4,7 @@
 
 **Goal:** Give gittyup a declarative temp-git-repo fixture for unit tests and a subprocess e2e harness for the built CLI, so every later hardening slice can assert behavior against real git state.
 
-**Architecture:** A `makeRepo(spec)` helper under `src/test/` builds a throwaway repository from an ordered list of commits per branch, fully isolated from the developer's git config, and tracks what it created for a one-call cleanup. Under `tests/e2e/`, a `runCli` helper spawns `bin/gittyup.mjs` with `HOME`/`AGENTX_HOME` pointed at a temp directory and `cwd` at a temp workspace holding a `gittyup.yaml`, after a vitest global setup has built `dist/`. Unit and e2e run under separate vitest configs so `pnpm test` stays fast.
+**Architecture:** A `makeRepo(spec)` helper under `src/test/` builds a throwaway repository from an ordered list of commits per branch, fully isolated from the developer's git config, and tracks what it created for a one-call cleanup. Under `tests/e2e/`, a `runCli` helper spawns `bin/gittyup.mjs` with `HOME`/`HELMSMITH_HOME` pointed at a temp directory and `cwd` at a temp workspace holding a `gittyup.yaml`, after a vitest global setup has built `dist/`. Unit and e2e run under separate vitest configs so `pnpm test` stays fast.
 
 **Tech Stack:** vitest 5, simple-git 3, tsup 8, js-yaml 5, Node 24 (`node:fs/promises`, `node:child_process`). No new dependencies.
 
@@ -26,7 +26,7 @@
 2. A commit spec deletes a file (`null` value): the file is gone from the tree and the commit succeeds. Test: Task 1 "deletes a file when the value is null".
 3. A commit spec names a branch that does not exist yet and gives no `from`: the branch is cut from the current `HEAD`, not from `main`. Test: Task 1 "cuts a new branch from the current HEAD when from is omitted".
 4. A test forgets `cleanupFixtures()`: temp dirs leak under `tmpdir()`. The fixture module registers `afterEach(cleanupFixtures)` itself when vitest's `afterEach` is available, so a forgotten call still cleans. Test: Task 1 "cleans up registered repos" (asserts the directory is gone after `cleanupFixtures()`).
-5. The CLI is run with no `gittyup.yaml` in the temp workspace: it must not fall back to the developer's real `~/.agentx/gittyup/`. `HOME` is overridden in `runCli`. Test: Task 3 "does not read the developer's home config" asserts the printed `config:` path is under the temp dir.
+5. The CLI is run with no `gittyup.yaml` in the temp workspace: it must not fall back to the developer's real `~/.helmsmith/gittyup/`. `HOME` is overridden in `runCli`. Test: Task 3 "does not read the developer's home config" asserts the printed `config:` path is under the temp dir.
 
 ---
 
@@ -295,7 +295,7 @@ git commit -m "test(gittyup): split unit and e2e vitest configs, co-locate schem
 // tests/e2e/helpers.ts
 export interface CliResult { stdout: string; stderr: string; exitCode: number }
 export interface Workspace {
-  /** temp dir used as cwd and as HOME/AGENTX_HOME for the spawned CLI */
+  /** temp dir used as cwd and as HOME/HELMSMITH_HOME for the spawned CLI */
   dir: string;
   /** path of <dir>/gittyup.yaml */
   manifestPath: string;
@@ -307,7 +307,7 @@ export async function createWorkspace(manifest?: Record<string, unknown>): Promi
 export async function runCli(ws: Workspace, args: string[], opts?: { env?: Record<string, string>; timeoutMs?: number }): Promise<CliResult>;
 ```
 
-`runCli` spawns `node bin/gittyup.mjs <args>` (the real launcher, so the Bun re-exec path is exercised) with `cwd: ws.dir` and `env: { ...process.env, ...FIXTURE_GIT_ENV, HOME: ws.dir, AGENTX_HOME: ws.dir, GITHUB_TOKEN: '', GH_TOKEN: '', COPILOT_GITHUB_TOKEN: '', ...opts.env }`. It never throws on non-zero exit. `createWorkspace()` with no argument writes `{ workspace: '.', groups: {} }`. The temp dir is created with `mkdtemp(join(tmpdir(), 'gittyup-e2e-'))` and is not inside any git repository (asserted once in the smoke test, see below).
+`runCli` spawns `node bin/gittyup.mjs <args>` (the real launcher, so the Bun re-exec path is exercised) with `cwd: ws.dir` and `env: { ...process.env, ...FIXTURE_GIT_ENV, HOME: ws.dir, HELMSMITH_HOME: ws.dir, GITHUB_TOKEN: '', GH_TOKEN: '', COPILOT_GITHUB_TOKEN: '', ...opts.env }`. It never throws on non-zero exit. `createWorkspace()` with no argument writes `{ workspace: '.', groups: {} }`. The temp dir is created with `mkdtemp(join(tmpdir(), 'gittyup-e2e-'))` and is not inside any git repository (asserted once in the smoke test, see below).
 
 - [ ] **Step 1: Write `global-setup.ts`**
 
@@ -383,7 +383,7 @@ Expected: PASS, 4 tests. Also run `pnpm test` again: still 16 tests, no e2e file
 
 - [ ] **Step 6: Update `tests/e2e/README.md`**
 
-Replace the "Gittyup-specific notes" section with three bullets: isolation is `cwd` = temp workspace with `gittyup.yaml`, `HOME` and `AGENTX_HOME` = that dir, `FIXTURE_GIT_ENV` applied; repos come from `src/test/git-fixture.ts`; GitHub is never hit (tokens blanked), tests that need the API stub `fetch`.
+Replace the "Gittyup-specific notes" section with three bullets: isolation is `cwd` = temp workspace with `gittyup.yaml`, `HOME` and `HELMSMITH_HOME` = that dir, `FIXTURE_GIT_ENV` applied; repos come from `src/test/git-fixture.ts`; GitHub is never hit (tokens blanked), tests that need the API stub `fetch`.
 
 - [ ] **Step 7: Commit**
 

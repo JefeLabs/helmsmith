@@ -14,7 +14,7 @@ vi.mock('node:fs/promises', () => ({
 
 // Mock store/paths to control getConfigPath and expandTilde
 vi.mock('../store/paths.js', () => ({
-  getConfigPath: vi.fn(() => '/home/user/.agentx/gitradar/config.yml'),
+  getConfigPath: vi.fn(() => '/home/user/.helmsmith/gitradar/config.yml'),
   expandTilde: vi.fn((p: string) => {
     if (p === '~') return '/home/user';
     if (p.startsWith('~/')) return `/home/user/${p.slice(2)}`;
@@ -93,7 +93,10 @@ describe('loadConfig', () => {
 
       await loadConfig();
 
-      expect(mockReadFile).toHaveBeenCalledWith('/home/user/.agentx/gitradar/config.yml', 'utf-8');
+      expect(mockReadFile).toHaveBeenCalledWith(
+        '/home/user/.helmsmith/gitradar/config.yml',
+        'utf-8',
+      );
     });
 
     it('applies Zod defaults for optional fields', async () => {
@@ -190,7 +193,7 @@ settings:
   weeks_back: 8  # two months
 `;
 
-const CONFIG_PATH = '/home/user/.agentx/gitradar/config.yml';
+const CONFIG_PATH = '/home/user/.helmsmith/gitradar/config.yml';
 
 describe('loadConfig distinguishes missing from invalid (#113)', () => {
   it('throws ConfigNotFoundError for a missing file', async () => {

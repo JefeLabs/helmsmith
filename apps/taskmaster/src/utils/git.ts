@@ -22,7 +22,7 @@ export async function detectGitRoot(cwd?: string): Promise<string | null> {
 
 /**
  * Returns the repo-local taskmaster home directory path.
- * e.g. {gitRoot}/.agentx/taskmaster/
+ * e.g. {gitRoot}/.helmsmith/taskmaster/
  */
 export function getRepoTaskmasterHome(gitRoot: string): string {
   return join(gitRoot, CONFIG_PARENT_DIR, CONFIG_DIR_NAME);

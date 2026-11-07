@@ -6,7 +6,7 @@
  *
  *   1. Allocates a per-job UDS path under `.harness/run/`
  *   2. Listens on it for newline-delimited JSON
- *   3. Spawns `agentx-load` as a child process with --output-events-uds
+ *   3. Spawns `helmsmith-load` as a child process with --output-events-uds
  *      pointing at that path + JOB_ID in env
  *   4. Fans inbound events out to subscribers
  *   5. Resolves a completion promise when the child exits cleanly or
@@ -30,7 +30,7 @@ import { fileURLToPath } from 'node:url';
 export interface LoaderSpawnSpec {
   /** Job identifier — surfaces on every emitted event and on the UDS path. */
   jobId: string;
-  /** Path to ingest (passed as positional to agentx-load). */
+  /** Path to ingest (passed as positional to helmsmith-load). */
   target: string;
   /** Source type id (e.g., 'code-full', 'prose-markdown'). */
   type: string;
@@ -46,10 +46,10 @@ export interface LoaderSpawnSpec {
   output?: 'json' | 'progress' | 'silent';
   /** Workspace root — UDS path is allocated under `<root>/.harness/run/`. */
   workspaceRoot: string;
-  /** Override for the agentx-load executable. Defaults to the bin.ts under
+  /** Override for the helmsmith-load executable. Defaults to the bin.ts under
    *  packages/context-loader-cli (dev mode). Production builds set this to
    *  the path of the bundled binary. */
-  agentxLoadCommand?: { command: string; prefixArgs?: string[] };
+  helmsmithLoadCommand?: { command: string; prefixArgs?: string[] };
   /**
    * When set, spawn the loader inside its own tmux pane in this session +
    * window so each concurrent loader has a dedicated pane for raw stdout
@@ -62,7 +62,7 @@ export interface LoaderSpawnSpec {
    * this only when `process.env.TMUX` is present.
    */
   tmuxPane?: {
-    /** tmux session name, e.g. 'agentx'. */
+    /** tmux session name, e.g. 'helmsmith'. */
     session: string;
     /** Window name within the session. Created if missing. */
     window: string;
@@ -104,11 +104,11 @@ export interface LoaderJobHandle {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-/** Default location of agentx-load's bin.ts in the dev-tree. Resolves
+/** Default location of helmsmith-load's bin.ts in the dev-tree. Resolves
  *  relative to this file's location so it works under both ts-node and
- *  bun. Production builds inject `agentxLoadCommand` to point at a
+ *  bun. Production builds inject `helmsmithLoadCommand` to point at a
  *  bundled binary instead. */
-function defaultAgentxLoadCommand(): { command: string; prefixArgs: string[] } {
+function defaultHelmsmithLoadCommand(): { command: string; prefixArgs: string[] } {
   // harness/harness-server/src → context/context-loader-cli/src/bin.ts
   // (context-loader-cli lives in the context/ domain group, not harness/)
   const binPath = join(
@@ -229,7 +229,7 @@ export async function spawnLoaderJob(spec: LoaderSpawnSpec): Promise<LoaderJobHa
 
   // We pass JOB_ID so the CLI's argv-parsing path is satisfied — it
   // rejects --output-events-uds without it.
-  const cmd = spec.agentxLoadCommand ?? defaultAgentxLoadCommand();
+  const cmd = spec.helmsmithLoadCommand ?? defaultHelmsmithLoadCommand();
   const childArgs = [...(cmd.prefixArgs ?? []), ...buildArgs(spec, udsPath)];
   const childEnv = { ...process.env, JOB_ID: spec.jobId };
 

@@ -159,7 +159,7 @@ reinstalling — you decide).
 
 ## Path B — Programmatic integration
 
-If you're building another AgentX package (or any Node tool) that
+If you're building another Helmsmith package (or any Node tool) that
 needs CLI dependencies at runtime, integrate toolz programmatically.
 
 ### Install as a dependency
@@ -246,7 +246,7 @@ switch (status.source) {
 ## Customizing the catalog
 
 If you need a tool toolz doesn't know about (or want to override how
-toolz installs a tool), edit `~/.agentx/toolz/catalog.yaml`:
+toolz installs a tool), edit `~/.helmsmith/toolz/catalog.yaml`:
 
 ```yaml
 tools:
@@ -303,11 +303,11 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 
 beforeEach(() => {
-  process.env.AGENTX_TOOLZ_DIR = mkdtempSync(`${tmpdir()}/toolz-test-`);
+  process.env.HELMSMITH_TOOLZ_DIR = mkdtempSync(`${tmpdir()}/toolz-test-`);
 });
 
 afterEach(() => {
-  delete process.env.AGENTX_TOOLZ_DIR;
+  delete process.env.HELMSMITH_TOOLZ_DIR;
 });
 ```
 
@@ -334,7 +334,7 @@ toolz check jq           # toolz will find + register it
 
 The catalog doesn't know about tool X. Either:
 
-1. Add it to `~/.agentx/toolz/catalog.yaml`:
+1. Add it to `~/.helmsmith/toolz/catalog.yaml`:
 
 ```yaml
 tools:
@@ -359,7 +359,7 @@ toolz doctor
 ### Reset everything
 
 ```bash
-rm -rf ~/.agentx/toolz/
+rm -rf ~/.helmsmith/toolz/
 ```
 
 Next `toolz check` or `toolz install` recreates the directory.

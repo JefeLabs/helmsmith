@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/dev-tmux.sh — launch the agentx ops dashboard in tmux.
+# scripts/dev-tmux.sh — launch the helmsmith ops dashboard in tmux.
 #
 # Layout (single window "dash"):
 #   ┌───────────────────────┬──────────────────────┐
@@ -13,16 +13,16 @@
 #   │  free-form commands   │                      │
 #   └───────────────────────┴──────────────────────┘
 #
-# Shell pane height: AGENTX_SHELL_LINES (default 12).
+# Shell pane height: HELMSMITH_SHELL_LINES (default 12).
 #
 # Idempotent: if the session exists, attach to it instead of recreating.
-# Override the session name with AGENTX_TMUX_SESSION=foo scripts/dev-tmux.sh.
+# Override the session name with HELMSMITH_TMUX_SESSION=foo scripts/dev-tmux.sh.
 # Tear down with `pnpm tmux:down` (sends SIGHUP to all panes; main.ts handles it).
 
 set -euo pipefail
 
-SESSION="${AGENTX_TMUX_SESSION:-agentx}"
-SHELL_LINES="${AGENTX_SHELL_LINES:-12}"
+SESSION="${HELMSMITH_TMUX_SESSION:-helmsmith}"
+SHELL_LINES="${HELMSMITH_SHELL_LINES:-12}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 RUN_DIR="$WS_ROOT/.harness/run"
@@ -83,7 +83,7 @@ tmux select-layout -t "${SESSION}:dash" main-vertical
 # pane indexes after layout reshuffles.
 SHELL_PANE=$(tmux split-window -v -l "$SHELL_LINES" -t "${SESSION}:dash.0" -c "$WS_ROOT" -P -F '#{pane_id}')
 tmux send-keys -t "$SHELL_PANE" \
-  "clear && echo 'agentx ops shell — pnpm harness <verb>  |  pnpm dev:*  |  cat scripts/dev-tmux-hints.txt'" C-m
+  "clear && echo 'helmsmith ops shell — pnpm harness <verb>  |  pnpm dev:*  |  cat scripts/dev-tmux-hints.txt'" C-m
 
 # Optional second window — plain shell that opens with the cheat sheet visible.
 tmux new-window -t "$SESSION" -n hints -c "$WS_ROOT"

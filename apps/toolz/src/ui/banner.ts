@@ -8,7 +8,7 @@ import { dim, heading } from './symbols.js';
 
 export function printBanner(version: string): void {
   console.log(heading(`🔧 ToolZ ${version}`));
-  console.log(dim('Cross-platform tool manager for the AgentX ecosystem'));
+  console.log(dim('Cross-platform tool manager for the Helmsmith ecosystem'));
   console.log('');
   console.log('Common commands:');
   console.log(dim('  toolz check <tool>      Is it installed? At what version?'));

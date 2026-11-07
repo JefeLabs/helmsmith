@@ -54,9 +54,9 @@ describe('incremental scan after a late merge', () => {
     git(dev, ['push', '-q', 'origin', 'main']);
     clone = await sb.mkdir('clone');
     git(clone, ['clone', '-q', origin, '.']);
-    await mkdir(join(sb.home, '.agentx'), { recursive: true });
+    await mkdir(join(sb.home, '.helmsmith'), { recursive: true });
     await writeFile(
-      join(sb.home, '.agentx', 'repos.yml'),
+      join(sb.home, '.helmsmith', 'repos.yml'),
       [
         'workspaces:',
         '  t:',

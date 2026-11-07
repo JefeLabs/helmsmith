@@ -182,7 +182,7 @@ describe('UDS job-mode event stream', () => {
     const collector = await startUdsCollector();
     try {
       // Race condition we have to work around: a fast machine can finish
-      // ingesting the whole agentx repo in ~170ms with the mock embedder.
+      // ingesting the whole helmsmith repo in ~170ms with the mock embedder.
       // To guarantee SIGTERM lands mid-flight, target a huge directory tree
       // (`/`) that the matcher will never finish walking, and signal as
       // soon as we know the child is up. The matcher excludes most of /

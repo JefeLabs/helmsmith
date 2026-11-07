@@ -13,9 +13,9 @@ src/index.ts (this package — canonical, hand-authored TS)
     ▼
 apps/skillzkit/schema/catalog.schema.json (generated, checked in)
     │
-    │ jsonschema2pojo  (in agentx-platform CI)
+    │ jsonschema2pojo  (in helmsmith CI)
     ▼
-Java POJOs in agentx-platform's catalog backend service
+Java POJOs in helmsmith's catalog backend service
 ```
 
 Why TS-first:
@@ -30,7 +30,7 @@ Why TS-first:
   the TS types and the JSON Schema fall out of it.
 
 The generated `catalog.schema.json` is checked into the repo so
-agentx-platform's Java side can read it without depending on this
+helmsmith's Java side can read it without depending on this
 TypeScript package.
 
 ## Workflow
@@ -44,7 +44,7 @@ When the catalog shape changes:
 3. Commit both files together.
 4. CI runs `npm run verify:schema` — fails the PR if the checked-in
    schema is out of sync with the TS source.
-5. Once merged, agentx-platform's Java codegen picks up the new
+5. Once merged, helmsmith's Java codegen picks up the new
    schema (via git submodule, CI fetch, or manual sync).
 
 ## JSDoc tag reference

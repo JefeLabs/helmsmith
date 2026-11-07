@@ -105,7 +105,7 @@ program
 program
   .command('init')
   .description(
-    'First-run setup — creates ~/.agentx/skillzkit/config.json. Interactive when called without args; pass flags to skip prompts.',
+    'First-run setup — creates ~/.helmsmith/skillzkit/config.json. Interactive when called without args; pass flags to skip prompts.',
   )
   .option('--mode <mode>', 'standalone | team')
   .option(
@@ -113,7 +113,7 @@ program
     'Your email (required, used for local artifact attribution and team-mode identity)',
   )
   .option('--api-url <url>', 'Team mode: skillzkit API base URL')
-  .option('--api-key <key>', 'Team mode: API key from agentx-controlplane')
+  .option('--api-key <key>', 'Team mode: API key from helmsmith-controlplane')
   .option('--pin <pin>', 'Team mode: PIN that encrypts the API key at rest (min 6 chars)')
   .option('--force', 'Overwrite an existing config')
   .action(

@@ -198,7 +198,7 @@
                   "type": "text",
                   "id": "P6SeS",
                   "fill": "$muted-foreground",
-                  "content": "Path: ~/.agentx/repos.yml",
+                  "content": "Path: ~/.helmsmith/repos.yml",
                   "fontFamily": "JetBrains Mono",
                   "fontSize": 13,
                   "fontWeight": "normal"
@@ -245,7 +245,7 @@
                           "type": "text",
                           "id": "Mjx9d",
                           "fill": "$foreground",
-                          "content": "agentx-gitradar",
+                          "content": "helmsmith-gitradar",
                           "fontFamily": "Inter",
                           "fontSize": 13,
                           "fontWeight": "normal"
@@ -254,7 +254,7 @@
                           "type": "text",
                           "id": "tdzif",
                           "fill": "$muted-foreground",
-                          "content": "~/Development/Workspaces/ecruz165/agentx-gitradar",
+                          "content": "~/Development/Workspaces/ecruz165/helmsmith-gitradar",
                           "fontFamily": "JetBrains Mono",
                           "fontSize": 12,
                           "fontWeight": "normal"

@@ -50,9 +50,9 @@ Quit with `q`. The synthetic data isn't persisted; you can re-run
 gitradar init
 ```
 
-This creates `~/.agentx/gitradar/` with:
+This creates `~/.helmsmith/gitradar/` with:
 
-- `config.yml` — your workspace's orgs, teams, members, and settings (repos are registered separately with `gitradar repo add`, in `~/.agentx/repos.yml`)
+- `config.yml` — your workspace's orgs, teams, members, and settings (repos are registered separately with `gitradar repo add`, in `~/.helmsmith/repos.yml`)
 - A SQLite database for storing scan results
 
 Multiple workspaces are supported (e.g., one for personal repos, one
@@ -238,7 +238,7 @@ the most platform work, separately from feature output.
 
 By default, gitradar's classification rules cover most JavaScript /
 TypeScript / Python projects out of the box. To customize for unusual
-project layouts, edit `~/.agentx/gitradar/config.yml` under the
+project layouts, edit `~/.helmsmith/gitradar/config.yml` under the
 `classification` section (see [architecture.md](architecture.md) for
 the rule format).
 
@@ -316,7 +316,7 @@ plain-text or JSON output.
 ### Reset everything
 
 ```bash
-rm -rf ~/.agentx/gitradar/
+rm -rf ~/.helmsmith/gitradar/
 gitradar init                            # fresh setup
 ```
 

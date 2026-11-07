@@ -1,9 +1,11 @@
 import { existsSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { CONFIG_PARENT_DIR } from '../config/branding.js';
+import { CONFIG_DIR_NAME, CONFIG_PARENT_DIR } from '../config/branding.js';
 
-const GITIGNORE_ENTRY = `${CONFIG_PARENT_DIR}/`;
+// Only taskmaster's own subdirectory: other tools share the parent dir, and
+// workbrokr's .helmsmith/hooks must stay committable.
+export const GITIGNORE_ENTRY = `${CONFIG_PARENT_DIR}/${CONFIG_DIR_NAME}/`;
 
 /**
  * Ensure .gitignore contains an entry for the config directory.

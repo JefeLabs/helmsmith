@@ -17,7 +17,7 @@ import org.springframework.context.annotation.Configuration;
  * even when neo4j compose isn't running; only Phase 4.2's query
  * exercises the connection.
  *
- * <p>Connection details come from {@code agentx.neo4j.*} in
+ * <p>Connection details come from {@code helmsmith.neo4j.*} in
  * {@code application.yml}, defaulting to the compose service.
  */
 @Configuration
@@ -30,9 +30,9 @@ public class Neo4jConfig {
     private final String password;
 
     public Neo4jConfig(
-        @Value("${agentx.neo4j.uri:bolt://localhost:7687}") String uri,
-        @Value("${agentx.neo4j.user:neo4j}") String user,
-        @Value("${agentx.neo4j.password:controlplane}") String password
+        @Value("${helmsmith.neo4j.uri:bolt://localhost:7687}") String uri,
+        @Value("${helmsmith.neo4j.user:neo4j}") String user,
+        @Value("${helmsmith.neo4j.password:controlplane}") String password
     ) {
         this.uri = uri;
         this.user = user;

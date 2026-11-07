@@ -25,6 +25,6 @@ describe('gitradar --demo', () => {
     expect(existsSync(join(sb.gitradarHome, 'config.yml'))).toBe(false);
     // Nothing created under the sandbox HOME except what the launcher itself needs.
     const home = await readdir(sb.home);
-    expect(home.filter((f) => f === '.agentx')).toEqual([]);
+    expect(home.filter((f) => f === '.helmsmith')).toEqual([]);
   });
 });

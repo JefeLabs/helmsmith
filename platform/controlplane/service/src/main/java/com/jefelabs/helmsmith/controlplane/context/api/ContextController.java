@@ -89,7 +89,7 @@ public class ContextController {
 
     /**
      * Trigger an ingestion run. Returns the ingestion_jobs record (status=pending);
-     * the agentx-load CLI runs asynchronously on a virtual thread, status updates
+     * the helmsmith-load CLI runs asynchronously on a virtual thread, status updates
      * as events arrive. Poll {@code GET /sources/{id}/ingestions} for progress.
      */
     @PostMapping("/sources/{id}/refresh")

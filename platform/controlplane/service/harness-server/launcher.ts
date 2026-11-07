@@ -20,9 +20,9 @@
  * Configuration via env:
  *   HARNESS_SOCKET           — output UDS path (default /run/harness/harness.sock)
  *   EDGE_SOCKETS_DIR         — edge-context + edge-memory UDS dir (default /run/edge)
- *   AGENTX_EMBEDDER_URL      — passed through to harness-core if it needs query
- *   AGENTX_EMBEDDER_MODEL
- *   AGENTX_EMBEDDER_DIMENSION
+ *   HELMSMITH_EMBEDDER_URL      — passed through to harness-core if it needs query
+ *   HELMSMITH_EMBEDDER_MODEL
+ *   HELMSMITH_EMBEDDER_DIMENSION
  */
 
 import { mkdirSync, rmSync } from 'node:fs';
@@ -58,7 +58,7 @@ const controlplaneUrl = (process.env.CONTROLPLANE_URL ?? 'http://controlplane:80
   /\/+$/,
   '',
 );
-const orgId = process.env.AGENTX_ORG_ID ?? 'dev-org';
+const orgId = process.env.HELMSMITH_ORG_ID ?? 'dev-org';
 
 async function fetchJson<T>(path: string): Promise<T> {
   const res = await fetch(`${controlplaneUrl}${path}`, {

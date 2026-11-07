@@ -112,7 +112,7 @@ export interface SearchQuery {
 /**
  * Auth context attached to a contribution. The API key (validated by
  * middleware) maps to a stable AuthorIdentity issued by
- * agentx-controlplane. Stored on each artifact so author-match update
+ * helmsmith-controlplane. Stored on each artifact so author-match update
  * checks have something to compare against.
  */
 export interface AuthorIdentity {

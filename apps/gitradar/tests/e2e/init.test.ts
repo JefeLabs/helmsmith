@@ -16,7 +16,7 @@ describe('gitradar init', () => {
     expect(r.stderr).toBe('');
     expect(r.exitCode).toBe(0);
     await expect(access(join(sb.gitradarHome, 'config.yml'))).resolves.toBeUndefined();
-    await expect(access(join(sb.home, '.agentx', 'repos.yml'))).resolves.toBeUndefined();
+    await expect(access(join(sb.home, '.helmsmith', 'repos.yml'))).resolves.toBeUndefined();
     expect(r.stdout).toContain('Initialized');
   });
 

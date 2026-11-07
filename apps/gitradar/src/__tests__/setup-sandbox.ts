@@ -6,7 +6,7 @@ import { afterAll } from 'vitest';
 /**
  * Vitest setup file: every test file runs with HOME and GITRADAR_HOME pointed
  * at a throwaway directory, so no test can write into the developer's real
- * ~/.agentx by omission (#74). Tests that need "no override" delete
+ * ~/.helmsmith by omission (#74). Tests that need "no override" delete
  * GITRADAR_HOME themselves; HOME stays sandboxed either way.
  */
 const home = mkdtempSync(join(tmpdir(), 'gitradar-unit-'));

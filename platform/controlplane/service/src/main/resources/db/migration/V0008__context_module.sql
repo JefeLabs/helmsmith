@@ -3,7 +3,7 @@
 --
 -- Phase 4.1 lands the schema only — the actual chunked content lives in
 -- Neo4j (a sibling container, not Postgres) and the ingestion subprocess
--- (agentx-load CLI) lands in Phase 4.3. This migration just captures
+-- (helmsmith-load CLI) lands in Phase 4.3. This migration just captures
 -- WHICH sources exist, when they last refreshed, and who's allowed to
 -- query them.
 

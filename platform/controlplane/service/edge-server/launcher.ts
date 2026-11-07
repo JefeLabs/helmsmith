@@ -12,9 +12,9 @@
  *   EDGE_NEO4J_URL     — bolt URL for the in-container neo4j (default bolt://localhost:7687)
  *   EDGE_NEO4J_USER    — default 'neo4j'
  *   EDGE_NEO4J_PASSWORD
- *   AGENTX_EMBEDDER_URL    — OpenAI-compat /v1 root (injected by Model Runner attachment)
- *   AGENTX_EMBEDDER_MODEL  — e.g. ai/qwen3-embedding:0.6B-F16
- *   AGENTX_EMBEDDER_DIMENSION — e.g. 1024
+ *   HELMSMITH_EMBEDDER_URL    — OpenAI-compat /v1 root (injected by Model Runner attachment)
+ *   HELMSMITH_EMBEDDER_MODEL  — e.g. ai/qwen3-embedding:0.6B-F16
+ *   HELMSMITH_EMBEDDER_DIMENSION — e.g. 1024
  *
  * If the embedder env vars are missing, edge-context's query falls back
  * to echo mode (no real vector search) — matches the existing
@@ -44,16 +44,16 @@ const contextSocket = join(sockDir, 'context.sock');
 let queryService: ContextQueryService | undefined;
 const neoUrl = process.env.EDGE_NEO4J_URL ?? 'bolt://localhost:7687';
 const neoPassword = process.env.EDGE_NEO4J_PASSWORD;
-const embedderUrl = process.env.AGENTX_EMBEDDER_URL;
+const embedderUrl = process.env.HELMSMITH_EMBEDDER_URL;
 if (neoPassword && embedderUrl) {
   queryService = new ContextQueryService({
     neo4jUrl: neoUrl,
     neo4jUser: process.env.EDGE_NEO4J_USER ?? 'neo4j',
     neo4jPassword: neoPassword,
     embedderUrl,
-    embedderModel: process.env.AGENTX_EMBEDDER_MODEL ?? 'ai/qwen3-embedding:0.6B-F16',
-    embedderDim: process.env.AGENTX_EMBEDDER_DIMENSION
-      ? Number(process.env.AGENTX_EMBEDDER_DIMENSION)
+    embedderModel: process.env.HELMSMITH_EMBEDDER_MODEL ?? 'ai/qwen3-embedding:0.6B-F16',
+    embedderDim: process.env.HELMSMITH_EMBEDDER_DIMENSION
+      ? Number(process.env.HELMSMITH_EMBEDDER_DIMENSION)
       : 1024,
   });
 }

@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Stage the harness CLIs so agents can call `harness …` and the pipeline
 # entrypoint `harness-pipeline …` (which launches OpenCode against the
 # mounted worktree). Package names are `@helmsmith/*` per the workspace.
-WORKDIR /opt/agentx
+WORKDIR /opt/helmsmith
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY tsconfig.base.json tsconfig.json ./
 
@@ -44,13 +44,13 @@ COPY packages/harness-cli ./packages/harness-cli
 COPY packages/harness-pipeline-cli ./packages/harness-pipeline-cli
 
 # Wrapper script so `harness …` works inside the container.
-RUN printf '#!/bin/sh\nexec pnpm --silent --filter @helmsmith/harness exec tsx /opt/agentx/packages/harness-cli/src/index.ts "$@"\n' > /usr/local/bin/harness \
+RUN printf '#!/bin/sh\nexec pnpm --silent --filter @helmsmith/harness exec tsx /opt/helmsmith/packages/harness-cli/src/index.ts "$@"\n' > /usr/local/bin/harness \
     && chmod 0755 /usr/local/bin/harness
 
 # Wrapper script so `harness-pipeline …` works inside the container —
 # this is what spawn-worker.ts invokes via `devcontainer exec harness-pipeline`
 # to launch OpenCode CLI against the mounted worktree.
-RUN printf '#!/bin/sh\nexec pnpm --silent --filter @helmsmith/harness-pipeline exec tsx /opt/agentx/packages/harness-pipeline-cli/src/bin.ts "$@"\n' > /usr/local/bin/harness-pipeline \
+RUN printf '#!/bin/sh\nexec pnpm --silent --filter @helmsmith/harness-pipeline exec tsx /opt/helmsmith/packages/harness-pipeline-cli/src/bin.ts "$@"\n' > /usr/local/bin/harness-pipeline \
     && chmod 0755 /usr/local/bin/harness-pipeline
 
 # Worktrees mount under /workspace/<repoName>/ (per F19 — synthetic monorepo).

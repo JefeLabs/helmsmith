@@ -35,7 +35,7 @@ export interface Sandbox {
 
 /**
  * Create an isolated sandbox: a temp HOME plus a GITRADAR_HOME under it.
- * The CLI's registry lives at `$HOME/.agentx/repos.yml` (see #75), so both
+ * The CLI's registry lives at `$HOME/.helmsmith/repos.yml` (see #75), so both
  * must point into the sandbox for a run to leave the developer's store alone.
  */
 export async function createSandbox(): Promise<Sandbox> {

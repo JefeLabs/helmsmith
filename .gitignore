@@ -55,7 +55,7 @@ catalog.json
 .env.local
 .env.*.local
 
-# Per-user host-side files (auth.json lives at ~/.agentx/auth.json, never in
+# Per-user host-side files (auth.json lives at ~/.helmsmith/auth.json, never in
 # repo — guard against filling in the template's example in place)
 /workspace-template/auth.json
 

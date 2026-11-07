@@ -14,8 +14,8 @@ import {
 } from './registry.js';
 
 /**
- * Tests use AGENTX_TOOLZ_DIR to redirect the registry path to a tmp
- * dir per test. Avoids polluting the developer's real ~/.agentx/toolz/
+ * Tests use HELMSMITH_TOOLZ_DIR to redirect the registry path to a tmp
+ * dir per test. Avoids polluting the developer's real ~/.helmsmith/toolz/
  * and lets each test see a clean state.
  */
 
@@ -24,11 +24,11 @@ describe('registry CRUD', () => {
 
   beforeEach(() => {
     tmp = mkdtempSync(join(tmpdir(), 'toolz-test-'));
-    process.env.AGENTX_TOOLZ_DIR = tmp;
+    process.env.HELMSMITH_TOOLZ_DIR = tmp;
   });
 
   afterEach(() => {
-    delete process.env.AGENTX_TOOLZ_DIR;
+    delete process.env.HELMSMITH_TOOLZ_DIR;
     rmSync(tmp, { recursive: true, force: true });
   });
 

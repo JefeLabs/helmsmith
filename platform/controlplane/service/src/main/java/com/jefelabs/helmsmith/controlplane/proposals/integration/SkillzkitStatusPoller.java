@@ -26,15 +26,15 @@ import java.util.List;
  * batch, with each row's exception isolated so a single bad row
  * doesn't kill the whole tick.
  *
- * <p>Disable via {@code agentx.skillzkit.poller.enabled=false} (tests,
+ * <p>Disable via {@code helmsmith.skillzkit.poller.enabled=false} (tests,
  * profiles without skillzkit reachable). When enabled but the client
- * itself is unconfigured ({@code agentx.skillzkit.url} is empty),
+ * itself is unconfigured ({@code helmsmith.skillzkit.url} is empty),
  * {@link #poll} early-returns — there's nothing to fetch and no
  * harm in skipping.
  */
 @Component
 @ConditionalOnProperty(
-    name = "agentx.skillzkit.poller.enabled",
+    name = "helmsmith.skillzkit.poller.enabled",
     havingValue = "true",
     matchIfMissing = true
 )
@@ -71,14 +71,14 @@ public class SkillzkitStatusPoller {
      * Default poll interval is 60s — fast enough to reflect skillzkit
      * decisions in the admin UI without user friction; slow enough
      * that an idle controlplane doesn't hammer skillzkit. Tunable via
-     * {@code agentx.skillzkit.poller.fixed-delay-ms}.
+     * {@code helmsmith.skillzkit.poller.fixed-delay-ms}.
      *
      * <p>Uses {@code fixedDelay} (not {@code fixedRate}) so a slow
      * skillzkit response can't queue a second tick on top of an
      * already-running one — each tick starts after the previous
      * completes.
      */
-    @Scheduled(fixedDelayString = "${agentx.skillzkit.poller.fixed-delay-ms:60000}")
+    @Scheduled(fixedDelayString = "${helmsmith.skillzkit.poller.fixed-delay-ms:60000}")
     public void poll() {
         if (!client.isConfigured()) return;
 

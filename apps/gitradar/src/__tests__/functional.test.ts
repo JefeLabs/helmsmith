@@ -8,7 +8,7 @@
  *   setup → scan (engine) → verify SQLite state → assign authors →
  *   queryRollup aggregation → contributions / leaderboard / repo-activity (SQL path)
  *
- * Uses a temp directory for SQLite so the user's real ~/.agentx is untouched.
+ * Uses a temp directory for SQLite so the user's real ~/.helmsmith is untouched.
  * Scans are limited to 4 weeks to keep the test fast.
  */
 
@@ -186,11 +186,11 @@ afterAll(async () => {
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 async function setupTempTree() {
-  const gitradarDir = join(tempHome, '.agentx', 'gitradar');
+  const gitradarDir = join(tempHome, '.helmsmith', 'gitradar');
   await mkdir(gitradarDir, { recursive: true });
 
   configPath = join(gitradarDir, 'config.yml');
-  reposRegistryPath = join(tempHome, '.agentx', 'repos.yml');
+  reposRegistryPath = join(tempHome, '.helmsmith', 'repos.yml');
 
   await writeFile(configPath, 'orgs: []\n', 'utf-8');
 

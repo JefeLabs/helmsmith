@@ -232,7 +232,7 @@ export interface HarnessServerOptions {
   /**
    * Workspace root on disk — used by the container path (slice 9d) to
    * compute worktree + spec.json mount paths. Defaults to
-   * `process.cwd()`. Required for `AGENTX_USE_CONTAINER=1` since
+   * `process.cwd()`. Required for `HELMSMITH_USE_CONTAINER=1` since
    * spawnWorker needs a real workspace dir.
    */
   workspaceRoot?: string;
@@ -1000,7 +1000,7 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: ServerCtx) {
       return;
     }
 
-    // POST /v1/loader-jobs — spawn an agentx-load worker, register it as
+    // POST /v1/loader-jobs — spawn a helmsmith-load worker, register it as
     // a JobRecord, bridge its events onto the JobBus as 'loader-event'
     // adapter envelopes. Once registered, jobs-tui sees the loader in
     // GET /v1/jobs and the SSE stream picks up its progress envelopes.
@@ -1094,7 +1094,7 @@ function emitJobStatusToControlplane(jobId: string, status: string, failureReaso
 function controlplaneHeaders(): Record<string, string> {
   return {
     'Content-Type': 'application/json',
-    'X-Org-Id': process.env.AGENTX_ORG_ID ?? 'dev-org',
+    'X-Org-Id': process.env.HELMSMITH_ORG_ID ?? 'dev-org',
     'X-User-Id': 'harness-server',
   };
 }
@@ -1220,7 +1220,7 @@ async function handleSubmitJob(
   // container per job) and bypass the dispatcher. Only deny here when
   // we're certain we'd hit the dispatcher AND it'd reject.
   const willUseContainer =
-    process.env.AGENTX_USE_CONTAINER === '1' &&
+    process.env.HELMSMITH_USE_CONTAINER === '1' &&
     ctx.resolver !== undefined &&
     hasContainerRepos(body, job, ctx);
   if (ctx.broker && !willUseContainer) {
@@ -1262,7 +1262,7 @@ async function handleSubmitJob(
   // Without a broker we have no way to authenticate adapter calls, so we leave
   // jobs in `received` state with all agents `pending` (registration-only mode).
   //
-  // Slice 9d-4 — when AGENTX_USE_CONTAINER=1 AND a resolver + repos are
+  // Slice 9d-4 — when HELMSMITH_USE_CONTAINER=1 AND a resolver + repos are
   // available, route through the container path (spawnWorker → runWorker →
   // runPipelineInContainer). Otherwise stay on the in-process runJob path
   // that's been the default since slice 6.
@@ -1287,7 +1287,7 @@ async function handleSubmitJob(
         ctx.pendingSuspends.delete(jobId);
       }
     };
-    const useContainer = process.env.AGENTX_USE_CONTAINER === '1' && resolver !== undefined;
+    const useContainer = process.env.HELMSMITH_USE_CONTAINER === '1' && resolver !== undefined;
 
     // Resolve repos for the container path. Priority: explicit
     // body.repos wins; otherwise look up from the catalog product
@@ -2610,7 +2610,7 @@ async function handleSubmitLoaderSingleResolved(
       embedderDim: spec.embedderDim,
       workspaceRoot: spec.workspaceRoot,
       tmuxPane: process.env.TMUX
-        ? { session: process.env.AGENTX_TMUX_SESSION ?? 'agentx', window: 'loaders' }
+        ? { session: process.env.HELMSMITH_TMUX_SESSION ?? 'helmsmith', window: 'loaders' }
         : undefined,
     });
   } catch (err) {
@@ -2770,7 +2770,7 @@ async function handleSubmitLoaderJob(
         typeof body.tmuxPane === 'object' && body.tmuxPane !== null
           ? (body.tmuxPane as { session: string; window: string })
           : process.env.TMUX
-            ? { session: process.env.AGENTX_TMUX_SESSION ?? 'agentx', window: 'loaders' }
+            ? { session: process.env.HELMSMITH_TMUX_SESSION ?? 'helmsmith', window: 'loaders' }
             : undefined,
     });
   } catch (err) {

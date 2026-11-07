@@ -23,17 +23,17 @@ npm install -g @helmsmith/taskmaster
 Verify:
 
 ```bash
-agentx-taskmaster --version
+helmsmith-taskmaster --version
 # Should print the installed version
 ```
 
 If you see "command not found", the npm global bin isn't on your
-`PATH`. Add `$(npm bin -g)` or use `npx agentx-taskmaster …`.
+`PATH`. Add `$(npm bin -g)` or use `npx helmsmith-taskmaster …`.
 
 ## 2. Initialize a project
 
 ```bash
-agentx-taskmaster init
+helmsmith-taskmaster init
 ```
 
 Interactive prompts walk you through:
@@ -46,17 +46,17 @@ Interactive prompts walk you through:
 Or non-interactive:
 
 ```bash
-agentx-taskmaster init --name my-project --style story-driven --no-interactive
+helmsmith-taskmaster init --name my-project --style story-driven --no-interactive
 ```
 
-This creates `~/.agentx-userdata/taskmaster/my-project/` with:
+This creates `~/.helmsmith-userdata/taskmaster/my-project/` with:
 
 - `tasks.json` — the structured task tree (initially empty)
 - `config.yaml` — your project's settings
 - `tasks/` — directory for individual task YAML files (created by
   `generate`)
 
-Override the userdata location with `AGENTX_USERDATA=/custom/path` if
+Override the userdata location with `HELMSMITH_USERDATA=/custom/path` if
 you need a non-default storage root.
 
 ## 3. Authenticate (optional)
@@ -65,7 +65,7 @@ If you want AI-driven complexity scoring or skill inference, log in
 with GitHub Copilot:
 
 ```bash
-agentx-taskmaster auth login
+helmsmith-taskmaster auth login
 ```
 
 This runs Device Flow and persists the token. Without auth, taskmaster
@@ -73,7 +73,7 @@ falls back to heuristic-only scoring — fully functional, just less
 nuanced.
 
 ```bash
-agentx-taskmaster auth status
+helmsmith-taskmaster auth status
 ```
 
 ## 4. Parse a plan
@@ -81,7 +81,7 @@ agentx-taskmaster auth status
 If you have an implementation plan in Markdown:
 
 ```bash
-agentx-taskmaster parse plan.md
+helmsmith-taskmaster parse plan.md
 ```
 
 The parser:
@@ -94,7 +94,7 @@ The parser:
 Verify:
 
 ```bash
-agentx-taskmaster list
+helmsmith-taskmaster list
 ```
 
 Output shows the parsed task hierarchy with IDs, types, and current
@@ -103,21 +103,21 @@ statuses (typically `pending`).
 ### Append vs replace
 
 ```bash
-agentx-taskmaster parse plan2.md --append    # adds to existing tasks
-agentx-taskmaster parse plan-rewrite.md --force   # replaces all tasks
+helmsmith-taskmaster parse plan2.md --append    # adds to existing tasks
+helmsmith-taskmaster parse plan-rewrite.md --force   # replaces all tasks
 ```
 
 ### Targeted parsing
 
 ```bash
-agentx-taskmaster parse plan.md --num-tasks 5
+helmsmith-taskmaster parse plan.md --num-tasks 5
 # Only parse the first 5 sections — useful for focused scoping
 ```
 
 ## 5. Score complexity
 
 ```bash
-agentx-taskmaster score --heuristic-only
+helmsmith-taskmaster score --heuristic-only
 # Heuristic scoring across 5 weighted dimensions:
 #   - Scope (how much functional surface)
 #   - Depth (technical complexity per unit)
@@ -129,13 +129,13 @@ agentx-taskmaster score --heuristic-only
 For AI-driven scoring (uses Copilot if authenticated):
 
 ```bash
-agentx-taskmaster score
+helmsmith-taskmaster score
 ```
 
 Inspect the scored tasks:
 
 ```bash
-agentx-taskmaster list --format table
+helmsmith-taskmaster list --format table
 ```
 
 You'll see a `complexity` column. Tasks above your threshold (default:
@@ -144,7 +144,7 @@ You'll see a `complexity` column. Tasks above your threshold (default:
 ## 6. Decompose high-complexity tasks
 
 ```bash
-agentx-taskmaster expand-all --threshold 7
+helmsmith-taskmaster expand-all --threshold 7
 ```
 
 For each task above complexity 7, taskmaster generates subtasks
@@ -154,19 +154,19 @@ generation if authenticated; template-based otherwise.
 To preview without writing:
 
 ```bash
-agentx-taskmaster expand-all --threshold 7 --dry-run
+helmsmith-taskmaster expand-all --threshold 7 --dry-run
 ```
 
 To expand a single task:
 
 ```bash
-agentx-taskmaster expand TASK-001 --max-subtasks 5
+helmsmith-taskmaster expand TASK-001 --max-subtasks 5
 ```
 
 ## 7. View what's ready to work on
 
 ```bash
-agentx-taskmaster ready
+helmsmith-taskmaster ready
 ```
 
 Shows the **delegation manifest** — tasks with all dependencies
@@ -176,14 +176,14 @@ agent (or a teammate) and say "pick from here next".
 For a single task:
 
 ```bash
-agentx-taskmaster next
+helmsmith-taskmaster next
 # → highest-priority ready task, formatted for immediate consumption
 ```
 
 Filter by skill:
 
 ```bash
-agentx-taskmaster ready --skills frontend,react
+helmsmith-taskmaster ready --skills frontend,react
 ```
 
 ## 8. Update task state
@@ -191,8 +191,8 @@ agentx-taskmaster ready --skills frontend,react
 As work progresses:
 
 ```bash
-agentx-taskmaster set-status TASK-042 in-progress
-agentx-taskmaster set-status TASK-042 done
+helmsmith-taskmaster set-status TASK-042 in-progress
+helmsmith-taskmaster set-status TASK-042 done
 ```
 
 Status values come from your project's preset:
@@ -204,13 +204,13 @@ Status values come from your project's preset:
 Cascade status to children:
 
 ```bash
-agentx-taskmaster set-status TASK-001 done --cascade
+helmsmith-taskmaster set-status TASK-001 done --cascade
 ```
 
 ## 9. Generate per-task YAML files
 
 ```bash
-agentx-taskmaster generate
+helmsmith-taskmaster generate
 ```
 
 Writes one YAML file per task to your project's `tasks/` directory.
@@ -225,17 +225,17 @@ skills, dependencies, status. Useful for:
 After editing, sync back to the structured store:
 
 ```bash
-agentx-taskmaster sync
-agentx-taskmaster sync --diff       # preview changes before applying
-agentx-taskmaster sync --dry-run    # preview without applying
+helmsmith-taskmaster sync
+helmsmith-taskmaster sync --diff       # preview changes before applying
+helmsmith-taskmaster sync --dry-run    # preview without applying
 ```
 
 ## 10. Generate reports
 
 ```bash
-agentx-taskmaster report
-agentx-taskmaster report --type progress --format markdown
-agentx-taskmaster report --type roadmap --format html
+helmsmith-taskmaster report
+helmsmith-taskmaster report --type progress --format markdown
+helmsmith-taskmaster report --type roadmap --format html
 ```
 
 Handlebars-driven report templates. Outputs go to stdout (pipe to a
@@ -246,20 +246,20 @@ file or commit to your repo's docs/).
 ### Manage multiple projects
 
 ```bash
-agentx-taskmaster projects list
-agentx-taskmaster projects create my-other-project
-agentx-taskmaster projects switch my-other-project
+helmsmith-taskmaster projects list
+helmsmith-taskmaster projects create my-other-project
+helmsmith-taskmaster projects switch my-other-project
 ```
 
-Each project has independent state under `~/.agentx-userdata/taskmaster/`.
+Each project has independent state under `~/.helmsmith-userdata/taskmaster/`.
 Use `--project <name>` on any command to target a specific project
 without switching the active one.
 
 ### Validate the dependency graph
 
 ```bash
-agentx-taskmaster validate
-agentx-taskmaster validate --fix    # auto-fix common issues
+helmsmith-taskmaster validate
+helmsmith-taskmaster validate --fix    # auto-fix common issues
 ```
 
 Catches:
@@ -271,7 +271,7 @@ Catches:
 ### Add a new task manually
 
 ```bash
-agentx-taskmaster add \
+helmsmith-taskmaster add \
   --title "Add OAuth login flow" \
   --type story \
   --parent EPIC-002 \
@@ -282,8 +282,8 @@ agentx-taskmaster add \
 ### Filter `list` aggressively
 
 ```bash
-agentx-taskmaster list --status pending --skills frontend --format json
-agentx-taskmaster list --category bug --format yaml
+helmsmith-taskmaster list --status pending --skills frontend --format json
+helmsmith-taskmaster list --category bug --format yaml
 ```
 
 JSON / YAML output is structured for piping to other tools (jq, yq).
@@ -291,15 +291,15 @@ JSON / YAML output is structured for piping to other tools (jq, yq).
 ### Show one task with children
 
 ```bash
-agentx-taskmaster show TASK-042 --with-children
+helmsmith-taskmaster show TASK-042 --with-children
 ```
 
 ## Troubleshooting
 
 ### "Project not initialized"
 
-Run `agentx-taskmaster init` first. Or, if you have an existing
-project, switch to it: `agentx-taskmaster projects switch my-project`.
+Run `helmsmith-taskmaster init` first. Or, if you have an existing
+project, switch to it: `helmsmith-taskmaster projects switch my-project`.
 
 ### "Parser couldn't infer task structure"
 
@@ -307,38 +307,38 @@ Plans in unconventional formats may not parse cleanly. Either:
 
 1. Restructure the plan to match conventional Markdown heading
    hierarchy (H1 = epic, H2 = story, H3 = task)
-2. Manually add tasks with `agentx-taskmaster add`
+2. Manually add tasks with `helmsmith-taskmaster add`
 3. Edit the generated `tasks.json` directly (advanced)
 
 ### "Score command says 'no AI provider configured'"
 
 Either:
 
-1. Authenticate: `agentx-taskmaster auth login`
-2. Use heuristic-only: `agentx-taskmaster score --heuristic-only`
+1. Authenticate: `helmsmith-taskmaster auth login`
+2. Use heuristic-only: `helmsmith-taskmaster score --heuristic-only`
 
 ### "Decomposition produced too many subtasks"
 
 Lower the cap:
 
 ```bash
-agentx-taskmaster expand-all --threshold 7 --max-subtasks 3
+helmsmith-taskmaster expand-all --threshold 7 --max-subtasks 3
 ```
 
 Or pre-mark specific tasks as already decomposed:
 
 ```bash
-agentx-taskmaster set-status TASK-042 done   # if it's actually small enough
+helmsmith-taskmaster set-status TASK-042 done   # if it's actually small enough
 ```
 
 ### Reset everything
 
 ```bash
-rm -rf ~/.agentx-userdata/taskmaster/<project-name>
-agentx-taskmaster init               # start over
+rm -rf ~/.helmsmith-userdata/taskmaster/<project-name>
+helmsmith-taskmaster init               # start over
 ```
 
-To remove only one project: `agentx-taskmaster projects remove <name>`.
+To remove only one project: `helmsmith-taskmaster projects remove <name>`.
 
 ## What's next
 

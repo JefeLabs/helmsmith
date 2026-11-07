@@ -26,7 +26,7 @@ export interface Cli {
 
 /**
  * Bootstrap a commander Program with conventions shared across the
- * AgentX ecosystem: name, version, description, error formatting,
+ * Helmsmith ecosystem: name, version, description, error formatting,
  * and a hook to access the consumer's auth provider.
  *
  * Usage:

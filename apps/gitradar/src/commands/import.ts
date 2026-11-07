@@ -81,18 +81,18 @@ export async function importWorkspace(filePath: string): Promise<void> {
     // Not in a git project — only offer global
     destination = {
       type: 'global',
-      path: path.join(homedir(), '.agentx', 'repos.yml'),
+      path: path.join(homedir(), '.helmsmith', 'repos.yml'),
     };
     console.log('Not inside a git project. Using global destination.');
   } else {
     const destChoices: Array<{ name: string; value: DestinationValue }> = [
       {
-        name: `Global (~/.agentx/repos.yml)`,
-        value: { type: 'global', path: path.join(homedir(), '.agentx', 'repos.yml') },
+        name: `Global (~/.helmsmith/repos.yml)`,
+        value: { type: 'global', path: path.join(homedir(), '.helmsmith', 'repos.yml') },
       },
       {
-        name: `Project (${gitRoot}/.agentx/repos.yml)`,
-        value: { type: 'project', path: path.join(gitRoot, '.agentx', 'repos.yml') },
+        name: `Project (${gitRoot}/.helmsmith/repos.yml)`,
+        value: { type: 'project', path: path.join(gitRoot, '.helmsmith', 'repos.yml') },
       },
     ];
 

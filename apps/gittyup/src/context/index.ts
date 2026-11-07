@@ -160,7 +160,7 @@ function buildAgentsMd(ids: string[], includeCommands: boolean): string {
     '# Gittyup Agent Instructions',
     '',
     'This project uses Gittyup for multi-repo orchestration.',
-    'Use `agentx-gittyup` to manage branch flow across repositories.',
+    'Use `helmsmith-gittyup` to manage branch flow across repositories.',
     '',
   ];
 
