@@ -126,7 +126,6 @@ export function runCli(
  * The `--json` success contract: stdout is exactly one `\n`-terminated line
  * holding one JSON document. Throws (failing the test) otherwise.
  */
-// biome-ignore lint/suspicious/noExplicitAny: tests read arbitrary document shapes
 export function parseJsonLine(stdout: string): any {
   if (!stdout.endsWith('\n') || stdout.slice(0, -1).includes('\n')) {
     throw new Error(`stdout is not exactly one JSON line:\n${stdout}`);

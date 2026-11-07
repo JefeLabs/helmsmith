@@ -2,12 +2,12 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import * as yaml from 'js-yaml';
+import { GittyupError } from '../core/errors.js';
 import { detectGitRoot, getRepoConfigHome } from '../utils/git.js';
 import type { ConfigLocation, ResolvedConfig } from '../utils/location.js';
 import { APP_CONFIG_DIR, APP_NAME, APP_REPO_URL, MANIFEST_FILENAME } from './branding.js';
 import type { Manifest, RepoConfig, RepoGroup } from './schema.js';
 import { ManifestSchema } from './schema.js';
-import { GittyupError } from '../core/errors.js';
 
 const DEFAULT_PR_TEMPLATE = [
   '## {{operation}} from `{{source_branch}}` → `{{target_branch}}`',

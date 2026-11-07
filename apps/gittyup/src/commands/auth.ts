@@ -35,7 +35,9 @@ export function registerAuth(program: Command): void {
         let reachable: boolean | null = null;
         const source = await resolveGitHubToken();
         if (source) {
-          reachable = await getCopilotToken(source.token, { fromEnv: source.source !== 'auth.json' })
+          reachable = await getCopilotToken(source.token, {
+            fromEnv: source.source !== 'auth.json',
+          })
             .then(() => true)
             .catch(() => false);
         }
@@ -59,7 +61,10 @@ export function registerAuth(program: Command): void {
   authCmd
     .command('models')
     .description('List available Copilot models')
-    .option('--json', 'Print { models: [{ id, maxPromptTokens, maxOutputTokens }] } as one JSON line')
+    .option(
+      '--json',
+      'Print { models: [{ id, maxPromptTokens, maxOutputTokens }] } as one JSON line',
+    )
     .action(async (opts: { json?: boolean }) => {
       const { fetchCopilotModels, resolveGitHubToken } = await import('../auth/token-manager.js');
       if (opts.json && !(await resolveGitHubToken())) {

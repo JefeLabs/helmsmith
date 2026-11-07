@@ -39,9 +39,13 @@ export function registerConfig(program: Command): void {
     .action(async (opts: { ai?: string; model?: string; show?: boolean; json?: boolean }) => {
       const manifest = new ManifestManager();
       if (opts.json && opts.ai && !AiModeSchema.safeParse(opts.ai).success) {
-        throw new GittyupError('USAGE', `--ai must be one of auto, suggest, manual (got "${opts.ai}")`, {
-          ai: opts.ai,
-        });
+        throw new GittyupError(
+          'USAGE',
+          `--ai must be one of auto, suggest, manual (got "${opts.ai}")`,
+          {
+            ai: opts.ai,
+          },
+        );
       }
       if (opts.ai) {
         manifest.updateSettings({ ai_mode: opts.ai as AiMode });

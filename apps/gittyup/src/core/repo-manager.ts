@@ -2,8 +2,8 @@ import { existsSync } from 'node:fs';
 import { APP_NAME } from '../config/branding.js';
 import { ManifestManager } from '../config/manifest.js';
 import type { RepoConfig, RepoGroup, RepoState } from '../config/schema.js';
-import { GitOperations } from './git-operations.js';
 import { GittyupError } from './errors.js';
+import { GitOperations } from './git-operations.js';
 
 /**
  * Manages loaded repos and their git instances.

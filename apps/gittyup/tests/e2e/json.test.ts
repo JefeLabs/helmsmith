@@ -8,7 +8,13 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanupFixtures, fixtureEnv, makeRepo } from '../../src/test/git-fixture.js';
-import { createWorkspace, parseErrorLine, parseJsonLine, runCli, type Workspace } from './helpers.js';
+import {
+  createWorkspace,
+  parseErrorLine,
+  parseJsonLine,
+  runCli,
+  type Workspace,
+} from './helpers.js';
 
 let ws: Workspace | undefined;
 afterEach(async () => {
@@ -83,7 +89,14 @@ describe('--json contract: manifest CRUD', () => {
   it('repo add/remove with branches, groupCreated and refusals', async () => {
     ws = await createWorkspace();
     let r = await runCli(ws, [
-      'repo', 'add', 'web', 'app', './app', '--branches', '{"dev":"develop"}', '--json',
+      'repo',
+      'add',
+      'web',
+      'app',
+      './app',
+      '--branches',
+      '{"dev":"develop"}',
+      '--json',
     ]);
     expect(parseJsonLine(r.stdout)).toStrictEqual({
       added: {
@@ -148,7 +161,13 @@ describe('--json contract: repo list / tags / tag', () => {
           description: 'Web',
           repos: [
             { name: 'a', path: '/x/a', branches: { dev: 'develop' }, tags: ['web', 'api'] },
-            { name: 'b', path: '/x/b', url: 'https://github.com/o/b.git', branches: {}, tags: ['api'] },
+            {
+              name: 'b',
+              path: '/x/b',
+              url: 'https://github.com/o/b.git',
+              branches: {},
+              tags: ['api'],
+            },
           ],
         },
       },
@@ -160,8 +179,22 @@ describe('--json contract: repo list / tags / tag', () => {
         name: 'web',
         description: 'Web',
         repos: [
-          { name: 'a', path: '/x/a', remote: 'origin', url: null, branches: { dev: 'develop' }, tags: ['web', 'api'] },
-          { name: 'b', path: '/x/b', remote: 'origin', url: 'https://github.com/o/b.git', branches: {}, tags: ['api'] },
+          {
+            name: 'a',
+            path: '/x/a',
+            remote: 'origin',
+            url: null,
+            branches: { dev: 'develop' },
+            tags: ['web', 'api'],
+          },
+          {
+            name: 'b',
+            path: '/x/b',
+            remote: 'origin',
+            url: 'https://github.com/o/b.git',
+            branches: {},
+            tags: ['api'],
+          },
         ],
       },
     ]);
@@ -179,8 +212,22 @@ describe('--json contract: repo list / tags / tag', () => {
       groups: { web: { repos: [{ name: 'a', path: '/x/a', tags: ['old'] }] } },
     });
     let r = await runCli(ws, ['repo', 'tag', '--json']);
-    expect([r.exitCode, r.stdout, parseErrorLine(r.stderr).code]).toEqual([2, '', 'INTERACTIVE_ONLY']);
-    r = await runCli(ws, ['repo', 'tag', '-g', 'web', '--add', 'api,core', '--remove', 'old', '--json']);
+    expect([r.exitCode, r.stdout, parseErrorLine(r.stderr).code]).toEqual([
+      2,
+      '',
+      'INTERACTIVE_ONLY',
+    ]);
+    r = await runCli(ws, [
+      'repo',
+      'tag',
+      '-g',
+      'web',
+      '--add',
+      'api,core',
+      '--remove',
+      'old',
+      '--json',
+    ]);
     expect(parseJsonLine(r.stdout)).toStrictEqual({
       updated: [{ repo: 'a', tags: ['api', 'core'] }],
       added: ['api', 'core'],
@@ -262,7 +309,11 @@ describe('--json contract: status', () => {
     const repo = await devProdRepo();
     ws = await createWorkspace({
       workspace: '.',
-      groups: { app: { repos: [{ name: 'fx', path: repo.path, branches: { dev: 'develop', prod: 'main' } }] } },
+      groups: {
+        app: {
+          repos: [{ name: 'fx', path: repo.path, branches: { dev: 'develop', prod: 'main' } }],
+        },
+      },
     });
     const r = await runCli(ws, ['status', '--json']);
     expect(r.exitCode).toBe(0);
@@ -311,7 +362,10 @@ describe('--json contract: status', () => {
     ws = await createWorkspace();
     const r = await runCli(ws, ['status', '-g', 'nope', '--json']);
     expect([r.exitCode, r.stdout]).toEqual([2, '']);
-    expect(parseErrorLine(r.stderr)).toMatchObject({ code: 'TARGET_UNKNOWN', details: { target: 'nope' } });
+    expect(parseErrorLine(r.stderr)).toMatchObject({
+      code: 'TARGET_UNKNOWN',
+      details: { target: 'nope' },
+    });
   });
 
   it('no manifest anywhere is an empty report', async () => {
@@ -330,7 +384,9 @@ describe('--json contract: status', () => {
     });
     const r = await runCli(ws, ['status', '--fetch', '--json']);
     expect(r.exitCode).toBe(0);
-    expect(parseJsonLine(r.stdout).fetch).toEqual([{ repo: 'fx', ok: false, error: expect.any(String) }]);
+    expect(parseJsonLine(r.stdout).fetch).toEqual([
+      { repo: 'fx', ok: false, error: expect.any(String) },
+    ]);
   });
 
   it('text status shows – for an untracked ahead/behind', async () => {
@@ -410,7 +466,15 @@ describe('--json contract: compare', () => {
 
   it('--no-conflicts reports hasConflicts as null', async () => {
     ws = await compareWorkspace();
-    const r = await runCli(ws, ['compare', 'dev', 'prod', '--no-conflicts', '--no-pr', '--json', '-f']);
+    const r = await runCli(ws, [
+      'compare',
+      'dev',
+      'prod',
+      '--no-conflicts',
+      '--no-pr',
+      '--json',
+      '-f',
+    ]);
     const doc = parseJsonLine(r.stdout);
     expect(doc.repos.map((x: { hasConflicts: unknown }) => x.hasConflicts)).toEqual([null, null]);
   });
@@ -435,7 +499,8 @@ describe('--json contract: compare', () => {
 });
 
 async function plainRepo(dir: string): Promise<void> {
-  const git = (args: string[]) => execFileSync('git', args, { cwd: dir, env: fixtureEnv(), stdio: 'pipe' });
+  const git = (args: string[]) =>
+    execFileSync('git', args, { cwd: dir, env: fixtureEnv(), stdio: 'pipe' });
   await mkdir(dir, { recursive: true });
   git(['init', '-q', '-b', 'main']);
   await writeFile(join(dir, 'f.txt'), 'x\n');
@@ -445,7 +510,10 @@ async function plainRepo(dir: string): Promise<void> {
 
 describe('--json contract: prs, fetch, find', () => {
   it('prs --json with no GitHub repos is an empty list', async () => {
-    ws = await createWorkspace({ workspace: '.', groups: { app: { repos: [{ name: 'a', path: '/x/a' }] } } });
+    ws = await createWorkspace({
+      workspace: '.',
+      groups: { app: { repos: [{ name: 'a', path: '/x/a' }] } },
+    });
     const r = await runCli(ws, ['prs', '--json']);
     expect(r.exitCode).toBe(0);
     expect(parseJsonLine(r.stdout)).toStrictEqual({ repos: [] });
@@ -464,7 +532,10 @@ describe('--json contract: prs, fetch, find', () => {
     ws = await createWorkspace();
     const repoPath = join(ws.dir, 'repoA');
     await plainRepo(repoPath);
-    await ws.writeManifest({ workspace: ws.dir, groups: { g: { repos: [{ name: 'repoA', path: repoPath }] } } });
+    await ws.writeManifest({
+      workspace: ws.dir,
+      groups: { g: { repos: [{ name: 'repoA', path: repoPath }] } },
+    });
     const r = await runCli(ws, ['fetch', '-g', 'g', '--json']);
     expect(r.exitCode).toBe(1);
     expect(parseJsonLine(r.stdout)).toStrictEqual({
@@ -473,8 +544,14 @@ describe('--json contract: prs, fetch, find', () => {
   });
 
   it('fetch --json succeeds against a real remote', async () => {
-    const repo = await makeRepo({ commits: [{ message: 'base', files: { 'f.txt': 'x\n' } }], remote: true });
-    ws = await createWorkspace({ workspace: '.', groups: { g: { repos: [{ name: 'fx', path: repo.path }] } } });
+    const repo = await makeRepo({
+      commits: [{ message: 'base', files: { 'f.txt': 'x\n' } }],
+      remote: true,
+    });
+    ws = await createWorkspace({
+      workspace: '.',
+      groups: { g: { repos: [{ name: 'fx', path: repo.path }] } },
+    });
     const r = await runCli(ws, ['fetch', '--json']);
     expect(r.exitCode).toBe(0);
     expect(parseJsonLine(r.stdout)).toStrictEqual({ repos: [{ repo: 'fx', ok: true }] });
@@ -497,6 +574,10 @@ describe('--json contract: prs, fetch, find', () => {
   it('find --json on a missing directory is PATH_NOT_FOUND', async () => {
     ws = await createWorkspace();
     const r = await runCli(ws, ['find', '/no/such/dir', '--json']);
-    expect([r.exitCode, r.stdout, parseErrorLine(r.stderr).code]).toEqual([2, '', 'PATH_NOT_FOUND']);
+    expect([r.exitCode, r.stdout, parseErrorLine(r.stderr).code]).toEqual([
+      2,
+      '',
+      'PATH_NOT_FOUND',
+    ]);
   });
 });

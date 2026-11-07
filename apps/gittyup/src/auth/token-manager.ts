@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname } from 'node:path';
 import chalk from 'chalk';
 import { APP_CONFIG_DIR_DISPLAY, CLI_BIN_NAME } from '../config/branding.js';
+import { GittyupError } from '../core/errors.js';
 import { getHomePath } from '../utils/home.js';
 import {
   type AuthCredentials,
@@ -22,7 +23,6 @@ import {
   TOKEN_REFRESH_THRESHOLD,
   type TokenSource,
 } from './types.js';
-import { GittyupError } from '../core/errors.js';
 
 const AUTH_FILE = 'auth.json';
 
