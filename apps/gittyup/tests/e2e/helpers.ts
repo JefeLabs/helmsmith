@@ -121,3 +121,29 @@ export function runCli(
     });
   });
 }
+
+/**
+ * The `--json` success contract: stdout is exactly one `\n`-terminated line
+ * holding one JSON document. Throws (failing the test) otherwise.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: tests read arbitrary document shapes
+export function parseJsonLine(stdout: string): any {
+  if (!stdout.endsWith('\n') || stdout.slice(0, -1).includes('\n')) {
+    throw new Error(`stdout is not exactly one JSON line:\n${stdout}`);
+  }
+  return JSON.parse(stdout);
+}
+
+/** The `--json` failure contract: the last non-empty stderr line is the error body. */
+export function parseErrorLine(stderr: string): {
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
+} {
+  const last = stderr.trim().split('\n').filter(Boolean).pop() ?? '';
+  try {
+    return JSON.parse(last);
+  } catch {
+    throw new Error(`stderr's last line is not a JSON error body:\n${stderr}`);
+  }
+}
