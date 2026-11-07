@@ -3,7 +3,7 @@
  * one JSON line on stdout on success; on failure an empty stdout, a JSON error
  * body as stderr's last line, exit 2 (refused) or 1 (broken).
  */
-import { rm } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanupFixtures } from '../../src/test/git-fixture.js';
@@ -185,5 +185,64 @@ describe('--json contract: repo list / tags / tag', () => {
       added: ['api', 'core'],
       removed: ['old'],
     });
+  });
+});
+
+describe('--json contract: config and auth', () => {
+  it('config --json shows defaults and no tokens', async () => {
+    ws = await createWorkspace();
+    const doc = parseJsonLine((await runCli(ws, ['config', '--json'])).stdout);
+    expect(doc).toStrictEqual({
+      manifest: { path: ws.manifestPath, location: 'home' },
+      settings: {
+        aiMode: 'suggest',
+        aiModel: 'gpt-4o',
+        aiModelIsDefault: true,
+        conflictBranchPrefix: 'conflict-resolution',
+      },
+      agent: { available: false, source: null },
+      github: { available: false, source: null },
+    });
+  });
+
+  it('config --ai/--model --json persists and returns the new settings', async () => {
+    ws = await createWorkspace();
+    const r = await runCli(ws, ['config', '--ai', 'auto', '--model', 'gpt-5', '--json']);
+    expect(parseJsonLine(r.stdout).settings).toStrictEqual({
+      aiMode: 'auto',
+      aiModel: 'gpt-5',
+      aiModelIsDefault: false,
+      conflictBranchPrefix: 'conflict-resolution',
+    });
+    expect(await readFile(ws.manifestPath, 'utf-8')).toContain('ai_mode: auto');
+  });
+
+  it('config --ai with an unknown mode is USAGE and leaves the manifest alone', async () => {
+    ws = await createWorkspace();
+    const before = await readFile(ws.manifestPath, 'utf-8');
+    const r = await runCli(ws, ['config', '--ai', 'bogus', '--json']);
+    expect([r.exitCode, parseErrorLine(r.stderr).code]).toEqual([2, 'USAGE']);
+    expect(await readFile(ws.manifestPath, 'utf-8')).toBe(before);
+  });
+
+  it('a GITHUB_TOKEN shows up as the source in both rows (no network)', async () => {
+    ws = await createWorkspace();
+    const r = await runCli(ws, ['config', '--json'], { env: { GITHUB_TOKEN: 'ghp_test' } });
+    const doc = parseJsonLine(r.stdout);
+    expect([doc.agent, doc.github]).toEqual([
+      { available: true, source: 'env:GITHUB_TOKEN' },
+      { available: true, source: 'env:GITHUB_TOKEN' },
+    ]);
+    expect(r.stdout).not.toContain('ghp_test');
+  });
+
+  it('auth status --json with no token, and auth models --json refuses', async () => {
+    ws = await createWorkspace();
+    expect(parseJsonLine((await runCli(ws, ['auth', 'status', '--json'])).stdout)).toStrictEqual({
+      agent: { available: false, source: null, reachable: null },
+      github: { available: false, source: null },
+    });
+    const r = await runCli(ws, ['auth', 'models', '--json']);
+    expect([r.exitCode, parseErrorLine(r.stderr).code]).toEqual([2, 'AUTH_REQUIRED']);
   });
 });

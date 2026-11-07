@@ -6,7 +6,7 @@
  */
 import { existsSync } from 'node:fs';
 import type { ManifestManager } from '../config/manifest.js';
-import type { RepoConfig } from '../config/schema.js';
+import type { AiMode, RepoConfig } from '../config/schema.js';
 
 // ─── shared ────────────────────────────────────────────────────────
 
@@ -80,4 +80,32 @@ export interface RepoTagDocument {
   updated: Array<{ repo: string; tags: string[] }>;
   added: string[];
   removed: string[];
+}
+
+// ─── config and auth ───────────────────────────────────────────────
+
+export interface TokenRow {
+  available: boolean;
+  source: string | null;
+}
+
+export interface ConfigDocument {
+  manifest: { path: string; location: 'home' | 'repo' };
+  settings: {
+    aiMode: AiMode;
+    aiModel: string;
+    aiModelIsDefault: boolean;
+    conflictBranchPrefix: string;
+  };
+  agent: TokenRow;
+  github: TokenRow;
+}
+
+export interface AuthStatusDocument {
+  agent: TokenRow & { reachable: boolean | null };
+  github: TokenRow;
+}
+
+export interface AuthModelsDocument {
+  models: Array<{ id: string; maxPromptTokens: number | null; maxOutputTokens: number | null }>;
 }
