@@ -1,7 +1,7 @@
 -- V0010 — unified catalog items.
 --
 -- One table covering all 6 skillzkit types (skill | workflow | prompt |
--- persona | context | template). The shape mirrors agentx-skillz's
+-- persona | context | template). The shape mirrors helmsmith-skillz's
 -- manifest.yaml format so agent definition becomes "compose from
 -- catalog" rather than "author from scratch."
 --

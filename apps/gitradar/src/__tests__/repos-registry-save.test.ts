@@ -18,7 +18,7 @@ function makeWorkspace(
 
   const source: RegistrySource = {
     type: 'global',
-    path: '/home/user/.agentx/repos.yml',
+    path: '/home/user/.helmsmith/repos.yml',
     registry,
   };
 

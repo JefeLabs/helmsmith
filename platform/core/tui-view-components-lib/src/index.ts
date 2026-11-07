@@ -17,7 +17,7 @@
  *
  * Cross-cutting infrastructure (not in the atomic hierarchy):
  *   theme/      design tokens, palette → semantics pipeline,
- *               AgentxThemeProvider, hooks, bundled themes
+ *               HelmsmithThemeProvider, hooks, bundled themes
  *   focus/      FocusManager + useFocus hook
  *   keyboard/   KeyboardProvider + useKeybinding hook + registry
  *

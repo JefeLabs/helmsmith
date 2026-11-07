@@ -5,7 +5,7 @@ import java.util.UUID;
 
 /**
  * Per-ingestion run. Multiple ingestion_jobs rows per source over time
- * (one per refresh). Phase 4.3 populates these via the agentx-load
+ * (one per refresh). Phase 4.3 populates these via the helmsmith-load
  * subprocess; Phase 4.1 just defines the shape.
  */
 public record IngestionJob(

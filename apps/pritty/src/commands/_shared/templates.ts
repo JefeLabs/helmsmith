@@ -28,7 +28,7 @@ The command will:
 5. Optionally let the user edit each message
 6. Create one commit per category using path-restricted \`git commit -- <files>\`
 
-If pritty isn't installed, suggest \`npm install -g @helmsmith/pritty\` (or workspace-link from agentx-toolbox).
+If pritty isn't installed, suggest \`npm install -g @helmsmith/pritty\` (or workspace-link from helmsmith).
 `,
 
   pr: `---
@@ -189,7 +189,7 @@ the repo. \`pritty init\` scaffolds one. Common fields:
 }
 \`\`\`
 
-See \`apps/pritty/README.md\` in the agentx-toolbox repo for the full
+See \`apps/pritty/README.md\` in the helmsmith repo for the full
 config reference.
 `;
 

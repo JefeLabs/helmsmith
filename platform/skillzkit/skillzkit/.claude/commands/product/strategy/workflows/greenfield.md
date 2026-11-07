@@ -155,7 +155,7 @@ JSON with **`@helmsmith/mech-pencil`** — this **replaces** the kit's former
 foundation-rendering, component, pattern, and template phases:
 
 ```bash
-# from agentx-toolbox/apps/mech-pencil (run under bun):
+# from helmsmith/apps/mech-pencil (run under bun):
 mech-pencil system -a <accent> -b <base> --font <family> -r <radius> -d product/design/system
 # (or: the no-args wizard → same system)
 ```

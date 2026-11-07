@@ -263,10 +263,10 @@ describe('loadReposRegistry', () => {
     mockAccess.mockResolvedValue(undefined);
     mockReadFile.mockResolvedValue(minimalRegistryYaml);
 
-    await loadReposRegistry('~/.agentx/repos.yml');
+    await loadReposRegistry('~/.helmsmith/repos.yml');
 
-    expect(mockAccess).toHaveBeenCalledWith('/home/user/.agentx/repos.yml');
-    expect(mockReadFile).toHaveBeenCalledWith('/home/user/.agentx/repos.yml', 'utf-8');
+    expect(mockAccess).toHaveBeenCalledWith('/home/user/.helmsmith/repos.yml');
+    expect(mockReadFile).toHaveBeenCalledWith('/home/user/.helmsmith/repos.yml', 'utf-8');
   });
 });
 
@@ -290,7 +290,7 @@ describe('loadAllRegistries', () => {
 
     expect(sources).toHaveLength(1);
     expect(sources[0].type).toBe('global');
-    expect(sources[0].path).toBe('/home/user/.agentx/repos.yml');
+    expect(sources[0].path).toBe('/home/user/.helmsmith/repos.yml');
     expect(sources[0].registry.workspaces).toBeDefined();
   });
 
@@ -302,9 +302,9 @@ describe('loadAllRegistries', () => {
 
     expect(sources).toHaveLength(2);
     expect(sources[0].type).toBe('global');
-    expect(sources[0].path).toBe('/home/user/.agentx/repos.yml');
+    expect(sources[0].path).toBe('/home/user/.helmsmith/repos.yml');
     expect(sources[1].type).toBe('project');
-    expect(sources[1].path).toBe('/projects/my-project/.agentx/repos.yml');
+    expect(sources[1].path).toBe('/projects/my-project/.helmsmith/repos.yml');
   });
 
   it('returns empty array when no registries exist', async () => {
@@ -330,7 +330,7 @@ describe('loadAllRegistries', () => {
       _callCount++;
       const filePath = String(p);
       // Global path does not exist (first call)
-      if (filePath.includes('/home/user/.agentx/repos.yml')) {
+      if (filePath.includes('/home/user/.helmsmith/repos.yml')) {
         throw new Error('ENOENT');
       }
       // Project path exists
@@ -342,7 +342,7 @@ describe('loadAllRegistries', () => {
 
     expect(sources).toHaveLength(1);
     expect(sources[0].type).toBe('project');
-    expect(sources[0].path).toBe('/projects/my-project/.agentx/repos.yml');
+    expect(sources[0].path).toBe('/projects/my-project/.helmsmith/repos.yml');
   });
 });
 
@@ -351,7 +351,7 @@ describe('loadAllRegistries', () => {
 describe('getAvailableWorkspaces', () => {
   const globalSource: RegistrySource = {
     type: 'global',
-    path: '/home/user/.agentx/repos.yml',
+    path: '/home/user/.helmsmith/repos.yml',
     registry: {
       workspaces: {
         frontend: {
@@ -370,7 +370,7 @@ describe('getAvailableWorkspaces', () => {
 
   const projectSource: RegistrySource = {
     type: 'project',
-    path: '/projects/foo/.agentx/repos.yml',
+    path: '/projects/foo/.helmsmith/repos.yml',
     registry: {
       workspaces: {
         frontend: {
@@ -466,7 +466,7 @@ describe('createWorkspace (#114)', () => {
 
   it('refuses to overwrite an existing registry file', async () => {
     mockAccess.mockResolvedValue(undefined); // file exists
-    await expect(createWorkspace('/home/user/.agentx/repos.yml', 'default')).rejects.toThrow(
+    await expect(createWorkspace('/home/user/.helmsmith/repos.yml', 'default')).rejects.toThrow(
       /already exists/,
     );
     expect(mockWriteFile).not.toHaveBeenCalled();
@@ -475,9 +475,9 @@ describe('createWorkspace (#114)', () => {
 
   it('creates the registry when the file is missing', async () => {
     mockAccess.mockRejectedValue(new Error('ENOENT'));
-    const { workspace } = await createWorkspace('~/.agentx/repos.yml', 'default');
+    const { workspace } = await createWorkspace('~/.helmsmith/repos.yml', 'default');
     expect(workspace.name).toBe('default');
-    expect(mockRename).toHaveBeenCalledWith(expect.any(String), '/home/user/.agentx/repos.yml');
+    expect(mockRename).toHaveBeenCalledWith(expect.any(String), '/home/user/.helmsmith/repos.yml');
   });
 });
 
@@ -487,23 +487,23 @@ describe('saveReposRegistry (#114)', () => {
 
   it('backs up the existing file, writes a temp file and renames it into place', async () => {
     mockAccess.mockResolvedValue(undefined); // file exists
-    await saveReposRegistry('/home/user/.agentx/repos.yml', registry);
+    await saveReposRegistry('/home/user/.helmsmith/repos.yml', registry);
 
     // The backup never follows a planted symlink: unlink the old .bak, then create exclusively.
-    expect(mockRm).toHaveBeenCalledWith('/home/user/.agentx/repos.yml.bak', { force: true });
+    expect(mockRm).toHaveBeenCalledWith('/home/user/.helmsmith/repos.yml.bak', { force: true });
     expect(mockCopyFile).toHaveBeenCalledWith(
-      '/home/user/.agentx/repos.yml',
-      '/home/user/.agentx/repos.yml.bak',
+      '/home/user/.helmsmith/repos.yml',
+      '/home/user/.helmsmith/repos.yml.bak',
       constants.COPYFILE_EXCL,
     );
     const [tmpPath, content, options] = mockWriteFile.mock.calls[0];
-    expect(String(tmpPath)).not.toBe('/home/user/.agentx/repos.yml');
-    expect(path.dirname(String(tmpPath))).toBe('/home/user/.agentx');
+    expect(String(tmpPath)).not.toBe('/home/user/.helmsmith/repos.yml');
+    expect(path.dirname(String(tmpPath))).toBe('/home/user/.helmsmith');
     expect(String(content)).toContain('workspaces:');
     // The temp file is created exclusively under an unpredictable name.
     expect(options).toMatchObject({ flag: 'wx' });
     expect(path.basename(String(tmpPath))).toMatch(/^\.repos\.yml\.[A-Za-z0-9_-]{12,}\.tmp$/);
-    expect(mockRename).toHaveBeenCalledWith(tmpPath, '/home/user/.agentx/repos.yml');
+    expect(mockRename).toHaveBeenCalledWith(tmpPath, '/home/user/.helmsmith/repos.yml');
     // order: backup, write, rename
     expect(mockRm.mock.invocationCallOrder[0]).toBeLessThan(
       mockCopyFile.mock.invocationCallOrder[0],
@@ -518,14 +518,14 @@ describe('saveReposRegistry (#114)', () => {
 
   it('uses a different temp name on every write', async () => {
     mockAccess.mockRejectedValue(new Error('ENOENT'));
-    await saveReposRegistry('/home/user/.agentx/repos.yml', registry);
-    await saveReposRegistry('/home/user/.agentx/repos.yml', registry);
+    await saveReposRegistry('/home/user/.helmsmith/repos.yml', registry);
+    await saveReposRegistry('/home/user/.helmsmith/repos.yml', registry);
     expect(mockWriteFile.mock.calls[0][0]).not.toBe(mockWriteFile.mock.calls[1][0]);
   });
 
   it('takes no backup when there is nothing to back up', async () => {
     mockAccess.mockRejectedValue(new Error('ENOENT'));
-    await saveReposRegistry('/home/user/.agentx/repos.yml', registry);
+    await saveReposRegistry('/home/user/.helmsmith/repos.yml', registry);
     expect(mockCopyFile).not.toHaveBeenCalled();
     expect(mockRename).toHaveBeenCalledTimes(1);
   });

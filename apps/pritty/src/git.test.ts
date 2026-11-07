@@ -3,37 +3,37 @@ import { parseGitHubRemote } from './git.js';
 
 describe('parseGitHubRemote', () => {
   it('parses HTTPS form with .git suffix', () => {
-    expect(parseGitHubRemote('https://github.com/ecruz165/agentx-toolbox.git')).toEqual({
+    expect(parseGitHubRemote('https://github.com/ecruz165/helmsmith.git')).toEqual({
       owner: 'ecruz165',
-      repo: 'agentx-toolbox',
+      repo: 'helmsmith',
     });
   });
 
   it('parses HTTPS form without .git suffix', () => {
-    expect(parseGitHubRemote('https://github.com/ecruz165/agentx-toolbox')).toEqual({
+    expect(parseGitHubRemote('https://github.com/ecruz165/helmsmith')).toEqual({
       owner: 'ecruz165',
-      repo: 'agentx-toolbox',
+      repo: 'helmsmith',
     });
   });
 
   it('parses HTTPS form with trailing slash', () => {
-    expect(parseGitHubRemote('https://github.com/ecruz165/agentx-toolbox/')).toEqual({
+    expect(parseGitHubRemote('https://github.com/ecruz165/helmsmith/')).toEqual({
       owner: 'ecruz165',
-      repo: 'agentx-toolbox',
+      repo: 'helmsmith',
     });
   });
 
   it('parses SSH form', () => {
-    expect(parseGitHubRemote('git@github.com:ecruz165/agentx-toolbox.git')).toEqual({
+    expect(parseGitHubRemote('git@github.com:ecruz165/helmsmith.git')).toEqual({
       owner: 'ecruz165',
-      repo: 'agentx-toolbox',
+      repo: 'helmsmith',
     });
   });
 
   it('parses SSH form without .git', () => {
-    expect(parseGitHubRemote('git@github.com:ecruz165/agentx-toolbox')).toEqual({
+    expect(parseGitHubRemote('git@github.com:ecruz165/helmsmith')).toEqual({
       owner: 'ecruz165',
-      repo: 'agentx-toolbox',
+      repo: 'helmsmith',
     });
   });
 

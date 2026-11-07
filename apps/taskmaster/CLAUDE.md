@@ -1,16 +1,16 @@
-# AgentX Taskmaster — Claude Code Instructions
+# Helmsmith Taskmaster — Claude Code Instructions
 
 ## Project Overview
 
-AgentX Taskmaster is a CLI-based project task generator that parses implementation plans, scores task complexity, and auto-decomposes work into structured hierarchies. It supports configurable project styles (Epics, Stories, Tasks, Subtasks) and produces delegation-ready output for a Team Lead agent to assign tasks to specialized agent personas.
+Helmsmith Taskmaster is a CLI-based project task generator that parses implementation plans, scores task complexity, and auto-decomposes work into structured hierarchies. It supports configurable project styles (Epics, Stories, Tasks, Subtasks) and produces delegation-ready output for a Team Lead agent to assign tasks to specialized agent personas.
 
 **Tech Stack**: TypeScript (strict mode), Node.js 20+, Commander.js (CLI), Inquirer.js (prompts), Handlebars.js (templates), js-yaml (YAML), Zod (validation), Vitest (testing), tsup (bundling)
 
-**Implementation Plan**: `.plans/agentx-taskmaster-implementation-plan.md`
+**Implementation Plan**: `.plans/helmsmith-taskmaster-implementation-plan.md`
 
 **Data Strategy**: YAML for human-facing files (config, task files, reports) — JSON as internal canonical store (`tasks.json`)
 
-**Runtime State**: All state lives under `~/.agentx-userdata/taskmaster/` — repositories stay clean with no dotfolders.
+**Runtime State**: All state lives under `~/.helmsmith-userdata/taskmaster/` — repositories stay clean with no dotfolders.
 
 ---
 
@@ -29,7 +29,7 @@ All work flows through the **Team Lead Agent**, which reads the implementation p
 
 The Team Lead is the orchestrator. It never writes application code directly — it reads, plans, delegates, and coordinates.
 
-1. **Read Implementation Plan** — Read `.plans/agentx-taskmaster-implementation-plan.md` and identify the current implementation phase:
+1. **Read Implementation Plan** — Read `.plans/helmsmith-taskmaster-implementation-plan.md` and identify the current implementation phase:
    - **Phase 1 (Foundation)**: T-1, T-2, T-3, T-4, T-11, T-12, T-13 — scaffolding, parser, config, states, prompts, templates, data bridge
    - **Phase 2 (Scoring & Skills)**: T-5, T-6, T-9 — heuristic scorer, Copilot AI scorer, skill tagging
    - **Phase 3 (Decomposition & Delegation)**: T-7, T-8, T-10 — decomposer, dependency graph, readiness
@@ -67,7 +67,7 @@ The Team Lead is the orchestrator. It never writes application code directly —
 Each teammate (sub-agent) follows this workflow after being spawned by the Team Lead:
 
 1. **Enter Plan Mode** — Use `EnterPlanMode` tool before doing any research or implementation
-2. **Read Implementation Plan** — Read `.plans/agentx-taskmaster-implementation-plan.md` and extract sections relevant to the assigned task. Focus on:
+2. **Read Implementation Plan** — Read `.plans/helmsmith-taskmaster-implementation-plan.md` and extract sections relevant to the assigned task. Focus on:
    - System architecture and data model (sections 3–4)
    - The specific task and subtask breakdown (sections 8–9)
    - Scoring methodology if the task involves scoring (section 5)
@@ -205,8 +205,8 @@ The Team Lead monitors teammates and manages the pipeline:
 ## Project Structure
 
 ```
-agentx-taskmaster/
-├── bin/agentx-taskmaster.js       # CLI entry point (Commander.js)
+helmsmith-taskmaster/
+├── bin/helmsmith-taskmaster.js       # CLI entry point (Commander.js)
 ├── src/
 │   ├── parser/                    # Plan parsing (MD, TXT, YAML)
 │   ├── scorer/                    # Complexity scoring (heuristic + AI)
@@ -232,7 +232,7 @@ agentx-taskmaster/
 
 **Runtime state** (not in repo):
 ```
-~/.agentx-userdata/taskmaster/
+~/.helmsmith-userdata/taskmaster/
 ├── auth.json                      # Copilot OAuth credentials
 ├── defaults.yaml                  # Smart defaults (last-used-wins)
 ├── projects.yaml                  # Project registry + active pointer
@@ -278,42 +278,42 @@ agentx-taskmaster/
 
 ```bash
 # Project management
-agentx-taskmaster init                          # Interactive project setup wizard
-agentx-taskmaster projects list                 # List all projects
-agentx-taskmaster projects create <name>        # Create new project
-agentx-taskmaster projects switch <name>        # Set active project
+helmsmith-taskmaster init                          # Interactive project setup wizard
+helmsmith-taskmaster projects list                 # List all projects
+helmsmith-taskmaster projects create <name>        # Create new project
+helmsmith-taskmaster projects switch <name>        # Set active project
 
 # Plan parsing
-agentx-taskmaster parse <file>                  # Parse plan into tasks
-agentx-taskmaster parse <file> --append         # Add tasks to existing project
+helmsmith-taskmaster parse <file>                  # Parse plan into tasks
+helmsmith-taskmaster parse <file> --append         # Add tasks to existing project
 
 # Scoring & expansion
-agentx-taskmaster score                         # Score unscored tasks
-agentx-taskmaster expand <id>                   # Decompose a task into subtasks
-agentx-taskmaster expand-all                    # Expand all above threshold
+helmsmith-taskmaster score                         # Score unscored tasks
+helmsmith-taskmaster expand <id>                   # Decompose a task into subtasks
+helmsmith-taskmaster expand-all                    # Expand all above threshold
 
 # Task management
-agentx-taskmaster list                          # List all tasks
-agentx-taskmaster show <id>                     # Full task details
-agentx-taskmaster add                           # Interactive task creation
-agentx-taskmaster remove <id>                   # Remove task + children
-agentx-taskmaster set-status <id> <status>      # Update task state
+helmsmith-taskmaster list                          # List all tasks
+helmsmith-taskmaster show <id>                     # Full task details
+helmsmith-taskmaster add                           # Interactive task creation
+helmsmith-taskmaster remove <id>                   # Remove task + children
+helmsmith-taskmaster set-status <id> <status>      # Update task state
 
 # Delegation & readiness
-agentx-taskmaster ready                         # Delegation manifest (ready tasks)
-agentx-taskmaster ready --format json           # Machine-readable for Team Lead
-agentx-taskmaster next                          # Single highest-priority ready task
+helmsmith-taskmaster ready                         # Delegation manifest (ready tasks)
+helmsmith-taskmaster ready --format json           # Machine-readable for Team Lead
+helmsmith-taskmaster next                          # Single highest-priority ready task
 
 # Reports & validation
-agentx-taskmaster report                        # Progress report
-agentx-taskmaster validate                      # Check dependency graph
-agentx-taskmaster generate                      # Regenerate YAML task files
-agentx-taskmaster sync                          # Merge YAML edits back to tasks.json
+helmsmith-taskmaster report                        # Progress report
+helmsmith-taskmaster validate                      # Check dependency graph
+helmsmith-taskmaster generate                      # Regenerate YAML task files
+helmsmith-taskmaster sync                          # Merge YAML edits back to tasks.json
 
 # Authentication
-agentx-taskmaster auth login                    # Copilot OAuth device flow
-agentx-taskmaster auth status                   # Token validity + subscription info
-agentx-taskmaster auth logout                   # Revoke credentials
+helmsmith-taskmaster auth login                    # Copilot OAuth device flow
+helmsmith-taskmaster auth status                   # Token validity + subscription info
+helmsmith-taskmaster auth logout                   # Revoke credentials
 
 # Development
 npx vitest run                                  # Run all tests
@@ -326,7 +326,7 @@ npx tsup                                        # Build CLI bundle
 ## Key Architecture Decisions
 
 1. **Hybrid YAML/JSON** — YAML for files humans touch, JSON for the machine pipeline. `tasks.json` is truth; YAML files are projections.
-2. **Global home (`~/.agentx-userdata/taskmaster/`)** — Repos stay clean. All state is user-local. Multi-project via `projects.yaml`.
+2. **Global home (`~/.helmsmith-userdata/taskmaster/`)** — Repos stay clean. All state is user-local. Multi-project via `projects.yaml`.
 3. **Configurable states** — Presets (simple, standard, kanban) or fully custom. State categories (open/active/closed) drive readiness and reporting.
 4. **Readiness is computed, never set** — Derived from dependency graph on every status change. Team Lead reads `ready --format json`.
 5. **Handlebars for all output** — Templates produce markdown, `marked-terminal` renders to ANSI. User-overridable templates in project's `templates/` dir.

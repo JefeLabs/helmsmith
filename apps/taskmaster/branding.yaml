@@ -1,5 +1,5 @@
 # Rebrand configuration — change these values and run `taskmaster rebrand`
-appGroupName: agentx
+appGroupName: helmsmith
 appGroupInitials: ax
 appName: taskmaster
 

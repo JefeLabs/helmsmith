@@ -118,7 +118,7 @@ program
       console.log(`Created config: ${configPath}`);
     }
 
-    const reposPath = path.join(homedir(), '.agentx', 'repos.yml');
+    const reposPath = path.join(homedir(), '.helmsmith', 'repos.yml');
     await mkdir(path.dirname(reposPath), { recursive: true });
     let reposCreated = false;
     try {
@@ -226,7 +226,7 @@ workspace
   .action(async (name: string, cmdOpts: { label?: string }) => {
     const { loadReposRegistry, saveReposRegistry } = await import('./config/repos-registry.js');
 
-    const reposPath = path.join(homedir(), '.agentx', 'repos.yml');
+    const reposPath = path.join(homedir(), '.helmsmith', 'repos.yml');
     let registry = await loadReposRegistry(reposPath);
     if (!registry) {
       registry = { workspaces: {}, groups: {}, tags: {} };

@@ -250,7 +250,7 @@ describe('importWorkspace — destination selection', () => {
     mockDetectGitRoot.mockResolvedValue('/my/project');
     mockSelect.mockResolvedValue({
       type: 'global',
-      path: '/home/user/.agentx/repos.yml',
+      path: '/home/user/.helmsmith/repos.yml',
     });
     mockInput.mockResolvedValue('skip');
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -609,7 +609,7 @@ describe('importWorkspace — save', () => {
 
     await importWorkspace('/path/to/repos.yml');
 
-    expect(mockMkdir).toHaveBeenCalledWith('/home/user/.agentx', { recursive: true });
+    expect(mockMkdir).toHaveBeenCalledWith('/home/user/.helmsmith', { recursive: true });
 
     logSpy.mockRestore();
   });
@@ -639,7 +639,7 @@ describe('importWorkspace — save', () => {
 
     await importWorkspace('/path/to/repos.yml');
 
-    const destPath = '/home/user/.agentx/repos.yml';
+    const destPath = '/home/user/.helmsmith/repos.yml';
     const tmpPath = `${destPath}.tmp`;
 
     expect(mockWriteFile).toHaveBeenCalledWith(tmpPath, expect.any(String), 'utf-8');

@@ -81,7 +81,7 @@ public interface CatalogItemDao {
     /**
      * Soft-delete a catalog item — sets {@code deleted_at} so reads
      * filter it out, but the row stays for audit and so a later upsert
-     * (e.g., agentx-load re-syncing the same id from skillzkit)
+     * (e.g., helmsmith-load re-syncing the same id from skillzkit)
      * resurrects it via the existing {@code deleted_at = NULL} branch
      * in upsert's ON CONFLICT clause.
      *

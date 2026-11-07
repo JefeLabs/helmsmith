@@ -43,7 +43,7 @@ public class IntentController {
         IntentService intentService,
         IntentSessionMapper mapper,
         IntentSessionEventBus eventBus,
-        @Value("${agentx.intent.default-intake-pipeline:default-intake}") String defaultIntakePipelineId
+        @Value("${helmsmith.intent.default-intake-pipeline:default-intake}") String defaultIntakePipelineId
     ) {
         this.intentService = intentService;
         this.mapper = mapper;

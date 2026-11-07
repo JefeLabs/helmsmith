@@ -1,7 +1,7 @@
 # helmsmith
 
-Unified monorepo for the **AgentX** ecosystem — the former `agentx-platform` and
-`agentx-toolbox` repos merged (history-preserving) into a single pnpm workspace,
+Unified monorepo for the **Helmsmith** ecosystem — the former platform and
+toolbox repos merged (history-preserving) into a single pnpm workspace,
 alongside the Java/Maven control plane.
 
 ## Layout

@@ -5,16 +5,16 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { defaultsExist, readDefaults, writeDefaults } from '../src/utils/defaults.js';
 import { bootstrapHome } from '../src/utils/home.js';
 
-const TEST_DIR = join(tmpdir(), `agentx-test-defaults-${Date.now()}`);
+const TEST_DIR = join(tmpdir(), `helmsmith-test-defaults-${Date.now()}`);
 
 describe('defaults manager', () => {
   beforeEach(async () => {
-    process.env.AGENTX_HOME = TEST_DIR;
+    process.env.HELMSMITH_HOME = TEST_DIR;
     await bootstrapHome();
   });
 
   afterEach(() => {
-    delete process.env.AGENTX_HOME;
+    delete process.env.HELMSMITH_HOME;
     if (existsSync(TEST_DIR)) {
       rmSync(TEST_DIR, { recursive: true, force: true });
     }

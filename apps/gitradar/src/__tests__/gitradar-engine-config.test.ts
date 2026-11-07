@@ -57,7 +57,7 @@ vi.mock('../config/repos-registry.js', async (importOriginal) => {
     loadAllRegistries: vi.fn(async () => [
       {
         type: 'global',
-        path: '/home/user/.agentx/repos.yml',
+        path: '/home/user/.helmsmith/repos.yml',
         registry: { workspaces: { default: { repos: [] } }, groups: {}, tags: {} },
       },
     ]),

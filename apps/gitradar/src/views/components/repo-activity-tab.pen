@@ -300,7 +300,7 @@
                       "type": "text",
                       "id": "uMghX",
                       "fill": "$foreground",
-                      "content": "agentx-gitradar",
+                      "content": "helmsmith-gitradar",
                       "fontFamily": "Inter",
                       "fontSize": 13,
                       "fontWeight": "normal"

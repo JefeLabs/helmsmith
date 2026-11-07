@@ -63,8 +63,8 @@ function makeWorkspace(
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe('selectWorkspace', () => {
-  const globalSource = makeSource('global', '/home/user/.agentx/repos.yml');
-  const projectSource = makeSource('project', '/projects/foo/.agentx/repos.yml');
+  const globalSource = makeSource('global', '/home/user/.helmsmith/repos.yml');
+  const projectSource = makeSource('project', '/projects/foo/.helmsmith/repos.yml');
 
   beforeEach(() => {
     vi.clearAllMocks();

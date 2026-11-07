@@ -55,7 +55,7 @@ your controlplane identity if you ever switch to team mode).
 You'll see:
 
 ```
-✓ Created /Users/you/.agentx/skillzkit/config.json
+✓ Created /Users/you/.helmsmith/skillzkit/config.json
 
 Mode: standalone (using bundled skills)
 Next:
@@ -203,8 +203,8 @@ In standalone mode, authoring happens locally — typically in a fork
 of the skillzkit repo:
 
 ```bash
-git clone https://github.com/ecruz165/agentx-toolbox
-cd agentx-toolbox/apps/skillzkit
+git clone https://github.com/JefeLabs/helmsmith
+cd helmsmith/platform/skillzkit/skillzkit
 git checkout -b feat/my-thing
 
 # Author a new command
@@ -255,7 +255,7 @@ non-TUI commands (`skillzkit list`, `skillzkit search`) instead.
 ### Reset config
 
 ```bash
-rm ~/.agentx/skillzkit/config.json
+rm ~/.helmsmith/skillzkit/config.json
 skillzkit init                       # fresh setup
 ```
 

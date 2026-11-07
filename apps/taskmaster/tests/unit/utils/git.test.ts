@@ -8,7 +8,7 @@ describe('detectGitRoot', () => {
   let tmpDir: string;
 
   beforeEach(async () => {
-    tmpDir = await mkdtemp(join(tmpdir(), 'agentx-git-test-'));
+    tmpDir = await mkdtemp(join(tmpdir(), 'helmsmith-git-test-'));
   });
 
   afterEach(async () => {
@@ -47,13 +47,13 @@ describe('detectGitRoot', () => {
 describe('getRepoTaskmasterHome', () => {
   it('returns the repo-local taskmaster home path', () => {
     const result = getRepoTaskmasterHome('/home/user/my-repo');
-    expect(result).toBe(join('/home/user/my-repo', '.agentx', 'taskmaster'));
+    expect(result).toBe(join('/home/user/my-repo', '.helmsmith', 'taskmaster'));
   });
 
   it('builds correct nested path structure', () => {
     const result = getRepoTaskmasterHome('/tmp/project');
-    expect(result).toContain('.agentx');
+    expect(result).toContain('.helmsmith');
     expect(result).toContain('taskmaster');
-    expect(result).toBe('/tmp/project/.agentx/taskmaster');
+    expect(result).toBe('/tmp/project/.helmsmith/taskmaster');
   });
 });

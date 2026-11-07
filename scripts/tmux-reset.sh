@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/tmux-reset.sh — nuclear option for when the agentx tmux state is wedged.
+# scripts/tmux-reset.sh — nuclear option for when the helmsmith tmux state is wedged.
 #
 # Kills the session, reaps any orphan trio processes (their PIDs survive even
 # when their tmux panes have died), and clears stale UDS socket files.
@@ -9,7 +9,7 @@
 
 set -euo pipefail
 
-SESSION="${AGENTX_TMUX_SESSION:-agentx}"
+SESSION="${HELMSMITH_TMUX_SESSION:-helmsmith}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 RUN_DIR="$WS_ROOT/.harness/run"

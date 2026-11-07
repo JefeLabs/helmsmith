@@ -41,7 +41,7 @@ function findWorkspaceRoot(): string {
 
 const WS_ROOT = findWorkspaceRoot();
 const HARNESS_SOCKET = join(WS_ROOT, '.harness', 'run', 'harness.sock');
-const TMUX_SESSION = process.env.AGENTX_TMUX_SESSION ?? 'agentx';
+const TMUX_SESSION = process.env.HELMSMITH_TMUX_SESSION ?? 'helmsmith';
 const POLL_MS = 3000;
 const EVENT_BUFFER_CAP = 200;
 

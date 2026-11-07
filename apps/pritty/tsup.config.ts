@@ -14,7 +14,7 @@ export default defineConfig({
   splitting: true,
   shims: false,
   // Bundle ONLY @helmsmith/agent-* (consumed via npm link from
-  // agentx-platform until those packages are published). Their
+  // helmsmith until those packages are published). Their
   // package.json exports point at .ts source, so they must be inlined
   // to ship a usable JS bundle. Everything else stays as a runtime
   // require — npm-installed at the consumer's node_modules.

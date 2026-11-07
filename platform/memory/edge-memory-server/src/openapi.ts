@@ -217,7 +217,7 @@ export function buildOpenApiSpec(): JsonSchema {
       title: 'edge-memory-server',
       version: '1.0.0',
       description:
-        'UDS-fronted memory store for agentx workers. Scope-aware, GDPR-compliant, vector-similarity-capable.',
+        'UDS-fronted memory store for helmsmith workers. Scope-aware, GDPR-compliant, vector-similarity-capable.',
     },
     paths,
     components: { schemas: components },

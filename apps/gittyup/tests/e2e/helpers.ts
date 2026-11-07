@@ -28,7 +28,7 @@ export interface RunCliOptions {
 }
 
 export interface Workspace {
-  /** Temp dir used as cwd and as HOME/AGENTX_HOME for the spawned CLI. */
+  /** Temp dir used as cwd and as HOME/HELMSMITH_HOME for the spawned CLI. */
   dir: string;
   /** Path of `<dir>/gittyup.yaml`. */
   manifestPath: string;
@@ -60,7 +60,7 @@ export async function createWorkspace(
 }
 
 /**
- * Run the CLI inside a workspace. HOME and AGENTX_HOME point at the
+ * Run the CLI inside a workspace. HOME and HELMSMITH_HOME point at the
  * workspace so config, cache and auth never touch the developer's home;
  * GitHub tokens are blanked so nothing reaches the network. stdin is
  * closed right after `opts.stdin` (if any) so an interactive prompt fails
@@ -75,7 +75,7 @@ export function runCli(
 ): Promise<CliResult> {
   const env = fixtureEnv({
     HOME: ws.dir,
-    AGENTX_HOME: ws.dir,
+    HELMSMITH_HOME: ws.dir,
     GITHUB_TOKEN: '',
     GH_TOKEN: '',
     COPILOT_GITHUB_TOKEN: '',

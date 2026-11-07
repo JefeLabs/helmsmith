@@ -13,16 +13,16 @@ import {
   switchProject,
 } from '../src/utils/projects.js';
 
-const TEST_DIR = join(tmpdir(), `agentx-test-projects-${Date.now()}`);
+const TEST_DIR = join(tmpdir(), `helmsmith-test-projects-${Date.now()}`);
 
 describe('projects manager (home location)', () => {
   beforeEach(async () => {
-    process.env.AGENTX_HOME = TEST_DIR;
+    process.env.HELMSMITH_HOME = TEST_DIR;
     await bootstrapHome();
   });
 
   afterEach(() => {
-    delete process.env.AGENTX_HOME;
+    delete process.env.HELMSMITH_HOME;
     if (existsSync(TEST_DIR)) {
       rmSync(TEST_DIR, { recursive: true, force: true });
     }
@@ -123,15 +123,15 @@ describe('projects manager (repo location)', () => {
   let repoDir: string;
 
   beforeEach(async () => {
-    process.env.AGENTX_HOME = TEST_DIR;
+    process.env.HELMSMITH_HOME = TEST_DIR;
     await bootstrapHome();
-    repoDir = join(tmpdir(), `agentx-test-repo-${Date.now()}`);
+    repoDir = join(tmpdir(), `helmsmith-test-repo-${Date.now()}`);
     mkdirSync(repoDir, { recursive: true });
     await bootstrapRepoHome(repoDir);
   });
 
   afterEach(() => {
-    delete process.env.AGENTX_HOME;
+    delete process.env.HELMSMITH_HOME;
     if (existsSync(TEST_DIR)) {
       rmSync(TEST_DIR, { recursive: true, force: true });
     }

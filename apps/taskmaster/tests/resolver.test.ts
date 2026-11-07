@@ -6,16 +6,16 @@ import { resolveProject, resolveProjectOrThrow } from '../src/config/resolver.js
 import { bootstrapHome, bootstrapRepoHome } from '../src/utils/home.js';
 import { createProject, switchProject } from '../src/utils/projects.js';
 
-const TEST_DIR = join(tmpdir(), `agentx-test-resolver-${Date.now()}`);
+const TEST_DIR = join(tmpdir(), `helmsmith-test-resolver-${Date.now()}`);
 
 describe('project resolver (home only)', () => {
   beforeEach(async () => {
-    process.env.AGENTX_HOME = TEST_DIR;
+    process.env.HELMSMITH_HOME = TEST_DIR;
     await bootstrapHome();
   });
 
   afterEach(() => {
-    delete process.env.AGENTX_HOME;
+    delete process.env.HELMSMITH_HOME;
     if (existsSync(TEST_DIR)) {
       rmSync(TEST_DIR, { recursive: true, force: true });
     }
@@ -85,15 +85,15 @@ describe('project resolver (with repo)', () => {
   let repoDir: string;
 
   beforeEach(async () => {
-    process.env.AGENTX_HOME = TEST_DIR;
+    process.env.HELMSMITH_HOME = TEST_DIR;
     await bootstrapHome();
-    repoDir = join(tmpdir(), `agentx-test-repo-resolver-${Date.now()}`);
+    repoDir = join(tmpdir(), `helmsmith-test-repo-resolver-${Date.now()}`);
     mkdirSync(repoDir, { recursive: true });
     await bootstrapRepoHome(repoDir);
   });
 
   afterEach(() => {
-    delete process.env.AGENTX_HOME;
+    delete process.env.HELMSMITH_HOME;
     if (existsSync(TEST_DIR)) {
       rmSync(TEST_DIR, { recursive: true, force: true });
     }
@@ -150,8 +150,8 @@ describe('project resolver (with repo)', () => {
     await createProject('my-repo-proj', 'repo', repoDir);
 
     const result = await resolveProjectOrThrow(undefined, repoDir);
-    expect(result.projectDir).toBe(join(repoDir, '.agentx', 'taskmaster', 'my-repo-proj'));
-    expect(result.taskmasterHome).toBe(join(repoDir, '.agentx', 'taskmaster'));
+    expect(result.projectDir).toBe(join(repoDir, '.helmsmith', 'taskmaster', 'my-repo-proj'));
+    expect(result.taskmasterHome).toBe(join(repoDir, '.helmsmith', 'taskmaster'));
     expect(result.gitRoot).toBe(repoDir);
   });
 });

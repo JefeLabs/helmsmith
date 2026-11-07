@@ -105,14 +105,14 @@ pritty's primitives are exported as a library:
 import { categorize, loadConfig, login } from "@helmsmith/pritty";
 ```
 
-Other AgentX tools (and your own scripts) can reuse the categorizer,
+Other Helmsmith tools (and your own scripts) can reuse the categorizer,
 config loader, or auth flow without spawning the CLI. This composability
 is core to the toolbox philosophy — every app is also a library.
 
 ### Built on shared agent infrastructure
 
 Auth comes from `@helmsmith/agent-auth` (the same OAuth/Device Flow
-implementation other AgentX tools use). LLM provider routing comes
+implementation other Helmsmith tools use). LLM provider routing comes
 from `@helmsmith/agent-adapter` (also shared). pritty doesn't reinvent
 either — it inherits improvements as the platform evolves.
 

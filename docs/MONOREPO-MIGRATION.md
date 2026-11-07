@@ -1,11 +1,11 @@
-# Monorepo migration: agentx-platform + agentx-toolbox → helmsmith
+# Monorepo migration: platform + toolbox repos → helmsmith
 
 This repo was assembled by merging two source repos into one pnpm workspace,
 **preserving full git history** (via `git filter-repo` path rewrites + merge of
 unrelated histories).
 
-- `agentx-platform` (branch `develop`, 220 commits) → core/harness/context/memory/web + controlplane
-- `agentx-toolbox` (branch `main`, 132 commits) → core libs + skillzkit/ + apps/
+- the platform repo (branch `develop`, 220 commits) → core/harness/context/memory/web + controlplane
+- the toolbox repo (branch `main`, 132 commits) → core libs + skillzkit/ + apps/
 
 Total history: **353 commits** (`git log` and `git blame` follow files across the rename).
 
@@ -27,7 +27,7 @@ Total history: **353 commits** (`git log` and `git blame` follow files across th
    - **npm scope:** `@ecruz165/* → @helmsmith/*` across all 25 packages + every
      import, `workspace:*` dep, `tsup` `noExternal` regex, and `pnpm --filter` arg.
      Product-branded for public-npm publishing (see #4).
-   - **Java:** `com.jefelabs.agentx → com.jefelabs.helmsmith` (package + Maven
+   - **Java:** package root renamed to `com.jefelabs.helmsmith` (package + Maven
      `groupId`).
    - **GitHub org** stays `JefeLabs` (owns the repo).
    Verified: `pnpm -r typecheck` 0 + full suite 3324 / 0 failed; `./mvnw test` BUILD

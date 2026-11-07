@@ -11,7 +11,7 @@ maintains a central registry of what's available where.
 It's designed to be consumed two ways:
 
 1. **As a CLI** — for humans setting up a workstation or build host.
-2. **As a library** — for other AgentX packages that declare CLI
+2. **As a library** — for other Helmsmith packages that declare CLI
    dependencies and want them present at runtime without writing
    per-platform install instructions in their docs.
 
@@ -55,7 +55,7 @@ if (!status.installed) {
 ```
 
 The CLI exists for human-driven setup, but the meaningful surface is
-the programmatic API. This makes toolz a building block other AgentX
+the programmatic API. This makes toolz a building block other Helmsmith
 packages depend on cleanly: skillzkit, taskmaster, gitradar, pritty
 can all declare `await ensureTool(...)` at startup without each
 re-implementing platform detection.
@@ -103,7 +103,7 @@ toolz doctor
 
 toolz ships with a built-in catalog of common tools (git, gh, jq, yq,
 ripgrep, fd, pandoc, ffmpeg). Users add to this via
-`~/.agentx/toolz/catalog.yaml`:
+`~/.helmsmith/toolz/catalog.yaml`:
 
 ```yaml
 tools:
@@ -121,7 +121,7 @@ customize the install command for tools toolz already knows about
 
 ## Who it's for
 
-- **Other AgentX packages** that need CLI dependencies at runtime.
+- **Other Helmsmith packages** that need CLI dependencies at runtime.
   This is the primary audience.
 - **DevEx / platform engineers** setting up developer machines or
   build hosts in a cross-platform way.

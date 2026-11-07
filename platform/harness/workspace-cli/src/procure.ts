@@ -9,7 +9,7 @@
  *   4. For each repo: `git clone <url> <projectDir>/<repoName>` — eager
  *      so the developer's working trees exist immediately.
  *   5. If any clone fails: roll back (rm -rf <projectDir>) so the next
- *      `agentx-workspace` invocation starts clean. The .code-workspace
+ *      `helmsmith-workspace` invocation starts clean. The .code-workspace
  *      file is the success sentinel — it is NOT written on partial failure.
  *   6. Write <projectDir>/harness-workspace.yml from the substitution rule.
  *   7. Write <projectDir>/<name>.code-workspace.
@@ -187,7 +187,7 @@ export async function procure(spec: ProcureSpec): Promise<ProcureResult> {
 /**
  * Spawn skillzkit's install subcommand. The bin string is split on
  * whitespace so callers can pass either a single binary
- * (`agentx-skillzkit`) or a multi-word command
+ * (`helmsmith-skillzkit`) or a multi-word command
  * (`npx -y @helmsmith/skillzkit`, `tsx /path/to/cli.ts`). Captures combined
  * output; truncates so ProcureResult.skillsInstalled.output stays small.
  */

@@ -2,7 +2,7 @@
  * Domain types for skillzkit's catalog. Re-exported from
  * `@helmsmith/skillzkit-types` (the cross-language source of truth that
  * generates `apps/skillzkit/schema/catalog.schema.json` for Java
- * consumers on agentx-platform).
+ * consumers on helmsmith).
  *
  * Skillzkit-internal types (NextSuggestion, NextReason — used only by
  * the suggest command) stay below.

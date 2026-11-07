@@ -7,7 +7,7 @@ describe('E2E: CRUD commands', () => {
 
   beforeEach(async () => {
     tempHome = await createTempHome();
-    env = { AGENTX_HOME: tempHome };
+    env = { HELMSMITH_HOME: tempHome };
     // Init a project for all CRUD tests
     await runCli(['init', '--name', 'crud-project', '--no-interactive'], env);
   });

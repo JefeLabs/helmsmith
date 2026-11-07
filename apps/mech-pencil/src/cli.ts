@@ -1,7 +1,7 @@
 /**
  * mech-pencil CLI entry. Thin commander wiring — each verb's logic
  * lives in `src/commands/<verb>.ts`. Matches the per-verb-file pattern
- * used across the agentx-toolbox monorepo (CONVENTIONS.md).
+ * used across the helmsmith monorepo (CONVENTIONS.md).
  */
 
 import { readFileSync } from 'node:fs';

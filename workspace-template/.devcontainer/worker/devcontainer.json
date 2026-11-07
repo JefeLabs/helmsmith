@@ -1,5 +1,5 @@
 {
-  "name": "agentx-worker-template",
+  "name": "helmsmith-worker-template",
   // Reference the pre-built worker image rather than rebuilding per
   // workspace. `workspace start` (or `workspace build-worker`) builds
   // and tags this image once on the host; all workspaces' devcontainers
@@ -8,8 +8,8 @@
   //
   // For local-customization (extra apt packages etc.), users can switch
   // back to a `build` block referencing this image as the base via FROM
-  // agentx/worker:dev in a workspace-local Dockerfile.
-  "image": "agentx/worker:dev",
+  // helmsmith/worker:dev in a workspace-local Dockerfile.
+  "image": "helmsmith/worker:dev",
   "workspaceFolder": "/workspace",
   "overrideCommand": false,
   "shutdownAction": "none"

@@ -2,7 +2,7 @@
  * Bearer-token verification for the contribute endpoints.
  *
  * The skillzkit API does not own user identity. Tokens are minted by
- * the host platform (typically agentx-controlplane) and presented to
+ * the host platform (typically helmsmith-controlplane) and presented to
  * skillzkit as opaque strings. The AuthVerifier interface is the seam
  * between "the request has this bearer token" and "this is the
  * AuthorIdentity I should record on the version metadata."

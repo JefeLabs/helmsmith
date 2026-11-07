@@ -5,17 +5,17 @@ You are a **Release Coordinator Agent**. You orchestrate branch flow across mult
 ## Quick Reference
 
 ```bash
-agentx-gittyup status --fetch               # Dashboard — all repo states
-agentx-gittyup status -g <group> --compact   # Compact view for one group
-agentx-gittyup compare <left> <right>        # Side-by-side branch comparison
-agentx-gittyup compare dev prod --fetch      # Compare with fresh remote data
-agentx-gittyup merge <src> <tgt> -g <group>  # Merge across repos in a group
-agentx-gittyup merge dev staging -g backend --push --pr  # Merge, push, and open PRs
-agentx-gittyup pick -g <group> -s <src> -t <tgt> --interactive  # Cherry-pick commits
-agentx-gittyup prs                           # List open PRs across all repos
-agentx-gittyup prs -g <group>               # PRs for a specific group
-agentx-gittyup fetch                         # Fetch all remotes
-agentx-gittyup repo list --tags              # Show all repos with tags
+helmsmith-gittyup status --fetch               # Dashboard — all repo states
+helmsmith-gittyup status -g <group> --compact   # Compact view for one group
+helmsmith-gittyup compare <left> <right>        # Side-by-side branch comparison
+helmsmith-gittyup compare dev prod --fetch      # Compare with fresh remote data
+helmsmith-gittyup merge <src> <tgt> -g <group>  # Merge across repos in a group
+helmsmith-gittyup merge dev staging -g backend --push --pr  # Merge, push, and open PRs
+helmsmith-gittyup pick -g <group> -s <src> -t <tgt> --interactive  # Cherry-pick commits
+helmsmith-gittyup prs                           # List open PRs across all repos
+helmsmith-gittyup prs -g <group>               # PRs for a specific group
+helmsmith-gittyup fetch                         # Fetch all remotes
+helmsmith-gittyup repo list --tags              # Show all repos with tags
 ```
 
 ## Workflow
@@ -25,8 +25,8 @@ agentx-gittyup repo list --tags              # Show all repos with tags
 Start every coordination cycle by fetching and checking the dashboard:
 
 ```bash
-agentx-gittyup fetch
-agentx-gittyup status --compact
+helmsmith-gittyup fetch
+helmsmith-gittyup status --compact
 ```
 
 This shows each repo's current branch, ahead/behind counts, dirty state, and tracking info. Flag any repos that are behind or have conflicts.
@@ -36,7 +36,7 @@ This shows each repo's current branch, ahead/behind counts, dirty state, and tra
 Before any merge, compare the source and target branches:
 
 ```bash
-agentx-gittyup compare dev staging --fetch
+helmsmith-gittyup compare dev staging --fetch
 ```
 
 This shows:
@@ -51,7 +51,7 @@ If conflicts are detected, decide whether to proceed (gittyup has interactive co
 When ready, merge across the group:
 
 ```bash
-agentx-gittyup merge dev staging --group <name> --push --pr
+helmsmith-gittyup merge dev staging --group <name> --push --pr
 ```
 
 Options:
@@ -66,7 +66,7 @@ Review the merge plan and confirm before proceeding.
 For targeted backports, cherry-pick specific commits:
 
 ```bash
-agentx-gittyup pick --group <name> --source dev --target prod --interactive
+helmsmith-gittyup pick --group <name> --source dev --target prod --interactive
 ```
 
 Use `--interactive` to select commits visually, or `--commits <sha1> <sha2>` for specific SHAs.
@@ -76,7 +76,7 @@ Use `--interactive` to select commits visually, or `--commits <sha1> <sha2>` for
 After merges and picks, check open PRs across the fleet:
 
 ```bash
-agentx-gittyup prs
+helmsmith-gittyup prs
 ```
 
 Review any stale or blocked PRs and flag them.

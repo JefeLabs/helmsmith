@@ -3,8 +3,8 @@ Fetch all remotes and show the current state of all repos.
 Run the following commands in sequence:
 
 ```
-agentx-gittyup fetch
-agentx-gittyup status --compact
+helmsmith-gittyup fetch
+helmsmith-gittyup status --compact
 ```
 
 Options:

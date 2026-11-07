@@ -23,7 +23,7 @@ export const TYPE_STEPS: TypeStep[] = [
     role: 'display',
     weight: '700',
     lineHeight: 1.13,
-    sample: 'AgentX',
+    sample: 'Helmsmith',
   },
   {
     name: 'display-xl',

@@ -1,7 +1,7 @@
 /**
  * `runConnectView` — programmatic entry point for CLI handlers.
  *
- * Wraps `<ConnectView>` in `<AgentxThemeProvider>` + `<KeyboardProvider>`
+ * Wraps `<ConnectView>` in `<HelmsmithThemeProvider>` + `<KeyboardProvider>`
  * + an openTUI renderer so the CLI's `.action()` can call this from
  * a non-React context:
  *
@@ -16,14 +16,14 @@
 import { createElement } from 'react';
 import type { Connection } from '../connection.ts';
 import { KeyboardProvider } from '../keyboard/registry.tsx';
-import { AgentxThemeProvider } from '../theme/AgentxThemeProvider.tsx';
+import { HelmsmithThemeProvider } from '../theme/HelmsmithThemeProvider.tsx';
 import { ConnectView } from './ConnectView.tsx';
 
 export interface RunConnectViewOptions {
   appName: string;
   required?: Connection[];
   optional?: Connection[];
-  /** Override the theme directory. Default: `~/.agentx/theme/`. */
+  /** Override the theme directory. Default: `~/.helmsmith/theme/`. */
   themeDir?: string;
   /** Theme to use if no `default.*` file exists yet. Default: rose-pine. */
   fallbackThemeName?: string;
@@ -71,7 +71,7 @@ export async function runConnectView(opts: RunConnectViewOptions): Promise<void>
     // rather than as a `children` prop. This is what JSX desugars to and
     // is what biome's noChildrenProp rule expects.
     const tree = createElement(
-      AgentxThemeProvider,
+      HelmsmithThemeProvider,
       {
         appName: opts.appName,
         fallbackThemeName: opts.fallbackThemeName,

@@ -60,7 +60,7 @@ holds the things that **can't** be Node modules and need to run as containers:
 ```
 
 The triad ↔ worker boundary is UDS via bind-mount. Cross-container IPC
-between sidecars uses the `agentx-harness-net` bridge (service-name DNS).
+between sidecars uses the `helmsmith-harness-net` bridge (service-name DNS).
 
 ## Run
 
@@ -73,7 +73,7 @@ the first `docker compose up`:**
 
 > Settings → AI → ✓ Enable Docker Model Runner
 
-The default TCP port is `12434`; the compose comments + `agentx-load`
+The default TCP port is `12434`; the compose comments + `helmsmith-load`
 examples assume that. If you change it in Docker Desktop, update consumers
 accordingly.
 
@@ -137,7 +137,7 @@ runtimes are their own containers.**
 ## Open considerations
 
 - **Worker network attachment.** `spawn-worker.ts` does not currently add
-  `--network agentx-harness-net` to its `runArgs`. Workers therefore reach
+  `--network helmsmith-harness-net` to its `runArgs`. Workers therefore reach
   Neo4j transitively through the host triad's UDS bind-mount (the canonical
   path) and reach the model sidecars via host-port mappings (`localhost:12434`,
   `localhost:7687`). If a future use case needs direct service-name DNS from

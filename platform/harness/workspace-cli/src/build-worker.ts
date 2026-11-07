@@ -21,13 +21,13 @@ import { join } from 'node:path';
 export interface BuildWorkerOptions {
   /** Force rebuild even if the image already exists locally. */
   force?: boolean;
-  /** Override the platform root (default: env AGENTX_PLATFORM_ROOT or cwd). */
+  /** Override the platform root (default: env HELMSMITH_PLATFORM_ROOT or cwd). */
   platformRoot?: string;
-  /** Image tag (default: agentx/worker:dev). */
+  /** Image tag (default: helmsmith/worker:dev). */
   tag?: string;
 }
 
-const DEFAULT_TAG = 'agentx/worker:dev';
+const DEFAULT_TAG = 'helmsmith/worker:dev';
 
 export async function runBuildWorker(opts: BuildWorkerOptions): Promise<void> {
   const root = resolveRoot(opts.platformRoot);
@@ -36,7 +36,7 @@ export async function runBuildWorker(opts: BuildWorkerOptions): Promise<void> {
 
   if (!existsSync(dockerfile)) {
     console.error(`error: ${dockerfile} not found.`);
-    console.error('set AGENTX_PLATFORM_ROOT or cd to the agentx-platform repo root.');
+    console.error('set HELMSMITH_PLATFORM_ROOT or cd to the helmsmith repo root.');
     process.exit(2);
   }
 
@@ -67,7 +67,7 @@ export async function runBuildWorker(opts: BuildWorkerOptions): Promise<void> {
 
 function resolveRoot(override?: string): string {
   if (override) return override;
-  if (process.env.AGENTX_PLATFORM_ROOT) return process.env.AGENTX_PLATFORM_ROOT;
+  if (process.env.HELMSMITH_PLATFORM_ROOT) return process.env.HELMSMITH_PLATFORM_ROOT;
   return process.cwd();
 }
 

@@ -28,7 +28,7 @@ node_modules/
 tasks.json
 tasks/
 
-# AgentX specific
+# Helmsmith specific
 extensions/*
 !extensions/.gitkeep
 dist/

@@ -356,7 +356,7 @@ Splunk is consumed by:
           "credentials": {
             "SPLUNK_PROD_TOKEN": {
               "storage": "keychain",
-              "keychainAccount": "agentx-skillzkit-splunk-prod-token"
+              "keychainAccount": "helmsmith-skillzkit-splunk-prod-token"
             }
           },
           "defaultIndexes": ["app_logs", "infra_logs"]
@@ -369,7 +369,7 @@ Splunk is consumed by:
           "credentials": {
             "SPLUNK_SECURITY_TOKEN": {
               "storage": "keychain",
-              "keychainAccount": "agentx-skillzkit-splunk-security-token"
+              "keychainAccount": "helmsmith-skillzkit-splunk-security-token"
             }
           },
           "defaultIndexes": ["auth_audit", "network_flow", "endpoint"],

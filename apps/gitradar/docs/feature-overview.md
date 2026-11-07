@@ -488,7 +488,7 @@ Useful for evaluation, demos, and UI development without real repositories.
 
 ## 13. Configuration
 
-Single YAML file at `~/.agentx/gitradar/config.yml`:
+Single YAML file at `~/.helmsmith/gitradar/config.yml`:
 
 Repos are managed through the workspace registry (`gitradar repo add`), never
 in `config.yml` — a `repos:` key here is ignored (with a warning) if present.
@@ -530,7 +530,7 @@ settings:
 ```
 
 Set `GITRADAR_HOME=/some/dir` to relocate config, data, and cache together
-(useful for sandboxes and CI; defaults to `~/.agentx/gitradar`).
+(useful for sandboxes and CI; defaults to `~/.helmsmith/gitradar`).
 
 Key configuration features:
 - **Aliases** — Match commits from multiple email addresses or names to one person

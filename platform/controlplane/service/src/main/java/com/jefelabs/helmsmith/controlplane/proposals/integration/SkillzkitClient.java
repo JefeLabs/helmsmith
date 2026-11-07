@@ -26,19 +26,19 @@ import java.util.Map;
 /**
  * Skillzkit contribution client. Submits approved proposals to upstream
  * skillzkit's {@code POST /api/v1/contributions} endpoint
- * (see {@code agentx-toolbox/apps/skillzkit/lib/api/contracts.ts} —
+ * (see {@code helmsmith/apps/skillzkit/lib/api/contracts.ts} —
  * {@code CreateContributionRequest} / {@code ContributionResponse}).
  *
  * <p>Per memory {@code project_skillzkit_is_skill_source_of_truth},
  * controlplane's catalog is a CACHE of skillzkit; new skills must
- * round-trip back to skillzkit so the next agentx-load sync picks
+ * round-trip back to skillzkit so the next helmsmith-load sync picks
  * them up canonically. This client is the round-trip vehicle.
  *
  * <p>Configuration (Spring properties):
  * <ul>
- *   <li>{@code agentx.skillzkit.url} — base URL (e.g.,
+ *   <li>{@code helmsmith.skillzkit.url} — base URL (e.g.,
  *       {@code https://skillzkit.example.com}). Empty string disables.
- *   <li>{@code agentx.skillzkit.token} — bearer token issued by
+ *   <li>{@code helmsmith.skillzkit.token} — bearer token issued by
  *       skillzkit; mapped on its side to a stable AuthorIdentity.
  * </ul>
  *
@@ -60,8 +60,8 @@ public class SkillzkitClient {
     private final ObjectMapper mapper;
 
     public SkillzkitClient(
-        @Value("${agentx.skillzkit.url:}") String baseUrl,
-        @Value("${agentx.skillzkit.token:}") String token,
+        @Value("${helmsmith.skillzkit.url:}") String baseUrl,
+        @Value("${helmsmith.skillzkit.token:}") String token,
         ObjectMapper mapper
     ) {
         this.token = token == null ? "" : token;
@@ -73,10 +73,10 @@ public class SkillzkitClient {
         if (configured) {
             log.info("SkillzkitClient configured: url={}", baseUrl);
             if (this.token.isBlank()) {
-                log.warn("SkillzkitClient: agentx.skillzkit.url is set but agentx.skillzkit.token is empty — submissions will fail with 401");
+                log.warn("SkillzkitClient: helmsmith.skillzkit.url is set but helmsmith.skillzkit.token is empty — submissions will fail with 401");
             }
         } else {
-            log.info("SkillzkitClient disabled: agentx.skillzkit.url is empty");
+            log.info("SkillzkitClient disabled: helmsmith.skillzkit.url is empty");
         }
     }
 
@@ -199,7 +199,7 @@ public class SkillzkitClient {
             frontmatter,
             List.of(new ContributionFile("SKILL.md", body)),
             null,                                                   // versionBump
-            "Submitted from agentx-controlplane proposal " + p.id() // changelog
+            "Submitted from helmsmith-controlplane proposal " + p.id() // changelog
         );
     }
 
@@ -222,7 +222,7 @@ public class SkillzkitClient {
             sb.append(p.rationale()).append('\n').append('\n');
         }
         if (p.sourceJobId() != null) {
-            sb.append("> Proposed from agentx job `").append(p.sourceJobId()).append("`\n");
+            sb.append("> Proposed from helmsmith job `").append(p.sourceJobId()).append("`\n");
         }
         return sb.toString();
     }
@@ -397,7 +397,7 @@ public class SkillzkitClient {
          *  envelope. */
         record TransportError(String message) implements ComposeResult {}
 
-        /** Skillzkit is not configured (agentx.skillzkit.url empty).
+        /** Skillzkit is not configured (helmsmith.skillzkit.url empty).
          *  Controller surfaces as 503. */
         record Skipped() implements ComposeResult {}
     }

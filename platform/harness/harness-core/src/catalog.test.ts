@@ -14,7 +14,7 @@ import {
   walkAgents,
 } from './catalog.ts';
 
-const tmpWorkspace = () => join(tmpdir(), `agentx-catalog-${randomUUID()}`);
+const tmpWorkspace = () => join(tmpdir(), `helmsmith-catalog-${randomUUID()}`);
 
 describe('loadCatalog', () => {
   const created: string[] = [];

@@ -1,4 +1,4 @@
-# AgentX Taskmaster — Architecture
+# Helmsmith Taskmaster — Architecture
 
 This document describes how the solution is composed: the modules, data flow, key design decisions, and how they connect.
 
@@ -123,7 +123,7 @@ src/
 │   └── types.ts            AuthCredentials, CopilotTokenResponse, model definitions
 │
 └── utils/                  ← Shared utilities
-    ├── home.ts             Global home (~/.agentx-userdata/taskmaster/) bootstrap
+    ├── home.ts             Global home (~/.helmsmith-userdata/taskmaster/) bootstrap
     ├── defaults.ts         Smart defaults (last-used-wins) read/write
     └── projects.ts         Project registry CRUD (projects.yaml)
 ```
@@ -247,7 +247,7 @@ This means:
 All state lives outside the repository in a global home directory:
 
 ```
-~/.agentx-userdata/taskmaster/
+~/.helmsmith-userdata/taskmaster/
 ├── auth.json              Copilot OAuth credentials (never in project config)
 ├── defaults.yaml          Smart defaults: last-used-wins across projects
 ├── projects.yaml          Project registry + active project pointer
@@ -264,7 +264,7 @@ All state lives outside the repository in a global home directory:
 - **Multi-session safe**: Multiple CLI instances can read concurrently; file locking serializes writes
 - **Repos stay clean**: No dotfolders or state files in the project directory
 - **Multi-project**: Each project is fully isolated under its own directory
-- **Env override**: `AGENTX_USERDATA` relocates the home (CI/CD, testing)
+- **Env override**: `HELMSMITH_USERDATA` relocates the home (CI/CD, testing)
 
 ---
 
@@ -411,7 +411,7 @@ The decomposer checks `getChildType()` before expanding — it won't create chil
 
 5. **Readiness is computed, never stored.** No stale flags — `recomputeAllReadiness()` runs on every status change and before every `ready`/`next` call.
 
-6. **Global home, clean repos.** All state lives under `~/.agentx-userdata/taskmaster/`. Project repositories contain zero Taskmaster artifacts.
+6. **Global home, clean repos.** All state lives under `~/.helmsmith-userdata/taskmaster/`. Project repositories contain zero Taskmaster artifacts.
 
 7. **File locking for concurrent safety.** `proper-lockfile` + atomic rename prevents corruption when multiple agents or terminals write to `tasks.json` simultaneously.
 

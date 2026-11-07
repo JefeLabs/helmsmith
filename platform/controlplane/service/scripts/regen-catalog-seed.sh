@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# regen-catalog-seed.sh — walk an agentx-skillz catalog directory and emit
+# regen-catalog-seed.sh — walk a helmsmith-skillz catalog directory and emit
 # a JSON array of normalized catalog items into
 # controlplane/src/main/resources/seed-catalog-items.json. The Spring app
 # loads that file on first startup (catalog_items table empty) to bootstrap
 # the unified catalog.
 #
 # Usage:
-#   AGENTX_SKILLZ_ROOT=/path/to/agentx-skillz ./regen-catalog-seed.sh
-#   # default: ../../../agentx-skillz (sibling repo)
+#   HELMSMITH_SKILLZ_ROOT=/path/to/helmsmith-skillz ./regen-catalog-seed.sh
+#   # default: ../../../helmsmith-skillz (sibling repo)
 #
 # Each <type>/<topic>/<id>/manifest.yaml becomes a JSON object:
 #   {
@@ -27,13 +27,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONTROLPLANE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 PLATFORM_ROOT="$(cd "$CONTROLPLANE_DIR/../../.." && pwd)"
-SKILLZ_ROOT="${AGENTX_SKILLZ_ROOT:-$PLATFORM_ROOT/../agentx-skillz}"
+SKILLZ_ROOT="${HELMSMITH_SKILLZ_ROOT:-$PLATFORM_ROOT/../helmsmith-skillz}"
 
 SEED_PATH="$CONTROLPLANE_DIR/src/main/resources/seed-catalog-items.json"
 
 if [ ! -d "$SKILLZ_ROOT/catalog" ]; then
     echo "error: $SKILLZ_ROOT/catalog not found." >&2
-    echo "set AGENTX_SKILLZ_ROOT to the agentx-skillz repo root." >&2
+    echo "set HELMSMITH_SKILLZ_ROOT to the helmsmith-skillz repo root." >&2
     exit 2
 fi
 

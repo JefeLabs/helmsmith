@@ -1,12 +1,12 @@
 # 🔧 @helmsmith/toolz
 
-Cross-platform tool manager for the AgentX ecosystem. Detects whether a
+Cross-platform tool manager for the Helmsmith ecosystem. Detects whether a
 CLI tool is installed, parses its version, installs missing tools via
 the platform's package manager, and registers everything in a central
-manifest. Designed to be consumed by other AgentX packages that
+manifest. Designed to be consumed by other Helmsmith packages that
 declare CLI dependencies.
 
-Part of the [agentx-toolbox](../..) monorepo.
+Part of the [helmsmith](../..) monorepo.
 
 ## Quick start
 
@@ -25,7 +25,7 @@ toolz doctor                         # Reconcile registry vs reality
 
 ## Programmatic API
 
-The primary consumer of `@helmsmith/toolz` is **other AgentX packages**:
+The primary consumer of `@helmsmith/toolz` is **other Helmsmith packages**:
 
 ```typescript
 import { ensureTool, ensureTools } from "@helmsmith/toolz";
@@ -72,8 +72,8 @@ package manager.
 
 ## How the registry works
 
-Persistent state lives at `~/.agentx/toolz/` (override with
-`AGENTX_TOOLZ_DIR=/path` for tests / CI):
+Persistent state lives at `~/.helmsmith/toolz/` (override with
+`HELMSMITH_TOOLZ_DIR=/path` for tests / CI):
 
 - `registry.yaml` — installed tools + version + path + when installed
 - `catalog.yaml` — user catalog extensions (merges with built-in)
@@ -89,7 +89,7 @@ The built-in catalog ships with common tools (git, gh, jq, yq,
 ripgrep, fd, pandoc, ffmpeg). To add your own:
 
 ```yaml
-# ~/.agentx/toolz/catalog.yaml
+# ~/.helmsmith/toolz/catalog.yaml
 tools:
   my-tool:
     description: Custom internal tool
@@ -103,7 +103,7 @@ User entries override built-in entries with the same name.
 
 ## Stack
 
-Per [agentx-toolbox stack conventions](../../README.md):
+Per [helmsmith stack conventions](../../README.md):
 
 - TypeScript ESM
 - Commander.js for CLI parsing
@@ -138,5 +138,5 @@ npm run build           # tsup → dist/
 npm run dev             # watch mode
 ```
 
-Tests use `AGENTX_TOOLZ_DIR=<tmpdir>` per test for state isolation —
-the user's real `~/.agentx/toolz/` is never touched during the suite.
+Tests use `HELMSMITH_TOOLZ_DIR=<tmpdir>` per test for state isolation —
+the user's real `~/.helmsmith/toolz/` is never touched during the suite.

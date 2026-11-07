@@ -3,7 +3,7 @@ List all open pull requests across repos managed by gittyup.
 Run the following command:
 
 ```
-agentx-gittyup prs
+helmsmith-gittyup prs
 ```
 
 Options:

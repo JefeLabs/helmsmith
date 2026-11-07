@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Spawns the {@code @helmsmith/context-loader-cli} (agentx-load) as a
+ * Spawns the {@code @helmsmith/context-loader-cli} (helmsmith-load) as a
  * subprocess to ingest a context source into the central Neo4j graph.
  * Per prd-context-module.md F3, D1: one source of truth for chunkers
  * (the TS implementation), no Java reimplementation.
@@ -44,18 +44,18 @@ import java.util.UUID;
  * <p>{@code @Async} runs each invocation on a Spring-managed virtual
  * thread (per umbrella PRD D14); HTTP submission returns immediately.
  *
- * <p>Configurable via {@code agentx.context-loader.*}:
+ * <p>Configurable via {@code helmsmith.context-loader.*}:
  * <ul>
  *   <li>{@code command} (list) — prefix args; e.g.
  *       {@code [bun, ../packages/context-loader-cli/src/bin.ts]} for dev,
- *       {@code [agentx-load]} for the static binary in production.</li>
+ *       {@code [helmsmith-load]} for the static binary in production.</li>
  *   <li>{@code working-dir} — cwd for the subprocess; resolves workspace deps.</li>
  * </ul>
  */
 @Component
-public class AgentxLoadRunner {
+public class HelmsmithLoadRunner {
 
-    private static final Logger log = LoggerFactory.getLogger(AgentxLoadRunner.class);
+    private static final Logger log = LoggerFactory.getLogger(HelmsmithLoadRunner.class);
 
     private final Jdbi jdbi;
     private final ObjectMapper objectMapper;
@@ -68,17 +68,17 @@ public class AgentxLoadRunner {
     private final String embedderModel;
     private final int embedderDim;
 
-    public AgentxLoadRunner(
+    public HelmsmithLoadRunner(
         Jdbi jdbi,
         ObjectMapper objectMapper,
-        @Value("${agentx.context-loader.command:bun,packages/context-loader-cli/src/bin.ts}") String baseCommandCsv,
-        @Value("${agentx.context-loader.working-dir:..}") String workingDir,
-        @Value("${agentx.neo4j.uri:bolt://localhost:7687}") String neo4jUri,
-        @Value("${agentx.neo4j.user:neo4j}") String neo4jUser,
-        @Value("${agentx.neo4j.password:controlplane}") String neo4jPassword,
-        @Value("${agentx.embedder.url:http://localhost:8081}") String embedderUrl,
-        @Value("${agentx.embedder.model:BAAI/bge-small-en-v1.5}") String embedderModel,
-        @Value("${agentx.embedder.dimension:384}") int embedderDim
+        @Value("${helmsmith.context-loader.command:bun,packages/context-loader-cli/src/bin.ts}") String baseCommandCsv,
+        @Value("${helmsmith.context-loader.working-dir:..}") String workingDir,
+        @Value("${helmsmith.neo4j.uri:bolt://localhost:7687}") String neo4jUri,
+        @Value("${helmsmith.neo4j.user:neo4j}") String neo4jUser,
+        @Value("${helmsmith.neo4j.password:controlplane}") String neo4jPassword,
+        @Value("${helmsmith.embedder.url:http://localhost:8081}") String embedderUrl,
+        @Value("${helmsmith.embedder.model:BAAI/bge-small-en-v1.5}") String embedderModel,
+        @Value("${helmsmith.embedder.dimension:384}") int embedderDim
     ) {
         this.jdbi = jdbi;
         this.objectMapper = objectMapper;
@@ -93,7 +93,7 @@ public class AgentxLoadRunner {
         this.embedderUrl = embedderUrl + "/v1";  // CLI expects /v1 root
         this.embedderModel = embedderModel;
         this.embedderDim = embedderDim;
-        log.info("AgentxLoadRunner configured: command={} cwd={} neo4j={} embedder={}",
+        log.info("HelmsmithLoadRunner configured: command={} cwd={} neo4j={} embedder={}",
             this.baseCommand, workingDir, neo4jUri, embedderUrl);
     }
 

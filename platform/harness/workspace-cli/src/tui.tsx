@@ -176,7 +176,7 @@ function App({ initial, onSubmit, onAbort }: TuiProps) {
 
   return (
     <box flexDirection="column" padding={1}>
-      <text fg="#06b6d4">agentx-workspace — procure a new project</text>
+      <text fg="#06b6d4">helmsmith-workspace — procure a new project</text>
       <text fg="#6b7280">────────────────────────────────────────</text>
 
       <box flexDirection="column" marginTop={1}>

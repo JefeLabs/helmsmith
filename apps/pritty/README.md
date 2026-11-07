@@ -6,7 +6,7 @@
 files by purpose, generates conventional commits, and creates pull
 requests — with pluggable hooks and human-in-the-loop approval.
 
-Part of the [agentx-toolbox](../..) monorepo. Auth + multi-agent
+Part of the [helmsmith](../..) monorepo. Auth + multi-agent
 adapters live in shared packages (`@helmsmith/agent-auth`,
 `@helmsmith/agent-adapter`) so pritty doesn't reinvent OAuth or LLM
 provider routing.
@@ -14,7 +14,7 @@ provider routing.
 ## Status
 
 This is a **phased build** following the
-[implementation plan](../../../agentx-pritty/pritty-implementation-plan.md).
+[implementation plan](../../../helmsmith-pritty/pritty-implementation-plan.md).
 
 | Phase | Status |
 |---|---|
@@ -94,7 +94,7 @@ Pritty's auth layer is a thin wrapper around `@helmsmith/agent-auth`:
 - `pritty auth logout` removes the file.
 
 Override the storage path with `PRITTY_HOME=<dir>`. The same primitive
-backs gittyup, future AgentX CLIs, etc. — change auth in one place,
+backs gittyup, future Helmsmith CLIs, etc. — change auth in one place,
 every consumer inherits the change.
 
 ## AI providers
@@ -137,7 +137,7 @@ to be present.
 
 ## Stack
 
-Per [agentx-toolbox stack conventions](../../README.md):
+Per [helmsmith stack conventions](../../README.md):
 
 - TypeScript ESM
 - Commander.js for CLI parsing

@@ -52,7 +52,7 @@ export type SourceRef =
 export interface SourceType {
   /** Stable id (see SourceTypeId or user extensions). */
   id: string;
-  /** Brief human-readable description. Shown by `agentx-load types`. */
+  /** Brief human-readable description. Shown by `helmsmith-load types`. */
   description: string;
   /** Default matcher (consumers can override via context-sources.yml). */
   matcher: SourceTypeMatcher;

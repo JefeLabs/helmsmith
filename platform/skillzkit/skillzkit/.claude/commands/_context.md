@@ -1,4 +1,4 @@
-# AgentX Skillz Suite — Top-Level Context
+# Helmsmith Skillz Suite — Top-Level Context
 
 > Read this for orientation when working anywhere in the suite.
 > The suite is organized as **persona namespaces** (`product/`,
@@ -11,7 +11,7 @@
 The suite has four top-level groupings:
 
 ```
-agentx-skillz-suite/
+helmsmith-skillz-suite/
 ├── core/                  cross-persona infrastructure
 │   ├── audit/             cross-persona audit dispatcher
 │   ├── tools/             local-invocation tools (playwright, pixelmatch,

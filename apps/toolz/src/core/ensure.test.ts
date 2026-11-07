@@ -6,7 +6,7 @@ import { isRegistered, registerTool } from '../config/registry.js';
 import { ensureTool, ensureTools } from './ensure.js';
 
 /**
- * Tests use AGENTX_TOOLZ_DIR to redirect the registry to a tmp dir.
+ * Tests use HELMSMITH_TOOLZ_DIR to redirect the registry to a tmp dir.
  * They probe `node` (always present where vitest runs) for the
  * happy-path cases and a definitely-absent name for the missing-tool
  * cases. autoInstall=true is NOT exercised here — that would require a
@@ -18,11 +18,11 @@ describe('ensureTool', () => {
 
   beforeEach(() => {
     tmp = mkdtempSync(join(tmpdir(), 'toolz-ensure-test-'));
-    process.env.AGENTX_TOOLZ_DIR = tmp;
+    process.env.HELMSMITH_TOOLZ_DIR = tmp;
   });
 
   afterEach(() => {
-    delete process.env.AGENTX_TOOLZ_DIR;
+    delete process.env.HELMSMITH_TOOLZ_DIR;
     rmSync(tmp, { recursive: true, force: true });
   });
 
@@ -86,11 +86,11 @@ describe('ensureTools', () => {
 
   beforeEach(() => {
     tmp = mkdtempSync(join(tmpdir(), 'toolz-ensure-tools-test-'));
-    process.env.AGENTX_TOOLZ_DIR = tmp;
+    process.env.HELMSMITH_TOOLZ_DIR = tmp;
   });
 
   afterEach(() => {
-    delete process.env.AGENTX_TOOLZ_DIR;
+    delete process.env.HELMSMITH_TOOLZ_DIR;
     rmSync(tmp, { recursive: true, force: true });
   });
 

@@ -17,19 +17,19 @@ Teams working across multiple repositories face a recurring problem: promoting c
 
 ```bash
 # Initialize (inside a git repo for project-local config, or globally)
-agentx-gittyup init
+helmsmith-gittyup init
 
 # Discover and add repos
-agentx-gittyup find ~/projects
+helmsmith-gittyup find ~/projects
 
 # Check the state of all repos
-agentx-gittyup status --fetch
+helmsmith-gittyup status --fetch
 
 # Compare branches before merging
-agentx-gittyup compare dev staging
+helmsmith-gittyup compare dev staging
 
 # Merge dev into staging across a group
-agentx-gittyup merge dev staging --group frontend --push --pr
+helmsmith-gittyup merge dev staging --group frontend --push --pr
 ```
 
 ## Configuration
@@ -37,9 +37,9 @@ agentx-gittyup merge dev staging --group frontend --push --pr
 Gittyup is driven by a `gittyup.yaml` manifest that defines repo groups, branch mappings, and settings.
 
 **Config discovery order:**
-1. Repo-local: `<git-root>/.agentx/gittyup/gittyup.yaml`
+1. Repo-local: `<git-root>/.helmsmith/gittyup/gittyup.yaml`
 2. Walk-up: bare `gittyup.yaml` in any parent directory
-3. Global: `~/.agentx/gittyup/gittyup.yaml`
+3. Global: `~/.helmsmith/gittyup/gittyup.yaml`
 
 **Example manifest:**
 
@@ -116,6 +116,6 @@ Gittyup ships bundled context files for AI coding tools. During `init`, you can 
 
 These give AI agents awareness of gittyup commands and workflows.
 
-## Part of AgentX
+## Part of Helmsmith
 
-Gittyup belongs to the **agentx** suite. Config lives under `~/.agentx/gittyup/` (or per-repo at `<repo>/.agentx/gittyup/`). The `AGENTX_HOME` environment variable can override the config root.
+Gittyup belongs to the **helmsmith** suite. Config lives under `~/.helmsmith/gittyup/` (or per-repo at `<repo>/.helmsmith/gittyup/`). The `HELMSMITH_HOME` environment variable can override the config root.

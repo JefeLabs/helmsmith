@@ -6,7 +6,7 @@ import { getCacheDir, getConfigDir } from '../store/paths.js';
 /**
  * Every unit-test file must run with HOME and GITRADAR_HOME pointed at a
  * throwaway directory, so no test can write into the developer's real
- * ~/.agentx by omission (#74). The vitest setup file provides this.
+ * ~/.helmsmith by omission (#74). The vitest setup file provides this.
  */
 describe('unit-test sandbox', () => {
   const tmp = realpathSync(tmpdir());

@@ -7,7 +7,7 @@ If no arguments are provided, default to comparing `dev` and `prod`.
 Run the following command:
 
 ```
-agentx-gittyup compare <left> <right> --fetch
+helmsmith-gittyup compare <left> <right> --fetch
 ```
 
 Where `<left>` and `<right>` are branch names or aliases defined in the manifest (e.g., `dev`, `staging`, `prod`).

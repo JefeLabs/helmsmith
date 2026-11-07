@@ -1,6 +1,6 @@
 # @helmsmith/edge-memory-server
 
-UDS-fronted memory store for agentx workers. Daemon process that holds
+UDS-fronted memory store for helmsmith workers. Daemon process that holds
 the local agent-memory state — scope-aware, GDPR-compliant, vector-
 similarity-capable. Co-located with the harness on each developer
 workstation / ECS task; persists across process restarts when configured
@@ -80,14 +80,14 @@ than silently returning empty.
 
 ```bash
 # Memory store
-export MEMORY_DB_PATH=/var/lib/agentx/memory.sqlite      # unset → InMemoryMemoryStore
+export MEMORY_DB_PATH=/var/lib/helmsmith/memory.sqlite      # unset → InMemoryMemoryStore
 export MEMORY_VECTOR_DIM=1024                            # default 1024 (qwen3-0.6B)
 export MEMORY_EMBEDDER_URL=http://localhost:12434/engines/llama.cpp/v1
 export MEMORY_EMBEDDER_MODEL=ai/qwen3-embedding:0.6B-F16
 
 # Audit log (PRD F12) — separate file by default; same file works
 # but mixes retention policies.
-export MEMORY_AUDIT_DB_PATH=/var/lib/agentx/memory-audit.sqlite   # unset → InMemoryAuditLog
+export MEMORY_AUDIT_DB_PATH=/var/lib/helmsmith/memory-audit.sqlite   # unset → InMemoryAuditLog
 
 # Listen address
 export MEMORY_SOCKET_PATH=/root/.harness/run/memory.sock
@@ -99,7 +99,7 @@ export MEMORY_IDLE_TIMEOUT_MS=600000               # default 10min
 export MEMORY_IDLE_CHECK_INTERVAL_MS=30000         # default 30s
 
 # Snapshot store (PRD F5) — separate file by default; in-memory if unset.
-export MEMORY_SNAPSHOT_DB_PATH=/var/lib/agentx/memory-snapshots.sqlite
+export MEMORY_SNAPSHOT_DB_PATH=/var/lib/helmsmith/memory-snapshots.sqlite
 ```
 
 The embedder env vars are only required when `MEMORY_DB_PATH` is set
@@ -126,7 +126,7 @@ const handle = await startMemoryServer({
 
 // Production
 const store = await SqliteVecMemoryStore.open({
-  dbPath: '/var/lib/agentx/memory.sqlite',
+  dbPath: '/var/lib/helmsmith/memory.sqlite',
   vectorDim: 1024,
   embed: async (texts) => [...],   // your embedder
 });

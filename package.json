@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Helmsmith monorepo — AgentX platform + toolbox unified (core / harness / context / memory / skillzkit / web / apps + Java controlplane).",
+  "description": "Helmsmith monorepo — platform + toolbox unified (core / harness / context / memory / skillzkit / web / apps + Java controlplane).",
   "packageManager": "pnpm@9.15.9",
   "engines": {
     "node": ">=24",
@@ -29,7 +29,7 @@
     "catalog": "pnpm --filter @helmsmith/skillzkit run catalog",
     "harness": "bun platform/harness/harness-cli/src/index.ts",
     "harness:run": "bun platform/harness/harness-cli/src/in-process-run.tsx",
-    "agentx-workspace": "bun platform/harness/workspace-cli/src/bin.tsx",
+    "helmsmith-workspace": "bun platform/harness/workspace-cli/src/bin.tsx",
     "skillzkit": "bun platform/skillzkit/skillzkit/src/cli.ts",
     "tui": "pnpm --silent harness tui",
     "verify": "tsx examples/verify-no-leak.ts",
@@ -46,7 +46,7 @@
     "dev:orchestrator-demo": "tsx examples/11-orchestrated-pipeline-demo.ts",
     "dev:in-process": "tsx examples/12-in-process-cli-demo.ts",
     "tmux": "scripts/dev-tmux.sh",
-    "tmux:down": "tmux kill-session -t ${AGENTX_TMUX_SESSION:-agentx} 2>/dev/null || true",
+    "tmux:down": "tmux kill-session -t ${HELMSMITH_TMUX_SESSION:-helmsmith} 2>/dev/null || true",
     "tmux:reset": "scripts/tmux-reset.sh"
   },
   "dependencies": {

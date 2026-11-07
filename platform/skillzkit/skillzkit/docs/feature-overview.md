@@ -318,7 +318,7 @@ deploys without changing skillzkit code.
 
 ## Configuration management
 
-Local config lives at `~/.agentx/skillzkit/config.json`. CLI:
+Local config lives at `~/.helmsmith/skillzkit/config.json`. CLI:
 
 ```bash
 skillzkit config                     # show all (API key masked)

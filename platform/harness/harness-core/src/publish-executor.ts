@@ -333,13 +333,13 @@ async function getDefaultBranch(
 }
 
 function defaultPrTitle(job: JobRecord): string {
-  return job.name ? job.name : `agentx job ${job.jobId}`;
+  return job.name ? job.name : `helmsmith job ${job.jobId}`;
 }
 
 function defaultPrBody(job: JobRecord, base: string, cred: GitHubCredential): string {
   const actor = cred.actor ? ` (as ${cred.actor})` : '';
   return [
-    `Opened by agentx job \`${job.jobId}\`${actor}.`,
+    `Opened by helmsmith job \`${job.jobId}\`${actor}.`,
     '',
     `- base: \`${base}\``,
     job.input ? `- intent: ${truncate(String(job.input), 500)}` : null,

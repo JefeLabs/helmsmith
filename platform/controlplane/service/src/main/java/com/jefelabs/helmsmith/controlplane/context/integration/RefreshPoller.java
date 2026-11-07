@@ -22,14 +22,14 @@ import java.util.List;
  * {@link ContextService#triggerIngestion(String, String)} the manual API
  * endpoint uses, so there's exactly one ingestion code path.
  *
- * <p>Disable via {@code agentx.context-loader.refresh-poller.enabled=false}
+ * <p>Disable via {@code helmsmith.context-loader.refresh-poller.enabled=false}
  * (tests, profiles where the Bun/Neo4j stack isn't available). Cron schedule
  * and cadence intervals are configurable so tests can run a tight loop
  * without changing schema.
  */
 @Component
 @ConditionalOnProperty(
-    name = "agentx.context-loader.refresh-poller.enabled",
+    name = "helmsmith.context-loader.refresh-poller.enabled",
     havingValue = "true",
     matchIfMissing = true
 )
@@ -45,8 +45,8 @@ public class RefreshPoller {
     public RefreshPoller(
         Jdbi jdbi,
         ContextService contextService,
-        @Value("${agentx.context-loader.refresh-poller.daily-seconds:86400}") long dailySeconds,
-        @Value("${agentx.context-loader.refresh-poller.weekly-seconds:604800}") long weeklySeconds
+        @Value("${helmsmith.context-loader.refresh-poller.daily-seconds:86400}") long dailySeconds,
+        @Value("${helmsmith.context-loader.refresh-poller.weekly-seconds:604800}") long weeklySeconds
     ) {
         this.jdbi = jdbi;
         this.contextService = contextService;
@@ -58,13 +58,13 @@ public class RefreshPoller {
 
     /**
      * Runs on the configured cron schedule. Default is hourly; tests override
-     * via {@code agentx.context-loader.refresh-poller.cron}.
+     * via {@code helmsmith.context-loader.refresh-poller.cron}.
      *
      * <p>Returns void and swallows per-source errors so that a single bad
      * source can't poison the rest of the batch — each ingestion is
      * independent and the next tick will retry.
      */
-    @Scheduled(cron = "${agentx.context-loader.refresh-poller.cron:0 0 * * * *}")
+    @Scheduled(cron = "${helmsmith.context-loader.refresh-poller.cron:0 0 * * * *}")
     public void pollAndRefresh() {
         List<ContextSourceDaoRow> due = jdbi.onDemand(ContextSourceDao.class)
             .findDueForRefresh(dailySeconds, weeklySeconds);

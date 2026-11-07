@@ -1,6 +1,6 @@
 # @helmsmith/tui-view-components
 
-Reusable TUI view components for the AgentX ecosystem. Built on
+Reusable TUI view components for the Helmsmith ecosystem. Built on
 [openTUI](https://github.com/sst/opentui) + React. Provides
 primitives, components, and pre-composed views (`ConnectView`, etc.)
 consumed by every toolbox CLI.

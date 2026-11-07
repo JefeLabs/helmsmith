@@ -18,10 +18,10 @@ export class ConfigNotFoundError extends Error {
 /**
  * Load, parse, and validate the YAML config file.
  *
- * - Default path: ~/.agentx/gitradar/config.yml
+ * - Default path: ~/.helmsmith/gitradar/config.yml
  * - Validates with ConfigSchema (Zod)
  * - A `repos:` key is ignored (repos come only from the workspace registry,
- *   `gitradar repo add` / ~/.agentx/repos.yml); warns once if present.
+ *   `gitradar repo add` / ~/.helmsmith/repos.yml); warns once if present.
  */
 export async function loadConfig(configPath?: string): Promise<Config> {
   const resolvedConfigPath = configPath ?? getConfigPath();
@@ -58,7 +58,7 @@ export async function loadConfig(configPath?: string): Promise<Config> {
   }
 
   // `repos:` in config.yml is a leftover from before the workspace registry
-  // existed — repos now come exclusively from `gitradar repo add` (~/.agentx/repos.yml).
+  // existed — repos now come exclusively from `gitradar repo add` (~/.helmsmith/repos.yml).
   // Ignore it here (never merged into the runtime repo list), warning once if present.
   if (config.repos.length > 0) {
     console.warn(

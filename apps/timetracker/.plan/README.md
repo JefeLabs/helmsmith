@@ -24,10 +24,10 @@ later) and externalized config.
   the shared libs require it; SQLite uses Bun's built-in driver.
 - **Discord:** discord.js v14 (Gateway intents: `Guilds`, `GuildMessages`,
   `MessageContent`, `GuildPresences`, `GuildMembers`)
-- **CLI:** [`@helmsmith/cli-kit`](../../agentx-toolbox/packages/cli-kit-lib)
+- **CLI:** [`@helmsmith/cli-kit`](../../../platform/core/cli-kit-lib)
   `createCli()` (commander + inquirer + pluggable auth) — peer deps
   `commander`, `inquirer`
-- **TUI:** [`@helmsmith/tui-view-components`](../../agentx-toolbox/packages/tui-view-components-lib)
+- **TUI:** [`@helmsmith/tui-view-components`](../../../platform/core/tui-view-components-lib)
   (`runTuiView`, `AppShell`, `StatusList`, `Table`, `Menu`) for the live admin
   dashboard — peer deps `@opentui/core`, `@opentui/react`, `react`
 - **Storage:** `StorageAdapter` interface → `SqliteAdapter` (default,
@@ -37,7 +37,7 @@ later) and externalized config.
 
 ## Leveraged workspace libraries
 
-This bot is an **AgentX toolbox app** and consumes the shared ecosystem libs
+This bot is a **Helmsmith toolbox app** and consumes the shared ecosystem libs
 rather than re-wiring CLI/TUI from scratch:
 
 | Lib | Used for | Key API |

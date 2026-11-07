@@ -152,7 +152,7 @@ function buildPrimary(ctx: MockupContext, vp: Viewport): Child {
           content,
         ],
       );
-  return screen(ctx, id, vp, 'Primary', [topbar(ctx, id, 'AgentX'), body]);
+  return screen(ctx, id, vp, 'Primary', [topbar(ctx, id, 'Helmsmith'), body]);
 }
 
 function buildSecondary(ctx: MockupContext, vp: Viewport): Child {
@@ -184,7 +184,7 @@ function buildSecondary(ctx: MockupContext, vp: Viewport): Child {
       ...sections,
     ],
   );
-  return screen(ctx, id, vp, 'Secondary', [topbar(ctx, id, 'AgentX'), content]);
+  return screen(ctx, id, vp, 'Secondary', [topbar(ctx, id, 'Helmsmith'), content]);
 }
 
 function buildTertiary(ctx: MockupContext, vp: Viewport): Child {
@@ -213,7 +213,7 @@ function buildTertiary(ctx: MockupContext, vp: Viewport): Child {
       ),
     ],
   );
-  return screen(ctx, id, vp, 'Tertiary', [topbar(ctx, id, 'AgentX'), form]);
+  return screen(ctx, id, vp, 'Tertiary', [topbar(ctx, id, 'Helmsmith'), form]);
 }
 
 function buildModal(ctx: MockupContext, vp: Viewport): Child {
@@ -236,7 +236,7 @@ function buildModal(ctx: MockupContext, vp: Viewport): Child {
         fontSize: ctx.token('font.h3.size'),
         fontWeight: '600',
       }),
-      text(id('body'), 'This will spin up agentx-job and open a PR when accepted.', {
+      text(id('body'), 'This will spin up helmsmith-job and open a PR when accepted.', {
         fill: ctx.token('color.muted'),
         fontFamily: ctx.token('font.family'),
         fontSize: ctx.token('font.body-md.size'),

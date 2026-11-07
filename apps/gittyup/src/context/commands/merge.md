@@ -7,7 +7,7 @@ If no arguments are provided, ask the user for the source branch, target branch,
 Run the following command:
 
 ```
-agentx-gittyup merge <source> <target> --group <name>
+helmsmith-gittyup merge <source> <target> --group <name>
 ```
 
 Where `<source>` and `<target>` are branch names or aliases (e.g., `dev`, `staging`, `prod`).

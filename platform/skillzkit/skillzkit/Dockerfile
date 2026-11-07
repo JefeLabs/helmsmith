@@ -1,5 +1,5 @@
 # skillzkit-api Docker image. Designed to be hosted alongside the
-# agentx-platform controlplane in docker-compose, with controlplane
+# helmsmith controlplane in docker-compose, with controlplane
 # reverse-proxying /api/skillz/* to this container on port 3000.
 #
 # Storage backend chosen via SKILLZKIT_STORAGE env var at runtime — the

@@ -162,7 +162,7 @@ public interface SkillProposalDao {
      * Clear the local catalog_items pointer on a proposal. Called when
      * the upstream draft has been retired (e.g., skillzkit accepted
      * the proposal and the canonical version will arrive via the next
-     * agentx-load sync). Doesn't change the proposal's own
+     * helmsmith-load sync). Doesn't change the proposal's own
      * {@code status} — that's a separate state machine.
      */
     @SqlUpdate("""

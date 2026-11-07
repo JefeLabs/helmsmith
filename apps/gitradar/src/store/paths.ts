@@ -16,7 +16,7 @@ export function expandTilde(filepath: string): string {
 }
 
 /**
- * Root config directory: ~/.agentx/gitradar/
+ * Root config directory: ~/.helmsmith/gitradar/
  *
  * Override with GITRADAR_HOME to relocate config, data, and cache together —
  * used by tests and sandboxes so they never touch the real store.
@@ -24,25 +24,25 @@ export function expandTilde(filepath: string): string {
 export function getConfigDir(): string {
   const override = process.env.GITRADAR_HOME;
   if (override) return override;
-  return join(homedir(), '.agentx', 'gitradar');
+  return join(homedir(), '.helmsmith', 'gitradar');
 }
 
 /**
- * Data directory: ~/.agentx/gitradar/data/
+ * Data directory: ~/.helmsmith/gitradar/data/
  */
 export function getDataDir(): string {
   return join(getConfigDir(), 'data');
 }
 
 /**
- * Config file path: ~/.agentx/gitradar/config.yml
+ * Config file path: ~/.helmsmith/gitradar/config.yml
  */
 export function getConfigPath(): string {
   return join(getConfigDir(), 'config.yml');
 }
 
 /**
- * Cache directory for raw API responses: ~/.agentx/gitradar/cache/
+ * Cache directory for raw API responses: ~/.helmsmith/gitradar/cache/
  */
 export function getCacheDir(): string {
   return join(getConfigDir(), 'cache');

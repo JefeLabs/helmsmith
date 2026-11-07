@@ -1,5 +1,5 @@
 /**
- * The `ensure` API — the primary entry point other AgentX packages
+ * The `ensure` API — the primary entry point other Helmsmith packages
  * consume. Given a canonical tool name, ensure it's available, and
  * optionally install it if missing.
  *
@@ -17,7 +17,7 @@
  *      mark `versionTooLow: true`. Caller decides whether to error.
  *
  * The function never throws — every failure mode returns a structured
- * ToolStatus with `error` populated. This makes it safe for AgentX
+ * ToolStatus with `error` populated. This makes it safe for Helmsmith
  * tools to call in setup paths without try/catch noise.
  */
 

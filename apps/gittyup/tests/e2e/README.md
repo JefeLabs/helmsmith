@@ -11,7 +11,7 @@ for the full convention.
 
 - **Isolation contract** (`helpers.ts`): `runCli(ws, args)` spawns
   `bin/gittyup.mjs` with `cwd` = a temp workspace holding `gittyup.yaml`,
-  `HOME` and `AGENTX_HOME` = that same dir, and the whitelist env from
+  `HOME` and `HELMSMITH_HOME` = that same dir, and the whitelist env from
   `src/test/git-fixture.ts` (`fixtureEnv`). Config, cache and auth never
   touch the developer's home. Run via `pnpm test:e2e`
   (`vitest.e2e.config.ts`; the global setup builds `dist/` first).

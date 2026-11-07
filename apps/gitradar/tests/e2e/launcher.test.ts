@@ -41,6 +41,6 @@ describe('bin/gitradar launcher hardening (#69)', () => {
     const r = await runCli(sb, ['init'], { cwd, env: { GITRADAR_HOME: undefined } });
     expect(r.exitCode).toBe(0);
     expect(await exists(join(evilHome, 'config.yml'))).toBe(false);
-    expect(await exists(join(sb.home, '.agentx', 'gitradar', 'config.yml'))).toBe(true);
+    expect(await exists(join(sb.home, '.helmsmith', 'gitradar', 'config.yml'))).toBe(true);
   });
 });

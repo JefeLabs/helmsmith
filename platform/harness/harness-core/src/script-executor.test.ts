@@ -212,8 +212,8 @@ describe.skipIf(!HAS_PYTHON)('makeScriptExecutor: python language', () => {
 
 describe('makeScriptExecutor: interpreter resolution', () => {
   it('returns UnknownInterpreter when interpreter binary does not exist', async () => {
-    const previous = process.env.AGENTX_BASH_BIN;
-    process.env.AGENTX_BASH_BIN = '/nonexistent/path/to/bash';
+    const previous = process.env.HELMSMITH_BASH_BIN;
+    process.env.HELMSMITH_BASH_BIN = '/nonexistent/path/to/bash';
     try {
       const exec = makeScriptExecutor(scriptStep('s', 'bash', 'echo hi'));
       const delta = await exec(freshState());
@@ -222,8 +222,8 @@ describe('makeScriptExecutor: interpreter resolution', () => {
         errorName: 'UnknownInterpreter',
       });
     } finally {
-      if (previous === undefined) delete process.env.AGENTX_BASH_BIN;
-      else process.env.AGENTX_BASH_BIN = previous;
+      if (previous === undefined) delete process.env.HELMSMITH_BASH_BIN;
+      else process.env.HELMSMITH_BASH_BIN = previous;
     }
   });
 

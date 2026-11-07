@@ -2,14 +2,14 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { loadAgentxTheme, persistAgentxTheme } from './agentx.ts';
+import { loadHelmsmithTheme, persistHelmsmithTheme } from './helmsmith.ts';
 import { rosePine, tokyoNight } from './themes/index.ts';
 
-describe('agentx theme loader', () => {
+describe('helmsmith theme loader', () => {
   let dir: string;
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), 'agentx-theme-test-'));
+    dir = mkdtempSync(join(tmpdir(), 'helmsmith-theme-test-'));
   });
 
   afterEach(() => {
@@ -17,7 +17,7 @@ describe('agentx theme loader', () => {
   });
 
   it('falls back to provided theme when no files exist', () => {
-    const { theme, sources } = loadAgentxTheme({
+    const { theme, sources } = loadHelmsmithTheme({
       themeDir: dir,
       fallback: rosePine,
     });
@@ -48,7 +48,7 @@ base0F: "cfc9c2"
 `,
       'utf8',
     );
-    const { theme, sources } = loadAgentxTheme({
+    const { theme, sources } = loadHelmsmithTheme({
       themeDir: dir,
       fallback: rosePine,
     });
@@ -89,7 +89,7 @@ spacing:
 `,
       'utf8',
     );
-    const { theme, sources } = loadAgentxTheme({
+    const { theme, sources } = loadHelmsmithTheme({
       appName: 'myapp',
       themeDir: dir,
       fallback: rosePine,
@@ -119,12 +119,12 @@ spacing:
 `,
       'utf8',
     );
-    const { theme: myappTheme } = loadAgentxTheme({
+    const { theme: myappTheme } = loadHelmsmithTheme({
       appName: 'myapp',
       themeDir: dir,
       fallback: tokyoNight,
     });
-    const { theme: otherTheme } = loadAgentxTheme({
+    const { theme: otherTheme } = loadHelmsmithTheme({
       appName: 'other',
       themeDir: dir,
       fallback: tokyoNight,
@@ -133,7 +133,7 @@ spacing:
     expect(otherTheme.colors.primary).toBe(rosePine.colors.primary);
   });
 
-  it('persistAgentxTheme writes default.json and removes stale yaml', () => {
+  it('persistHelmsmithTheme writes default.json and removes stale yaml', () => {
     writeFileSync(
       join(dir, 'default.yaml'),
       `scheme: "Old"
@@ -156,13 +156,13 @@ base0F: "660000"
 `,
       'utf8',
     );
-    persistAgentxTheme(rosePine, { themeDir: dir });
+    persistHelmsmithTheme(rosePine, { themeDir: dir });
     expect(existsSync(join(dir, 'default.json'))).toBe(true);
     expect(existsSync(join(dir, 'default.yaml'))).toBe(false);
     // Backup preserved
     expect(existsSync(join(dir, 'default.yaml.bak'))).toBe(true);
 
-    const { theme } = loadAgentxTheme({ themeDir: dir, fallback: tokyoNight });
+    const { theme } = loadHelmsmithTheme({ themeDir: dir, fallback: tokyoNight });
     expect(theme.name).toBe('rose-pine');
   });
 });

@@ -7,7 +7,7 @@ If no arguments are provided, ask the user for the source branch, target branch,
 Run the following command:
 
 ```
-agentx-gittyup pick --group <name> --source <branch> --target <branch> --interactive
+helmsmith-gittyup pick --group <name> --source <branch> --target <branch> --interactive
 ```
 
 Required: Either `--group <name>` or `--repo <name>` must be specified, plus `--source` and `--target`.

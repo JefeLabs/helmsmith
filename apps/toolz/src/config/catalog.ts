@@ -1,6 +1,6 @@
 /**
  * Catalog loader — merges the built-in inline catalog with the user's
- * extensions at `~/.agentx/toolz/catalog.yaml`. User entries override
+ * extensions at `~/.helmsmith/toolz/catalog.yaml`. User entries override
  * built-in ones for the same tool name; user-only entries add new
  * tools.
  *
