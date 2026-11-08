@@ -118,9 +118,13 @@ export interface StatusBranchDocument {
   tracking: boolean;
   ahead: number | null;
   behind: number | null;
-  isDirty: boolean;
-  hasConflicts: boolean;
+  /** `null` when the branch could not be read (see `error`). */
+  isDirty: boolean | null;
+  /** `null` when the branch could not be read (see `error`). */
+  hasConflicts: boolean | null;
   lastCommit: { sha: string; date: string } | null;
+  /** Why the branch could not be read, e.g. it doesn't exist in this repo. */
+  error?: string;
 }
 
 export interface StatusRepoDocument {
@@ -173,11 +177,13 @@ export interface CompareRepoDocument {
   url: string | null;
   leftRef: string;
   rightRef: string;
-  /** `null` with `--no-conflicts`. */
+  /** `null` when the check did not run: `--no-conflicts`, a side missing, or `error`. */
   hasConflicts: boolean | null;
   left: CompareSideDocument | null;
   right: CompareSideDocument | null;
   pr: { number: number; state: 'open' | 'closed' | 'merged'; url: string; date?: string } | null;
+  /** This repo's PR lookup failed; `pr: null` then means unknown, not "no open PR". */
+  prError?: string;
   error?: string;
 }
 

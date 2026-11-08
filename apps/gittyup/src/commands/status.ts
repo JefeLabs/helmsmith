@@ -30,9 +30,10 @@ export function toStatusDocument(
         tracking: b.tracking,
         ahead: b.ahead,
         behind: b.behind,
-        isDirty: b.isDirty,
-        hasConflicts: b.hasConflicts,
+        isDirty: b.error ? null : b.isDirty,
+        hasConflicts: b.error ? null : b.hasConflicts,
         lastCommit: b.lastCommitSha ? { sha: b.lastCommitSha, date: b.lastCommitDate } : null,
+        ...(b.error ? { error: b.error } : {}),
       };
     }
     return {

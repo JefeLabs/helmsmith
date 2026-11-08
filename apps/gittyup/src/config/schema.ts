@@ -112,6 +112,9 @@ export interface RepoBranchState {
   lastCommitSha: string | null;
   lastCommitDate: string;
   trackingBranch?: string;
+  /** Why the branch could not be read (e.g. it doesn't exist); the fields above are
+   *  then placeholders, not observations. */
+  error?: string;
 }
 
 export interface RepoState {

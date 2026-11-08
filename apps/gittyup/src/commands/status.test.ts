@@ -82,6 +82,40 @@ describe('toStatusDocument', () => {
     });
   });
 
+  it('reports an unreadable branch as an error with unknowns null, not false', () => {
+    const unreadable: RepoState = {
+      ...healthy,
+      branches: {
+        staging: {
+          branch: 'staging',
+          ahead: null,
+          behind: null,
+          tracking: false,
+          hasConflicts: false,
+          isDirty: false,
+          lastCommit: 'error',
+          lastCommitSha: null,
+          lastCommitDate: 'error',
+          error: "fatal: ambiguous argument 'staging': unknown revision",
+        },
+      },
+    };
+
+    const row = toStatusDocument([unreadable], ctx).repos[0]?.branches.staging;
+
+    expect(row).toStrictEqual({
+      branch: 'staging',
+      trackingBranch: null,
+      tracking: false,
+      ahead: null,
+      behind: null,
+      isDirty: null,
+      hasConflicts: null,
+      lastCommit: null,
+      error: "fatal: ambiguous argument 'staging': unknown revision",
+    });
+  });
+
   it('reports fetch outcomes as ok/error rows', () => {
     const doc = toStatusDocument([], {
       ...ctx,

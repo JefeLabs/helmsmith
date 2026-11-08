@@ -250,7 +250,11 @@ Every command a program would call accepts `--json`. That covers `status`, `comp
 | Broken (unexpected error) | empty | last line: the same error body | 1 |
 
 `--json` never prompts. A request that would need a prompt, such as `repo tag --json` without `--add`/`--remove`, is refused with `INTERACTIVE_ONLY`. Values are honest:
-- Unknown is `null`. For example, `ahead`/`behind` are `null` when a branch has no tracking ref.
+- Unknown is `null`, never `false`, `0` or "none". For example:
+  - `ahead`/`behind` are `null` when a branch has no tracking ref.
+  - `hasConflicts` is `null` when the conflict check didn't run (`--no-conflicts`, a branch missing on one side, or an `error` row), and that repo isn't counted as `clean`.
+  - A status branch that can't be read (say it doesn't exist in that repo) carries an `error`, and its `isDirty`/`hasConflicts` are `null`.
+  - A compare repo whose PR lookup failed carries `prError` next to `pr: null`. Only a `pr: null` without `prError` means "no open PR".
 - Dates are ISO-8601 and SHAs are full 40-character hashes.
 - Values contain no colour codes.
 

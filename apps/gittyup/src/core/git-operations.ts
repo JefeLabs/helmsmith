@@ -139,7 +139,8 @@ export class GitOperations {
         lastCommitDate: latest?.date ?? 'unknown',
         trackingBranch: tracking,
       };
-    } catch {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       return {
         branch: branchName,
         ahead: null,
@@ -150,6 +151,12 @@ export class GitOperations {
         lastCommit: 'error',
         lastCommitSha: null,
         lastCommitDate: 'error',
+        // git's first line names the problem; the rest is usage advice.
+        error:
+          message
+            .split('\n')
+            .find((l) => l.trim())
+            ?.trim() ?? 'unreadable branch',
       };
     }
   }

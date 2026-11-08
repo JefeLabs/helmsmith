@@ -493,4 +493,12 @@ describe('getBranchState tracking', () => {
       trackingBranch: 'origin/main',
     });
   });
+
+  it('carries the reason when the branch cannot be read', async () => {
+    const repo = await makeRepo({ commits: [{ message: 'base', files: { 'f.txt': 'x\n' } }] });
+    const s = await new GitOperations(repo.path).getBranchState('staging');
+    expect(s.lastCommitSha).toBeNull();
+    expect(s.error).toEqual(expect.stringContaining('staging'));
+    expect(s.error).not.toContain('\n');
+  });
 });
