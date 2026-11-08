@@ -2,8 +2,17 @@ import chalk from 'chalk';
 import type { Command } from 'commander';
 import { ManifestManager } from '../config/manifest.js';
 import type { AiMode, CherryPickTarget } from '../config/schema.js';
+import { GittyupError } from '../core/errors.js';
+import { runPickJson } from '../core/json-operations.js';
 import { Orchestrator } from '../core/orchestrator.js';
 import { confirmGate } from '../ui/confirm.js';
+import {
+  emitMergePickReport,
+  parseAiFlag,
+  refuseSuggest,
+  requireScope,
+  requireYes,
+} from './merge-pick-json.js';
 
 export function registerPick(program: Command): void {
   program
@@ -21,6 +30,10 @@ export function registerPick(program: Command): void {
     .option('--pr', 'Create PRs', false)
     .option('--no-fetch', 'Skip fetching')
     .option('-y, --yes', 'Skip the AI write confirmation', false)
+    .option(
+      '--json',
+      'Run without prompts; print the merge/pick report as one JSON line (needs --yes)',
+    )
     .action(
       async (opts: {
         group?: string;
@@ -34,9 +47,51 @@ export function registerPick(program: Command): void {
         pr?: boolean;
         fetch?: boolean;
         yes?: boolean;
+        json?: boolean;
       }) => {
         const manifest = new ManifestManager();
         const orchestrator = new Orchestrator(manifest);
+
+        if (opts.json) {
+          // Refusals in spec §5.1 order; nothing is touched before all of them pass.
+          const ai = parseAiFlag(opts.ai);
+          const { source, target } = opts;
+          if (!source || !target) {
+            throw new GittyupError('USAGE', 'Specify --source and --target branches');
+          }
+          const jsonScope = requireScope(opts);
+          refuseSuggest(ai);
+          if (opts.interactive) {
+            throw new GittyupError(
+              'INTERACTIVE_ONLY',
+              '--interactive needs a person to choose commits; pass --commits with --json',
+            );
+          }
+          const commits = opts.commits ?? [];
+          if (commits.length === 0) {
+            throw new GittyupError('INTERACTIVE_ONLY', 'pick --json needs --commits');
+          }
+          requireYes(opts, 'pick');
+          const targets: CherryPickTarget[] = orchestrator.repos
+            .getReposForTarget(jsonScope)
+            .map((repo) => ({
+              repo,
+              commits,
+              sourceBranch: repo.branches[source] ?? source,
+              targetBranch: repo.branches[target] ?? target,
+            }));
+          return emitMergePickReport({
+            operation: 'pick',
+            source,
+            target,
+            manifest,
+            orchestrator,
+            ai,
+            opts,
+            run: (deps, runOptions) => runPickJson(targets, deps, runOptions),
+          });
+        }
+
         const scope = opts.group ?? opts.repo;
         if (!scope) {
           console.error(chalk.red('Specify --group or --repo'));
