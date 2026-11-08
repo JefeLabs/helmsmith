@@ -216,6 +216,54 @@ export interface ConflictRow {
   reason?: string;
 }
 
+export interface PrRow {
+  status: 'created' | 'existing' | 'skipped' | 'error';
+  url?: string;
+  number?: number;
+  reason?: string;
+}
+
+export interface MergePickRow {
+  repo: string;
+  /** Resolved branch names. */
+  sourceRef: string;
+  targetRef: string;
+  status: 'success' | 'conflict' | 'error' | 'skipped';
+  /** For people; never parse it. */
+  message: string;
+  /** pick only. `applied`: on the target now because of this run (`[]` after a rollback);
+   *  `dropped`: already present (`--empty=drop`). `requested` echoes the caller. */
+  commits?: { requested: string[]; applied: string[]; dropped: string[] };
+  /** pick conflict: the commit that could not be resolved. */
+  stoppedAt?: string;
+  /** Non-null only when the agent resolved at least one conflict that was kept. */
+  resolvedBy: 'agent' | null;
+  /** Every conflicted file the run met, resolved or not. */
+  conflicts: ConflictRow[];
+  rolledBack: boolean;
+  /** Target branch sha after the run (the pre-run sha when rolled back or untouched). */
+  head: string | null;
+  pushed: boolean;
+  pr: PrRow | null;
+  error?: string;
+}
+
+export interface MergePickDocument {
+  operation: 'merge' | 'pick';
+  /** As given (aliases). */
+  source: string;
+  target: string;
+  /** `available` is `null` in manual mode: nothing was checked. */
+  agent: {
+    mode: 'auto' | 'manual';
+    modeSource: 'flag' | 'manifest';
+    model: string;
+    available: boolean | null;
+  };
+  repos: MergePickRow[];
+  summary: { repos: number; success: number; conflict: number; error: number; skipped: number };
+}
+
 // ─── prs, fetch, find ──────────────────────────────────────────────
 
 export interface PrsDocument {
