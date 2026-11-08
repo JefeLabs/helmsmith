@@ -7,7 +7,7 @@
  * The text-mode flows (`Orchestrator.executeMerge`/`executeCherryPick`) are untouched.
  */
 import { APP_NAME } from '../config/branding.js';
-import type { AiMode, MergeTarget, RepoConfig } from '../config/schema.js';
+import type { AiMode, CherryPickTarget, MergeTarget, RepoConfig } from '../config/schema.js';
 import type { MergePickDocument, MergePickRow, PrRow } from '../output/contract.js';
 import {
   type AgentAvailability,
@@ -249,6 +249,111 @@ async function resolveOrRollBack(
       /* the guard reports what it could not restore */
     }
     throw err;
+  }
+}
+
+// ─── pick ──────────────────────────────────────────────────────────
+
+export async function runPickJson(
+  targets: CherryPickTarget[],
+  deps: RunDeps,
+  opts: RunOptions,
+): Promise<MergePickRow[]> {
+  const rows: MergePickRow[] = [];
+  for (const t of targets) {
+    const git = deps.getGit(t.repo);
+    const row: MergePickRow = {
+      ...newRow(t),
+      commits: { requested: [...t.commits], applied: [], dropped: [] },
+    };
+    rows.push(row);
+    if (await prefetch(git, row, t, opts)) {
+      await pickOneRepo(git, row, t, deps.agent);
+    }
+    await finishRow(git, row, t, opts, 'pick');
+  }
+  return rows;
+}
+
+async function pickOneRepo(
+  git: GitOperations,
+  row: MergePickRow,
+  t: CherryPickTarget,
+  agent: AgentSetup,
+): Promise<void> {
+  const commits = row.commits as NonNullable<MergePickRow['commits']>;
+  const target = t.targetBranch;
+
+  // Resolve every requested commit first: a sha this repo lacks is refused before
+  // anything is touched (spec §5.1: the same SHAs go to every repo in the target).
+  const full: string[] = [];
+  for (const sha of t.commits) {
+    try {
+      full.push(await git.revParse(sha));
+    } catch {
+      fail(row, 'error', `commit ${sha} not found in ${t.repo.name}`);
+      row.head = await headOf(git, target);
+      return;
+    }
+  }
+
+  try {
+    await git.withRepoGuard(`cherry-pick → ${target} (${t.repo.name})`, async () => {
+      await git.switchToBranch(target);
+      const preSha = await git.revParse('HEAD');
+      // Undo this run's picks (spec §5.2). Safe because withRepoGuard guaranteed a clean
+      // tree on entry and preSha was recorded by this run on this branch; refuse rather
+      // than reset if HEAD somehow no longer descends from it.
+      const undo = async () => {
+        await git.cherryPickAbort().catch(() => {});
+        if (!(await git.isAncestor(preSha, 'HEAD'))) {
+          throw new Error(`HEAD no longer descends from ${preSha}; not resetting`);
+        }
+        await git.resetHard(preSha);
+        row.rolledBack = true;
+        commits.applied = [];
+        row.resolvedBy = null;
+      };
+
+      try {
+        for (const sha of full) {
+          const outcome = await git.pickOne(sha);
+          if (outcome === 'applied') commits.applied.push(sha);
+          else if (outcome === 'dropped') commits.dropped.push(sha);
+          else {
+            const result = await resolveConflictsHeadless(git, agent, sha);
+            row.conflicts.push(...result.conflicts);
+            if (!result.resolved) {
+              row.stoppedAt = sha;
+              await undo();
+              row.status = 'conflict';
+              row.message = `conflict at ${sha.slice(0, 8)} not resolved; pick rolled back`;
+              break;
+            }
+            await git.finishResolvedCommit(resolvedByTrailer(agent.model));
+            commits.applied.push(sha);
+            row.resolvedBy = 'agent';
+          }
+        }
+        if (row.status !== 'conflict') {
+          row.status = 'success';
+          row.message = `Applied ${commits.applied.length} commit(s) to ${target}${
+            commits.dropped.length ? `; ${commits.dropped.length} already present` : ''
+          }`;
+        }
+      } catch (err) {
+        try {
+          await undo();
+        } catch (undoErr) {
+          throw new Error(`${firstLine(err)}; rollback failed: ${firstLine(undoErr)}`);
+        }
+        throw err;
+      }
+      row.head = await git.revParse(target);
+    });
+  } catch (err) {
+    fail(row, 'error', firstLine(err));
+    row.head = await headOf(git, target);
   }
 }
 

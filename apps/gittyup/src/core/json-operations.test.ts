@@ -5,7 +5,7 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it, vi } from 'vitest';
-import type { MergeTarget, RepoConfig } from '../config/schema.js';
+import type { CherryPickTarget, MergeTarget, RepoConfig } from '../config/schema.js';
 import type { MergePickRow } from '../output/contract.js';
 import { type ConflictRepo, makeConflictRepo } from '../test/conflict-fixture.js';
 import { cleanupFixtures } from '../test/git-fixture.js';
@@ -16,6 +16,7 @@ import {
   type RunOptions,
   resolveAgentMode,
   runMergeJson,
+  runPickJson,
   setupAgent,
   toMergePickDocument,
 } from './json-operations.js';
@@ -231,6 +232,166 @@ describe('runMergeJson', () => {
       status: 'skipped',
       reason: expect.stringContaining('needs --branch'),
     });
+  });
+});
+
+describe('runPickJson', () => {
+  const pick = (repo: ConflictRepo, commits: string[]): CherryPickTarget => ({
+    repo: config(repo),
+    commits,
+    sourceBranch: 'feature',
+    targetBranch: 'main',
+  });
+  const body = async (repo: ConflictRepo, ref: string) =>
+    (await repo.git.raw(['log', '-1', '--format=%B', ref])).trimEnd();
+  const pickHeadExists = (repo: ConflictRepo) =>
+    repo.git.raw(['rev-parse', '--verify', 'CHERRY_PICK_HEAD']).then(
+      () => true,
+      () => false,
+    );
+
+  it('applies clean commits in order, keeping their messages', async () => {
+    const repo = await makeConflictRepo();
+    const { addA, addB } = repo.c;
+
+    const [row] = await runPickJson([pick(repo, [addA, addB])], deps(), OFFLINE);
+
+    expect(row).toMatchObject({
+      status: 'success',
+      commits: { requested: [addA, addB], applied: [addA, addB], dropped: [] },
+      resolvedBy: null,
+      head: await repo.sha('main'),
+    });
+    expect(await body(repo, 'main')).toBe('feat: add b');
+    expect(await body(repo, 'main~1')).toBe('feat: add a');
+  });
+
+  it('lets the agent resolve a conflict at commit 2 of 3 and carries on', async () => {
+    const repo = await makeConflictRepo();
+    await repo.git.addConfig('user.name', 'resolver');
+    const { addA, changeF, addB } = repo.c;
+
+    const [row] = await runPickJson([pick(repo, [addA, changeF, addB])], deps(resolves), OFFLINE);
+
+    expect(row).toMatchObject({
+      status: 'success',
+      commits: { applied: [addA, changeF, addB], dropped: [] },
+      resolvedBy: 'agent',
+      conflicts: [{ path: 'f.txt', commit: changeF, outcome: 'resolved' }],
+    });
+    const log = (await repo.git.raw(['log', '-3', '--format=%an|%s', 'main'])).trim().split('\n');
+    expect(log).toEqual([
+      'gittyup-fixture|feat: add b',
+      'gittyup-fixture|feat: b becomes FEATURE',
+      'gittyup-fixture|feat: add a',
+    ]);
+    expect(await body(repo, 'main~1')).toContain('Resolved-by: gittyup agent (test-model)');
+    expect(await body(repo, 'main')).not.toContain('Resolved-by');
+    expect(await body(repo, 'main~2')).not.toContain('Resolved-by');
+    expect(await repo.read('f.txt')).toBe(RESOLVED);
+  });
+
+  it('undoes the whole pick when the agent cannot resolve commit 2', async () => {
+    const repo = await makeConflictRepo();
+    const before = await repo.sha('main');
+    const { addA, changeF, addB } = repo.c;
+
+    const [row] = await runPickJson([pick(repo, [addA, changeF, addB])], deps(refuses), OFFLINE);
+
+    expect(row).toMatchObject({
+      status: 'conflict',
+      rolledBack: true,
+      stoppedAt: changeF,
+      commits: { applied: [] },
+      head: before,
+    });
+    expect(await repo.sha('main')).toBe(before);
+    expect(await repo.exists('a.txt')).toBe(false);
+    expect(await pickHeadExists(repo)).toBe(false);
+  });
+
+  it('undoes earlier agent-resolved picks when a later conflict fails', async () => {
+    const repo = await makeConflictRepo();
+    const before = await repo.sha('main');
+    const { addA, changeF, addB, changeF2 } = repo.c;
+    const reply = vi
+      .fn<AgentReply>()
+      .mockResolvedValueOnce(RESOLVED)
+      .mockResolvedValueOnce('<<<<<<< x\n');
+
+    const [row] = await runPickJson(
+      [pick(repo, [addA, changeF, addB, changeF2])],
+      {
+        getGit: (r: RepoConfig) => new GitOperations(r.path),
+        agent: { ...agentSetup(resolves), reply },
+      },
+      OFFLINE,
+    );
+
+    expect(row).toMatchObject({
+      status: 'conflict',
+      rolledBack: true,
+      stoppedAt: changeF2,
+      resolvedBy: null,
+      commits: { applied: [] },
+      head: before,
+    });
+    expect(await repo.exists('a.txt')).toBe(false);
+    expect(await repo.exists('b.txt')).toBe(false);
+  });
+
+  it('lists a commit already on the target as dropped, not applied', async () => {
+    const repo = await makeConflictRepo();
+    const { addA } = repo.c;
+
+    const [row] = await runPickJson([pick(repo, [addA, addA])], deps(), OFFLINE);
+
+    expect(row).toMatchObject({
+      status: 'success',
+      commits: { applied: [addA], dropped: [addA] },
+    });
+  });
+
+  it('echoes a short sha as requested and reports the full sha as applied', async () => {
+    const repo = await makeConflictRepo();
+    const short = repo.c.addA.slice(0, 8);
+
+    const [row] = await runPickJson([pick(repo, [short])], deps(), OFFLINE);
+
+    expect(row?.commits).toEqual({ requested: [short], applied: [repo.c.addA], dropped: [] });
+  });
+
+  it('refuses a commit the repo does not have before touching anything', async () => {
+    const repo = await makeConflictRepo();
+    const before = await repo.sha('main');
+
+    const [row] = await runPickJson([pick(repo, ['0'.repeat(40)])], deps(), OFFLINE);
+
+    expect(row).toMatchObject({
+      status: 'error',
+      error: expect.stringContaining('not found'),
+      rolledBack: false,
+      head: before,
+    });
+  });
+
+  it('undoes earlier picks when a later commit cannot be picked (a merge commit)', async () => {
+    const repo = await makeConflictRepo();
+    await repo.git.raw(['checkout', '-b', 'm', repo.c.addG]);
+    await repo.git.raw(['merge', '--no-ff', '-m', 'm', repo.c.addA]);
+    const mergeSha = await repo.sha('m');
+    await repo.git.checkout('main');
+    const before = await repo.sha('main');
+
+    const [row] = await runPickJson([pick(repo, [repo.c.addA, mergeSha])], deps(), OFFLINE);
+
+    expect(row).toMatchObject({
+      status: 'error',
+      rolledBack: true,
+      commits: { applied: [] },
+      head: before,
+    });
+    expect(await repo.exists('a.txt')).toBe(false);
   });
 });
 
