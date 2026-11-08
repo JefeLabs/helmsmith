@@ -24,4 +24,10 @@ describe('ConnectView', () => {
 
     expect(statusCalls).toBe(1);
   }, 20_000);
+
+  it('keeps a failed login’s error on screen after the status refresh', () => {
+    const { frame } = render('login-fails');
+
+    expect(frame).toContain('login failed: device code expired');
+  }, 20_000);
 });

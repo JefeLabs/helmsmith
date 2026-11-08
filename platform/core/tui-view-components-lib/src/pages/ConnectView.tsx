@@ -31,6 +31,7 @@ import { KeybindingsBar } from '../molecules/KeybindingsBar.tsx';
 import { Spinner } from '../molecules/Spinner.tsx';
 import { SelectList, type SelectListItem } from '../organisms/SelectList.tsx';
 import { StatusList, type StatusListItem } from '../organisms/StatusList.tsx';
+import { useThemeTokens } from '../theme/hooks.ts';
 
 export interface ConnectViewProps {
   appName: string;
@@ -62,6 +63,10 @@ export function ConnectView({
 
   const [statuses, setStatuses] = useState<Map<string, ConnectionStatus>>(() => new Map());
   const [busy, setBusy] = useState<BusyState | null>(null);
+  /** Why the last login/logout failed. Kept apart from `statuses`, which the
+   *  post-action refresh rebuilds from getStatus() and would erase it. */
+  const [actionError, setActionError] = useState<string | null>(null);
+  const theme = useThemeTokens();
 
   // Initial status fetch + refresh helper
   const refreshAll = useCallback(async () => {
@@ -131,6 +136,7 @@ export function ConnectView({
       if (!conn) return;
       const s = statusOf(conn);
       const action: 'login' | 'logout' = s?.state === 'connected' ? 'logout' : 'login';
+      setActionError(null);
       setBusy({
         connectionId: conn.id,
         action,
@@ -145,14 +151,8 @@ export function ConnectView({
           await conn.logout();
         }
       } catch (err) {
-        setStatuses((prev) => {
-          const next = new Map(prev);
-          next.set(conn.id, {
-            state: 'disconnected',
-            message: `${action} failed: ${(err as Error).message}`,
-          });
-          return next;
-        });
+        const reason = err instanceof Error ? err.message : String(err);
+        setActionError(`${conn.displayName}: ${action} failed: ${reason}`);
       } finally {
         setBusy(null);
         await refreshAll();
@@ -211,6 +211,7 @@ export function ConnectView({
         )}
 
         {busy ? <Spinner label={busy.message} /> : null}
+        {actionError && !busy ? <Text color={theme.colors.danger}>✗ {actionError}</Text> : null}
 
         <KeybindingsBar />
       </Box>
