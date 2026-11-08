@@ -2,6 +2,7 @@
  * The headless (`--json`) merge and pick flows: every repo ends either done or exactly
  * as it started, and its row says which. Real repos; the agent is a fake.
  */
+import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it, vi } from 'vitest';
@@ -426,5 +427,123 @@ describe('toMergePickDocument', () => {
       model: 'test-model',
       available: true,
     });
+  });
+});
+
+describe('final review: rollback and restore edge cases', () => {
+  const pickTarget = (repo: ConflictRepo, commits: string[]): CherryPickTarget => ({
+    repo: config(repo),
+    commits,
+    sourceBranch: 'feature',
+    targetBranch: 'main',
+  });
+  const porcelain = async (repo: ConflictRepo) =>
+    (await repo.git.raw(['status', '--porcelain'])).trim();
+  const gone = (t: MergeTarget): MergeTarget => ({
+    ...t,
+    repo: { ...t.repo, name: 'gone', path: '/nonexistent/gittyup-gone' },
+  });
+
+  it('aborts a merge git started but could not commit (signing fails), back on the start branch', async () => {
+    const repo = await makeConflictRepo();
+    const before = await repo.sha('main');
+    await repo.git.checkout('side');
+    // Plain git: simple-git refuses to set gpg.program. `false` makes every signature fail.
+    execFileSync('git', ['-C', repo.path, 'config', 'commit.gpgsign', 'true']);
+    execFileSync('git', ['-C', repo.path, 'config', 'gpg.program', 'false']);
+
+    const [row] = await runMergeJson([target(repo, 'side')], deps(), OFFLINE);
+
+    expect(row).toMatchObject({ status: 'error', rolledBack: true, head: before });
+    expect(await mergeHeadExists(repo)).toBe(false);
+    expect(await repo.currentBranch()).toBe('side');
+    expect(await porcelain(repo)).toBe('');
+    expect(await repo.sha('main')).toBe(before);
+  });
+
+  it('reports a repo whose path is gone as an error row and still merges the rest', async () => {
+    const repo = await makeConflictRepo();
+
+    const rows = await runMergeJson(
+      [gone(target(repo, 'side')), target(repo, 'side')],
+      deps(),
+      OFFLINE,
+    );
+
+    expect(rows[0]).toMatchObject({ repo: 'gone', status: 'error', head: null });
+    expect(rows[1]).toMatchObject({ repo: 'app', status: 'success' });
+  });
+
+  it('reports a repo whose path is gone as an error row and still picks the rest', async () => {
+    const repo = await makeConflictRepo();
+    const t = pickTarget(repo, [repo.c.addA]);
+
+    const rows = await runPickJson(
+      [{ ...t, repo: { ...t.repo, name: 'gone', path: '/nonexistent/gittyup-gone' } }, t],
+      deps(),
+      OFFLINE,
+    );
+
+    expect(rows[0]).toMatchObject({ repo: 'gone', status: 'error', head: null });
+    expect(rows[1]).toMatchObject({ repo: 'app', status: 'success' });
+  });
+
+  it('returns a detached HEAD to the same commit with the uncommitted work back', async () => {
+    const repo = await makeConflictRepo();
+    const base = await repo.sha('main~1');
+    await repo.git.raw(['checkout', '--detach', base]);
+    writeFileSync(join(repo.path, 'f.txt'), 'a\nb\nc\nlocal\n');
+
+    const [row] = await runMergeJson([target(repo, 'side')], deps(), OFFLINE);
+
+    expect(row?.status).toBe('success');
+    expect((await repo.git.raw(['rev-parse', '--abbrev-ref', 'HEAD'])).trim()).toBe('HEAD');
+    expect(await repo.sha('HEAD')).toBe(base);
+    expect(await repo.read('f.txt')).toBe('a\nb\nc\nlocal\n');
+    expect((await repo.git.raw(['stash', 'list'])).trim()).toBe('');
+  });
+
+  it('keeps the stash, leaves no conflicts and says so when uncommitted work cannot be re-applied', async () => {
+    const repo = await makeConflictRepo();
+    await repo.git.raw(['checkout', '-b', 'g2', 'main']);
+    writeFileSync(join(repo.path, 'f.txt'), 'a\nG2\nc\n');
+    await repo.git.raw(['commit', '-qam', 'g2']);
+    await repo.git.checkout('main');
+    writeFileSync(join(repo.path, 'f.txt'), 'a\nDIRTY\nc\n');
+
+    const [row] = await runMergeJson([target(repo, 'g2')], deps(), OFFLINE);
+
+    expect(row).toMatchObject({ status: 'success', notRestored: expect.stringContaining('stash') });
+    expect(await porcelain(repo)).toBe('');
+    expect((await repo.git.raw(['stash', 'list'])).trim().split('\n')).toHaveLength(1);
+    expect(await repo.read('f.txt')).toBe('a\nG2\nc\n');
+  });
+
+  it('reads the target branch, not a tag with the same name', async () => {
+    const repo = await makeConflictRepo();
+    await repo.git.raw(['tag', 'main', 'main~1']);
+
+    const [row] = await runMergeJson([target(repo, 'side')], deps(), OFFLINE);
+
+    const tip = (await repo.git.raw(['rev-parse', 'refs/heads/main'])).trim();
+    expect(row?.head).toBe(tip);
+    expect(row?.message).not.toMatch(/already/);
+  });
+
+  it('keeps a picked commit’s message verbatim, # lines included, when the agent resolves it', async () => {
+    const repo = await makeConflictRepo();
+    const msg = 'fix: hash lines\n\n#1234 reported by ops\n## Notes\nkeep me';
+    await repo.git.raw(['checkout', '-b', 'hashy', 'main~1']);
+    writeFileSync(join(repo.path, 'f.txt'), 'a\nHASHY\nc\n');
+    await repo.git.raw(['commit', '-qa', '-m', msg]);
+    const sha = await repo.sha('hashy');
+    expect((await repo.git.raw(['log', '-1', '--format=%B', sha])).trimEnd()).toBe(msg);
+    await repo.git.checkout('main');
+
+    const [row] = await runPickJson([pickTarget(repo, [sha])], deps(resolves), OFFLINE);
+
+    expect(row?.status).toBe('success');
+    const body = (await repo.git.raw(['log', '-1', '--format=%B', 'main'])).trimEnd();
+    expect(body).toBe(`${msg}\n\nResolved-by: gittyup agent (test-model)`);
   });
 });

@@ -246,6 +246,9 @@ export interface MergePickRow {
   pushed: boolean;
   pr: PrRow | null;
   error?: string;
+  /** Present when the start branch or the uncommitted work could not be put back after
+   *  the run, and says where things are (e.g. the work is kept in `git stash list`). */
+  notRestored?: string;
 }
 
 export interface MergePickDocument {

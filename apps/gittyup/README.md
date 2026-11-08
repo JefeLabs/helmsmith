@@ -277,7 +277,7 @@ gittyup config --json | jq '{agent, github}'                  # which token each
   - no `--yes` → `CONFIRMATION_REQUIRED`
   - an unknown group or repo → `TARGET_UNKNOWN`
 - **Who resolves conflicts.** The mode is `--ai` if given, else the manifest's `ai_mode`. `auto` and `suggest` let gittyup's agent try. A manifest set to `manual` is honoured: no file goes to the agent unless you pass `--ai auto`. The report's `agent` block says which mode applied and whether the agent was reachable.
-- **On a conflict** the agent tries each file. If it can't resolve one, the repo is rolled back to exactly where it started: the merge is aborted, or the commits this run picked are undone. Its row says `status: "conflict"`, `rolledBack: true`, which file stopped it and why. The start branch and any uncommitted work are put back either way.
+- **On a conflict** the agent tries each file. If it can't resolve one, the repo is rolled back to exactly where it started: the merge is aborted, or the commits this run picked are undone. Its row says `status: "conflict"`, `rolledBack: true`, which file stopped it and why. Either way, the repo is returned to the branch (or detached commit) it started on, and your uncommitted work is re-applied. If that work can't be re-applied cleanly, it stays in `git stash list` and the row's `notRestored` says so.
 - **Traceability.** Every commit with agent-written content carries a `Resolved-by: gittyup agent (<model>)` trailer. Find them with `git log --format='%(trailers:key=Resolved-by)'`.
 - **Exit code.** It is 1 when any repo is not `success`, and the report is still on stdout.
 - `--pr` reports `skipped` for now. It needs `--branch`, which is still to come.

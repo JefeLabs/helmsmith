@@ -101,8 +101,24 @@ function newRow(t: RepoTarget): MergePickRow {
   };
 }
 
-async function headOf(git: GitOperations, ref: string): Promise<string | null> {
-  return git.revParse(ref).catch(() => null);
+/** A branch's tip. Through `refs/heads/`: plain `rev-parse <name>` prefers a tag with
+ *  the same name, which made `head` and "already contains" wrong. */
+function branchTip(git: GitOperations, branch: string): Promise<string> {
+  return git.revParse(`refs/heads/${branch}`);
+}
+
+async function headOf(git: GitOperations, branch: string): Promise<string | null> {
+  return branchTip(git, branch).catch(() => null);
+}
+
+/** C2: a repo that can't even be opened (path gone) is its own error row, never the run's. */
+function openRepo(deps: RunDeps, t: RepoTarget, row: MergePickRow): GitOperations | null {
+  try {
+    return deps.getGit(t.repo);
+  } catch (err) {
+    fail(row, 'error', firstLine(err));
+    return null;
+  }
 }
 
 function fail(row: MergePickRow, status: 'error' | 'skipped', error: string): void {
@@ -179,9 +195,13 @@ export async function runMergeJson(
 ): Promise<MergePickRow[]> {
   const rows: MergePickRow[] = [];
   for (const t of targets) {
-    const git = deps.getGit(t.repo);
     const row = newRow(t);
     rows.push(row);
+    const git = openRepo(deps, t, row);
+    if (!git) {
+      row.pr = opts.pr ? prRow(row, 'merge') : null;
+      continue;
+    }
     if (await prefetch(git, row, t, opts)) {
       await mergeOne(git, row, t, deps.agent);
     }
@@ -198,20 +218,37 @@ async function mergeOne(
 ): Promise<void> {
   const { sourceBranch: source, targetBranch: target } = t;
   try {
-    await git.withRepoGuard(`merge ${source} → ${target} (${t.repo.name})`, async () => {
-      const before = await git.revParse(target);
-      const merged = await git.merge(source, target);
-      if (merged.success) {
-        row.status = 'success';
-        row.message =
-          (await git.revParse(target)) === before
-            ? `${target} already contains ${source}`
-            : `Merged ${source} → ${target}`;
-      } else {
-        await resolveOrRollBack(git, row, agent, source, target);
-      }
-      row.head = await git.revParse(target);
-    });
+    await git.withRepoGuard(
+      `merge ${source} → ${target} (${t.repo.name})`,
+      async () => {
+        const before = await branchTip(git, target);
+        let merged: { success: boolean };
+        try {
+          merged = await git.merge(source, target);
+        } catch (err) {
+          // git can start a merge and then fail (the merge commit can't be signed, rerere
+          // auto-staged everything): abort it so the guard can restore the start branch.
+          if (await git.mergeInProgress()) {
+            await git.abortMerge();
+            row.rolledBack = true;
+          }
+          throw err;
+        }
+        if (merged.success) {
+          row.status = 'success';
+          row.message =
+            (await branchTip(git, target)) === before
+              ? `${target} already contains ${source}`
+              : `Merged ${source} → ${target}`;
+        } else {
+          await resolveOrRollBack(git, row, agent, source, target);
+        }
+        row.head = await branchTip(git, target);
+      },
+      (problem) => {
+        row.notRestored = problem;
+      },
+    );
   } catch (err) {
     fail(row, 'error', firstLine(err));
     row.head = await headOf(git, target);
@@ -261,12 +298,16 @@ export async function runPickJson(
 ): Promise<MergePickRow[]> {
   const rows: MergePickRow[] = [];
   for (const t of targets) {
-    const git = deps.getGit(t.repo);
     const row: MergePickRow = {
       ...newRow(t),
       commits: { requested: [...t.commits], applied: [], dropped: [] },
     };
     rows.push(row);
+    const git = openRepo(deps, t, row);
+    if (!git) {
+      row.pr = opts.pr ? prRow(row, 'pick') : null;
+      continue;
+    }
     if (await prefetch(git, row, t, opts)) {
       await pickOneRepo(git, row, t, deps.agent);
     }
@@ -298,59 +339,65 @@ async function pickOneRepo(
   }
 
   try {
-    await git.withRepoGuard(`cherry-pick → ${target} (${t.repo.name})`, async () => {
-      await git.switchToBranch(target);
-      const preSha = await git.revParse('HEAD');
-      // Undo this run's picks (spec §5.2). Safe because withRepoGuard guaranteed a clean
-      // tree on entry and preSha was recorded by this run on this branch; refuse rather
-      // than reset if HEAD somehow no longer descends from it.
-      const undo = async () => {
-        await git.cherryPickAbort().catch(() => {});
-        if (!(await git.isAncestor(preSha, 'HEAD'))) {
-          throw new Error(`HEAD no longer descends from ${preSha}; not resetting`);
-        }
-        await git.resetHard(preSha);
-        row.rolledBack = true;
-        commits.applied = [];
-        row.resolvedBy = null;
-      };
-
-      try {
-        for (const sha of full) {
-          const outcome = await git.pickOne(sha);
-          if (outcome === 'applied') commits.applied.push(sha);
-          else if (outcome === 'dropped') commits.dropped.push(sha);
-          else {
-            const result = await resolveConflictsHeadless(git, agent, sha);
-            row.conflicts.push(...result.conflicts);
-            if (!result.resolved) {
-              row.stoppedAt = sha;
-              await undo();
-              row.status = 'conflict';
-              row.message = `conflict at ${sha.slice(0, 8)} not resolved; pick rolled back`;
-              break;
-            }
-            await git.finishResolvedCommit(resolvedByTrailer(agent.model));
-            commits.applied.push(sha);
-            row.resolvedBy = 'agent';
+    await git.withRepoGuard(
+      `cherry-pick → ${target} (${t.repo.name})`,
+      async () => {
+        await git.switchToBranch(target);
+        const preSha = await git.revParse('HEAD');
+        // Undo this run's picks (spec §5.2). Safe because withRepoGuard guaranteed a clean
+        // tree on entry and preSha was recorded by this run on this branch; refuse rather
+        // than reset if HEAD somehow no longer descends from it.
+        const undo = async () => {
+          await git.cherryPickAbort().catch(() => {});
+          if (!(await git.isAncestor(preSha, 'HEAD'))) {
+            throw new Error(`HEAD no longer descends from ${preSha}; not resetting`);
           }
-        }
-        if (row.status !== 'conflict') {
-          row.status = 'success';
-          row.message = `Applied ${commits.applied.length} commit(s) to ${target}${
-            commits.dropped.length ? `; ${commits.dropped.length} already present` : ''
-          }`;
-        }
-      } catch (err) {
+          await git.resetHard(preSha);
+          row.rolledBack = true;
+          commits.applied = [];
+          row.resolvedBy = null;
+        };
+
         try {
-          await undo();
-        } catch (undoErr) {
-          throw new Error(`${firstLine(err)}; rollback failed: ${firstLine(undoErr)}`);
+          for (const sha of full) {
+            const outcome = await git.pickOne(sha);
+            if (outcome === 'applied') commits.applied.push(sha);
+            else if (outcome === 'dropped') commits.dropped.push(sha);
+            else {
+              const result = await resolveConflictsHeadless(git, agent, sha);
+              row.conflicts.push(...result.conflicts);
+              if (!result.resolved) {
+                row.stoppedAt = sha;
+                await undo();
+                row.status = 'conflict';
+                row.message = `conflict at ${sha.slice(0, 8)} not resolved; pick rolled back`;
+                break;
+              }
+              await git.finishResolvedCommit(resolvedByTrailer(agent.model), sha);
+              commits.applied.push(sha);
+              row.resolvedBy = 'agent';
+            }
+          }
+          if (row.status !== 'conflict') {
+            row.status = 'success';
+            row.message = `Applied ${commits.applied.length} commit(s) to ${target}${
+              commits.dropped.length ? `; ${commits.dropped.length} already present` : ''
+            }`;
+          }
+        } catch (err) {
+          try {
+            await undo();
+          } catch (undoErr) {
+            throw new Error(`${firstLine(err)}; rollback failed: ${firstLine(undoErr)}`);
+          }
+          throw err;
         }
-        throw err;
-      }
-      row.head = await git.revParse(target);
-    });
+        row.head = await branchTip(git, target);
+      },
+      (problem) => {
+        row.notRestored = problem;
+      },
+    );
   } catch (err) {
     fail(row, 'error', firstLine(err));
     row.head = await headOf(git, target);

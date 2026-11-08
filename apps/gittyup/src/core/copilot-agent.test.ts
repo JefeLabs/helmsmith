@@ -115,4 +115,27 @@ describe('createCopilotAgent', () => {
 
     await expect(createCopilotAgent('m')(file)).rejects.toThrow(/Copilot API error \(500\)/);
   });
+
+  it('gives up once the time limit passes, instead of hanging the run', async () => {
+    process.env.GITHUB_TOKEN = 't';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string | URL, init?: RequestInit) => {
+        if (String(url) === COPILOT_TOKEN_URL) {
+          return new Response(
+            JSON.stringify({ token: 'cop', expires_at: Math.floor(Date.now() / 1000) + 3600 }),
+            { status: 200 },
+          );
+        }
+        // The chat call never answers; only an abort ends it.
+        return new Promise<Response>((_, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+        });
+      }),
+    );
+
+    await expect(createCopilotAgent('m', { timeoutMs: 50 })(file)).rejects.toThrow(
+      /timed out after 50 ms/,
+    );
+  }, 2_000);
 });

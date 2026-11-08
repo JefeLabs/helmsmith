@@ -38,9 +38,20 @@ export async function checkAgentAvailable(): Promise<AgentAvailability> {
   }
 }
 
-export function createCopilotAgent(model: string): AgentReply {
+/** Upper bound on one file's agent call. A hung call would otherwise hang the run, and a
+ *  caller that kills gittyup then can't get the repo rolled back. */
+export const AGENT_TIMEOUT_MS = 120_000;
+
+export function createCopilotAgent(model: string, opts: { timeoutMs?: number } = {}): AgentReply {
+  const timeoutMs = opts.timeoutMs ?? AGENT_TIMEOUT_MS;
   return async (file) => {
-    const response = await callCopilot(buildAiMessages(file, 'auto'), model);
-    return response.choices?.[0]?.message?.content ?? '';
+    const signal = AbortSignal.timeout(timeoutMs);
+    try {
+      const response = await callCopilot(buildAiMessages(file, 'auto'), model, { signal });
+      return response.choices?.[0]?.message?.content ?? '';
+    } catch (err) {
+      if (signal.aborted) throw new Error(`agent timed out after ${timeoutMs} ms`);
+      throw err;
+    }
   };
 }
