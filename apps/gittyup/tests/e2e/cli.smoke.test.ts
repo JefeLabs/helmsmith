@@ -76,13 +76,17 @@ describe('gittyup CLI smoke', () => {
   });
 });
 
-/** Number of live `gittyup/dist/cli.js` processes (Bun re-execs); 0 when pgrep finds none. */
-function countCliProcesses(): number {
+/**
+ * True while any process in the group led by `pid` is alive. Checks this run's own
+ * group: a machine-wide count of gittyup processes also saw other test files' and other
+ * sessions' CLIs starting or exiting, and failed in both directions.
+ */
+function groupAlive(pid: number): boolean {
   try {
-    const out = execFileSync('pgrep', ['-f', 'gittyup/dist/cli.js'], { stdio: 'pipe' }).toString();
-    return out.split('\n').filter(Boolean).length;
-  } catch {
-    return 0;
+    process.kill(-pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === 'EPERM';
   }
 }
 
@@ -105,12 +109,11 @@ describe('runCli process hygiene', () => {
       workspace: '.',
       groups: { app: { repos: [{ name: 'fixture', path: repo.path }] } },
     });
-    const before = countCliProcesses();
     const r = await runCli(ws, ['repo', 'tag'], { timeoutMs: 1_500, keepStdinOpen: true });
     expect(r.timedOut).toBe(true);
     expect(r.exitCode).not.toBe(0);
     await new Promise((res) => setTimeout(res, 300));
-    const after = countCliProcesses();
-    expect(after).toBe(before);
+    expect(r.pid).toEqual(expect.any(Number));
+    expect(groupAlive(r.pid as number)).toBe(false);
   });
 });

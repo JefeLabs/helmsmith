@@ -15,6 +15,8 @@ export interface CliResult {
   exitCode: number;
   /** True when `timeoutMs` elapsed and the process group was killed. */
   timedOut: boolean;
+  /** The spawned CLI's pid; it runs detached, so this is also its process group id. */
+  pid?: number;
 }
 
 export interface RunCliOptions {
@@ -113,11 +115,17 @@ export function runCli(
 
     child.on('close', (code) => {
       clearTimeout(timer);
-      resolvePromise({ stdout, stderr, exitCode: code ?? 1, timedOut });
+      resolvePromise({ stdout, stderr, exitCode: code ?? 1, timedOut, pid: child.pid });
     });
     child.on('error', (err) => {
       clearTimeout(timer);
-      resolvePromise({ stdout, stderr: `${stderr}${err.message}`, exitCode: 1, timedOut });
+      resolvePromise({
+        stdout,
+        stderr: `${stderr}${err.message}`,
+        exitCode: 1,
+        timedOut,
+        pid: child.pid,
+      });
     });
   });
 }
