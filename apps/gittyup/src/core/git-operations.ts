@@ -75,7 +75,7 @@ export class GitOperations {
    * land on the *current* branch while the result row still showed success (G2). Verify
    * HEAD actually moved to the named branch, or refuse.
    */
-  private async switchToBranch(target: string): Promise<void> {
+  async switchToBranch(target: string): Promise<void> {
     this.assertSafeRef(target);
     await this.git.checkout(target);
     const current = await this.getCurrentBranch();
@@ -266,6 +266,70 @@ export class GitOperations {
 
   async cherryPickContinue(): Promise<void> {
     await this.git.raw(['cherry-pick', '--continue']);
+  }
+
+  // ─── Headless (--json) Primitives ─────────────────────────────────
+  // Used by the no-prompt merge/pick flows (src/core/json-operations.ts); hardening §3.3
+  // can reuse them for the interactive pick path later.
+
+  /** Full 40-char SHA of `<ref>^{commit}`; throws when it does not resolve to a commit. */
+  async revParse(ref: string): Promise<string> {
+    this.assertSafeRef(ref);
+    const sha = (await this.git.raw(['rev-parse', '--verify', `${ref}^{commit}`])).trim();
+    if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error(`not a commit: ${ref}`);
+    return sha;
+  }
+
+  /**
+   * True when `ancestor` is in `descendant`'s history. Compares `merge-base` output rather
+   * than using `merge-base --is-ancestor`: that answers "no" with exit 1 and empty stderr,
+   * which simple-git resolves instead of rejecting (same trap as `refExists`).
+   */
+  async isAncestor(ancestor: string, descendant: string): Promise<boolean> {
+    const a = await this.revParse(ancestor);
+    const d = await this.revParse(descendant);
+    const base = (await this.git.raw(['merge-base', a, d])).trim();
+    return base === a;
+  }
+
+  async resetHard(sha: string): Promise<void> {
+    this.assertSafeRef(sha);
+    await this.git.raw(['reset', '--hard', sha]);
+  }
+
+  /**
+   * Cherry-pick one commit onto the current branch. `--empty=drop` turns a commit whose
+   * change is already present into a no-op, which git reports as success; HEAD not moving
+   * is how that case is told apart from a real apply.
+   */
+  async pickOne(sha: string): Promise<'applied' | 'dropped' | 'conflict'> {
+    this.assertSafeRef(sha);
+    const before = await this.revParse('HEAD');
+    let failure: unknown;
+    try {
+      await this.git.raw(['cherry-pick', '--empty=drop', '--end-of-options', sha]);
+    } catch (err) {
+      failure = err;
+    }
+    const status = await this.git.status();
+    if (status.conflicted.length > 0) return 'conflict';
+    if (failure) {
+      const msg = failure instanceof Error ? failure.message : String(failure);
+      throw new Error(`cherry-pick failed on ${sha}: ${msg.split('\n')[0]}`);
+    }
+    return (await this.revParse('HEAD')) === before ? 'dropped' : 'applied';
+  }
+
+  /**
+   * Commit a merge or cherry-pick whose conflicts are resolved and staged, keeping what
+   * git prepared: the merge message, or the picked commit's message and author (from
+   * CHERRY_PICK_HEAD). `--cleanup=strip` drops git's `# Conflicts:` comment, which
+   * `--no-edit` would otherwise keep. No editor runs, so this works headless — and it
+   * can't rely on GIT_EDITOR, which simple-git strips.
+   */
+  async finishResolvedCommit(trailer: string): Promise<string> {
+    await this.git.raw(['commit', '--no-edit', '--cleanup=strip', '--trailer', trailer]);
+    return this.revParse('HEAD');
   }
 
   // ─── Conflict Branch Management ───────────────────────────────────
