@@ -7,6 +7,7 @@
 import { existsSync } from 'node:fs';
 import type { ManifestManager } from '../config/manifest.js';
 import type { AiMode, RepoConfig } from '../config/schema.js';
+import type { ConfigLocation } from '../utils/location.js';
 
 // ─── shared ────────────────────────────────────────────────────────
 
@@ -90,7 +91,8 @@ export interface TokenRow {
 }
 
 export interface ConfigDocument {
-  manifest: { path: string; location: 'home' | 'repo' };
+  /** Where the manifest was found; the same values the text footer shows. */
+  manifest: { path: string; location: ConfigLocation };
   settings: {
     aiMode: AiMode;
     aiModel: string;
