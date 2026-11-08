@@ -7,8 +7,7 @@ GitRadar scans your local git repos, classifies every file change, and presents 
 ## Quick Start
 
 ```bash
-npm install
-npm run build
+npm install -g @helmsmith/gitradar
 
 # Try it instantly with synthetic data
 gitradar --demo
@@ -156,7 +155,7 @@ Or skip the YAML and configure everything from the **Manage tab** in the TUI.
 
 ## Tech Stack
 
-- **TypeScript** on **Bun** (`bun:sqlite`) — GitRadar requires the Bun runtime; `bin/gitradar` execs the vendored `bun` binary from the `bun` npm dependency. `npm install --ignore-scripts` is unsupported.
+- **TypeScript** on **Bun** (`bun:sqlite`) — GitRadar requires the Bun runtime; `bin/gitradar.mjs` re-runs the bundle under the vendored `bun` binary from the `bun` npm dependency (falling back to a `bun` on `PATH`). `npm install --ignore-scripts` is unsupported.
 - **SQLite** (`bun:sqlite`) — local storage with WAL mode
 - **Commander** — CLI argument parsing (via `@helmsmith/cli-kit`)
 - **Octokit** — optional GitHub API enrichment

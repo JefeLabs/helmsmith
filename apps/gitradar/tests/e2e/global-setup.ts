@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 
 /**
  * Vitest globalSetup: build the CLI bundle before running E2E tests so
- * bin/gitradar runs a fresh dist/cli.js.
+ * bin/gitradar.mjs runs a fresh dist/cli.js.
  */
 export function setup(): void {
   const projectRoot = resolve(import.meta.dirname, '../..');

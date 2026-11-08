@@ -267,7 +267,7 @@ with the app's vendored Bun (copy it from an existing app, e.g. `apps/gittyup/bi
 
 ```js
 #!/usr/bin/env node
-// … resolve `bun` from require.resolve('bun/package.json'), fall back to `bun` on PATH …
+// … resolve `bun` from require.resolve('bun/package.json'); if that fails, print an error and exit 1 …
 const entry = fileURLToPath(new URL('../dist/cli.js', import.meta.url));
 const bunfig = fileURLToPath(new URL('../bunfig.toml', import.meta.url));
 spawnSync(bun, ['--no-env-file', `--config=${bunfig}`, entry, ...process.argv.slice(2)], {
@@ -288,8 +288,16 @@ asserts neither takes effect — copy it with the bin.
 Source lives in `src/cli.ts`. **Don't** put TS source in `bin/` — npm consumers don't
 get tsx/Bun for free, and the stub keeps the bin tiny and transparent.
 
-gitradar uses a POSIX `sh` launcher (`apps/gitradar/bin/gitradar`) with the same two
-flags. Either is fine; pick the Node launcher for new apps.
+Don't use a `sh` launcher that execs `<package>/node_modules/.bin/bun`: `npx` and
+project-local installs hoist `bun` above the package, so that path doesn't exist there.
+`require.resolve('bun/package.json')` finds it wherever npm put it. (gitradar shipped a
+`sh` launcher until its first npm release, which replaced it for this reason.)
+
+**Fail closed when the vendored Bun can't be resolved.** Don't fall back to a bare
+`bun`: it is looked up through `PATH`, and on Windows in the current directory first, so a
+cloned repo can plant one. gitradar's launcher and its `launcher.test.ts` (a fake `bun` on
+`PATH` must never run) are the reference. gittyup, toolz, mech-pencil and timetracker still
+carry the old fallback.
 
 ## Bun distribution
 
