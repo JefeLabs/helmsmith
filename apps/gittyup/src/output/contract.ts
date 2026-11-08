@@ -198,6 +198,24 @@ export interface CompareDocument {
   summary: { repos: number; withConflicts: number; clean: number };
 }
 
+// ─── merge and pick (spec §5.4) ────────────────────────────────────
+
+/** What happened to one conflicted file in a headless merge/pick. */
+export type ConflictOutcome =
+  | 'resolved'
+  | 'agent_unavailable'
+  | 'agent_refused'
+  | 'agent_error'
+  | 'not_attempted';
+
+export interface ConflictRow {
+  path: string;
+  /** pick: the commit whose conflict this was. */
+  commit?: string;
+  outcome: ConflictOutcome;
+  reason?: string;
+}
+
 // ─── prs, fetch, find ──────────────────────────────────────────────
 
 export interface PrsDocument {
