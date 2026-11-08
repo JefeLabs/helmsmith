@@ -47,7 +47,17 @@ interface BusyState {
   message: string;
 }
 
-export function ConnectView({ appName, required = [], optional = [], onQuit }: ConnectViewProps) {
+/** One shared empty list: a `= []` default is a new array every render, which
+ *  re-keys `all` → `refreshAll` → the fetch effect, so every re-render
+ *  re-fetched every status (and each fetch caused another re-render). */
+const NONE: Connection[] = [];
+
+export function ConnectView({
+  appName,
+  required = NONE,
+  optional = NONE,
+  onQuit,
+}: ConnectViewProps) {
   const all = useMemo(() => [...required, ...optional], [required, optional]);
 
   const [statuses, setStatuses] = useState<Map<string, ConnectionStatus>>(() => new Map());
