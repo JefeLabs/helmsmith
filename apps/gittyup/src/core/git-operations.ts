@@ -75,7 +75,7 @@ export class GitOperations {
    * land on the *current* branch while the result row still showed success (G2). Verify
    * HEAD actually moved to the named branch, or refuse.
    */
-  private async switchToBranch(target: string): Promise<void> {
+  async switchToBranch(target: string): Promise<void> {
     this.assertSafeRef(target);
     await this.git.checkout(target);
     const current = await this.getCurrentBranch();
@@ -266,6 +266,89 @@ export class GitOperations {
 
   async cherryPickContinue(): Promise<void> {
     await this.git.raw(['cherry-pick', '--continue']);
+  }
+
+  // ─── Headless (--json) Primitives ─────────────────────────────────
+  // Used by the no-prompt merge/pick flows (src/core/json-operations.ts); hardening §3.3
+  // can reuse them for the interactive pick path later.
+
+  /** Full 40-char SHA of `<ref>^{commit}`; throws when it does not resolve to a commit. */
+  async revParse(ref: string): Promise<string> {
+    this.assertSafeRef(ref);
+    const sha = (await this.git.raw(['rev-parse', '--verify', `${ref}^{commit}`])).trim();
+    if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error(`not a commit: ${ref}`);
+    return sha;
+  }
+
+  /**
+   * True when `ancestor` is in `descendant`'s history. Compares `merge-base` output rather
+   * than using `merge-base --is-ancestor`: that answers "no" with exit 1 and empty stderr,
+   * which simple-git resolves instead of rejecting (same trap as `refExists`).
+   */
+  async isAncestor(ancestor: string, descendant: string): Promise<boolean> {
+    const a = await this.revParse(ancestor);
+    const d = await this.revParse(descendant);
+    const base = (await this.git.raw(['merge-base', a, d])).trim();
+    return base === a;
+  }
+
+  async resetHard(sha: string): Promise<void> {
+    this.assertSafeRef(sha);
+    await this.git.raw(['reset', '--hard', sha]);
+  }
+
+  /**
+   * Cherry-pick one commit onto the current branch. `--empty=drop` turns a commit whose
+   * change is already present into a no-op, which git reports as success; HEAD not moving
+   * is how that case is told apart from a real apply.
+   */
+  async pickOne(sha: string): Promise<'applied' | 'dropped' | 'conflict'> {
+    this.assertSafeRef(sha);
+    const before = await this.revParse('HEAD');
+    let failure: unknown;
+    try {
+      await this.git.raw(['cherry-pick', '--empty=drop', '--end-of-options', sha]);
+    } catch (err) {
+      failure = err;
+    }
+    const status = await this.git.status();
+    if (status.conflicted.length > 0) return 'conflict';
+    if (failure) {
+      const msg = failure instanceof Error ? failure.message : String(failure);
+      throw new Error(`cherry-pick failed on ${sha}: ${msg.split('\n')[0]}`);
+    }
+    return (await this.revParse('HEAD')) === before ? 'dropped' : 'applied';
+  }
+
+  /**
+   * Commit a merge or cherry-pick whose conflicts are resolved and staged, keeping what
+   * git prepared: the merge message, or the picked commit's message and author (from
+   * CHERRY_PICK_HEAD). `--cleanup=strip` drops git's `# Conflicts:` comment, which
+   * `--no-edit` would otherwise keep. No editor runs, so this works headless — and it
+   * can't rely on GIT_EDITOR, which simple-git strips.
+   */
+  async finishResolvedCommit(trailer: string, reuseMessageFrom?: string): Promise<string> {
+    if (reuseMessageFrom) {
+      // A pick: take the original commit's message and author exactly (`-C`), verbatim.
+      // `--cleanup=strip` would also delete the author's own lines starting with `#`.
+      this.assertSafeRef(reuseMessageFrom);
+      await this.git.raw([
+        'commit',
+        '-C',
+        reuseMessageFrom,
+        '--cleanup=verbatim',
+        '--trailer',
+        trailer,
+      ]);
+    } else {
+      await this.git.raw(['commit', '--no-edit', '--cleanup=strip', '--trailer', trailer]);
+    }
+    return this.revParse('HEAD');
+  }
+
+  /** True while a merge is in progress (MERGE_HEAD exists). */
+  async mergeInProgress(): Promise<boolean> {
+    return this.refExists('MERGE_HEAD');
   }
 
   // ─── Conflict Branch Management ───────────────────────────────────
@@ -594,9 +677,18 @@ export class GitOperations {
    * be restored (the operation left the repo mid-conflict and the user kept it), the stash
    * is left in place and named rather than popped onto the wrong tree.
    */
-  async withRepoGuard<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  async withRepoGuard<T>(
+    label: string,
+    fn: () => Promise<T>,
+    /** Told what could not be put back (start branch or uncommitted work), if anything. */
+    onNotRestored?: (problem: string) => void,
+  ): Promise<T> {
     await this.assertNoOperationInProgress();
     const startBranch = await this.getCurrentBranch();
+    // A detached HEAD has no branch to go back to (`status` reports 'HEAD', and
+    // `checkout HEAD` is a no-op): remember the commit instead.
+    const detachedAt = startBranch === 'HEAD' ? await this.revParse('HEAD') : null;
+    const start = detachedAt ? `detached HEAD at ${detachedAt.slice(0, 8)}` : startBranch;
     const stashed = await this.stash();
     let error: unknown;
     let result: T | undefined;
@@ -605,24 +697,37 @@ export class GitOperations {
     } catch (err) {
       error = err;
     }
+    const report = (problem: string) => {
+      console.error(`  ${label}: ${problem}`);
+      onNotRestored?.(problem);
+    };
     let restored = true;
     try {
-      await this.git.checkout(startBranch);
+      if (detachedAt) await this.git.checkout(['--detach', detachedAt]);
+      else await this.git.checkout(startBranch);
     } catch {
       restored = false;
     }
-    if (stashed) {
-      if (restored) {
-        try {
-          await this.stashPop();
-        } catch {
-          console.error(
-            `  ${label}: stash kept on ${startBranch} (pop conflicted) — "git stash pop"`,
-          );
-        }
-      } else {
-        console.error(
-          `  ${label}: could not return to ${startBranch}; your changes are stashed — "git stash list"`,
+    if (!restored) {
+      report(
+        `could not return to ${start}${stashed ? '; your uncommitted changes are in "git stash list"' : ''}`,
+      );
+    } else if (stashed) {
+      let kept = false;
+      try {
+        await this.stashPop();
+      } catch {
+        kept = true;
+      }
+      // simple-git resolves a `stash pop` that conflicted. git keeps the stash entry then,
+      // so undo the half-applied pop rather than leave unmerged paths behind.
+      if ((await this.git.status()).conflicted.length > 0) {
+        await this.git.raw(['reset', '--hard', 'HEAD']);
+        kept = true;
+      }
+      if (kept) {
+        report(
+          `your uncommitted changes could not be re-applied on ${start}; they are kept in "git stash list"`,
         );
       }
     }

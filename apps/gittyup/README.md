@@ -259,7 +259,7 @@ Every command a program would call accepts `--json`. That covers `status`, `comp
 - Values contain no colour codes.
 
 Error codes:
-- Refused (exit 2): `USAGE`, `INTERACTIVE_ONLY`, `TARGET_UNKNOWN`, `GROUP_EXISTS`, `GROUP_NOT_FOUND`, `REPO_EXISTS`, `REPO_NOT_FOUND`, `PATH_NOT_FOUND`, `MANIFEST_INVALID`, `AUTH_REQUIRED`.
+- Refused (exit 2): `USAGE`, `CONFIRMATION_REQUIRED`, `INTERACTIVE_ONLY`, `TARGET_REQUIRED`, `TARGET_UNKNOWN`, `GROUP_EXISTS`, `GROUP_NOT_FOUND`, `REPO_EXISTS`, `REPO_NOT_FOUND`, `PATH_NOT_FOUND`, `MANIFEST_INVALID`, `AUTH_REQUIRED`.
 - Broken (exit 1): `GIT_FAILED`, `GITHUB_FAILED`, `INTERNAL`.
 
 ```bash
@@ -269,7 +269,23 @@ gittyup repo list --json | jq '.groups[].repos[].name'
 gittyup config --json | jq '{agent, github}'                  # which token each lookup found (never the token)
 ```
 
-`merge` and `pick` get `--json` in a later release.
+**`merge` and `pick`** run with no person present:
+- They need `--yes`, which is the confirmation. Each of these is refused before anything is touched:
+  - a bad `--ai` value, or `pick` without `-s`/`-t` → `USAGE`
+  - no `--group`/`--repo` → `TARGET_REQUIRED`
+  - `--ai suggest`, `pick -i`, or `pick` without `--commits` → `INTERACTIVE_ONLY`
+  - no `--yes` → `CONFIRMATION_REQUIRED`
+  - an unknown group or repo → `TARGET_UNKNOWN`
+- **Who resolves conflicts.** The mode is `--ai` if given, else the manifest's `ai_mode`. `auto` and `suggest` let gittyup's agent try. A manifest set to `manual` is honoured: no file goes to the agent unless you pass `--ai auto`. The report's `agent` block says which mode applied and whether the agent was reachable.
+- **On a conflict** the agent tries each file. If it can't resolve one, the repo is rolled back to exactly where it started: the merge is aborted, or the commits this run picked are undone. Its row says `status: "conflict"`, `rolledBack: true`, which file stopped it and why. Either way, the repo is returned to the branch (or detached commit) it started on, and your uncommitted work is re-applied. If that work can't be re-applied cleanly, it stays in `git stash list` and the row's `notRestored` says so.
+- **Traceability.** Every commit with agent-written content carries a `Resolved-by: gittyup agent (<model>)` trailer. Find them with `git log --format='%(trailers:key=Resolved-by)'`.
+- **Exit code.** It is 1 when any repo is not `success`, and the report is still on stdout.
+- `--pr` reports `skipped` for now. It needs `--branch`, which is still to come.
+
+```bash
+gittyup merge feature dev -g web --yes --json | jq '.repos[] | {repo, status, rolledBack}'
+gittyup pick -s dev -t main -c abc1234 -r api --yes --json | jq '.repos[0].commits'
+```
 
 **Stability.** While gittyup is 0.x, a document's shape may change when one of the planned hardening fixes lands. Every such change is listed in the CHANGELOG under a **JSON contract** heading. Otherwise fields are only ever added. The stricter promise starts at 1.0.
 

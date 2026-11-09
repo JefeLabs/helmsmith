@@ -150,7 +150,7 @@ export async function resolveGitHubToken(): Promise<TokenSource | null> {
  */
 export async function getCopilotToken(
   githubToken: string,
-  opts: { fromEnv?: boolean } = {},
+  opts: { fromEnv?: boolean; signal?: AbortSignal } = {},
 ): Promise<string> {
   // Check cached token
   const creds = await readAuthCredentials();
@@ -168,6 +168,7 @@ export async function getCopilotToken(
       Authorization: `token ${githubToken}`,
       Accept: 'application/json',
     },
+    signal: opts.signal,
   });
 
   if (!response.ok) {
@@ -203,6 +204,8 @@ export async function getCopilotToken(
 export async function callCopilot(
   messages: ChatCompletionMessage[],
   model: string,
+  /** `signal` aborts the token exchange and the chat request (e.g. a time limit). */
+  opts: { signal?: AbortSignal } = {},
 ): Promise<ChatCompletionResponse> {
   const tokenSource = await resolveGitHubToken();
   if (!tokenSource) {
@@ -222,11 +225,12 @@ export async function callCopilot(
         'Openai-Intent': 'conversation-panel',
       },
       body: JSON.stringify({ model, messages, stream: false }),
+      signal: opts.signal,
     });
   };
 
   const fromEnv = tokenSource.source !== 'auth.json';
-  let copilotToken = await getCopilotToken(tokenSource.token, { fromEnv });
+  let copilotToken = await getCopilotToken(tokenSource.token, { fromEnv, signal: opts.signal });
   let response = await doRequest(copilotToken);
 
   // Reactive retry on 401 (token may have been revoked or clock skew)
@@ -238,7 +242,7 @@ export async function callCopilot(
       creds.copilot_token_expires_at = undefined;
       await writeAuthCredentials(creds);
     }
-    copilotToken = await getCopilotToken(tokenSource.token, { fromEnv });
+    copilotToken = await getCopilotToken(tokenSource.token, { fromEnv, signal: opts.signal });
     response = await doRequest(copilotToken);
   }
 

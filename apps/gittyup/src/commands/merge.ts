@@ -2,8 +2,16 @@ import chalk from 'chalk';
 import type { Command } from 'commander';
 import { ManifestManager } from '../config/manifest.js';
 import type { AiMode, MergeTarget } from '../config/schema.js';
+import { runMergeJson } from '../core/json-operations.js';
 import { Orchestrator } from '../core/orchestrator.js';
 import { confirmGate } from '../ui/confirm.js';
+import {
+  emitMergePickReport,
+  parseAiFlag,
+  refuseSuggest,
+  requireScope,
+  requireYes,
+} from './merge-pick-json.js';
 
 export function registerMerge(program: Command): void {
   program
@@ -18,6 +26,10 @@ export function registerMerge(program: Command): void {
     .option('--pr', 'Create PRs after merge', false)
     .option('--no-fetch', 'Skip fetching before merge')
     .option('-y, --yes', 'Skip the AI write confirmation', false)
+    .option(
+      '--json',
+      'Run without prompts; print the merge/pick report as one JSON line (needs --yes)',
+    )
     .action(
       async (
         source: string,
@@ -30,10 +42,37 @@ export function registerMerge(program: Command): void {
           pr?: boolean;
           fetch?: boolean;
           yes?: boolean;
+          json?: boolean;
         },
       ) => {
         const manifest = new ManifestManager();
         const orchestrator = new Orchestrator(manifest);
+
+        if (opts.json) {
+          // Refusals in spec §5.1 order; nothing is touched before all of them pass.
+          const ai = parseAiFlag(opts.ai);
+          const jsonScope = requireScope(opts);
+          refuseSuggest(ai);
+          requireYes(opts, 'merge');
+          const targets: MergeTarget[] = orchestrator.repos
+            .getReposForTarget(jsonScope)
+            .map((repo) => ({
+              repo,
+              sourceBranch: repo.branches[source] ?? source,
+              targetBranch: repo.branches[target] ?? target,
+            }));
+          return emitMergePickReport({
+            operation: 'merge',
+            source,
+            target,
+            manifest,
+            orchestrator,
+            ai,
+            opts,
+            run: (deps, runOptions) => runMergeJson(targets, deps, runOptions),
+          });
+        }
+
         const scope = opts.group ?? opts.repo;
         if (!scope) {
           console.error(chalk.red('Specify --group or --repo'));
