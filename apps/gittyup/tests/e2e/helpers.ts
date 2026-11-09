@@ -15,6 +15,8 @@ export interface CliResult {
   exitCode: number;
   /** True when `timeoutMs` elapsed and the process group was killed. */
   timedOut: boolean;
+  /** The spawned CLI's pid; it runs detached, so this is also its process group id. */
+  pid?: number;
 }
 
 export interface RunCliOptions {
@@ -113,11 +115,42 @@ export function runCli(
 
     child.on('close', (code) => {
       clearTimeout(timer);
-      resolvePromise({ stdout, stderr, exitCode: code ?? 1, timedOut });
+      resolvePromise({ stdout, stderr, exitCode: code ?? 1, timedOut, pid: child.pid });
     });
     child.on('error', (err) => {
       clearTimeout(timer);
-      resolvePromise({ stdout, stderr: `${stderr}${err.message}`, exitCode: 1, timedOut });
+      resolvePromise({
+        stdout,
+        stderr: `${stderr}${err.message}`,
+        exitCode: 1,
+        timedOut,
+        pid: child.pid,
+      });
     });
   });
+}
+
+/**
+ * The `--json` success contract: stdout is exactly one `\n`-terminated line
+ * holding one JSON document. Throws (failing the test) otherwise.
+ */
+export function parseJsonLine(stdout: string): any {
+  if (!stdout.endsWith('\n') || stdout.slice(0, -1).includes('\n')) {
+    throw new Error(`stdout is not exactly one JSON line:\n${stdout}`);
+  }
+  return JSON.parse(stdout);
+}
+
+/** The `--json` failure contract: the last non-empty stderr line is the error body. */
+export function parseErrorLine(stderr: string): {
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
+} {
+  const last = stderr.trim().split('\n').filter(Boolean).pop() ?? '';
+  try {
+    return JSON.parse(last);
+  } catch {
+    throw new Error(`stderr's last line is not a JSON error body:\n${stderr}`);
+  }
 }

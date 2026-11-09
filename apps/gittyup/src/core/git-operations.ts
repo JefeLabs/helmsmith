@@ -105,9 +105,12 @@ export class GitOperations {
       const latest = (await this.listCommits(branchName, 1))[0];
       const tracking = trackingBranch ?? `origin/${branchName}`;
 
-      let ahead = 0;
-      let behind = 0;
-      try {
+      // No tracking ref → ahead/behind are unknown, not 0 (spec §3.4): "0/0" would read
+      // as "in sync" for a branch that was never pushed.
+      const hasTracking = await this.branchExists(tracking);
+      let ahead: number | null = null;
+      let behind: number | null = null;
+      if (hasTracking) {
         const revList = await this.git.raw([
           'rev-list',
           '--left-right',
@@ -117,8 +120,6 @@ export class GitOperations {
         const [a, b] = revList.trim().split(/\s+/).map(Number);
         ahead = a ?? 0;
         behind = b ?? 0;
-      } catch {
-        // tracking branch may not exist
       }
 
       const status = await this.git.status();
@@ -130,21 +131,32 @@ export class GitOperations {
         branch: branchName,
         ahead,
         behind,
+        tracking: hasTracking,
         hasConflicts: status.conflicted.length > 0,
         isDirty,
         lastCommit: latest?.hash?.substring(0, 8) ?? 'unknown',
+        lastCommitSha: latest?.hash ?? null,
         lastCommitDate: latest?.date ?? 'unknown',
         trackingBranch: tracking,
       };
-    } catch {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       return {
         branch: branchName,
-        ahead: 0,
-        behind: 0,
+        ahead: null,
+        behind: null,
+        tracking: false,
         hasConflicts: false,
         isDirty: false,
         lastCommit: 'error',
+        lastCommitSha: null,
         lastCommitDate: 'error',
+        // git's first line names the problem; the rest is usage advice.
+        error:
+          message
+            .split('\n')
+            .find((l) => l.trim())
+            ?.trim() ?? 'unreadable branch',
       };
     }
   }

@@ -93,8 +93,9 @@ async function getSideInfo(git: GitOperations, branchRef: string): Promise<Branc
     const sinceDays = Math.floor((Date.now() - commitDate.getTime()) / (1000 * 60 * 60 * 24));
     const allCommits = await git.listCommits(branchRef, 9999);
     return {
-      lastCommitDate: commitDate.toISOString().slice(0, 10),
-      author: latest.author.substring(0, 7).toUpperCase(),
+      // Raw values; renderCompare formats them for the table. `--json` reads them as-is.
+      lastCommitDate: commitDate.toISOString(),
+      author: latest.author,
       sinceDays,
       commitCount: allCommits.length,
     };
@@ -196,13 +197,13 @@ function renderSection(
     const line = [
       indicator,
       repoCol,
-      pad(row.left?.lastCommitDate ?? 'N/A', 12),
-      pad(row.left?.author ?? 'N/A', 8),
+      pad(shortDate(row.left?.lastCommitDate), 12),
+      pad(shortAuthor(row.left?.author), 8),
       pad(colorSince(row.left?.sinceDays ?? -1), 6),
       pad(colorCommits(row.left?.commitCount ?? 0), 8),
       pad(prStr, 16, prVisLen),
-      pad(row.right?.lastCommitDate ?? 'N/A', 12),
-      pad(row.right?.author ?? 'N/A', 8),
+      pad(shortDate(row.right?.lastCommitDate), 12),
+      pad(shortAuthor(row.right?.author), 8),
       pad(colorSince(row.right?.sinceDays ?? -1), 6),
       colorCommits(row.right?.commitCount ?? 0),
     ].join('');
@@ -211,6 +212,14 @@ function renderSection(
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────
+
+function shortDate(iso: string | undefined): string {
+  return iso ? iso.slice(0, 10) : 'N/A';
+}
+
+function shortAuthor(author: string | undefined): string {
+  return author ? author.substring(0, 7).toUpperCase() : 'N/A';
+}
 
 function pad(str: string, len: number, knownVisLen?: number): string {
   // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape sequences (deliberate)

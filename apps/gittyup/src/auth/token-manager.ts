@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname } from 'node:path';
 import chalk from 'chalk';
 import { APP_CONFIG_DIR_DISPLAY, CLI_BIN_NAME } from '../config/branding.js';
+import { GittyupError } from '../core/errors.js';
 import { getHomePath } from '../utils/home.js';
 import {
   type AuthCredentials,
@@ -354,7 +355,10 @@ export async function requireGitHubToken(): Promise<TokenSource> {
     return { token: gitToken, source: 'auth.json' as const };
   }
 
-  throw new Error(`No GitHub token found. Run "${CLI_BIN_NAME} auth login" or set GITHUB_TOKEN.`);
+  throw new GittyupError(
+    'AUTH_REQUIRED',
+    `No GitHub token found. Run "${CLI_BIN_NAME} auth login" or set GITHUB_TOKEN.`,
+  );
 }
 
 /**

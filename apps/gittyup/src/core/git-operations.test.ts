@@ -466,3 +466,39 @@ describe('the inherited environment reaching git (simple-git 4 env guard)', () =
     }
   });
 });
+
+describe('getBranchState tracking', () => {
+  it('reports null ahead/behind when there is no tracking ref', async () => {
+    const repo = await makeRepo({ commits: [{ message: 'base', files: { 'f.txt': 'x\n' } }] });
+    const s = await new GitOperations(repo.path).getBranchState('main');
+    expect(s).toMatchObject({
+      tracking: false,
+      ahead: null,
+      behind: null,
+      lastCommitSha: await repo.sha('main'),
+    });
+    expect(s.lastCommitSha).toMatch(/^[0-9a-f]{40}$/);
+  });
+
+  it('counts against origin/<branch> when it exists', async () => {
+    const repo = await makeRepo({
+      commits: [{ message: 'base', files: { 'f.txt': 'x\n' } }],
+      remote: true,
+    });
+    await repo.git.raw(['commit', '--allow-empty', '-m', 'local only']);
+    expect(await new GitOperations(repo.path).getBranchState('main')).toMatchObject({
+      tracking: true,
+      ahead: 1,
+      behind: 0,
+      trackingBranch: 'origin/main',
+    });
+  });
+
+  it('carries the reason when the branch cannot be read', async () => {
+    const repo = await makeRepo({ commits: [{ message: 'base', files: { 'f.txt': 'x\n' } }] });
+    const s = await new GitOperations(repo.path).getBranchState('staging');
+    expect(s.lastCommitSha).toBeNull();
+    expect(s.error).toEqual(expect.stringContaining('staging'));
+    expect(s.error).not.toContain('\n');
+  });
+});

@@ -99,13 +99,22 @@ export interface CherryPickTarget {
 
 export interface RepoBranchState {
   branch: string;
-  ahead: number;
-  behind: number;
+  /** Commits on `branch` not on its tracking ref; `null` when there is no tracking ref. */
+  ahead: number | null;
+  /** Commits on the tracking ref not on `branch`; `null` when there is no tracking ref. */
+  behind: number | null;
+  /** Whether `trackingBranch` exists, i.e. whether ahead/behind mean anything. */
+  tracking: boolean;
   hasConflicts: boolean;
   isDirty: boolean;
+  /** 8-char display form; see `lastCommitSha` for the full hash. */
   lastCommit: string;
+  lastCommitSha: string | null;
   lastCommitDate: string;
   trackingBranch?: string;
+  /** Why the branch could not be read (e.g. it doesn't exist); the fields above are
+   *  then placeholders, not observations. */
+  error?: string;
 }
 
 export interface RepoState {

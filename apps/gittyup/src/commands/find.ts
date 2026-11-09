@@ -5,7 +5,10 @@ import type { Command } from 'commander';
 import ora from 'ora';
 import { ManifestManager } from '../config/manifest.js';
 import type { RepoConfig } from '../config/schema.js';
+import { GittyupError } from '../core/errors.js';
 import { type DiscoveredRepo, RepoFinder } from '../core/repo-finder.js';
+import type { FindDocument } from '../output/contract.js';
+import { emitJson } from '../output/json.js';
 import {
   BACK,
   checkboxWithBack,
@@ -16,6 +19,12 @@ import {
   tagAssigner,
 } from '../ui/prompts.js';
 
+interface FindOptions {
+  depth: string;
+  metadata?: boolean;
+  json?: boolean;
+}
+
 export function registerFind(program: Command): void {
   program
     .command('find')
@@ -23,10 +32,16 @@ export function registerFind(program: Command): void {
     .argument('[directory]', 'Directory to search (default: current directory)', '.')
     .option('-d, --depth <n>', 'Maximum search depth', '5')
     .option('--no-metadata', 'Skip fetching repo metadata (faster)')
-    .action(async (directory: string, opts: { depth: string; metadata?: boolean }) => {
+    .option('--json', 'Print { root, repos } as one JSON line (discovery only, nothing is added)')
+    .action(async (directory: string, opts: FindOptions) => {
       const searchDir = directory.startsWith('/') ? directory : `${process.cwd()}/${directory}`;
 
       if (!existsSync(searchDir)) {
+        if (opts.json) {
+          throw new GittyupError('PATH_NOT_FOUND', `No such file or directory: ${directory}`, {
+            path: directory,
+          });
+        }
         console.error(chalk.red(`No such file or directory: ${directory}`));
         process.exit(1);
       }
@@ -44,6 +59,22 @@ export function registerFind(program: Command): void {
       });
 
       spinner.stop();
+
+      if (opts.json) {
+        return emitJson({
+          root: searchDir,
+          repos: [...repos]
+            .sort((a, b) => a.relativePath.localeCompare(b.relativePath))
+            .map((r) => ({
+              name: r.name,
+              absolutePath: r.absolutePath,
+              relativePath: r.relativePath,
+              remoteUrl: r.remoteUrl ?? null,
+              currentBranch: r.currentBranch ?? null,
+              isDirty: r.isDirty ?? null,
+            })),
+        } satisfies FindDocument);
+      }
 
       if (repos.length === 0) {
         console.log(chalk.yellow('\n  No git repositories found.\n'));

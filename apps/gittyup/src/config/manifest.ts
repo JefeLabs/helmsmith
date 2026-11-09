@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import * as yaml from 'js-yaml';
+import { GittyupError } from '../core/errors.js';
 import { detectGitRoot, getRepoConfigHome } from '../utils/git.js';
 import type { ConfigLocation, ResolvedConfig } from '../utils/location.js';
 import { APP_CONFIG_DIR, APP_NAME, APP_REPO_URL, MANIFEST_FILENAME } from './branding.js';
@@ -98,9 +99,15 @@ export class ManifestManager {
         settings: { pr_template: DEFAULT_PR_TEMPLATE },
       });
     }
-    const raw = readFileSync(this.filePath, 'utf-8');
-    const parsed = yaml.load(raw);
-    return ManifestSchema.parse(parsed);
+    try {
+      const raw = readFileSync(this.filePath, 'utf-8');
+      return ManifestSchema.parse(yaml.load(raw));
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      throw new GittyupError('MANIFEST_INVALID', `Invalid manifest ${this.filePath}: ${reason}`, {
+        path: this.filePath,
+      });
+    }
   }
 
   /** Write the manifest back to disk as YAML. */
@@ -169,7 +176,11 @@ export class ManifestManager {
     }
     const group = this.manifest.groups[groupName];
     if (group.repos.find((r) => r.name === repo.name)) {
-      throw new Error(`Repo "${repo.name}" already exists in group "${groupName}"`);
+      throw new GittyupError(
+        'REPO_EXISTS',
+        `Repo "${repo.name}" already exists in group "${groupName}"`,
+        { group: groupName, repo: repo.name },
+      );
     }
     group.repos.push(repo);
   }
@@ -177,9 +188,19 @@ export class ManifestManager {
   /** Remove a repo from a group by name. */
   removeRepo(groupName: string, repoName: string): void {
     const group = this.manifest.groups[groupName];
-    if (!group) throw new Error(`Group "${groupName}" not found`);
+    if (!group) {
+      throw new GittyupError('GROUP_NOT_FOUND', `Group "${groupName}" not found`, {
+        group: groupName,
+      });
+    }
     const idx = group.repos.findIndex((r) => r.name === repoName);
-    if (idx === -1) throw new Error(`Repo "${repoName}" not found in group "${groupName}"`);
+    if (idx === -1) {
+      throw new GittyupError(
+        'REPO_NOT_FOUND',
+        `Repo "${repoName}" not found in group "${groupName}"`,
+        { group: groupName, repo: repoName },
+      );
+    }
     group.repos.splice(idx, 1);
   }
 
@@ -231,7 +252,7 @@ export class ManifestManager {
   /** Create a new empty group. Throws if it already exists. */
   createGroup(name: string, description?: string): void {
     if (this.manifest.groups[name]) {
-      throw new Error(`Group "${name}" already exists`);
+      throw new GittyupError('GROUP_EXISTS', `Group "${name}" already exists`, { group: name });
     }
     this.manifest.groups[name] = { repos: [], description };
   }
@@ -239,7 +260,7 @@ export class ManifestManager {
   /** Remove a group entirely. Throws if not found. */
   removeGroup(name: string): void {
     if (!this.manifest.groups[name]) {
-      throw new Error(`Group "${name}" not found`);
+      throw new GittyupError('GROUP_NOT_FOUND', `Group "${name}" not found`, { group: name });
     }
     delete this.manifest.groups[name];
   }

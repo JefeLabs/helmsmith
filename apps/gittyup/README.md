@@ -238,6 +238,41 @@ gittyup config --show
 gittyup config --ai auto      # set AI mode
 ```
 
+## Scripting with `--json`
+
+Every command a program would call accepts `--json`. That covers `status`, `compare`, `prs`, `fetch`, `find`, `repo list|tags|tag|add|remove`, `group create|remove`, `config`, `auth status|models` and `cache clear|prune`. With `--json`, gittyup is safe to call from scripts and agents (workbrokr, CI):
+
+| Outcome | stdout | stderr | exit |
+|---|---|---|---|
+| Success | exactly one line, the JSON document | progress text, never parsed | 0 |
+| A multi-repo run where some repos failed (`fetch`) | the full report | progress text | 1 |
+| Refused (bad arguments, unknown group, a rule said no) | empty | last line: `{"code":"…","message":"…","details":{…}}` | 2 |
+| Broken (unexpected error) | empty | last line: the same error body | 1 |
+
+`--json` never prompts. A request that would need a prompt, such as `repo tag --json` without `--add`/`--remove`, is refused with `INTERACTIVE_ONLY`. Values are honest:
+- Unknown is `null`, never `false`, `0` or "none". For example:
+  - `ahead`/`behind` are `null` when a branch has no tracking ref.
+  - `hasConflicts` is `null` when the conflict check didn't run (`--no-conflicts`, a branch missing on one side, or an `error` row), and that repo isn't counted as `clean`.
+  - A status branch that can't be read (say it doesn't exist in that repo) carries an `error`, and its `isDirty`/`hasConflicts` are `null`.
+  - A compare repo whose PR lookup failed carries `prError` next to `pr: null`. Only a `pr: null` without `prError` means "no open PR".
+- Dates are ISO-8601 and SHAs are full 40-character hashes.
+- Values contain no colour codes.
+
+Error codes:
+- Refused (exit 2): `USAGE`, `INTERACTIVE_ONLY`, `TARGET_UNKNOWN`, `GROUP_EXISTS`, `GROUP_NOT_FOUND`, `REPO_EXISTS`, `REPO_NOT_FOUND`, `PATH_NOT_FOUND`, `MANIFEST_INVALID`, `AUTH_REQUIRED`.
+- Broken (exit 1): `GIT_FAILED`, `GITHUB_FAILED`, `INTERNAL`.
+
+```bash
+gittyup status --json | jq '.repos[] | {name, dev: .branches.dev.ahead}'
+gittyup compare dev prod --no-pr --json | jq '.summary'        # { repos, withConflicts, clean }
+gittyup repo list --json | jq '.groups[].repos[].name'
+gittyup config --json | jq '{agent, github}'                  # which token each lookup found (never the token)
+```
+
+`merge` and `pick` get `--json` in a later release.
+
+**Stability.** While gittyup is 0.x, a document's shape may change when one of the planned hardening fixes lands. Every such change is listed in the CHANGELOG under a **JSON contract** heading. Otherwise fields are only ever added. The stricter promise starts at 1.0.
+
 ## Conflict Resolution
 
 When a merge or cherry-pick hits conflicts, gittyup drops you into an **interactive resolution session**:
