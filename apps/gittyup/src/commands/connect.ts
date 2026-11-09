@@ -7,36 +7,9 @@
  * if richer integrations land (Linear, Jira, etc.).
  */
 
-import { type Connection, runConnectView } from '@helmsmith/tui-view-components';
-import { Command } from 'commander';
-
-const githubConnection: Connection = {
-  id: 'github',
-  displayName: 'GitHub',
-  description: 'Used by gittyup for cherry-pick / merge / PR orchestration across repos.',
-
-  async getStatus() {
-    const token = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN;
-    if (!token) {
-      return {
-        state: 'disconnected',
-        message: 'set GITHUB_TOKEN or run `gittyup auth login`',
-      };
-    }
-    return {
-      state: 'connected',
-      identity: `${token.slice(0, 4)}…${token.slice(-4)}`,
-    };
-  },
-
-  async login() {
-    throw new Error('Run `gittyup auth login` for OAuth, or set GITHUB_TOKEN in your environment.');
-  },
-
-  async logout() {
-    throw new Error('Run `gittyup auth logout` instead.');
-  },
-};
+import { runConnectView } from '@helmsmith/tui-view-components';
+import type { Command } from 'commander';
+import { githubConnection } from '../auth/github-connection.js';
 
 export function registerConnect(program: Command): void {
   program

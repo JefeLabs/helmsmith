@@ -141,25 +141,34 @@ export function useKeybinding(
   handler: (key: KeyEvent) => void | false,
   opts: UseKeybindingOptions = {},
 ): void {
-  const ctx = useContext(KeyboardContext);
+  // Depend on `register` (stable for the provider's lifetime), never on the
+  // whole context value: that value changes whenever `bindings` does, so a
+  // registration that lands in it would re-run this effect, unregister and
+  // register again, forever.
+  const register = useContext(KeyboardContext)?.register;
   const handlerRef = useRef(handler);
   handlerRef.current = handler;
+  // Function matchers are usually written inline, a new function every render.
+  // Read them through a ref like the handler; only a string key re-registers.
+  const matchRef = useRef(match);
+  matchRef.current = match;
+  const matchKey = typeof match === 'string' ? match : null;
 
   useEffect(() => {
-    if (!ctx) return;
+    if (!register) return;
     if (opts.enabled === false) return;
     const entry: KeybindingEntry = {
       id: `kb-${nextId++}`,
-      match,
+      match: matchKey ?? ((key) => matches(matchRef.current, key)),
       label,
-      keyDisplay: opts.keyDisplay ?? (typeof match === 'string' ? match : undefined) ?? label,
+      keyDisplay: opts.keyDisplay ?? matchKey ?? label,
       priority: opts.priority,
       hidden: opts.hidden,
       handler: (key) => handlerRef.current(key),
     };
-    return ctx.register(entry);
+    return register(entry);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ctx, label, opts.enabled, opts.priority, opts.hidden, opts.keyDisplay, match]);
+  }, [register, label, opts.enabled, opts.priority, opts.hidden, opts.keyDisplay, matchKey]);
 }
 
 /**

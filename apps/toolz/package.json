@@ -1,6 +1,6 @@
 {
   "name": "@helmsmith/toolz",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "description": "ToolZ — cross-platform tool manager for the Helmsmith ecosystem. Detects, installs, and registers CLI dependencies.",
   "type": "module",
   "bin": {
