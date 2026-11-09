@@ -17,13 +17,27 @@ export function applyTrailers(message: string, trailers: readonly string[]): str
   return `${trimmed}${hasBlock ? '\n' : '\n\n'}${missing.join('\n')}`;
 }
 
-/** Append `footer` to a body as its last paragraph, removing an earlier copy first. */
+/**
+ * Append `footer` to a body as its last paragraph, removing earlier copies
+ * first. A copy is the footer's lines in a row, so a footer of several lines
+ * is found as a whole (and a line it shares with the body, like `---`, is
+ * left alone elsewhere).
+ */
 export function applyFooter(body: string, footer: string | undefined): string {
   if (!footer || footer.trim().length === 0) return body;
   const needle = footer.trim();
-  const without = body
-    .split('\n')
-    .filter((l) => l.trim() !== needle)
+  const needleLines = needle.split('\n').map((l) => l.trim());
+  const lines = body.split('\n');
+  const kept: string[] = [];
+  for (let i = 0; i < lines.length; ) {
+    if (needleLines.every((n, j) => lines[i + j]?.trim() === n)) {
+      i += needleLines.length;
+      continue;
+    }
+    kept.push(lines[i]!);
+    i++;
+  }
+  const without = kept
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .replace(/\s+$/, '');

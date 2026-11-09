@@ -1,3 +1,4 @@
+import { chmodSync } from 'node:fs';
 import { join, sep } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { gitIn, stagedPaths, write } from '../../src/testing/repo.js';
@@ -175,5 +176,102 @@ describe('pritty commit (claude provider)', () => {
     expect(r.exitCode).toBe(1);
     expect(r.stderr).toContain('No AI provider available. Tried: claude.');
     expect(r.stderr).toContain('install Claude Code');
+  });
+});
+
+describe('pritty commit: what the trial found (order, type, reuse, hooks, one-commit plans)', () => {
+  const TEST_FIRST = JSON.stringify([
+    { category: 'test', message: 'test(feature): cover greet', files: [] },
+    { category: 'app', message: 'feat(feature): add greet', files: [] },
+  ]);
+  const subjectsNewestLast = (repo: string, n: number): string[] =>
+    gitIn(repo, 'log', '--format=%s', `-${n}`).trim().split('\n').reverse();
+
+  it('commits the code before its test even when the model lists the test first', async () => {
+    sb = makeSandbox();
+    const repo = stagedRepo(sb);
+    installFakeClaude(sb).answer(TEST_FIRST);
+
+    const r = await runCli(sb, repo, ['commit', '--json']);
+    expect(r.exitCode, r.stderr).toBe(0);
+    expect(subjectsNewestLast(repo, 2)).toEqual([
+      'feat(feature): add greet',
+      'test(feature): cover greet',
+    ]);
+  });
+
+  it('on a fix/ branch types the code commit fix and tells claude the branch', async () => {
+    sb = makeSandbox();
+    const repo = stagedRepo(sb);
+    gitIn(repo, 'checkout', '-q', '-b', 'fix/greeting--kenya');
+    const fake = installFakeClaude(sb);
+    fake.answer(PLAN);
+
+    const r = await runCli(sb, repo, ['commit', '--json']);
+    expect(r.exitCode, r.stderr).toBe(0);
+    expect(subjectsNewestLast(repo, 2)).toEqual([
+      'fix(feature): add greet',
+      'test(feature): cover greet',
+    ]);
+    expect(fake.calls()[0]!.stdin).toContain('Branch: fix/greeting--kenya');
+  });
+
+  it('a real run after a dry run commits the dry run’s messages and asks claude nothing new', async () => {
+    sb = makeSandbox();
+    const repo = stagedRepo(sb);
+    const fake = installFakeClaude(sb);
+    fake.answer(PLAN);
+    const dry = await runCli(sb, repo, ['commit', '--dry-run', '--json']);
+    expect(dry.exitCode, dry.stderr).toBe(0);
+
+    fake.answer(
+      JSON.stringify([
+        { category: 'app', message: 'feat(feature): reworded by a second call', files: [] },
+        { category: 'test', message: 'test(feature): reworded too', files: [] },
+      ]),
+    );
+    const real = await runCli(sb, repo, ['commit', '--json']);
+    expect(real.exitCode, real.stderr).toBe(0);
+    expect(fake.calls()).toHaveLength(1);
+    expect(jsonLine<Outcome & { reusedPlan?: boolean }>(real).reusedPlan).toBe(true);
+    expect(subjectsNewestLast(repo, 2)).toEqual([
+      'feat(feature): add greet',
+      'test(feature): cover greet',
+    ]);
+  });
+
+  it('--no-verify commits past a refusing pre-commit hook; without it nothing is committed', async () => {
+    sb = makeSandbox();
+    const repo = stagedRepo(sb);
+    write(repo, '.git/hooks/pre-commit', '#!/bin/sh\necho "scope locked" >&2\nexit 1\n');
+    chmodSync(join(repo, '.git/hooks/pre-commit'), 0o755);
+    installFakeClaude(sb).answer(PLAN);
+    const before = head(repo);
+
+    const refused = await runCli(sb, repo, ['commit', '--json']);
+    expect(refused.exitCode).toBe(1);
+    expect(refused.stderr).toContain('scope locked');
+    expect(head(repo)).toBe(before);
+
+    const r = await runCli(sb, repo, ['commit', '--json', '--no-verify']);
+    expect(r.exitCode, r.stderr).toBe(0);
+    expect(subjectsNewestLast(repo, 2)).toEqual([
+      'feat(feature): add greet',
+      'test(feature): cover greet',
+    ]);
+  });
+
+  it('accepts a one-commit plan returned as a single object', async () => {
+    sb = makeSandbox();
+    const repo = makeRepo(sb, { config: { provider: 'claude' } });
+    write(repo, 'src/feature.ts', 'export const greet = () => "hi";\n');
+    gitIn(repo, 'add', 'src/feature.ts');
+    installFakeClaude(sb).answer(
+      JSON.stringify({ category: 'app', message: 'feat(feature): add greet', files: [] }),
+    );
+
+    const r = await runCli(sb, repo, ['commit', '--json']);
+    expect(r.exitCode, r.stderr).toBe(0);
+    expect(gitIn(repo, 'log', '-1', '--format=%s').trim()).toBe('feat(feature): add greet');
   });
 });

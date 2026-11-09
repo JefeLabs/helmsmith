@@ -29,13 +29,25 @@ export interface GitOps {
    * commits only the INDEX content of those paths (never the working
    * tree: `git commit -- <files>` would record what is on disk) and
    * leaves every other staged path staged. Throws when nothing in the
-   * subset is staged.
+   * subset is staged. `noVerify` passes `--no-verify` (skips the
+   * pre-commit and commit-msg hooks).
    */
-  commit(message: string, files?: string[]): Promise<void>;
+  commit(message: string, files?: string[], opts?: { noVerify?: boolean }): Promise<void>;
+  /**
+   * What a commit made now would contain: `<HEAD>:<tree of the index>`
+   * (`git write-tree`; zeros for HEAD on an unborn branch). Null when the
+   * index cannot be written as a tree, e.g. during an unresolved merge.
+   */
+  stagedState(): Promise<string | null>;
+  /** Absolute path of `name` inside this worktree's git directory (`git rev-parse --git-path`). */
+  gitPath(name: string): Promise<string>;
   /** Push the current branch. setUpstream=true on first push. */
   push(branch: string, opts?: { setUpstream?: boolean }): Promise<void>;
-  /** Commits reachable from `head` (default HEAD) but not from `base`: `base..head`. Newest first. */
-  log(base: string, head?: string): Promise<Array<{ hash: string; subject: string }>>;
+  /** Commits reachable from `head` (default HEAD) but not from `base`: `base..head`. Newest first, each with its body (`''` when it has none). */
+  log(
+    base: string,
+    head?: string,
+  ): Promise<Array<{ hash: string; subject: string; body?: string }>>;
   /** Files `head` (default HEAD) changed since its merge base with `base`: `base...head`. */
   changedFilesBetween(base: string, head?: string): Promise<string[]>;
   /**
@@ -119,12 +131,31 @@ export function createGit(dir: string = process.cwd()): GitOps {
       await git.add(files);
     },
 
-    async commit(message: string, files?: string[]): Promise<void> {
+    async commit(
+      message: string,
+      files?: string[],
+      opts: { noVerify?: boolean } = {},
+    ): Promise<void> {
       if (files && files.length > 0) {
-        commitIndexSubset(cwd, message, files);
+        commitIndexSubset(cwd, message, files, Boolean(opts.noVerify));
       } else {
-        await git.commit(message);
+        await git.commit(message, undefined, opts.noVerify ? { '--no-verify': null } : undefined);
       }
+    },
+
+    async stagedState(): Promise<string | null> {
+      const tree = spawnSync('git', ['write-tree'], { cwd, encoding: 'utf8' });
+      if (tree.status !== 0) return null;
+      const head = spawnSync('git', ['rev-parse', '--verify', '-q', 'HEAD'], {
+        cwd,
+        encoding: 'utf8',
+      });
+      const sha = head.status === 0 ? head.stdout.trim() : '0'.repeat(40);
+      return `${sha}:${tree.stdout.trim()}`;
+    },
+
+    async gitPath(name: string): Promise<string> {
+      return runGit(cwd, ['rev-parse', '--path-format=absolute', '--git-path', name]).trim();
     },
 
     async push(branch: string, opts: { setUpstream?: boolean } = {}): Promise<void> {
@@ -133,11 +164,14 @@ export function createGit(dir: string = process.cwd()): GitOps {
       await git.push(args);
     },
 
-    async log(base: string, head?: string): Promise<Array<{ hash: string; subject: string }>> {
+    async log(
+      base: string,
+      head?: string,
+    ): Promise<Array<{ hash: string; subject: string; body?: string }>> {
       // Two dots on purpose: simple-git's { from, to } form emits `base...head`,
       // which for `git log` is the symmetric difference and includes base-only commits.
       const result = await git.log([`${base}..${head ?? 'HEAD'}`]);
-      return result.all.map((c) => ({ hash: c.hash, subject: c.message }));
+      return result.all.map((c) => ({ hash: c.hash, subject: c.message, body: c.body.trim() }));
     },
 
     async resolveBaseRef(base: string): Promise<string> {
@@ -256,7 +290,7 @@ function runGit(
  * The real index is untouched; after the commit its entries for the subset
  * equal HEAD, so they read as clean, and every other staged path stays staged.
  */
-function commitIndexSubset(cwd: string, message: string, files: string[]): void {
+function commitIndexSubset(cwd: string, message: string, files: string[], noVerify: boolean): void {
   const dir = mkdtempSync(join(tmpdir(), 'pritty-index-'));
   const env = { ...process.env, GIT_INDEX_FILE: join(dir, 'index') };
   try {
@@ -288,7 +322,7 @@ function commitIndexSubset(cwd: string, message: string, files: string[]): void 
     if (changed.length === 0) {
       throw new Error(`nothing staged for ${files.join(', ')}`);
     }
-    runGit(cwd, ['commit', '-q', '-m', message], { env });
+    runGit(cwd, ['commit', '-q', ...(noVerify ? ['--no-verify'] : []), '-m', message], { env });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

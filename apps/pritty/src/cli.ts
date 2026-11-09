@@ -126,7 +126,11 @@ program
   .option('--commit-style <style>', 'conventional | gitmoji | angular | simple')
   .option(
     '--json',
-    'Print one JSON line { dryRun, commits: [{ category, message, files, sha }] } on stdout; implies --auto-approve',
+    'Print one JSON line { dryRun, commits: [{ category, message, files, sha }], reusedPlan? } on stdout; implies --auto-approve',
+  )
+  .option(
+    '--no-verify',
+    'Pass --no-verify to git commit (skips the pre-commit and commit-msg hooks)',
   )
   .action(
     async (options: {
@@ -134,8 +138,10 @@ program
       dryRun?: boolean;
       commitStyle?: string;
       json?: boolean;
+      verify: boolean;
     }) => {
-      await runCommit(options);
+      const { verify, ...rest } = options;
+      await runCommit({ ...rest, noVerify: verify === false });
     },
   );
 
@@ -154,6 +160,7 @@ program
   .option('--body <text>', 'Use this body verbatim (with --title)')
   .option('--body-file <path>', 'Read the body from a file (with --title)')
   .option('--no-push', 'Do not push: the branch is already on origin')
+  .option('--no-footer', 'Leave the prFooter from .pritty.json out of the body')
   .option(
     '--check',
     'Only print the open PR for this head and base as one JSON line { open }; push, generate and create nothing',
@@ -170,9 +177,10 @@ program
       bodyFile?: string;
       check?: boolean;
       push: boolean;
+      footer: boolean;
     }) => {
-      const { push, ...rest } = options;
-      await runPr({ ...rest, noPush: push === false });
+      const { push, footer, ...rest } = options;
+      await runPr({ ...rest, noPush: push === false, noFooter: footer === false });
     },
   );
 
