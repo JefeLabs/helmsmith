@@ -144,7 +144,17 @@ the user's repo as cwd. Pass through any flags the user mentions:
 - \`--commit-style conventional|gitmoji|angular|simple\` for one-off
   override
 - \`--base <branch>\` for PR base override
+- \`--no-verify\` (commit) passes \`--no-verify\` to \`git commit\`, skipping
+  the pre-commit and commit-msg hooks; only when the user approved
+  bypassing a hook
+- \`--no-footer\` (pr) leaves \`prFooter\` out of the body
 - \`--strategy interactive|squash|fixup|auto\` for rebase strategy
+
+After \`pritty commit --dry-run\`, a real \`pritty commit\` commits the
+plan the dry run showed (no second model call) as long as HEAD and the
+staged changes are unchanged; run \`--dry-run\` again for a fresh draft.
+Commits are ordered code first, then tests, then stories, and on a
+\`fix/…\` branch a \`feat\`, \`build\` or \`chore\` code commit is typed \`fix\`.
 
 Surface pritty's output verbatim — its colored prompts, plan
 previews, and confirmations are designed to be read.

@@ -2,12 +2,20 @@ import type { CommitMessage } from '../../ai.js';
 import type { CategorizedFiles } from '../../categorizer.js';
 import { applyTrailers } from './attribution.js';
 
+/** Committed after the code, in this order: tests exercise it, stories render it. */
+const LAST_CATEGORIES: readonly string[] = ['test', 'storybook'];
+
 /**
  * The model writes the messages; the categorizer decides the files. Whatever
  * file list the model returned is replaced by the deterministic grouping, so
  * neither a hallucinated path nor text inside a diff can steer what gets
  * committed. A plan that does not cover every non-empty category one time
  * each is rejected before anything is committed.
+ *
+ * The order is not the model's either: code categories first, in the
+ * categorizer's order, then `test`, then `storybook`, so every commit builds
+ * and passes its own tests on its own (a test committed before the code it
+ * exercises is red at that commit and breaks bisect).
  */
 export function reconcileCommitPlan(
   plan: readonly CommitMessage[],
@@ -33,7 +41,16 @@ export function reconcileCommitPlan(
   if (missing.length > 0) {
     throw new Error(`AI plan omits categories with staged files: ${missing.join(', ')}`);
   }
-  return out;
+  const position = Object.keys(grouped);
+  const rank = (c: CommitMessage): [number, number] => [
+    LAST_CATEGORIES.indexOf(c.category) + 1,
+    position.indexOf(c.category),
+  ];
+  return out.sort((a, b) => {
+    const [ra, pa] = rank(a);
+    const [rb, pb] = rank(b);
+    return ra - rb || pa - pb;
+  });
 }
 
 /** Subject, optional body, then the configured trailers. */

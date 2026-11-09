@@ -81,8 +81,10 @@ export async function runRebase(options: RebaseOptions = {}): Promise<void> {
   );
   const commits = await git.log(base);
   const dryRun = Boolean(options.dryRun);
+  // The JSON contract is { hash, subject } per commit; log() also carries the body, for the PR prompt only.
+  const listed = [...commits].reverse().map(({ hash, subject }) => ({ hash, subject }));
   const outcome = (o: Pick<RebaseOutcome, 'steps' | 'summary' | 'rebased'>): RebaseOutcome =>
-    result({ dryRun, branch, base, strategy, commits: [...commits].reverse(), ...o });
+    result({ dryRun, branch, base, strategy, commits: listed, ...o });
   const nothing = { steps: [], summary: null, rebased: false };
   if (commits.length === 0) {
     say(chalk.dim(`No commits between ${base} and ${branch}. Nothing to rebase.`));

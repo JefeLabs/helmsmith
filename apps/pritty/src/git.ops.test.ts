@@ -1,4 +1,12 @@
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -342,5 +350,99 @@ describe('GitOps.push and the inherited environment (simple-git 4 env guard)', (
     // simple-git strips GIT_SSH, so git falls back to real ssh and cannot reach the host
     await expect(createGit(repo).push('main')).rejects.toThrow();
     expect(existsSync(marker)).toBe(false);
+  });
+});
+
+describe('GitOps.commit noVerify', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('skips a refusing pre-commit hook, for a subset and for everything staged', async () => {
+    const r = makeRepo();
+    cleanup = r.cleanup;
+    const hook = join(r.dir, '.git', 'hooks', 'pre-commit');
+    writeFileSync(hook, '#!/bin/sh\nexit 1\n');
+    chmodSync(hook, 0o755);
+    write(r.dir, 'a.txt', 'A\n');
+    write(r.dir, 'b.txt', 'B\n');
+    gitIn(r.dir, 'add', 'a.txt', 'b.txt');
+
+    const git = createGit(r.dir);
+    await git.commit('feat: a', ['a.txt'], { noVerify: true });
+    await git.commit('feat: b', undefined, { noVerify: true });
+
+    expect(gitIn(r.dir, 'log', '--format=%s', '-2').trim().split('\n')).toEqual([
+      'feat: b',
+      'feat: a',
+    ]);
+    expect(stagedPaths(r.dir)).toEqual([]);
+  });
+});
+
+describe('GitOps.stagedState and gitPath (the commit-plan cache key and home)', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('is stable while nothing changes, and moves with the index and with HEAD', async () => {
+    const r = makeRepo();
+    cleanup = r.cleanup;
+    const git = createGit(r.dir);
+    write(r.dir, 'a.txt', 'A\n');
+    gitIn(r.dir, 'add', 'a.txt');
+    const staged = await git.stagedState();
+    expect(staged).toMatch(/^[0-9a-f]{40}:[0-9a-f]{40}$/);
+    expect(await git.stagedState()).toBe(staged);
+
+    write(r.dir, 'a.txt', 'A2\n'); // working tree only: the index is what gets committed
+    expect(await git.stagedState()).toBe(staged);
+
+    gitIn(r.dir, 'add', 'a.txt');
+    const restaged = await git.stagedState();
+    expect(restaged).not.toBe(staged);
+
+    gitIn(r.dir, 'commit', '-q', '-m', 'a');
+    expect(await git.stagedState()).not.toBe(restaged);
+  });
+
+  it('is null with an unmerged index', async () => {
+    const r = makeRepo();
+    cleanup = r.cleanup;
+    commitFile(r.dir, 'c.txt', 'base\n', 'base');
+    gitIn(r.dir, 'checkout', '-q', '-b', 'other');
+    commitFile(r.dir, 'c.txt', 'other\n', 'other');
+    gitIn(r.dir, 'checkout', '-q', 'main');
+    commitFile(r.dir, 'c.txt', 'main\n', 'main');
+    expect(() => gitIn(r.dir, 'merge', '-q', 'other')).toThrow();
+
+    expect(await createGit(r.dir).stagedState()).toBeNull();
+  });
+
+  it('gitPath resolves inside this worktree’s git directory, from a subdirectory too', async () => {
+    const r = makeRepo();
+    cleanup = r.cleanup;
+    write(r.dir, 'src/a.ts', 'a\n');
+    const path = await createGit(join(r.dir, 'src')).gitPath('pritty/commit-plan.json');
+    expect(path).toBe(join(realpathSync(r.dir), '.git', 'pritty', 'commit-plan.json'));
+  });
+});
+
+describe('GitOps.log carries commit bodies (item 9)', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it("returns each commit's body under its subject, empty when there is none", async () => {
+    const r = makeRepo();
+    cleanup = r.cleanup;
+    gitIn(r.dir, 'checkout', '-q', '-b', 'fix/x');
+    write(r.dir, 'a.txt', 'A\n');
+    gitIn(r.dir, 'add', 'a.txt');
+    gitIn(r.dir, 'commit', '-q', '-m', 'fix(a): repair a\n\nIt was broken because b.\n\nRefs #1');
+    commitFile(r.dir, 'b.txt', 'B\n', 'test(a): cover a');
+
+    const commits = await createGit(r.dir).log('main');
+    expect(commits.map((c) => ({ subject: c.subject, body: c.body }))).toEqual([
+      { subject: 'test(a): cover a', body: '' },
+      { subject: 'fix(a): repair a', body: 'It was broken because b.\n\nRefs #1' },
+    ]);
   });
 });
