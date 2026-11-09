@@ -40,7 +40,7 @@ export function resolveManifestPath(): ResolvedConfig {
   while (true) {
     const candidate = join(dir, MANIFEST_FILENAME);
     if (existsSync(candidate)) {
-      return { location: 'home', configDir: dir, manifestPath: candidate, gitRoot };
+      return { location: 'workspace', configDir: dir, manifestPath: candidate, gitRoot };
     }
     const parent = dirname(dir);
     if (parent === dir) break;
