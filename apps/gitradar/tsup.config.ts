@@ -9,8 +9,13 @@ export default defineConfig({
   dts: false,
   shims: true,
   clean: true,
-  // Bun builtin — esbuild can't resolve it, leave it for the Bun runtime.
-  external: ['bun:sqlite'],
+  // Bundle the @helmsmith/* workspace libraries into dist so the published package has no
+  // workspace:* dependencies (the private tui-view-components can't be installed from npm).
+  noExternal: [/^@helmsmith\//],
+  // bun:sqlite is a Bun builtin esbuild can't resolve. @opentui/* use Bun-specific import
+  // attributes; they stay external and are declared as real dependencies, as is react, so
+  // the bundle and @opentui/react share one React instance.
+  external: ['bun:sqlite', /^@opentui\//, 'react'],
   banner: {
     js: '#!/usr/bin/env bun',
   },

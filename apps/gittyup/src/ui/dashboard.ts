@@ -53,7 +53,10 @@ export class Dashboard {
           'right-mid': '',
           middle: chalk.dim(' │ '),
         },
-        style: { 'padding-left': 0, 'padding-right': 1 },
+        // `head`/`border` empty: no colours from cli-table3 itself (its defaults are red
+        // heads and grey borders, applied even when stdout is a pipe); chalk, used for
+        // every cell, already switches itself off there.
+        style: { 'padding-left': 0, 'padding-right': 1, head: [], border: [] },
       });
 
       for (const repo of repos) {
@@ -140,6 +143,7 @@ export class Dashboard {
   ): void {
     console.log(chalk.bold(`\n  ${operation.toUpperCase()} RESULTS\n`));
     const table = new Table({
+      style: { head: [], border: [] }, // see render(): chalk alone decides colour
       head: [chalk.dim('Repo'), chalk.dim('Status'), chalk.dim('Details')],
       chars: {
         top: '',

@@ -1,9 +1,9 @@
 /**
  * `runConnectView` — programmatic entry point for CLI handlers.
  *
- * Wraps `<ConnectView>` in `<HelmsmithThemeProvider>` + `<KeyboardProvider>`
- * + an openTUI renderer so the CLI's `.action()` can call this from
- * a non-React context:
+ * Mounts `<ConnectView>` through `runTuiView` (openTUI renderer +
+ * `<HelmsmithThemeProvider>` + `<KeyboardProvider>`) so the CLI's `.action()`
+ * can call this from a non-React context:
  *
  *   program.command("connect").action(() =>
  *     runConnectView({
@@ -15,9 +15,8 @@
 
 import { createElement } from 'react';
 import type { Connection } from '../connection.ts';
-import { KeyboardProvider } from '../keyboard/registry.tsx';
-import { HelmsmithThemeProvider } from '../theme/HelmsmithThemeProvider.tsx';
 import { ConnectView } from './ConnectView.tsx';
+import { runTuiView } from './runTuiView.ts';
 
 export interface RunConnectViewOptions {
   appName: string;
@@ -31,64 +30,21 @@ export interface RunConnectViewOptions {
 
 /**
  * Mount the connect view as a full-screen openTUI app. Resolves when
- * the user quits (via `q` / Ctrl+C / process signals).
+ * the user quits (via `q` / Ctrl+C / process signals), after the
+ * renderer has handed the terminal back.
  *
- * Implementation is split between this thin wrapper and the React
- * tree. The renderer setup uses `@opentui/core`'s `createCliRenderer`
- * + `@opentui/react`'s `createRoot`, dynamically imported so the
- * theme subsystem stays usable in non-TUI contexts.
+ * Built on `runTuiView`, which owns the openTUI bootstrap, the theme +
+ * keyboard providers and the teardown.
  */
 export async function runConnectView(opts: RunConnectViewOptions): Promise<void> {
-  const [{ createCliRenderer }, { createRoot }] = await Promise.all([
-    import('@opentui/core'),
-    import('@opentui/react'),
-  ]);
-
-  const renderer = await createCliRenderer();
-  const root = createRoot(renderer);
-
-  return new Promise<void>((resolve) => {
-    const cleanup = () => {
-      try {
-        // Different @opentui versions expose unmount differently. Try a
-        // few shapes; tolerate version drift.
-        const r = root as { unmount?: () => void };
-        r.unmount?.();
-      } catch {
-        /* ignore */
-      }
-      try {
-        const rd = renderer as unknown as { stop?: () => void; close?: () => void };
-        rd.stop?.();
-        rd.close?.();
-      } catch {
-        /* ignore */
-      }
-      resolve();
-    };
-
-    // Pass children as the third arg to createElement (idiomatic React)
-    // rather than as a `children` prop. This is what JSX desugars to and
-    // is what biome's noChildrenProp rule expects.
-    const tree = createElement(
-      HelmsmithThemeProvider,
-      {
+  return runTuiView(
+    { appName: opts.appName, themeDir: opts.themeDir, fallbackThemeName: opts.fallbackThemeName },
+    (onQuit) =>
+      createElement(ConnectView, {
         appName: opts.appName,
-        fallbackThemeName: opts.fallbackThemeName,
-        themeDir: opts.themeDir,
-        watch: true,
-      },
-      createElement(
-        KeyboardProvider,
-        null,
-        createElement(ConnectView, {
-          appName: opts.appName,
-          required: opts.required,
-          optional: opts.optional,
-          onQuit: cleanup,
-        }),
-      ),
-    );
-    root.render(tree);
-  });
+        required: opts.required,
+        optional: opts.optional,
+        onQuit,
+      }),
+  );
 }

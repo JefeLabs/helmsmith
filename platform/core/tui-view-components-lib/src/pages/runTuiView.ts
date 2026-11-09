@@ -11,11 +11,8 @@
  *
  * The caller supplies a `render(onQuit)` that returns the page element.
  * `onQuit` tears the renderer down and resolves the returned promise —
- * wire it to your view's quit/finish path.
- *
- * (`runConnectView` predates this and still hand-rolls the same
- * bootstrap; it can be re-expressed on top of `runTuiView` later — kept
- * separate here to avoid destabilizing the shipped `connect` view.)
+ * wire it to your view's quit/finish path. `runConnectView` is built on
+ * this.
  */
 
 import { createElement, type ReactElement } from 'react';
@@ -51,17 +48,17 @@ export async function runTuiView(
     const cleanup = () => {
       try {
         // Different @opentui versions expose unmount differently. Try a
-        // few shapes; tolerate version drift. (Verbatim from
-        // runConnectView — keep the two in sync if this changes.)
+        // few shapes; tolerate version drift.
         const r = root as { unmount?: () => void };
         r.unmount?.();
       } catch {
         /* ignore */
       }
       try {
-        const rd = renderer as unknown as { stop?: () => void; close?: () => void };
-        rd.stop?.();
-        rd.close?.();
+        // destroy(), not stop(): stop() only pauses the render loop and keeps
+        // the terminal and stdin, so the screen cleared on quit but the host
+        // CLI never exited (teardown.test.ts).
+        renderer.destroy();
       } catch {
         /* ignore */
       }

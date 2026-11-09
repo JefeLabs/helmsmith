@@ -241,7 +241,7 @@ describe('--json contract: config and auth', () => {
     ws = await createWorkspace();
     const doc = parseJsonLine((await runCli(ws, ['config', '--json'])).stdout);
     expect(doc).toStrictEqual({
-      manifest: { path: ws.manifestPath, location: 'home' },
+      manifest: { path: ws.manifestPath, location: 'workspace' },
       settings: {
         aiMode: 'suggest',
         aiModel: 'gpt-4o',

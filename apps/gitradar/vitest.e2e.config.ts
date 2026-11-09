@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config';
 
-// E2E: spawns the real launcher (bin/gitradar → vendored Bun → dist/cli.js).
+// E2E: spawns the real launcher (bin/gitradar.mjs → vendored Bun → dist/cli.js).
 // The global setup builds dist/ first, so these never run against stale output.
 export default defineConfig({
   test: {

@@ -9,6 +9,7 @@ import { ConfigNotFoundError, loadConfig } from './config/loader.js';
 import { getAvailableWorkspaces, loadAllRegistries } from './config/repos-registry.js';
 import { getConfigPath, getDataDir } from './store/paths.js';
 import { DEFAULT_SETTINGS, SCORECARD_METRIC_KEYS } from './types/schema.js';
+import { VERSION } from './version.js';
 import {
   FAMILY_ORDER,
   type ScorecardFamily,
@@ -19,7 +20,7 @@ import {
 // noopAuthProvider stays as the default; commands never call getToken.
 const { program } = createCli({
   name: 'gitradar',
-  version: '0.1.0',
+  version: VERSION,
   description: 'Terminal-based TUI analytics for git contribution data',
 });
 

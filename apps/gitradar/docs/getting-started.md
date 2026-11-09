@@ -14,7 +14,7 @@ about 10 minutes. Two paths:
   uses `bun:sqlite`, so the Bun runtime is required, not optional. A
   global `npm install -g @helmsmith/gitradar` gets the vendored `bun`
   binary automatically via the `bun` npm dependency's postinstall
-  step — `bin/gitradar` execs that vendored binary, so a separate
+  step — `bin/gitradar.mjs` runs under that vendored binary, so a separate
   system-wide Bun install isn't required for normal use. `npm install
   --ignore-scripts` skips that postinstall and is unsupported. If
   you're running from a source checkout (`bun src/cli.ts`, `bun

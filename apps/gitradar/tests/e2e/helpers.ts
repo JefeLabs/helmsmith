@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 /** The real launcher, so the Bun re-exec path is exercised, not just dist/cli.js. */
-export const BIN = resolve(import.meta.dirname, '../../bin/gitradar');
+export const BIN = resolve(import.meta.dirname, '../../bin/gitradar.mjs');
 
 export interface CliResult {
   stdout: string;
@@ -19,7 +19,7 @@ export interface RunCliOptions {
   env?: Record<string, string | undefined>;
   /** Working directory. Default: the sandbox home. */
   cwd?: string;
-  /** Default 20 s. On expiry the whole process group (sh + Bun) is SIGKILLed. */
+  /** Default 20 s. On expiry the whole process group (Node launcher + Bun) is SIGKILLed. */
   timeoutMs?: number;
 }
 
