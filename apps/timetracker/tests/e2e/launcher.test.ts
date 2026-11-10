@@ -130,3 +130,14 @@ describe('timetracker launcher', () => {
     expect(r.stdout.trim()).toBe(version);
   }, 60_000);
 });
+
+describe('dist bundle', () => {
+  it('keeps the node: prefix on node:sqlite, which has no unprefixed form', () => {
+    // tsup strips `node:` by default (removeNodeProtocol), turning the Node branch of
+    // src/storage/sqlite/driver.ts into `import('sqlite')`, which Node resolves as an
+    // npm package and fails on.
+    const cli = readFileSync(join(APP, 'dist', 'cli.js'), 'utf8');
+    expect(cli).toContain('import("node:sqlite")');
+    expect(cli).not.toMatch(/import\(["']sqlite["']\)/);
+  });
+});

@@ -11,6 +11,9 @@ export default defineConfig({
   sourcemap: true,
   splitting: false,
   shims: false,
+  // Keep `node:` on builtin imports. tsup strips it by default, and node:sqlite (the Node
+  // branch of src/storage/sqlite/driver.ts) only exists under that prefix.
+  removeNodeProtocol: false,
   // Bundle ONLY @helmsmith/* workspace libs — their package.json exports
   // point at .ts source (cli-kit ships dist, tui-view-components ships
   // src), so they must be inlined to produce a usable JS bundle. They are
