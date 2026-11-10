@@ -11,6 +11,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   realpathSync,
   rmSync,
   writeFileSync,
@@ -119,4 +120,24 @@ describe('timetracker launcher', () => {
     expect(r.status).toBe(1);
     expect(r.stderr).toMatch(/vendored Bun/);
   }, 60_000);
+
+  it('reports the version from package.json, not a hard-coded one', () => {
+    const { version } = JSON.parse(readFileSync(join(APP, 'package.json'), 'utf8')) as {
+      version: string;
+    };
+    const r = run(sb, ['--version']);
+    expect(r.status).toBe(0);
+    expect(r.stdout.trim()).toBe(version);
+  }, 60_000);
+});
+
+describe('dist bundle', () => {
+  it('keeps the node: prefix on node:sqlite, which has no unprefixed form', () => {
+    // tsup strips `node:` by default (removeNodeProtocol), turning the Node branch of
+    // src/storage/sqlite/driver.ts into `import('sqlite')`, which Node resolves as an
+    // npm package and fails on.
+    const cli = readFileSync(join(APP, 'dist', 'cli.js'), 'utf8');
+    expect(cli).toContain('import("node:sqlite")');
+    expect(cli).not.toMatch(/import\(["']sqlite["']\)/);
+  });
 });

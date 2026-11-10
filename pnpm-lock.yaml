@@ -458,12 +458,6 @@ importers:
 
   apps/timetracker:
     dependencies:
-      '@helmsmith/cli-kit':
-        specifier: workspace:*
-        version: link:../../platform/core/cli-kit-lib
-      '@helmsmith/tui-view-components':
-        specifier: workspace:*
-        version: link:../../platform/core/tui-view-components-lib
       '@inquirer/prompts':
         specifier: ^8.7.4
         version: 8.7.4(@types/node@24.19.2)
@@ -496,6 +490,12 @@ importers:
         specifier: ^3.1156.0
         version: 3.1156.0(@aws-sdk/client-dynamodb@3.1156.0)
     devDependencies:
+      '@helmsmith/cli-kit':
+        specifier: workspace:*
+        version: link:../../platform/core/cli-kit-lib
+      '@helmsmith/tui-view-components':
+        specifier: workspace:*
+        version: link:../../platform/core/tui-view-components-lib
       '@types/bun':
         specifier: ^1.4.3
         version: 1.4.3

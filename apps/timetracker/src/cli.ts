@@ -21,10 +21,11 @@ import { runReport } from './commands/report.js';
 import { runSetup } from './commands/setup.js';
 import { runStart } from './commands/start.js';
 import { runView } from './commands/view.js';
+import { VERSION } from './version.js';
 
 const { program } = createCli({
   name: 'timetracker',
-  version: '0.1.0',
+  version: VERSION,
   description: 'Admin-only Discord activity time tracker',
   // Local v1 runs without auth; swap for @helmsmith/agent-auth when hosted (see Q8).
   auth: noopAuthProvider,
