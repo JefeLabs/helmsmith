@@ -487,6 +487,7 @@ describe('getBranchState tracking', () => {
     });
     await repo.git.raw(['commit', '--allow-empty', '-m', 'local only']);
     expect(await new GitOperations(repo.path).getBranchState('main')).toMatchObject({
+      local: true,
       tracking: true,
       ahead: 1,
       behind: 0,
@@ -494,11 +495,39 @@ describe('getBranchState tracking', () => {
     });
   });
 
-  it('carries the reason when the branch cannot be read', async () => {
+  // A fresh clone has only the default branch locally; every other branch the manifest
+  // names exists only as origin/<b>. That is the branch, not a read failure.
+  it('reads a branch that exists only on the remote from origin/<branch>', async () => {
+    const repo = await makeRepo({
+      commits: [
+        { message: 'base', files: { 'f.txt': 'x\n' } },
+        { branch: 'staging', message: 'stage', files: { 'f.txt': 'y\n' } },
+      ],
+      remote: true,
+    });
+    await repo.git.checkout('main');
+    await repo.git.raw(['branch', '-D', 'staging']);
+
+    const s = await new GitOperations(repo.path).getBranchState('staging');
+
+    expect(s).toMatchObject({
+      local: false,
+      tracking: true,
+      trackingBranch: 'origin/staging',
+      // No local branch, so nothing to compare: unknown, not "in sync".
+      ahead: null,
+      behind: null,
+      lastCommitSha: await repo.sha('origin/staging'),
+    });
+    expect(s.error).toBeUndefined();
+  });
+
+  it('carries the reason when the branch exists neither locally nor on the remote', async () => {
     const repo = await makeRepo({ commits: [{ message: 'base', files: { 'f.txt': 'x\n' } }] });
     const s = await new GitOperations(repo.path).getBranchState('staging');
-    expect(s.lastCommitSha).toBeNull();
+    expect(s).toMatchObject({ local: false, tracking: false, lastCommitSha: null });
     expect(s.error).toEqual(expect.stringContaining('staging'));
+    expect(s.error).toEqual(expect.stringContaining('origin/staging'));
     expect(s.error).not.toContain('\n');
   });
 });

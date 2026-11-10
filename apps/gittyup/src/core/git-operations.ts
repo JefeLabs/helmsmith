@@ -101,16 +101,27 @@ export class GitOperations {
   async getBranchState(branchName: string, trackingBranch?: string): Promise<RepoBranchState> {
     this.assertSafeRef(branchName);
     if (trackingBranch) this.assertSafeRef(trackingBranch);
+    const tracking = trackingBranch ?? `origin/${branchName}`;
     try {
-      const latest = (await this.listCommits(branchName, 1))[0];
-      const tracking = trackingBranch ?? `origin/${branchName}`;
-
+      // `refs/heads/` explicitly: a bare name would also match a tag of the same name.
+      const hasLocal = await this.refExists(`refs/heads/${branchName}`);
       // No tracking ref → ahead/behind are unknown, not 0 (spec §3.4): "0/0" would read
       // as "in sync" for a branch that was never pushed.
       const hasTracking = await this.branchExists(tracking);
+      if (!hasLocal && !hasTracking) {
+        return this.unreadableBranch(branchName, {
+          local: false,
+          trackingBranch: tracking,
+          error: `no branch '${branchName}' locally or at ${tracking}`,
+        });
+      }
+
+      // Remote-only (the usual case in a fresh clone for every branch but the default):
+      // describe the remote's branch instead of failing (hardening §3.9's rule for compare).
+      const latest = (await this.listCommits(hasLocal ? branchName : tracking, 1))[0];
       let ahead: number | null = null;
       let behind: number | null = null;
-      if (hasTracking) {
+      if (hasLocal && hasTracking) {
         const revList = await this.git.raw([
           'rev-list',
           '--left-right',
@@ -132,6 +143,7 @@ export class GitOperations {
         ahead,
         behind,
         tracking: hasTracking,
+        local: hasLocal,
         hasConflicts: status.conflicted.length > 0,
         isDirty,
         lastCommit: latest?.hash?.substring(0, 8) ?? 'unknown',
@@ -141,24 +153,35 @@ export class GitOperations {
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      return {
-        branch: branchName,
-        ahead: null,
-        behind: null,
-        tracking: false,
-        hasConflicts: false,
-        isDirty: false,
-        lastCommit: 'error',
-        lastCommitSha: null,
-        lastCommitDate: 'error',
+      return this.unreadableBranch(branchName, {
+        local: null,
         // git's first line names the problem; the rest is usage advice.
         error:
           message
             .split('\n')
             .find((l) => l.trim())
             ?.trim() ?? 'unreadable branch',
-      };
+      });
     }
+  }
+
+  /** A branch state whose fields are placeholders, with `error` saying why. */
+  private unreadableBranch(
+    branch: string,
+    known: { local: boolean | null; error: string; trackingBranch?: string },
+  ): RepoBranchState {
+    return {
+      branch,
+      ahead: null,
+      behind: null,
+      tracking: false,
+      hasConflicts: false,
+      isDirty: false,
+      lastCommit: 'error',
+      lastCommitSha: null,
+      lastCommitDate: 'error',
+      ...known,
+    };
   }
 
   /** Aggregate state across all aliased branches for dashboard display. */

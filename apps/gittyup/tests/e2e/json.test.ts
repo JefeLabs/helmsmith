@@ -322,6 +322,7 @@ describe('--json contract: status', () => {
     expect(doc.repos[0].branches.dev).toMatchObject({
       branch: 'develop',
       tracking: false,
+      local: true,
       ahead: null,
       behind: null,
       lastCommit: {

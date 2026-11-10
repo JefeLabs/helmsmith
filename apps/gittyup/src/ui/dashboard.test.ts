@@ -5,8 +5,8 @@
  */
 import chalk, { type ColorSupportLevel } from 'chalk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { RepoState } from '../config/schema.js';
-import { Dashboard } from './dashboard.js';
+import type { RepoBranchState, RepoState } from '../config/schema.js';
+import { branchStatusCell, Dashboard } from './dashboard.js';
 
 let printed: string[];
 let savedLevel: ColorSupportLevel;
@@ -60,6 +60,84 @@ describe('Dashboard tables in a pipe (no colour)', () => {
     Dashboard.renderOperationResults([{ repo: 'app', status: 'success', message: 'ok' }], 'Merge');
 
     expect(printed.join('\n')).not.toContain(ESC);
+  });
+});
+
+describe('branchStatusCell', () => {
+  const inSync: RepoBranchState = {
+    branch: 'main',
+    ahead: 0,
+    behind: 0,
+    tracking: true,
+    local: true,
+    hasConflicts: false,
+    isDirty: false,
+    lastCommit: '0123abcd',
+    lastCommitSha: `0123abcd${'0'.repeat(32)}`,
+    lastCommitDate: '2026-01-01T00:00:00Z',
+    trackingBranch: 'origin/main',
+  };
+
+  it('never shows ✓ for a branch that could not be read', () => {
+    chalk.level = 0;
+    const unreadable: RepoBranchState = {
+      ...inSync,
+      branch: 'develop',
+      ahead: null,
+      behind: null,
+      tracking: false,
+      local: false,
+      lastCommit: 'error',
+      lastCommitSha: null,
+      lastCommitDate: 'error',
+      trackingBranch: 'origin/develop',
+      error: "no branch 'develop' locally or at origin/develop",
+    };
+
+    expect(branchStatusCell(unreadable)).not.toContain('✓');
+  });
+
+  it('tells a remote-only branch apart from a local one that is in sync', () => {
+    chalk.level = 0;
+    const remoteOnly: RepoBranchState = {
+      ...inSync,
+      branch: 'staging',
+      ahead: null,
+      behind: null,
+      local: false,
+      trackingBranch: 'origin/staging',
+    };
+
+    expect(branchStatusCell(remoteOnly)).not.toBe(branchStatusCell(inSync));
+  });
+});
+
+describe('Dashboard rows for unreadable branches', () => {
+  it('shows no "error" placeholder in the Last Commit column', () => {
+    chalk.level = 0;
+    const s: RepoState = {
+      ...state,
+      branches: {
+        dev: {
+          ...state.branches.dev,
+          local: false,
+          tracking: false,
+          lastCommit: 'error',
+          lastCommitSha: null,
+          lastCommitDate: 'error',
+          error: "no branch 'develop' locally or at origin/develop",
+        },
+      },
+    };
+
+    Dashboard.render([s]);
+
+    const row = printed
+      .join('\n')
+      .split('\n')
+      .find((l) => l.includes('dev (develop)'));
+    expect(row).toBeDefined();
+    expect(row).not.toMatch(/│\s*error\s*$/);
   });
 });
 
