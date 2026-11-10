@@ -344,7 +344,7 @@ $ helmsmith-gittyup prs
   config: /home/user/.helmsmith/gittyup/gittyup.yaml [home]
 ```
 
-The `[repo]` or `[home]` tag tells you whether you're using project-local or global config.
+The tag tells you which config you're using: `[repo]` for project-local, `[workspace]` for a `gittyup.yaml` found in the current folder or a parent, `[home]` for global.
 
 ---
 

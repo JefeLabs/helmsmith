@@ -140,7 +140,7 @@ resolveManifestPath()
   │       Found? → location: 'repo'
   │
   ├─ Walk up from CWD looking for bare gittyup.yaml
-  │   Found? → location: 'home' (backwards compat)
+  │   Found? → location: 'workspace' (backwards compat)
   │
   └─ Fall back to ~/.helmsmith/gittyup/gittyup.yaml
       → location: 'home'
@@ -203,11 +203,11 @@ interface RepoConfig {
 ### ConfigLocation
 
 ```typescript
-type ConfigLocation = 'home' | 'repo';
+type ConfigLocation = 'home' | 'repo' | 'workspace';
 
 interface ResolvedConfig {
   location: ConfigLocation;
-  configDir: string;          // e.g. ~/.helmsmith/gittyup or <repo>/.helmsmith/gittyup
+  configDir: string;          // ~/.helmsmith/gittyup, <repo>/.helmsmith/gittyup, or the folder holding a walked-up gittyup.yaml
   manifestPath: string;       // Full path to gittyup.yaml
   gitRoot: string | null;
 }
