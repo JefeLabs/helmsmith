@@ -30,8 +30,6 @@
     "typecheck": "tsc --noEmit --allowImportingTsExtensions"
   },
   "dependencies": {
-    "@helmsmith/cli-kit": "workspace:*",
-    "@helmsmith/tui-view-components": "workspace:*",
     "@inquirer/prompts": "^8.7.4",
     "@opentui/core": "^0.5.10",
     "@opentui/react": "^0.5.10",
@@ -46,6 +44,8 @@
     "@aws-sdk/lib-dynamodb": "^3.1156.0"
   },
   "devDependencies": {
+    "@helmsmith/cli-kit": "workspace:*",
+    "@helmsmith/tui-view-components": "workspace:*",
     "@types/bun": "^1.4.3",
     "@types/node": "^24.19.2",
     "@types/react": "^19.2.18",

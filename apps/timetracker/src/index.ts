@@ -9,4 +9,4 @@
  */
 
 export const name = '@helmsmith/timetracker';
-export const version = '0.1.0';
+export { VERSION as version } from './version.js';

@@ -13,7 +13,9 @@ export default defineConfig({
   shims: false,
   // Bundle ONLY @helmsmith/* workspace libs — their package.json exports
   // point at .ts source (cli-kit ships dist, tui-view-components ships
-  // src), so they must be inlined to produce a usable JS bundle.
+  // src), so they must be inlined to produce a usable JS bundle. They are
+  // devDependencies: the private tui-view-components can't be installed
+  // from npm, so the published package must not depend on it.
   //
   // Everything else (discord.js, @aws-sdk/*, react, @opentui/*) stays a
   // runtime require, loaded from node_modules in its published form.
@@ -23,7 +25,7 @@ export default defineConfig({
     // Any unscoped npm package (`discord.js`, `commander`, `react`, …)
     /^[^@./]/,
     // Any scoped package that isn't @helmsmith/* (excluded via lookahead)
-    /^@(?!ecruz165\/)/,
+    /^@(?!helmsmith\/)/,
     // Bun built-in — never bundle
     'bun:sqlite',
   ],
