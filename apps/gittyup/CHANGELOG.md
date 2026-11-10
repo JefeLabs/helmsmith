@@ -1,5 +1,33 @@
 # @helmsmith/gittyup
 
+## 0.5.0
+
+### Minor Changes
+
+- 2c55c61: Every command a program would call now takes `--json`: `status`, `compare`, `prs`, `fetch`, `find`, `repo list|tags|tag|add|remove`, `group create|remove`, `config`, `auth status|models` and `cache clear|prune`. Each prints exactly one JSON line on stdout and never prompts. A refusal prints an empty stdout, a `{ code, message, details? }` line on stderr and exits 2; a breakage exits 1. See "Scripting with `--json`" in the README. `merge` and `pick` follow in a later release.
+  
+  ### JSON contract
+  
+  - New in this release. While gittyup is 0.x, shapes may change when a hardening slice lands; each such change will be listed here.
+  - Text mode: `status` now shows `–` instead of `0` for ahead/behind when a branch has no tracking ref, because "0" read as "in sync" for a branch that was never pushed.
+- 5ada89d: `merge` and `pick` take `--json` (with `--yes`). They never prompt: on a conflict gittyup's own agent tries to resolve every file, and if any file can't be resolved the repo is rolled back to exactly where it started. Each run prints one JSON report: per repo the status, which files the agent resolved, whether it rolled back, the target's final commit, and whether it pushed. Commits the agent resolved carry a `Resolved-by: gittyup agent (<model>)` trailer. A manifest set to `ai_mode: manual` keeps the agent out.
+  
+  ### JSON contract
+  
+  - `--pr` under `--json` reports `skipped` ("needs --branch") for every repo until hardening §3.5 adds `--branch`; it will then report `created`/`existing`/`error`.
+  - `agent.available` is `null` when the mode is `manual` (nothing was checked).
+
+### Patch Changes
+
+- f8888da: `gittyup connect` now shows GitHub as connected whenever gittyup can actually reach GitHub. It only looked at `GITHUB_TOKEN` and `GH_TOKEN`, so a token saved by `gittyup auth login`, from `gh auth login`, or in your git credentials showed as "disconnected" even though `compare`, `prs` and `merge --pr` were using it. It now checks the same places, in the same order, as those commands.
+- efff70d: The `config: <path> [<location>]` line under each command now says `[workspace]` for a `gittyup.yaml` found in the current directory or one of its parents. It used to say `[home]`, which made a workspace manifest look like the global one in `~/.helmsmith/gittyup`.
+- efff70d: `gittyup status` (and the merge/pick results table) no longer writes colour codes when its output goes to a pipe or a file, so `gittyup status | grep …` and `> status.txt` get plain text. On a terminal, table headers now show dim as intended instead of red. The table library added its own red headers and grey borders regardless of where the output went.
+- 9281bab: Security: the launcher only ever runs the Bun installed as the package's `bun` dependency. When that dependency couldn't be resolved it used to fall back to a bare `bun`, which is looked up through `PATH` (on Windows, in the current directory first), so a repo you ran the CLI in could supply its own `bun`. It now exits 1 with a reinstall message instead.
+- bafaa38: `connect` (and mech-pencil's `wizard`) exits when you quit. Pressing `q` used to clear the screen and leave the process running until it was killed, because the shared TUI harness stopped openTUI's render loop instead of destroying the renderer, so the terminal and stdin were never released. The harness now destroys the renderer, and the process exits normally.
+- f8888da: `connect` now shows why a login or logout failed. The error was written into the connection's status line and then immediately replaced when the view re-checked the status, so a failed login looked like nothing happened. It now stays on its own line under the actions until you start another action, and a failed logout no longer shows a still-connected account as disconnected.
+- f8888da: `connect` checks each connection's status once when it opens (and again on `r` or after a login or logout), instead of thousands of times a second. An app that passed no optional connections got a new empty list on every render, so every render re-fetched every status and each fetch caused another render.
+- f8888da: Interactive screens no longer burn CPU while they sit open. Every screen that binds a key (`connect`, mech-pencil's `wizard`, timetracker's summary, and any list, menu, table or confirm prompt) re-registered its key bindings in an endless loop, re-rendering hundreds of thousands of times and holding a core at 100% or more. Bindings now register once.
+
 ## 0.4.0
 
 ### Minor Changes

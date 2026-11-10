@@ -1,6 +1,6 @@
 {
   "name": "@helmsmith/skillzkit",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Helmsmith skillzkit — commands, skills, and workflows for Claude Code. Part of the helmsmith monorepo.",
   "type": "module",
   "bin": {

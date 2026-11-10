@@ -1,5 +1,12 @@
 # @helmsmith/timetracker
 
+## 0.1.2
+
+### Patch Changes
+
+- 9281bab: Security: the launcher only ever runs the Bun installed as the package's `bun` dependency, and timetracker now declares that dependency. Before, timetracker had no `bun` dependency and always ran a bare `bun`, looked up through `PATH` (on Windows, in the current directory first), so a repo you ran it in could supply its own `bun`. A system-wide Bun is no longer needed; if the vendored one is missing, the launcher exits 1 with a reinstall message.
+- f8888da: Interactive screens no longer burn CPU while they sit open. Every screen that binds a key (`connect`, mech-pencil's `wizard`, timetracker's summary, and any list, menu, table or confirm prompt) re-registered its key bindings in an endless loop, re-rendering hundreds of thousands of times and holding a core at 100% or more. Bindings now register once.
+
 ## 0.1.1
 
 ### Patch Changes
