@@ -473,6 +473,9 @@ importers:
       '@opentui/react':
         specifier: ^0.5.10
         version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.1)(ws@8.22.0)
+      bun:
+        specifier: ^1.4.4
+        version: 1.4.4
       commander:
         specifier: ^15.0.0
         version: 15.0.0
