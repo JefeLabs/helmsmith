@@ -296,8 +296,7 @@ project-local installs hoist `bun` above the package, so that path doesn't exist
 **Fail closed when the vendored Bun can't be resolved.** Don't fall back to a bare
 `bun`: it is looked up through `PATH`, and on Windows in the current directory first, so a
 cloned repo can plant one. gitradar's launcher and its `launcher.test.ts` (a fake `bun` on
-`PATH` must never run) are the reference. gittyup, toolz, mech-pencil and timetracker still
-carry the old fallback.
+`PATH` must never run) are the reference; every Bun launcher here has that test.
 
 ## Bun distribution
 
