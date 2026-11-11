@@ -59,6 +59,10 @@ afterEach(() => {
  * Run `skillzkit ui`, press `q` once the TUI has drawn, and wait for it to exit. The TUI is a
  * grandchild (launcher → CLI → TUI), so the run gets its own process group and is killed as
  * a group if it outlives the timeout or leaves anything behind.
+ *
+ * `q` is pressed every 200ms until the TUI exits, not once: the first frame is drawn before
+ * React registers the TUI's keyboard handler, and a key that arrives in between is dropped.
+ * On a busy CI runner a single `q` sent on the first frame was lost and the run timed out.
  */
 async function runUi(s: Sandbox): Promise<{ status: number | null; out: string }> {
   const child = spawn(process.execPath, [BIN, 'ui', '--target', s.target], {
@@ -75,20 +79,23 @@ async function runUi(s: Sandbox): Promise<{ status: number | null; out: string }
     }
   };
   let out = '';
-  let quitSent = false;
+  let pressQ: NodeJS.Timeout | undefined;
   const onData = (chunk: Buffer) => {
     out += chunk.toString();
-    if (!quitSent && out.includes(FIRST_FRAME)) {
-      quitSent = true;
+    if (!pressQ && out.includes(FIRST_FRAME)) {
       child.stdin.write('q');
+      pressQ = setInterval(() => child.stdin.write('q'), 200);
     }
   };
+  // EPIPE from a `q` written as the TUI exits is expected.
+  child.stdin.on('error', () => {});
   child.stdout.on('data', onData);
   child.stderr.on('data', onData);
   const status = await new Promise<number | null>((done) => {
     const timer = setTimeout(killGroup, 30_000);
     child.on('exit', (code) => {
       clearTimeout(timer);
+      clearInterval(pressQ);
       done(code);
     });
   });
