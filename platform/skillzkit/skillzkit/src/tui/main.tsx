@@ -15,6 +15,7 @@ import type { CatalogIndex } from '../api/contracts.js';
 import { tryReadConfig } from '../init/config.js';
 import { getInterfaces } from '../interfaces.js';
 import type { Catalog } from '../types.js';
+import { VERSION } from '../version.js';
 import { installSelection } from './install.js';
 import { resolveCascade, summarize } from './state.js';
 
@@ -932,7 +933,7 @@ const App = () => {
       >
         <ascii-font text="SkillzKit" font="slick" fg="#00FFFF" />
         <text content="   " />
-        <text content="v0.1.0" style={{ fg: '#888888' }} />
+        <text content={`v${VERSION}`} style={{ fg: '#888888' }} />
       </box>
 
       {/* ═══ ROW 2 — search bar (no border; left-aligned with Catalog label) ═══ */}

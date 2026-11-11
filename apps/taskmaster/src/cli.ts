@@ -60,7 +60,6 @@ import {
   APP_REPO_CONFIG_DIR_DISPLAY,
   CLI_BIN_NAME,
   CLI_DESCRIPTION,
-  CLI_VERSION,
 } from './config/branding.js';
 import { loadProjectConfig, writeProjectConfig } from './config/loader.js';
 import { resolveProjectOrThrow } from './config/resolver.js';
@@ -77,6 +76,7 @@ import { ensureGitignoreEntry, GITIGNORE_ENTRY } from './utils/gitignore.js';
 import { bootstrapHome, bootstrapRepoHome } from './utils/home.js';
 import type { ProjectLocation } from './utils/location.js';
 import { createProject, switchProject } from './utils/projects.js';
+import { VERSION } from './version.js';
 
 // No `auth` wired — taskmaster resolves auth per-project via
 // `resolveActiveAuth(config.ai.provider)` (multi-provider with PKCE
@@ -84,7 +84,7 @@ import { createProject, switchProject } from './utils/projects.js';
 // AuthProvider contract). cli-kit still provides the bootstrap.
 const { program } = createCli({
   name: CLI_BIN_NAME,
-  version: CLI_VERSION,
+  version: VERSION,
   description: CLI_DESCRIPTION,
 });
 
