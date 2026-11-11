@@ -43,8 +43,8 @@
   "dependencies": {
     "@helmsmith/cli-kit": "workspace:*",
     "@helmsmith/tui-view-components": "workspace:*",
-    "@opentui/core": "^0.5.10",
-    "@opentui/react": "^0.5.10",
+    "@opentui/core": "0.5.10",
+    "@opentui/react": "0.5.10",
     "bun": "^1.4.4",
     "chalk": "^6.0.1",
     "commander": "^15.0.0",
