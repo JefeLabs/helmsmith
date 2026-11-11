@@ -31,12 +31,12 @@
   },
   "dependencies": {
     "@inquirer/prompts": "^8.7.4",
-    "@opentui/core": "^0.5.10",
-    "@opentui/react": "^0.5.10",
+    "@opentui/core": "0.5.10",
+    "@opentui/react": "0.5.10",
     "bun": "^1.4.4",
     "commander": "^15.0.0",
     "discord.js": "^14.27.0",
-    "react": "^19.2.9",
+    "react": "19.2.9",
     "zod": "^4.6.7"
   },
   "optionalDependencies": {

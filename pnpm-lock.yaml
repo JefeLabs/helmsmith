@@ -78,10 +78,10 @@ importers:
         specifier: ^8.7.4
         version: 8.7.4(@types/node@24.19.2)
       '@opentui/core':
-        specifier: ^0.5.10
+        specifier: 0.5.10
         version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.1)
       '@opentui/react':
-        specifier: ^0.5.10
+        specifier: 0.5.10
         version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.1)(ws@8.22.0)
       bun:
         specifier: ^1.4.4
@@ -157,10 +157,10 @@ importers:
         specifier: ^8.7.4
         version: 8.7.4(@types/node@24.19.2)
       '@opentui/core':
-        specifier: ^0.5.10
+        specifier: 0.5.10
         version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.1)
       '@opentui/react':
-        specifier: ^0.5.10
+        specifier: 0.5.10
         version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.1)(ws@8.22.0)
       bun:
         specifier: ^1.4.4
@@ -224,10 +224,10 @@ importers:
         specifier: workspace:*
         version: link:../../platform/core/tui-view-components-lib
       '@opentui/core':
-        specifier: ^0.5.10
+        specifier: 0.5.10
         version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.1)
       '@opentui/react':
-        specifier: ^0.5.10
+        specifier: 0.5.10
         version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.1)(ws@8.22.0)
       bun:
         specifier: ^1.4.4
@@ -395,10 +395,10 @@ importers:
         specifier: ^8.7.4
         version: 8.7.4(@types/node@24.19.2)
       '@opentui/core':
-        specifier: ^0.5.10
+        specifier: 0.5.10
         version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.25.10)
       '@opentui/react':
-        specifier: ^0.5.10
+        specifier: 0.5.10
         version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.25.10)(ws@8.22.0)
       bun:
         specifier: ^1.4.4
@@ -462,10 +462,10 @@ importers:
         specifier: ^8.7.4
         version: 8.7.4(@types/node@24.19.2)
       '@opentui/core':
-        specifier: ^0.5.10
+        specifier: 0.5.10
         version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.1)
       '@opentui/react':
-        specifier: ^0.5.10
+        specifier: 0.5.10
         version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.1)(ws@8.22.0)
       bun:
         specifier: ^1.4.4
@@ -805,10 +805,10 @@ importers:
   platform/core/tui-view-components-lib:
     devDependencies:
       '@opentui/core':
-        specifier: ^0.5.10
+        specifier: 0.5.10
         version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.1)
       '@opentui/react':
-        specifier: ^0.5.10
+        specifier: 0.5.10
         version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.1)(ws@8.22.0)
       '@types/node':
         specifier: ^24.19.2
@@ -899,10 +899,10 @@ importers:
         specifier: workspace:*
         version: link:../harness-server
       '@opentui/core':
-        specifier: ^0.5.10
+        specifier: 0.5.10
         version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.1)
       '@opentui/react':
-        specifier: ^0.5.10
+        specifier: 0.5.10
         version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.1)(ws@8.22.0)
       react:
         specifier: 19.2.9
@@ -1014,10 +1014,10 @@ importers:
   platform/harness/workspace-cli:
     dependencies:
       '@opentui/core':
-        specifier: ^0.5.10
+        specifier: 0.5.10
         version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.1)
       '@opentui/react':
-        specifier: ^0.5.10
+        specifier: 0.5.10
         version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.1)(ws@8.22.0)
       react:
         specifier: 19.2.9
@@ -1095,10 +1095,10 @@ importers:
         specifier: workspace:*
         version: link:../../core/tui-view-components-lib
       '@opentui/core':
-        specifier: ^0.5.10
+        specifier: 0.5.10
         version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.1)
       '@opentui/react':
-        specifier: ^0.5.10
+        specifier: 0.5.10
         version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.1)(ws@8.22.0)
       bun:
         specifier: ^1.4.4
@@ -3608,6 +3608,7 @@ packages:
 
   bun@1.4.4:
     resolution: {integrity: sha512-hj0ASdG6PNjLZGFAXktWb3Uaj/dcv/1wCsIttoEXADNIQBsGjTr+5uLKYbrDkuc7NT0Tkj4yPIqJI2jDxXdvVg==}
+    cpu: [arm64, x64]
     os: [darwin, linux, android, freebsd, win32]
     hasBin: true
 
