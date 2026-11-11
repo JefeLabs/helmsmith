@@ -84,10 +84,16 @@ function launchTui(targetDir: string): number | null {
     process.exit(1);
   }
   const bunBin = join(dirname(bunPkgJsonPath), bunBinRel);
-  const tuiEntry = join(packageRoot, 'tui', 'main.tsx');
+  // Installed, this module is bundled into dist/cli.js and the TUI is dist/tui.js (tsup entry
+  // `tui`). Run from source (`bun src/cli.ts`), this module is a .ts file: use the TUI source.
+  const tuiEntry = import.meta.url.endsWith('.ts')
+    ? join(packageRoot, 'src', 'tui', 'main.tsx')
+    : join(packageRoot, 'dist', 'tui.js');
 
   if (!existsSync(tuiEntry)) {
-    console.error(`TUI entry not found at ${tuiEntry}. Did you forget to ship the tui/ directory?`);
+    console.error(
+      `TUI entry not found at ${tuiEntry}. Reinstall skillzkit (in a checkout: pnpm build).`,
+    );
     process.exit(1);
   }
   if (!existsSync(bunBin)) {
@@ -95,7 +101,11 @@ function launchTui(targetDir: string): number | null {
     process.exit(1);
   }
 
-  const result = spawnSync(bunBin, [tuiEntry], {
+  // --no-env-file / --config, as in bin/skillzkit.mjs: without them this Bun process reads
+  // `.env*` and `bunfig.toml` (whose `preload` runs code) from the current directory, which
+  // is routinely a cloned repo. The package's bunfig.toml is intentionally empty.
+  const bunfig = join(packageRoot, 'bunfig.toml');
+  const result = spawnSync(bunBin, ['--no-env-file', `--config=${bunfig}`, tuiEntry], {
     stdio: 'inherit',
     env: { ...process.env, SKILLZKIT_TARGET: targetDir },
   });
