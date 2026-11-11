@@ -1,7 +1,10 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/index.ts', 'src/cli.ts'],
+  // `tui` is the TUI `skillzkit ui` runs in its own Bun process (src/commands/ui.ts). It ships
+  // bundled like the CLI: its imports reach the private @helmsmith/* workspace packages, which
+  // only exist inlined in a bundle, never as installed dependencies.
+  entry: { index: 'src/index.ts', cli: 'src/cli.ts', tui: 'src/tui/main.tsx' },
   format: ['esm'],
   target: 'es2022',
   clean: true,

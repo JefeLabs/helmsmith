@@ -4,7 +4,7 @@
  * arbitrary code, so running this CLI inside a cloned repo could execute that repo's code
  * (same class as helmsmith#69). These tests spawn the real launcher from a hostile cwd.
  */
-import { execFileSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
   copyFileSync,
@@ -18,15 +18,12 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const APP = resolve(import.meta.dirname, '../..');
 const BIN = join(APP, 'bin', 'skillzkit.mjs');
 
-// Build the real bundle the launcher spawns (`dist/cli.js`), so this never runs stale output.
-beforeAll(() => {
-  execFileSync('pnpm', ['exec', 'tsup'], { cwd: APP, stdio: 'pipe' });
-}, 120_000);
+// dist/cli.js is built by this suite's vitest globalSetup (tests/e2e/global-setup.ts).
 
 interface Sandbox {
   root: string;
