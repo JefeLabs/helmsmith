@@ -29,7 +29,7 @@
   "peerDependencies": {
     "@opentui/core": "0.5.10",
     "@opentui/react": "0.5.10",
-    "react": "^19.2.8"
+    "react": "19.2.9"
   },
   "devDependencies": {
     "@opentui/core": "0.5.10",
@@ -37,7 +37,7 @@
     "@types/node": "^24.19.2",
     "@types/react": "^19.2.18",
     "bun": "^1.4.4",
-    "react": "^19.2.9",
+    "react": "19.2.9",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3"
   },
