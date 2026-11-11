@@ -1,6 +1,6 @@
 {
   "name": "@helmsmith/gittyup",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Multi-repo orchestration CLI with interactive conflict resolution. Part of the helmsmith monorepo.",
   "type": "module",
   "bin": {

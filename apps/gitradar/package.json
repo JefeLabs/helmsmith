@@ -1,6 +1,6 @@
 {
   "name": "@helmsmith/gitradar",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Terminal-based TUI analytics tool for git contribution data. Part of the helmsmith monorepo.",
   "type": "module",
   "bin": {

@@ -1,6 +1,6 @@
 {
   "name": "@helmsmith/workspace",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Procure a new helmsmith project workspace from the workspace-template — the front door for setting up agent flows on a new product.",
   "type": "module",
   "main": "./dist/bin.js",
