@@ -14,7 +14,7 @@ export const APP_NAME = 'taskmaster';
 export const CLI_BIN_NAME = APP_NAME;
 export const CLI_DESCRIPTION =
   'CLI-based project task generator with complexity scoring and auto-decomposition';
-export const CLI_VERSION = '0.1.0';
+// The CLI version is not a brand string: it comes from package.json (src/version.ts).
 
 // ── Derived config path fragments ───────────────────────────
 export const CONFIG_PARENT_DIR = `.${APP_GROUP_NAME}`;

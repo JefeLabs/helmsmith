@@ -24,6 +24,7 @@ import { runSuggest, type SuggestOptions } from './commands/suggest.js';
 import { runTags } from './commands/tags.js';
 import { runUi } from './commands/ui.js';
 import { runVersion } from './commands/version.js';
+import { VERSION } from './version.js';
 
 // No `auth` wired today — skillzkit's catalog/install/serve commands
 // are local file-system operations. Team-mode contribute uses an
@@ -31,7 +32,7 @@ import { runVersion } from './commands/version.js';
 // If that changes, wire a skillzkitAuthProvider here.
 const { program } = createCli({
   name: 'skillzkit',
-  version: '0.1.0',
+  version: VERSION,
   description: 'Catalog of slash commands, agent skills, and multi-phase workflows for Claude Code',
 });
 

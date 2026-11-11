@@ -5,7 +5,17 @@
  * (same class as helmsmith#69). These tests spawn the real launcher from a hostile cwd.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -67,10 +77,42 @@ describe('taskmaster launcher', () => {
     expect(existsSync(marker)).toBe(false);
   }, 60_000);
 
+  it('reports the version from package.json, not a hard-coded one', () => {
+    const { version } = JSON.parse(readFileSync(join(APP, 'package.json'), 'utf8')) as {
+      version: string;
+    };
+    const r = run(sb, ['--version']);
+    expect(r.status).toBe(0);
+    expect(r.stdout.trim()).toBe(version);
+  }, 60_000);
+
   it('does not load a .env from the current directory', () => {
     // Sanity: the observable is live — FORCE_COLOR as a real variable colours this command.
     expect(run(sb, COLOURED, { FORCE_COLOR: '3' }).out).toContain(ESC);
     writeFileSync(join(sb.cwd, '.env'), 'FORCE_COLOR=3\n');
     expect(run(sb, COLOURED).out).not.toContain(ESC);
+  }, 60_000);
+
+  it('fails closed instead of running a `bun` found on PATH when the vendored Bun is missing', () => {
+    // A bare `bun` is looked up through PATH, and on Windows in the current directory first,
+    // so a cloned repo could plant one. Copy the launcher where no node_modules sits above
+    // it, so require.resolve('bun/package.json') fails, and put a fake `bun` first on PATH.
+    mkdirSync(join(sb.root, 'bin'));
+    mkdirSync(join(sb.root, 'fakebin'));
+    const launcher = join(sb.root, 'bin', 'launcher.mjs');
+    copyFileSync(BIN, launcher);
+    const marker = join(sb.root, 'PLANTED_BUN_RAN');
+    const fakeBun = join(sb.root, 'fakebin', 'bun');
+    writeFileSync(fakeBun, `#!/bin/sh\ntouch ${JSON.stringify(marker)}\n`);
+    chmodSync(fakeBun, 0o755);
+    const r = spawnSync(process.execPath, [launcher, '--version'], {
+      cwd: sb.cwd,
+      env: { HOME: sb.home, PATH: `${join(sb.root, 'fakebin')}:/usr/bin:/bin` },
+      encoding: 'utf8',
+      timeout: 30_000,
+    });
+    expect(existsSync(marker)).toBe(false);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/vendored Bun/);
   }, 60_000);
 });
