@@ -99,12 +99,18 @@ export interface CherryPickTarget {
 
 export interface RepoBranchState {
   branch: string;
-  /** Commits on `branch` not on its tracking ref; `null` when there is no tracking ref. */
+  /** Commits on `branch` not on its tracking ref; `null` when there is no tracking ref
+   *  or no local branch to compare. */
   ahead: number | null;
-  /** Commits on the tracking ref not on `branch`; `null` when there is no tracking ref. */
+  /** Commits on the tracking ref not on `branch`; `null` as for `ahead`. */
   behind: number | null;
-  /** Whether `trackingBranch` exists, i.e. whether ahead/behind mean anything. */
+  /** Whether `trackingBranch` exists. Ahead/behind mean something only when this and
+   *  `local` are both true. */
   tracking: boolean;
+  /** Whether `refs/heads/<branch>` exists. `false` with `tracking` true: the branch exists
+   *  only on the remote, and the commit fields describe `trackingBranch`. `null` when the
+   *  read failed before this was known. */
+  local: boolean | null;
   hasConflicts: boolean;
   isDirty: boolean;
   /** 8-char display form; see `lastCommitSha` for the full hash. */

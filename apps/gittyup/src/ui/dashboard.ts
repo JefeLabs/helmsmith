@@ -1,6 +1,36 @@
 import chalk from 'chalk';
 import Table from 'cli-table3';
-import type { RepoState } from '../config/schema.js';
+import type { RepoBranchState, RepoState } from '../config/schema.js';
+
+/**
+ * The Status column for one branch row of the dashboard.
+ *
+ * Two states reach this from `getBranchState` that the problem icons don't cover:
+ *  - `state.error` set: the branch couldn't be read (e.g. it exists neither locally nor on
+ *    the remote). The other fields are placeholders, so no icon below is an observation.
+ *    `error` is one line, e.g. "no branch 'develop' locally or at origin/develop".
+ *  - `state.local === false` (and no error): the branch exists only as `trackingBranch`,
+ *    e.g. `origin/staging` in a fresh clone. Last commit is the remote's; ahead/behind are
+ *    unknown (`null`); dirty/conflicts are about the checked-out branch, not this one.
+ *
+ * Table cells here are ~35 columns wide before cli-table3 pads them, and the repo-level
+ * error row truncates its message to 30 characters (see `render`).
+ */
+export function branchStatusCell(state: RepoBranchState): string {
+  // `local === false` on an error row means both refs were checked and neither exists;
+  // any other read failure is reported as unreadable rather than guessed to be missing.
+  if (state.error) return chalk.red(state.local === false ? '⚠ no such branch' : '⚠ unreadable');
+  // Dirty/conflict flags describe the checked-out working tree, not a branch that isn't
+  // checked out, so a remote-only row shows only that it is remote-only.
+  if (state.local === false) return chalk.cyan('☁ remote only');
+
+  const icons: string[] = [];
+  if (state.hasConflicts) icons.push(chalk.red('⚡conflict'));
+  if (state.isDirty) icons.push(chalk.yellow('●dirty'));
+  if ((state.ahead ?? 0) > 0 && (state.behind ?? 0) > 0) icons.push(chalk.magenta('↕diverged'));
+  if (icons.length === 0) icons.push(chalk.green('✓'));
+  return icons.join(' ');
+}
 
 /**
  * TUI dashboard for displaying branch state across repos.
@@ -104,20 +134,14 @@ export class Dashboard {
                   ? chalk.red(`-${state.behind}`)
                   : chalk.dim('0');
 
-            const icons: string[] = [];
-            if (state.hasConflicts) icons.push(chalk.red('⚡conflict'));
-            if (state.isDirty) icons.push(chalk.yellow('●dirty'));
-            if ((state.ahead ?? 0) > 0 && (state.behind ?? 0) > 0)
-              icons.push(chalk.magenta('↕diverged'));
-            if (icons.length === 0) icons.push(chalk.green('✓'));
-
             table.push([
               repoCol,
               branchLabel,
               aheadStr,
               behindStr,
-              icons.join(' '),
-              chalk.dim(state.lastCommit),
+              branchStatusCell(state),
+              // `lastCommit` is a placeholder ('error') when the branch couldn't be read.
+              chalk.dim(state.error ? '-' : state.lastCommit),
             ]);
           }
         }

@@ -118,6 +118,10 @@ export interface StatusBranchDocument {
   branch: string;
   trackingBranch: string | null;
   tracking: boolean;
+  /** Whether the branch exists locally. `false` with `tracking: true`: it exists only on
+   *  the remote, `lastCommit` is the remote's, and `ahead`/`behind` are `null`. `null`
+   *  when the read failed before this was known. */
+  local: boolean | null;
   ahead: number | null;
   behind: number | null;
   /** `null` when the branch could not be read (see `error`). */

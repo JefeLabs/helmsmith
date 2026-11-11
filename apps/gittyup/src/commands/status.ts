@@ -28,6 +28,7 @@ export function toStatusDocument(
         branch: b.branch,
         trackingBranch: b.trackingBranch ?? null,
         tracking: b.tracking,
+        local: b.local,
         ahead: b.ahead,
         behind: b.behind,
         isDirty: b.error ? null : b.isDirty,
