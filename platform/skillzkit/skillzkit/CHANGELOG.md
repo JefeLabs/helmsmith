@@ -1,5 +1,12 @@
 # @helmsmith/skillzkit
 
+## 0.2.3
+
+### Patch Changes
+
+- 80bdd5e: `skillzkit ui` starts the interactive installer again. It looked for the TUI at `tui/main.tsx` in the package, which stopped existing when the TUI moved to `src/tui/` (and no `tui/` directory was ever shipped), so it exited with `TUI entry not found`. The TUI is now built into `dist/tui.js` alongside the CLI. The Bun process that runs it also no longer reads `.env` or `bunfig.toml` from the directory you run `skillzkit ui` in: a `bunfig.toml` `preload` there would have run its code. It now starts the way `bin/skillzkit.mjs` starts the CLI, with `--no-env-file` and the package's own empty `bunfig.toml`.
+- 346c811: `taskmaster --version` and `skillzkit --version` report the package version; both printed a hard-coded `0.1.0`. The skillzkit TUI header showed the same `v0.1.0` and now shows the real version. The launchers no longer fall back to a `bun` found on PATH when the bundled Bun is missing: a bare `bun` is looked up through PATH, and on Windows in the current directory first, so a repo the CLI runs in could plant one. They now exit 1 with a reinstall message, as gittyup's, gitradar's, mech-pencil's, toolz's and timetracker's launchers already do.
+
 ## 0.2.2
 
 ### Patch Changes
