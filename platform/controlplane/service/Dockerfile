@@ -9,7 +9,7 @@
 #                        on the controlplane-ui workspace member; emits
 #                        dist/ ready to drop into Spring's static dir.
 #   2. jar-builder     — maven:3.9-eclipse-temurin-25; copies UI dist
-#                        into src/main/resources/static, runs `mvn package`
+#                        into src/main/resources/static, runs `./mvnw package`
 #                        producing a Spring Boot fat jar.
 #   3. runtime         — eclipse-temurin:25-jre; copies the jar; exposes
 #                        8080. UI served at / (Spring's default static
@@ -44,23 +44,34 @@ FROM maven:3.9-eclipse-temurin-25 AS jar-builder
 
 WORKDIR /repo
 
+# Everything lands at the same path as in the repo, so WORKDIR below, the UI
+# copy, and the runtime stage's jar path all agree.
 # pom.xml first → Maven dep cache is reusable across source-only changes.
-COPY platform/controlplane/service/pom.xml ./controlplane/
-COPY platform/controlplane/service/.mvn ./controlplane/.mvn
-COPY platform/controlplane/service/mvnw ./controlplane/
+COPY platform/controlplane/service/pom.xml ./platform/controlplane/service/
+COPY platform/controlplane/service/.mvn ./platform/controlplane/service/.mvn
+COPY platform/controlplane/service/mvnw ./platform/controlplane/service/
 
 # Bundle the UI into Spring's static resources before the package step.
 # Spring serves /static/** at /; index.html lands at /.
 COPY --from=ui-builder /repo/platform/controlplane/ui/dist ./platform/controlplane/service/src/main/resources/static
 
 # Now copy the rest of the Spring source.
-COPY platform/controlplane/service/src ./controlplane/src
+COPY platform/controlplane/service/src ./platform/controlplane/service/src
 
 WORKDIR /repo/platform/controlplane/service
-RUN mvn -B -DskipTests package
+# The wrapper pins the same Maven as CI (.mvn/wrapper/maven-wrapper.properties),
+# so the image's own Maven version doesn't matter.
+RUN ./mvnw -B -DskipTests package
 
 # ── Stage 3: runtime ─────────────────────────────────────────────────
 FROM eclipse-temurin:25-jre AS runtime
+
+# compose.yaml's healthcheck runs `wget --spider http://localhost:8080/`, and the
+# temurin JRE image ships neither wget nor curl. Without it the container never
+# turns healthy, and harness-server (depends_on: service_healthy) never starts.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends wget && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
