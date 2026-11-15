@@ -42,6 +42,50 @@ const PLAN = JSON.stringify([
 
 const argAfter = (argv: string[], flag: string): string | undefined => argv[argv.indexOf(flag) + 1];
 
+describe('pritty commit --scope / --type / --trailer', () => {
+  it('commits with the scope, the code type and every trailer given on the command line', async () => {
+    sb = makeSandbox();
+    const repo = stagedRepo(sb);
+    installFakeClaude(sb).answer(PLAN);
+
+    const r = await runCli(sb, repo, [
+      'commit',
+      '--json',
+      '--scope',
+      'org/global',
+      '--type',
+      'fix',
+      '--trailer',
+      'Refs: plan-5 T9',
+      '--trailer',
+      'Task: T9',
+    ]);
+    expect(r.exitCode, r.stderr).toBe(0);
+    const out = jsonLine<Outcome>(r);
+    expect(out.commits.map((c) => c.message)).toEqual([
+      'fix(org/global): add greet',
+      'test(org/global): cover greet',
+    ]);
+    for (const c of out.commits) {
+      expect(gitIn(repo, 'log', '-1', '--format=%B', c.sha!).trim()).toBe(
+        `${c.message}\n\nRefs: E2E-1\nRefs: plan-5 T9\nTask: T9`,
+      );
+    }
+  });
+
+  it('refuses a bad --scope before calling the model, committing nothing', async () => {
+    sb = makeSandbox();
+    const repo = stagedRepo(sb);
+    const claude = installFakeClaude(sb);
+    claude.answer(PLAN);
+
+    const r = await runCli(sb, repo, ['commit', '--json', '--scope', 'Org/Global']);
+    expect(r.exitCode).not.toBe(0);
+    expect(r.stderr).toContain('--scope');
+    expect(stagedPaths(repo)).toEqual(STAGED);
+  });
+});
+
 describe('pritty commit (claude provider)', () => {
   it('makes one commit per category with the model’s messages, the categorizer’s files and the configured trailer', async () => {
     sb = makeSandbox();

@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
 import { defaultStarterConfig } from '../config.js';
@@ -21,7 +21,23 @@ export interface InitOptions {
 }
 
 /**
- * Write a starter .pritty.json + Claude Code / VS Code Copilot
+ * Where `init` writes the config: over the files already there (both, while
+ * a repository keeps the old name for older pritty), else in `.helmsmith/`
+ * when the repository keeps its helmsmith files there, else `.pritty.json`.
+ * Never a second file beside an existing one: two configs that differ make
+ * `loadConfig` refuse.
+ */
+function configTargets(cwd: string): string[] {
+  const helmsmith = join(cwd, '.helmsmith', 'pritty.json');
+  const legacy = join(cwd, '.pritty.json');
+  const existing = [helmsmith, legacy].filter((p) => existsSync(p));
+  if (existing.length > 0) return existing;
+  return [existsSync(join(cwd, '.helmsmith')) ? helmsmith : legacy];
+}
+
+/**
+ * Write a starter config (`.helmsmith/pritty.json` in a repository with a
+ * `.helmsmith` folder, else `.pritty.json`) + Claude Code / VS Code Copilot
  * slash commands. Skips integration files outside a git repo.
  */
 export async function runInit(options: InitOptions = {}): Promise<void> {
@@ -37,12 +53,14 @@ export async function runInit(options: InitOptions = {}): Promise<void> {
   const written: string[] = [];
   const skipped: string[] = [];
 
-  // 1. .pritty.json (always)
-  const configPath = join(cwd, '.pritty.json');
-  if (existsSync(configPath) && !force) {
-    say(chalk.dim(`· skipped ${configPath} (exists; --force to overwrite)`));
-    skipped.push(configPath);
-  } else {
+  // 1. The config (always)
+  for (const configPath of configTargets(cwd)) {
+    if (existsSync(configPath) && !force) {
+      say(chalk.dim(`· skipped ${configPath} (exists; --force to overwrite)`));
+      skipped.push(configPath);
+      continue;
+    }
+    mkdirSync(dirname(configPath), { recursive: true });
     writeFileSync(configPath, `${JSON.stringify(defaultStarterConfig(), null, 2)}\n`);
     say(chalk.green(`✓ ${configPath}`));
     written.push(configPath);

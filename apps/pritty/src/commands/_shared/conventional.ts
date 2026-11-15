@@ -87,6 +87,53 @@ export function retypeForBranch(
   return { plan: out, retyped };
 }
 
+/** Whether `style` writes `<type>(<scope>):` subjects, so `--type` and `--scope` mean something. */
+export function styleHasTypes(style: Config['commitStyle']): boolean {
+  return STYLES_WITH_TYPES.includes(style);
+}
+
+/** A type `--type` accepts: one of the conventional types. */
+export function isCommitType(type: string): boolean {
+  return (TYPE_RANK as readonly string[]).includes(type);
+}
+
+/** One to three lowercase segments: `network`, `org/global`, `org/network/directory`. */
+const SCOPE = /^[a-z0-9][a-z0-9-]*(?:\/[a-z0-9][a-z0-9-]*){0,2}$/;
+
+/** A scope `--scope` accepts: an area-shaped path of one to three lowercase segments. */
+export function isCommitScope(scope: string): boolean {
+  return SCOPE.test(scope);
+}
+
+/**
+ * What the caller already knows, applied over the model's subjects the way
+ * `retypeForBranch` applies the branch: `type` sets the code commits' type
+ * (test and storybook commits keep theirs), `scope` sets every commit's
+ * scope; `!` and the subject are kept. A subject that is not conventional is
+ * kept as written and its category returned in `kept`, so the caller can say
+ * so rather than invent a prefix.
+ */
+export function applySubjectOverrides(
+  plan: readonly CommitMessage[],
+  o: { type?: string; scope?: string },
+): { plan: CommitMessage[]; kept: string[] } {
+  const kept: string[] = [];
+  const out = plan.map((c) => {
+    const setsType = o.type !== undefined && !OWN_TYPE_CATEGORIES.has(c.category);
+    if (!setsType && o.scope === undefined) return c;
+    const parsed = parseConventional(c.message);
+    if (!parsed) {
+      kept.push(c.category);
+      return c;
+    }
+    const type = setsType ? o.type! : parsed.type;
+    const scope = o.scope ?? parsed.scope;
+    const message = `${type}${scope ? `(${scope})` : ''}${parsed.breaking ? '!' : ''}: ${parsed.description}`;
+    return { ...c, message };
+  });
+  return { plan: out, kept };
+}
+
 /**
  * A PR title in the commits' own convention: `<type>(<scope>)<!>: <model's summary>`.
  * The type is the branch's when a commit carries it (a `fix/` branch whose

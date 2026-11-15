@@ -26,6 +26,65 @@ describe('config baseBranch', () => {
   });
 });
 
+describe('config provider default', () => {
+  it('is claude when no config names a provider', () => {
+    expect(ConfigSchema.parse({}).provider).toBe('claude');
+  });
+
+  it('is claude in the starter config pritty init writes', () => {
+    expect(defaultStarterConfig()).toMatchObject({ provider: 'claude' });
+  });
+});
+
+describe('config in the .helmsmith folder', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  async function repo() {
+    const { makeRepo, write } = await import('./testing/repo.js');
+    const r = makeRepo();
+    cleanup = r.cleanup;
+    return { dir: r.dir, write: (path: string, content: string) => write(r.dir, path, content) };
+  }
+
+  it('finds .helmsmith/pritty.json at the repository root from a subdirectory', async () => {
+    const r = await repo();
+    r.write('.helmsmith/pritty.json', JSON.stringify({ baseBranch: 'develop' }));
+    r.write('app-ui/src/keep', '');
+    expect(loadConfig(join(r.dir, 'app-ui/src')).baseBranch).toBe('develop');
+  });
+
+  it('reads .helmsmith/pritty.yml', async () => {
+    const r = await repo();
+    r.write('.helmsmith/pritty.yml', 'baseBranch: develop\n');
+    expect(loadConfig(r.dir).baseBranch).toBe('develop');
+  });
+
+  it('accepts .pritty.json beside it while the two hold the same config', async () => {
+    const r = await repo();
+    r.write('.pritty.json', JSON.stringify({ baseBranch: 'develop', provider: 'claude' }));
+    r.write(
+      '.helmsmith/pritty.json',
+      JSON.stringify({ provider: 'claude', baseBranch: 'develop' }),
+    );
+    expect(loadConfig(r.dir).baseBranch).toBe('develop');
+  });
+
+  it('refuses, naming both files, when .pritty.json beside it holds a different config', async () => {
+    const r = await repo();
+    r.write('.pritty.json', JSON.stringify({ baseBranch: 'main' }));
+    r.write('.helmsmith/pritty.json', JSON.stringify({ baseBranch: 'develop' }));
+    expect(() => loadConfig(r.dir)).toThrow(/\.pritty\.json[\s\S]*\.helmsmith\/pritty\.json/);
+  });
+
+  it('still lets a nearer .pritty.json win over the root .helmsmith/pritty.json', async () => {
+    const r = await repo();
+    r.write('.helmsmith/pritty.json', JSON.stringify({ baseBranch: 'develop' }));
+    r.write('pkg/.pritty.json', JSON.stringify({ baseBranch: 'release' }));
+    expect(loadConfig(join(r.dir, 'pkg')).baseBranch).toBe('release');
+  });
+});
+
 describe('config lookup from inside a repository', () => {
   let cleanup = () => {};
   afterEach(() => cleanup());

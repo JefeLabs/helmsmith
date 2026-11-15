@@ -20,7 +20,7 @@ helmsmith packages plug in.
         │                │    │                │    │                │
         │  delegates to  │    │  Zod schema +  │    │  glob-based    │
         │  @helmsmith/    │    │  defaults +    │    │  first-match-  │
-        │  agent-auth    │    │  cosmiconfig   │    │  wins bucketing│
+        │  agent-auth    │    │  config files  │    │  wins bucketing│
         └───────┬────────┘    └────────────────┘    └────────────────┘
                 │
                 │ (auth tokens, ~/.pritty/auth.json)
@@ -73,16 +73,17 @@ once and every consumer inherits them.
 
 ### Config (`src/config.ts`)
 
-Zod-validated schema for `.pritty.json` (or `.prittyrc.yaml`,
-`pritty.config.json` — anything cosmiconfig can find). Defaults are
+Zod-validated schema for `.helmsmith/pritty.json` or `.pritty.json` (or
+`.prittyrc.yaml`, `pritty.config.json` and the rest of `CONFIG_FILES`).
+Defaults are
 sensible; overrides are validated at load time.
 
 Schema shape (simplified):
 
 ```typescript
 {
-  model: string,                    // default: "gpt-4o"
-  provider: "copilot" | "anthropic" | "openai",
+  model?: string,                   // default: the provider's own ("claude-opus-5-5"; "gpt-6-astra" for openai)
+  provider: "claude" | "copilot" | "anthropic" | "openai", // default: "claude"
   fallback: ProviderName[],         // default: []
   baseBranch: string,               // default: "main"
   commitStyle: "conventional",
@@ -230,14 +231,15 @@ src/github.ts: octokit.pulls.create()
 
 ### Local (per-repo)
 
-`.pritty.json` (or any cosmiconfig-discovered name) at repo root:
+`.helmsmith/pritty.json` or `.pritty.json` (or another name in
+`CONFIG_FILES`) at repo root:
 
 ```json
 {
-  "model": "gpt-4o",
+  "model": "claude-opus-5-5",
   "baseBranch": "main",
   "commitStyle": "conventional",
-  "provider": "copilot",
+  "provider": "claude",
   "fallback": ["anthropic", "openai"],
   "preCommit": ["eslint", "prettier"],
   "prePush": ["test"],
@@ -274,13 +276,16 @@ which is visible. The tradeoff: contributors must put specific
 patterns before broad ones — a one-time learning cost paid up front,
 not every time they look at a config.
 
-### Why GitHub Copilot is the default provider
+### Why Claude Code is the default provider
 
-Most Helmsmith users already have Copilot subscriptions through their
-employers. Reusing the same Device Flow they're used to (and that
-their IDE already uses) is the lowest-friction onboarding path.
-Anthropic and OpenAI are first-class alternates for users with their
-own API keys.
+pritty mostly runs next to Claude Code, and the repositories using it
+had already pinned `"provider": "claude"`. The `claude` provider needs
+no pritty-side login and passes no key through pritty: it runs on
+whatever login the binary has, so each developer's own subscription
+pays. Copilot (Device Flow), Anthropic and OpenAI stay first-class
+alternates, chosen with `provider`. There is no automatic fallback to
+them: a machine without `claude` gets the setup error, which names how
+to configure each one.
 
 ### Why a fallback chain instead of provider auto-detection
 
@@ -321,7 +326,7 @@ apps/pritty/
 ├── src/
 │   ├── cli.ts                  # Commander entry; registers all subcommands
 │   ├── auth.ts                 # Auth wrappers (delegates to @helmsmith/agent-auth)
-│   ├── config.ts               # Zod schema + cosmiconfig loader
+│   ├── config.ts               # Zod schema + config file lookup
 │   ├── categorizer.ts          # First-match-wins glob bucketing
 │   ├── ai.ts                   # Multi-provider LLM invocation
 │   ├── git.ts                  # Local git ops (read-only in shipped phase)

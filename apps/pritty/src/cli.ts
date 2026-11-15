@@ -67,7 +67,7 @@ authCmd
 program
   .command('init')
   .description(
-    'Write a starter .pritty.json + Claude Code / VS Code Copilot slash commands. Skips integration files outside a git repo.',
+    'Write a starter config (.helmsmith/pritty.json in a repo with a .helmsmith folder, else .pritty.json) + Claude Code / VS Code Copilot slash commands. Skips integration files outside a git repo.',
   )
   .option('--force', 'Overwrite existing files')
   .option('--no-claude', 'Skip writing .claude/commands/{commit,pr}.md')
@@ -132,6 +132,20 @@ program
     '--no-verify',
     'Pass --no-verify to git commit (skips the pre-commit and commit-msg hooks)',
   )
+  .option(
+    '--scope <scope>',
+    'Scope of every commit: one to three lowercase segments (network, org/global, org/network/directory)',
+  )
+  .option(
+    '--type <type>',
+    'Type of the code commits (feat, fix, …); test and story commits keep theirs',
+  )
+  .option(
+    '--trailer <line>',
+    'Add a `Token: value` trailer to every commit, after commitTrailers (repeatable)',
+    (line: string, all: string[]) => [...all, line],
+    [] as string[],
+  )
   .action(
     async (options: {
       autoApprove?: boolean;
@@ -139,6 +153,9 @@ program
       commitStyle?: string;
       json?: boolean;
       verify: boolean;
+      scope?: string;
+      type?: string;
+      trailer: string[];
     }) => {
       const { verify, ...rest } = options;
       await runCommit({ ...rest, noVerify: verify === false });

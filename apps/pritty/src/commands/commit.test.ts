@@ -198,6 +198,106 @@ describe('runCommit on a fix/ branch', () => {
   });
 });
 
+describe('runCommit --trailer', () => {
+  it('adds each trailer to every commit, after the configured ones', async () => {
+    const f = fakes({ config: { commitTrailers: ['Co-Authored-By: A <a@x>'] } });
+    await runCommit({ json: true, trailer: ['Refs: plan-5 T9'] }, f.deps);
+    for (const c of f.committed) {
+      expect(c.message.endsWith('\n\nCo-Authored-By: A <a@x>\nRefs: plan-5 T9')).toBe(true);
+    }
+    expect(f.committed).toHaveLength(2);
+  });
+
+  it('refuses a line that is not `Token: value`, before asking the model or committing', async () => {
+    const f = fakes();
+    await expect(runCommit({ json: true, trailer: ['plan-5 T9'] }, f.deps)).rejects.toThrow(
+      /--trailer/,
+    );
+    expect(f.calls).toEqual([]);
+  });
+});
+
+describe('runCommit --type', () => {
+  const answer: Answer = () => [
+    { category: 'app', message: 'feat(phone): add kenya', files: [] },
+    { category: 'test', message: 'test(phone): cover kenya', files: [] },
+  ];
+
+  it('sets the type of the code commits, keeping scope and subject; the test commit keeps its own', async () => {
+    const f = fakes({ answer });
+    await runCommit({ json: true, type: 'fix' }, f.deps);
+    expect(subjects(f.committed)).toEqual(['fix(phone): add kenya', 'test(phone): cover kenya']);
+  });
+
+  it('wins over the fix/ branch rule', async () => {
+    const f = fakes({ answer, branch: 'fix/org/network--table-sort' });
+    await runCommit({ json: true, type: 'refactor' }, f.deps);
+    expect(subjects(f.committed)[0]).toBe('refactor(phone): add kenya');
+  });
+
+  it('refuses a type outside the conventional list, before asking the model', async () => {
+    const f = fakes({ answer });
+    await expect(runCommit({ json: true, type: 'feature' }, f.deps)).rejects.toThrow(/--type/);
+    expect(f.calls).toEqual([]);
+  });
+
+  it('refuses under a commit style without types', async () => {
+    const f = fakes({ answer });
+    await expect(
+      runCommit({ json: true, type: 'fix', commitStyle: 'simple' }, f.deps),
+    ).rejects.toThrow(/--type/);
+  });
+});
+
+describe('runCommit --scope', () => {
+  const answer: Answer = () => [
+    { category: 'app', message: 'feat(globaldirectory)!: drop the zip filter', files: [] },
+    { category: 'test', message: 'test: cover the search', files: [] },
+  ];
+
+  it('sets the scope of every commit, test included, keeping type, `!` and subject', async () => {
+    const f = fakes({ answer });
+    await runCommit({ json: true, scope: 'org/global' }, f.deps);
+    expect(subjects(f.committed)).toEqual([
+      'feat(org/global)!: drop the zip filter',
+      'test(org/global): cover the search',
+    ]);
+  });
+
+  it('takes one, two or three levels', async () => {
+    for (const scope of ['network', 'org/network', 'org/network/directory']) {
+      const f = fakes({ answer });
+      await runCommit({ json: true, scope }, f.deps);
+      expect(subjects(f.committed)[1]).toBe(`test(${scope}): cover the search`);
+    }
+  });
+
+  it('refuses anything but one to three lowercase segments, before asking the model', async () => {
+    for (const scope of [
+      'Org/Global',
+      'org/network/directory/search',
+      'org//global',
+      'org global',
+    ]) {
+      const f = fakes({ answer });
+      await expect(runCommit({ json: true, scope }, f.deps)).rejects.toThrow(/--scope/);
+      expect(f.calls).toEqual([]);
+    }
+  });
+
+  it('keeps a subject that is not conventional as written, and says so', async () => {
+    const f = fakes({
+      answer: (groups) =>
+        Object.entries(groups)
+          .filter(([, files]) => files.length > 0)
+          .map(([category, files]) => ({ category, message: `Update ${category}`, files })),
+    });
+    await runCommit({ json: true, scope: 'org/global' }, f.deps);
+    expect(subjects(f.committed)).toEqual(['Update app', 'Update test']);
+    expect(f.err.join('\n')).toMatch(/not a conventional subject/);
+  });
+});
+
 describe('runCommit --no-verify', () => {
   it('passes noVerify to every git commit when asked, and not otherwise', async () => {
     const f = fakes();

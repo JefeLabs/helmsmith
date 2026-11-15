@@ -5,7 +5,8 @@
  * duplicates them.
  */
 
-const TRAILER_LINE = /^[A-Za-z][A-Za-z0-9-]*: .+$/;
+/** A git trailer line: `Token: value`. */
+export const TRAILER_LINE = /^[A-Za-z][A-Za-z0-9-]*: .+$/;
 
 /** Append `trailers` to a commit message, joining an existing trailer block when the message ends with one. */
 export function applyTrailers(message: string, trailers: readonly string[]): string {

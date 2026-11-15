@@ -6,6 +6,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import { load as parseYaml } from 'js-yaml';
 import { z } from 'zod';
 import { searchDirs } from './repo-root.js';
@@ -65,13 +66,13 @@ export const ConfigSchema = z.object({
   dryRun: z.boolean().default(false),
   commitStyle: z.enum(['conventional', 'gitmoji', 'angular', 'simple']).default('conventional'),
   /**
-   * Primary AI provider. `copilot` (default) uses the OAuth Device
-   * Flow login at ~/.pritty/auth.json. `claude` runs the Claude Code
-   * binary on PATH headlessly, on its own login (a claude.ai subscription
-   * works; no key passes through pritty). `anthropic` reads the API key
-   * from `anthropicKeyEnv`; `openai` from `openaiKeyEnv`.
+   * Primary AI provider. `claude` (default) runs the Claude Code binary
+   * on PATH headlessly, on its own login (a claude.ai subscription works;
+   * no key passes through pritty). `copilot` uses the OAuth Device Flow
+   * login at ~/.pritty/auth.json. `anthropic` reads the API key from
+   * `anthropicKeyEnv`; `openai` from `openaiKeyEnv`.
    */
-  provider: ProviderSchema.default('copilot'),
+  provider: ProviderSchema.default('claude'),
   /**
    * Fallback providers tried (in order) if the primary isn't
    * configured on this machine. Default: empty (no fallback). Set
@@ -125,24 +126,54 @@ const CONFIG_FILES = [
 ];
 
 /**
+ * The same config kept with the other helmsmith files of a repository
+ * (`.helmsmith/`, beside workbrokr's hooks and gitradar's repos.yml).
+ */
+const HELMSMITH_CONFIG_FILES = [
+  '.helmsmith/pritty.json',
+  '.helmsmith/pritty.yaml',
+  '.helmsmith/pritty.yml',
+];
+
+function firstExisting(dir: string, filenames: readonly string[]): string | undefined {
+  return filenames.map((f) => join(dir, f)).find((path) => existsSync(path));
+}
+
+function readConfigFile(path: string): Config {
+  const raw = readFileSync(path, 'utf8');
+  const isYaml = path.endsWith('.yaml') || path.endsWith('.yml');
+  const parsed = isYaml ? parseYaml(raw) : JSON.parse(raw);
+  return ConfigSchema.parse(parsed ?? {});
+}
+
+/**
  * Load and validate config, searching cwd and then each parent up to the
  * repository root (nearest wins), so running from a package directory still
- * finds the repository's config. Falls back to schema defaults when no file
- * exists. Throws ZodError when a file exists but is invalid. Keys the schema
- * no longer knows (the old preCommit / prePush / skipHooks / verbose) are
- * dropped silently.
+ * finds the repository's config. In each directory the config is
+ * `.helmsmith/pritty.{json,yaml,yml}` or one of CONFIG_FILES. Both may exist
+ * while a team moves to `.helmsmith/` (older pritty reads only the second),
+ * but only holding the same config: files never merge, so two that differ
+ * would let one silently hide the other's settings, and that throws.
+ * Falls back to schema defaults when no file exists. Throws ZodError when a
+ * file exists but is invalid. Keys the schema no longer knows (the old
+ * preCommit / prePush / skipHooks / verbose) are dropped silently.
  */
 export function loadConfig(cwd: string = process.cwd()): Config {
   for (const dir of searchDirs(cwd)) {
-    for (const filename of CONFIG_FILES) {
-      const path = join(dir, filename);
-      if (!existsSync(path)) continue;
+    const helmsmith = firstExisting(dir, HELMSMITH_CONFIG_FILES);
+    const legacy = firstExisting(dir, CONFIG_FILES);
+    if (!helmsmith && !legacy) continue;
+    if (!helmsmith) return readConfigFile(legacy!);
 
-      const raw = readFileSync(path, 'utf8');
-      const isYaml = filename.endsWith('.yaml') || filename.endsWith('.yml');
-      const parsed = isYaml ? parseYaml(raw) : JSON.parse(raw);
-      return ConfigSchema.parse(parsed ?? {});
+    const config = readConfigFile(helmsmith);
+    if (legacy && !isDeepStrictEqual(readConfigFile(legacy), config)) {
+      throw new Error(
+        `Two pritty configs in ${dir} disagree: ${legacy} and ${helmsmith}. ` +
+          `Keep ${helmsmith} and delete ${legacy}, or make them identical while ` +
+          'someone still runs a pritty that reads only the old name.',
+      );
     }
+    return config;
   }
   return ConfigSchema.parse({});
 }
@@ -150,7 +181,7 @@ export function loadConfig(cwd: string = process.cwd()): Config {
 /** Produce the starter config used by `pritty init`. */
 export function defaultStarterConfig(): unknown {
   return {
-    provider: 'copilot',
+    provider: 'claude',
     commitStyle: 'conventional',
   };
 }
