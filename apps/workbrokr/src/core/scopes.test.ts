@@ -86,12 +86,12 @@ describe('scopes', () => {
     expect(
       globsOverlap(['app-service/modules/school/**'], ['app-service/modules/schoolscandidates/**']),
     ).toEqual([]);
-    expect(
-      globsOverlap(['db/migration/*registration_students*'], ['db/migration/*team*']),
-    ).toEqual([]);
-    expect(
-      globsOverlap(['db/migration/*team*'], ['db/migration/*team*']),
-    ).toEqual(['db/migration/*team* ~ db/migration/*team*']);
+    expect(globsOverlap(['db/migration/*registration_students*'], ['db/migration/*team*'])).toEqual(
+      [],
+    );
+    expect(globsOverlap(['db/migration/*team*'], ['db/migration/*team*'])).toEqual([
+      'db/migration/*team* ~ db/migration/*team*',
+    ]);
   });
   it('narrows scopes when --task and --scope are passed, and refuses invalid narrowing', () => {
     expect(() =>

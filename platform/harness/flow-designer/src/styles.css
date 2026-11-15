@@ -68,7 +68,8 @@
 
 /* ── Canvas chart grid ──────────────────────────────────────────── */
 .react-flow {
-  background: radial-gradient(ellipse at 30% 0%, var(--flow-canvas-glow) 0%, transparent 60%),
+  background:
+    radial-gradient(ellipse at 30% 0%, var(--flow-canvas-glow) 0%, transparent 60%),
     var(--flow-canvas-bg);
 }
 .react-flow__attribution {
