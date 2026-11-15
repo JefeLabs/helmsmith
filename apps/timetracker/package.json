@@ -40,8 +40,8 @@
     "zod": "^4.6.7"
   },
   "optionalDependencies": {
-    "@aws-sdk/client-dynamodb": "^3.1156.0",
-    "@aws-sdk/lib-dynamodb": "^3.1156.0"
+    "@aws-sdk/client-dynamodb": "^3.1169.0",
+    "@aws-sdk/lib-dynamodb": "^3.1169.0"
   },
   "devDependencies": {
     "@helmsmith/cli-kit": "workspace:*",
