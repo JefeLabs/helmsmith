@@ -28,6 +28,7 @@ beforeAll(() => {
 
 let fakeChunks: Array<Record<string, unknown>> = [];
 let lastParams: Record<string, unknown> | undefined;
+let lastClientOpts: Record<string, unknown> | undefined;
 
 vi.mock('@google/genai', () => {
   class ApiError extends Error {
@@ -52,7 +53,9 @@ vi.mock('@google/genai', () => {
         return makeStream(params.config as { abortSignal?: AbortSignal });
       }),
     };
-    constructor(public opts: { apiKey?: string }) {}
+    constructor(public opts: { apiKey?: string }) {
+      lastClientOpts = opts;
+    }
   }
 
   return { GoogleGenAI, ApiError };
@@ -129,6 +132,26 @@ describe('GeminiSdkAdapter — basics', () => {
 
   it('exposes workdir from deps', () => {
     expect(makeAdapter(undefined, { workdir: '/my/repo' }).workdir).toBe('/my/repo');
+  });
+});
+
+describe('GeminiSdkAdapter — API version', () => {
+  const saved = process.env.GOOGLE_GENAI_API_VERSION;
+  afterEach(() => {
+    if (saved === undefined) delete process.env.GOOGLE_GENAI_API_VERSION;
+    else process.env.GOOGLE_GENAI_API_VERSION = saved;
+  });
+
+  it('keeps v1beta, the API @google/genai 2.x defaulted to (3.x defaults to v1)', () => {
+    delete process.env.GOOGLE_GENAI_API_VERSION;
+    makeAdapter();
+    expect(lastClientOpts).toMatchObject({ apiKey: 'test-key', apiVersion: 'v1beta' });
+  });
+
+  it('leaves the version to GOOGLE_GENAI_API_VERSION when it is set', () => {
+    process.env.GOOGLE_GENAI_API_VERSION = 'v1';
+    makeAdapter();
+    expect(lastClientOpts).not.toHaveProperty('apiVersion');
   });
 });
 

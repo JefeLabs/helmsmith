@@ -128,7 +128,13 @@ export class GeminiSdkAdapter implements AgentAdapter {
     this.spec = spec;
     this.workdir = deps.workdir;
     this.capabilities = ADAPTER_CATALOG['gemini-sdk'].capabilities;
-    this.client = new GoogleGenAI({ apiKey });
+    // @google/genai 3 moved the Gemini Developer API default from v1beta to v1, where the
+    // `*-latest` aliases and some `-preview` models do not exist. Keep v1beta, the API this
+    // adapter was written against, unless GOOGLE_GENAI_API_VERSION chooses one.
+    this.client = new GoogleGenAI({
+      apiKey,
+      ...(process.env.GOOGLE_GENAI_API_VERSION ? {} : { apiVersion: 'v1beta' }),
+    });
   }
 
   // -------------------------------------------------------------------------
