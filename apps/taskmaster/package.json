@@ -45,7 +45,7 @@
     "bun": "^1.4.4",
     "chalk": "^6.0.1",
     "cli-table3": "^0.6.5",
-    "commander": "^15.0.0",
+    "commander": "^15.1.0",
     "handlebars": "^4.7.10",
     "js-yaml": "^5.5.0",
     "marked": "^18.1.1",
