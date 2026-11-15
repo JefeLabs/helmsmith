@@ -31,8 +31,11 @@ seconds.
 ## Install
 
 ```bash
-npm i -g @helmsmith/storybrokr
+npm i -g @helmsmith/storybrokr      # provides `storybrokr` and `story`
 ```
+
+`story` is the short name for typing (`story up`, `story check`), as `work` is
+for workbrokr. Scripts and hooks call `storybrokr`.
 
 Requires Node 24 or newer, and a host repo that:
 
