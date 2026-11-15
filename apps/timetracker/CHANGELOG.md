@@ -1,5 +1,11 @@
 # @helmsmith/timetracker
 
+## 0.1.5
+
+### Patch Changes
+
+- 1cd231a: Dependency updates: `discord.js` 14.28, the optional `@aws-sdk/client-dynamodb` and `@aws-sdk/lib-dynamodb` 3.1169, `commander` 15.1 and `@inquirer/prompts` 8.8.
+
 ## 0.1.4
 
 ### Patch Changes

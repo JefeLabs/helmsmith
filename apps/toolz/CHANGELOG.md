@@ -1,5 +1,11 @@
 # @helmsmith/toolz
 
+## 0.1.2
+
+### Patch Changes
+
+- 1cd231a: Dependency updates: `semver` 7.8.6 and `commander` 15.1.
+
 ## 0.1.1
 
 ### Patch Changes

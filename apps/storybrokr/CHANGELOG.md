@@ -1,5 +1,15 @@
 # @helmsmith/storybrokr
 
+## 0.4.0
+
+### Minor Changes
+
+- cd1698a: `story` is a short name for `storybrokr`, as `work` is for workbrokr: `npm i -g @helmsmith/storybrokr` now installs both commands, which run the same CLI (`story up`, `story check`, `story --version`). Scripts and hooks keep calling `storybrokr`, the name that cannot collide with another `story` on someone's PATH.
+
+### Patch Changes
+
+- 1cd231a: Dependency updates. Playwright 1.64 → 1.65: the first run after upgrading downloads the Chromium build that Playwright 1.65 uses, as storybrokr already does whenever Chromium is missing. Also `@modelcontextprotocol/sdk` 1.32.2 and `commander` 15.1.
+
 ## 0.3.3
 
 ### Patch Changes

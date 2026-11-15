@@ -1,5 +1,11 @@
 # @helmsmith/flow-designer
 
+## 0.3.1
+
+### Patch Changes
+
+- 1cd231a: The bundled React Flow (`@xyflow/react`) moves to 12.12.1 and dagre (`@dagrejs/dagre`) to 3.1.3.
+
 ## 0.3.0
 
 ### Minor Changes

@@ -1,5 +1,11 @@
 # @helmsmith/workspace
 
+## 0.1.2
+
+### Patch Changes
+
+- 1cd231a: Dependency update: `commander` 15.1.
+
 ## 0.1.1
 
 ### Patch Changes

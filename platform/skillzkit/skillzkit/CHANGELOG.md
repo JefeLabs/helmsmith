@@ -1,5 +1,11 @@
 # @helmsmith/skillzkit
 
+## 0.2.4
+
+### Patch Changes
+
+- 1cd231a: Dependency updates: `hono` 4.13.18 and `commander` 15.1.
+
 ## 0.2.3
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @helmsmith/workbrokr
 
+## 0.4.1
+
+### Patch Changes
+
+- 1cd231a: Dependency updates: `@modelcontextprotocol/sdk` 1.32.2 and `commander` 15.1.
+
 ## 0.4.0
 
 ### Minor Changes
