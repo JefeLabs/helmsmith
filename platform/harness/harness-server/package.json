@@ -17,8 +17,8 @@
     "@helmsmith/agent-auth": "workspace:*",
     "@helmsmith/harness-core": "workspace:*",
     "@helmsmith/harness-pipeline": "workspace:*",
-    "@langchain/core": "^1.3.0",
-    "@langchain/langgraph": "^1.5.2",
+    "@langchain/core": "^1.4.1",
+    "@langchain/langgraph": "^1.7.4",
     "@langchain/langgraph-checkpoint-sqlite": "^1.1.0",
     "yaml": "^2.9.1"
   },
