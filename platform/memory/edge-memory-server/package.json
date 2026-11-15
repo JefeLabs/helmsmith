@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@helmsmith/context-loader-core": "workspace:*",
-    "better-sqlite3": "^13.0.3",
+    "better-sqlite3": "^13.2.0",
     "sqlite-vec": "^0.1.9",
     "zod": "^4.6.7"
   },
