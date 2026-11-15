@@ -256,6 +256,12 @@ is mechanically checkable, not a judgement call. (Today only
 }
 ```
 
+The bin is the package name. A tool people type all day may add one short
+name beside it, with its own stub (`work` for workbrokr, `story` for
+storybrokr): people and docs for people use the short name; scripts, hooks
+and other tools call the full name, which cannot collide with an unrelated
+command on someone's PATH.
+
 Every app must implement every script above (even if some are thin
 wrappers). `npm test` at the root runs them all via workspaces — a
 missing script means that app silently doesn't get tested.

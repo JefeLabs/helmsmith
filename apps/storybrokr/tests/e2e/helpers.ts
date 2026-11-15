@@ -22,10 +22,10 @@ export function makeHome(): { home: string; cleanup: () => void } {
 
 export function runCli(
   args: string[],
-  opts: { home: string; cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number },
+  opts: { home: string; cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number; bin?: string },
 ): Promise<CliResult> {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [BIN, ...args], {
+    const child = spawn(process.execPath, [opts.bin ?? BIN, ...args], {
       cwd: opts.cwd ?? APP_ROOT,
       env: { ...process.env, ...opts.env, STORYBROKR_HOME: opts.home, FORCE_COLOR: '0' },
       stdio: ['ignore', 'pipe', 'pipe'],

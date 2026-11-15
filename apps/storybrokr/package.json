@@ -8,7 +8,8 @@
     "node": ">=24"
   },
   "bin": {
-    "storybrokr": "./bin/storybrokr.mjs"
+    "storybrokr": "./bin/storybrokr.mjs",
+    "story": "./bin/story.mjs"
   },
   "main": "./dist/cli.js",
   "types": "./dist/cli.d.ts",
