@@ -7,7 +7,7 @@ settings:
 overrides:
   react: 19.2.9
   react-dom: 19.2.9
-  commander: ^15.0.0
+  commander: ^15.1.0
   tsup: ^9.0.0
   vitest: 5.0.3
   vite: ^8.3.8
@@ -90,8 +90,8 @@ importers:
         specifier: ^6.0.1
         version: 6.0.1
       commander:
-        specifier: ^15.0.0
-        version: 15.0.0
+        specifier: ^15.1.0
+        version: 15.1.0
       js-yaml:
         specifier: ^5.5.0
         version: 5.5.0
@@ -172,8 +172,8 @@ importers:
         specifier: ^0.6.5
         version: 0.6.5
       commander:
-        specifier: ^15.0.0
-        version: 15.0.0
+        specifier: ^15.1.0
+        version: 15.1.0
       js-yaml:
         specifier: ^5.5.0
         version: 5.5.0
@@ -236,8 +236,8 @@ importers:
         specifier: ^6.0.1
         version: 6.0.1
       commander:
-        specifier: ^15.0.0
-        version: 15.0.0
+        specifier: ^15.1.0
+        version: 15.1.0
       react:
         specifier: 19.2.9
         version: 19.2.9
@@ -273,8 +273,8 @@ importers:
         specifier: ^6.0.1
         version: 6.0.1
       commander:
-        specifier: ^15.0.0
-        version: 15.0.0
+        specifier: ^15.1.0
+        version: 15.1.0
       js-yaml:
         specifier: ^5.5.0
         version: 5.5.0
@@ -331,8 +331,8 @@ importers:
         specifier: ^6.0.1
         version: 6.0.1
       commander:
-        specifier: ^15.0.0
-        version: 15.0.0
+        specifier: ^15.1.0
+        version: 15.1.0
       playwright:
         specifier: ^1.65.1
         version: 1.65.1
@@ -410,8 +410,8 @@ importers:
         specifier: ^0.6.5
         version: 0.6.5
       commander:
-        specifier: ^15.0.0
-        version: 15.0.0
+        specifier: ^15.1.0
+        version: 15.1.0
       handlebars:
         specifier: ^4.7.10
         version: 4.7.10
@@ -471,8 +471,8 @@ importers:
         specifier: ^1.4.4
         version: 1.4.4
       commander:
-        specifier: ^15.0.0
-        version: 15.0.0
+        specifier: ^15.1.0
+        version: 15.1.0
       discord.js:
         specifier: ^14.27.0
         version: 14.27.0
@@ -533,8 +533,8 @@ importers:
         specifier: ^6.0.1
         version: 6.0.1
       commander:
-        specifier: ^15.0.0
-        version: 15.0.0
+        specifier: ^15.1.0
+        version: 15.1.0
       semver:
         specifier: ^7.8.6
         version: 7.8.6
@@ -570,8 +570,8 @@ importers:
         specifier: ^6.0.1
         version: 6.0.1
       commander:
-        specifier: ^15.0.0
-        version: 15.0.0
+        specifier: ^15.1.0
+        version: 15.1.0
       picomatch:
         specifier: ^4.0.7
         version: 4.0.7
@@ -787,8 +787,8 @@ importers:
         specifier: ^24.19.2
         version: 24.19.2
       commander:
-        specifier: ^15.0.0
-        version: 15.0.0
+        specifier: ^15.1.0
+        version: 15.1.0
       inquirer:
         specifier: ^14.2.4
         version: 14.2.4(@types/node@24.19.2)
@@ -1033,8 +1033,8 @@ importers:
         specifier: ^19.2.18
         version: 19.2.18
       commander:
-        specifier: ^15.0.0
-        version: 15.0.0
+        specifier: ^15.1.0
+        version: 15.1.0
       tsup:
         specifier: ^9.0.0
         version: 9.0.0(jiti@2.7.0)(postcss@8.5.33)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.1)
@@ -1104,8 +1104,8 @@ importers:
         specifier: ^1.4.4
         version: 1.4.4
       commander:
-        specifier: ^15.0.0
-        version: 15.0.0
+        specifier: ^15.1.0
+        version: 15.1.0
       gray-matter:
         specifier: ^4.0.3
         version: 4.0.3
@@ -3734,8 +3734,8 @@ packages:
   color-name@1.1.4:
     resolution: {integrity: sha512-dOy+3AuW3a2wNbZHIuMZpTcgjGuLU/uBL/ubcZF9OXbDo8ff4O8yVp5Bf0efS8uEoYo5q4Fx7dY9OgQGXgAsQA==}
 
-  commander@15.0.0:
-    resolution: {integrity: sha512-z67u4ZhzCL/Tydu1lJARtEZYWbWaN7oYLHbsuzocr6y4N6WZAagG3RQ4FW61V1/0+jImpj293XfrcYnd1qxtPg==}
+  commander@15.1.0:
+    resolution: {integrity: sha512-cgnQ88TRrWcC7pVq46RzJVRMktu3W2RcbnoidnfBsl1bmDCBwJS/udcIZpKoCrbAYYaCqsz1yZCVIgbIaU3ddQ==}
     engines: {node: '>=22.12.0'}
 
   confbox@0.1.8:
@@ -8247,7 +8247,7 @@ snapshots:
 
   color-name@1.1.4: {}
 
-  commander@15.0.0: {}
+  commander@15.1.0: {}
 
   confbox@0.1.8: {}
 
@@ -9844,7 +9844,7 @@ snapshots:
   sucrase@3.35.1:
     dependencies:
       '@jridgewell/gen-mapping': 0.3.13
-      commander: 15.0.0
+      commander: 15.1.0
       lines-and-columns: 1.2.4
       mz: 2.7.0
       pirates: 4.0.7
@@ -9929,7 +9929,7 @@ snapshots:
   ts-json-schema-generator@2.9.0:
     dependencies:
       '@types/json-schema': 7.0.15
-      commander: 15.0.0
+      commander: 15.1.0
       glob: 13.0.6
       json5: 2.2.3
       normalize-path: 3.0.0

@@ -40,7 +40,7 @@
     "@opentui/core": "0.5.10",
     "@opentui/react": "0.5.10",
     "bun": "^1.4.4",
-    "commander": "^15.0.0",
+    "commander": "^15.1.0",
     "gray-matter": "^4.0.3",
     "hono": "^4.13.18",
     "react": "19.2.9",
