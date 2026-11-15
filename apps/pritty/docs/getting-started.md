@@ -9,8 +9,9 @@ table in [executive-overview.md](executive-overview.md).
 
 - **Node.js ≥ 20**. Check with `node --version`.
 - A git repository to use pritty in (any project will do).
-- (For the default Copilot provider) a GitHub account with access to
-  Copilot, OR an Anthropic API key, OR an OpenAI API key.
+- (For the default Claude provider) Claude Code installed and logged
+  in, OR a GitHub account with access to Copilot, OR an Anthropic API
+  key, OR an OpenAI API key.
 
 ## 1. Install
 
@@ -31,8 +32,19 @@ If you see "command not found", the npm global bin is not on your
 
 ## 2. Authenticate
 
-The default provider is **GitHub Copilot** via Device Flow. If you
-already use Copilot in your IDE, this should feel familiar.
+The default provider is **Claude Code**. pritty runs the `claude`
+binary on your PATH, on that binary's own login (a claude.ai
+subscription works), so there is nothing to log in to in pritty:
+
+```bash
+npm install -g @anthropic-ai/claude-code   # if `which claude` finds nothing
+claude                                     # once, to log in
+```
+
+### Alternative: use GitHub Copilot
+
+If you'd rather use Copilot, set `{ "provider": "copilot" }` in
+`.pritty.json` (created in the next step) and log in with Device Flow:
 
 ```bash
 pritty auth login
@@ -56,8 +68,8 @@ pritty auth status
 
 ### Alternative: use Anthropic or OpenAI
 
-If you'd rather use Claude or GPT directly, skip Device Flow and set
-an API key in your environment:
+If you'd rather bill an API key (Anthropic) or use GPT (OpenAI), set
+the key in your environment:
 
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-..."
@@ -94,8 +106,8 @@ This writes `.pritty.json` with sensible defaults. Open it and adjust:
 
 ```json
 {
-  "model": "gpt-4o",
-  "provider": "copilot",
+  "model": "claude-opus-5-5",
+  "provider": "claude",
   "fallback": [],
   "baseBranch": "main",
   "commitStyle": "conventional",
@@ -307,9 +319,11 @@ the command.
 
 ### Use a different config location
 
-cosmiconfig discovers any of: `.pritty.json`, `.prittyrc`,
-`.prittyrc.json`, `.prittyrc.yaml`, `pritty.config.json`,
-`pritty.config.js`, or a `"pritty"` field in `package.json`.
+pritty reads `.helmsmith/pritty.json` (or `.yaml` / `.yml`) or any of
+`.pritty.json`, `.prittyrc`, `.prittyrc.json`, `.prittyrc.yaml`,
+`.prittyrc.yml`, `pritty.config.json`, `pritty.config.yaml`, nearest
+directory first. A `.helmsmith/` file and an old-name file in the same
+directory must hold the same config, or pritty refuses to run.
 
 ### Run pritty from a script
 

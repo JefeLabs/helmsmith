@@ -133,8 +133,8 @@ async function tryBuildProvider(
 
 /**
  * Resolve an AI provider per the user's `provider` + `fallback`
- * config. Default is `copilot` with no fallback — preserves the
- * Copilot-only behavior pritty had before this option existed.
+ * config. Default is `claude` with no fallback: a machine without the
+ * Claude Code binary gets the setup error below, not a silent switch.
  *
  * Tries the primary first; iterates the fallback list (skipping
  * dupes) only when primary is unconfigured. Throws a single clear
@@ -275,6 +275,7 @@ export async function generateCommitMessages(
     'You are an expert engineer writing git commit messages for a developer.',
     `Produce one commit message per file category. ${styleGuide}`,
     'Return strict JSON: an array of objects with keys `category`, `message`, `body` (optional), `files` (the input files for that category).',
+    'Copy each category name exactly as it appears in the `##` headings, even `unknown`: never rename one after the commit type or the change.',
     'Do not wrap the output in markdown code fences. Do not include any prose before or after the JSON.',
     context.branch
       ? 'The branch name is the developer’s intent: on a `fix/…` branch the code change repairs a bug, so type it `fix` (not feat, build or chore) and say in the body what was broken; tests and stories keep their own type.'

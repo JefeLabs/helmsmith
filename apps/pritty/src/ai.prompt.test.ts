@@ -61,6 +61,12 @@ describe('generateCommitMessages', () => {
     );
   });
 
+  it('tells the model to copy each category name exactly, not rename it', async () => {
+    answer(JSON.stringify([{ category: 'unknown', message: 'feat: x', files: [] }]));
+    await generateCommitMessages({ unknown: ['app-ui/a.ts'] }, '+a', config);
+    expect(sent().system).toMatch(/category name exactly/i);
+  });
+
   it('gives the model the branch name and what a fix/ branch means', async () => {
     answer(JSON.stringify([{ category: 'app', message: 'fix: x', files: [] }]));
     await generateCommitMessages({ app: ['src/a.ts'] }, '+a', config, undefined, {

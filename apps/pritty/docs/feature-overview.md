@@ -53,26 +53,32 @@ Useful for CI environments, multi-account setups, or when the default
 pritty init
 ```
 
-Writes a `.pritty.json` with sensible defaults at the repo root. Use
+Writes `.helmsmith/pritty.json` (or `.pritty.json` when the repo has no
+`.helmsmith` folder) with sensible defaults at the repo root. Use
 this once per project; check the file in to git so teammates inherit
 your settings.
 
 ### Config discovery
 
-pritty uses cosmiconfig — any of these names work, in priority order:
+Any of these names work, searched from the current directory up to the
+repo root (nearest directory wins):
 
+- `.helmsmith/pritty.json` / `.helmsmith/pritty.yaml` / `.helmsmith/pritty.yml`
 - `.pritty.json`
 - `.prittyrc`
 - `.prittyrc.json` / `.prittyrc.yaml` / `.prittyrc.yml`
-- `pritty.config.json` / `pritty.config.js`
-- `"pritty"` field in `package.json`
+- `pritty.config.json` / `pritty.config.yaml`
+
+A `.helmsmith/` file and an old-name file in the same directory must hold
+the same config (kept while older pritty versions still need the old
+name), or pritty refuses to run.
 
 ### Settable fields
 
 ```json
 {
-  "model": "gpt-4o",                      // Model to use within the chosen provider
-  "provider": "copilot",                  // Default LLM provider
+  "model": "claude-opus-5-5",             // Optional; each provider has its own default
+  "provider": "claude",                   // Default LLM provider
   "fallback": ["anthropic", "openai"],    // Try in order if primary fails
   "baseBranch": "main",                   // Base for PR diff
   "commitStyle": "conventional",          // Conventional Commits
@@ -153,7 +159,8 @@ before broad ones (`app`), or `src/foo.test.ts` will land in `app`.
 
 | Provider | How auth works | When to pick |
 |---|---|---|
-| `copilot` (default) | Device Flow → `~/.pritty/auth.json` | You already have a Copilot subscription |
+| `claude` (default) | The `claude` binary on PATH, on its own login | You have Claude Code (a claude.ai subscription works) |
+| `copilot` | Device Flow → `~/.pritty/auth.json` | You already have a Copilot subscription |
 | `anthropic` | API key in env (`ANTHROPIC_API_KEY` by default) | You have your own Anthropic budget |
 | `openai` | API key in env (`OPENAI_API_KEY` by default) | You have your own OpenAI budget |
 

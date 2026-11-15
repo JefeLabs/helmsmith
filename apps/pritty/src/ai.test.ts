@@ -80,7 +80,7 @@ describe('buildAdapter — provider resolution', () => {
 
   it('uses copilot when configured and auth.json present', async () => {
     writeCopilotAuth(tmp);
-    const adapter = await buildAdapter(defaultConfig());
+    const adapter = await buildAdapter(defaultConfig({ provider: 'copilot' }));
     expect(adapter).toBeDefined();
     expect(adapter.type).toBe('copilot-sdk');
   });
@@ -119,7 +119,10 @@ describe('buildAdapter — provider resolution', () => {
   });
 
   it('throws a clear error when nothing is configured', async () => {
-    await expect(buildAdapter(defaultConfig())).rejects.toThrow(/No AI provider available/);
+    process.env.PATH = join(tmp, 'empty'); // the default provider, claude, finds no binary
+    await expect(buildAdapter(defaultConfig())).rejects.toThrow(
+      /No AI provider available\. Tried: claude\./,
+    );
   });
 
   it('error message lists every provider tried + how to configure it', async () => {

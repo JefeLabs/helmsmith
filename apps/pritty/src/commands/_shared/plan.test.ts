@@ -31,6 +31,48 @@ describe('reconcileCommitPlan', () => {
     ).toThrow(/infra/);
   });
 
+  it('pairs the one name it did not produce with the one category with staged files nothing claimed, and says so', () => {
+    const renames: Array<[string, string]> = [];
+    const plan = reconcileCommitPlan(
+      [
+        { category: 'feature', message: 'feat: a', files: [] },
+        { category: 'test', message: 'test: a', files: [] },
+      ],
+      grouped,
+      (from, to) => renames.push([from, to]),
+    );
+    expect(plan).toEqual([
+      { category: 'app', message: 'feat: a', files: ['src/a.ts', 'src/b.ts'] },
+      { category: 'test', message: 'test: a', files: ['src/a.test.ts'] },
+    ]);
+    expect(renames).toEqual([['feature', 'app']]);
+  });
+
+  it('still rejects a name it did not produce when two categories with staged files are unclaimed', () => {
+    const g = { app: ['src/a.ts'], config: ['package.json'], test: ['src/a.test.ts'] };
+    expect(() =>
+      reconcileCommitPlan(
+        [
+          { category: 'feature', message: 'm', files: [] },
+          { category: 'test', message: 'm', files: [] },
+        ],
+        g,
+      ),
+    ).toThrow(/feature/);
+  });
+
+  it('still rejects two names it did not produce', () => {
+    expect(() =>
+      reconcileCommitPlan(
+        [
+          { category: 'feature', message: 'm', files: [] },
+          { category: 'tests', message: 'm', files: [] },
+        ],
+        grouped,
+      ),
+    ).toThrow(/feature|tests/);
+  });
+
   it('rejects a plan that omits a category with staged files', () => {
     expect(() =>
       reconcileCommitPlan([{ category: 'app', message: 'm', files: [] }], grouped),

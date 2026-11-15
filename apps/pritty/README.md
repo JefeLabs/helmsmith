@@ -36,7 +36,7 @@ This is a **phased build** following the
 pritty                                # shows command list (Commander default)
 pritty auth login                     # GitHub Device Flow → ~/.pritty/auth.json
 pritty auth status
-pritty init                           # write .pritty.json with sane defaults
+pritty init                           # write the config (.helmsmith/pritty.json, else .pritty.json)
 pritty categorize                     # show staged files grouped by category
 pritty categorize --all               # include modified + untracked
 ```
@@ -57,8 +57,13 @@ const buckets = categorize(["src/index.ts", "test/foo.test.ts"]);
 
 ## Configuration
 
-`.pritty.json` (or `.prittyrc.yaml`, `pritty.config.json`, etc.) at
-your repo root (found from any subdirectory; a nearer one wins):
+`.helmsmith/pritty.json` (or `.yaml` / `.yml`), or `.pritty.json` (or
+`.prittyrc.yaml`, `pritty.config.json`, etc.), at your repo root (found
+from any subdirectory; a nearer one wins). Both may sit in one folder
+while a team moves to `.helmsmith/` (an older pritty reads only
+`.pritty.json`), as long as they hold the same config: pritty refuses to
+run when they differ. `pritty init` writes `.helmsmith/pritty.json` when
+the repo has a `.helmsmith` folder.
 
 ```json
 {
@@ -99,13 +104,14 @@ every consumer inherits the change.
 
 ## AI providers
 
-Default is **GitHub Copilot** via the device-flow login at
-`~/.pritty/auth.json`. Pick a different primary or set up a fallback
-chain in `.pritty.json`:
+Default is **Claude Code**: pritty runs the `claude` binary on PATH
+headlessly, on that binary's own login (a claude.ai subscription
+works). Pick a different primary or set up a fallback chain in
+`.pritty.json`:
 
 ```jsonc
 {
-  "provider": "copilot",                    // default; or "anthropic" / "openai"
+  "provider": "claude",                     // default; or "copilot" / "anthropic" / "openai"
   "fallback": [],                           // empty by default — opt in here
   "anthropicKeyEnv": "ANTHROPIC_API_KEY",   // env var to read the key from
   "openaiKeyEnv": "OPENAI_API_KEY"          // (these are also the defaults)
@@ -236,6 +242,20 @@ bounded by `aiTimeoutMs`.
   `fix/…` (also `bugfix/`, `hotfix/`) branch, a code commit the model typed
   `feat`, `build` or `chore` becomes `fix`; `test` and `storybook` commits,
   docs, refactors and the rest keep their type.
+- **What the caller knows wins.** `--type <type>` sets the code commits' type
+  (test and storybook commits keep theirs), over the model and the branch
+  rule. `--scope <path>` sets every commit's scope, one to three lowercase
+  segments: `network`, `org/global`, `org/network/directory`. `--trailer
+  "Token: value"` (repeatable) adds a trailer to every commit after
+  `commitTrailers`, such as `Refs: plan-5 T9` to tie a task's commits
+  together for `git log --grep`. All three are checked before the model is
+  asked; a subject the model wrote that is not conventional is kept as
+  written, with a note.
+- **A renamed category is paired, once.** If the model returns exactly one
+  category name the categorizer did not produce (it once sent `unknown`
+  back as `feature`) and exactly one category with staged files is
+  unclaimed, the two are paired and the run says so. Anything less certain
+  is still refused before a commit is made.
 - **`--no-verify`** passes `--no-verify` to `git commit`, for when a hook
   refuses and bypassing it was approved.
 
@@ -260,17 +280,11 @@ AI adapters, OpenTUI or inquirer.
 
 `provider` is one of:
 
-- `copilot` (default): `pritty auth login` runs the GitHub device flow.
-- `claude`: runs the `claude` binary on PATH headlessly (`claude -p`, one turn, no tools, no MCP servers, no session on disk, user settings only, from the temp directory rather than the repository, so a cloned repository's hooks, settings, CLAUDE.md and `.mcp.json` never apply) on whatever login that binary has. A claude.ai subscription works; no API key passes through pritty. Install Claude Code and run `claude` once to log in.
+- `claude` (default): runs the `claude` binary on PATH headlessly (`claude -p`, one turn, no tools, no MCP servers, no session on disk, user settings only, from the temp directory rather than the repository, so a cloned repository's hooks, settings, CLAUDE.md and `.mcp.json` never apply) on whatever login that binary has. A claude.ai subscription works; no API key passes through pritty. Install Claude Code and run `claude` once to log in.
+- `copilot`: `pritty auth login` runs the GitHub device flow.
 - `anthropic`: the Anthropic API with the key from `ANTHROPIC_API_KEY` (or the variable named by `anthropicKeyEnv`).
 - `openai`: `OPENAI_API_KEY` / `openaiKeyEnv`.
 
 `model` is optional and defaults per provider: `claude-opus-5-5` for `claude`, `anthropic` and `copilot`, `gpt-6-astra` for `openai`. `fallback` lists providers to try when the primary is not configured on the machine.
 
-To use Claude on the team's subscriptions by default in a repository:
-
-```json
-{ "provider": "claude" }
-```
-
-or `{ "provider": "anthropic" }` with `ANTHROPIC_API_KEY` exported in the shell that runs `pritty` (or `work pr`) to bill an API key instead.
+A repository needs no `provider` key to use Claude on the team's subscriptions. To keep GitHub Copilot, set `{ "provider": "copilot" }`; to bill an API key instead, set `{ "provider": "anthropic" }` and export `ANTHROPIC_API_KEY` in the shell that runs `pritty` (or `work pr`).

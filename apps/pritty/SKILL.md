@@ -1,6 +1,6 @@
 ---
 name: pritty
-description: AI-powered commit & PR creation. Fires when the user wants to commit staged changes, write a commit message, open a pull request, draft a PR description, or rebase a feature branch — phrases like "commit these changes", "make a commit", "open a PR", "create a pull request", "rebase this branch", "clean up the commit history", "what should this commit message be", "write me a PR description", "wrap up this work". Pritty handles per-category AI commit messages, AI PR title + body (respecting .github/pull_request_template.md), ticket detection from branch / commits / Jira / Linear, GitHub Copilot or Anthropic or OpenAI providers, and pushes via Octokit with auto-requested CODEOWNERS reviewers. Runs as a CLI: `pritty commit`, `pritty pr`, `pritty rebase`.
+description: AI-powered commit & PR creation. Fires when the user wants to commit staged changes, write a commit message, open a pull request, draft a PR description, or rebase a feature branch — phrases like "commit these changes", "make a commit", "open a PR", "create a pull request", "rebase this branch", "clean up the commit history", "what should this commit message be", "write me a PR description", "wrap up this work". Pritty handles per-category AI commit messages, AI PR title + body (respecting .github/pull_request_template.md), ticket detection from branch / commits / Jira / Linear, Claude Code, GitHub Copilot, Anthropic or OpenAI providers, and pushes via Octokit with auto-requested CODEOWNERS reviewers. Runs as a CLI: `pritty commit`, `pritty pr`, `pritty rebase`.
 ---
 
 # pritty
@@ -46,7 +46,7 @@ Don't fire when:
 | `pritty commit` | Categorize staged files, generate AI commit messages per category, commit each separately via path-restricted commits |
 | `pritty pr` | Generate AI PR title + body (filling `.github/pull_request_template.md` when present), push, create the PR via Octokit, auto-request reviewers from `.github/CODEOWNERS` |
 | `pritty rebase` | AI-planned interactive rebase to clean up history. Mandatory confirm; no `--auto-approve` |
-| `pritty init` | Set up a project — writes `.pritty.json`, slash commands, this skill |
+| `pritty init` | Set up a project — writes the config (`.helmsmith/pritty.json`, or `.pritty.json` without a `.helmsmith` folder), slash commands, this skill |
 | `pritty auth login` | GitHub Copilot Device Flow → `~/.pritty/auth.json` |
 
 Every command takes `--json`: one JSON line on stdout (the result),
@@ -62,9 +62,12 @@ Before running any pritty command, check:
 2. **pritty is installed** — `which pritty` succeeds. If not,
    suggest `npm install -g @helmsmith/pritty` (or
    `toolz install pritty` if the user has @helmsmith/toolz set up).
-3. **User has authenticated** — `pritty auth status` shows a
-   provider. If not, suggest `pritty auth login` (Copilot) or
-   setting an API key (`ANTHROPIC_API_KEY` / `OPENAI_API_KEY`).
+3. **An AI provider is available** — the default `claude` provider
+   needs Claude Code on PATH (`which claude` succeeds) and logged in
+   (run `claude` once). For another provider, set `provider` in
+   `.pritty.json` and suggest `pritty auth login` (Copilot; listed by
+   `pritty auth status`) or an API key (`ANTHROPIC_API_KEY` /
+   `OPENAI_API_KEY`).
 4. **Per-command preconditions:**
    - `commit`: at least one staged file
      (`git diff --cached --name-only`)
@@ -88,6 +91,12 @@ the user's repo as cwd. Pass through any flags the user mentions:
   the pre-commit and commit-msg hooks; only when the user approved
   bypassing a hook
 - `--no-footer` (pr) leaves `prFooter` out of the body
+- `--scope <path>` (commit) sets every commit's scope: one to three
+  lowercase segments (`network`, `org/global`, `org/network/directory`)
+- `--type <type>` (commit) sets the code commits' type (`fix` for a fix on
+  a non-`fix/` branch); test and story commits keep theirs
+- `--trailer "Token: value"` (commit, repeatable) adds a trailer such as
+  `Refs: plan-5 T9` to every commit, after `commitTrailers`
 - `--strategy interactive|squash|fixup|auto` for rebase strategy
 
 After `pritty commit --dry-run`, a real `pritty commit` commits the
@@ -118,15 +127,18 @@ Do not:
 
 ## Config reference
 
-Pritty looks for `.pritty.json` (or .yaml / .prittyrc variants) in
-the repo. `pritty init` scaffolds one. Common fields:
+Pritty looks for `.helmsmith/pritty.json` (or `.yaml` / `.yml`) or
+`.pritty.json` (or .yaml / .prittyrc variants) in the repo, nearest
+directory first. If both sit in one directory they must hold the same
+config, or pritty refuses to run. `pritty init` scaffolds one, in
+`.helmsmith/` when the repo has that folder. Common fields:
 
 ```jsonc
 {
   "model": "claude-opus-5-5",
   "baseBranch": "main",
   "commitStyle": "conventional",
-  "provider": "copilot",                    // or "claude" / "anthropic" / "openai"
+  "provider": "claude",                     // or "copilot" / "anthropic" / "openai"
   "fallback": [],                           // opt-in multi-provider
   "ticket": {
     "pattern": "[A-Z]+-\\d+",

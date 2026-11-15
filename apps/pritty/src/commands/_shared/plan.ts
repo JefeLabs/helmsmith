@@ -20,10 +20,11 @@ const LAST_CATEGORIES: readonly string[] = ['test', 'storybook'];
 export function reconcileCommitPlan(
   plan: readonly CommitMessage[],
   grouped: CategorizedFiles,
+  onRename?: (from: string, to: string) => void,
 ): CommitMessage[] {
   const seen = new Set<string>();
   const out: CommitMessage[] = [];
-  for (const step of plan) {
+  for (const step of pairRenamedCategory(plan, grouped, onRename)) {
     const files = grouped[step.category];
     if (files === undefined) {
       throw new Error(`AI plan names a category the categorizer did not produce: ${step.category}`);
@@ -51,6 +52,31 @@ export function reconcileCommitPlan(
     const [rb, pb] = rank(b);
     return ra - rb || pa - pb;
   });
+}
+
+/**
+ * A model sometimes renames a category in its answer (`unknown` came back as
+ * `feature`). With exactly one name the categorizer did not produce and
+ * exactly one category with staged files that no step claims, only one
+ * pairing is possible, so it is made and reported. Anything less certain is
+ * left for `reconcileCommitPlan` to refuse.
+ */
+function pairRenamedCategory(
+  plan: readonly CommitMessage[],
+  grouped: CategorizedFiles,
+  onRename?: (from: string, to: string) => void,
+): readonly CommitMessage[] {
+  const strangers = plan.filter((s) => grouped[s.category] === undefined);
+  if (strangers.length !== 1) return plan;
+  const claimed = new Set(plan.map((s) => s.category));
+  const unclaimed = Object.entries(grouped)
+    .filter(([cat, files]) => files.length > 0 && !claimed.has(cat))
+    .map(([cat]) => cat);
+  if (unclaimed.length !== 1) return plan;
+  const from = strangers[0]!.category;
+  const to = unclaimed[0]!;
+  onRename?.(from, to);
+  return plan.map((s) => (s.category === from ? { ...s, category: to } : s));
 }
 
 /** Subject, optional body, then the configured trailers. */

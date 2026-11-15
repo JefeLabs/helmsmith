@@ -5,7 +5,14 @@ import { categorize, mergeCategories, UNKNOWN_CATEGORY } from '../categorizer.js
 import { type Config, loadConfig } from '../config.js';
 import { createGit, type GitOps } from '../git.js';
 import { VERSION } from '../version.js';
-import { retypeForBranch } from './_shared/conventional.js';
+import { TRAILER_LINE } from './_shared/attribution.js';
+import {
+  applySubjectOverrides,
+  isCommitScope,
+  isCommitType,
+  retypeForBranch,
+  styleHasTypes,
+} from './_shared/conventional.js';
 import { splitTitleBody } from './_shared/format.js';
 import { composeCommitMessage, reconcileCommitPlan } from './_shared/plan.js';
 import { filePlanCache, type PlanCache, planKey } from './_shared/plan-cache.js';
@@ -20,6 +27,12 @@ export interface CommitOptions {
   json?: boolean;
   /** Pass `--no-verify` to every `git commit` (skips the pre-commit and commit-msg hooks). */
   noVerify?: boolean;
+  /** Scope of every commit: one to three lowercase segments (`network`, `org/global`). */
+  scope?: string;
+  /** Type of the code commits; test and storybook commits keep theirs. */
+  type?: string;
+  /** `Token: value` lines added to every commit after the configured `commitTrailers`. */
+  trailer?: string[];
 }
 
 export interface CommitOutcome {
@@ -66,6 +79,30 @@ function defaultDeps(): CommitDeps {
 
 const VALID_STYLES = ['conventional', 'gitmoji', 'angular', 'simple'] as const;
 
+/** Refuse a bad --type, --scope or --trailer before anything else runs: no model call, no commit. */
+function validateOverrides(options: CommitOptions, style: Config['commitStyle']): void {
+  if ((options.type !== undefined || options.scope !== undefined) && !styleHasTypes(style)) {
+    throw new Error(
+      `--type and --scope need a commit style with \`type(scope):\` subjects (conventional or angular), not ${style}`,
+    );
+  }
+  if (options.type !== undefined && !isCommitType(options.type)) {
+    throw new Error(
+      `--type ${options.type} is not a conventional type: feat, fix, perf, refactor, revert, build, ci, docs, style, test or chore`,
+    );
+  }
+  if (options.scope !== undefined && !isCommitScope(options.scope)) {
+    throw new Error(
+      `--scope ${options.scope} must be one to three lowercase segments joined by "/", like network, org/global or org/network/directory`,
+    );
+  }
+  for (const line of options.trailer ?? []) {
+    if (!TRAILER_LINE.test(line)) {
+      throw new Error(`--trailer "${line}" is not a git trailer: write it as \`Token: value\``);
+    }
+  }
+}
+
 /**
  * Generate AI commit messages per category and commit each group from the
  * index. Resolves ticket context up front so validation gates fail fast
@@ -94,6 +131,8 @@ export async function runCommit(
     }
     config.commitStyle = options.commitStyle as Config['commitStyle'];
   }
+  validateOverrides(options, config.commitStyle);
+  const trailers = [...config.commitTrailers, ...(options.trailer ?? [])];
 
   // Ticket context first: the validation gate fires before any AI call.
   const branch = await git.getCurrentBranch();
@@ -156,6 +195,7 @@ export async function runCommit(
       plan = reconcileCommitPlan(
         await deps.ai.generateCommitMessages(grouped, diff, config, ticketCtx, { branch }),
         grouped,
+        (from, to) => say(chalk.dim(`  the model named the ${to} commit "${from}"; paired them`)),
       );
       spinner.succeed(`Generated ${plan.length} commit message(s)`);
     } catch (err) {
@@ -171,6 +211,17 @@ export async function runCommit(
     say(
       chalk.dim(
         `  ${r.category}: typed fix for ${branch} (the model said ${r.from.split(':')[0]})`,
+      ),
+    );
+  }
+
+  // 3.6 --type and --scope: what the caller knows wins over the model and the branch
+  const overridden = applySubjectOverrides(plan, { type: options.type, scope: options.scope });
+  plan = overridden.plan;
+  for (const category of overridden.kept) {
+    say(
+      chalk.yellow(
+        `  ${category}: kept as written, not a conventional subject, so --type/--scope could not apply`,
       ),
     );
   }
@@ -246,7 +297,7 @@ export async function runCommit(
   for (const c of plan) {
     try {
       await git.commit(
-        composeCommitMessage(c, config.commitTrailers),
+        composeCommitMessage(c, trailers),
         c.files,
         options.noVerify ? { noVerify: true } : undefined,
       );
