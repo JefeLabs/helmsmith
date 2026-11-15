@@ -6,7 +6,7 @@
 # runtimes — alongside that host triad.
 #
 # Composition:
-#   - `neo4j-edge`        — Neo4j 5 Community sidecar, the graph store
+#   - `neo4j-edge`        — Neo4j 2026 Community sidecar, the graph store
 #                           edge-context-server dials via Bolt.
 #   - `embedder`, `agent-llm`  — Docker Model Runner sidecars (llama.cpp).
 #   - `agent-vl`          — vision LLM, profile-gated to `vision`.
@@ -135,7 +135,7 @@ services:
   # dev the default is `neo4j/devpassword`; rotate via env var override
   # before sharing the workspace with anyone outside your machine.
   neo4j-edge:
-    image: neo4j:5-community
+    image: neo4j:2026-community
     container_name: helmsmith-neo4j-edge
     environment:
       NEO4J_AUTH: ${NEO4J_AUTH:-neo4j/devpassword}

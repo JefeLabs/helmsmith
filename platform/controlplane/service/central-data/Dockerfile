@@ -1,4 +1,4 @@
-# central-data — bundles Postgres 15 + Neo4j 5 in one container.
+# central-data — bundles Postgres 17 + Neo4j 2026 in one container.
 #
 # Per the design exchange in 2026-05-08: data here is throwaway (the
 # central plane re-bootstraps schema via Flyway on startup), so the
@@ -10,7 +10,7 @@
 # binary built with specific runtime libs that don't transplant cleanly
 # onto a different base.
 
-FROM neo4j:5
+FROM neo4j:2026
 
 USER root
 
