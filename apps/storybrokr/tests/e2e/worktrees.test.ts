@@ -1,4 +1,12 @@
-import { cpSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import type { InstanceRecord } from '../../src/types.js';
@@ -7,7 +15,14 @@ import { FIXTURE_HOST, makeHome, runCli, runJson } from './helpers.js';
 function cloneFixtureWorktree(): { host: string; cleanup: () => void } {
   const raw = mkdtempSync(join(dirname(FIXTURE_HOST), 'host-wt-'));
   const host = realpathSync(raw);
-  for (const entry of ['.storybook', 'package.json', 'public', 'src', 'tsconfig.json', 'vite.config.ts']) {
+  for (const entry of [
+    '.storybook',
+    'package.json',
+    'public',
+    'src',
+    'tsconfig.json',
+    'vite.config.ts',
+  ]) {
     cpSync(join(FIXTURE_HOST, entry), join(host, entry), { recursive: true });
   }
   const srcNm = join(FIXTURE_HOST, 'node_modules');

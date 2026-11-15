@@ -74,7 +74,7 @@ export async function runBenchUpsert(suiteId: string, opts: UpsertBenchOptions):
   for (const line of lines) {
     try {
       inputs.push(JSON.parse(line));
-    } catch (err) {
+    } catch {
       console.error(`error: failed to parse JSONL line: ${line.slice(0, 100)}`);
       process.exit(2);
     }

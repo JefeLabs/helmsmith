@@ -21,7 +21,7 @@ import { loadCatalogFromWorkspaceYaml } from './load-catalog.ts';
 function agentAt(p: FlowDef, i: number): AgentDef {
   // Skip the synthetic __trigger node (always at index 0 for phases-expanded flows).
   const target = p.nodes.filter((n) => n.kind === 'agent')[i];
-  if (!target || target.kind !== 'agent') {
+  if (target?.kind !== 'agent') {
     throw new Error(`expected agent node at index ${i}, got ${target?.kind}`);
   }
   return (target.config as { agent: AgentDef }).agent;

@@ -29,7 +29,7 @@
  * and trigger a pointless publish wave the following Sunday.
  */
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -60,6 +60,7 @@ const SKIP_MARKER = ['--grep=\\[skip release\\]', '--invert-grep'];
  * Excluding too much means a real fix ships late (next week, piggybacked
  * on other work); excluding nothing means a README typo publishes a patch.
  */
+// biome-ignore lint/correctness/noUnusedFunctionParameters: policy hook; `file` is the input the TODO above will filter on
 function isReleaseWorthy(file) {
   return true;
 }

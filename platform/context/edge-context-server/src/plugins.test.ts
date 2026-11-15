@@ -249,7 +249,7 @@ describe('OpenApiPlugin (route surface)', () => {
         },
       },
     });
-    const fakeFetch = ((u: string) =>
+    const fakeFetch = ((_u: string) =>
       Promise.resolve(new Response(spec, { status: 200 }))) as typeof fetch;
 
     const plugin = new OpenApiPlugin({
@@ -276,14 +276,13 @@ describe('OpenApiPlugin (route surface)', () => {
     const handler = await plugin.register(ctx);
 
     // Lookup
-    const lookupReq: any = { method: 'POST', url: '/lookup', on: () => {} };
     // Simulate body: we'll bypass readJsonBody by calling handler with a
     // stub req that emits 'data' + 'end' events after handler subscribes.
-    const listeners: Record<string, Function[]> = {};
+    const listeners: Record<string, Array<(...args: unknown[]) => void>> = {};
     const eventReq: any = {
       method: 'POST',
       url: '/lookup',
-      on(e: string, cb: Function) {
+      on(e: string, cb: (...args: unknown[]) => void) {
         listeners[e] = listeners[e] ?? [];
         listeners[e].push(cb);
         return this;
@@ -301,10 +300,10 @@ describe('OpenApiPlugin (route surface)', () => {
       headersSent: false,
     };
     const handlerPromise = handler(eventReq, eventRes, 'lookup');
-    listeners['data']?.[0]?.(
+    listeners.data?.[0]?.(
       Buffer.from(JSON.stringify({ api: 'stripe', operation: 'createCharge' })),
     );
-    listeners['end']?.[0]?.();
+    listeners.end?.[0]?.();
     await handlerPromise;
     expect(writeHead.s).toBe(200);
     const result = JSON.parse(chunks[0]!);

@@ -10,7 +10,7 @@ describe('oklch color engine', () => {
   it('parses HeroUI accent oklch into a plausible blue', () => {
     const hex = toHex(parseColor('oklch(0.6204 0.195 253.83)'));
     expect(hex).toMatch(/^#[0-9a-f]{6}$/);
-    const [, r, , g, , b] = hex;
+    const [, r, , _g, , b] = hex;
     // accent is a blue: blue channel should dominate red.
     expect(Number.parseInt(b, 16)).toBeGreaterThan(Number.parseInt(r, 16));
   });

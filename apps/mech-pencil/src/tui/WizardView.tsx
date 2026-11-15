@@ -83,7 +83,7 @@ export function WizardView({ frameworks, onComplete, onQuit }: WizardViewProps) 
   });
 
   const cycleField = (dir: 1 | -1) => {
-    if (!field || field.kind !== 'enum' || !field.options) return;
+    if (field?.kind !== 'enum' || !field.options) return;
     setDraft((d) => setField(d, field.id, cycle(field.options ?? [], getField(d, field.id), dir)));
   };
   useKeybinding('left', '←/→ cycle', () => cycleField(-1), {

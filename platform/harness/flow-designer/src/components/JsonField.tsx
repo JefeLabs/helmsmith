@@ -26,7 +26,6 @@ export function JsonField({
   const [error, setError] = useState<string | null>(null);
 
   // Re-sync when the selection (and therefore `value`) changes.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: canonical is derived from value
   useEffect(() => {
     setText(canonical);
     setError(null);

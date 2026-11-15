@@ -152,7 +152,7 @@ function route(
 
   // Wrap res.end so every response increments the right counters.
   const origEnd = res.end.bind(res);
-  // biome-ignore lint/suspicious/noExplicitAny: thin pass-through to Node's overloaded res.end signature
+  // `any`: thin pass-through to Node's overloaded res.end signature
   (res as any).end = (...args: unknown[]) => {
     const seconds = Number(process.hrtime.bigint() - start) / 1e9;
     metrics.observeLatency(op, seconds);

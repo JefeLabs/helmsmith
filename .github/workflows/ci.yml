@@ -79,13 +79,12 @@ jobs:
         # reproducible installs.
         run: pnpm install --frozen-lockfile
 
-      # Biome (`pnpm check`) intentionally NOT enforced in CI yet — there
-      # is a pre-existing backlog of 90 lint errors + 23 warnings across
-      # the codebase that would turn every PR red. The right sequence is
-      # a dedicated cleanup pass to drive the count to zero, then turn
-      # it on as a required check in a follow-up CI iteration. Locally,
-      # `pnpm check` and `pnpm check:fix` work today; this is purely a
-      # don't-block-the-team decision for the v1 wiring.
+      - name: Biome — lint + format
+        # `biome check .` = lint + formatter + import sorting, clean as of the
+        # backlog cleanup. Markdown and YAML formatting are off in biome.json:
+        # Biome's Markdown formatter mangles changeset frontmatter, and its YAML
+        # formatter collapses hand-aligned comments. Fix locally: `pnpm check:fix`.
+        run: pnpm check
 
       - name: TypeScript typecheck
         # Recursive across packages — each package owns its own tsconfig.

@@ -301,7 +301,12 @@ describe('DaemonClient', () => {
     daemons.push(daemon);
     await daemon.start(0);
     registry.add({ ...makeRecord('a1'), hostRoot: '/wt-a/app-ui', component: 'src/Button' });
-    registry.add({ ...makeRecord('b1'), hostRoot: '/wt-b/app-ui', component: 'src/Button', port: 6101 });
+    registry.add({
+      ...makeRecord('b1'),
+      hostRoot: '/wt-b/app-ui',
+      component: 'src/Button',
+      port: 6101,
+    });
     const client = await DaemonClient.connect({ home, autoStart: false });
 
     expect((await client.list({ host: '/wt-b/app-ui' })).map((r) => r.id)).toEqual(['b1']);
@@ -309,11 +314,7 @@ describe('DaemonClient', () => {
     expect((await client.get('src/Button', { hint: '/wt-a/app-ui' })).id).toBe('a1');
     await expect(client.get('src/Button')).rejects.toMatchObject({ code: 'INSTANCE_AMBIGUOUS' });
 
-    const checkRes = await client.check(
-      'src/Button',
-      { concurrency: 2 },
-      { host: '/wt-b/app-ui' },
-    );
+    const checkRes = await client.check('src/Button', { concurrency: 2 }, { host: '/wt-b/app-ui' });
     expect(checkRes.instanceId).toBe('b1');
     expect(seen[0]).toEqual({ id: 'b1', req: { concurrency: 2 } });
 

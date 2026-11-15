@@ -185,6 +185,7 @@ function FigmaPanel({ figma, tz }: { figma: FigmaDailySummary | null; tz: string
           <Box style={{ flexDirection: 'column' }}>
             <Heading>Live log</Heading>
             {figma.events.slice(0, 15).map((e, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: FigmaEventView has no unique id, and rows of this capped snapshot hold no state
               <Text key={`${e.at}-${i}`} variant="muted">
                 {figmaEventLine(e, tz)}
               </Text>

@@ -9,12 +9,7 @@ import type {
   GithubIssuesIngestRequest,
   JiraIngestRequest,
 } from './external-sources.ts';
-import type {
-  CrawlIngestRequest,
-  IngestService,
-  RepoIngestRequest,
-  UploadIngestRequest,
-} from './ingest.ts';
+import type { CrawlIngestRequest, IngestService, RepoIngestRequest } from './ingest.ts';
 import { OPENAPI_SPEC } from './openapi.ts';
 import type { Plugin, PluginContext, RegisteredPlugin } from './plugins.ts';
 import type {
@@ -650,7 +645,8 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: RouteContext): vo
   if (req.method === 'POST' && url === '/v1/ingest/upload') {
     bumpRoute(ctx.metrics, 'ingest_upload');
     if (!opts.ingest) {
-      return notReady(res, 'backend not configured');
+      notReady(res, 'backend not configured');
+      return;
     }
     handleMultipartUpload(req, res, opts.ingest, ctx.metrics);
     return;
@@ -660,9 +656,15 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: RouteContext): vo
   if (req.method === 'GET' && url.startsWith('/v1/ingest/') && url !== '/v1/ingest/events') {
     bumpRoute(ctx.metrics, 'ingest_status');
     const ingestId = url.slice('/v1/ingest/'.length);
-    if (!opts.ingest) return notReady(res, 'backend not configured');
+    if (!opts.ingest) {
+      notReady(res, 'backend not configured');
+      return;
+    }
     const status = opts.ingest.getIngest(ingestId);
-    if (!status) return notFound(res, `ingest not found: ${ingestId}`);
+    if (!status) {
+      notFound(res, `ingest not found: ${ingestId}`);
+      return;
+    }
     ok(res, { service: 'context', status, ts: new Date().toISOString() });
     return;
   }
@@ -670,7 +672,10 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: RouteContext): vo
   // GET /v1/ingest — list all ingests.
   if (req.method === 'GET' && url === '/v1/ingest') {
     bumpRoute(ctx.metrics, 'ingest_list');
-    if (!opts.ingest) return notReady(res, 'backend not configured');
+    if (!opts.ingest) {
+      notReady(res, 'backend not configured');
+      return;
+    }
     ok(res, {
       service: 'context',
       ingests: opts.ingest.listIngests(),
@@ -683,9 +688,15 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: RouteContext): vo
   if (req.method === 'DELETE' && url.startsWith('/v1/ingest/')) {
     bumpRoute(ctx.metrics, 'ingest_cancel');
     const ingestId = url.slice('/v1/ingest/'.length);
-    if (!opts.ingest) return notReady(res, 'backend not configured');
+    if (!opts.ingest) {
+      notReady(res, 'backend not configured');
+      return;
+    }
     const cancelled = opts.ingest.cancelIngest(ingestId);
-    if (!cancelled) return notFound(res, `ingest not found: ${ingestId}`);
+    if (!cancelled) {
+      notFound(res, `ingest not found: ${ingestId}`);
+      return;
+    }
     res.writeHead(204);
     res.end();
     return;
@@ -694,7 +705,10 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: RouteContext): vo
   // GET /v1/uploads — list stored uploads.
   if (req.method === 'GET' && url === '/v1/uploads') {
     bumpRoute(ctx.metrics, 'uploads_list');
-    if (!opts.ingest) return notReady(res, 'backend not configured');
+    if (!opts.ingest) {
+      notReady(res, 'backend not configured');
+      return;
+    }
     void opts.ingest
       .listUploads()
       .then((entries) =>
@@ -708,7 +722,10 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: RouteContext): vo
   if (req.method === 'DELETE' && url.startsWith('/v1/uploads/')) {
     bumpRoute(ctx.metrics, 'uploads_delete');
     const docId = url.slice('/v1/uploads/'.length);
-    if (!opts.ingest) return notReady(res, 'backend not configured');
+    if (!opts.ingest) {
+      notReady(res, 'backend not configured');
+      return;
+    }
     void opts.ingest
       .deleteUpload(docId)
       .then((existed) => {
@@ -740,7 +757,8 @@ function route(req: IncomingMessage, res: ServerResponse, ctx: RouteContext): vo
     bumpRoute(ctx.metrics, `plugin_${pluginId}`);
     const rp = ctx.plugins.find((p) => p.plugin.id === pluginId);
     if (!rp) {
-      return notFound(res, `plugin '${pluginId}' not registered`);
+      notFound(res, `plugin '${pluginId}' not registered`);
+      return;
     }
     void Promise.resolve()
       .then(() => rp.handler(req, res, sub))
@@ -845,7 +863,8 @@ function handleJsonPostIngest<TBody>(
   handler: (svc: IngestService, body: Partial<TBody> | null) => Promise<void>,
 ): void {
   if (!ingest) {
-    return notReady(res, 'ingest backend not configured');
+    notReady(res, 'ingest backend not configured');
+    return;
   }
   let raw = '';
   req.on('data', (c) => (raw += c.toString()));
@@ -873,7 +892,10 @@ function handleMultipartUpload(
 ): void {
   const ct = req.headers['content-type'] ?? '';
   const m = /boundary=("?)([^";]+)\1/.exec(ct);
-  if (!m) return badRequest(res, 'content-type must be multipart/form-data with boundary');
+  if (!m) {
+    badRequest(res, 'content-type must be multipart/form-data with boundary');
+    return;
+  }
   const boundary = `--${m[2]}`;
 
   const chunks: Buffer[] = [];
@@ -895,7 +917,7 @@ function handleMultipartUpload(
     try {
       const parsed = parseMultipart(Buffer.concat(chunks), boundary);
       const filePart = parsed.parts.find((p) => p.filename);
-      if (!filePart || !filePart.filename) {
+      if (!filePart?.filename) {
         return badRequest(res, 'multipart body must include a file part with a filename');
       }
       const textPart = (name: string): string | undefined => {
@@ -1000,7 +1022,7 @@ function attachWsClient(
       const msg = JSON.parse(data.toString()) as { subscribe?: string };
       if (typeof msg.subscribe === 'string') {
         filterId = msg.subscribe;
-        unsubs.splice(0).forEach((u) => u());
+        for (const u of unsubs.splice(0)) u();
         subscribeAll();
       }
     } catch {
@@ -1009,7 +1031,7 @@ function attachWsClient(
   });
 
   ws.on('close', () => {
-    unsubs.splice(0).forEach((u) => u());
+    for (const u of unsubs.splice(0)) u();
   });
 
   subscribeAll();

@@ -11,11 +11,11 @@
 <script>
   const state = document.getElementById('state');
   const time = document.getElementById('time');
-  onmessage = (event) => {
+  window.onmessage = (event) => {
     const msg = event.data.pluginMessage;
     if (!msg) return;
     state.textContent = (msg.kind === 'ok' ? '● ' : '⚠ ') + msg.message;
     state.style.color = msg.kind === 'ok' ? '#0a0' : '#c00';
-    time.textContent = 'last attempt: ' + msg.at;
+    time.textContent = `last attempt: ${msg.at}`;
   };
 </script>

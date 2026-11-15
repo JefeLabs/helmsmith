@@ -66,6 +66,7 @@ export function resolveBackfillSince(
   if (!lastSeenAt) return today;
   const gapStart = dayKeyFor(new Date(lastSeenAt), tz);
   const floor = addDays(today, -(maxDays - 1));
+  // biome-ignore lint/complexity/useMathMinMax: ISODate strings compare lexicographically; Math.max would return NaN
   const since = gapStart < floor ? floor : gapStart;
   return since > today ? today : since; // clock-skew guard: never a future day
 }
@@ -115,7 +116,7 @@ export async function replayHistory(
   const perRole: Record<ChannelRole, number> = { goals: 0, summary: 0, ci: 0, engagement: 0 };
   for (const { id, role } of trackedChannels(deps.config)) {
     const channel = await client.channels.fetch(id).catch(() => null);
-    if (!channel || !channel.isTextBased() || !('messages' in channel)) {
+    if (!channel?.isTextBased() || !('messages' in channel)) {
       console.error(`  ! skipping ${role} channel ${id} — not a readable text channel`);
       continue;
     }

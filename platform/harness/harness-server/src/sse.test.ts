@@ -156,7 +156,7 @@ describe('GET /v1/jobs/:id/events (SSE-over-UDS)', () => {
 
     expect(envelopes).toHaveLength(1);
     expect(envelopes[0]?.jobId).toBe('job-A');
-    expect((envelopes[0]?.event as { user: string }).user).toBe('right job');
+    expect((envelopes[0]?.event as { user: string } | undefined)?.user).toBe('right job');
   });
 
   it('unsubscribes when the client disconnects', async () => {

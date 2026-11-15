@@ -387,6 +387,7 @@ function FindingsList({ findings }: { findings: ReviewFinding[] }) {
             </Chip>
             <ul className="space-y-1 ml-2">
               {items.map((f, idx) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: findings are re-derived from the report each render and hold no per-item state
                 <li key={idx} className="text-sm">
                   <span className="text-muted text-xs">{f.axis}:</span> {f.message}
                   {f.fileRef && <Code className="ml-1">{f.fileRef}</Code>}

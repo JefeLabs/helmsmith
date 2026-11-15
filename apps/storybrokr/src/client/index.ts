@@ -288,10 +288,7 @@ export class DaemonClient {
   }
   async list(opts?: { host?: string }): Promise<InstanceRecord[]> {
     return (
-      await this.request<{ instances: InstanceRecord[] }>(
-        'GET',
-        `/v1/instances${scopeQuery(opts)}`,
-      )
+      await this.request<{ instances: InstanceRecord[] }>('GET', `/v1/instances${scopeQuery(opts)}`)
     ).instances;
   }
   async get(id: string, scope?: ResolveScope): Promise<InstanceRecord> {
@@ -310,10 +307,7 @@ export class DaemonClient {
   }
   async downByHost(host: string): Promise<string[]> {
     return (
-      await this.request<{ stopped: string[] }>(
-        'DELETE',
-        `/v1/instances${scopeQuery({ host })}`,
-      )
+      await this.request<{ stopped: string[] }>('DELETE', `/v1/instances${scopeQuery({ host })}`)
     ).stopped;
   }
   async touch(id: string, scope?: ResolveScope): Promise<InstanceRecord> {

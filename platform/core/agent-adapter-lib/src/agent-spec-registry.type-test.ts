@@ -43,7 +43,7 @@ export type SpecCarriesProviderFields = Assert<
 // `class TestAdapter implements AgentAdapter`, and AgentAdapter.type resolving
 // to `never` would make it unimplementable.
 
-type EmptyRegistry = {};
+type EmptyRegistry = Record<never, never>;
 type EmptyKeys = keyof EmptyRegistry & string;
 type FallbackType = [EmptyKeys] extends [never] ? string : EmptyKeys;
 type FallbackSpec = [EmptyKeys] extends [never] ? BaseSpec & { type: string } : never;

@@ -218,6 +218,7 @@ export default function IntakePage() {
           <div className="space-y-2 max-h-[60vh] overflow-y-auto">
             {lines.map((l, i) => (
               <div
+                // biome-ignore lint/suspicious/noArrayIndexKey: the transcript is append-only, so an index is a stable key
                 key={i}
                 className={
                   'p-2 rounded-md text-sm ' +

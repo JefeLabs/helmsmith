@@ -75,7 +75,7 @@ function triggeredFlow(id: string, trigger: TriggerConfig): FlowDef {
   };
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: test helper mirrors approval-resume-integration.test.ts
+// `any`: test helper mirrors approval-resume-integration.test.ts
 function udsJson(
   socketPath: string,
   method: string,
