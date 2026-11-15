@@ -26,7 +26,7 @@
 # datasource is configured.
 
 services:
-  # central-data — Postgres 15 + Neo4j 5 in one container. Data is throwaway
+  # central-data — Postgres 17 + Neo4j 2026 in one container. Data is throwaway
   # (Flyway re-bootstraps schema on each spring-boot run), so the operational
   # risk of bundling is low. See central-data/Dockerfile + entrypoint.sh for
   # the multi-process supervision details (tini + bash trap, no supervisord).

@@ -4,7 +4,7 @@ The triad — `harness-server`, `edge-memory-server`, `edge-context-server` —
 runs as Node processes on the host (via `pnpm dev:servers`). This directory
 holds the things that **can't** be Node modules and need to run as containers:
 
-- the Neo4j 5 graph store that backs `edge-context-server`
+- the Neo4j 2026 graph store that backs `edge-context-server`
 - Docker Model Runner sidecars (embedder, agent-llm, agent-vl)
 - worker DevContainer template (instantiated per-job by `harness-server`)
 
@@ -44,7 +44,7 @@ holds the things that **can't** be Node modules and need to run as containers:
 └──────────────────────────────────────────────────────┘
 
        ┌──── neo4j-edge container ────────┐
-       │   neo4j:5-community              │
+       │   neo4j:2026-community           │
        │   bolt://localhost:7687 (host)   │
        │   bolt://neo4j-edge:7687 (net)   │
        └──────────────────────────────────┘

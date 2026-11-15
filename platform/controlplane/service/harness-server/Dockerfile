@@ -65,7 +65,7 @@ RUN bun build ./launcher.ts --outfile /out/launcher.js --target bun
 FROM oven/bun:1 AS bun-bin
 
 # ── Stage 3: runtime ─────────────────────────────────────────────────
-# Debian slim + tini + bun + the launcher bundle. Smaller than neo4j:5
+# Debian slim + tini + bun + the launcher bundle. Smaller than the neo4j base
 # since the harness has no graph-DB requirement.
 FROM debian:trixie-slim
 

@@ -8,7 +8,7 @@
 #   1. bun-bundler — installs workspace deps, runs `bun build` to emit a
 #      single self-contained launcher.js that imports both edge servers.
 #   2. (no separate intermediate) — bun binary pulled from oven/bun:1
-#   3. runtime — neo4j:5 base + bun binary + launcher bundle. Entrypoint
+#   3. runtime — neo4j:2026 base + bun binary + launcher bundle. Entrypoint
 #      runs neo4j (foreground) + the bun launcher (background) under tini.
 
 # ── Stage 1: bun bundler ─────────────────────────────────────────────
@@ -68,7 +68,7 @@ RUN bun build ./launcher.ts --outfile /out/launcher.js --target bun
 FROM oven/bun:1 AS bun-bin
 
 # ── Stage 3: runtime ─────────────────────────────────────────────────
-FROM neo4j:5
+FROM neo4j:2026
 
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends \

@@ -75,7 +75,7 @@ trap shutdown SIGTERM SIGINT
     kill -TERM 1 2>/dev/null || true
 ) &
 
-# ── Hand off to neo4j (foreground; uses neo4j:5's entrypoint logic) ──
+# ── Hand off to neo4j (foreground; uses the neo4j image's entrypoint logic) ──
 log "starting neo4j…"
 /startup/docker-entrypoint.sh neo4j &
 NEO4J_PID=$!
