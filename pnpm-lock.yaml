@@ -79,10 +79,10 @@ importers:
         version: 8.7.4(@types/node@24.19.2)
       '@opentui/core':
         specifier: 0.5.10
-        version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.1)
+        version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.2)
       '@opentui/react':
         specifier: 0.5.10
-        version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.1)(ws@8.22.0)
+        version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.2)(ws@8.22.0)
       bun:
         specifier: ^1.4.4
         version: 1.4.4
@@ -158,10 +158,10 @@ importers:
         version: 8.7.4(@types/node@24.19.2)
       '@opentui/core':
         specifier: 0.5.10
-        version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.1)
+        version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.2)
       '@opentui/react':
         specifier: 0.5.10
-        version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.1)(ws@8.22.0)
+        version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.2)(ws@8.22.0)
       bun:
         specifier: ^1.4.4
         version: 1.4.4
@@ -225,10 +225,10 @@ importers:
         version: link:../../platform/core/tui-view-components-lib
       '@opentui/core':
         specifier: 0.5.10
-        version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.1)
+        version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.2)
       '@opentui/react':
         specifier: 0.5.10
-        version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.1)(ws@8.22.0)
+        version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.2)(ws@8.22.0)
       bun:
         specifier: ^1.4.4
         version: 1.4.4
@@ -325,8 +325,8 @@ importers:
         specifier: workspace:*
         version: link:../../platform/core/cli-kit-lib
       '@modelcontextprotocol/sdk':
-        specifier: ^1.32.1
-        version: 1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7)
+        specifier: ^1.32.2
+        version: 1.32.2(@cfworker/json-schema@4.1.1)(zod@4.6.7)
       chalk:
         specifier: ^6.0.1
         version: 6.0.1
@@ -463,10 +463,10 @@ importers:
         version: 8.7.4(@types/node@24.19.2)
       '@opentui/core':
         specifier: 0.5.10
-        version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.1)
+        version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.2)
       '@opentui/react':
         specifier: 0.5.10
-        version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.1)(ws@8.22.0)
+        version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.2)(ws@8.22.0)
       bun:
         specifier: ^1.4.4
         version: 1.4.4
@@ -536,8 +536,8 @@ importers:
         specifier: ^15.0.0
         version: 15.0.0
       semver:
-        specifier: ^7.8.5
-        version: 7.8.5
+        specifier: ^7.8.6
+        version: 7.8.6
       yaml:
         specifier: ^2.9.1
         version: 2.9.1
@@ -564,8 +564,8 @@ importers:
         specifier: workspace:*
         version: link:../../platform/core/cli-kit-lib
       '@modelcontextprotocol/sdk':
-        specifier: ^1.32.1
-        version: 1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7)
+        specifier: ^1.32.2
+        version: 1.32.2(@cfworker/json-schema@4.1.1)(zod@4.6.7)
       chalk:
         specifier: ^6.0.1
         version: 6.0.1
@@ -623,8 +623,8 @@ importers:
         specifier: ^6.2.0
         version: 6.2.0
       web-tree-sitter:
-        specifier: ^0.27.1
-        version: 0.27.1
+        specifier: ^0.27.2
+        version: 0.27.2
     devDependencies:
       '@types/node':
         specifier: ^24.19.2
@@ -692,8 +692,8 @@ importers:
         specifier: 19.2.9
         version: 19.2.9(react@19.2.9)
       react-router-dom:
-        specifier: ^7.18.4
-        version: 7.18.4(react-dom@19.2.9(react@19.2.9))(react@19.2.9)
+        specifier: ^7.18.5
+        version: 7.18.5(react-dom@19.2.9(react@19.2.9))(react@19.2.9)
       recharts:
         specifier: ^3.10.1
         version: 3.10.1(@types/react@19.2.18)(react-dom@19.2.9(react@19.2.9))(react-is@18.3.1)(react@19.2.9)(redux@5.0.1)
@@ -745,8 +745,8 @@ importers:
   platform/core/agent-adapter-lib:
     devDependencies:
       '@anthropic-ai/claude-agent-sdk':
-        specifier: ^0.3.309
-        version: 0.3.309(@anthropic-ai/sdk@0.137.0(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7))(zod@4.6.7)
+        specifier: ^0.3.325
+        version: 0.3.325(@anthropic-ai/sdk@0.137.0(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.2(@cfworker/json-schema@4.1.1)(zod@4.6.7))(zod@4.6.7)
       '@anthropic-ai/sdk':
         specifier: ^0.137.0
         version: 0.137.0(zod@4.6.7)
@@ -755,7 +755,7 @@ importers:
         version: 3.1156.0
       '@google/genai':
         specifier: ^2.30.0
-        version: 2.30.0(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7))
+        version: 2.30.0(@modelcontextprotocol/sdk@1.32.2(@cfworker/json-schema@4.1.1)(zod@4.6.7))
       '@types/node':
         specifier: ^24.19.2
         version: 24.19.2
@@ -806,10 +806,10 @@ importers:
     devDependencies:
       '@opentui/core':
         specifier: 0.5.10
-        version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.1)
+        version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.2)
       '@opentui/react':
         specifier: 0.5.10
-        version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.1)(ws@8.22.0)
+        version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.2)(ws@8.22.0)
       '@types/node':
         specifier: ^24.19.2
         version: 24.19.2
@@ -836,8 +836,8 @@ importers:
         version: link:../flow-spec
     devDependencies:
       '@dagrejs/dagre':
-        specifier: ^3.1.1
-        version: 3.1.1
+        specifier: ^3.1.3
+        version: 3.1.3
       '@tailwindcss/vite':
         specifier: ^4.3.5
         version: 4.3.5(vite@8.3.5(@types/node@25.9.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
@@ -851,8 +851,8 @@ importers:
         specifier: ^6.1.2
         version: 6.1.2(vite@8.3.5(@types/node@25.9.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
       '@xyflow/react':
-        specifier: ^12.12.0
-        version: 12.12.0(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(immer@11.1.18)(react-dom@19.2.9(react@19.2.9))(react@19.2.9)
+        specifier: ^12.12.1
+        version: 12.12.1(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(immer@11.1.18)(react-dom@19.2.9(react@19.2.9))(react@19.2.9)
       react:
         specifier: 19.2.9
         version: 19.2.9
@@ -900,10 +900,10 @@ importers:
         version: link:../harness-server
       '@opentui/core':
         specifier: 0.5.10
-        version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.1)
+        version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.2)
       '@opentui/react':
         specifier: 0.5.10
-        version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.1)(ws@8.22.0)
+        version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.2)(ws@8.22.0)
       react:
         specifier: 19.2.9
         version: 19.2.9
@@ -1015,10 +1015,10 @@ importers:
     dependencies:
       '@opentui/core':
         specifier: 0.5.10
-        version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.1)
+        version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.2)
       '@opentui/react':
         specifier: 0.5.10
-        version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.1)(ws@8.22.0)
+        version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.2)(ws@8.22.0)
       react:
         specifier: 19.2.9
         version: 19.2.9
@@ -1096,10 +1096,10 @@ importers:
         version: link:../../core/tui-view-components-lib
       '@opentui/core':
         specifier: 0.5.10
-        version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.1)
+        version: 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.2)
       '@opentui/react':
         specifier: 0.5.10
-        version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.1)(ws@8.22.0)
+        version: 0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.2)(ws@8.22.0)
       bun:
         specifier: ^1.4.4
         version: 1.4.4
@@ -1110,8 +1110,8 @@ importers:
         specifier: ^4.0.3
         version: 4.0.3
       hono:
-        specifier: ^4.13.13
-        version: 4.13.13
+        specifier: ^4.13.18
+        version: 4.13.18
       react:
         specifier: 19.2.9
         version: 19.2.9
@@ -1176,49 +1176,49 @@ packages:
       react: 19.2.9
       react-dom: 19.2.9
 
-  '@anthropic-ai/claude-agent-sdk-darwin-arm64@0.3.309':
-    resolution: {integrity: sha512-qC93iDGEioaXqWsYazcZzNv3hd8d4VHkCFgb+AzvbkCWOzZHnRu1EqF4Iz5kCTLDs4VdMvCa1NkzlUwtTedBVw==}
+  '@anthropic-ai/claude-agent-sdk-darwin-arm64@0.3.325':
+    resolution: {integrity: sha512-0u8bTug2zH+zWE8CMiFrm/ldmH20uA9B/zhXpI7ATHFJnpPMdwTqE56CFM0m3LOwnNum0jpRn7XV1dn6Pf2pqA==}
     cpu: [arm64]
     os: [darwin]
 
-  '@anthropic-ai/claude-agent-sdk-darwin-x64@0.3.309':
-    resolution: {integrity: sha512-RvP0UOcYxn42c1lgByoMufHaMOH86U2ThGGFupOxBKATY4Q6WJd6M1CukQ/qygfgJ8lcxvK8GOOd3SIny4kQ8Q==}
+  '@anthropic-ai/claude-agent-sdk-darwin-x64@0.3.325':
+    resolution: {integrity: sha512-HD3YRFyM5H5QH2usS/WD6gobk3BEp2jq9dKyrkhAVdQIqFMlrcSrRhGA0i3R1IOLxtPAYkmDGepZ62k1kMOW9Q==}
     cpu: [x64]
     os: [darwin]
 
-  '@anthropic-ai/claude-agent-sdk-linux-arm64-musl@0.3.309':
-    resolution: {integrity: sha512-14ZD9hdUeobw+jr166YvCZyZwSYG3hDWi5S4yQxpSCrRuY/1z4Kl1AfymUlugiN3UT4Q1rif32K6GnjRJBvQdA==}
+  '@anthropic-ai/claude-agent-sdk-linux-arm64-musl@0.3.325':
+    resolution: {integrity: sha512-72y6QNRZC4eMCxne/wNsuwNHsViSkgFKlYMCUVXxmiR9gpIMd3rf++oJMIsSuEAQqzqT7jwCrdtibv6R4bx5PA==}
     cpu: [arm64]
     os: [linux]
 
-  '@anthropic-ai/claude-agent-sdk-linux-arm64@0.3.309':
-    resolution: {integrity: sha512-+8rQwzycuXTW2e/C+yotvP/SDiEDHxItdPvIriGAf2ixh7nPRjVuzHOj1tamgVO0J8nmpPvIAO4edzJ7VZCcAg==}
+  '@anthropic-ai/claude-agent-sdk-linux-arm64@0.3.325':
+    resolution: {integrity: sha512-28oVrCEN6M6MJP8Od4SK/scal1QdLbn5Sci+qL8j55l6csHtPeUYF9zdjWLniFKph43pejfZf5te/Vf/bwehkw==}
     cpu: [arm64]
     os: [linux]
 
-  '@anthropic-ai/claude-agent-sdk-linux-x64-musl@0.3.309':
-    resolution: {integrity: sha512-9ViOt4MGMiE2h8V+JUPR5l9F0ZTFuhKC3jawIL/MrMfYY1m2Gt3gcMuP7h7YK914a4tmpXrmITWrpTOu1WOZQQ==}
+  '@anthropic-ai/claude-agent-sdk-linux-x64-musl@0.3.325':
+    resolution: {integrity: sha512-BHewYUTd7mDLR5iHTVt6Q28gJKLC5C24b1H3NM0qGt9dxnjVUh1Lza52GzHY2Rb9hAPQymLSXWuVh1OFoFQatA==}
     cpu: [x64]
     os: [linux]
 
-  '@anthropic-ai/claude-agent-sdk-linux-x64@0.3.309':
-    resolution: {integrity: sha512-96G8/uTArlvTTg0qGtiP36W76Ug/YT0gMBh8KX7J2RigdOTrk6QkHtUeCzrw6yff5hEIzecN7EWNw6uh9USo4A==}
+  '@anthropic-ai/claude-agent-sdk-linux-x64@0.3.325':
+    resolution: {integrity: sha512-wXEWbDmNYiorY5EKASYjvQct8zHShUPmAS9N/IAsgPA/cx2vsOFqPQw8jRQKeaW6AmFgx7k/Wf7THalNXbMEkQ==}
     cpu: [x64]
     os: [linux]
 
-  '@anthropic-ai/claude-agent-sdk-win32-arm64@0.3.309':
-    resolution: {integrity: sha512-lDsmw5hguDF7KNMG2OvvKlG0Zgs9bKlrX9Gs2Rv/NjLVl0PIy1TUsh7byOsUR4pXwoMU1toyU1CKqBc/Au8hHw==}
+  '@anthropic-ai/claude-agent-sdk-win32-arm64@0.3.325':
+    resolution: {integrity: sha512-NH3I2o105oKK8lfJ5RlzCp+YTZn3qncwQ1xSzQ4jqn7LUddThIidpFU7B+TKQxh1X9eayAp7EtrBQ36mXflQwQ==}
     cpu: [arm64]
     os: [win32]
 
-  '@anthropic-ai/claude-agent-sdk-win32-x64@0.3.309':
-    resolution: {integrity: sha512-otGHQimz6F++6SajGqSAKBclRPGTn60cx+8u3dnhMa5yovKZ5SgChFgstFsiDIWr/ZBqpJysvFemSgHX61mlmQ==}
+  '@anthropic-ai/claude-agent-sdk-win32-x64@0.3.325':
+    resolution: {integrity: sha512-pjqVL++V/2oMJ6u1HdB608bcTUvzts1e8hX93Q8khasy2JB+R823bnvpQapcOurOWB3+v1X2JXIjXyWcGPJCQQ==}
     cpu: [x64]
     os: [win32]
 
-  '@anthropic-ai/claude-agent-sdk@0.3.309':
-    resolution: {integrity: sha512-Tou0fXBkxKJDcgT09v3Iv/Jd7bNgapgfAiHxGPctAADPFQhidfhZbcv7at1cVL0Lon5sbs+OzP/pEOigw2TI0A==}
-    engines: {node: '>=18.0.0'}
+  '@anthropic-ai/claude-agent-sdk@0.3.325':
+    resolution: {integrity: sha512-MhSm2Fhk3DA/hhjdCKXDZWlnykpPWJjX42SogllAHMplY9ZKT+Ltb8QPtQxpe225Imfs4A8IKaNE4biivA+fHg==}
+    engines: {node: '>=18.14.0'}
     peerDependencies:
       '@anthropic-ai/sdk': '>=0.93.0'
       '@modelcontextprotocol/sdk': ^1.29.0
@@ -1553,11 +1553,11 @@ packages:
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
     engines: {node: '>=0.1.90'}
 
-  '@dagrejs/dagre@3.1.1':
-    resolution: {integrity: sha512-zroZB1dFOFiGgv4Xcrn1DckB1o4aOikPqD2NDQPV0WM//CXGcS6xiD0rNkqHmw6FEg4tabt4nxPLwgCWT+Vb2A==}
+  '@dagrejs/dagre@3.1.3':
+    resolution: {integrity: sha512-X4aUTwOReZvthaZWOVHqlJ52/ZdhZFEM4+Lh/uR4XooUSLE6p71bcy7MPGzYnNUcNh+nj+i/qJQpCMIdQnSmrg==}
 
-  '@dagrejs/graphlib@4.0.5':
-    resolution: {integrity: sha512-7xrBTqIts3o+PMUZX97wSc+7TUbW+/rULzGNCTP6yooNVDXbzw4Wutg/H/xOutTB/c/k0YqOAavgPh4/Zk9PFA==}
+  '@dagrejs/graphlib@4.0.6':
+    resolution: {integrity: sha512-Hjv7hbfmSBMP4nVXMFt4gusqWWHghQF0qNT4V5KHo4Jatvd+2L5VHKFnnIjXVuDnaHIRz7ZuHSnlf0RuZkOwWA==}
 
   '@discordjs/builders@1.14.1':
     resolution: {integrity: sha512-gSKkhXLqs96TCzk66VZuHHl8z2bQMJFGwrXC0f33ngK+FLNau4hU1PYny3DNJfNdSH+gVMzE85/d5FQ2BpcNwQ==}
@@ -2018,8 +2018,8 @@ packages:
     resolution: {integrity: sha512-6QEf6yqFbETdwGITKq57aYoPfX/3K8XFNwsAlx0C1M7o8cb79sv1M3w+tWuWvIcSbNqrLF7OD7YpZMVVz335hQ==}
     engines: {node: '>=20.0.0'}
 
-  '@modelcontextprotocol/sdk@1.32.1':
-    resolution: {integrity: sha512-2DdE+SJDtzLEEWzY1ZjY7Q+VcPhcV1KisD3zI4u0XZyktsjHum1mwbMI+JaulUBi2OZk+KJAi2uPXzxichPkdw==}
+  '@modelcontextprotocol/sdk@1.32.2':
+    resolution: {integrity: sha512-SWsVtH/0vULSQStoZ6xxH2K09Li8fXYTMC64ZeogCdpZ3XSi1eCPOByV1OpuJxuI3OcmHhosDWYyii07tpPsLw==}
     engines: {node: '>=18'}
     peerDependencies:
       '@cfworker/json-schema': ^4.1.1
@@ -3444,8 +3444,8 @@ packages:
   '@webcontainer/env@1.1.1':
     resolution: {integrity: sha512-6aN99yL695Hi9SuIk1oC88l9o0gmxL1nGWWQ/kNy81HigJ0FoaoTXpytCj6ItzgyCEwA9kF1wixsTuv5cjsgng==}
 
-  '@xyflow/react@12.12.0':
-    resolution: {integrity: sha512-74oXI0Rgm1Eu33cHQAd74J6oVgCH9mbFyTVQbsGgp2kmWwh0HdtBr2VP04z8mbPD+M/xO69nqG5dDEt7/EN2rQ==}
+  '@xyflow/react@12.12.1':
+    resolution: {integrity: sha512-g41OHmP+GL5wDBQKpgYt8AF6RlB4CrABtiStXhCMqdItK6gPdSpsuDk8V0YtdyvIvMPTjDJvkuLkz0JbSYu5Cw==}
     peerDependencies:
       '@types/react': '>=17'
       '@types/react-dom': '>=17'
@@ -3457,8 +3457,8 @@ packages:
       '@types/react-dom':
         optional: true
 
-  '@xyflow/system@0.0.83':
-    resolution: {integrity: sha512-a//eDjez3WZF47aaPTfVUDD0OINOq+WVwBZCRTqG+m0a5euX8EwlJ4jMY1Wxz0Ocj4xOeekJ70V22Pq0ll8RJw==}
+  '@xyflow/system@0.0.84':
+    resolution: {integrity: sha512-96zfGFjH3oZ3T0MRdH4gJ0SlXuCIxbBuHVevZ4xry5UTxqjzjt010+LRdholgepq7jhrcaz1JNtzrETscwnkEA==}
 
   accepts@2.0.0:
     resolution: {integrity: sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng==}
@@ -4178,8 +4178,8 @@ packages:
   highlight.js@10.7.3:
     resolution: {integrity: sha512-tzcUFauisWKNHaRkN4Wjl/ZA07gENAjFl3J/c480dprkGTg5EQstgaNFqBfUqCq54kZRIEcreTsAgF/m2quD7A==}
 
-  hono@4.13.13:
-    resolution: {integrity: sha512-CQ46U0ZkAGmbT/4UxdzzGJpacP2IeKgY4a5/tOI9AABbpOMfK739wfDXmv1usCk+3RkKj1hQy4/fjhiwa2xlrA==}
+  hono@4.13.18:
+    resolution: {integrity: sha512-H9q/E1XizaWstJxUW881dmLxEj+t/TrGGnyxINkm4+sK0qUwsMtFdo2BWI9Vs3cIS19MU6b6iCijoUoEf4f3DA==}
     engines: {node: '>=16.9.0'}
 
   http-errors@2.0.1:
@@ -4929,15 +4929,15 @@ packages:
       redux:
         optional: true
 
-  react-router-dom@7.18.4:
-    resolution: {integrity: sha512-yrfmJHIpDG7taCpqKjT1G5B6q3O2K+RN8/fgNf0lTjCwiPbQ0ei6vXX9ZjQR+7ld8Tr7Z5xmyMnZ8YJrphWQUw==}
+  react-router-dom@7.18.5:
+    resolution: {integrity: sha512-9HcfDMU6JJ/fp6gJZYGwNE6RknVGS4kBjH1HkNw959mCJi70TVwdipQWv2FEol9uGpi+SZTFtVpJPtEQfayeOw==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       react: 19.2.9
       react-dom: 19.2.9
 
-  react-router@7.18.4:
-    resolution: {integrity: sha512-PUPQcMhMGRAslLcvtlPz/kmzBEWPhLdgLFrL7pLNepBL6dX0lWj4WD2cUYVgYCuT3jxvghYFg81cDTj44DhetQ==}
+  react-router@7.18.5:
+    resolution: {integrity: sha512-dTgvcXDOrLPrlLHrcZAqWveiK1hMSqN+rGAJzegP8HtmNkfRxOoshGWBNX3ZJ0cZjOHkRdlUJtaIhZMLLyGyPw==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       react: 19.2.9
@@ -5073,6 +5073,11 @@ packages:
 
   semver@7.8.5:
     resolution: {integrity: sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA==}
+    engines: {node: '>=10'}
+    hasBin: true
+
+  semver@7.8.6:
+    resolution: {integrity: sha512-9lpSSU4Mly3mrtruwLs1eLK6+gzbzqeBFwRNjIjE+9LuDpWdYctrQlQ3ej1Ilgi7gknpsTRnPoLP8DpCHqHIJw==}
     engines: {node: '>=10'}
     hasBin: true
 
@@ -5562,8 +5567,8 @@ packages:
       '@types/emscripten':
         optional: true
 
-  web-tree-sitter@0.27.1:
-    resolution: {integrity: sha512-qtx0VyUyNRHtL3ze7+v0hCKB/sLcAmY7ZAVp/ZK/bCj0yED8ptvNrr7Vd7DwDyKDWN9baqcUx4uaD2r2ql+6IA==}
+  web-tree-sitter@0.27.2:
+    resolution: {integrity: sha512-ZRo86GKI4aOSBAqOrPmCtriExI3xIzu1sNw/V6v3b4QGxrEmO19FGwbMNdyhw3MJLAZIw0xAV0oSpqX361eAyQ==}
 
   which@2.0.2:
     resolution: {integrity: sha512-BLI3Tl1TW3Pvl70l3yq3Y64i+awpwXqsGBYWkkqMtnbXgrMD+yj7rhW0kuEDxzJaYXGjEW5ogapKNMEKNMjibA==}
@@ -5695,44 +5700,44 @@ snapshots:
       react-transition-group: 4.4.5(react-dom@19.2.9(react@19.2.9))(react@19.2.9)
       use-sync-external-store: 1.7.0(react@19.2.9)
 
-  '@anthropic-ai/claude-agent-sdk-darwin-arm64@0.3.309':
+  '@anthropic-ai/claude-agent-sdk-darwin-arm64@0.3.325':
     optional: true
 
-  '@anthropic-ai/claude-agent-sdk-darwin-x64@0.3.309':
+  '@anthropic-ai/claude-agent-sdk-darwin-x64@0.3.325':
     optional: true
 
-  '@anthropic-ai/claude-agent-sdk-linux-arm64-musl@0.3.309':
+  '@anthropic-ai/claude-agent-sdk-linux-arm64-musl@0.3.325':
     optional: true
 
-  '@anthropic-ai/claude-agent-sdk-linux-arm64@0.3.309':
+  '@anthropic-ai/claude-agent-sdk-linux-arm64@0.3.325':
     optional: true
 
-  '@anthropic-ai/claude-agent-sdk-linux-x64-musl@0.3.309':
+  '@anthropic-ai/claude-agent-sdk-linux-x64-musl@0.3.325':
     optional: true
 
-  '@anthropic-ai/claude-agent-sdk-linux-x64@0.3.309':
+  '@anthropic-ai/claude-agent-sdk-linux-x64@0.3.325':
     optional: true
 
-  '@anthropic-ai/claude-agent-sdk-win32-arm64@0.3.309':
+  '@anthropic-ai/claude-agent-sdk-win32-arm64@0.3.325':
     optional: true
 
-  '@anthropic-ai/claude-agent-sdk-win32-x64@0.3.309':
+  '@anthropic-ai/claude-agent-sdk-win32-x64@0.3.325':
     optional: true
 
-  '@anthropic-ai/claude-agent-sdk@0.3.309(@anthropic-ai/sdk@0.137.0(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7))(zod@4.6.7)':
+  '@anthropic-ai/claude-agent-sdk@0.3.325(@anthropic-ai/sdk@0.137.0(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.2(@cfworker/json-schema@4.1.1)(zod@4.6.7))(zod@4.6.7)':
     dependencies:
       '@anthropic-ai/sdk': 0.137.0(zod@4.6.7)
-      '@modelcontextprotocol/sdk': 1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7)
+      '@modelcontextprotocol/sdk': 1.32.2(@cfworker/json-schema@4.1.1)(zod@4.6.7)
       zod: 4.6.7
     optionalDependencies:
-      '@anthropic-ai/claude-agent-sdk-darwin-arm64': 0.3.309
-      '@anthropic-ai/claude-agent-sdk-darwin-x64': 0.3.309
-      '@anthropic-ai/claude-agent-sdk-linux-arm64': 0.3.309
-      '@anthropic-ai/claude-agent-sdk-linux-arm64-musl': 0.3.309
-      '@anthropic-ai/claude-agent-sdk-linux-x64': 0.3.309
-      '@anthropic-ai/claude-agent-sdk-linux-x64-musl': 0.3.309
-      '@anthropic-ai/claude-agent-sdk-win32-arm64': 0.3.309
-      '@anthropic-ai/claude-agent-sdk-win32-x64': 0.3.309
+      '@anthropic-ai/claude-agent-sdk-darwin-arm64': 0.3.325
+      '@anthropic-ai/claude-agent-sdk-darwin-x64': 0.3.325
+      '@anthropic-ai/claude-agent-sdk-linux-arm64': 0.3.325
+      '@anthropic-ai/claude-agent-sdk-linux-arm64-musl': 0.3.325
+      '@anthropic-ai/claude-agent-sdk-linux-x64': 0.3.325
+      '@anthropic-ai/claude-agent-sdk-linux-x64-musl': 0.3.325
+      '@anthropic-ai/claude-agent-sdk-win32-arm64': 0.3.325
+      '@anthropic-ai/claude-agent-sdk-win32-x64': 0.3.325
 
   '@anthropic-ai/sdk@0.137.0(zod@4.6.7)':
     dependencies:
@@ -6133,7 +6138,7 @@ snapshots:
       '@changesets/types': 7.0.0
       import-meta-resolve: 4.2.0
       jsonc-parser: 3.3.1
-      semver: 7.8.5
+      semver: 7.8.6
 
   '@changesets/assemble-release-plan@7.0.0':
     dependencies:
@@ -6141,7 +6146,7 @@ snapshots:
       '@changesets/get-dependents-graph': 3.0.0
       '@changesets/should-skip-package': 1.0.0
       '@changesets/types': 7.0.0
-      semver: 7.8.5
+      semver: 7.8.6
 
   '@changesets/changelog-git@1.0.0':
     dependencies:
@@ -6189,7 +6194,7 @@ snapshots:
   '@changesets/get-dependents-graph@3.0.0':
     dependencies:
       '@changesets/types': 7.0.0
-      semver: 7.8.5
+      semver: 7.8.6
 
   '@changesets/git@4.0.1':
     dependencies:
@@ -6243,11 +6248,11 @@ snapshots:
   '@colors/colors@1.5.0':
     optional: true
 
-  '@dagrejs/dagre@3.1.1':
+  '@dagrejs/dagre@3.1.3':
     dependencies:
-      '@dagrejs/graphlib': 4.0.5
+      '@dagrejs/graphlib': 4.0.6
 
-  '@dagrejs/graphlib@4.0.5': {}
+  '@dagrejs/graphlib@4.0.6': {}
 
   '@discordjs/builders@1.14.1':
     dependencies:
@@ -6408,14 +6413,14 @@ snapshots:
   '@esbuild/win32-x64@0.28.2':
     optional: true
 
-  '@google/genai@2.30.0(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7))':
+  '@google/genai@2.30.0(@modelcontextprotocol/sdk@1.32.2(@cfworker/json-schema@4.1.1)(zod@4.6.7))':
     dependencies:
       google-auth-library: 10.9.1
       p-retry: 4.6.2
       protobufjs: 7.6.6
       ws: 8.22.0
     optionalDependencies:
-      '@modelcontextprotocol/sdk': 1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7)
+      '@modelcontextprotocol/sdk': 1.32.2(@cfworker/json-schema@4.1.1)(zod@4.6.7)
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -6452,9 +6457,9 @@ snapshots:
     transitivePeerDependencies:
       - tailwind-merge
 
-  '@hono/node-server@1.19.17(hono@4.13.13)':
+  '@hono/node-server@1.19.17(hono@4.13.18)':
     dependencies:
-      hono: 4.13.13
+      hono: 4.13.18
 
   '@inquirer/ansi@2.0.9': {}
 
@@ -6688,9 +6693,9 @@ snapshots:
       tinyglobby: 0.2.17
       yaml: 2.9.1
 
-  '@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7)':
+  '@modelcontextprotocol/sdk@1.32.2(@cfworker/json-schema@4.1.1)(zod@4.6.7)':
     dependencies:
-      '@hono/node-server': 1.19.17(hono@4.13.13)
+      '@hono/node-server': 1.19.17(hono@4.13.18)
       ajv: 8.20.0
       ajv-formats: 3.0.1(ajv@8.20.0)
       content-type: 1.0.5
@@ -6700,7 +6705,7 @@ snapshots:
       eventsource-parser: 3.1.1
       express: 5.2.1
       express-rate-limit: 8.7.0(express@5.2.1)
-      hono: 4.13.13
+      hono: 4.13.18
       jose: 6.2.12
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
@@ -6940,14 +6945,14 @@ snapshots:
     transitivePeerDependencies:
       - typescript
 
-  '@opentui/core@0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.1)':
+  '@opentui/core@0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.2)':
     dependencies:
       bun-ffi-structs: 0.3.1(typescript@7.0.2)
       diff: 9.0.0
       marked: 17.0.1
       string-width: 7.2.0
       strip-ansi: 7.1.2
-      web-tree-sitter: 0.27.1
+      web-tree-sitter: 0.27.2
     optionalDependencies:
       '@opentui/core-darwin-arm64': 0.5.10
       '@opentui/core-darwin-x64': 0.5.10
@@ -6971,9 +6976,9 @@ snapshots:
       - typescript
       - web-tree-sitter
 
-  '@opentui/react@0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.1)(ws@8.22.0)':
+  '@opentui/react@0.5.10(react-devtools-core@7.0.1)(react@19.2.9)(typescript@7.0.2)(web-tree-sitter@0.27.2)(ws@8.22.0)':
     dependencies:
-      '@opentui/core': 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.1)
+      '@opentui/core': 0.5.10(typescript@7.0.2)(web-tree-sitter@0.27.2)
       react: 19.2.9
       react-devtools-core: 7.0.1
       react-reconciler: 0.33.0(react@19.2.9)
@@ -7916,9 +7921,9 @@ snapshots:
 
   '@webcontainer/env@1.1.1': {}
 
-  '@xyflow/react@12.12.0(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(immer@11.1.18)(react-dom@19.2.9(react@19.2.9))(react@19.2.9)':
+  '@xyflow/react@12.12.1(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(immer@11.1.18)(react-dom@19.2.9(react@19.2.9))(react@19.2.9)':
     dependencies:
-      '@xyflow/system': 0.0.83
+      '@xyflow/system': 0.0.84
       classcat: 5.0.5
       react: 19.2.9
       react-dom: 19.2.9(react@19.2.9)
@@ -7929,7 +7934,7 @@ snapshots:
     transitivePeerDependencies:
       - immer
 
-  '@xyflow/system@0.0.83':
+  '@xyflow/system@0.0.84':
     dependencies:
       '@types/d3-drag': 3.0.7
       '@types/d3-interpolate': 3.0.4
@@ -8662,7 +8667,7 @@ snapshots:
 
   highlight.js@10.7.3: {}
 
-  hono@4.13.13: {}
+  hono@4.13.18: {}
 
   http-errors@2.0.1:
     dependencies:
@@ -9000,7 +9005,7 @@ snapshots:
 
   node-abi@3.92.0:
     dependencies:
-      semver: 7.8.5
+      semver: 7.8.6
 
   node-addon-api@8.9.2: {}
 
@@ -9384,13 +9389,13 @@ snapshots:
       '@types/react': 19.2.18
       redux: 5.0.1
 
-  react-router-dom@7.18.4(react-dom@19.2.9(react@19.2.9))(react@19.2.9):
+  react-router-dom@7.18.5(react-dom@19.2.9(react@19.2.9))(react@19.2.9):
     dependencies:
       react: 19.2.9
       react-dom: 19.2.9(react@19.2.9)
-      react-router: 7.18.4(react-dom@19.2.9(react@19.2.9))(react@19.2.9)
+      react-router: 7.18.5(react-dom@19.2.9(react@19.2.9))(react@19.2.9)
 
-  react-router@7.18.4(react-dom@19.2.9(react@19.2.9))(react@19.2.9):
+  react-router@7.18.5(react-dom@19.2.9(react@19.2.9))(react@19.2.9):
     dependencies:
       cookie: 1.1.1
       react: 19.2.9
@@ -9577,6 +9582,8 @@ snapshots:
   semver@6.3.1: {}
 
   semver@7.8.5: {}
+
+  semver@7.8.6: {}
 
   send@1.2.1:
     dependencies:
@@ -10084,7 +10091,7 @@ snapshots:
 
   web-tree-sitter@0.25.10: {}
 
-  web-tree-sitter@0.27.1: {}
+  web-tree-sitter@0.27.2: {}
 
   which@2.0.2:
     dependencies:
