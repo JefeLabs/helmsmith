@@ -180,7 +180,7 @@ export function renderToTerminal(templateName: string, context: Record<string, u
  * Convert a markdown string to ANSI-styled terminal output.
  */
 function markdownToTerminal(markdown: string): string {
-  marked.use(markedTerminal({ tab: 2 }) as Record<string, unknown>);
+  marked.use(markedTerminal({ tab: 2 }));
   const result = marked.parse(markdown);
   // marked.parse can return string | Promise<string>; we use sync mode
   if (typeof result === 'string') {
