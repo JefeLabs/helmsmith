@@ -282,8 +282,7 @@ async function subscribeCatalogEvents(): Promise<void> {
         const { done, value } = await reader.read();
         if (done) break;
         buf += decoder.decode(value, { stream: true });
-        let sep: number;
-        while ((sep = buf.indexOf('\n\n')) >= 0) {
+        for (let sep = buf.indexOf('\n\n'); sep >= 0; sep = buf.indexOf('\n\n')) {
           const frame = buf.slice(0, sep);
           buf = buf.slice(sep + 2);
           await handleSseFrame(frame);

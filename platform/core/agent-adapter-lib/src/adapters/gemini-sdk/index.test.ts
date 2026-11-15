@@ -190,9 +190,9 @@ describe('GeminiSdkAdapter — text streaming', () => {
       }),
     );
     expect(lastParams?.model).toBe('gemini-2.5-pro');
-    expect((lastParams?.config as { systemInstruction?: string }).systemInstruction).toBe(
-      'be terse',
-    );
+    expect(
+      (lastParams?.config as { systemInstruction?: string } | undefined)?.systemInstruction,
+    ).toBe('be terse');
   });
 });
 
@@ -240,7 +240,7 @@ describe('GeminiSdkAdapter — tool use', () => {
     expect(chunks.at(-1)).toEqual({ type: 'message-stop', finishReason: 'tool_use' });
 
     // tools forwarded as functionDeclarations
-    const tools = (lastParams?.config as { tools?: unknown[] }).tools;
+    const tools = (lastParams?.config as { tools?: unknown[] } | undefined)?.tools;
     expect(tools).toEqual([
       { functionDeclarations: [expect.objectContaining({ name: 'read_file' })] },
     ]);
@@ -274,7 +274,7 @@ describe('GeminiSdkAdapter — tool use', () => {
 
 describe('GeminiSdkAdapter — toolChoice', () => {
   function toolConfigOf(): unknown {
-    return (lastParams?.config as { toolConfig?: unknown }).toolConfig;
+    return (lastParams?.config as { toolConfig?: unknown } | undefined)?.toolConfig;
   }
 
   it("maps 'auto' → functionCallingConfig mode AUTO", async () => {

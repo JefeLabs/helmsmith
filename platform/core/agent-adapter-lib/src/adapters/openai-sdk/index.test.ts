@@ -230,7 +230,9 @@ describe('OpenAiSdkAdapter — tool use', () => {
     expect(chunks.at(-1)).toEqual({ type: 'message-stop', finishReason: 'tool_use' });
 
     // tools forwarded
-    expect((lastBody?.tools as Array<{ function: { name: string } }>)[0]?.function.name).toBe('f');
+    expect(
+      (lastBody?.tools as Array<{ function: { name: string } }> | undefined)?.[0]?.function.name,
+    ).toBe('f');
   });
 });
 

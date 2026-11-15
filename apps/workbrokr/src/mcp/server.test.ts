@@ -154,7 +154,7 @@ describe('work_pr input surface', () => {
     const client = await connected(f.main);
     const tool = (await client.listTools()).tools.find((t) => t.name === 'work_pr');
     const props = Object.keys(
-      (tool?.inputSchema as { properties?: Record<string, unknown> }).properties ?? {},
+      (tool?.inputSchema as { properties?: Record<string, unknown> } | undefined)?.properties ?? {},
     );
     expect(props).toContain('body');
     expect(props).not.toContain('bodyFile');

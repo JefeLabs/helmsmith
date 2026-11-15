@@ -43,23 +43,24 @@ async function snapshot() {
     users: users,
   };
   try {
-    var res = await fetch(ENDPOINT, {
+    const res = await fetch(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
     if (!res.ok) {
       consecutiveErrors++;
-      status('error', 'tracker replied ' + res.status + ' (x' + consecutiveErrors + ')');
+      status('error', `tracker replied ${res.status} (x${consecutiveErrors})`);
       return;
     }
     consecutiveErrors = 0;
-    status('ok', users.length + ' active user(s) posted');
+    status('ok', `${users.length} active user(s) posted`);
   } catch (err) {
     consecutiveErrors++;
     status(
       'error',
-      'POST failed: ' + (err && err.message ? err.message : err) + ' (x' + consecutiveErrors + ')',
+      // biome-ignore lint/complexity/useOptionalChain: code.js ships untranspiled to Figma's plugin sandbox; forum reports of `?.` syntax errors there, so keep ES2017 syntax
+      `POST failed: ${err && err.message ? err.message : err} (x${consecutiveErrors})`,
     );
   }
 }

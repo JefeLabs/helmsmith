@@ -1066,7 +1066,9 @@ export function rrfFuse(
       .filter((c) => c[key] != null)
       .sort((a, b) => (b[key] as number) - (a[key] as number));
     const m = new Map<string, number>();
-    ranked.forEach((c, i) => m.set(c.nodeId, i + 1));
+    ranked.forEach((c, i) => {
+      m.set(c.nodeId, i + 1);
+    });
     return m;
   };
   const vRank = rankBy('vectorScore');
