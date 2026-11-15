@@ -78,7 +78,7 @@ function agentFlow(id: string, agentId: string, over: Partial<FlowDef> = {}): Fl
   };
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: test helper mirrors approval-resume-integration.test.ts
+// `any`: test helper mirrors approval-resume-integration.test.ts
 function udsJson(
   socketPath: string,
   method: string,

@@ -761,9 +761,7 @@ async function handleSteering(args: string[]) {
     const sinceStr = parsed.flags.since;
     const sinceCount = sinceStr ? Number(sinceStr) : 0;
     if (sinceStr && Number.isNaN(sinceCount)) {
-      die(
-        '--since must be an integer count of already-seen steering entries (got: ' + sinceStr + ')',
-      );
+      die(`--since must be an integer count of already-seen steering entries (got: ${sinceStr})`);
     }
     const timeoutMs = Number(parsed.flags.timeout ?? '30000');
     const start = Date.now();

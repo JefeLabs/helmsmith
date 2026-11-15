@@ -112,7 +112,7 @@ function validateFlow(
   }
   if (kind === 'job-definition') {
     const out = flow.output as { kind?: string } | undefined;
-    if (!out || out.kind !== 'job-intent') {
+    if (out?.kind !== 'job-intent') {
       throw new CatalogError(`${where}: kind 'job-definition' requires output.kind 'job-intent'`);
     }
   }

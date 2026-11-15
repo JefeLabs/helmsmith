@@ -958,7 +958,7 @@ function formatQueryResult(r: MemoryQueryResult): string {
   const lines: string[] = [];
   for (const e of r.entries) {
     const valueStr = typeof e.value === 'string' ? e.value : JSON.stringify(e.value);
-    const snippet = valueStr.length > 80 ? valueStr.slice(0, 80) + '…' : valueStr;
+    const snippet = valueStr.length > 80 ? `${valueStr.slice(0, 80)}…` : valueStr;
     const scopeBits = Object.entries(e.scope)
       .filter(([, v]) => v !== undefined)
       .map(([k, v]) => `${k}=${v}`)
@@ -967,5 +967,5 @@ function formatQueryResult(r: MemoryQueryResult): string {
     lines.push(`  ${snippet}`);
     lines.push(`  ${e.createdAt}`);
   }
-  return lines.join('\n') + '\n';
+  return `${lines.join('\n')}\n`;
 }

@@ -89,7 +89,7 @@ export class LocalAmbientGitHubResolver implements GitHubCredentialResolver {
 
   async resolve(_repo: GitHubRepoRef): Promise<GitHubCredential | null> {
     const tokenRes = await runCapture(this.ghBin, ['auth', 'token']).catch(() => null);
-    if (!tokenRes || tokenRes.code !== 0) return null;
+    if (tokenRes?.code !== 0) return null;
     const token = tokenRes.stdout.trim();
     if (!token) return null;
 

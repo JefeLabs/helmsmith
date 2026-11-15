@@ -513,7 +513,6 @@ export function makeAnthropicMockModule(): Record<string, unknown> {
     static APIError = APIError;
     static APIUserAbortError = APIUserAbortError;
     messages = { stream };
-    constructor(_opts?: unknown) {}
   }
   return { default: MockAnthropic, APIUserAbortError };
 }
@@ -551,7 +550,6 @@ export function makeOpenAiMockModule(): Record<string, unknown> {
         },
       },
     };
-    constructor(_opts?: unknown) {}
   }
   return { default: MockOpenAI };
 }
@@ -603,7 +601,6 @@ export function makeBedrockMockModule(): Record<string, unknown> {
     }
   }
   class BedrockRuntimeClient {
-    constructor(_config?: unknown) {}
     send = async (
       command: { input?: Obj },
       opts?: { abortSignal?: AbortSignal },

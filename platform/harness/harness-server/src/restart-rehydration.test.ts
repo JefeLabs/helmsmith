@@ -102,7 +102,7 @@ function udsJson(
   path: string,
   body?: unknown,
   headers?: Record<string, string>,
-  // biome-ignore lint/suspicious/noExplicitAny: test helper mirrors approval-resume-integration.test.ts
+  // `any`: test helper mirrors approval-resume-integration.test.ts
 ): Promise<{ status: number; body: any }> {
   return new Promise((resolve, reject) => {
     const payload = body === undefined ? undefined : JSON.stringify(body);

@@ -157,7 +157,7 @@ describe('GithubIssuesFetcher', () => {
     const f = new GithubIssuesFetcher({
       fetchImpl: fakeFetch((_url, init) => {
         const headers = (init?.headers ?? {}) as Record<string, string>;
-        capturedAuth = headers['authorization'] ?? '';
+        capturedAuth = headers.authorization ?? '';
         return new Response('[]', { status: 200 });
       }),
       envGet: (k) => (k === 'GITHUB_TOKEN' ? 'mytoken' : undefined),
@@ -236,7 +236,7 @@ describe('JiraFetcher', () => {
     const f = new JiraFetcher({
       fetchImpl: fakeFetch((_u, init) => {
         const headers = (init?.headers ?? {}) as Record<string, string>;
-        captured = headers['authorization'] ?? '';
+        captured = headers.authorization ?? '';
         return new Response(JSON.stringify({ issues: [], total: 0, startAt: 0 }), { status: 200 });
       }),
       envGet: jiraEnv(),
@@ -252,7 +252,7 @@ describe('JiraFetcher', () => {
     const f = new JiraFetcher({
       fetchImpl: fakeFetch((_u, init) => {
         const headers = (init?.headers ?? {}) as Record<string, string>;
-        captured = headers['authorization'] ?? '';
+        captured = headers.authorization ?? '';
         return new Response(JSON.stringify({ issues: [], total: 0, startAt: 0 }), { status: 200 });
       }),
       envGet: jiraEnv({ JIRA_AUTH_SCHEME: 'Bearer' }),

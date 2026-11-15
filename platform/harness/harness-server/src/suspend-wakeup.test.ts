@@ -87,7 +87,7 @@ function suspendFlow(trigger: SuspendTag['trigger']): FlowDef {
   return { id: 'work-then-build', nodes, edges };
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: test helper mirrors approval-resume-integration.test.ts
+// `any`: test helper mirrors approval-resume-integration.test.ts
 function udsJson(
   socketPath: string,
   method: string,

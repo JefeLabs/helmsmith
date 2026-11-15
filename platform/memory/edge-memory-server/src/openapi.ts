@@ -40,7 +40,7 @@ import {
   SnapshotResultSchema,
 } from './schemas.ts';
 
-// biome-ignore lint/suspicious/noExplicitAny: spec output is loosely typed by design
+// `any`: spec output is loosely typed by design
 type JsonSchema = Record<string, any>;
 
 interface OpenApiOperation {

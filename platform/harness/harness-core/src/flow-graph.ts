@@ -310,7 +310,7 @@ export function compileFlow(opts: CompileFlowOptions) {
     throw new Error(`flow "${flow.id}" has no trigger node`);
   }
 
-  // biome-ignore lint/suspicious/noExplicitAny: builder type evolves per addNode call (LangGraph's chained-builder generics rotate the type after each addNode/addEdge). The runtime is correct; the static path-dependent types are too narrow for our dynamic-iteration construction.
+  // `any`: builder type evolves per addNode call (LangGraph's chained-builder generics rotate the type after each addNode/addEdge). The runtime is correct; the static path-dependent types are too narrow for our dynamic-iteration construction.
   const builder: any = new StateGraph(FlowState);
 
   // Forward-edge (sequence | conditional) sources per target — the
@@ -1064,7 +1064,7 @@ function rewriteFlowForInterruptTags(flow: FlowDef): RewrittenFlow {
  * string) — purely best-effort enrichment, never throws.
  */
 function extractPrUrlFromOutput(output: string): string | undefined {
-  if (!output || output[0] !== '{') return undefined;
+  if (output?.[0] !== '{') return undefined;
   try {
     const parsed = JSON.parse(output) as Record<string, unknown>;
     return typeof parsed.prUrl === 'string' ? parsed.prUrl : undefined;

@@ -430,7 +430,7 @@ export function FlowDesigner({
   const selectedSubflow = useMemo(() => {
     if (selection?.type !== 'node') return null;
     const step = nodes.find((n) => n.id === selection.id)?.data.step;
-    if (!step || step.kind !== 'subflow') return null;
+    if (step?.kind !== 'subflow') return null;
     const cfg = step.config as { flowId?: string; version?: string };
     const target = cfg.flowId ?? '';
     return {

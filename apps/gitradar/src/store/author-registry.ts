@@ -43,6 +43,7 @@ export function mergeDiscoveredAuthors(
         // Keep the most recent name (may have changed)
         name: d.name,
         identifier: identifier ?? existing.identifier,
+        // biome-ignore lint/complexity/useMathMinMax: ISO date strings compare lexicographically; Math.max would return NaN
         lastSeen: d.date > existing.lastSeen ? d.date : existing.lastSeen,
         reposSeenIn: [...reposSet],
         commitCount: existing.commitCount + d.commitCount,

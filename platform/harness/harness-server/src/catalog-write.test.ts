@@ -75,7 +75,7 @@ function agentFlow(id: string): FlowDef {
   };
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: test helper mirrors trigger-ingress.test.ts
+// `any`: test helper mirrors trigger-ingress.test.ts
 function udsJson(
   socketPath: string,
   method: string,

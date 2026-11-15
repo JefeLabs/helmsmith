@@ -1268,9 +1268,7 @@ async function handleSubmitJob(
   // that's been the default since slice 6.
   if (ctx.broker) {
     const broker = ctx.broker;
-    const adapterFactory = ctx.adapterFactory;
     const resolver = ctx.resolver;
-    const githubResolver = ctx.githubResolver;
     const tokens = ctx.tokens;
     const onJobTerminal = (agentId: string | null, status: string) => {
       // Token accumulator detaches on job-level terminal transitions
@@ -1771,7 +1769,7 @@ function armSlaTimer(
     () => {
       ctx.approvalTimers.delete(jobId);
       const job = ctx.jobs.get(jobId);
-      if (!job || job.status !== 'awaiting-approval' || !ctx.pendingApprovals.has(jobId)) return;
+      if (job?.status !== 'awaiting-approval' || !ctx.pendingApprovals.has(jobId)) return;
       console.warn(
         `[harness] approval SLA of ${request.slaMs}ms expired for job ${jobId} — auto-rejecting`,
       );
@@ -1816,7 +1814,7 @@ function armSuspendTimer(
     () => {
       ctx.suspendTimers.delete(jobId);
       const job = ctx.jobs.get(jobId);
-      if (!job || job.status !== 'suspended' || !ctx.pendingSuspends.has(jobId)) return;
+      if (job?.status !== 'suspended' || !ctx.pendingSuspends.has(jobId)) return;
       executeResume(ctx, jobId, { wake: 'timer', firedAt: new Date().toISOString() });
     },
     Math.max(0, remaining),
@@ -1854,7 +1852,7 @@ function handleIngestEvent(res: ServerResponse, body: unknown, ctx: ServerCtx): 
     if (request.trigger.eventType !== event.type) continue;
     if (request.trigger.matcher && !evalExpression(request.trigger.matcher, envelope)) continue;
     const job = ctx.jobs.get(jobId);
-    if (!job || job.status !== 'suspended') continue;
+    if (job?.status !== 'suspended') continue;
     woke.push(jobId);
     executeResume(ctx, jobId, { wake: 'event', event: envelope });
   }
@@ -1863,7 +1861,7 @@ function handleIngestEvent(res: ServerResponse, body: unknown, ctx: ServerCtx): 
   const started: string[] = [];
   for (const flow of ctx.catalog.flows) {
     const cfg = triggerConfigOf(flow);
-    if (!cfg || cfg.kind !== 'event' || cfg.eventType !== event.type) continue;
+    if (cfg?.kind !== 'event' || cfg.eventType !== event.type) continue;
     if (cfg.matcher && !evalExpression(cfg.matcher, envelope)) continue;
     const spawnResult = spawnFlowJob(ctx, flow, {
       input: JSON.stringify(envelope),
@@ -2001,7 +1999,7 @@ function handleIngestMessage(res: ServerResponse, body: unknown, ctx: ServerCtx)
   const started: string[] = [];
   for (const flow of ctx.catalog.flows) {
     const cfg = triggerConfigOf(flow);
-    if (!cfg || cfg.kind !== 'message' || cfg.channel !== msg.channel) continue;
+    if (cfg?.kind !== 'message' || cfg.channel !== msg.channel) continue;
     const spawnResult = spawnFlowJob(ctx, flow, {
       input: msg.text,
       triggeredBy: `message:${msg.channel}`,

@@ -120,7 +120,6 @@ export function templateVariables(m: {
 }
 
 function defaultEnv(services: string[]): Manifest['env'] {
-  // biome-ignore lint/suspicious/noTemplateCurlyInString: these ARE the manifest's template placeholders
   const template: Record<string, string> = {
     // biome-ignore lint/suspicious/noTemplateCurlyInString: manifest template placeholder
     SLOT: '${SLOT}',

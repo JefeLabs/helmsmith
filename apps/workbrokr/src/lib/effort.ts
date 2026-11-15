@@ -459,7 +459,7 @@ export async function startEffort(ctx: Ctx, o: StartOptions): Promise<StartResul
       await sleep(200);
       open = ctx.registry.openEffortFor(m.project, o.area, o.task);
     }
-    if (!open || open.state !== 'active') {
+    if (open?.state !== 'active') {
       throw new WorkkitError(
         'EFFORT_NOT_FOUND',
         `effort on ${effortLabel(o.area, o.task)} did not become active in time to join`,

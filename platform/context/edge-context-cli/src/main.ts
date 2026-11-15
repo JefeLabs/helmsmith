@@ -372,7 +372,7 @@ async function cmdSearch(
     for (const pair of predicateWeightStr.split(',')) {
       const [k, v] = pair.split('=');
       const n = Number(v);
-      if (k && k.trim() && Number.isFinite(n)) w[k.trim()] = n;
+      if (k?.trim() && Number.isFinite(n)) w[k.trim()] = n;
     }
     if (Object.keys(w).length > 0) body.expandPredicateWeights = w;
   }
@@ -505,7 +505,7 @@ function formatTraverse(r: TraverseResult): string {
       lines.push(`  ${e.fromNodeId} -[:${e.type}]-> ${e.toNodeId}`);
     }
   }
-  return lines.join('\n') + '\n';
+  return `${lines.join('\n')}\n`;
 }
 
 function formatRelated(r: RelatedResult): string {
@@ -520,7 +520,7 @@ function formatRelated(r: RelatedResult): string {
       `  [d=${h.distance}] ${h.label.padEnd(12)} ${h.nodeId}  ${name !== h.nodeId ? `(${name})` : ''}`,
     );
   }
-  return lines.join('\n') + '\n';
+  return `${lines.join('\n')}\n`;
 }
 
 function formatSearch(r: ContextQueryResult): string {
@@ -531,13 +531,13 @@ function formatSearch(r: ContextQueryResult): string {
   lines.push('');
   for (const h of r.hits) {
     const text = (h.properties.text ?? h.properties.title ?? h.properties.name ?? '') as string;
-    const snippet = text.length > 100 ? text.slice(0, 100) + '…' : text;
+    const snippet = text.length > 100 ? `${text.slice(0, 100)}…` : text;
     lines.push(
       `  ${h.score.toFixed(3)}  ${(h.via ?? '?').padEnd(16)} ${(h.domain ?? '-').padEnd(8)} ${h.label.padEnd(12)} ${h.nodeId}`,
     );
     if (snippet) lines.push(`         ${snippet}`);
   }
-  return lines.join('\n') + '\n';
+  return `${lines.join('\n')}\n`;
 }
 
 function formatCypher(r: CypherResult): string {
@@ -549,7 +549,7 @@ function formatCypher(r: CypherResult): string {
   for (const row of r.rows) {
     lines.push(JSON.stringify(row));
   }
-  return lines.join('\n') + '\n';
+  return `${lines.join('\n')}\n`;
 }
 
 // ─── ingest / upload / events command handlers ───────────────────────
@@ -837,7 +837,7 @@ async function cmdIngests(
 
   if (cancel) {
     if (!positional) throw new Error('ingests --cancel requires <ingestId> as positional arg');
-    const r = await udsJson<unknown>(socket, 'DELETE', `/v1/ingest/${positional}`);
+    await udsJson<unknown>(socket, 'DELETE', `/v1/ingest/${positional}`);
     if (json) stdout(`${JSON.stringify({ cancelled: positional })}\n`);
     else stdout(`cancelled ${positional}\n`);
     return 0;
@@ -936,7 +936,7 @@ function formatIngestStatus(s: IngestStatus): string {
       lines.push(`    ${ev.kind}`);
     }
   }
-  return lines.join('\n') + '\n';
+  return `${lines.join('\n')}\n`;
 }
 
 function formatIngestList(ingests: IngestStatus[]): string {
@@ -948,7 +948,7 @@ function formatIngestList(ingests: IngestStatus[]): string {
       `${s.ingestId.padEnd(25)} ${s.kind.padEnd(8)} ${s.state.padEnd(11)} ${(s.productId ?? '-').padEnd(13)} ${s.startedAt}`,
     );
   }
-  return lines.join('\n') + '\n';
+  return `${lines.join('\n')}\n`;
 }
 
 function formatUploadList(uploads: UploadEntry[]): string {
@@ -962,5 +962,5 @@ function formatUploadList(uploads: UploadEntry[]): string {
       `${u.docId.padEnd(17)} ${u.filename.slice(0, 30).padEnd(30)} ${String(u.sizeBytes).padStart(8)} ${u.contentType.padEnd(19)} ${u.uploadedAt}`,
     );
   }
-  return lines.join('\n') + '\n';
+  return `${lines.join('\n')}\n`;
 }
