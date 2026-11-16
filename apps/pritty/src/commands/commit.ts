@@ -242,13 +242,18 @@ export async function runCommit(
   // 4. Show the plan
   say('');
   say(chalk.cyan('Commit plan:'));
-  let heading: string | undefined;
+  // Grouped by change, the files are the model's choice: show them under each commit.
+  const byChange = plan.some((c) => c.change);
+  const pad = byChange ? '    ' : '  ';
+  let heading: string | null = null;
   for (const c of plan) {
-    if (c.change && c.change !== heading) say(`  ${chalk.cyan(c.change)}`);
-    heading = c.change;
-    say(`  ${chalk.bold(c.category)}  ${chalk.dim(`(${c.files.length} files)`)}`);
-    say(`    ${chalk.green(c.message)}`);
-    if (c.body) for (const line of c.body.split('\n')) say(`    ${chalk.dim(line)}`);
+    const change = c.change ?? 'no change named';
+    if (byChange && change !== heading) say(`  ${chalk.cyan(change)}`);
+    heading = change;
+    say(`${pad}${chalk.bold(c.category)}  ${chalk.dim(`(${c.files.length} files)`)}`);
+    say(`${pad}  ${chalk.green(c.message)}`);
+    if (c.body) for (const line of c.body.split('\n')) say(`${pad}  ${chalk.dim(line)}`);
+    if (byChange) for (const f of c.files) say(`${pad}  ${chalk.dim(f)}`);
   }
   say('');
 

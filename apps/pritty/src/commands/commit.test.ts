@@ -444,6 +444,15 @@ describe('runCommit grouping by change', () => {
     expect(result?.commits[0]?.change).toBe('b');
   });
 
+  it('shows each change with its commits and their files, indented under it', async () => {
+    const f = fakes({ staged, answer: split });
+    await runCommit({ json: true, dryRun: true }, f.deps);
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: strips ANSI colour codes
+    const text = f.err.join('\n').replace(/\x1b\[[0-9;]*m/g, '');
+    expect(text).toMatch(/^ {2}b\n {4}app {2}\(1 files\)\n {6}feat: b\n {6}src\/b\.ts$/m);
+    expect(text).toMatch(/^ {2}a\n {4}app {2}\(1 files\)\n {6}feat: a\n {6}src\/a\.ts$/m);
+  });
+
   it('labels edit prompts with the change and category', async () => {
     const f = fakes({ staged, answer: split });
     const asked: string[] = [];

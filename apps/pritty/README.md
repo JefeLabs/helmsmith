@@ -243,12 +243,16 @@ invoice rounding   app   fix(billing): round invoice totals
 ```
 
 A category the model leaves whole commits all of its staged files, whatever
-file list the model returned. A category it splits takes each commit's files
+file list the model returned; but a commit labelled with a change that names
+some of its category's files and not the rest is refused, since a file was left
+out of every change. A category the model splits takes each commit's files
 from the model, and the whole plan is refused, before any commit, when the
 split is not exact: a commit with no change label or no files, a file that is
 not one of that category's staged files (a misspelled path included), a file
 in two commits, two commits with the same label, or a staged file in none.
-Whole files only: a file holding parts of two changes goes with one of them.
+The plan shows each change with its commits and their files, so the grouping
+is reviewed before anything is committed. Whole files only: a file holding
+parts of two changes goes with one of them.
 `"commitGrouping": "category"` (default `"change"`) restores one commit per
 category.
 
@@ -260,10 +264,13 @@ category.
   again (`"reusedPlan": true` under `--json`); a successful run deletes it, a
   refused commit keeps it for the retry. A dry run always asks the model, so
   a fresh draft is one `--dry-run` away.
-- **Order is fixed:** change by change, in the order the model first named
-  each change; inside a change, code categories first (in category order),
-  then `test`, then `storybook`, whatever order the model answered in, so no
-  commit is red against its own tests.
+- **Order is fixed, except the order of changes:** change by change, in the
+  order the model first named each change; inside a change, code categories
+  first (in category order), then `test`, then `storybook`. Commits the model
+  gave no change go first (code) or last (tests and stories), so a plan with
+  no changes keeps the plain code → test → storybook order. Within a change no
+  commit is red against its own tests; across changes the order is the
+  model's.
 - **The branch types fixes.** The model is told the branch name. On a
   `fix/…` (also `bugfix/`, `hotfix/`) branch, a code commit the model typed
   `feat`, `build` or `chore` becomes `fix`; `test` and `storybook` commits,

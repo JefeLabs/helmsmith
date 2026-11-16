@@ -159,7 +159,12 @@ describe('reconcileCommitPlan with grouping change', () => {
   it("gives a category the model left whole the categorizer's full list", () => {
     const plan = reconcileCommitPlan(
       [
-        { change: 'a', category: 'app', message: 'm', files: ['src/a.ts', 'secret.env'] },
+        {
+          change: 'a',
+          category: 'app',
+          message: 'm',
+          files: ['src/a.ts', 'src/b.ts', 'secret.env'],
+        },
         { change: 'a', category: 'test', message: 'm', files: ['src/a.test.ts'] },
         { change: 'b', category: 'test', message: 'm', files: ['src/b.test.ts'] },
       ],
@@ -256,6 +261,70 @@ describe('reconcileCommitPlan with grouping change', () => {
         ),
       ).toThrow(/commitGrouping/);
     }
+  });
+
+  it("ignores change labels when grouping is category: today's order, no labels", () => {
+    const plan = reconcileCommitPlan(
+      [
+        { change: 'x', category: 'test', message: 'm', files: [] },
+        { change: 'y', category: 'app', message: 'm', files: [] },
+      ],
+      grouped,
+      undefined,
+      'category',
+    );
+    expect(shape(plan)).toEqual([
+      [undefined, 'app', ['src/a.ts', 'src/b.ts']],
+      [undefined, 'test', ['src/a.test.ts']],
+    ]);
+  });
+
+  it('puts unlabelled code before every change and unlabelled tests after them', () => {
+    const tests = reconcileCommitPlan(
+      [
+        { change: 'a', category: 'test', message: 'm', files: ['src/a.test.ts'] },
+        { change: 'b', category: 'test', message: 'm', files: ['src/b.test.ts'] },
+        { category: 'app', message: 'm', files: [] },
+      ],
+      g,
+      undefined,
+      'change',
+    );
+    expect(shape(tests)).toEqual([
+      [undefined, 'app', ['src/a.ts', 'src/b.ts']],
+      ['a', 'test', ['src/a.test.ts']],
+      ['b', 'test', ['src/b.test.ts']],
+    ]);
+    const code = reconcileCommitPlan(
+      [
+        { category: 'test', message: 'm', files: [] },
+        { change: 'a', category: 'app', message: 'm', files: ['src/a.ts'] },
+        { change: 'b', category: 'app', message: 'm', files: ['src/b.ts'] },
+      ],
+      { app: ['src/a.ts', 'src/b.ts'], test: ['src/t.test.ts'] },
+      undefined,
+      'change',
+    );
+    expect(shape(code)).toEqual([
+      ['a', 'app', ['src/a.ts']],
+      ['b', 'app', ['src/b.ts']],
+      [undefined, 'test', ['src/t.test.ts']],
+    ]);
+  });
+
+  it('refuses a labelled whole entry that lists some but not all of its staged files', () => {
+    expect(() =>
+      reconcileCommitPlan(
+        [
+          { change: 'b', category: 'test', message: 'm', files: ['src/b.test.ts'] },
+          { change: 'a', category: 'app', message: 'm', files: ['src/a.ts'] },
+          { change: 'a', category: 'test', message: 'm', files: ['src/a.test.ts'] },
+        ],
+        g,
+        undefined,
+        'change',
+      ),
+    ).toThrow(/src\/b\.ts[\s\S]*commitGrouping/);
   });
 
   it('still refuses a split category when grouping is category', () => {

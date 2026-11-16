@@ -13,16 +13,20 @@ const LAST_CATEGORIES: readonly string[] = ['test', 'storybook'];
  * text inside a diff can steer what gets committed. With `grouping: 'change'`
  * the model may split a category into one step per change; only then do its
  * file lists count, and they must divide that category's staged files exactly
- * (see splitCategory). A plan that does not cover every non-empty category is
- * rejected before anything is committed.
+ * (see splitCategory). A labelled step the model left whole must list either
+ * all of its category's staged files or none of them: naming some but not all
+ * means the model left a file out of every change. With `grouping: 'category'`
+ * change labels are dropped. A plan that does not cover every non-empty
+ * category is rejected before anything is committed.
  *
  * The order is not the model's either, except for the order of changes: steps
  * go change by change, in the order the model first names each change, and
  * inside a change code categories come first, in the categorizer's order, then
  * `test`, then `storybook`, so every commit builds and passes its own tests on
  * its own (a test committed before the code it exercises is red at that
- * commit and breaks bisect). Steps without a change label form one change, so
- * a plan without labels is ordered exactly as before.
+ * commit and breaks bisect). Unlabelled code steps go before every change and
+ * unlabelled test and storybook steps after them, so a plan without labels is
+ * ordered exactly as before.
  */
 export function reconcileCommitPlan(
   plan: readonly CommitMessage[],
@@ -30,7 +34,9 @@ export function reconcileCommitPlan(
   onRename?: (from: string, to: string) => void,
   grouping: CommitGrouping = 'category',
 ): CommitMessage[] {
-  const paired = pairRenamedCategory(plan, grouped, onRename);
+  const renamed = pairRenamedCategory(plan, grouped, onRename);
+  const paired =
+    grouping === 'category' ? renamed.map(({ change: _ignored, ...step }) => step) : renamed;
   const byCategory = new Map<string, CommitMessage[]>();
   for (const step of paired) {
     if (grouped[step.category] === undefined) {
@@ -47,7 +53,7 @@ export function reconcileCommitPlan(
   for (const [category, steps] of byCategory) {
     const files = grouped[category]!;
     if (files.length === 0) continue;
-    if (steps.length === 1) out.push(labelled({ ...steps[0]!, files: [...files] }));
+    if (steps.length === 1) out.push(wholeCategory(category, steps[0]!, files));
     else out.push(...splitCategory(category, steps, files));
   }
   const missing = Object.entries(grouped)
@@ -59,19 +65,46 @@ export function reconcileCommitPlan(
   const changeOrder = new Map<string, number>();
   for (const step of paired) {
     const key = changeKey(step);
-    if (!changeOrder.has(key)) changeOrder.set(key, changeOrder.size);
+    if (key && !changeOrder.has(key)) changeOrder.set(key, changeOrder.size);
   }
   const position = Object.keys(grouped);
-  const rank = (c: CommitMessage): [number, number, number] => [
-    changeOrder.get(changeKey(c)) ?? 0,
-    LAST_CATEGORIES.indexOf(c.category) + 1,
-    position.indexOf(c.category),
-  ];
+  // [band, change, test/storybook last, categorizer position]. Bands: unlabelled
+  // code, then the labelled changes, then unlabelled tests and stories.
+  const rank = (c: CommitMessage): number[] => {
+    const last = LAST_CATEGORIES.indexOf(c.category) + 1;
+    const key = changeKey(c);
+    const band = key ? 1 : last === 0 ? 0 : 2;
+    return [band, changeOrder.get(key) ?? 0, last, position.indexOf(c.category)];
+  };
   return out.sort((a, b) => {
     const ra = rank(a);
     const rb = rank(b);
-    return ra[0] - rb[0] || ra[1] - rb[1] || ra[2] - rb[2];
+    return ra.reduce((d, v, i) => d || v - rb[i]!, 0);
   });
+}
+
+/**
+ * A category the model left whole: it gets the categorizer's full list. A
+ * labelled step whose list names some of those files but not all is refused:
+ * the model meant to list them and left one out of every change. An empty list,
+ * or one naming no staged file, is no claim about the files and is ignored.
+ */
+function wholeCategory(
+  category: string,
+  step: CommitMessage,
+  files: readonly string[],
+): CommitMessage {
+  const label = changeKey(step);
+  if (label && Array.isArray(step.files)) {
+    const listed = new Set(step.files);
+    if (files.some((f) => listed.has(f))) {
+      const left = files.filter((f) => !listed.has(f));
+      if (left.length > 0) {
+        refuseSplit(category, `the "${label}" commit leaves out ${left.join(', ')}`);
+      }
+    }
+  }
+  return labelled({ ...step, files: [...files] });
 }
 
 function changeKey(step: CommitMessage): string {
