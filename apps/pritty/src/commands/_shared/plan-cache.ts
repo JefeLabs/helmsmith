@@ -17,12 +17,13 @@ export interface PlanCache {
 /**
  * Everything the plan depends on. `stagedState` is HEAD plus the index's tree
  * (`git write-tree`), so a staged edit, a commit made elsewhere or a reset
- * each miss; the rest covers how the plan was categorised and typed.
+ * each miss; the rest covers how the plan was categorised, grouped and typed.
  */
 export function planKey(parts: {
   stagedState: string;
   branch: string;
   commitStyle: string;
+  commitGrouping: string;
   categories: Record<string, string[]>;
   version: string;
 }): string {
@@ -33,6 +34,7 @@ function isCommitMessage(v: unknown): v is CommitMessage {
   if (typeof v !== 'object' || v === null) return false;
   const c = v as Record<string, unknown>;
   return (
+    (c.change === undefined || typeof c.change === 'string') &&
     typeof c.category === 'string' &&
     typeof c.message === 'string' &&
     (c.body === undefined || typeof c.body === 'string') &&

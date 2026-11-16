@@ -383,3 +383,75 @@ describe('runCommit reuses the reviewed plan', () => {
     expect(f.calls.filter((c) => c === 'generate')).toHaveLength(2);
   });
 });
+
+describe('runCommit grouping by change', () => {
+  const staged = ['src/a.ts', 'src/b.ts', 'src/a.test.ts', 'src/b.test.ts'];
+  const split: Answer = () => [
+    { change: 'b', category: 'test', message: 'test: b', files: ['src/b.test.ts'] },
+    { change: 'a', category: 'app', message: 'feat: a', files: ['src/a.ts'] },
+    { change: 'b', category: 'app', message: 'feat: b', files: ['src/b.ts'] },
+    { change: 'a', category: 'test', message: 'test: a', files: ['src/a.test.ts'] },
+  ];
+
+  it("commits each change's code then its tests, change by change, each with only its files", async () => {
+    const f = fakes({ staged, answer: split });
+    await runCommit({ json: true }, f.deps);
+    expect(f.committed.map((c) => c.files)).toEqual([
+      ['src/b.ts'],
+      ['src/b.test.ts'],
+      ['src/a.ts'],
+      ['src/a.test.ts'],
+    ]);
+    const line = JSON.parse(f.out[0]!);
+    expect(line.commits.map((c: { change?: string }) => c.change)).toEqual(['b', 'b', 'a', 'a']);
+  });
+
+  it('refuses a bad split and commits nothing', async () => {
+    // Dropping a whole entry would leave `test` with one step, which takes the full list;
+    // a split step that lists a file the other step already has is the bad split.
+    const f = fakes({
+      staged,
+      answer: (g) =>
+        split(g).map((c) => (c.message === 'test: b' ? { ...c, files: ['src/a.test.ts'] } : c)),
+    });
+    await expect(runCommit({ json: true }, f.deps)).rejects.toThrow(/commitGrouping/);
+    expect(f.calls).not.toContain('commit');
+  });
+
+  it("with commitGrouping category, sends today's plan and refuses a split", async () => {
+    const f = fakes({ staged, answer: split, config: { commitGrouping: 'category' } });
+    await expect(runCommit({ json: true }, f.deps)).rejects.toThrow(/more than once/);
+    expect(f.calls).not.toContain('commit');
+  });
+
+  it('does not reuse a plan kept under the other grouping', async () => {
+    const cache = memoryCache();
+    const f1 = fakes({ staged, config: { commitGrouping: 'category' }, planCache: cache });
+    await runCommit({ json: true, dryRun: true }, f1.deps);
+    expect(cache.store.size).toBe(1);
+    const f2 = fakes({ staged, answer: split, planCache: cache });
+    await runCommit({ json: true }, f2.deps);
+    expect(f2.calls).toContain('generate');
+    expect(f2.committed).toHaveLength(4);
+  });
+
+  it("keeps a split commit's change and files when its message is edited", async () => {
+    const f = fakes({ staged, answer: split });
+    f.deps.prompts.editor = async () => 'feat: edited';
+    const result = await runCommit({}, f.deps);
+    expect(f.committed[0]?.message.startsWith('feat: edited')).toBe(true);
+    expect(f.committed[0]?.files).toEqual(['src/b.ts']);
+    expect(result?.commits[0]?.change).toBe('b');
+  });
+
+  it('labels edit prompts with the change and category', async () => {
+    const f = fakes({ staged, answer: split });
+    const asked: string[] = [];
+    f.deps.prompts.confirm = async (o) => {
+      asked.push(o.message);
+      return false;
+    };
+    await runCommit({}, f.deps);
+    expect(asked).toContain('Edit message for b · app?');
+  });
+});

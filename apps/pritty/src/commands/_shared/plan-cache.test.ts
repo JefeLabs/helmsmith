@@ -42,6 +42,15 @@ describe('filePlanCache', () => {
     writeFileSync(path, JSON.stringify({ key: 'k1', plan: [{ category: 'app', files: [] }] }));
     expect(await cache.read('k1')).toBeUndefined();
   });
+
+  it('keeps a change label, and treats a non-string one as a miss', async () => {
+    const cache = filePlanCache(async () => path);
+    const split = [{ change: 'a', category: 'app', message: 'feat: a', files: ['src/a.ts'] }];
+    await cache.write('k1', split);
+    expect(await cache.read('k1')).toEqual(split);
+    writeFileSync(path, JSON.stringify({ key: 'k1', plan: [{ ...split[0], change: 3 }] }));
+    expect(await cache.read('k1')).toBeUndefined();
+  });
 });
 
 describe('planKey', () => {
@@ -49,6 +58,7 @@ describe('planKey', () => {
     stagedState: 'h:t',
     branch: 'fix/x',
     commitStyle: 'conventional',
+    commitGrouping: 'change',
     categories: { app: ['src/**'] },
     version: '0.3.4',
   };
@@ -59,6 +69,7 @@ describe('planKey', () => {
       { stagedState: 'h:t2' },
       { branch: 'fix/y' },
       { commitStyle: 'simple' },
+      { commitGrouping: 'category' },
       { categories: { app: ['lib/**'] } },
       { version: '0.3.5' },
     ]) {
