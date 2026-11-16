@@ -57,6 +57,14 @@ export const TicketSchema = z.object({
 
 export const ProviderSchema = z.enum(['copilot', 'anthropic', 'openai', 'claude']);
 
+/**
+ * How `pritty commit` splits the staged files. `change`: the model groups
+ * each category's files into changes, one commit per change per category.
+ * `category`: one commit per category.
+ */
+export const CommitGroupingSchema = z.enum(['change', 'category']);
+export type CommitGrouping = z.infer<typeof CommitGroupingSchema>;
+
 export const ConfigSchema = z.object({
   /** Unset means the provider's own default (see effectiveModel). */
   model: z.string().optional(),
@@ -65,6 +73,7 @@ export const ConfigSchema = z.object({
   autoApprove: z.boolean().default(false),
   dryRun: z.boolean().default(false),
   commitStyle: z.enum(['conventional', 'gitmoji', 'angular', 'simple']).default('conventional'),
+  commitGrouping: CommitGroupingSchema.default('change'),
   /**
    * Primary AI provider. `claude` (default) runs the Claude Code binary
    * on PATH headlessly, on its own login (a claude.ai subscription works;

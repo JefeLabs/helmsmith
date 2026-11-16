@@ -62,6 +62,8 @@ export interface TicketContext {
 }
 
 export interface CommitMessage {
+  /** Which change this commit belongs to, when the model grouped files by change. */
+  change?: string;
   category: string;
   message: string; // first line, e.g. "feat(api): add /users endpoint"
   body?: string; // optional body paragraph
@@ -272,10 +274,20 @@ export async function generateCommitMessages(
     ? ticketPromptGuidance(ticket.ticket, ticket.link, ticket.title)
     : '';
 
+  const shape =
+    config.commitGrouping === 'change'
+      ? [
+          `Group the files into changes: a change is one logical unit of work (a feature, a fix, a refactor), and it may span several categories. Write one commit message per change per category. ${styleGuide}`,
+          'Return strict JSON: an array of objects with keys `change` (a short label, the same on every entry of that change), `category`, `message`, `body` (optional), `files` (that change’s files from that category’s list).',
+          'Every listed file goes in exactly one entry. When a category holds a single change, its one entry lists all of its files. List the changes in the order they should be committed.',
+        ]
+      : [
+          `Produce one commit message per file category. ${styleGuide}`,
+          'Return strict JSON: an array of objects with keys `category`, `message`, `body` (optional), `files` (the input files for that category).',
+        ];
   const system = [
     'You are an expert engineer writing git commit messages for a developer.',
-    `Produce one commit message per file category. ${styleGuide}`,
-    'Return strict JSON: an array of objects with keys `category`, `message`, `body` (optional), `files` (the input files for that category).',
+    ...shape,
     'Copy each category name exactly as it appears in the `##` headings, even `unknown`: never rename one after the commit type or the change.',
     'Do not wrap the output in markdown code fences. Do not include any prose before or after the JSON.',
     context.branch

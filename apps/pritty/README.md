@@ -24,7 +24,7 @@ This is a **phased build** following the
 | `pritty init` starter config | ✅ |
 | `pritty categorize` (read-only file bucketing) | ✅ |
 | AI client (multi-provider via `@helmsmith/agent-adapter`) | ✅ |
-| `pritty commit` (per-category AI commit messages, index-only commits) | ✅ |
+| `pritty commit` (AI commit messages per change, per category; index-only commits) | ✅ |
 | `pritty pr` (AI-generated PR title + body, existing-PR reuse) | ✅ |
 | `pritty rebase` (AI-planned rebase; a last resort — prefer a merge commit) | ✅ |
 | Pre-commit / pre-push hook runner | removed — git hooks belong to the repository |
@@ -70,6 +70,7 @@ the repo has a `.helmsmith` folder.
   "provider": "anthropic",
   "baseBranch": "develop",
   "commitStyle": "conventional",
+  "commitGrouping": "change",
   "github": { "account": "my-gh-login" },
   "commitTrailers": ["Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"],
   "prFooter": "🤖 Generated with [Claude Code](https://claude.com/claude-code)",
@@ -204,7 +205,7 @@ on stderr and exit code 1.
 
 | Command | JSON line |
 |---|---|
-| `commit` | `{ dryRun, commits: [{ category, message, files, sha }] }` (implies `--auto-approve`) |
+| `commit` | `{ dryRun, commits: [{ change?, category, message, files, sha }] }` (implies `--auto-approve`) |
 | `pr` | `{ number, url, created, draft, head, base }` (implies `--auto-approve`, needs a base) |
 | `pr --check` | `{ open, last }` |
 | `rebase` | `{ dryRun, branch, base, strategy, commits: [{ hash, subject }], steps: [{ hash, action, message?, rationale? }], summary, rebased }`; commits oldest first; `steps: []` and `summary: null` when fewer than two commits |
@@ -227,17 +228,49 @@ copy; `--no-footer` leaves it out). The diff sent to the model is redacted
 (secret files omitted, keys and tokens masked) and every model call is
 bounded by `aiTimeoutMs`.
 
+`pritty commit` groups staged files **by change, then by category**. The
+categorizer labels every file by glob first, with no model involved; the same
+model call that writes the messages then says which files form each change,
+and pritty makes one commit per change per category:
+
+```
+staged: auth/login.ts, auth/login.test.ts, billing/invoice.ts, billing/invoice.test.ts
+
+login rate limit   app   feat(auth): rate-limit login
+                   test  test(auth): cover the rate limit
+invoice rounding   app   fix(billing): round invoice totals
+                   test  test(billing): cover rounding
+```
+
+A category the model leaves whole commits all of its staged files, whatever
+file list the model returned; but a commit labelled with a change that names
+some of its category's files and not the rest is refused, since a file was left
+out of every change. A category the model splits takes each commit's files
+from the model, and the whole plan is refused, before any commit, when the
+split is not exact: a commit with no change label or no files, a file that is
+not one of that category's staged files (a misspelled path included), a file
+in two commits, two commits with the same label, or a staged file in none.
+The plan shows each change with its commits and their files, so the grouping
+is reviewed before anything is committed. Whole files only: a file holding
+parts of two changes goes with one of them.
+`"commitGrouping": "category"` (default `"change"`) restores one commit per
+category.
+
 `pritty commit` details that make its output reviewable:
 - **The dry run is what gets committed.** A run keeps the plan it showed in
   `<git dir>/pritty/commit-plan.json`, keyed by HEAD, the staged tree
-  (`git write-tree`), the branch, the categories and the commit style. The
+  (`git write-tree`), the branch, the categories, the grouping and the commit style. The
   next real run with the same key commits that plan without asking the model
   again (`"reusedPlan": true` under `--json`); a successful run deletes it, a
   refused commit keeps it for the retry. A dry run always asks the model, so
   a fresh draft is one `--dry-run` away.
-- **Order is fixed:** code categories first (in category order), then
-  `test`, then `storybook`, whatever order the model answered in, so no commit
-  is red against its own tests.
+- **Order is fixed, except the order of changes:** change by change, in the
+  order the model first named each change; inside a change, code categories
+  first (in category order), then `test`, then `storybook`. Commits the model
+  gave no change go first (code) or last (tests and stories), so a plan with
+  no changes keeps the plain code → test → storybook order. Within a change no
+  commit is red against its own tests; across changes the order is the
+  model's.
 - **The branch types fixes.** The model is told the branch name. On a
   `fix/…` (also `bugfix/`, `hotfix/`) branch, a code commit the model typed
   `feat`, `build` or `chore` becomes `fix`; `test` and `storybook` commits,

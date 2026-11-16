@@ -78,6 +78,40 @@ describe('generateCommitMessages', () => {
   });
 });
 
+describe('generateCommitMessages grouping', () => {
+  it('asks the model to group files into changes and label each entry', async () => {
+    answer(JSON.stringify([{ change: 'x', category: 'app', message: 'feat: x', files: [] }]));
+    await generateCommitMessages({ app: ['src/a.ts'] }, '+a', config);
+    const { system } = sent();
+    expect(system).toMatch(/group the files into changes/i);
+    expect(system).toContain('`change`');
+    expect(system).toMatch(/exactly one entry/i);
+    expect(system).not.toMatch(/one commit message per file category/i);
+  });
+
+  it("keeps today's per-category prompt when commitGrouping is category", async () => {
+    answer(JSON.stringify([{ category: 'app', message: 'feat: x', files: [] }]));
+    await generateCommitMessages(
+      { app: ['src/a.ts'] },
+      '+a',
+      ConfigSchema.parse({ provider: 'claude', commitGrouping: 'category' }),
+    );
+    const { system } = sent();
+    expect(system).toMatch(/one commit message per file category/i);
+    expect(system).not.toContain('`change`');
+  });
+
+  it('passes the change label through', async () => {
+    answer(
+      JSON.stringify([
+        { change: 'login', category: 'app', message: 'feat: x', files: ['src/a.ts'] },
+      ]),
+    );
+    const plan = await generateCommitMessages({ app: ['src/a.ts'] }, '+a', config);
+    expect(plan[0]?.change).toBe('login');
+  });
+});
+
 describe('generatePR', () => {
   it('does not ask for a checklist of unchecked boxes', async () => {
     answer(JSON.stringify({ title: 't', body: 'b', labels: [] }));

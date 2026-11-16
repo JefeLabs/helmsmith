@@ -37,7 +37,13 @@ export interface CommitOptions {
 
 export interface CommitOutcome {
   dryRun: boolean;
-  commits: Array<{ category: string; message: string; files: string[]; sha?: string }>;
+  commits: Array<{
+    change?: string;
+    category: string;
+    message: string;
+    files: string[];
+    sha?: string;
+  }>;
   /** Present when the plan came from the previous run (a dry run, or a refused commit), not a new model call. */
   reusedPlan?: true;
 }
@@ -79,6 +85,11 @@ function defaultDeps(): CommitDeps {
 
 const VALID_STYLES = ['conventional', 'gitmoji', 'angular', 'simple'] as const;
 
+/** How a commit is named in prompts and progress lines: its change too, when it has one. */
+function label(c: CommitMessage): string {
+  return c.change ? `${c.change} · ${c.category}` : c.category;
+}
+
 /** Refuse a bad --type, --scope or --trailer before anything else runs: no model call, no commit. */
 function validateOverrides(options: CommitOptions, style: Config['commitStyle']): void {
   if ((options.type !== undefined || options.scope !== undefined) && !styleHasTypes(style)) {
@@ -104,8 +115,8 @@ function validateOverrides(options: CommitOptions, style: Config['commitStyle'])
 }
 
 /**
- * Generate AI commit messages per category and commit each group from the
- * index. Resolves ticket context up front so validation gates fail fast
+ * Generate AI commit messages per change per category (or per category, with
+ * `commitGrouping: "category"`) and commit each group from the index. Resolves ticket context up front so validation gates fail fast
  * (before any AI call). Errors are thrown (the CLI prints them and exits 1).
  */
 export async function runCommit(
@@ -169,6 +180,7 @@ export async function runCommit(
           stagedState,
           branch,
           commitStyle: config.commitStyle,
+          commitGrouping: config.commitGrouping,
           categories,
           version: VERSION,
         })
@@ -178,7 +190,7 @@ export async function runCommit(
     const saved = await cache.read(key);
     if (saved) {
       try {
-        plan = reconcileCommitPlan(saved, grouped);
+        plan = reconcileCommitPlan(saved, grouped, undefined, config.commitGrouping);
         say(
           chalk.dim('Reusing the plan the last run showed: HEAD and the staged changes match it.'),
         );
@@ -196,6 +208,7 @@ export async function runCommit(
         await deps.ai.generateCommitMessages(grouped, diff, config, ticketCtx, { branch }),
         grouped,
         (from, to) => say(chalk.dim(`  the model named the ${to} commit "${from}"; paired them`)),
+        config.commitGrouping,
       );
       spinner.succeed(`Generated ${plan.length} commit message(s)`);
     } catch (err) {
@@ -229,10 +242,18 @@ export async function runCommit(
   // 4. Show the plan
   say('');
   say(chalk.cyan('Commit plan:'));
+  // Grouped by change, the files are the model's choice: show them under each commit.
+  const byChange = plan.some((c) => c.change);
+  const pad = byChange ? '    ' : '  ';
+  let heading: string | null = null;
   for (const c of plan) {
-    say(`  ${chalk.bold(c.category)}  ${chalk.dim(`(${c.files.length} files)`)}`);
-    say(`    ${chalk.green(c.message)}`);
-    if (c.body) for (const line of c.body.split('\n')) say(`    ${chalk.dim(line)}`);
+    const change = c.change ?? 'no change named';
+    if (byChange && change !== heading) say(`  ${chalk.cyan(change)}`);
+    heading = change;
+    say(`${pad}${chalk.bold(c.category)}  ${chalk.dim(`(${c.files.length} files)`)}`);
+    say(`${pad}  ${chalk.green(c.message)}`);
+    if (c.body) for (const line of c.body.split('\n')) say(`${pad}  ${chalk.dim(line)}`);
+    if (byChange) for (const f of c.files) say(`${pad}  ${chalk.dim(f)}`);
   }
   say('');
 
@@ -241,12 +262,12 @@ export async function runCommit(
     for (let i = 0; i < plan.length; i++) {
       const c = plan[i]!;
       const wantEdit = await deps.prompts.confirm({
-        message: `Edit message for ${c.category}?`,
+        message: `Edit message for ${label(c)}?`,
         default: false,
       });
       if (!wantEdit) continue;
       const edited = await deps.prompts.editor({
-        message: `Editing ${c.category} commit message`,
+        message: `Editing ${label(c)} commit message`,
         default: c.body ? `${c.message}\n\n${c.body}` : c.message,
       });
       const { title: nextMessage, body: nextBody } = splitTitleBody(edited);
@@ -276,7 +297,12 @@ export async function runCommit(
     say(chalk.yellow('Dry-run — no commits made. Re-run without --dry-run to apply.'));
     return finish({
       dryRun: true,
-      commits: plan.map((c) => ({ category: c.category, message: c.message, files: c.files })),
+      commits: plan.map((c) => ({
+        ...(c.change ? { change: c.change } : {}),
+        category: c.category,
+        message: c.message,
+        files: c.files,
+      })),
     });
   }
 
@@ -304,14 +330,20 @@ export async function runCommit(
     } catch (err) {
       io.err(
         chalk.red(
-          `✗ failed to commit ${c.category}: ${(err as Error).message} (${commits.length} commit(s) already made)`,
+          `✗ failed to commit ${label(c)}: ${(err as Error).message} (${commits.length} commit(s) already made)`,
         ),
       );
       throw err;
     }
     const sha = await git.headSha();
-    commits.push({ category: c.category, message: c.message, files: c.files, sha });
-    say(chalk.green(`✓ committed ${c.category}: ${c.message} (${sha.slice(0, 7)})`));
+    commits.push({
+      ...(c.change ? { change: c.change } : {}),
+      category: c.category,
+      message: c.message,
+      files: c.files,
+      sha,
+    });
+    say(chalk.green(`✓ committed ${label(c)}: ${c.message} (${sha.slice(0, 7)})`));
   }
   say(chalk.green(`\n✓ ${commits.length} commit(s) created.`));
   if (cache && key) await cache.clear().catch(() => undefined);
