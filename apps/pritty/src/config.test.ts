@@ -204,3 +204,17 @@ describe('claude provider config', () => {
     expect(() => ConfigSchema.parse({ claude: { strictMcpConfig: 'no' } })).toThrow();
   });
 });
+
+describe('commitGrouping', () => {
+  it('is change when no config sets it', () => {
+    expect(ConfigSchema.parse({}).commitGrouping).toBe('change');
+  });
+
+  it('is category when the config says so', () => {
+    expect(ConfigSchema.parse({ commitGrouping: 'category' }).commitGrouping).toBe('category');
+  });
+
+  it('rejects any other value', () => {
+    expect(() => ConfigSchema.parse({ commitGrouping: 'file' })).toThrow();
+  });
+});
