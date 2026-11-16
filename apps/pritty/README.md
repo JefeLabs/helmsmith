@@ -32,6 +32,8 @@ This is a **phased build** following the
 
 ## Quick start
 
+Requires Node 24 or newer (`npm install -g @helmsmith/pritty`).
+
 ```bash
 pritty                                # shows command list (Commander default)
 pritty auth login                     # GitHub Device Flow → ~/.pritty/auth.json

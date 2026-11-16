@@ -4,6 +4,8 @@ CLI-based project task generator with complexity scoring and auto-decomposition.
 
 ## Quick Start
 
+Requires Node 24 or newer.
+
 ```bash
 # Install dependencies
 npm install

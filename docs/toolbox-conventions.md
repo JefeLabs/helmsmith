@@ -12,6 +12,7 @@ root-level overrides) and by review where it isn't.
 | Concern              | Standard                                            |
 | -------------------- | --------------------------------------------------- |
 | Runtime              | **Bun** (`engines.bun >=1.3`); whole app, not split |
+| Node                 | **24** (`engines.node >=24`); runs the bin launcher |
 | Package manager      | npm workspaces (Bun is the runtime, not the PM)     |
 | Build                | **tsup** → `dist/cli.js` (ESM)                      |
 | TypeScript           | extends `tsconfig.base.json` at repo root           |
@@ -191,7 +192,7 @@ Migration sequence:
 ```
 apps/<name>/
 ├── bin/
-│   └── <name>.mjs        # stub: #!/usr/bin/env bun → import('../dist/cli.js')
+│   └── <name>.mjs        # Node 24 launcher → re-execs dist/cli.js on the vendored Bun
 ├── src/
 │   ├── cli.ts            # commander setup, registers commands; imports @ecruz165/cli-kit
 │   ├── commands/         # one file per subcommand; exports an action handler
@@ -241,7 +242,7 @@ is mechanically checkable, not a judgement call. (Today only
   "name": "@ecruz165/<name>",
   "version": "0.x.y",
   "type": "module",
-  "engines": { "bun": ">=1.3" },
+  "engines": { "node": ">=24", "bun": ">=1.3" },
   "bin": { "<name>": "./bin/<name>.mjs" },
   "main": "./dist/cli.js",
   "exports": { ".": "./dist/cli.js" },

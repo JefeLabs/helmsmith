@@ -6,6 +6,8 @@ GitRadar scans your local git repos, classifies every file change, and presents 
 
 ## Quick Start
 
+Requires Node 24 or newer. Bun is vendored as a dependency — no global Bun install needed.
+
 ```bash
 npm install -g @helmsmith/gitradar
 

@@ -14,6 +14,8 @@ Tools like `gita` and `gitopolis` manage multiple repos, but don't handle the or
 
 ## Installation
 
+Requires Node 24 or newer. Bun is vendored as a dependency — no global Bun install needed.
+
 ```bash
 git clone https://github.com/yourorg/gittyup.git
 cd gittyup

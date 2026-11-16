@@ -20,6 +20,8 @@ A `.pen` / `.lib.pen` is plain pretty-printed JSON on disk (schema
 npm install -g @helmsmith/mech-pencil   # or: bun run src/cli.ts <cmd>
 ```
 
+Requires Node 24 or newer. Bun is vendored as a dependency — no global Bun install needed.
+
 ## Quick start
 
 ```bash

@@ -12,6 +12,9 @@ selectively.
 npm install -g @helmsmith/skillzkit
 ```
 
+Requires Node 24 or newer. The Bun behind `skillzkit ui` is vendored as a
+dependency — no global Bun install needed.
+
 In a fresh project:
 
 ```bash

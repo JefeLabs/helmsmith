@@ -25,6 +25,9 @@ Bun · TypeScript · discord.js v14 · [`@helmsmith/cli-kit`](../../platform/cor
 
 ## Develop
 
+Requires Node 24 or newer (workspace tooling and the `timetracker` launcher);
+the app itself runs on the Bun vendored as a dependency.
+
 ```bash
 pnpm install                 # from the monorepo root
 cp .env.bak.example .env.bak         # fill in token, guild, channel IDs

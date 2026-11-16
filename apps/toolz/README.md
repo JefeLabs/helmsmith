@@ -10,6 +10,8 @@ Part of the [helmsmith](../..) monorepo.
 
 ## Quick start
 
+Requires Node 24 or newer. Bun is vendored as a dependency — no global Bun install needed.
+
 ```bash
 toolz                                # Branded banner + common commands
 toolz platform                       # Show host OS / arch / distro

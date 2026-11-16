@@ -100,6 +100,10 @@ A complete sweep was run after the merge. Honest results:
   compile against Node 26's V8. **CI pins Node 22** (prebuilts exist) so CI is
   unaffected. To run these tests locally, use Node 22 (`nvm use 22`).
   ✅ **Confirmed:** on Node 22, `edge-memory-server` passes **12/12 files**.
+  > **Update (2026-11):** Node 24 is now the workspace standard — CI runs
+  > Node 24 (`setup-node`, `node-version: 24`) and `engines.node` is `>=24`.
+  > Use Node 24 locally (`nvm use 24`). The Node 22 references in this
+  > document record the state at migration time.
   - ⚠️ **pnpm settings location gotcha:** `overrides` / `onlyBuiltDependencies`
     must live in `package.json`'s `pnpm` field for the pinned pnpm 9.15.9 — it
     does NOT read them from `pnpm-workspace.yaml` (despite a deprecation warning

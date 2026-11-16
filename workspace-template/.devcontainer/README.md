@@ -1,7 +1,7 @@
 # .devcontainer — sidecars for the host triad
 
 The triad — `harness-server`, `edge-memory-server`, `edge-context-server` —
-runs as Node processes on the host (via `pnpm dev:servers`). This directory
+runs as Node 24 processes on the host (via `pnpm dev:servers`). This directory
 holds the things that **can't** be Node modules and need to run as containers:
 
 - the Neo4j 2026 graph store that backs `edge-context-server`

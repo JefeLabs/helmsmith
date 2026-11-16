@@ -4,7 +4,7 @@
 
 Helmsmith Taskmaster is a CLI-based project task generator that parses implementation plans, scores task complexity, and auto-decomposes work into structured hierarchies. It supports configurable project styles (Epics, Stories, Tasks, Subtasks) and produces delegation-ready output for a Team Lead agent to assign tasks to specialized agent personas.
 
-**Tech Stack**: TypeScript (strict mode), Node.js 20+, Commander.js (CLI), Inquirer.js (prompts), Handlebars.js (templates), js-yaml (YAML), Zod (validation), Vitest (testing), tsup (bundling)
+**Tech Stack**: TypeScript (strict mode), Node.js 24+, Commander.js (CLI), Inquirer.js (prompts), Handlebars.js (templates), js-yaml (YAML), Zod (validation), Vitest (testing), tsup (bundling)
 
 **Implementation Plan**: `.plans/helmsmith-taskmaster-implementation-plan.md`
 

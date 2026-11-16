@@ -6,7 +6,7 @@ platform CLIs (workspace-cli, harness-cli, harness-pipeline-cli,
 context-loader-cli, edge-context-cli, edge-memory-cli) — 11 CLIs in
 total.
 
-**Runtime-agnostic.** Works on Node and Bun. No Bun-specific imports
+**Runtime-agnostic.** Works on Node 24+ and Bun ≥ 1.3. No Bun-specific imports
 so it doesn't constrain consumers' runtime choice.
 
 ## Install

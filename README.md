@@ -19,7 +19,9 @@ alongside the Java/Maven control plane.
 
 ## Toolchain
 
-- **Node** ≥ 20, **Bun** ≥ 1.3, **pnpm** 9.15.9 (TS workspace)
+- **Node 24** (`engines.node >=24`) — CI (`actions/setup-node`), the Node-based Docker
+  images (`node:24-trixie-slim`) and `@types/node` (`^24`) all target it
+- **Bun** ≥ 1.3, **pnpm** 9.15.9 (TS workspace)
 - **JDK 25** + Maven (`platform/controlplane/service/`)
 - Lint/format: Biome · Versioning: Changesets
 
