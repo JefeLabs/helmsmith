@@ -301,6 +301,6 @@ What changes when it is `false`:
 
 - pritty passes neither `--strict-mcp-config` nor `--mcp-config`. Without the strict flag, an empty `--mcp-config` adds nothing, so both are dropped.
 - The MCP servers from your user settings and from the managed policy load as usual.
-- Nothing else changes. `claude` still runs one turn with no tools and user settings only, from the temp directory. The repository's `.mcp.json`, hooks, settings and CLAUDE.md still never apply.
+- Nothing else changes. `claude` still runs one turn with none of its built-in tools and user settings only, from the temp directory. The repository's `.mcp.json`, hooks, settings and CLAUDE.md still never apply.
 
-The setting lives in the repository's pritty config. pritty has no per-user config file, so it applies to everyone who runs pritty in that repository, including people on machines without a managed policy. On those machines, the MCP servers in their own user settings start with each call. That costs startup time and nothing more, because the call has no tools and one turn.
+The setting lives in the repository's pritty config. pritty has no per-user config file, so it applies to everyone who runs pritty in that repository, including people on machines without a managed policy. On those machines, the MCP servers in their own user settings start with each call, and the model is offered their tools: `--tools ''` turns off only Claude Code's built-in tools. A tool that someone's settings already allow could run within the one turn, with the staged diff as the model's input. Set the key only in repositories whose contributors you trust.
