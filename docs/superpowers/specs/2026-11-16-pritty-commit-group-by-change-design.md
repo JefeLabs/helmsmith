@@ -48,15 +48,17 @@ test  test: both                                      test  test(auth): cover th
 
 **Plan type.** `CommitMessage` gains `change?: string`.
 
-**Reconcile.** With `"change"`, the model's `files` now decide membership, so the check becomes the safety gate. A plan is refused before anything is committed (same as today's "omits categories" error) when an entry:
-- names a category the categorizer did not produce (the existing one-stranger rename pairing still applies first);
-- lists a file that is not in that category's staged files, or no files;
-- repeats a file another entry already has, or repeats a `(change, category)` pair;
-- or when any staged file is in no entry.
+**Reconcile.** A category the model leaves whole (one entry) gets the categorizer's full file list and the model's list is ignored, exactly as today. Only a category the model **splits** (two or more entries, allowed with `"change"` only) takes membership from the model's `files`, so for those the check is the safety gate. A plan is refused before anything is committed (same as today's "omits categories" error) when:
+- an entry names a category the categorizer did not produce (the existing rename pairing still applies first, counting distinct names);
+- in a split category, an entry has no `change` label, no files, or a file that is not in that category's staged files;
+- in a split category, a file is in two entries, two entries share a `change` label, or a staged file is in no entry;
+- with `"category"`, any category appears twice (today's rule).
+
+A plan where no category is split commits exactly what today's pritty commits; only the order can differ, when the model labels changes.
 
 Refusing rather than falling back to per-category commits is *my call*: a silent fallback would commit a grouping nobody was shown. The error says to rerun, or to set `commitGrouping: "category"`.
 
-**Order.** Changes in the order the model first names them; inside a change, code categories in categorizer order, then `test`, then `storybook` (today's `LAST_CATEGORIES`).
+**Order.** Changes in the order the model first names them (labels compared after trimming; entries with no label form one change); inside a change, code categories in categorizer order, then `test`, then `storybook` (today's `LAST_CATEGORIES`). A split category's files keep the categorizer's order.
 
 **Display and editing.** The plan prints grouped under change headings. The per-commit edit prompt names both: `Edit message for login rate limit · app?`.
 
