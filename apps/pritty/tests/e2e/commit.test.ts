@@ -184,6 +184,26 @@ describe('pritty commit (claude provider)', () => {
     expect(call.cwd === repo || call.cwd.startsWith(repo + sep)).toBe(false);
   });
 
+  it('drops the MCP flags when the config sets claude.strictMcpConfig to false', async () => {
+    sb = makeSandbox();
+    const repo = makeRepo(sb, {
+      config: { provider: 'claude', claude: { strictMcpConfig: false } },
+    });
+    write(repo, 'src/feature.ts', 'export const greet = 1;\n');
+    gitIn(repo, 'add', '-A');
+    const fake = installFakeClaude(sb);
+    fake.answer(JSON.stringify([{ category: 'app', message: 'feat: add greet', files: [] }]));
+
+    const r = await runCli(sb, repo, ['commit', '--dry-run', '--json']);
+    expect(r.exitCode, r.stderr).toBe(0);
+
+    const call = fake.calls()[0]!;
+    expect(call.argv).not.toContain('--strict-mcp-config');
+    expect(call.argv).not.toContain('--mcp-config');
+    expect(argAfter(call.argv, '--setting-sources')).toBe('user');
+    expect(argAfter(call.argv, '--tools')).toBe('');
+  });
+
   it('fails without committing when claude fails', async () => {
     sb = makeSandbox();
     const repo = stagedRepo(sb);

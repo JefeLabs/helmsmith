@@ -280,7 +280,7 @@ AI adapters, OpenTUI or inquirer.
 
 `provider` is one of:
 
-- `claude` (default): runs the `claude` binary on PATH headlessly (`claude -p`, one turn, no tools, no MCP servers, no session on disk, user settings only, from the temp directory rather than the repository, so a cloned repository's hooks, settings, CLAUDE.md and `.mcp.json` never apply) on whatever login that binary has. A claude.ai subscription works; no API key passes through pritty. Install Claude Code and run `claude` once to log in.
+- `claude` (default): runs the `claude` binary on PATH headlessly (`claude -p`, one turn, no tools, no MCP servers (see [Claude Code under an enterprise policy](#claude-code-under-an-enterprise-policy)), no session on disk, user settings only, from the temp directory rather than the repository, so a cloned repository's hooks, settings, CLAUDE.md and `.mcp.json` never apply) on whatever login that binary has. A claude.ai subscription works; no API key passes through pritty. Install Claude Code and run `claude` once to log in.
 - `copilot`: `pritty auth login` runs the GitHub device flow.
 - `anthropic`: the Anthropic API with the key from `ANTHROPIC_API_KEY` (or the variable named by `anthropicKeyEnv`).
 - `openai`: `OPENAI_API_KEY` / `openaiKeyEnv`.
@@ -288,3 +288,19 @@ AI adapters, OpenTUI or inquirer.
 `model` is optional and defaults per provider: `claude-opus-5-5` for `claude`, `anthropic` and `copilot`, `gpt-6-astra` for `openai`. `fallback` lists providers to try when the primary is not configured on the machine.
 
 A repository needs no `provider` key to use Claude on the team's subscriptions. To keep GitHub Copilot, set `{ "provider": "copilot" }`; to bill an API key instead, set `{ "provider": "anthropic" }` and export `ANTHROPIC_API_KEY` in the shell that runs `pritty` (or `work pr`).
+
+### Claude Code under an enterprise policy
+
+By default the `claude` provider runs `claude` with `--strict-mcp-config` and an empty `--mcp-config`, so no MCP server loads. Some enterprise environments deploy a managed Claude Code policy that refuses those flags, and every call pritty makes to `claude` then fails. Turn the MCP lockdown off for those environments:
+
+```jsonc
+{ "claude": { "strictMcpConfig": false } }   // default true
+```
+
+What changes when it is `false`:
+
+- pritty passes neither `--strict-mcp-config` nor `--mcp-config`. Without the strict flag, an empty `--mcp-config` adds nothing, so both are dropped.
+- The MCP servers from your user settings and from the managed policy load as usual.
+- Nothing else changes. `claude` still runs one turn with no tools and user settings only, from the temp directory. The repository's `.mcp.json`, hooks, settings and CLAUDE.md still never apply.
+
+The setting lives in the repository's pritty config. pritty has no per-user config file, so it applies to everyone who runs pritty in that repository, including people on machines without a managed policy. On those machines, the MCP servers in their own user settings start with each call. That costs startup time and nothing more, because the call has no tools and one turn.

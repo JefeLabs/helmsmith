@@ -37,6 +37,11 @@ export interface ClaudeCliOptions {
   model: string;
   /** The child is killed after this long; the caller's withTimeout fires first. */
   timeoutMs: number;
+  /**
+   * Default true: no MCP server loads. false drops both MCP flags, for machines
+   * whose managed Claude Code policy will not run with them.
+   */
+  strictMcpConfig?: boolean;
 }
 
 export interface ClaudeCliAdapter {
@@ -45,10 +50,10 @@ export interface ClaudeCliAdapter {
 }
 
 /**
- * One answer, no tools, no MCP servers, no session on disk, no skills, and only
- * the user's own settings: the repository's `.claude/settings*.json` hooks and
- * permissions are untrusted input and never load. (`--bare` would be stricter
- * but never reads the OAuth login, which is the point of this provider.)
+ * One answer, no tools, no session on disk, no skills, and only the user's own
+ * settings: the repository's `.claude/settings*.json` hooks and permissions are
+ * untrusted input and never load. (`--bare` would be stricter but never reads
+ * the OAuth login, which is the point of this provider.)
  */
 const HEADLESS_FLAGS = [
   '-p',
@@ -58,12 +63,15 @@ const HEADLESS_FLAGS = [
   'json',
   '--max-turns',
   '1',
-  '--strict-mcp-config',
-  '--mcp-config',
-  '{"mcpServers":{}}',
   '--no-session-persistence',
   '--disable-slash-commands',
 ];
+
+/**
+ * No MCP servers either. Without `--strict-mcp-config` the empty `--mcp-config`
+ * would add nothing, so the two go together.
+ */
+const NO_MCP_FLAGS = ['--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}'];
 
 interface ResultMessage {
   type?: string;
@@ -113,7 +121,9 @@ export function createClaudeCliAdapter(options: ClaudeCliOptions): ClaudeCliAdap
     type: CLAUDE_CLI_TYPE,
     invoke(input: AgentInput): Promise<AgentInvocationResult> {
       const started = Date.now();
-      const args = [...HEADLESS_FLAGS, '--model', options.model];
+      const args = [...HEADLESS_FLAGS];
+      if (options.strictMcpConfig ?? true) args.push(...NO_MCP_FLAGS);
+      args.push('--model', options.model);
       if (input.systemPrompt) args.push('--system-prompt', input.systemPrompt);
       args.push('--tools', '');
       return new Promise((resolve, reject) => {

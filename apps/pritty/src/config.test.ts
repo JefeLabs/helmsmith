@@ -187,3 +187,20 @@ describe('model default follows the provider', () => {
     );
   });
 });
+
+describe('claude provider config', () => {
+  it('keeps strict MCP config on when no config mentions it', () => {
+    expect(ConfigSchema.parse({}).claude?.strictMcpConfig ?? true).toBe(true);
+    expect(ConfigSchema.parse({ claude: {} }).claude?.strictMcpConfig).toBe(true);
+  });
+
+  it('turns strict MCP config off when claude.strictMcpConfig is false', () => {
+    expect(ConfigSchema.parse({ claude: { strictMcpConfig: false } }).claude?.strictMcpConfig).toBe(
+      false,
+    );
+  });
+
+  it('rejects a non-boolean claude.strictMcpConfig', () => {
+    expect(() => ConfigSchema.parse({ claude: { strictMcpConfig: 'no' } })).toThrow();
+  });
+});

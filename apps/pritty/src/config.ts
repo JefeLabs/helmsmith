@@ -92,6 +92,18 @@ export const ConfigSchema = z.object({
   aiTimeoutMs: z.number().int().positive().default(60_000),
   /** Per-repository GitHub identity: the `gh` login whose token opens PRs here. */
   github: z.object({ account: z.string().optional() }).optional(),
+  /** Options for the `claude` provider. */
+  claude: z
+    .object({
+      /**
+       * true (default): the child runs with `--strict-mcp-config` and an empty
+       * `--mcp-config`, so no MCP server from any source loads. Set false where
+       * a managed (enterprise) Claude Code policy refuses those flags: both are
+       * dropped and the servers that policy allows load as usual.
+       */
+      strictMcpConfig: z.boolean().default(true),
+    })
+    .optional(),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

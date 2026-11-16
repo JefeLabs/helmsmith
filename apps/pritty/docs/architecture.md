@@ -92,6 +92,7 @@ Schema shape (simplified):
   categories: Record<string, string[]>,    // glob patterns per bucket
   anthropicKeyEnv: string,          // env var name to read key from
   openaiKeyEnv: string,
+  claude?: { strictMcpConfig: boolean }, // default true; false drops the MCP flags (enterprise policy)
 }
 ```
 

@@ -97,6 +97,34 @@ describe('createClaudeCliAdapter', () => {
     expect(readFileSync(join(dir, 'env'), 'utf8')).not.toMatch(/^CLAUDECODE=/m);
   });
 
+  it('loads no MCP servers by default: strict MCP config with an empty server list', async () => {
+    fakeClaude(RESULT_OK);
+    const adapter = createClaudeCliAdapter({ binary, model: 'm', timeoutMs: 10_000 });
+    await adapter.invoke({ messages: [{ role: 'user', content: 'x' }] });
+    const argv = readFileSync(join(dir, 'argv'), 'utf8').split('\n');
+    expect(argv).toContain('--strict-mcp-config');
+    expect(argv.slice(argv.indexOf('--mcp-config'))[1]).toBe('{"mcpServers":{}}');
+  });
+
+  it('passes neither --strict-mcp-config nor --mcp-config when strictMcpConfig is false', async () => {
+    // Enterprise machines whose managed MCP policy refuses these flags.
+    fakeClaude(RESULT_OK);
+    const adapter = createClaudeCliAdapter({
+      binary,
+      model: 'm',
+      timeoutMs: 10_000,
+      strictMcpConfig: false,
+    });
+    await adapter.invoke({ messages: [{ role: 'user', content: 'x' }] });
+    const argv = readFileSync(join(dir, 'argv'), 'utf8').split('\n');
+    expect(argv).not.toContain('--strict-mcp-config');
+    expect(argv).not.toContain('--mcp-config');
+    // Everything else that keeps the repository out stays.
+    expect(argv.slice(argv.indexOf('--setting-sources'))[1]).toBe('user');
+    expect(argv).toContain('--no-session-persistence');
+    expect(argv).toContain('--tools');
+  });
+
   it('reports the adapter type claude-cli', () => {
     fakeClaude(RESULT_OK);
     expect(createClaudeCliAdapter({ binary, model: 'm', timeoutMs: 1000 }).type).toBe('claude-cli');
