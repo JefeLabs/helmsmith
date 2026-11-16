@@ -118,6 +118,7 @@ async function tryBuildProvider(
         binary,
         model: effectiveModel(config, 'claude'),
         timeoutMs: config.aiTimeoutMs,
+        strictMcpConfig: config.claude?.strictMcpConfig ?? true,
       });
     }
     case 'openai': {
