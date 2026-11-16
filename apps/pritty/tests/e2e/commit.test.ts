@@ -20,7 +20,13 @@ afterEach(() => {
 
 interface Outcome {
   dryRun: boolean;
-  commits: Array<{ category: string; message: string; files: string[]; sha?: string }>;
+  commits: Array<{
+    change?: string;
+    category: string;
+    message: string;
+    files: string[];
+    sha?: string;
+  }>;
 }
 
 const STAGED = ['src/feature.test.ts', 'src/feature.ts'];
@@ -202,6 +208,39 @@ describe('pritty commit (claude provider)', () => {
     expect(call.argv).not.toContain('--mcp-config');
     expect(argAfter(call.argv, '--setting-sources')).toBe('user');
     expect(argAfter(call.argv, '--tools')).toBe('');
+  });
+
+  it('splits two changes into a commit per change per category', async () => {
+    sb = makeSandbox();
+    const repo = makeRepo(sb, { config: { provider: 'claude' } });
+    const files = ['src/a.ts', 'src/a.test.ts', 'src/b.ts', 'src/b.test.ts'];
+    for (const f of files) write(repo, f, `// ${f}\n`);
+    gitIn(repo, 'add', ...files);
+    installFakeClaude(sb).answer(
+      JSON.stringify([
+        { change: 'b', category: 'test', message: 'test(b): cover b', files: ['src/b.test.ts'] },
+        { change: 'a', category: 'app', message: 'feat(a): add a', files: ['src/a.ts'] },
+        { change: 'b', category: 'app', message: 'feat(b): add b', files: ['src/b.ts'] },
+        { change: 'a', category: 'test', message: 'test(a): cover a', files: ['src/a.test.ts'] },
+      ]),
+    );
+
+    const r = await runCli(sb, repo, ['commit', '--json']);
+    expect(r.exitCode, r.stderr).toBe(0);
+    const out = jsonLine<Outcome>(r);
+    expect(out.commits.map((c) => [c.change, c.category, c.files])).toEqual([
+      ['b', 'app', ['src/b.ts']],
+      ['b', 'test', ['src/b.test.ts']],
+      ['a', 'app', ['src/a.ts']],
+      ['a', 'test', ['src/a.test.ts']],
+    ]);
+    expect(gitIn(repo, 'log', '--format=%s', '-4').trim().split('\n')).toEqual([
+      'test(a): cover a',
+      'feat(a): add a',
+      'test(b): cover b',
+      'feat(b): add b',
+    ]);
+    expect(gitIn(repo, 'status', '--porcelain').trim()).toBe('');
   });
 
   it('fails without committing when claude fails', async () => {

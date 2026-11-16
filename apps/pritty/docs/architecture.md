@@ -87,6 +87,7 @@ Schema shape (simplified):
   fallback: ProviderName[],         // default: []
   baseBranch: string,               // default: "main"
   commitStyle: "conventional",
+  commitGrouping: "change" | "category", // default "change": one commit per change per category
   preCommit: string[],              // shell commands run before commit
   prePush: string[],
   categories: Record<string, string[]>,    // glob patterns per bucket
