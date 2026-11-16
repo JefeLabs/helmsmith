@@ -1,5 +1,12 @@
 # @helmsmith/pritty
 
+## 0.7.0
+
+### Minor Changes
+
+- 4b136a5: New config key `claude.strictMcpConfig` (default `true`). Set it to `false` where a managed (enterprise) Claude Code policy refuses `--strict-mcp-config`: the `claude` provider then runs without `--strict-mcp-config` and the empty `--mcp-config`, and the MCP servers that policy allows load as usual. Every other headless flag stays, so the repository's settings, hooks, CLAUDE.md and `.mcp.json` still never apply. With it off, the MCP servers that load offer their tools to the model (`--tools ''` turns off only Claude Code's built-in tools), so set it only in repositories whose contributors you trust.
+- a5a60c9: `pritty commit` now groups staged files by change, then by category: the same model call that writes the messages says which files form each change, and pritty makes one commit per change per category, code before tests within each change. A grouping that is not a clean split of the staged files is refused before anything is committed. `"commitGrouping": "category"` keeps the old one-commit-per-category behavior. `--json` commits carry a `change` label when the model gave one.
+
 ## 0.6.1
 
 ### Patch Changes
