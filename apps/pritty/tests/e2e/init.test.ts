@@ -3,6 +3,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -28,6 +29,18 @@ const INTEGRATION_FILES = [
   '.github/prompts/commit.prompt.md',
   '.github/prompts/pr.prompt.md',
 ];
+
+interface InitJson {
+  written: string[];
+  skipped: string[];
+}
+
+/** Every regular file under `dir`, relative to it, sorted. */
+function filesUnder(dir: string): string[] {
+  return (readdirSync(dir, { recursive: true }) as string[])
+    .filter((f) => statSync(join(dir, f)).isFile())
+    .sort();
+}
 
 /** The closing "N written, M skipped" line. */
 function tally(out: string): { written: number; skipped: number } {
@@ -100,10 +113,6 @@ describe('pritty init', () => {
 
   describe('agent files', () => {
     const SHIPPED = join(__dirname, '..', '..', 'agents', 'pritty.md');
-    interface InitJson {
-      written: string[];
-      skipped: string[];
-    }
 
     it('installs the committer subagent and the AGENTS.md section, keeping the subagent on a second run', async () => {
       sb = makeSandbox();
@@ -198,6 +207,95 @@ describe('pritty init', () => {
       expect(readFileSync(target, 'utf8')).toBe('export B=1\n');
       expect(jsonLine<InitJson>(r).skipped).toContain(agent);
       expect(r.stderr).toContain(agent);
+    });
+  });
+
+  describe('writes only inside the repository', () => {
+    it('skips every file under a parent directory that links outside, even with --force', async () => {
+      sb = makeSandbox();
+      const repo = makeRepo(sb);
+      const outside = join(sb.root, 'outside');
+      mkdirSync(join(outside, 'claude', 'commands'), { recursive: true });
+      mkdirSync(join(outside, 'github'));
+      mkdirSync(join(outside, 'helmsmith'));
+      writeFileSync(join(outside, 'claude', 'commands', 'commit.md'), 'USER FILE\n');
+      symlinkSync(join(outside, 'claude'), join(repo, '.claude'));
+      symlinkSync('../outside/github', join(repo, '.github'));
+      symlinkSync(join(outside, 'helmsmith'), join(repo, '.helmsmith'));
+      const before = filesUnder(outside);
+
+      for (const extra of [[], ['--force']]) {
+        const r = await runCli(sb, repo, ['init', '--json', '--no-aliases', ...extra]);
+        expect(r.exitCode).toBe(0);
+        const out = jsonLine<InitJson>(r);
+        for (const f of [
+          '.helmsmith/pritty.json',
+          '.claude/commands/commit.md',
+          '.claude/commands/pr.md',
+          '.claude/skills/pritty/SKILL.md',
+          '.claude/agents/pritty.md',
+          '.github/prompts/commit.prompt.md',
+          '.github/prompts/pr.prompt.md',
+        ]) {
+          expect(out.skipped, f).toContain(join(repo, f));
+          expect(r.stderr, f).toContain(join(repo, f));
+        }
+        expect(out.written).toEqual([join(repo, 'AGENTS.md')]);
+        expect(r.stderr).toContain('outside the repository');
+      }
+      expect(filesUnder(outside)).toEqual(before);
+      expect(readFileSync(join(outside, 'claude', 'commands', 'commit.md'), 'utf8')).toBe(
+        'USER FILE\n',
+      );
+    });
+
+    it('creates nothing through a dangling link and overwrites nothing through a link, even with --force', async () => {
+      sb = makeSandbox();
+      const repo = makeRepo(sb);
+      const victim = join(sb.root, 'victim');
+      mkdirSync(victim);
+      writeFileSync(join(victim, 'rc'), 'export SAFE=1\n');
+      mkdirSync(join(repo, '.claude', 'commands'), { recursive: true });
+      mkdirSync(join(repo, '.github', 'prompts'), { recursive: true });
+      const config = join(repo, '.pritty.json');
+      const command = join(repo, '.claude', 'commands', 'commit.md');
+      const prompt = join(repo, '.github', 'prompts', 'pr.prompt.md');
+      symlinkSync(join(victim, 'config.json'), config);
+      symlinkSync('../../../victim/created-by-init', command);
+      symlinkSync('../../../victim/rc', prompt);
+
+      for (const extra of [[], ['--force']]) {
+        const r = await runCli(sb, repo, ['init', '--json', '--no-aliases', ...extra]);
+        expect(r.exitCode).toBe(0);
+        const out = jsonLine<InitJson>(r);
+        for (const p of [config, command, prompt]) {
+          expect(out.skipped, p).toContain(p);
+          expect(out.written, p).not.toContain(p);
+          expect(r.stderr, p).toContain(p);
+        }
+      }
+      expect(readdirSync(victim)).toEqual(['rc']);
+      expect(readFileSync(join(victim, 'rc'), 'utf8')).toBe('export SAFE=1\n');
+    });
+
+    it('still writes through a directory link that stays inside the repository', async () => {
+      sb = makeSandbox();
+      const repo = makeRepo(sb);
+      mkdirSync(join(repo, 'tools', 'claude'), { recursive: true });
+      symlinkSync('tools/claude', join(repo, '.claude'));
+      const r = await runCli(sb, repo, ['init', '--json', '--no-aliases']);
+      expect(r.exitCode).toBe(0);
+      const out = jsonLine<InitJson>(r);
+      expect(out.skipped).toEqual([]);
+      for (const f of [
+        'commands/commit.md',
+        'commands/pr.md',
+        'skills/pritty/SKILL.md',
+        'agents/pritty.md',
+      ]) {
+        expect(existsSync(join(repo, 'tools', 'claude', f)), f).toBe(true);
+        expect(out.written, f).toContain(join(repo, '.claude', f));
+      }
     });
   });
 });

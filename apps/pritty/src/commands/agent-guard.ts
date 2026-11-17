@@ -12,8 +12,8 @@
  * redirect, `< path`, takes either form and must stay inside the scratch dir.
  */
 import { execFileSync } from 'node:child_process';
-import { lstatSync, realpathSync } from 'node:fs';
-import { basename, dirname, join, resolve, sep } from 'node:path';
+import { resolve } from 'node:path';
+import { isUnder, realOfNearest } from './_shared/real-path.js';
 
 export type GuardVerdict = { allow: true } | { allow: false; reason: string };
 
@@ -74,28 +74,6 @@ export const defaultScratchResolver: ScratchResolver = (cwd) => {
   }
 };
 
-/** Real path of `p` even when it does not exist yet: the nearest existing ancestor, realpath'd. Null for a dangling symlink. */
-function realOfNearest(p: string): string | null {
-  const rest: string[] = [];
-  let cur = resolve(p);
-  for (;;) {
-    try {
-      return join(realpathSync(cur), ...rest.reverse());
-    } catch {
-      try {
-        lstatSync(cur);
-        return null; // exists but cannot be resolved: a dangling symlink
-      } catch {
-        // does not exist: climb
-      }
-    }
-    const parent = dirname(cur);
-    if (parent === cur) return null;
-    rest.push(basename(cur));
-    cur = parent;
-  }
-}
-
 /** How refusals name the scratch directory: its resolved path, else how to find it. */
 const scratchLabel = (dir: string | null): string =>
   dir
@@ -108,7 +86,7 @@ function insideScratch(path: string, cwd: string, dir: string | null): boolean {
   const realDir = realOfNearest(dir);
   const real = realOfNearest(resolve(cwd, path));
   if (realDir === null || real === null) return false;
-  return real.startsWith(realDir + sep);
+  return isUnder(real, realDir);
 }
 
 type Token = { text: string; quoted: boolean };
