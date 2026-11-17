@@ -206,6 +206,15 @@ describe('pritty without the TUI', () => {
   });
 });
 
+describe('shipped agent files', () => {
+  it('the package files include agents', () => {
+    const files = (
+      JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { files: string[] }
+    ).files;
+    expect(files).toContain('agents');
+  });
+});
+
 describe('pritty has no connect command', () => {
   it('lists auth login/status/logout and no connect in --help', () => {
     const out = execFileSync(process.execPath, [join(root, 'dist/cli.js'), '--help'], {

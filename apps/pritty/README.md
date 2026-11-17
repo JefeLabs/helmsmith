@@ -38,7 +38,7 @@ Requires Node 24 or newer (`npm install -g @helmsmith/pritty`).
 pritty                                # shows command list (Commander default)
 pritty auth login                     # GitHub Device Flow → ~/.pritty/auth.json
 pritty auth status
-pritty init                           # write the config (.helmsmith/pritty.json, else .pritty.json)
+pritty init                           # config, slash commands, skill, agent files (see Agent files)
 pritty categorize                     # show staged files grouped by category
 pritty categorize --all               # include modified + untracked
 ```
@@ -413,6 +413,50 @@ title gets the label and tags added when missing. This depends on the commits,
 not on `commitLabels`. Where PRs are squash-merged, that title becomes the
 commit subject and is not conventional; merge-commit repositories are
 unaffected.
+
+## Agent files
+
+`pritty init` also installs two files for coding agents (skip them with
+`--no-agent` and `--no-agents-md`; `--no-claude` does not affect them):
+
+- `.claude/agents/pritty.md`, a Claude Code subagent named `pritty` with the
+  tools Bash, Read, Grep, Glob and Write. Ask for it by name ("use the pritty
+  agent to commit this") or `@agent-pritty`; Claude Code also picks it up when
+  work is done. Tell it what the change was for, and the ticket. It reads git,
+  stages with `git add -- <paths>`, previews and commits with `pritty commit`,
+  and opens PRs with `pritty pr --base <branch> --input=json` (the base the
+  request names; with none, it asks unless the config sets `baseBranch`). An
+  existing file is kept unless `--force`.
+- A section of `AGENTS.md`, between the markers
+  `` <!-- pritty:begin (managed by `pritty init`; edits inside are replaced) --> ``
+  and `<!-- pritty:end -->`. `init` creates the file when missing, appends the
+  section after a blank line when the file has no markers, and replaces the
+  section in place on every later run; the rest of the file is untouched. Broken
+  markers (only one, wrong order, duplicated) or a symlink leave the file alone
+  and `init` reports it as skipped, with the reason. Claude Code reads
+  `AGENTS.md` only when the repository has no `CLAUDE.md`; with one, `init`
+  prints a hint to add `@AGENTS.md` and never edits `CLAUDE.md`.
+
+`init` writes only inside the repository it runs in: a target that is a
+symlink, dangling or not, or that sits under a directory linking out of the
+repository is left alone, with or without `--force`, and reported as skipped
+with the reason. Links that stay inside the repository are followed.
+
+The subagent's `PreToolUse` hooks run `pritty agent-guard || exit 2` on Bash and
+on Write|Edit, so a missing or broken `pritty` blocks the call. The hidden
+`agent-guard` allows only read-only `git status|diff|log|show|rev-parse|ls-files`,
+`git add -- <paths>` and `pritty commit|pr|categorize` with a flag allowlist
+per command, written as plain words and simple double-quoted text (revisions
+with `^` or `~` quoted: `"HEAD^"`), and Write/Edit only inside the scratch
+directory (`git rev-parse --path-format=absolute --git-path pritty`). It refuses
+`--no-verify`, `--trailer`, `--body-file`, flag values starting with `-` and
+every shell operator, `$` and other quote; the one exception is a single `<`
+redirect with `--input=json` from a path inside the scratch directory,
+double-quoted (`< "<scratch>/plan.json"`) so a path with spaces or non-ASCII
+characters works. Text that
+starts with `-`, or contains `"`, `$`, a backtick, a backslash, `!` or a newline,
+goes through `--input=json`. Claude Code runs a project agent's hooks only after
+you accept the workspace trust prompt.
 
 ## Programmatic use
 

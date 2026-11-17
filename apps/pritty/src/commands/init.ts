@@ -1,10 +1,20 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
 import { confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
+import { readAgentFile } from '../agent-files.js';
 import { defaultStarterConfig } from '../config.js';
 import { detectShell, installShellAliases } from '../shell-aliases.js';
+import { upsertSection } from './_shared/agents-md.js';
 import { output } from './_shared/output.js';
+import { isUnder, realOfNearest } from './_shared/real-path.js';
 import { CLAUDE_COMMANDS, COPILOT_PROMPTS, PRITTY_SKILL } from './_shared/templates.js';
 
 export interface InitOptions {
@@ -13,11 +23,40 @@ export interface InitOptions {
   copilot?: boolean;
   aliases?: boolean;
   skill?: boolean;
+  /** The `.claude/agents/pritty.md` committer subagent (default true). */
+  agent?: boolean;
+  /** The managed section in `AGENTS.md` (default true). */
+  agentsMd?: boolean;
   /**
    * One JSON line { written, skipped, gitRepo } (absolute paths); implies
    * --no-aliases, since an unattended run should not edit a shell rc file.
    */
   json?: boolean;
+}
+
+/**
+ * Why `init` must not create or write `path`, or undefined when it may. The
+ * file itself must be absent or a regular file (a symlink, dangling or not,
+ * would be written through), and the nearest existing ancestor must resolve
+ * inside `root`, the real working directory: a linked parent directory such as
+ * `.claude -> ../elsewhere` would carry mkdir and the write out of the
+ * repository. Links that stay inside the repository are fine.
+ */
+function unsafeTarget(path: string, root: string): string | undefined {
+  let st: ReturnType<typeof lstatSync> | undefined;
+  try {
+    st = lstatSync(path);
+  } catch {
+    st = undefined;
+  }
+  if (st?.isSymbolicLink()) return 'it is a symlink; init does not write through links';
+  if (st && !st.isFile()) return 'it is not a regular file';
+  const real = realOfNearest(path);
+  if (real === null) return 'a parent directory is a dangling symlink';
+  if (!isUnder(real, root)) {
+    return `it resolves outside the repository (${real}); init writes only inside ${root}`;
+  }
+  return undefined;
 }
 
 /**
@@ -38,7 +77,9 @@ function configTargets(cwd: string): string[] {
 /**
  * Write a starter config (`.helmsmith/pritty.json` in a repository with a
  * `.helmsmith` folder, else `.pritty.json`) + Claude Code / VS Code Copilot
- * slash commands. Skips integration files outside a git repo.
+ * slash commands. Skips integration files outside a git repo. Every project
+ * file goes through `unsafeTarget` first, so none is written outside the
+ * working directory or through a link (the opt-in shell aliases edit an rc file).
  */
 export async function runInit(options: InitOptions = {}): Promise<void> {
   const { say, result } = output(options.json);
@@ -48,70 +89,85 @@ export async function runInit(options: InitOptions = {}): Promise<void> {
   const includeCopilot = options.copilot !== false;
   const includeAliases = options.aliases !== false && !options.json;
   const includeSkill = options.skill !== false;
+  const includeAgent = options.agent !== false;
+  const includeAgentsMd = options.agentsMd !== false;
   const inGitRepo = existsSync(join(cwd, '.git'));
+  const root = realpathSync(cwd);
 
   const written: string[] = [];
   const skipped: string[] = [];
+  const refuse = (path: string, why: string): void => {
+    console.error(chalk.yellow(`! skipped ${path}: ${why}`));
+    skipped.push(path);
+  };
+  /** Write `body` to `path` unless it is unsafe, or exists and --force is off. */
+  const place = (path: string, body: string): void => {
+    const unsafe = unsafeTarget(path, root);
+    if (unsafe) {
+      refuse(path, unsafe);
+    } else if (existsSync(path) && !force) {
+      say(chalk.dim(`· skipped ${path} (exists; --force to overwrite)`));
+      skipped.push(path);
+    } else {
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, body);
+      say(chalk.green(`✓ ${path}`));
+      written.push(path);
+    }
+  };
 
   // 1. The config (always)
   for (const configPath of configTargets(cwd)) {
-    if (existsSync(configPath) && !force) {
-      say(chalk.dim(`· skipped ${configPath} (exists; --force to overwrite)`));
-      skipped.push(configPath);
-      continue;
-    }
-    mkdirSync(dirname(configPath), { recursive: true });
-    writeFileSync(configPath, `${JSON.stringify(defaultStarterConfig(), null, 2)}\n`);
-    say(chalk.green(`✓ ${configPath}`));
-    written.push(configPath);
+    place(configPath, `${JSON.stringify(defaultStarterConfig(), null, 2)}\n`);
   }
 
   // 2. Claude Code slash commands (in git repos only)
   if (includeClaude && inGitRepo) {
-    const claudeDir = join(cwd, '.claude', 'commands');
     for (const [name, body] of Object.entries(CLAUDE_COMMANDS)) {
-      const path = join(claudeDir, `${name}.md`);
-      if (existsSync(path) && !force) {
-        say(chalk.dim(`· skipped ${path} (exists; --force to overwrite)`));
-        skipped.push(path);
-        continue;
-      }
-      mkdirSync(claudeDir, { recursive: true });
-      writeFileSync(path, body);
-      say(chalk.green(`✓ ${path}`));
-      written.push(path);
+      place(join(cwd, '.claude', 'commands', `${name}.md`), body);
     }
   }
 
   // 2.5. Standalone Claude Code skill (in git repos only).
   if (includeSkill && inGitRepo) {
-    const skillDir = join(cwd, '.claude', 'skills', 'pritty');
-    const skillPath = join(skillDir, 'SKILL.md');
-    if (existsSync(skillPath) && !force) {
-      say(chalk.dim(`· skipped ${skillPath} (exists; --force to overwrite)`));
-      skipped.push(skillPath);
+    place(join(cwd, '.claude', 'skills', 'pritty', 'SKILL.md'), PRITTY_SKILL);
+  }
+
+  // 2.6. The committer subagent (in git repos only; kept when present).
+  if (includeAgent && inGitRepo) {
+    place(join(cwd, '.claude', 'agents', 'pritty.md'), readAgentFile('pritty.md'));
+  }
+
+  // 2.7. The AGENTS.md section (in git repos only; replaced on every run).
+  if (includeAgentsMd && inGitRepo) {
+    const agentsPath = join(cwd, 'AGENTS.md');
+    const unsafe = unsafeTarget(agentsPath, root);
+    if (unsafe) {
+      refuse(agentsPath, unsafe);
     } else {
-      mkdirSync(skillDir, { recursive: true });
-      writeFileSync(skillPath, PRITTY_SKILL);
-      say(chalk.green(`✓ ${skillPath}`));
-      written.push(skillPath);
+      const existing = existsSync(agentsPath) ? readFileSync(agentsPath, 'utf8') : undefined;
+      const upserted = upsertSection(existing, readAgentFile('AGENTS.section.md'));
+      if (upserted.ok) {
+        writeFileSync(agentsPath, upserted.text);
+        say(chalk.green(`✓ ${agentsPath}`));
+        written.push(agentsPath);
+      } else {
+        refuse(agentsPath, `its pritty markers are broken (${upserted.problem}); fix them by hand`);
+      }
+    }
+    if (existsSync(join(cwd, 'CLAUDE.md'))) {
+      say(
+        chalk.dim(
+          '  CLAUDE.md is untouched. To have Claude Code read AGENTS.md, add a line `@AGENTS.md` to CLAUDE.md.',
+        ),
+      );
     }
   }
 
   // 3. VS Code Copilot Chat prompts (in git repos only)
   if (includeCopilot && inGitRepo) {
-    const promptDir = join(cwd, '.github', 'prompts');
     for (const [name, body] of Object.entries(COPILOT_PROMPTS)) {
-      const path = join(promptDir, `${name}.prompt.md`);
-      if (existsSync(path) && !force) {
-        say(chalk.dim(`· skipped ${path} (exists; --force to overwrite)`));
-        skipped.push(path);
-        continue;
-      }
-      mkdirSync(promptDir, { recursive: true });
-      writeFileSync(path, body);
-      say(chalk.green(`✓ ${path}`));
-      written.push(path);
+      place(join(cwd, '.github', 'prompts', `${name}.prompt.md`), body);
     }
   }
 
@@ -149,7 +205,7 @@ export async function runInit(options: InitOptions = {}): Promise<void> {
   }
 
   // 5. Summary
-  if (!inGitRepo && (includeClaude || includeCopilot)) {
+  if (!inGitRepo && (includeClaude || includeCopilot || includeAgent || includeAgentsMd)) {
     say(
       chalk.dim(
         `\nNot a git repository (no .git/ found) — skipped Claude Code & Copilot integration files.`,

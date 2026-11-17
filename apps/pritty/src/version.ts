@@ -19,5 +19,11 @@ function findPackageJson(startDir: string): string {
 }
 
 const pkgFile = findPackageJson(dirname(fileURLToPath(import.meta.url)));
+
+/** The directory holding this package's package.json (where `agents/`, `dist/` and `bin/` live). */
+export function packageRoot(): string {
+  return dirname(pkgFile);
+}
+
 export const VERSION: string = (JSON.parse(readFileSync(pkgFile, 'utf8')) as { version: string })
   .version;

@@ -79,3 +79,24 @@ describe('agent commit inputs in the skill and the /commit command', () => {
     expect(PRITTY_SKILL).toMatch(/Skip the confirmation flow[\s\S]*unattended by design/);
   });
 });
+
+describe('PRITTY_SKILL agent files', () => {
+  it('names the subagent file, the AGENTS.md section and the guard', () => {
+    expect(PRITTY_SKILL).toContain('.claude/agents/pritty.md');
+    expect(PRITTY_SKILL).toContain('AGENTS.md');
+    expect(PRITTY_SKILL).toContain('@agent-pritty');
+    expect(PRITTY_SKILL).toContain('agent-guard');
+  });
+});
+
+describe('PRITTY_SKILL agent files detail', () => {
+  it('says AGENTS.md is appended to, and how the hook fails closed', () => {
+    expect(PRITTY_SKILL).toContain('appends the');
+    expect(PRITTY_SKILL).toContain('section after a blank line when the file has no markers');
+    expect(PRITTY_SKILL).toContain('pritty agent-guard || exit 2');
+    expect(PRITTY_SKILL).toContain('Bash, Read, Grep, Glob and Write');
+    expect(PRITTY_SKILL).toContain(
+      '<!-- pritty:begin (managed by `pritty init`; edits inside are replaced) -->',
+    );
+  });
+});
