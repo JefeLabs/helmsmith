@@ -112,6 +112,70 @@ describe('generateCommitMessages grouping', () => {
   });
 });
 
+describe('generateCommitMessages labels', () => {
+  const category = ConfigSchema.parse({ provider: 'claude', commitGrouping: 'category' });
+  const head = [
+    'You are an expert engineer writing git commit messages for a developer.',
+    'Group the files into changes: a change is one logical unit of work (a feature, a fix, a refactor), and it may span several categories. Write one commit message per change per category. Format: `<type>(<scope>): <subject>` where type is one of feat|fix|refactor|test|docs|chore|build|ci|perf|style and scope is the affected area in lowercase. Subject is imperative mood, lowercase, no trailing period, max 70 chars.',
+  ];
+  const tail = [
+    'Copy each category name exactly as it appears in the `##` headings, even `unknown`: never rename one after the commit type or the change.',
+    'Do not wrap the output in markdown code fences. Do not include any prose before or after the JSON.',
+  ];
+  /** The system prompts as they were before labels, pinned byte for byte. */
+  const today = {
+    change: [
+      ...head,
+      'Return strict JSON: an array of objects with keys `change` (a short label, the same on every entry of that change), `category`, `message`, `body` (optional), `files` (that change’s files from that category’s list).',
+      'Every listed file goes in exactly one entry. When a category holds a single change, its one entry lists all of its files. List the changes in the order they should be committed.',
+      ...tail,
+    ].join('\n'),
+    category: [
+      head[0],
+      'Produce one commit message per file category. Format: `<type>(<scope>): <subject>` where type is one of feat|fix|refactor|test|docs|chore|build|ci|perf|style and scope is the affected area in lowercase. Subject is imperative mood, lowercase, no trailing period, max 70 chars.',
+      'Return strict JSON: an array of objects with keys `category`, `message`, `body` (optional), `files` (the input files for that category).',
+      ...tail,
+    ].join('\n'),
+  };
+
+  it('asks for one shared change name for the whole set in category grouping', async () => {
+    answer(JSON.stringify([{ change: 'x', category: 'app', message: 'feat: x', files: [] }]));
+    await generateCommitMessages({ app: ['src/a.ts'] }, '+a', category, undefined, {
+      labels: true,
+    });
+    const { system } = sent();
+    expect(system).toMatch(/one commit message per file category/i);
+    expect(system).toContain(
+      '`change` (a name of two to four words for the change, one shared name for the whole set, the same on every entry)',
+    );
+  });
+
+  it('asks for change names of two to four words in change grouping', async () => {
+    answer(JSON.stringify([{ change: 'x', category: 'app', message: 'feat: x', files: [] }]));
+    await generateCommitMessages({ app: ['src/a.ts'] }, '+a', config, undefined, {
+      labels: true,
+    });
+    const { system } = sent();
+    expect(system).toContain(
+      '`change` (a name of two to four words for the change, the same on every entry of that change)',
+    );
+    expect(system).not.toContain('a short label');
+  });
+
+  it("keeps today's prompt byte for byte without labels", async () => {
+    answer(JSON.stringify([{ category: 'app', message: 'feat: x', files: [] }]));
+    for (const [cfg, expected] of [
+      [config, today.change],
+      [category, today.category],
+    ] as const) {
+      for (const context of [undefined, { labels: false }]) {
+        await generateCommitMessages({ app: ['src/a.ts'] }, '+a', cfg, undefined, context);
+        expect(sent().system).toBe(expected);
+      }
+    }
+  });
+});
+
 describe('generatePR', () => {
   it('does not ask for a checklist of unchecked boxes', async () => {
     answer(JSON.stringify({ title: 't', body: 'b', labels: [] }));

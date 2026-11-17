@@ -1,5 +1,6 @@
 import chalk from 'chalk';
 import ora from 'ora';
+import type { ValidationResult } from '../adapters/index.js';
 import { type CommitMessage, generateCommitMessages, type TicketContext } from '../ai.js';
 import { categorize, mergeCategories, UNKNOWN_CATEGORY } from '../categorizer.js';
 import { type Config, loadConfig } from '../config.js';
@@ -22,10 +23,20 @@ import {
   STDIN_HINT,
 } from './_shared/explicit.js';
 import { splitTitleBody } from './_shared/format.js';
-import { composeCommitMessage, reconcileCommitPlan, subjectOf } from './_shared/plan.js';
+import { labelFromChange, normalizeLabel } from './_shared/label.js';
+import {
+  applyLabels,
+  composeCommitMessage,
+  reconcileCommitPlan,
+  subjectOf,
+} from './_shared/plan.js';
 import { filePlanCache, type PlanCache, planKey } from './_shared/plan-cache.js';
-import { confirm, editor } from './_shared/prompts.js';
-import { resolveTicketContext, type TicketContextOptions } from './_shared/ticket-context.js';
+import { confirm, editor, input } from './_shared/prompts.js';
+import {
+  lookupTicket,
+  resolveTicketContext,
+  type TicketContextOptions,
+} from './_shared/ticket-context.js';
 
 export interface CommitOptions {
   autoApprove?: boolean;
@@ -118,7 +129,10 @@ export interface CommitDeps {
   prompts: {
     confirm(o: { message: string; default?: boolean }): Promise<boolean>;
     editor(o: { message: string; default?: string }): Promise<string>;
+    input(o: { message: string; default?: string }): Promise<string>;
   };
+  /** Looks a typed ticket up in `ticket.validation`'s tracker (default: lookupTicket). */
+  lookupTicket?: (config: Config, ticket: string) => Promise<ValidationResult | null>;
   io?: { out: (line: string) => void; err: (line: string) => void };
   /** Where a shown plan waits for the run that commits it; without one, every run asks the model. */
   planCache?: PlanCache;
@@ -143,7 +157,8 @@ function defaultDeps(): CommitDeps {
     config: loadConfig(),
     ai: { generateCommitMessages },
     ticket: resolveTicketContext,
-    prompts: { confirm, editor },
+    prompts: { confirm, editor, input },
+    lookupTicket,
     planCache: filePlanCache(() => git.gitPath(PLAN_CACHE_FILE)),
   };
 }
@@ -214,8 +229,21 @@ function validateOverrides(options: CommitOptions, style: Config['commitStyle'])
       `--scope ${options.scope} must be one to three lowercase segments joined by "/", like network, org/global or org/network/directory`,
     );
   }
+  if (options.label !== undefined && !styleHasTypes(style)) {
+    throw new Error(
+      `--label needs a commit style with \`type(scope):\` subjects (conventional or angular), not ${style}`,
+    );
+  }
   const [badTrailer] = trailerProblems(options.trailer);
   if (badTrailer) throw new Error(badTrailer);
+}
+
+/** `--label`, normalised: a blank one is no label, one outside the grammar is refused. */
+function explicitLabel(raw: string | undefined): string | undefined {
+  if (raw === undefined || raw.trim() === '') return undefined;
+  const result = normalizeLabel(raw);
+  if (!result.ok) throw new Error(`--label: ${result.error}`);
+  return result.label;
 }
 
 /** What every input shares once the options are read. */
@@ -373,13 +401,81 @@ async function commitExplicit(
   return run.finish({ dryRun: false, commits: made });
 }
 
+const LABEL_QUESTION =
+  "Label for these commits (Jira ticket or effort name, Enter for the model's names):";
+
+/**
+ * The label the person types, normalised; blank leaves the labels to the
+ * model's change names. An answer outside the label grammar is explained and
+ * asked again.
+ */
+async function askLabel(run: Run, deps: CommitDeps): Promise<string | undefined> {
+  for (;;) {
+    const answer = await deps.prompts.input({ message: LABEL_QUESTION });
+    if (answer.trim() === '') return undefined;
+    const result = normalizeLabel(answer);
+    if (result.ok) {
+      await checkTicket(result.label, run, deps);
+      return result.label;
+    }
+    run.say(chalk.yellow(`⚠ ${result.error}; try again, or press Enter for the model's names`));
+  }
+}
+
+/**
+ * A typed label shaped like the repository's tickets is looked up when
+ * `ticket.validation` is configured. A ticket the tracker does not know is a
+ * warning, or refused under `validateStrict`; a tracker that cannot answer
+ * leaves the label as typed.
+ */
+async function checkTicket(label: string, run: Run, deps: CommitDeps): Promise<void> {
+  const ticket = run.config.ticket;
+  if (!ticket?.validation || !matchesTicket(label, ticket.pattern)) return;
+  const tracker = ticket.validation.type;
+  let result: ValidationResult | null;
+  try {
+    result = await (deps.lookupTicket ?? lookupTicket)(run.config, label);
+  } catch (err) {
+    run.say(chalk.yellow(`⚠ Ticket validation failed: ${(err as Error).message}`));
+    result = null;
+  }
+  if (!result) {
+    run.say(chalk.dim(`  (couldn't verify ${label} via ${tracker}; using it anyway)`));
+  } else if (!result.exists && ticket.validateStrict) {
+    throw new Error(
+      `${label} not found in ${tracker}: ${result.error ?? 'ticket missing'}. Set ticket.validateStrict: false to proceed anyway.`,
+    );
+  } else if (!result.exists) {
+    run.say(chalk.yellow(`⚠ ${label} not found in ${tracker}; proceeding anyway.`));
+  }
+}
+
+/** The whole label matches the configured ticket pattern, ignoring case. */
+function matchesTicket(label: string, pattern: string): boolean {
+  try {
+    return new RegExp(`^(?:${pattern})$`, 'i').test(label);
+  } catch {
+    return false;
+  }
+}
+
+/** The first change the model named: under category grouping, the one name for the run. */
+function firstChange(raw: readonly CommitMessage[]): string | undefined {
+  return raw
+    .map((c) => c.change)
+    .find((change): change is string => typeof change === 'string' && change.trim() !== '');
+}
+
 /**
  * Commit the index from one of three inputs: `--message` (one commit from the
  * flags), `--input=json` (the commits of a JSON body on stdin) or neither,
  * where the model writes a message per change per category (or per category,
  * with `commitGrouping: "category"`). The model path resolves ticket context
- * up front so validation gates fail fast (before any AI call). Errors are
- * thrown (the CLI prints them and exits 1).
+ * up front so validation gates fail fast (before any AI call). Where
+ * `commitLabels` is on (conventional and angular styles), every commit gets a
+ * label: `--label`, else the detected ticket, else the one the person types
+ * when asked, else the model's change name; elsewhere only `--label` labels
+ * them. Errors are thrown (the CLI prints them and exits 1).
  */
 export async function runCommit(
   options: CommitOptions = {},
@@ -421,10 +517,14 @@ export async function runCommit(
   };
   if (input !== 'interactive') return commitExplicit(input, options, run, deps);
   validateOverrides(options, config.commitStyle);
+  const explicit = explicitLabel(options.label);
+  const labelsOn = config.commitLabels && styleHasTypes(config.commitStyle);
 
   // Ticket context first: the validation gate fires before any AI call.
   const branch = await git.getCurrentBranch();
   const ticketCtx = await deps.ticket(config, branch, git, { interactive: !auto });
+  const detected = labelsOn && ticketCtx?.ticket ? normalizeLabel(ticketCtx.ticket) : undefined;
+  const ticketLabel = detected?.ok ? detected.label : undefined;
 
   // 1. Staged files
   const staged = await git.getStaged();
@@ -459,6 +559,8 @@ export async function runCommit(
           commitStyle: config.commitStyle,
           commitGrouping: config.commitGrouping,
           categories,
+          commitLabels: config.commitLabels,
+          label: explicit ?? null,
           version: VERSION,
         })
       : null;
@@ -477,12 +579,24 @@ export async function runCommit(
     }
   }
   const reused = plan !== undefined;
+  let chosen: string | undefined;
+  let runLabel: string | undefined;
   if (!plan) {
+    // Asked before the model, so a refused ticket costs no model call; a kept
+    // plan already carries the labels it was shown with.
+    if (labelsOn && !explicit && !ticketLabel && !auto) chosen = await askLabel(run, deps);
+    const named = explicit ?? chosen ?? ticketLabel;
     const spinner = ora({ text: 'Generating commit messages...', color: 'cyan' }).start();
     try {
       const diff = await git.getStagedDiff();
+      const raw = await deps.ai.generateCommitMessages(grouped, diff, config, ticketCtx, {
+        branch,
+        labels: labelsOn && !named,
+      });
+      // Read before reconciling, which drops `change` under category grouping.
+      if (labelsOn) runLabel = labelFromChange(firstChange(raw));
       plan = reconcileCommitPlan(
-        await deps.ai.generateCommitMessages(grouped, diff, config, ticketCtx, { branch }),
+        raw,
         grouped,
         (from, to) => say(chalk.dim(`  the model named the ${to} commit "${from}"; paired them`)),
         config.commitGrouping,
@@ -515,6 +629,11 @@ export async function runCommit(
       ),
     );
   }
+
+  // 3.7 Labels: --label, the answer, the ticket, then the model's change names;
+  //     with commitLabels off, only --label. A commit that has a label keeps it.
+  if (labelsOn) plan = applyLabels(plan, { explicit, chosen, ticket: ticketLabel, runLabel });
+  else if (explicit) plan = applyLabels(plan, { explicit });
 
   // 4. Show the plan; grouped by change, the files are the model's choice, so they are listed
   showPlan(plan, say, 'change');

@@ -1,5 +1,6 @@
 import { posix } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import type { ValidationResult } from '../adapters/index.js';
 import type { CommitMessage } from '../ai.js';
 import { ConfigSchema } from '../config.js';
 import type { GitOps } from '../git.js';
@@ -45,11 +46,20 @@ function fakes(
     stdin?: string;
     stdinIsTTY?: boolean;
     cwd?: string;
+    /** The ticket the branch names, as resolveTicketContext reports it. */
+    ticket?: string;
+    /** What the person types at each label question, in order; then Enter. */
+    inputs?: string[];
+    /** The tracker's answer for a looked-up ticket (default: unreachable, null). */
+    lookup?: (ticket: string) => ValidationResult | null;
   } = {},
 ) {
   const calls: string[] = [];
   const committed: Array<{ message: string; files: string[]; noVerify: boolean }> = [];
-  const generated: Array<{ branch?: string }> = [];
+  const generated: Array<{ branch?: string; labels?: boolean }> = [];
+  /** The questions put to the person through `prompts.input`. */
+  const asked: string[] = [];
+  const inputs = [...(o.inputs ?? [])];
   const stagedFor: Array<{ pathspecs: string[]; fromDir?: string }> = [];
   let sha = 0;
   let attempts = 0;
@@ -96,13 +106,13 @@ function fakes(
     ai: {
       generateCommitMessages: async (groups, _diff, _config, _ticket, context) => {
         calls.push('generate');
-        generated.push({ branch: context?.branch });
+        generated.push({ branch: context?.branch, labels: context?.labels });
         return state.answer(groups);
       },
     },
     ticket: async () => {
       calls.push('ticket');
-      return undefined;
+      return o.ticket ? { ticket: o.ticket } : undefined;
     },
     prompts: {
       confirm: async () => {
@@ -110,6 +120,15 @@ function fakes(
         return true;
       },
       editor: async (d) => d.default ?? '',
+      input: async (q) => {
+        calls.push('input');
+        asked.push(q.message);
+        return inputs.shift() ?? '';
+      },
+    },
+    lookupTicket: async (_config, ticket) => {
+      calls.push(`lookup ${ticket}`);
+      return o.lookup ? o.lookup(ticket) : null;
     },
     io: { out: (l) => out.push(l), err: (l) => err.push(l) },
     ...(o.planCache ? { planCache: o.planCache } : {}),
@@ -120,7 +139,7 @@ function fakes(
     stdinIsTTY: o.stdinIsTTY ?? false,
     cwd: o.cwd ?? '/repo',
   };
-  return { deps, calls, committed, generated, stagedFor, out, err, state };
+  return { deps, calls, committed, generated, stagedFor, asked, out, err, state };
 }
 
 const subjects = (committed: Array<{ message: string }>): string[] =>
@@ -265,7 +284,7 @@ describe('runCommit on a fix/ branch', () => {
   it('tells the model the branch name', async () => {
     const f = fakes({ branch: 'fix/family/my-profile--phone-kenya' });
     await runCommit({ json: true, dryRun: true }, f.deps);
-    expect(f.generated).toEqual([{ branch: 'fix/family/my-profile--phone-kenya' }]);
+    expect(f.generated).toEqual([{ branch: 'fix/family/my-profile--phone-kenya', labels: false }]);
   });
 });
 
@@ -896,6 +915,180 @@ describe('runCommit shows what it commits', () => {
     expect(JSON.parse(g.out[0]!).commits[0]).toMatchObject({
       message: 'ABC-1 Update app',
       label: 'ABC-1',
+    });
+  });
+});
+
+describe('runCommit labels on the model path', () => {
+  const labelsOn = { commitLabels: true };
+  const QUESTION =
+    "Label for these commits (Jira ticket or effort name, Enter for the model's names):";
+  const named =
+    (change: string): Answer =>
+    (groups) =>
+      oneEach(groups).map((c) => ({ ...c, change }));
+  const generations = (calls: string[]) => calls.filter((c) => c === 'generate').length;
+
+  it('asks for a label when attended with no ticket, and puts the answer on every subject', async () => {
+    const f = fakes({ config: labelsOn, inputs: ['wedmodd-23444'] });
+    await runCommit({}, f.deps);
+    expect(f.asked).toEqual([QUESTION]);
+    expect(subjects(f.committed)).toEqual(['WEDMODD-23444 feat: app', 'WEDMODD-23444 feat: test']);
+    expect(f.generated[0]?.labels).toBe(false);
+  });
+
+  it("takes the model's change name when the answer is blank", async () => {
+    const f = fakes({ config: labelsOn, inputs: [''], answer: named('login rate limit') });
+    await runCommit({}, f.deps);
+    expect(f.asked).toEqual([QUESTION]);
+    expect(subjects(f.committed)).toEqual([
+      'LOGIN-RATE-LIMIT feat: app',
+      'LOGIN-RATE-LIMIT feat: test',
+    ]);
+    expect(f.generated[0]?.labels).toBe(true);
+  });
+
+  it('never asks when unattended, and labels from the model', async () => {
+    for (const options of [{ json: true }, { autoApprove: true }]) {
+      const f = fakes({ config: labelsOn, answer: named('login rate limit') });
+      await runCommit(options, f.deps);
+      expect(f.calls).not.toContain('input');
+      expect(subjects(f.committed)).toEqual([
+        'LOGIN-RATE-LIMIT feat: app',
+        'LOGIN-RATE-LIMIT feat: test',
+      ]);
+    }
+  });
+
+  it("gives every commit of a category-grouped plan the model's one name for the run", async () => {
+    const f = fakes({
+      config: { ...labelsOn, commitGrouping: 'category' },
+      answer: named('login rate limit'),
+    });
+    await runCommit({ json: true }, f.deps);
+    expect(f.generated[0]?.labels).toBe(true);
+    const { commits } = JSON.parse(f.out[0]!);
+    expect(commits.map((c: { message: string }) => c.message)).toEqual([
+      'LOGIN-RATE-LIMIT feat: app',
+      'LOGIN-RATE-LIMIT feat: test',
+    ]);
+    expect(commits[0]).toMatchObject({ label: 'LOGIN-RATE-LIMIT', type: 'feat' });
+    expect(commits[0]).not.toHaveProperty('change');
+  });
+
+  it('labels every commit with the detected ticket and asks nothing', async () => {
+    const f = fakes({ config: labelsOn, ticket: 'ABC-9', answer: named('login rate limit') });
+    await runCommit({}, f.deps);
+    expect(f.calls).not.toContain('input');
+    expect(subjects(f.committed)).toEqual(['ABC-9 feat: app', 'ABC-9 feat: test']);
+    expect(f.generated[0]?.labels).toBe(false);
+  });
+
+  it('puts --label on every subject, ahead of the ticket, without asking', async () => {
+    const f = fakes({ config: labelsOn, ticket: 'ABC-9' });
+    await runCommit({ label: 'wedmodd 1' }, f.deps);
+    expect(f.calls).not.toContain('input');
+    expect(subjects(f.committed)).toEqual(['WEDMODD-1 feat: app', 'WEDMODD-1 feat: test']);
+  });
+
+  it('with commitLabels off, asks nothing and leaves the subjects unlabelled', async () => {
+    const f = fakes({ ticket: 'ABC-9', answer: named('login rate limit') });
+    await runCommit({}, f.deps);
+    expect(f.calls).not.toContain('input');
+    expect(subjects(f.committed)).toEqual(['feat: app', 'feat: test']);
+    expect(f.generated[0]?.labels).toBe(false);
+  });
+
+  it('with commitLabels off, still puts --label on every subject', async () => {
+    const f = fakes({ answer: named('login rate limit') });
+    await runCommit({ label: 'foo' }, f.deps);
+    expect(f.calls).not.toContain('input');
+    expect(subjects(f.committed)).toEqual(['FOO feat: app', 'FOO feat: test']);
+  });
+
+  it('explains an answer it cannot use and asks again', async () => {
+    const f = fakes({ config: labelsOn, inputs: ['status/logging', 'status logging'] });
+    await runCommit({}, f.deps);
+    expect(f.asked).toEqual([QUESTION, QUESTION]);
+    expect(plain(f.out)).toMatch(/can hold only letters, digits and single hyphens \(found "\/"\)/);
+    expect(subjects(f.committed)).toEqual([
+      'STATUS-LOGGING feat: app',
+      'STATUS-LOGGING feat: test',
+    ]);
+  });
+
+  it('refuses a --label it cannot use, or a style without types, before anything runs', async () => {
+    for (const options of [
+      { label: 'a_b' },
+      { label: 'ABC-1', commitStyle: 'simple' },
+      { label: 'ABC-1', commitStyle: 'gitmoji' },
+    ]) {
+      const f = fakes({ config: labelsOn });
+      await expect(runCommit({ ...options, json: true }, f.deps)).rejects.toThrow(/--label/);
+      expect(f.calls).toEqual([]);
+    }
+  });
+
+  it('commits the labels a dry run showed, without asking again', async () => {
+    const f = fakes({ config: labelsOn, inputs: ['abc-1'], planCache: memoryCache() });
+    await runCommit({ dryRun: true }, f.deps);
+    await runCommit({}, f.deps);
+    expect(f.asked).toHaveLength(1);
+    expect(generations(f.calls)).toBe(1);
+    expect(subjects(f.committed)).toEqual(['ABC-1 feat: app', 'ABC-1 feat: test']);
+  });
+
+  it('does not reuse a dry run made with another --label', async () => {
+    const f = fakes({ config: labelsOn, answer: named('login'), planCache: memoryCache() });
+    await runCommit({ json: true, dryRun: true }, f.deps);
+    await runCommit({ json: true, label: 'abc-1' }, f.deps);
+    expect(generations(f.calls)).toBe(2);
+    expect(subjects(f.committed)).toEqual(['ABC-1 feat: app', 'ABC-1 feat: test']);
+  });
+
+  describe('a ticket-shaped answer', () => {
+    const tracked = (ticket: Record<string, unknown> = {}) => ({
+      ...labelsOn,
+      ticket: { pattern: 'WEDMODD-\\d+', validation: { type: 'jira-cli' }, ...ticket },
+    });
+
+    it('is looked up; a ticket the tracker does not know is a warning', async () => {
+      const f = fakes({
+        config: tracked(),
+        inputs: ['wedmodd-23444'],
+        lookup: () => ({ exists: false }),
+      });
+      await runCommit({}, f.deps);
+      expect(f.calls).toContain('lookup WEDMODD-23444');
+      expect(plain(f.out)).toMatch(/WEDMODD-23444 not found in jira-cli; proceeding anyway/);
+      expect(subjects(f.committed)[0]).toBe('WEDMODD-23444 feat: app');
+    });
+
+    it('is refused when the tracker does not know it under validateStrict, before the model is asked', async () => {
+      const f = fakes({
+        config: tracked({ validateStrict: true }),
+        inputs: ['wedmodd-23444'],
+        lookup: () => ({ exists: false, error: 'no such issue' }),
+      });
+      await expect(runCommit({}, f.deps)).rejects.toThrow(
+        /WEDMODD-23444 not found in jira-cli: no such issue/,
+      );
+      expect(f.calls).not.toContain('generate');
+      expect(f.committed).toEqual([]);
+    });
+
+    it('is used as typed when the tracker cannot be reached', async () => {
+      const f = fakes({ config: tracked({ validateStrict: true }), inputs: ['wedmodd-23444'] });
+      await runCommit({}, f.deps);
+      expect(plain(f.out)).toMatch(/couldn't verify WEDMODD-23444 via jira-cli/);
+      expect(subjects(f.committed)[0]).toBe('WEDMODD-23444 feat: app');
+    });
+
+    it('is not looked up when it does not match the ticket pattern', async () => {
+      const f = fakes({ config: tracked(), inputs: ['status logging'] });
+      await runCommit({}, f.deps);
+      expect(f.calls.filter((c) => c.startsWith('lookup'))).toEqual([]);
+      expect(subjects(f.committed)[0]).toBe('STATUS-LOGGING feat: app');
     });
   });
 });

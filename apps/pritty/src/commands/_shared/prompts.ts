@@ -1,4 +1,8 @@
-import { confirm as inquirerConfirm, editor as inquirerEditor } from '@inquirer/prompts';
+import {
+  confirm as inquirerConfirm,
+  editor as inquirerEditor,
+  input as inquirerInput,
+} from '@inquirer/prompts';
 
 /**
  * Inquirer opens a prompt even when stdin is not a terminal, then dies with
@@ -31,4 +35,8 @@ export const confirm = guardPrompt(
 );
 export const editor = guardPrompt(
   (o: { message: string; default?: string }): Promise<string> => inquirerEditor(o),
+);
+export const input = guardPrompt(
+  (o: { message: string; default?: string }, ctx?: PromptContext): Promise<string> =>
+    inquirerInput(o, ctx),
 );
