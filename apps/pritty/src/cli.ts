@@ -11,6 +11,7 @@
  */
 import { createCli } from '@helmsmith/cli-kit';
 import chalk from 'chalk';
+import type { Command } from 'commander';
 import { prittyAuthProvider } from './auth-provider.js';
 import { runAuthLogin } from './commands/auth-login.js';
 import { runAuthLogout } from './commands/auth-logout.js';
@@ -34,12 +35,27 @@ const { program } = createCli({
   auth: prittyAuthProvider,
 });
 
+/**
+ * `--output <format>` (json | text) on a command, the long form of `--json`:
+ * `json` sets the command's `json` option, `text` is today's human output,
+ * anything else is refused before the action runs.
+ */
+function addOutputOption(cmd: Command): Command {
+  return cmd
+    .option('--output <format>', 'Output format: json (same as --json) or text (default)')
+    .hook('preAction', (thisCommand) => {
+      const format = thisCommand.opts<{ output?: string }>().output;
+      if (format === undefined || format === 'text') return;
+      if (format !== 'json') throw new Error('--output must be json or text');
+      thisCommand.setOptionValue('json', true);
+    });
+}
+
 // ─── auth ─────────────────────────────────────────────────────────────
 
 const authCmd = program.command('auth').description('Manage GitHub Copilot authentication');
 
-authCmd
-  .command('login')
+addOutputOption(authCmd.command('login'))
   .description('Run the GitHub Device Flow and persist credentials')
   .option(
     '--json',
@@ -47,14 +63,12 @@ authCmd
   )
   .action((options: { json?: boolean }) => runAuthLogin(options));
 
-authCmd
-  .command('logout')
+addOutputOption(authCmd.command('logout'))
   .description('Remove the local auth file')
   .option('--json', 'Print one JSON line { path, removed } on stdout')
   .action((options: { json?: boolean }) => runAuthLogout(options));
 
-authCmd
-  .command('status')
+addOutputOption(authCmd.command('status'))
   .description('Show authentication status')
   .option(
     '--json',
@@ -64,8 +78,7 @@ authCmd
 
 // ─── init ─────────────────────────────────────────────────────────────
 
-program
-  .command('init')
+addOutputOption(program.command('init'))
   .description(
     'Write a starter config (.helmsmith/pritty.json in a repo with a .helmsmith folder, else .pritty.json) + Claude Code / VS Code Copilot slash commands. Skips integration files outside a git repo.',
   )
@@ -91,8 +104,7 @@ program
 
 // ─── categorize ───────────────────────────────────────────────────────
 
-program
-  .command('categorize')
+addOutputOption(program.command('categorize'))
   .description('Categorize staged files (read-only — does not commit)')
   .option('--all', 'Include unstaged + untracked files too')
   .option('--json', 'Print one JSON line { all, categories: [{ category, files }] } on stdout')
@@ -104,22 +116,19 @@ const cache = program
   .command('cache')
   .description('Manage the validated-ticket cache (~/.pritty/cache.json)');
 
-cache
-  .command('clear')
+addOutputOption(cache.command('clear'))
   .description('Wipe the validated-ticket cache')
   .option('--json', 'Print one JSON line { path, removed } on stdout')
   .action((options: { json?: boolean }) => runCacheClear(options));
 
-cache
-  .command('path')
+addOutputOption(cache.command('path'))
   .description('Print the cache file path (useful for inspection / scripting)')
   .option('--json', 'Print one JSON line { path } on stdout')
   .action((options: { json?: boolean }) => runCachePath(options));
 
 // ─── commit / pr / rebase ─────────────────────────────────────────────
 
-program
-  .command('commit')
+addOutputOption(program.command('commit'))
   .description('Generate AI commit messages per category and commit each group')
   .option('--auto-approve', 'Skip the confirmation prompt before committing')
   .option('--dry-run', 'Show the plan without making any commits')
@@ -162,8 +171,7 @@ program
     },
   );
 
-program
-  .command('pr')
+addOutputOption(program.command('pr'))
   .description('Generate a pull request title + body via AI and open it on GitHub')
   .option('--base <branch>', "Base branch (default: repo's default branch)")
   .option('--auto-approve', 'Skip the confirmation prompt before pushing/creating')
@@ -201,8 +209,7 @@ program
     },
   );
 
-program
-  .command('rebase')
+addOutputOption(program.command('rebase'))
   .description('AI-planned interactive rebase over commits ahead of base branch')
   .option(
     '--strategy <strategy>',
