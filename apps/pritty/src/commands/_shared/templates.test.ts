@@ -79,3 +79,12 @@ describe('agent commit inputs in the skill and the /commit command', () => {
     expect(PRITTY_SKILL).toMatch(/Skip the confirmation flow[\s\S]*unattended by design/);
   });
 });
+
+describe('PRITTY_SKILL agent files', () => {
+  it('names the subagent file, the AGENTS.md section and the guard', () => {
+    expect(PRITTY_SKILL).toContain('.claude/agents/pritty.md');
+    expect(PRITTY_SKILL).toContain('AGENTS.md');
+    expect(PRITTY_SKILL).toContain('@agent-pritty');
+    expect(PRITTY_SKILL).toContain('agent-guard');
+  });
+});
