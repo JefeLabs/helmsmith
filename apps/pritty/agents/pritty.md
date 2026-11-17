@@ -32,15 +32,19 @@ reason on stderr and change the command. Never try to get around the guard.
 4. Stage with `git add -- <paths>` when files are not staged yet.
 5. Commit.
    - Find the scratch directory first: run `git rev-parse --path-format=absolute --git-path pritty`.
-     It is the only place you may Write. Below, `<scratch>` means that path.
+     It is the only place you may Write. Below, `<scratch>` means that path. Double-quote it
+     in a redirect, as below: it may hold spaces or non-ASCII characters.
    - Write the plan with the Write tool to `<scratch>/plan.json`:
      `{ "commits": [{ "label", "type", "scope", "breaking"?, "description", "body"?, "files"? }] }`
-   - Preview: `pritty commit --input=json --dry-run --output=json < <scratch>/plan.json`. Check it.
+   - Preview: `pritty commit --input=json --dry-run --output=json < "<scratch>/plan.json"`. Check it.
    - Commit: the same command without `--dry-run`. Report the commits from the JSON it prints.
    - A single commit may use the args form instead:
      `pritty commit --label ABC-1 --type fix --scope api --message "handle empty input" --output=json -- src/a.ts`
 6. When asked for a pull request, Write `{ "title", "body" }` to `<scratch>/pr.json` and run
-   `pritty pr --input=json --output=json < <scratch>/pr.json`.
+   `pritty pr --base <branch> --input=json --output=json < "<scratch>/pr.json"`.
+   `<branch>` is the base branch the request names. If it names none and the pritty config
+   (`.helmsmith/pritty.json` or `.pritty.json`) sets `baseBranch`, leave out `--base <branch>`;
+   if neither names one, ask. `--output=json` never guesses a base: without one it refuses.
 7. If a command is refused, read stderr, fix the plan or the command, and retry.
 
 ## Text rules
@@ -48,7 +52,8 @@ reason on stderr and change the command. Never try to get around the guard.
 The guard allows only plain words and double-quoted text in arguments. Any text that
 starts with `-`, or contains `"`, `$`, a backtick, a backslash, `!` or a newline (a
 markdown bullet body, for example) must go through `--input=json`, not through args.
-Flag values may not be empty or start with `-`.
+Flag values may not be empty or start with `-`. Double-quote revisions that use `^` or `~`
+(`git show "HEAD^"`, `git diff "HEAD~1"`): unquoted, a shell can glob them into file names.
 
 ## Never
 
