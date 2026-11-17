@@ -129,7 +129,13 @@ addOutputOption(cache.command('path'))
 // ─── commit / pr / rebase ─────────────────────────────────────────────
 
 addOutputOption(program.command('commit'))
-  .description('Generate AI commit messages per category and commit each group')
+  .description(
+    'Commit staged files: one commit from --message, the commits of a JSON body (--input=json), or AI-written commits per change and category',
+  )
+  .argument(
+    '[paths...]',
+    'With --message: the staged paths to commit (after --), resolved from the current directory; default every staged file',
+  )
   .option('--auto-approve', 'Skip the confirmation prompt before committing')
   .option('--dry-run', 'Show the plan without making any commits')
   .option('--commit-style <style>', 'conventional | gitmoji | angular | simple')
@@ -143,11 +149,24 @@ addOutputOption(program.command('commit'))
   )
   .option(
     '--scope <scope>',
-    'Scope of every commit: one to three lowercase segments (network, org/global, org/network/directory)',
+    "One to three lowercase segments (network, org/global, org/network/directory): with --message the commit's scope, otherwise the scope of every commit",
   )
   .option(
     '--type <type>',
-    'Type of the code commits (feat, fix, …); test and story commits keep theirs',
+    "With --message the commit's type; otherwise the type of the code commits (feat, fix, …), test and story commits keep theirs",
+  )
+  .option(
+    '--label <label>',
+    'Label at the start of every subject: a ticket or effort name, normalised (abc 1 → ABC-1)',
+  )
+  .option(
+    '--message <text>',
+    'Make one commit with this description, no AI (needs --type and --scope)',
+  )
+  .option('--body <text>', 'Body of the --message commit')
+  .option(
+    '--input <format>',
+    'json: read the commits from stdin, { "commits": [{ label, type, scope, description, body?, files? }] }',
   )
   .option(
     '--trailer <line>',
@@ -156,18 +175,29 @@ addOutputOption(program.command('commit'))
     [] as string[],
   )
   .action(
-    async (options: {
-      autoApprove?: boolean;
-      dryRun?: boolean;
-      commitStyle?: string;
-      json?: boolean;
-      verify: boolean;
-      scope?: string;
-      type?: string;
-      trailer: string[];
-    }) => {
+    async (
+      paths: string[],
+      options: {
+        autoApprove?: boolean;
+        dryRun?: boolean;
+        commitStyle?: string;
+        json?: boolean;
+        verify: boolean;
+        scope?: string;
+        type?: string;
+        trailer: string[];
+        label?: string;
+        message?: string;
+        body?: string;
+        input?: string;
+      },
+    ) => {
       const { verify, ...rest } = options;
-      await runCommit({ ...rest, noVerify: verify === false });
+      await runCommit({
+        ...rest,
+        noVerify: verify === false,
+        ...(paths.length > 0 ? { paths } : {}),
+      });
     },
   );
 

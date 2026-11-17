@@ -4,6 +4,7 @@ import { type CommitMessage, generateCommitMessages, type TicketContext } from '
 import { categorize, mergeCategories, UNKNOWN_CATEGORY } from '../categorizer.js';
 import { type Config, loadConfig } from '../config.js';
 import { createGit, type GitOps } from '../git.js';
+import { readStdin } from '../stdin.js';
 import { VERSION } from '../version.js';
 import { TRAILER_LINE } from './_shared/attribution.js';
 import {
@@ -14,6 +15,12 @@ import {
   retypeForBranch,
   styleHasTypes,
 } from './_shared/conventional.js';
+import {
+  type ExplicitCommit,
+  parseCommitInput,
+  planExplicit,
+  STDIN_HINT,
+} from './_shared/explicit.js';
 import { splitTitleBody } from './_shared/format.js';
 import { composeCommitMessage, reconcileCommitPlan, subjectOf } from './_shared/plan.js';
 import { filePlanCache, type PlanCache, planKey } from './_shared/plan-cache.js';
@@ -28,12 +35,25 @@ export interface CommitOptions {
   json?: boolean;
   /** Pass `--no-verify` to every `git commit` (skips the pre-commit and commit-msg hooks). */
   noVerify?: boolean;
-  /** Scope of every commit: one to three lowercase segments (`network`, `org/global`). */
+  /**
+   * One to three lowercase segments (`network`, `org/global`): with `message`,
+   * the commit's scope; otherwise the scope of every commit the model plans.
+   */
   scope?: string;
-  /** Type of the code commits; test and storybook commits keep theirs. */
+  /** With `message`, the commit's type; otherwise the type of the code commits (test and storybook keep theirs). */
   type?: string;
   /** `Token: value` lines added to every commit after the configured `commitTrailers`. */
   trailer?: string[];
+  /** The label of every commit (normalised, e.g. `abc 1` → `ABC-1`). */
+  label?: string;
+  /** Selects the args input: the description of the one commit to make, with `type` and `scope`. */
+  message?: string;
+  /** The body of the `message` commit. */
+  body?: string;
+  /** `json`: the commits come from a JSON body on stdin, `{ "commits": [...] }`. */
+  input?: string;
+  /** Pathspecs of the staged files the `message` commit takes, from `cwd`; default every staged file. */
+  paths?: string[];
 }
 
 export interface CommitOutcome {
@@ -54,16 +74,26 @@ export interface CommitOutcome {
   reusedPlan?: true;
 }
 
-/** `message` is the subject as committed; the parsed parts follow when it is conventional. */
-function subjectFields(c: CommitMessage) {
+type OutcomeCommit = CommitOutcome['commits'][number];
+
+/**
+ * A planned commit as the outcome reports it: `message` is the subject as
+ * committed, the label is the plan's own, and the other parts are parsed from
+ * the subject when it is conventional.
+ */
+function entryOf(c: CommitMessage): OutcomeCommit {
   const message = subjectOf(c);
   const p = parseConventional(message);
+  const label = c.label || p?.label;
   return {
+    ...(c.change ? { change: c.change } : {}),
+    category: c.category,
     message,
-    ...(p?.label ? { label: p.label } : {}),
+    ...(label ? { label } : {}),
     ...(p ? { type: p.type } : {}),
     ...(p?.scope ? { scope: p.scope } : {}),
     ...(p ? { description: p.description } : {}),
+    files: c.files,
   };
 }
 
@@ -85,6 +115,12 @@ export interface CommitDeps {
   io?: { out: (line: string) => void; err: (line: string) => void };
   /** Where a shown plan waits for the run that commits it; without one, every run asks the model. */
   planCache?: PlanCache;
+  /** The JSON body of `--input=json` (default: all of process.stdin). */
+  readStdin?: () => Promise<string>;
+  /** A terminal stdin refuses `--input=json` at once (default: process.stdin.isTTY). */
+  stdinIsTTY?: boolean;
+  /** Where paths after `--` resolve from, as `git add` would (default: process.cwd()). */
+  cwd?: string;
 }
 
 /** The plan file lives in the worktree's git directory: untracked, one per index. */
@@ -105,8 +141,50 @@ function defaultDeps(): CommitDeps {
 const VALID_STYLES = ['conventional', 'gitmoji', 'angular', 'simple'] as const;
 
 /** How a commit is named in prompts and progress lines: its change too, when it has one. */
-function label(c: CommitMessage): string {
+function nameOf(c: CommitMessage): string {
   return c.change ? `${c.change} · ${c.category}` : c.category;
+}
+
+/** One problem per `--trailer` line that is not `Token: value`. */
+function trailerProblems(lines: readonly string[] = []): string[] {
+  return lines
+    .filter((line) => !TRAILER_LINE.test(line))
+    .map((line) => `--trailer "${line}" is not a git trailer: write it as \`Token: value\``);
+}
+
+/**
+ * Which input the call names: `--message` (args), `--input=json` (a JSON body
+ * on stdin) or neither (the model). Every refusal here comes before stdin, git
+ * or a model is touched; a terminal stdin is refused rather than waited on.
+ */
+function chooseInput(options: CommitOptions, stdinIsTTY: boolean): 'args' | 'json' | 'interactive' {
+  if (options.input !== undefined && options.input !== 'json') {
+    throw new Error('--input must be json');
+  }
+  const paths = (options.paths?.length ?? 0) > 0;
+  if (options.input === 'json') {
+    if (options.message !== undefined) throw new Error('pass --message or --input, not both');
+    const given = [
+      options.label !== undefined && '--label',
+      options.type !== undefined && '--type',
+      options.scope !== undefined && '--scope',
+      options.body !== undefined && '--body',
+      paths && 'paths after --',
+    ].filter((flag): flag is string => typeof flag === 'string');
+    if (given.length > 0) {
+      throw new Error(
+        `--input=json takes each commit's fields from the JSON body; drop ${given.join(', ')}`,
+      );
+    }
+    if (stdinIsTTY) throw new Error(`${STDIN_HINT}; stdin is a terminal, so nothing is piped in`);
+    return 'json';
+  }
+  if (options.message !== undefined) return 'args';
+  if (options.body !== undefined) throw new Error('--body needs --message');
+  if (paths) {
+    throw new Error('paths after -- need --message: a run without it commits every staged file');
+  }
+  return 'interactive';
 }
 
 /** Refuse a bad --type, --scope or --trailer before anything else runs: no model call, no commit. */
@@ -126,22 +204,173 @@ function validateOverrides(options: CommitOptions, style: Config['commitStyle'])
       `--scope ${options.scope} must be one to three lowercase segments joined by "/", like network, org/global or org/network/directory`,
     );
   }
-  for (const line of options.trailer ?? []) {
-    if (!TRAILER_LINE.test(line)) {
-      throw new Error(`--trailer "${line}" is not a git trailer: write it as \`Token: value\``);
-    }
-  }
+  const [badTrailer] = trailerProblems(options.trailer);
+  if (badTrailer) throw new Error(badTrailer);
+}
+
+/** What every input shares once the options are read. */
+interface Run {
+  git: GitOps;
+  config: Config;
+  io: { out: (line: string) => void; err: (line: string) => void };
+  /** Human lines: stdout, or stderr under --json. */
+  say: (line: string) => void;
+  auto: boolean;
+  dryRun: boolean;
+  trailers: string[];
+  noVerify: boolean;
+  /** Prints the outcome as the one JSON line under --json. */
+  finish: (o: CommitOutcome) => CommitOutcome;
 }
 
 /**
- * Generate AI commit messages per change per category (or per category, with
- * `commitGrouping: "category"`) and commit each group from the index. Resolves ticket context up front so validation gates fail fast
- * (before any AI call). Errors are thrown (the CLI prints them and exits 1).
+ * The plan as it will be committed: each subject as committed, its body, and,
+ * under a heading per change (model) or per label (args and JSON), the files
+ * it takes. Explicit commits always list their files: the caller chose them.
+ */
+function showPlan(plan: readonly CommitMessage[], say: Run['say'], by: 'change' | 'label'): void {
+  const groupOf = (c: CommitMessage) => (by === 'change' ? c.change : c.label);
+  const grouped = plan.some((c) => groupOf(c));
+  const files = grouped || by === 'label';
+  const pad = grouped ? '    ' : '  ';
+  say('');
+  say(chalk.cyan('Commit plan:'));
+  let heading: string | null = null;
+  for (const c of plan) {
+    const group = groupOf(c) ?? (by === 'change' ? 'no change named' : 'no label');
+    if (grouped && group !== heading) say(`  ${chalk.cyan(group)}`);
+    heading = group;
+    say(`${pad}${chalk.bold(c.category)}  ${chalk.dim(`(${c.files.length} files)`)}`);
+    say(`${pad}  ${chalk.green(subjectOf(c))}`);
+    if (c.body) for (const line of c.body.split('\n')) say(`${pad}  ${chalk.dim(line)}`);
+    if (files) for (const f of c.files) say(`${pad}  ${chalk.dim(f)}`);
+  }
+  say('');
+}
+
+/** The run's go-ahead: given under --json or --auto-approve, else asked. */
+async function approved(plan: readonly CommitMessage[], run: Run, deps: CommitDeps) {
+  if (run.auto) return true;
+  const ok = await deps.prompts.confirm({
+    message: `Create ${plan.length} commit(s) above?`,
+    default: true,
+  });
+  if (!ok) run.say(chalk.dim('Aborted. No commits made.'));
+  return ok;
+}
+
+/**
+ * One commit per plan entry, in order, each from the index with only its
+ * files. A commit git refuses stops the run: stderr names it and the commits
+ * already made, and the error is rethrown (exit 1).
+ */
+async function commitAll(plan: readonly CommitMessage[], run: Run): Promise<OutcomeCommit[]> {
+  const commits: OutcomeCommit[] = [];
+  for (const c of plan) {
+    try {
+      await run.git.commit(
+        composeCommitMessage(c, run.trailers),
+        c.files,
+        run.noVerify ? { noVerify: true } : undefined,
+      );
+    } catch (err) {
+      const made = commits.map((m) => `${m.sha} ${m.message}`).join(', ') || 'none';
+      run.io.err(
+        chalk.red(
+          `✗ failed to commit ${subjectOf(c)}: ${(err as Error).message}; already committed: ${made}`,
+        ),
+      );
+      throw err;
+    }
+    const sha = await run.git.headSha();
+    commits.push({ ...entryOf(c), sha });
+    run.say(chalk.green(`✓ committed ${nameOf(c)}: ${subjectOf(c)} (${sha.slice(0, 7)})`));
+  }
+  run.say(chalk.green(`\n✓ ${commits.length} commit(s) created.`));
+  return commits;
+}
+
+/**
+ * `--message` or `--input=json`: the caller's commits, checked together and
+ * ordered (label by label, code before tests), then committed as given. No
+ * ticket context, model, plan cache, retyping or overrides: pritty adds
+ * trailers and normalises the label, nothing else.
+ */
+async function commitExplicit(
+  input: 'args' | 'json',
+  options: CommitOptions,
+  run: Run,
+  deps: CommitDeps,
+): Promise<CommitOutcome | undefined> {
+  const { git, config } = run;
+  if (!styleHasTypes(config.commitStyle)) {
+    throw new Error(
+      `--message and --input=json write \`type(scope):\` subjects, which need the conventional or angular commit style, not ${config.commitStyle}`,
+    );
+  }
+  const problems = trailerProblems(options.trailer);
+  if (input === 'args') {
+    if (options.type === undefined) problems.push('--type is required with --message');
+    if (options.scope === undefined) problems.push('--scope is required with --message');
+  }
+  if (problems.length > 0) throw new Error(problems.join('\n'));
+
+  const commits: ExplicitCommit[] =
+    input === 'json'
+      ? parseCommitInput(await (deps.readStdin ?? readStdin)())
+      : [
+          {
+            ...(options.label !== undefined ? { label: options.label } : {}),
+            type: options.type!,
+            scope: options.scope!,
+            description: options.message!,
+            ...(options.body !== undefined ? { body: options.body } : {}),
+            ...(options.paths?.length ? { paths: options.paths } : {}),
+          },
+        ];
+  const staged = await git.getStaged();
+  const specs = [...new Set(commits.flatMap((c) => c.paths ?? []))];
+  const matched =
+    specs.length > 0
+      ? await git.stagedFor(specs, deps.cwd ?? process.cwd())
+      : new Map<string, string[]>();
+  const { plan, warnings } = planExplicit(commits, {
+    staged,
+    matched,
+    categories: mergeCategories(config.categories),
+    labelsRequired: config.commitLabels,
+  });
+
+  showPlan(plan, run.say, 'label');
+  for (const w of warnings) run.io.err(chalk.yellow(`⚠ ${w}`));
+  if (run.dryRun) {
+    run.say(chalk.yellow('Dry-run — no commits made. Re-run without --dry-run to apply.'));
+    return run.finish({ dryRun: true, commits: plan.map(entryOf) });
+  }
+  if (!(await approved(plan, run, deps))) return undefined;
+  const made = await commitAll(plan, run);
+  // A path the caller left out (the old side of a rename, say) is still staged: say so.
+  const left = await git.getStaged();
+  if (left.length > 0) {
+    run.io.err(chalk.yellow(`⚠ ${left.length} file(s) left staged, not committed:`));
+    for (const f of left) run.io.err(`  ${f}`);
+  }
+  return run.finish({ dryRun: false, commits: made });
+}
+
+/**
+ * Commit the index from one of three inputs: `--message` (one commit from the
+ * flags), `--input=json` (the commits of a JSON body on stdin) or neither,
+ * where the model writes a message per change per category (or per category,
+ * with `commitGrouping: "category"`). The model path resolves ticket context
+ * up front so validation gates fail fast (before any AI call). Errors are
+ * thrown (the CLI prints them and exits 1).
  */
 export async function runCommit(
   options: CommitOptions = {},
   deps: CommitDeps = defaultDeps(),
 ): Promise<CommitOutcome | undefined> {
+  const input = chooseInput(options, deps.stdinIsTTY ?? Boolean(process.stdin.isTTY));
   const { git } = deps;
   const config = { ...deps.config };
   const io = deps.io ?? {
@@ -161,8 +390,20 @@ export async function runCommit(
     }
     config.commitStyle = options.commitStyle as Config['commitStyle'];
   }
-  validateOverrides(options, config.commitStyle);
   const trailers = [...config.commitTrailers, ...(options.trailer ?? [])];
+  const run: Run = {
+    git,
+    config,
+    io,
+    say,
+    auto,
+    dryRun,
+    trailers,
+    noVerify: Boolean(options.noVerify),
+    finish,
+  };
+  if (input !== 'interactive') return commitExplicit(input, options, run, deps);
+  validateOverrides(options, config.commitStyle);
 
   // Ticket context first: the validation gate fires before any AI call.
   const branch = await git.getCurrentBranch();
@@ -258,35 +499,20 @@ export async function runCommit(
     );
   }
 
-  // 4. Show the plan
-  say('');
-  say(chalk.cyan('Commit plan:'));
-  // Grouped by change, the files are the model's choice: show them under each commit.
-  const byChange = plan.some((c) => c.change);
-  const pad = byChange ? '    ' : '  ';
-  let heading: string | null = null;
-  for (const c of plan) {
-    const change = c.change ?? 'no change named';
-    if (byChange && change !== heading) say(`  ${chalk.cyan(change)}`);
-    heading = change;
-    say(`${pad}${chalk.bold(c.category)}  ${chalk.dim(`(${c.files.length} files)`)}`);
-    say(`${pad}  ${chalk.green(c.message)}`);
-    if (c.body) for (const line of c.body.split('\n')) say(`${pad}  ${chalk.dim(line)}`);
-    if (byChange) for (const f of c.files) say(`${pad}  ${chalk.dim(f)}`);
-  }
-  say('');
+  // 4. Show the plan; grouped by change, the files are the model's choice, so they are listed
+  showPlan(plan, say, 'change');
 
   // 4.5 Optional per-commit editing — default N so the wrap-up stays fast.
   if (!auto && !dryRun) {
     for (let i = 0; i < plan.length; i++) {
       const c = plan[i]!;
       const wantEdit = await deps.prompts.confirm({
-        message: `Edit message for ${label(c)}?`,
+        message: `Edit message for ${nameOf(c)}?`,
         default: false,
       });
       if (!wantEdit) continue;
       const edited = await deps.prompts.editor({
-        message: `Editing ${label(c)} commit message`,
+        message: `Editing ${nameOf(c)} commit message`,
         default: c.body ? `${c.message}\n\n${c.body}` : c.message,
       });
       const { title: nextMessage, body: nextBody } = splitTitleBody(edited);
@@ -314,57 +540,14 @@ export async function runCommit(
   // 5. Dry-run stops here
   if (dryRun) {
     say(chalk.yellow('Dry-run — no commits made. Re-run without --dry-run to apply.'));
-    return finish({
-      dryRun: true,
-      commits: plan.map((c) => ({
-        ...(c.change ? { change: c.change } : {}),
-        category: c.category,
-        ...subjectFields(c),
-        files: c.files,
-      })),
-    });
+    return finish({ dryRun: true, commits: plan.map(entryOf) });
   }
 
   // 6. Confirm
-  if (!auto) {
-    const ok = await deps.prompts.confirm({
-      message: `Create ${plan.length} commit(s) above?`,
-      default: true,
-    });
-    if (!ok) {
-      say(chalk.dim('Aborted. No commits made.'));
-      return undefined;
-    }
-  }
+  if (!(await approved(plan, run, deps))) return undefined;
 
   // 7. One commit per group, from the index
-  const commits: CommitOutcome['commits'] = [];
-  for (const c of plan) {
-    try {
-      await git.commit(
-        composeCommitMessage(c, trailers),
-        c.files,
-        options.noVerify ? { noVerify: true } : undefined,
-      );
-    } catch (err) {
-      io.err(
-        chalk.red(
-          `✗ failed to commit ${label(c)}: ${(err as Error).message} (${commits.length} commit(s) already made)`,
-        ),
-      );
-      throw err;
-    }
-    const sha = await git.headSha();
-    commits.push({
-      ...(c.change ? { change: c.change } : {}),
-      category: c.category,
-      ...subjectFields(c),
-      files: c.files,
-      sha,
-    });
-    say(chalk.green(`✓ committed ${label(c)}: ${c.message} (${sha.slice(0, 7)})`));
-  }
-  say(chalk.green(`\n✓ ${commits.length} commit(s) created.`));
+  const commits = await commitAll(plan, run);
   if (cache && key) await cache.clear().catch(() => undefined);
   return finish({ dryRun: false, commits, ...(reused ? { reusedPlan: true as const } : {}) });
 }

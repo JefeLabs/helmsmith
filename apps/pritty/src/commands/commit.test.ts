@@ -38,26 +38,49 @@ function fakes(
     answer?: Answer;
     planCache?: PlanCache;
     failCommits?: number;
+    /** Commits that succeed before the `failCommits` failures start. */
+    failAfter?: number;
+    stdin?: string;
+    stdinIsTTY?: boolean;
+    cwd?: string;
   } = {},
 ) {
   const calls: string[] = [];
   const committed: Array<{ message: string; files: string[]; noVerify: boolean }> = [];
   const generated: Array<{ branch?: string }> = [];
+  const stagedFor: Array<{ pathspecs: string[]; fromDir: string }> = [];
   let sha = 0;
+  let attempts = 0;
   let failures = o.failCommits ?? 0;
-  const state = { staged: 'tree1' as string | null, answer: o.answer ?? oneEach };
+  const state = {
+    staged: 'tree1' as string | null,
+    answer: o.answer ?? oneEach,
+    /** The index: a commit takes its files out of it, as git does. */
+    files: [...(o.staged ?? ['src/a.ts', 'src/a.test.ts'])],
+  };
   const git = {
     getCurrentBranch: async () => o.branch ?? 'feature/x',
-    getStaged: async () => o.staged ?? ['src/a.ts', 'src/a.test.ts'],
+    getStaged: async () => [...state.files],
+    stagedFor: async (pathspecs: readonly string[], fromDir: string) => {
+      stagedFor.push({ pathspecs: [...pathspecs], fromDir });
+      return new Map(
+        pathspecs.map((p) => [
+          p,
+          state.files.filter((f) => f === p || f.startsWith(`${p.replace(/\/$/, '')}/`)),
+        ]),
+      );
+    },
     getStagedDiff: async () => '+a',
     stagedState: async () => state.staged,
     commit: async (message: string, files?: string[], opts?: { noVerify?: boolean }) => {
       calls.push('commit');
-      if (failures > 0) {
+      if (attempts++ >= (o.failAfter ?? 0) && failures > 0) {
         failures--;
         throw new Error('pre-commit hook refused');
       }
       committed.push({ message, files: files ?? [], noVerify: Boolean(opts?.noVerify) });
+      const done = new Set(files ?? state.files);
+      state.files = state.files.filter((f) => !done.has(f));
     },
     headSha: async () => `sha${++sha}`,
   } as unknown as GitOps;
@@ -73,7 +96,10 @@ function fakes(
         return state.answer(groups);
       },
     },
-    ticket: async () => undefined,
+    ticket: async () => {
+      calls.push('ticket');
+      return undefined;
+    },
     prompts: {
       confirm: async () => {
         calls.push('confirm');
@@ -83,8 +109,14 @@ function fakes(
     },
     io: { out: (l) => out.push(l), err: (l) => err.push(l) },
     ...(o.planCache ? { planCache: o.planCache } : {}),
+    readStdin: async () => {
+      calls.push('readStdin');
+      return o.stdin ?? '';
+    },
+    stdinIsTTY: o.stdinIsTTY ?? false,
+    cwd: o.cwd ?? '/repo',
   };
-  return { deps, calls, committed, generated, out, err, state };
+  return { deps, calls, committed, generated, stagedFor, out, err, state };
 }
 
 const subjects = (committed: Array<{ message: string }>): string[] =>
@@ -497,5 +529,277 @@ describe('runCommit grouping by change', () => {
     };
     await runCommit({}, f.deps);
     expect(asked).toContain('Edit message for b · app?');
+  });
+});
+
+// biome-ignore lint/suspicious/noControlCharactersInRegex: strips ANSI colour codes
+const plain = (lines: string[]): string => lines.join('\n').replace(/\x1b\[[0-9;]*m/g, '');
+
+/** A JSON body: the code commit listed after its test, to show pritty orders them. */
+const twoCommits = JSON.stringify({
+  commits: [
+    {
+      label: 'wedmodd-23444',
+      type: 'test',
+      scope: 'api',
+      description: 'cover 404',
+      files: ['src/a.test.ts'],
+    },
+    {
+      label: 'wedmodd-23444',
+      type: 'fix',
+      scope: 'api',
+      description: 'handle 404',
+      files: ['src/a.ts'],
+    },
+  ],
+});
+
+describe('runCommit --message (args)', () => {
+  const args = { message: 'handle 404', type: 'fix', scope: 'api' };
+
+  it('makes one commit from the flags, with the normalised label, only the listed files and no model call', async () => {
+    const f = fakes({ cwd: '/repo/apps/x' });
+    await runCommit({ ...args, label: 'abc 1', paths: ['src/a.ts'] }, f.deps);
+    expect(f.committed).toHaveLength(1);
+    expect(subjects(f.committed)).toEqual(['ABC-1 fix(api): handle 404']);
+    expect(f.committed[0]!.files).toEqual(['src/a.ts']);
+    expect(f.calls).not.toContain('generate');
+    expect(f.calls).not.toContain('ticket');
+    expect(f.stagedFor).toEqual([{ pathspecs: ['src/a.ts'], fromDir: '/repo/apps/x' }]);
+  });
+
+  it('adds --body and the trailers after the subject', async () => {
+    const f = fakes({
+      staged: ['src/a.ts'],
+      config: { commitTrailers: ['Co-Authored-By: A <a@x>'] },
+    });
+    await runCommit(
+      { ...args, body: 'The handler threw.', trailer: ['Refs: T7'], json: true },
+      f.deps,
+    );
+    expect(f.committed[0]!.message).toBe(
+      'fix(api): handle 404\n\nThe handler threw.\n\nCo-Authored-By: A <a@x>\nRefs: T7',
+    );
+  });
+
+  it('under --dry-run --json prints one line with the plan and commits nothing', async () => {
+    const f = fakes({ staged: ['src/a.ts'] });
+    await runCommit({ ...args, dryRun: true, json: true }, f.deps);
+    expect(f.out).toHaveLength(1);
+    expect(JSON.parse(f.out[0]!)).toEqual({
+      dryRun: true,
+      commits: [
+        {
+          category: 'app',
+          message: 'fix(api): handle 404',
+          type: 'fix',
+          scope: 'api',
+          description: 'handle 404',
+          files: ['src/a.ts'],
+        },
+      ],
+    });
+    expect(f.calls).not.toContain('commit');
+  });
+
+  it('keeps the given type on a fix/ branch and keeps no plan', async () => {
+    const cache = memoryCache();
+    const f = fakes({ staged: ['src/a.ts'], branch: 'fix/api/not-found', planCache: cache });
+    await runCommit({ ...args, type: 'feat', dryRun: true, json: true }, f.deps);
+    expect(JSON.parse(f.out[0]!).commits[0].message).toBe('feat(api): handle 404');
+    expect(cache.store.size).toBe(0);
+  });
+
+  it('refuses without a label when the repository sets commitLabels, and commits nothing', async () => {
+    const f = fakes({ staged: ['src/a.ts'], config: { commitLabels: true } });
+    await expect(runCommit({ ...args, json: true }, f.deps)).rejects.toThrow(/--label is required/);
+    expect(f.calls).not.toContain('commit');
+  });
+
+  it('refuses --message without --type and --scope, naming both', async () => {
+    const f = fakes({ staged: ['src/a.ts'] });
+    const run = runCommit({ message: 'handle 404', json: true }, f.deps);
+    await expect(run).rejects.toThrow(/--type.*\n.*--scope/);
+    expect(f.calls).not.toContain('commit');
+  });
+
+  it('refuses a commit style without `type(scope):` subjects, from the flag or the config', async () => {
+    const cases: Array<[Record<string, unknown>, Record<string, unknown>]> = [
+      [{ commitStyle: 'simple' }, {}],
+      [{}, { commitStyle: 'gitmoji' }],
+    ];
+    for (const [flags, config] of cases) {
+      const f = fakes({ staged: ['src/a.ts'], config });
+      await expect(runCommit({ ...args, ...flags, json: true }, f.deps)).rejects.toThrow(
+        /conventional or angular/,
+      );
+      expect(f.calls).toEqual([]);
+    }
+  });
+
+  it('warns on stderr about a subject over 72 characters, and still commits', async () => {
+    const f = fakes({ staged: ['src/a.ts'] });
+    const message = 'handle the not found answer from the upstream directory service gracefully';
+    await runCommit({ ...args, message, json: true }, f.deps);
+    expect(plain(f.err)).toMatch(/subject is \d+ characters/);
+    expect(f.committed).toHaveLength(1);
+  });
+
+  it('shows the labelled subject in the plan and in the committed line', async () => {
+    const f = fakes({ staged: ['src/a.ts'] });
+    await runCommit({ ...args, label: 'ABC-1' }, f.deps);
+    const text = plain(f.out);
+    expect(text).toMatch(
+      /^ {2}ABC-1\n {4}app {2}\(1 files\)\n {6}ABC-1 fix\(api\): handle 404\n {6}src\/a\.ts$/m,
+    );
+    expect(text).toMatch(/✓ committed app: ABC-1 fix\(api\): handle 404 \(sha1\)/);
+  });
+
+  it('lists on stderr the staged files it left uncommitted', async () => {
+    const f = fakes({ staged: ['src/a.ts', 'src/old.ts'] });
+    await runCommit({ ...args, paths: ['src/a.ts'] }, f.deps);
+    const err = plain(f.err).split('\n');
+    const at = err.findIndex((l) => /left staged/.test(l));
+    expect(at).toBeGreaterThanOrEqual(0);
+    expect(err.slice(at + 1)).toEqual(['  src/old.ts']);
+    expect(plain(f.out)).not.toMatch(/left staged/);
+  });
+
+  it('says nothing about leftovers when every staged file was committed', async () => {
+    const f = fakes({ staged: ['src/a.ts'] });
+    await runCommit({ ...args, json: true }, f.deps);
+    expect(plain(f.err)).not.toMatch(/left staged/);
+  });
+});
+
+describe('runCommit --input=json', () => {
+  it('commits the body’s commits in planned order, code before tests, with labelled subjects in the outcome', async () => {
+    const f = fakes({ stdin: twoCommits });
+    await runCommit({ input: 'json', json: true }, f.deps);
+    expect(subjects(f.committed)).toEqual([
+      'WEDMODD-23444 fix(api): handle 404',
+      'WEDMODD-23444 test(api): cover 404',
+    ]);
+    expect(f.committed.map((c) => c.files)).toEqual([['src/a.ts'], ['src/a.test.ts']]);
+    const line = JSON.parse(f.out[0]!);
+    expect(line.commits.map((c: { message: string }) => c.message)).toEqual(subjects(f.committed));
+    expect(line.commits[0]).toEqual({
+      category: 'app',
+      message: 'WEDMODD-23444 fix(api): handle 404',
+      label: 'WEDMODD-23444',
+      type: 'fix',
+      scope: 'api',
+      description: 'handle 404',
+      files: ['src/a.ts'],
+      sha: 'sha1',
+    });
+    expect(f.calls).not.toContain('generate');
+    expect(f.calls).not.toContain('ticket');
+  });
+
+  it('shows the plan grouped by label', async () => {
+    const f = fakes({ stdin: twoCommits });
+    await runCommit({ input: 'json', dryRun: true }, f.deps);
+    expect(plain(f.out)).toMatch(
+      /^ {2}WEDMODD-23444\n {4}app {2}\(1 files\)\n {6}WEDMODD-23444 fix\(api\): handle 404\n {6}src\/a\.ts\n {4}test/m,
+    );
+  });
+
+  it('stops at a commit git refuses, naming it and the commits already made; stdout stays empty', async () => {
+    const f = fakes({ stdin: twoCommits, failCommits: 1, failAfter: 1 });
+    await expect(runCommit({ input: 'json', json: true }, f.deps)).rejects.toThrow(/refused/);
+    const err = plain(f.err);
+    expect(err).toMatch(
+      /✗ failed to commit WEDMODD-23444 test\(api\): cover 404: pre-commit hook refused; already committed: sha1 WEDMODD-23444 fix\(api\): handle 404/,
+    );
+    expect(f.out).toEqual([]);
+  });
+
+  it('refuses an empty stdin with the stdin message', async () => {
+    const f = fakes({ stdin: '' });
+    await expect(runCommit({ input: 'json', json: true }, f.deps)).rejects.toThrow(
+      /expected a JSON document on stdin/,
+    );
+    expect(f.calls).not.toContain('commit');
+  });
+});
+
+describe('runCommit input selection', () => {
+  it('refuses --message together with --input', async () => {
+    const f = fakes({ stdin: twoCommits });
+    await expect(
+      runCommit({ input: 'json', message: 'x', type: 'fix', scope: 'api' }, f.deps),
+    ).rejects.toThrow('pass --message or --input, not both');
+    expect(f.calls).toEqual([]);
+  });
+
+  it('refuses --input=json at once when stdin is a terminal, without reading it', async () => {
+    const f = fakes({ stdin: twoCommits, stdinIsTTY: true });
+    await expect(runCommit({ input: 'json' }, f.deps)).rejects.toThrow(
+      /expected a JSON document on stdin/,
+    );
+    expect(f.calls).toEqual([]);
+  });
+
+  it('refuses an --input format other than json', async () => {
+    const f = fakes({ stdin: twoCommits });
+    await expect(runCommit({ input: 'yaml' }, f.deps)).rejects.toThrow(/--input must be json/);
+    expect(f.calls).toEqual([]);
+  });
+
+  it('refuses the per-commit flags with --input=json: the body carries them', async () => {
+    const cases: Array<[Record<string, unknown>, string]> = [
+      [{ label: 'ABC-1' }, '--label'],
+      [{ type: 'fix' }, '--type'],
+      [{ scope: 'api' }, '--scope'],
+      [{ body: 'why' }, '--body'],
+      [{ paths: ['src/a.ts'] }, 'paths after --'],
+    ];
+    for (const [o, flag] of cases) {
+      const f = fakes({ stdin: twoCommits });
+      await expect(runCommit({ input: 'json', ...o }, f.deps)).rejects.toThrow(flag);
+      expect(f.calls).toEqual([]);
+    }
+  });
+
+  it('refuses --body and paths without --message', async () => {
+    for (const o of [{ body: 'why' }, { paths: ['src/a.ts'] }]) {
+      const f = fakes();
+      await expect(runCommit(o, f.deps)).rejects.toThrow(/--message/);
+      expect(f.calls).toEqual([]);
+    }
+  });
+
+  it('accepts --label on an interactive run', async () => {
+    const f = fakes();
+    await runCommit({ label: 'ABC-1', json: true }, f.deps);
+    expect(f.calls).toContain('generate');
+    expect(f.committed).toHaveLength(2);
+  });
+});
+
+describe('runCommit shows what it commits', () => {
+  it('prints the labelled subject in the plan and the committed line, and takes the label from the plan', async () => {
+    const f = fakes({
+      staged: ['src/a.ts'],
+      answer: (groups) =>
+        oneEach(groups).map((c) => ({ ...c, label: 'ABC-1', message: 'Update app' })),
+    });
+    await runCommit({}, f.deps);
+    const text = plain(f.out);
+    expect(text).toMatch(/^ {4}ABC-1 Update app$/m);
+    expect(text).toMatch(/✓ committed app: ABC-1 Update app \(sha1\)/);
+
+    const g = fakes({
+      staged: ['src/a.ts'],
+      answer: (groups) =>
+        oneEach(groups).map((c) => ({ ...c, label: 'ABC-1', message: 'Update app' })),
+    });
+    await runCommit({ json: true }, g.deps);
+    expect(JSON.parse(g.out[0]!).commits[0]).toMatchObject({
+      message: 'ABC-1 Update app',
+      label: 'ABC-1',
+    });
   });
 });

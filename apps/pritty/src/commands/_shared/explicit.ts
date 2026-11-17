@@ -15,7 +15,8 @@ export interface ExplicitCommit {
   paths?: string[];
 }
 
-const STDIN_HINT = 'expected a JSON document on stdin: { "commits": [...] }';
+/** What --input=json wants on stdin; the refusal for an empty, non-JSON or terminal stdin. */
+export const STDIN_HINT = 'expected a JSON document on stdin: { "commits": [...] }';
 
 const commitShape = z.object({
   label: z.string().optional(),
