@@ -26,12 +26,13 @@ The owner likes the commit format pritty produces today and wants it kept (*owne
 - One call commits the staged paths listed after `--`, or every staged file when none are listed; listed paths must already be staged and the rest stay staged (*owner*, option b).
 - Today's format is enforced on the args and JSON inputs too: one category per commit, so code and its tests stay separate, adjacent commits (*owner* keeps today's format; enforcement is *my call*).
 - `pritty commit` with no message keeps today's model-driven flow, and its commits carry a label too (*my call*, following "I like what pritty is doing today").
+- `pritty pr` takes the same three inputs as commit (*owner*, added after approval): **args** (`--title`, `--body` / `--body-file`, as today), **a JSON body** (`--input=json`), or **interactive** (today's model draft), each with `--dry-run` and `--output=json`.
 - A PR whose commits all carry the same label gets the title `LABEL: summary [type]… [scope]…` (*owner*).
 - Every parser of commit subjects the owner controls accepts the leading label: pritty, gitradar, skoolscout-com's commit-msg hook (*my call*, required by the owner's format).
 
 **Non-goals**
 - Removing pritty's built-in model, provider config or `pritty auth` (discussed; not decided; separate work).
-- Changing `pritty pr` beyond the shared-label PR title (§5.8) and parsing labelled commits; changing `pritty rebase`.
+- Changing `pritty pr` beyond its inputs and output (§5.8.1), the shared-label PR title (§5.8) and parsing labelled commits; changing `pritty rebase`.
 - Hunk-level commits: a file goes whole into one commit.
 
 **Anti-goals**
@@ -161,6 +162,19 @@ WEDMODD-23444: stop status apply from logging exception text [fix] [test] [issue
 - GitHub labels derived from commit types (`labels.ts`) are unchanged.
 - **Known limit:** in a repository that squash-merges, the PR title becomes the commit subject on the base branch, and `LABEL: … [fix]` is not a conventional subject, so gitradar counts that commit as `other` and commitlint-style checks reject it. skoolscout-com lands PRs as merge commits, which keep the labelled commits and put the title only in the merge commit's body.
 
+### 5.8.1 PR inputs and output (*owner*, added after approval)
+
+| Input | Selected by | Model call |
+|---|---|---|
+| Args | `--title`, with `--body` or `--body-file` (today's flags) | no |
+| JSON body | `--input=json`, the PR read from stdin | no |
+| Interactive | neither | yes (today's draft, editor pass) |
+
+- **JSON body:** `{ "title": "…", "body": "…", "draft"?: true, "labels"?: ["…"] }`. `title` is required. The title is treated like `--title` (shared label and tags added if missing, §5.8), the body like `--body` (`prFooter` appended unless `--no-footer`). `labels`, when present, replace the labels pritty infers from the commit types; absent, they are inferred as today (*my call*). Output-only fields (`dryRun`, `number`, `url`, `created`, `head`, `base`) are ignored, so a dry run's output can be fed back (*my call*). Args and `--input` together are refused (*my call*).
+- **`--dry-run --output=json`** prints `{ "dryRun": true, "title", "body", "labels", "draft", "head", "base" }`; today a dry run prints nothing on stdout under `--json` (*my call*, closes that gap in the contract).
+- **Real run `--output=json`:** today's `{ number, url, created, draft, head, base }`, plus `title` and `labels` (additive, *my call*).
+- `--check`, `--no-push`, `--no-footer`, `--draft` and `--base` behave as today with every input.
+
 ### 5.9 Docs
 
 pritty `SKILL.md` and the `/commit` slash-command template (`_shared/templates.ts`): the anti-pattern "write your own message" is replaced by the args and JSON inputs: the agent passes label, type, scope and message, one call per commit, code before tests. Also fix the stale "per category" wording. README commit section and `docs/work-lifecycle.md` updated.
@@ -201,3 +215,4 @@ Exact error wording; flag help text; whether the args and JSON inputs live in `c
 - `--input=json` reads the body from stdin (value names the format, like `--output=json`); `--json` kept as shorthand for `--output=json` on every command; args and `--input` together refused; input shape = output shape, with `description` for the text `--message` takes.
 - JSON body: commits ordered by label (first appearance), code → test → storybook inside each; unlisted staged files stay staged; mid-way git refusal stops and reports shas made.
 - Interactive label prompt when attended and no ticket is detected.
+- pr JSON body: `title` required, `labels` replace inferred ones when given, output-only fields ignored; pr dry run prints the draft as JSON; real-run JSON gains `title` and `labels`.
