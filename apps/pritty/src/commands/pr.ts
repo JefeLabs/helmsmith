@@ -23,7 +23,12 @@ import {
 import { findPullRequestTemplate, type PullRequestTemplate } from '../pr-template.js';
 import { applyFooter } from './_shared/attribution.js';
 import { resolveBaseBranch } from './_shared/base.js';
-import { conventionalPrTitle } from './_shared/conventional.js';
+import {
+  addSharedLabel,
+  conventionalPrTitle,
+  labelledPrTitle,
+  sharedLabel,
+} from './_shared/conventional.js';
 import { splitTitleBody } from './_shared/format.js';
 import { inferLabels } from './_shared/labels.js';
 import { confirm, editor } from './_shared/prompts.js';
@@ -245,8 +250,14 @@ export async function runPr(
       ),
     );
     if (given) {
+      const shared =
+        given.title !== undefined
+          ? sharedLabel(await git.log(await git.resolveBaseRef(effectiveBase)))
+          : null;
       const patch: PRPatch = {
-        ...(given.title !== undefined ? { title: given.title } : {}),
+        ...(given.title !== undefined
+          ? { title: shared ? addSharedLabel(given.title, shared) : given.title }
+          : {}),
         ...(given.body !== undefined ? { body: applyFooter(given.body, footer) } : {}),
       };
       await deps.github.updatePR(repo.owner, repo.repo, existing.number, patch);
@@ -279,8 +290,14 @@ export async function runPr(
   // 6. The words: given verbatim (no model, no ticket flow), or drafted by the model
   let draft: PRDraft;
   let changedFiles: string[] | undefined;
+  const shared = sharedLabel(commits);
   if (given) {
-    draft = { title: given.title ?? '', body: given.body ?? '', labels: inferLabels(commits) };
+    const givenTitle = given.title ?? '';
+    draft = {
+      title: shared && givenTitle ? addSharedLabel(givenTitle, shared) : givenTitle,
+      body: given.body ?? '',
+      labels: inferLabels(commits),
+    };
     if (draft.title.length === 0) {
       throw new Error('--title is required when --body/--body-file is given.');
     }
@@ -312,12 +329,14 @@ export async function runPr(
     // The model writes the summary; the commits decide the `type(scope):` it opens with.
     draft = {
       ...draft,
-      title: conventionalPrTitle(
-        draft.title,
-        commits.map((c) => c.subject),
-        branch,
-        config.commitStyle,
-      ),
+      title: shared
+        ? labelledPrTitle(draft.title, shared)
+        : conventionalPrTitle(
+            draft.title,
+            commits.map((c) => c.subject),
+            branch,
+            config.commitStyle,
+          ),
     };
   }
 

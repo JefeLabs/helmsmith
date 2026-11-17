@@ -50,11 +50,11 @@ export interface GitOps {
   gitPath(name: string): Promise<string>;
   /** Push the current branch. setUpstream=true on first push. */
   push(branch: string, opts?: { setUpstream?: boolean }): Promise<void>;
-  /** Commits reachable from `head` (default HEAD) but not from `base`: `base..head`. Newest first, each with its body (`''` when it has none). */
+  /** Commits reachable from `head` (default HEAD) but not from `base`: `base..head`. Newest first, each with its body (`''` when it has none); merge commits carry `merge: true`. */
   log(
     base: string,
     head?: string,
-  ): Promise<Array<{ hash: string; subject: string; body?: string }>>;
+  ): Promise<Array<{ hash: string; subject: string; body?: string; merge?: true }>>;
   /** Files `head` (default HEAD) changed since its merge base with `base`: `base...head`. */
   changedFilesBetween(base: string, head?: string): Promise<string[]>;
   /**
@@ -199,11 +199,21 @@ export function createGit(dir: string = process.cwd()): GitOps {
     async log(
       base: string,
       head?: string,
-    ): Promise<Array<{ hash: string; subject: string; body?: string }>> {
+    ): Promise<Array<{ hash: string; subject: string; body?: string; merge?: true }>> {
       // Two dots on purpose: simple-git's { from, to } form emits `base...head`,
       // which for `git log` is the symmetric difference and includes base-only commits.
       const result = await git.log([`${base}..${head ?? 'HEAD'}`]);
-      return result.all.map((c) => ({ hash: c.hash, subject: c.message, body: c.body.trim() }));
+      const merges = new Set(
+        (await git.raw(['rev-list', '--merges', `${base}..${head ?? 'HEAD'}`]))
+          .split('\n')
+          .filter(Boolean),
+      );
+      return result.all.map((c) => ({
+        hash: c.hash,
+        subject: c.message,
+        body: c.body.trim(),
+        ...(merges.has(c.hash) ? { merge: true as const } : {}),
+      }));
     },
 
     async resolveBaseRef(base: string): Promise<string> {

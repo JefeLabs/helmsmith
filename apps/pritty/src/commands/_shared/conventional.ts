@@ -186,3 +186,49 @@ function sharedScope(commits: readonly ConventionalSubject[]): string | undefine
 function lowerFirstWord(text: string): string {
   return /^[A-Z][a-z]+\b/.test(text) ? `${text[0]!.toLowerCase()}${text.slice(1)}` : text;
 }
+
+export interface SharedLabel {
+  label: string;
+  tags: string[];
+}
+
+/**
+ * The label every non-merge commit carries, with the tags a PR title lists:
+ * each type once in TYPE_RANK order, then each scope once in the order the
+ * commits used them. `commits` is newest first (git log order). Null unless
+ * at least one commit remains and all parse with the same label.
+ */
+export function sharedLabel(
+  commits: ReadonlyArray<{ subject: string; merge?: boolean }>,
+): SharedLabel | null {
+  const parsed: ConventionalSubject[] = [];
+  for (const c of commits) {
+    if (c.merge) continue;
+    const p = parseConventional(c.subject);
+    if (!p?.label) return null;
+    parsed.push(p);
+  }
+  const label = parsed[0]?.label;
+  if (!label || parsed.some((p) => p.label !== label)) return null;
+  const types = TYPE_RANK.filter((t) => parsed.some((p) => p.type === t));
+  const scopes = new Set<string>();
+  for (const p of [...parsed].reverse()) if (p.scope) scopes.add(p.scope);
+  return { label, tags: [...types, ...scopes] };
+}
+
+const TITLE_LABEL_PREFIX = /^[A-Z0-9]+(?:-[A-Z0-9]+)*:\s*/;
+
+/** `LABEL: summary [tag] [tag]`: the model's summary under the label every commit shares. */
+export function labelledPrTitle(modelTitle: string, shared: SharedLabel): string {
+  const bare = modelTitle.trim().replace(TITLE_LABEL_PREFIX, '');
+  const own = parseConventional(bare);
+  const summary = lowerFirstWord(own ? own.description : bare);
+  return addSharedLabel(`${shared.label}: ${summary}`, shared);
+}
+
+/** A title as written, with the label in front and any missing `[tag]` after it. */
+export function addSharedLabel(title: string, shared: SharedLabel): string {
+  let out = title.startsWith(`${shared.label}: `) ? title : `${shared.label}: ${title}`;
+  for (const tag of shared.tags) if (!out.includes(`[${tag}]`)) out += ` [${tag}]`;
+  return out;
+}

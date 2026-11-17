@@ -545,3 +545,58 @@ describe('runPr gives the model commit bodies and changed files (item 9)', () =>
     ]);
   });
 });
+
+describe('runPr title from a shared label', () => {
+  const labelled = async () => [
+    { hash: 'a'.repeat(40), subject: 'ABC-1 test(issue-report): b' },
+    { hash: 'b'.repeat(40), subject: 'ABC-1 fix(issue-report): a' },
+    { hash: 'c'.repeat(40), subject: "Merge remote-tracking branch 'origin/develop'", merge: true },
+  ];
+  const titleOf = (f: ReturnType<typeof fakes>) => (f.createArgs[0] as { title: string }).title;
+
+  it('titles the model path with the label and tags', async () => {
+    const f = fakes({ config: { baseBranch: 'main' } });
+    f.deps.git.log = labelled;
+    f.deps.ai.generatePR = async () => ({
+      title: 'fix(api): Stop logging exception text',
+      body: 'b',
+      labels: [],
+    });
+    await runPr({ autoApprove: true }, f.deps);
+    expect(titleOf(f)).toBe('ABC-1: stop logging exception text [fix] [test] [issue-report]');
+  });
+
+  it('keeps type(scope): summary when the labels differ', async () => {
+    const f = fakes({ config: { baseBranch: 'main' } });
+    f.deps.git.log = async () => [
+      { hash: 'a'.repeat(40), subject: 'ABC-1 fix(x): a' },
+      { hash: 'b'.repeat(40), subject: 'ABC-2 fix(x): b' },
+    ];
+    f.deps.ai.generatePR = async () => ({ title: 'Stop it', body: 'b', labels: [] });
+    await runPr({ autoApprove: true }, f.deps);
+    expect(titleOf(f)).toBe('fix(x): stop it');
+  });
+
+  it('adds the label and tags to a --title', async () => {
+    const f = fakes({ config: { baseBranch: 'main' } });
+    f.deps.git.log = labelled;
+    await runPr({ autoApprove: true, title: 'my words', body: 'b' }, f.deps);
+    expect(titleOf(f)).toBe('ABC-1: my words [fix] [test] [issue-report]');
+  });
+
+  it('updates an existing open PR title with the label and tags', async () => {
+    const f = fakes({
+      config: { baseBranch: 'main' },
+      openPRs: [
+        { number: 7, url: 'u', title: 'old', head: 'feature/x', base: 'main', draft: false },
+      ],
+    });
+    f.deps.git.log = labelled;
+    const updates: unknown[] = [];
+    f.deps.github.updatePR = async (_o, _r, _n, patch) => {
+      updates.push(patch);
+    };
+    await runPr({ autoApprove: true, title: 'my words' }, f.deps);
+    expect(updates).toEqual([{ title: 'ABC-1: my words [fix] [test] [issue-report]' }]);
+  });
+});
