@@ -88,3 +88,15 @@ describe('PRITTY_SKILL agent files', () => {
     expect(PRITTY_SKILL).toContain('agent-guard');
   });
 });
+
+describe('PRITTY_SKILL agent files detail', () => {
+  it('says AGENTS.md is appended to, and how the hook fails closed', () => {
+    expect(PRITTY_SKILL).toContain('appends the');
+    expect(PRITTY_SKILL).toContain('section after a blank line when the file has no markers');
+    expect(PRITTY_SKILL).toContain('pritty agent-guard || exit 2');
+    expect(PRITTY_SKILL).toContain('Bash, Read, Grep, Glob and Write');
+    expect(PRITTY_SKILL).toContain(
+      '<!-- pritty:begin (managed by `pritty init`; edits inside are replaced) -->',
+    );
+  });
+});
