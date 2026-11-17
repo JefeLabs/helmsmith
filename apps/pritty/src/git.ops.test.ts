@@ -492,3 +492,28 @@ describe('GitOps.stagedFor', () => {
     }
   });
 });
+
+describe('GitOps.log marks merge commits', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('flags a merge commit and leaves ordinary commits unflagged', async () => {
+    const r = makeRepo();
+    cleanup = r.cleanup;
+    gitIn(r.dir, 'switch', '-q', '-c', 'feature');
+    commitFile(r.dir, 'a.txt', 'a\n', 'ABC-1 fix(x): a');
+    gitIn(r.dir, 'switch', '-q', 'main');
+    gitIn(r.dir, 'switch', '-q', '-c', 'other');
+    commitFile(r.dir, 'b.txt', 'b\n', 'other work');
+    gitIn(r.dir, 'switch', '-q', 'feature');
+    gitIn(r.dir, 'merge', '--no-ff', '-q', '-m', 'Merge branch other', 'other');
+
+    const log = await createGit(r.dir).log('main');
+
+    const merge = log.find((c) => c.subject === 'Merge branch other');
+    const ordinary = log.find((c) => c.subject === 'ABC-1 fix(x): a');
+    expect(merge?.merge).toBe(true);
+    expect(ordinary).toBeDefined();
+    expect(ordinary).not.toHaveProperty('merge');
+  });
+});
