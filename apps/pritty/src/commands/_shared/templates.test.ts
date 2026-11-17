@@ -45,3 +45,18 @@ describe('PRITTY_SKILL pre-conditions', () => {
     expect(PRITTY_SKILL).toContain('which claude');
   });
 });
+
+describe('agent commit inputs in the skill and the /commit command', () => {
+  it('names --label, --message, --input=json and --output=json', async () => {
+    const { CLAUDE_COMMANDS } = await import('./templates.js');
+    for (const text of [PRITTY_SKILL, CLAUDE_COMMANDS.commit!]) {
+      for (const token of ['--label', '--message', '--input=json', '--output=json']) {
+        expect(text).toContain(token);
+      }
+    }
+  });
+
+  it('no longer tells an agent to hand-write commits with git commit -m', () => {
+    expect(PRITTY_SKILL).not.toContain("That's bypassing the");
+  });
+});

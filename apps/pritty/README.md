@@ -24,7 +24,7 @@ This is a **phased build** following the
 | `pritty init` starter config | ✅ |
 | `pritty categorize` (read-only file bucketing) | ✅ |
 | AI client (multi-provider via `@helmsmith/agent-adapter`) | ✅ |
-| `pritty commit` (AI commit messages per change, per category; index-only commits) | ✅ |
+| `pritty commit` (AI commit messages per change, per category; one commit from args or a JSON body, no model; labels; index-only commits) | ✅ |
 | `pritty pr` (AI-generated PR title + body, existing-PR reuse) | ✅ |
 | `pritty rebase` (AI-planned rebase; a last resort — prefer a merge commit) | ✅ |
 | Pre-commit / pre-push hook runner | removed — git hooks belong to the repository |
@@ -73,6 +73,7 @@ the repo has a `.helmsmith` folder.
   "baseBranch": "develop",
   "commitStyle": "conventional",
   "commitGrouping": "change",
+  "commitLabels": false,
   "github": { "account": "my-gh-login" },
   "commitTrailers": ["Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"],
   "prFooter": "🤖 Generated with [Claude Code](https://claude.com/claude-code)",
@@ -84,6 +85,13 @@ the repo has a `.helmsmith` folder.
   }
 }
 ```
+
+`commitLabels` (default `false`) makes every commit subject start with a
+label, `<LABEL> <type>(<scope>): <description>`, for the `conventional` and
+`angular` styles; `--label` is refused under `gitmoji` and `simple`. An
+explicit label (`--label`, or `label` in a JSON body) is used whatever the
+setting; with `commitLabels` on, the args and JSON inputs require one and the
+interactive flow adds one (see [Agent commits](#agent-commits-and-labels)).
 
 **Tip on category ordering**: pritty uses *first-match-wins*, so put
 specific categories (like `test`) before broad ones (like `app`)
@@ -192,8 +200,8 @@ pritty pr --json --base develop --draft --no-push \
   --title "feat(area): what changed" --body-file /tmp/pr-body.md
 ```
 
-`--json` prints one line `{ number, url, created, draft, head, base }` on
-stdout and everything else on stderr, implies `--auto-approve`, and requires
+`--json` (`--output=json`) prints one line
+`{ number, url, created, draft, head, base, title, labels }` on stdout and everything else on stderr, implies `--auto-approve`, and requires
 `--base` or a configured `baseBranch`. `--title` with `--body`/`--body-file`
 uses the words verbatim: no model call, no ticket flow; labels come from
 conventional commit types. An open PR for the same head and base is returned
@@ -201,14 +209,15 @@ conventional commit types. An open PR for the same head and base is returned
 `--no-push` is for callers that already pushed with upstream tracking.
 Every prompt fails with instructions when stdin is not a terminal.
 
-Every command takes `--json`. stdout then carries exactly one JSON line, the
+Every command takes `--output=json`, with `--json` as its shorthand
+(`--output=text`, the default, is for people; any other value is refused). stdout then carries exactly one JSON line, the
 result; every human line moves to stderr. A failure prints no JSON: a message
 on stderr and exit code 1.
 
 | Command | JSON line |
 |---|---|
-| `commit` | `{ dryRun, commits: [{ change?, category, message, files, sha }] }` (implies `--auto-approve`) |
-| `pr` | `{ number, url, created, draft, head, base }` (implies `--auto-approve`, needs a base) |
+| `commit` | `{ dryRun, commits: [{ change?, category, message, label?, type, scope, description, body?, files, sha? }], reusedPlan? }`; `message` is the labelled first line as committed; `sha` is absent on a dry run (implies `--auto-approve`) |
+| `pr` | `{ number, url, created, draft, head, base, title, labels }` (implies `--auto-approve`, needs a base); `--dry-run`: `{ dryRun, title, body, labels, draft, head, base }` |
 | `pr --check` | `{ open, last }` |
 | `rebase` | `{ dryRun, branch, base, strategy, commits: [{ hash, subject }], steps: [{ hash, action, message?, rationale? }], summary, rebased }`; commits oldest first; `steps: []` and `summary: null` when fewer than two commits |
 | `categorize` | `{ all, categories: [{ category, files }] }` (empty categories left out) |
@@ -303,6 +312,97 @@ drafted title with the commits' conventional prefix: the
 branch's type when a commit carries it, else the most significant commit type
 (feat, fix, perf, refactor, revert, build, ci, docs, style, test, chore), with
 the scope that type's commits share. A `--title` is always used verbatim.
+
+## Agent commits and labels
+
+`pritty commit` takes its commits from one of three inputs; args and JSON make
+no model call and combining them is refused.
+
+| Input | Selected by | Model call |
+|---|---|---|
+| Args | `--message`, with `--type` and `--scope` (and `--label`) | no |
+| JSON body | `--input=json`, the commits on stdin | no |
+| Interactive | neither | yes |
+
+**Args.** One commit per call:
+
+```bash
+pritty commit --label STATUS-LOGGING --type fix --scope issue-report \
+  --message "log only exception class when status apply fails" \
+  [--body <text>] [--trailer "Token: value"] [--no-verify] [--dry-run] \
+  --output=json -- src/StatusConsumer.java
+```
+
+`--type` and `--scope` are required; `--label` is required where
+`commitLabels` is `true` and used when given elsewhere. The paths after `--`
+resolve from the current directory like `git add`, must each be staged and
+are the only files committed; with none, every staged file. Paths after `--`
+without `--message` are refused. All the files must share one category (code
+and tests go in separate commits, code first); a `test` or `storybook`
+category needs `--type test`, a code category must not use it. Problems are
+reported together before anything is committed.
+
+**JSON body.** One or more commits on stdin; `files` are
+repository-root-relative, as `--output=json` prints them:
+
+```bash
+echo '{"commits":[
+  {"label":"WEDMODD-23444","type":"fix","scope":"issue-report","description":"log only exception class","files":["src/StatusConsumer.java"]},
+  {"label":"WEDMODD-23444","type":"test","scope":"issue-report","description":"assert no exception text is logged","body":"why","files":["src/StatusConsumerTest.java"]}
+]}' | pritty commit --input=json --output=json
+```
+
+`body` and `files` are optional (`files` may be left out only for a single
+commit, which then takes every staged file); `label` is optional unless
+`commitLabels` is `true`. Each commit gets the args checks, plus: a file is
+staged and in one commit only. Commits are made label by label in order of
+first appearance, code, then tests, then stories. `--input=json` runs
+unattended (no confirmation prompt) and refuses `--label`, `--type`, `--scope`,
+`--message`, `--body` and paths after `--`; `--trailer`, `--no-verify`,
+`--dry-run` and `--output`/`--json` stay allowed. Staged files no commit lists
+stay staged. If git refuses a commit midway (a hook), pritty stops and the
+error names the refused commit and the shas already made.
+
+**Output and dry run.** `--output=json` prints the result: each commit has
+`category`, `message` (the labelled first line as committed), `label`, `type`,
+`scope`, `description`, `body` (when present), `files` and `sha`. `--dry-run`
+validates and prints the same JSON without `sha`, touching nothing, and that
+output can be fed straight back through `--input=json`. A subject over 72
+characters warns on stderr; it is never refused. The args and JSON inputs
+check format only: no ticket detection or lookup.
+
+**Labels.** A label is trimmed, upper-cased, and each run of whitespace
+becomes one `-` (`status logging` is `STATUS-LOGGING`, `wedmodd-23444` is
+`WEDMODD-23444`); the result must match `[A-Z0-9]+(-[A-Z0-9]+)*`, and `/`,
+`_`, `--` and punctuation are refused rather than converted. Labels need the
+`conventional` or `angular` commit style. pritty never rewrites the type,
+scope or description it is given; it normalises the label and adds trailers.
+
+**Interactive labels** (only where `commitLabels` is `true`): an explicit
+`--label`, else the ticket detected (repositories with a `ticket` block), else
+an attended prompt (`Enter` takes the model's names), else the model's change
+names, normalised. With `commitGrouping: "category"` the model gives one label
+for the run.
+
+**Pull requests** take the same three inputs: args (`--title`, with `--body`
+or `--body-file`), a JSON body (`--input=json`) of
+`{ "title", "body"?, "draft"?, "labels"? }`, or interactive. The JSON title is
+treated like `--title` and the body like `--body` (`prFooter` appended unless
+`--no-footer`); `labels` replace the labels inferred from commit types; output
+fields (`number`, `url`, `dryRun`, …) are ignored, so a dry run's output can be
+fed back. `--input=json` runs unattended and is refused together with
+`--title`, `--body` or `--body-file`; `--check`, `--no-push`, `--no-footer`,
+`--draft` and `--base` work with every input.
+
+When every non-merge commit between base and HEAD carries the same label, the
+PR title is `LABEL: summary [types] [scopes]`: the model's summary, then each
+commit type once (most significant first), then each scope once in order of
+first use: `WEDMODD-23444: stop status apply logging exception text [fix] [test] [issue-report]`.
+Otherwise the title is `type(scope): summary` as before. A `--title` or JSON
+title gets the label and tags added when missing. This depends on the commits,
+not on `commitLabels`. Where PRs are squash-merged, that title becomes the
+commit subject and is not conventional; merge-commit repositories are
+unaffected.
 
 ## Programmatic use
 
