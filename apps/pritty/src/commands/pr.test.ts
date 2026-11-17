@@ -702,4 +702,49 @@ describe('runPr --dry-run --json', () => {
     expect(f.calls).not.toContain('push');
     expect(f.calls).not.toContain('createPR');
   });
+
+  it('never edits an open PR: prints the title and body it would set instead', async () => {
+    const f = fakes({
+      config: { baseBranch: 'main', prFooter: 'FOOTER' },
+      openPRs: [{ number: 7, url: 'u', title: 'o', head: 'feature/x', base: 'main', draft: true }],
+    });
+    f.deps.git.log = async () => [{ hash: 'a'.repeat(40), subject: 'ABC-1 feat(x): add' }];
+    const out: string[] = [];
+    f.deps.io = { out: (s) => out.push(s), err: () => {} };
+    const result = await runPr(
+      { dryRun: true, json: true, title: 'new words', body: 'nb' },
+      f.deps,
+    );
+    expect(f.calls).not.toContain('updatePR');
+    expect(out).toHaveLength(1);
+    expect(JSON.parse(out[0]!)).toEqual({
+      dryRun: true,
+      title: 'ABC-1: new words [feat] [x]',
+      body: 'nb\n\nFOOTER',
+      labels: [],
+      draft: true,
+      head: 'feature/x',
+      base: 'main',
+    });
+    expect(result).toBeUndefined();
+    expect(f.calls).not.toContain('push');
+    expect(f.calls).not.toContain('createPR');
+  });
+
+  it('leaves the body out when only a title is given, and edits nothing without --json either', async () => {
+    const open = [
+      { number: 7, url: 'u', title: 'o', head: 'feature/x', base: 'main', draft: false },
+    ];
+    const f = fakes({ config: { baseBranch: 'main' }, openPRs: open });
+    const out: string[] = [];
+    f.deps.io = { out: (s) => out.push(s), err: () => {} };
+    await runPr({ dryRun: true, json: true, title: 'feat: new' }, f.deps);
+    expect(JSON.parse(out[0]!)).not.toHaveProperty('body');
+    expect(JSON.parse(out[0]!)).toMatchObject({ title: 'feat: new', draft: false });
+
+    const g = fakes({ config: { baseBranch: 'main' }, openPRs: open });
+    g.deps.io = { out: () => {}, err: () => {} };
+    await runPr({ dryRun: true, title: 't', body: 'b' }, g.deps);
+    expect(g.calls).not.toContain('updatePR');
+  });
 });

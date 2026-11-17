@@ -72,11 +72,12 @@ export interface PrOutcome {
   labels: string[];
 }
 
-/** What a `--dry-run --json` run prints: the PR it would open. */
+/** What a `--dry-run --json` run prints: the PR it would open, or what it would set on the open one. */
 export interface PrDryRun {
   dryRun: true;
   title: string;
-  body: string;
+  /** Absent only for an open PR whose body the run would leave as it is. */
+  body?: string;
   labels: string[];
   draft: boolean;
   head: string;
@@ -241,8 +242,8 @@ export async function runPr(
   );
 
   // 4. An open PR for this head and base already exists: return it (updating its
-  //    title/body when they were given explicitly), create nothing. A failed
-  //    lookup is fatal; pushing without knowing would be worse.
+  //    title/body when they were given explicitly, except under --dry-run),
+  //    create nothing. A failed lookup is fatal; pushing without knowing would be worse.
   const open = await deps.github.listOpenPRs(repo.owner, repo.repo, branch, effectiveBase);
   if (options.check) {
     const existing = open[0];
@@ -291,6 +292,30 @@ export async function runPr(
           : {}),
         ...(given.body !== undefined ? { body: applyFooter(given.body, footer) } : {}),
       };
+      // A dry run touches nothing: it shows what the update would set.
+      if (dryRun) {
+        if (patch.title !== undefined) say(chalk.bold.cyan(patch.title));
+        if (patch.body !== undefined)
+          for (const line of patch.body.split('\n')) say(`  ${chalk.dim(line)}`);
+        say(
+          chalk.yellow(
+            `Dry-run — #${existing.number} not updated. Re-run without --dry-run to apply.`,
+          ),
+        );
+        if (options.json) {
+          const line: PrDryRun = {
+            dryRun: true,
+            title: patch.title ?? existing.title,
+            ...(patch.body !== undefined ? { body: patch.body } : {}),
+            labels: [],
+            draft: existing.draft,
+            head: branch,
+            base: effectiveBase,
+          };
+          io.out(JSON.stringify(line));
+        }
+        return undefined;
+      }
       await deps.github.updatePR(repo.owner, repo.repo, existing.number, patch);
       title = patch.title ?? title;
       say(chalk.dim('  Updated its title/body in place.'));
