@@ -216,19 +216,28 @@ export function sharedLabel(
   return { label, tags: [...types, ...scopes] };
 }
 
-const TITLE_LABEL_PREFIX = /^[A-Z0-9]+(?:-[A-Z0-9]+)*:\s*/;
-
-/** `LABEL: summary [tag] [tag]`: the model's summary under the label every commit shares. */
+/**
+ * `LABEL: summary [tag] [tag]`: the model's summary under the label every
+ * commit shares. Only that label's own `LABEL:` is taken off the model's
+ * title; another upper-case word (`API: …`) is part of the summary.
+ */
 export function labelledPrTitle(modelTitle: string, shared: SharedLabel): string {
-  const bare = modelTitle.trim().replace(TITLE_LABEL_PREFIX, '');
+  const trimmed = modelTitle.trim();
+  const prefix = `${shared.label}:`;
+  const bare = trimmed.startsWith(prefix) ? trimmed.slice(prefix.length).trimStart() : trimmed;
   const own = parseConventional(bare);
   const summary = lowerFirstWord(own ? own.description : bare);
   return addSharedLabel(`${shared.label}: ${summary}`, shared);
 }
 
-/** A title as written, with the label in front and any missing `[tag]` after it. */
+/**
+ * A title as written, with the label in front and any missing `[tag]` after
+ * it. A title that already opens with the label (`LABEL: …`, or a labelled
+ * subject `LABEL type(scope): …`) gets no second one.
+ */
 export function addSharedLabel(title: string, shared: SharedLabel): string {
-  let out = title.startsWith(`${shared.label}: `) ? title : `${shared.label}: ${title}`;
+  const labelled = title.startsWith(`${shared.label}: `) || title.startsWith(`${shared.label} `);
+  let out = labelled ? title : `${shared.label}: ${title}`;
   for (const tag of shared.tags) if (!out.includes(`[${tag}]`)) out += ` [${tag}]`;
   return out;
 }

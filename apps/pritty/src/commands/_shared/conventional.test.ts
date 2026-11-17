@@ -103,4 +103,22 @@ describe('sharedLabel and the PR title it makes', () => {
     expect(addSharedLabel(once, shared)).toBe(once);
     expect(addSharedLabel('my words', shared)).toBe('ABC-1: my words [fix] [test] [issue-report]');
   });
+
+  it('counts a title that opens with the label and a subject as already labelled', () => {
+    expect(addSharedLabel('ABC-1 fix(x): stop logging', shared)).toBe(
+      'ABC-1 fix(x): stop logging [fix] [test] [issue-report]',
+    );
+    expect(addSharedLabel('ABC-12 fix(x): stop logging', shared)).toBe(
+      'ABC-1: ABC-12 fix(x): stop logging [fix] [test] [issue-report]',
+    );
+  });
+
+  it("strips only the shared label's own prefix from the model's title", () => {
+    expect(labelledPrTitle('API: add rate limiting', shared)).toBe(
+      'ABC-1: API: add rate limiting [fix] [test] [issue-report]',
+    );
+    expect(labelledPrTitle('ABC-1:Stop it', shared)).toBe(
+      'ABC-1: stop it [fix] [test] [issue-report]',
+    );
+  });
 });

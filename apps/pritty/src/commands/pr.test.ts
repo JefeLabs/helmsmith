@@ -597,6 +597,26 @@ describe('runPr title from a shared label', () => {
     expect(titleOf(f)).toBe('ABC-1: my words [fix] [test] [issue-report]');
   });
 
+  it('adds only the missing tags to a --title that already carries the label', async () => {
+    for (const [title, expected] of [
+      ['ABC-1: my words', 'ABC-1: my words [fix] [test] [issue-report]'],
+      ['ABC-1 fix(x): stop logging', 'ABC-1 fix(x): stop logging [fix] [test] [issue-report]'],
+    ]) {
+      const f = fakes({ config: { baseBranch: 'main' } });
+      f.deps.git.log = labelled;
+      await runPr({ autoApprove: true, title, body: 'b' }, f.deps);
+      expect(titleOf(f)).toBe(expected);
+    }
+  });
+
+  it('keeps an upper-case word the model opened its title with', async () => {
+    const f = fakes({ config: { baseBranch: 'main' } });
+    f.deps.git.log = labelled;
+    f.deps.ai.generatePR = async () => ({ title: 'API: add rate limiting', body: 'b', labels: [] });
+    await runPr({ autoApprove: true }, f.deps);
+    expect(titleOf(f)).toBe('ABC-1: API: add rate limiting [fix] [test] [issue-report]');
+  });
+
   it('updates an existing open PR title with the label and tags', async () => {
     const f = fakes({
       config: { baseBranch: 'main' },
