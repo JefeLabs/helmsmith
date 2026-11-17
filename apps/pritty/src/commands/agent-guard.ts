@@ -148,7 +148,7 @@ function tokenize(cmd: string): Token[] | null {
   return tokens;
 }
 
-const isOutputFlag = (t: string): boolean => t === '--output' || t.startsWith('--output=');
+const isOutputFlag = (t: string): boolean => t.startsWith('--outp');
 
 function judgePritty(sub: string, rest: string[], redirect: boolean): GuardVerdict {
   const flags = PRITTY_FLAGS[sub];
@@ -169,6 +169,12 @@ function judgePritty(sub: string, rest: string[], redirect: boolean): GuardVerdi
       else {
         value = rest[++i];
         if (value === undefined) return refuse(`${name} needs a value.`);
+      }
+      if (value === '' || value.startsWith('-')) {
+        return refuse(`The value of ${name} must not be empty or start with "-".`);
+      }
+      if (name === '--base' && (!/^[A-Za-z0-9._/-]+$/.test(value) || value.includes('..'))) {
+        return refuse('--base must be a plain branch name (letters, digits, . _ / -; no "..").');
       }
       if (name === '--input' && value === 'json') input = true;
       continue;
