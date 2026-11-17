@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -91,6 +91,42 @@ describe('lookupTicket', () => {
     });
     expect(validate).toHaveBeenCalledWith('PROJ-8');
     expect(getCachedTicket('PROJ-8', 'jira-cli')).toMatchObject({ exists: false });
+  });
+
+  it("returns the tracker's answer when the cache cannot be written, so validateStrict still refuses", async () => {
+    // PRITTY_HOME is a file: reading finds no cache, writing one throws.
+    const file = join(tmp, 'not-a-directory');
+    writeFileSync(file, '');
+    process.env.PRITTY_HOME = file;
+    vi.mocked(buildAdapter).mockResolvedValue({
+      name: 'jira-cli',
+      isAvailable: async () => true,
+      validate: async () => ({ exists: false, error: 'no such issue' }),
+    });
+    expect(await lookupTicket(validated, 'PROJ-8')).toEqual({
+      exists: false,
+      error: 'no such issue',
+    });
+
+    const strict = ConfigSchema.parse({
+      ticket: { pattern: 'PROJ-\\d+', validation: { type: 'jira-cli' }, validateStrict: true },
+    });
+    const exit = vi.spyOn(process, 'exit').mockImplementation((code) => {
+      throw new Error(`exit ${code}`);
+    });
+    const err = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    try {
+      await expect(resolveTicketContext(strict, 'feature/PROJ-8-x', staleGit)).rejects.toThrow(
+        'exit 1',
+      );
+      expect(err.mock.calls.flat().join('\n')).toMatch(/PROJ-8 not found in jira-cli/);
+      expect(log.mock.calls.flat().join('\n')).not.toMatch(/couldn't verify/);
+    } finally {
+      exit.mockRestore();
+      err.mockRestore();
+      log.mockRestore();
+    }
   });
 
   it('returns null without ticket.validation, and throws what the adapter throws', async () => {

@@ -135,10 +135,10 @@ export async function resolveTicketContext(
 
 /**
  * What `ticket.validation`'s tracker says about a ticket: the cached answer
- * when there is one, else the adapter's, which is then cached. Null without
- * `ticket.validation`, or when the adapter cannot reach its tracker; an
- * adapter that fails to build or run throws. Prints nothing and never exits:
- * the caller decides what a missing ticket means.
+ * when there is one, else the adapter's, which is then cached when the cache
+ * can be written. Null without `ticket.validation`, or when the adapter cannot
+ * reach its tracker; an adapter that fails to build or run throws. Prints
+ * nothing and never exits: the caller decides what a missing ticket means.
  */
 export async function lookupTicket(
   config: Config,
@@ -158,12 +158,18 @@ export async function lookupTicket(
   const adapter = await buildAdapter(validation);
   const result = await adapter.validate(ticket);
   if (result) {
-    setCachedTicket(ticket, validation.type, {
-      exists: result.exists,
-      ...(result.title ? { title: result.title } : {}),
-      ...(result.status ? { status: result.status } : {}),
-      ...(result.url ? { url: result.url } : {}),
-    });
+    // Best effort: a cache that cannot be written must not turn the tracker's
+    // answer into "couldn't verify", or validateStrict would pass a missing ticket.
+    try {
+      setCachedTicket(ticket, validation.type, {
+        exists: result.exists,
+        ...(result.title ? { title: result.title } : {}),
+        ...(result.status ? { status: result.status } : {}),
+        ...(result.url ? { url: result.url } : {}),
+      });
+    } catch {
+      // the next run asks the tracker again
+    }
   }
   return result;
 }
