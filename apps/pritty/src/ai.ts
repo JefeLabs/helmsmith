@@ -64,6 +64,8 @@ export interface TicketContext {
 export interface CommitMessage {
   /** Which change this commit belongs to, when the model grouped files by change. */
   change?: string;
+  /** Normalised subject label; `message` stays `type(scope): description`. */
+  label?: string;
   category: string;
   message: string; // first line, e.g. "feat(api): add /users endpoint"
   body?: string; // optional body paragraph

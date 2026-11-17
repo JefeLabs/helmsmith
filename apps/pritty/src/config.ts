@@ -74,6 +74,8 @@ export const ConfigSchema = z.object({
   dryRun: z.boolean().default(false),
   commitStyle: z.enum(['conventional', 'gitmoji', 'angular', 'simple']).default('conventional'),
   commitGrouping: CommitGroupingSchema.default('change'),
+  /** Prefix each commit subject with a label (ticket, change or run label). */
+  commitLabels: z.boolean().default(false),
   /**
    * Primary AI provider. `claude` (default) runs the Claude Code binary
    * on PATH headlessly, on its own login (a claude.ai subscription works;

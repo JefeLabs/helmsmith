@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CommitMessage } from '../../ai.js';
-import { reconcileCommitPlan } from './plan.js';
+import { applyLabels, composeCommitMessage, reconcileCommitPlan } from './plan.js';
 
 const grouped = { app: ['src/a.ts', 'src/b.ts'], test: ['src/a.test.ts'], docs: [], unknown: [] };
 
@@ -385,5 +385,54 @@ describe('composeCommitMessage', () => {
     expect(composeCommitMessage({ category: 'app', message: 'feat: x', files: [] }, [])).toBe(
       'feat: x',
     );
+  });
+});
+
+describe('composeCommitMessage with a label', () => {
+  it('puts the label on the first line, before body and trailers', () => {
+    expect(
+      composeCommitMessage(
+        { label: 'ABC-1', category: 'app', message: 'fix(x): y', body: 'b', files: [] },
+        ['T: v'],
+      ),
+    ).toBe('ABC-1 fix(x): y\n\nb\n\nT: v');
+  });
+});
+
+describe('applyLabels', () => {
+  const step = (o: Partial<CommitMessage> = {}): CommitMessage => ({
+    category: 'app',
+    message: 'fix(x): y',
+    files: [],
+    ...o,
+  });
+
+  it('prefers explicit over chosen, ticket, change and run label', () => {
+    const [c] = applyLabels([step({ change: 'login' })], {
+      explicit: 'EXP-1',
+      chosen: 'CH-1',
+      ticket: 'TK-1',
+      runLabel: 'RUN',
+    });
+    expect(c!.label).toBe('EXP-1');
+  });
+
+  it('falls through chosen, then ticket', () => {
+    expect(applyLabels([step()], { chosen: 'CH-1', ticket: 'TK-1' })[0]!.label).toBe('CH-1');
+    expect(applyLabels([step()], { ticket: 'TK-1', runLabel: 'RUN' })[0]!.label).toBe('TK-1');
+  });
+
+  it('derives a label from the change name, ahead of the run label', () => {
+    const [c] = applyLabels([step({ change: 'login rate limit' })], { runLabel: 'RUN' });
+    expect(c!.label).toBe('LOGIN-RATE-LIMIT');
+  });
+
+  it('uses the run label last, and leaves a commit unlabelled with no source', () => {
+    expect(applyLabels([step()], { runLabel: 'RUN' })[0]!.label).toBe('RUN');
+    expect(applyLabels([step()], {})[0]).not.toHaveProperty('label');
+  });
+
+  it('keeps an existing label', () => {
+    expect(applyLabels([step({ label: 'KEEP' })], { explicit: 'EXP-1' })[0]!.label).toBe('KEEP');
   });
 });

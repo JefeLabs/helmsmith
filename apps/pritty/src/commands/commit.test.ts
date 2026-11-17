@@ -99,13 +99,48 @@ describe('runCommit --json', () => {
     expect(line).toEqual({
       dryRun: false,
       commits: [
-        { category: 'app', message: 'feat: app', files: ['src/a.ts'], sha: 'sha1' },
-        { category: 'test', message: 'feat: test', files: ['src/a.test.ts'], sha: 'sha2' },
+        {
+          category: 'app',
+          message: 'feat: app',
+          type: 'feat',
+          description: 'app',
+          files: ['src/a.ts'],
+          sha: 'sha1',
+        },
+        {
+          category: 'test',
+          message: 'feat: test',
+          type: 'feat',
+          description: 'test',
+          files: ['src/a.test.ts'],
+          sha: 'sha2',
+        },
       ],
     });
     expect(f.err.length).toBeGreaterThan(0);
     expect(f.calls).not.toContain('confirm');
     expect(result?.commits).toHaveLength(2);
+  });
+
+  it('splits each subject into type, scope and description, with no label while commitLabels is off', async () => {
+    const f = fakes({
+      answer: (groups) =>
+        Object.entries(groups)
+          .filter(([, files]) => files.length > 0)
+          .map(([category, files]) => ({
+            category,
+            message: `fix(api): ${category} thing`,
+            files,
+          })),
+    });
+    await runCommit({ json: true }, f.deps);
+    const { commits } = JSON.parse(f.out[0]!);
+    expect(commits).toHaveLength(2);
+    for (const c of commits) {
+      expect(c).toMatchObject({ type: 'fix', scope: 'api' });
+      expect(c.description).toBe(`${c.category} thing`);
+      expect(c).not.toHaveProperty('label');
+    }
   });
 
   it('under --dry-run --json reports the plan and commits nothing', async () => {

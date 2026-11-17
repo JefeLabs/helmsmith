@@ -10,11 +10,12 @@ import {
   applySubjectOverrides,
   isCommitScope,
   isCommitType,
+  parseConventional,
   retypeForBranch,
   styleHasTypes,
 } from './_shared/conventional.js';
 import { splitTitleBody } from './_shared/format.js';
-import { composeCommitMessage, reconcileCommitPlan } from './_shared/plan.js';
+import { composeCommitMessage, reconcileCommitPlan, subjectOf } from './_shared/plan.js';
 import { filePlanCache, type PlanCache, planKey } from './_shared/plan-cache.js';
 import { confirm, editor } from './_shared/prompts.js';
 import { resolveTicketContext, type TicketContextOptions } from './_shared/ticket-context.js';
@@ -40,12 +41,30 @@ export interface CommitOutcome {
   commits: Array<{
     change?: string;
     category: string;
+    /** The first line as committed, label included. */
     message: string;
+    label?: string;
+    type?: string;
+    scope?: string;
+    description?: string;
     files: string[];
     sha?: string;
   }>;
   /** Present when the plan came from the previous run (a dry run, or a refused commit), not a new model call. */
   reusedPlan?: true;
+}
+
+/** `message` is the subject as committed; the parsed parts follow when it is conventional. */
+function subjectFields(c: CommitMessage) {
+  const message = subjectOf(c);
+  const p = parseConventional(message);
+  return {
+    message,
+    ...(p?.label ? { label: p.label } : {}),
+    ...(p ? { type: p.type } : {}),
+    ...(p?.scope ? { scope: p.scope } : {}),
+    ...(p ? { description: p.description } : {}),
+  };
 }
 
 /** Everything `runCommit` touches outside its own logic, so tests can drive it without git or a model. */
@@ -300,7 +319,7 @@ export async function runCommit(
       commits: plan.map((c) => ({
         ...(c.change ? { change: c.change } : {}),
         category: c.category,
-        message: c.message,
+        ...subjectFields(c),
         files: c.files,
       })),
     });
@@ -339,7 +358,7 @@ export async function runCommit(
     commits.push({
       ...(c.change ? { change: c.change } : {}),
       category: c.category,
-      message: c.message,
+      ...subjectFields(c),
       files: c.files,
       sha,
     });
