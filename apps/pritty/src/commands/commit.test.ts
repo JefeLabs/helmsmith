@@ -895,27 +895,55 @@ describe('runCommit input selection', () => {
 });
 
 describe('runCommit shows what it commits', () => {
+  /** A kept plan that carries its label, as a dry run with labels leaves it: read whatever the key. */
+  const keptPlan = (): PlanCache => ({
+    read: async () => [
+      { category: 'app', label: 'ABC-1', message: 'Update app', files: ['src/a.ts'] },
+    ],
+    write: async () => undefined,
+    clear: async () => undefined,
+  });
+
   it('prints the labelled subject in the plan and the committed line, and takes the label from the plan', async () => {
-    const f = fakes({
-      staged: ['src/a.ts'],
-      answer: (groups) =>
-        oneEach(groups).map((c) => ({ ...c, label: 'ABC-1', message: 'Update app' })),
-    });
+    const f = fakes({ staged: ['src/a.ts'], planCache: keptPlan() });
     await runCommit({}, f.deps);
     const text = plain(f.out);
     expect(text).toMatch(/^ {4}ABC-1 Update app$/m);
     expect(text).toMatch(/✓ committed app: ABC-1 Update app \(sha1\)/);
 
-    const g = fakes({
-      staged: ['src/a.ts'],
-      answer: (groups) =>
-        oneEach(groups).map((c) => ({ ...c, label: 'ABC-1', message: 'Update app' })),
-    });
+    const g = fakes({ staged: ['src/a.ts'], planCache: keptPlan() });
     await runCommit({ json: true }, g.deps);
     expect(JSON.parse(g.out[0]!).commits[0]).toMatchObject({
       message: 'ABC-1 Update app',
       label: 'ABC-1',
     });
+  });
+});
+
+describe('runCommit ignores a label in the model’s answer', () => {
+  /** The model answers with a `label` key of its own: pritty labels commits, the model never does. */
+  const stray: Answer = (groups) =>
+    oneEach(groups).map((c) => ({ ...c, change: 'login', label: 'oops label' }));
+
+  it('with commitLabels off, commits unlabelled subjects', async () => {
+    const f = fakes({ answer: stray });
+    await runCommit({ json: true }, f.deps);
+    expect(subjects(f.committed)).toEqual(['feat: app', 'feat: test']);
+    const { commits } = JSON.parse(f.out[0]!);
+    expect(commits[0]).toMatchObject({ message: 'feat: app', type: 'feat', description: 'app' });
+    expect(commits[0]).not.toHaveProperty('label');
+  });
+
+  it("with commitLabels on, labels from the model's change name", async () => {
+    const f = fakes({ answer: stray, config: { commitLabels: true } });
+    await runCommit({ json: true }, f.deps);
+    expect(subjects(f.committed)).toEqual(['LOGIN feat: app', 'LOGIN feat: test']);
+  });
+
+  it('with --label, puts that label on every subject', async () => {
+    const f = fakes({ answer: stray });
+    await runCommit({ json: true, label: 'abc-1' }, f.deps);
+    expect(subjects(f.committed)).toEqual(['ABC-1 feat: app', 'ABC-1 feat: test']);
   });
 });
 

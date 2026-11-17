@@ -589,10 +589,14 @@ export async function runCommit(
     const spinner = ora({ text: 'Generating commit messages...', color: 'cyan' }).start();
     try {
       const diff = await git.getStagedDiff();
-      const raw = await deps.ai.generateCommitMessages(grouped, diff, config, ticketCtx, {
-        branch,
-        labels: labelsOn && !named,
-      });
+      // pritty labels commits, never the model: a `label` key in its answer is
+      // dropped. Only a kept plan (the one a run showed) carries labels.
+      const raw = (
+        await deps.ai.generateCommitMessages(grouped, diff, config, ticketCtx, {
+          branch,
+          labels: labelsOn && !named,
+        })
+      ).map(({ label: _ignored, ...c }) => c);
       // Read before reconciling, which drops `change` under category grouping.
       if (labelsOn) runLabel = labelFromChange(firstChange(raw));
       plan = reconcileCommitPlan(
