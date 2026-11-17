@@ -203,9 +203,12 @@ pritty pr --json --base develop --draft --no-push \
 `--json` (`--output=json`) prints one line
 `{ number, url, created, draft, head, base, title, labels }` on stdout and everything else on stderr, implies `--auto-approve`, and requires
 `--base` or a configured `baseBranch`. `--title` with `--body`/`--body-file`
-uses the words verbatim: no model call, no ticket flow; labels come from
+uses your words: no model call, no ticket flow; a label every commit shares,
+and its tags, are added to the title when missing (see
+[Agent commits and labels](#agent-commits-and-labels)); labels come from
 conventional commit types. An open PR for the same head and base is returned
-(`created: false`) and, when a title or body was given, updated in place.
+(`created: false`) and, when a title or body was given, updated in place;
+`--dry-run` never updates it, and prints what it would set instead.
 `--no-push` is for callers that already pushed with upstream tracking.
 Every prompt fails with instructions when stdin is not a terminal.
 
@@ -216,8 +219,8 @@ on stderr and exit code 1.
 
 | Command | JSON line |
 |---|---|
-| `commit` | `{ dryRun, commits: [{ change?, category, message, label?, type, scope, description, body?, files, sha? }], reusedPlan? }`; `message` is the labelled first line as committed; `sha` is absent on a dry run (implies `--auto-approve`) |
-| `pr` | `{ number, url, created, draft, head, base, title, labels }` (implies `--auto-approve`, needs a base); `--dry-run`: `{ dryRun, title, body, labels, draft, head, base }` |
+| `commit` | `{ dryRun, commits: [{ change?, category, message, label?, type, scope, breaking?, description, body?, files, sha? }], reusedPlan? }`; `message` is the labelled first line as committed; `breaking` is present (`true`) only for a `!` subject; `sha` is absent on a dry run (implies `--auto-approve`) |
+| `pr` | `{ number, url, created, draft, head, base, title, labels }` (implies `--auto-approve`, needs a base); `--dry-run`: `{ dryRun, title, body?, labels, draft, head, base }`, the PR it would open or what it would set on the open one (`body` absent only when that PR keeps its own) |
 | `pr --check` | `{ open, last }` |
 | `rebase` | `{ dryRun, branch, base, strategy, commits: [{ hash, subject }], steps: [{ hash, action, message?, rationale? }], summary, rebased }`; commits oldest first; `steps: []` and `summary: null` when fewer than two commits |
 | `categorize` | `{ all, categories: [{ category, files }] }` (empty categories left out) |
@@ -311,7 +314,9 @@ told to take the why from the bodies rather than invent one. `pritty pr` opens a
 drafted title with the commits' conventional prefix: the
 branch's type when a commit carries it, else the most significant commit type
 (feat, fix, perf, refactor, revert, build, ci, docs, style, test, chore), with
-the scope that type's commits share. A `--title` is always used verbatim.
+the scope that type's commits share. A `--title` keeps its words: only a label
+every commit shares, and its tags, are added when missing (see
+[Agent commits and labels](#agent-commits-and-labels)).
 
 ## Agent commits and labels
 
@@ -329,12 +334,15 @@ no model call and combining them is refused.
 ```bash
 pritty commit --label STATUS-LOGGING --type fix --scope issue-report \
   --message "log only exception class when status apply fails" \
-  [--body <text>] [--trailer "Token: value"] [--no-verify] [--dry-run] \
-  --output=json -- src/StatusConsumer.java
+  [--body <text>] [--breaking] [--trailer "Token: value"] [--no-verify] \
+  [--dry-run] --output=json -- src/StatusConsumer.java
 ```
 
 `--type` and `--scope` are required; `--label` is required where
-`commitLabels` is `true` and used when given elsewhere. The paths after `--`
+`commitLabels` is `true` and used when given elsewhere; `--breaking` marks a
+breaking change, `!` after the scope (`fix(api)!: …`). The description
+(`--message`) is one line with no space before or after it, a lower-case
+first word and no trailing period; more lines go in `--body`. The paths after `--`
 resolve from the current directory like `git add`, must each be staged and
 are the only files committed; with none, every staged file. Paths after `--`
 without `--message` are refused. All the files must share one category (code
@@ -354,18 +362,19 @@ echo '{"commits":[
 
 `body` and `files` are optional (`files` may be left out only for a single
 commit, which then takes every staged file); `label` is optional unless
-`commitLabels` is `true`. Each commit gets the args checks, plus: a file is
+`commitLabels` is `true`; `"breaking": true` puts `!` after the scope. Each commit gets the args checks, plus: a file is
 staged and in one commit only. Commits are made label by label in order of
 first appearance, code, then tests, then stories. `--input=json` runs
 unattended (no confirmation prompt) and refuses `--label`, `--type`, `--scope`,
-`--message`, `--body` and paths after `--`; `--trailer`, `--no-verify`,
+`--message`, `--body`, `--breaking` and paths after `--`; `--trailer`, `--no-verify`,
 `--dry-run` and `--output`/`--json` stay allowed. Staged files no commit lists
 stay staged. If git refuses a commit midway (a hook), pritty stops and the
 error names the refused commit and the shas already made.
 
 **Output and dry run.** `--output=json` prints the result: each commit has
 `category`, `message` (the labelled first line as committed), `label`, `type`,
-`scope`, `description`, `body` (when present), `files` and `sha`. `--dry-run`
+`scope`, `breaking` (when true), `description`, `body` (when present), `files`
+and `sha`. `--dry-run`
 validates and prints the same JSON without `sha`, touching nothing, and that
 output can be fed straight back through `--input=json`. A subject over 72
 characters warns on stderr; it is never refused. The args and JSON inputs
@@ -392,7 +401,8 @@ treated like `--title` and the body like `--body` (`prFooter` appended unless
 fields (`number`, `url`, `dryRun`, …) are ignored, so a dry run's output can be
 fed back. `--input=json` runs unattended and is refused together with
 `--title`, `--body` or `--body-file`; `--check`, `--no-push`, `--no-footer`,
-`--draft` and `--base` work with every input.
+`--draft` and `--base` work with every input. `--dry-run` pushes, creates and
+edits nothing, an open PR included.
 
 When every non-merge commit between base and HEAD carries the same label, the
 PR title is `LABEL: summary [types] [scopes]`: the model's summary, then each

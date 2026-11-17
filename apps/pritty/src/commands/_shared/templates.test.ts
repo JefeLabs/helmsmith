@@ -59,4 +59,23 @@ describe('agent commit inputs in the skill and the /commit command', () => {
   it('no longer tells an agent to hand-write commits with git commit -m', () => {
     expect(PRITTY_SKILL).not.toContain("That's bypassing the");
   });
+
+  it('names --breaking and the optional label and breaking fields', async () => {
+    const { CLAUDE_COMMANDS } = await import('./templates.js');
+    for (const text of [PRITTY_SKILL, CLAUDE_COMMANDS.commit!]) {
+      for (const token of ['--breaking', 'label?', 'breaking?']) expect(text).toContain(token);
+    }
+  });
+
+  it('describes /commit per change, not only per category', async () => {
+    const { CLAUDE_COMMANDS, COPILOT_PROMPTS } = await import('./templates.js');
+    for (const text of [CLAUDE_COMMANDS.commit!, COPILOT_PROMPTS.commit!]) {
+      expect(text).not.toMatch(/messages per category/);
+      expect(text).toMatch(/per change/);
+    }
+  });
+
+  it('says JSON runs are unattended where it warns against skipping confirmation', () => {
+    expect(PRITTY_SKILL).toMatch(/Skip the confirmation flow[\s\S]*unattended by design/);
+  });
 });

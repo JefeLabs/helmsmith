@@ -44,7 +44,7 @@ export interface PrOptions {
   json?: boolean;
   /** Open the PR as a draft. */
   draft?: boolean;
-  /** Use this title verbatim: no model, no ticket flow. */
+  /** Use this title: no model, no ticket flow; a label every commit shares, and its tags, are added when missing. */
   title?: string;
   /** Use this body verbatim (with --title). */
   body?: string;
@@ -156,7 +156,7 @@ function defaultDeps(): PrDeps {
  * Open a pull request for the current branch. Order matters: the token and
  * the open-PR check come first, so nothing is generated or pushed when the
  * PR cannot be created or already exists; then commits and the words (given
- * verbatim, or drafted by the model); push and create last. Errors are
+ * by the caller, or drafted by the model); push and create last. Errors are
  * thrown (the CLI prints them and exits 1).
  */
 export async function runPr(
@@ -346,7 +346,7 @@ export async function runPr(
   }
   say('');
 
-  // 6. The words: given verbatim (no model, no ticket flow), or drafted by the model
+  // 6. The words: given (no model, no ticket flow; a shared label goes on the title), or drafted by the model
   let draft: PRDraft;
   let changedFiles: string[] | undefined;
   const shared = sharedLabel(commits);

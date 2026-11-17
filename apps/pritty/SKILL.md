@@ -100,11 +100,14 @@ the user's repo as cwd. Pass through any flags the user mentions:
   lowercase segments (`network`, `org/global`, `org/network/directory`)
 - `--type <type>` (commit) sets the code commits' type (`fix` for a fix on
   a non-`fix/` branch); test and story commits keep theirs
+- `--breaking` (commit, with `--message`) marks a breaking change: `!` after
+  the scope
 - `--trailer "Token: value"` (commit, repeatable) adds a trailer such as
   `Refs: plan-5 T9` to every commit, after `commitTrailers`
 - `--strategy interactive|squash|fixup|auto` for rebase strategy
 - `--output=json` (any command) is `--json`; `--output=text` is the default
-- `--title`, `--body` / `--body-file` (pr) use the words verbatim, no model;
+- `--title`, `--body` / `--body-file` (pr) use your words, no model; a label
+  every commit shares, and its tags, are added to the title when missing.
   `--input=json` (pr) reads `{ "title", "body"?, "draft"?, "labels"? }` from
   stdin, unattended
 
@@ -116,10 +119,10 @@ staged paths; the index content, never the working tree. Stage first
 (`git add`), and use the repository's `.pritty.json` conventions: the
 `conventional` or `angular` commit style.
 
-One call per commit, code before tests, with the paths after `--` (resolved from the
-current directory, like `git add`; they must be staged, and a
-`--message` call needs `--type` and `--scope`, plus `--label` where the
-repository sets `commitLabels`):
+One call per commit, code before tests, with the paths after `--`
+(resolved from the current directory, like `git add`; they must be staged,
+and a `--message` call needs `--type` and `--scope`, plus `--label` where the
+repository sets `commitLabels`; `--breaking` adds `!` after the scope):
 
 ```
 pritty commit --label STATUS-LOGGING --type fix --scope issue-report \
@@ -130,9 +133,15 @@ pritty commit --label STATUS-LOGGING --type test --scope issue-report \
   --output=json -- src/StatusConsumerTest.java
 ```
 
-Paths after `--` without `--message` are refused. Or all commits in one
-call, a JSON body on stdin (`files` are repository-root-relative, as the
-output prints them; optional fields end in `?`):
+The description (`--message`) is one line, with no space before or after
+it, a lower-case first word and no trailing period; more lines go in `--body`.
+Paths after `--` without `--message` are refused. Or all commits in one call,
+a JSON body on stdin (optional fields end in `?`; `files` are
+repository-root-relative, as the output prints them):
+
+```
+{ "commits": [{ label?, type, scope, breaking?, description, body?, files? }] }
+```
 
 ```
 echo '{"commits":[{"label":"STATUS-LOGGING","type":"fix","scope":"issue-report",
@@ -140,18 +149,20 @@ echo '{"commits":[{"label":"STATUS-LOGGING","type":"fix","scope":"issue-report",
   | pritty commit --input=json --output=json
 ```
 
-(`body?` is optional; `files?` may be left out only for a single commit,
-which then takes every staged file.) With `--input=json` the flags `--label`,
-`--type`, `--scope`, `--message`, `--body` and `--` paths are refused;
-`--trailer`, `--no-verify`, `--dry-run` and `--output` still apply. It runs
-unattended (no confirmation prompt). One category per commit: a file set that
-spans code and tests is refused, so keep them in separate commits.
+`label` is required where the repository sets `commitLabels`;
+`"breaking": true` puts `!` after the scope; `files` may be left out only for
+a single commit, which then takes every staged file. With `--input=json` the
+flags `--label`, `--type`, `--scope`, `--message`, `--body`, `--breaking` and
+`--` paths are refused; `--trailer`, `--no-verify`, `--dry-run` and
+`--output` still apply. It runs unattended (no confirmation prompt). One
+category per commit: a file set that spans code and tests is refused, so keep
+them in separate commits.
 
 `--dry-run --output=json` prints the plan, the same JSON without `sha`, and
 touches nothing; feed it straight back through `--input=json` to commit it.
 Each commit in the output has `category`, `message` (the labelled first
-line as committed), `label`, `type`, `scope`, `description`, `body` (when
-present), `files` and `sha`.
+line as committed), `label`, `type`, `scope`, `breaking` (when true),
+`description`, `body` (when present), `files` and `sha`.
 
 Interactive `pritty commit` labels its commits only where `commitLabels` is
 `true`: an explicit `--label`, else the ticket detected (repositories with a
@@ -177,8 +188,10 @@ Do not:
 - **Run `git commit` directly** when the user asked for an AI commit
   message — call `pritty commit` instead. The whole point of pritty
   existing is the categorize-and-commit-per-bucket flow.
-- **Skip the confirmation flow** unless the user explicitly passed
-  `--auto-approve`. Pritty's prompts are part of the contract.
+- **Skip the confirmation flow** of an interactive run unless the user
+  explicitly passed `--auto-approve`. Pritty's prompts are part of the
+  contract. `--output=json` and `--input=json` run unattended by design:
+  there, `--dry-run --output=json` is the preview.
 - **Run `pritty rebase --auto-approve`** — pritty itself rejects
   this; rebase rewrites history and gets the friction it deserves.
 - **Re-implement what pritty does** in shell scripting — pritty

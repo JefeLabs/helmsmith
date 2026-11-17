@@ -13,9 +13,9 @@
  */
 export const CLAUDE_COMMANDS: Record<string, string> = {
   commit: `---
-description: Generate AI commit messages per category and commit each group via pritty.
+description: Commit staged files via pritty, with AI messages per change and category or the words you pass.
 allowed-tools: Bash
-argument-hint: "[--auto-approve] [--dry-run] [--commit-style conventional|gitmoji|angular|simple] [--scope <path>] [--type <type>] [--trailer <line>] [--label <label>] [--message <text>] [--input=json] [--output=json]"
+argument-hint: "[--auto-approve] [--dry-run] [--commit-style conventional|gitmoji|angular|simple] [--scope <path>] [--type <type>] [--trailer <line>] [--label <label>] [--message <text>] [--breaking] [--input=json] [--output=json]"
 ---
 
 Run \`pritty commit\` in the current repo. Pass any flags the user provides through.
@@ -23,12 +23,12 @@ Run \`pritty commit\` in the current repo. Pass any flags the user provides thro
 The command will:
 1. Read staged files (run \`git add\` first if needed)
 2. Categorize them via .pritty.json's category map
-3. Generate per-category commit messages via AI
+3. Generate a commit message per change, per category via AI
 4. Show the plan and confirm before committing
 5. Optionally let the user edit each message
-6. Create one commit per category using path-restricted \`git commit -- <files>\`
+6. Create one commit per change and category using path-restricted \`git commit -- <files>\`
 
-When you already know the message, skip the model: \`pritty commit --label <label> --type <type> --scope <scope> --message "<text>" --output=json -- <staged paths>\` makes one commit (one call per commit, code before tests), and \`pritty commit --input=json --output=json\` reads \`{ "commits": [{ label, type, scope, description, body?, files? }] }\` from stdin (unattended; \`files\` are repository-root paths; \`--label\`, \`--type\`, \`--scope\`, \`--message\`, \`--body\` and \`--\` paths are refused with it). \`--dry-run --output=json\` prints a plan that can be fed back through \`--input=json\`. \`--label\` needs the \`conventional\` or \`angular\` style.
+When you already know the message, skip the model: \`pritty commit --label <label> --type <type> --scope <scope> --message "<text>" --output=json -- <staged paths>\` makes one commit (one call per commit, code before tests; \`--breaking\` adds \`!\` after the scope; the description is one line, more lines go in \`--body\`), and \`pritty commit --input=json --output=json\` reads \`{ "commits": [{ label?, type, scope, breaking?, description, body?, files? }] }\` from stdin (unattended; \`label\` is required where the repository sets \`commitLabels\`; \`files\` are repository-root paths; \`--label\`, \`--type\`, \`--scope\`, \`--message\`, \`--body\`, \`--breaking\` and \`--\` paths are refused with it). \`--dry-run --output=json\` prints a plan that can be fed back through \`--input=json\`. \`--label\` needs the \`conventional\` or \`angular\` style.
 
 If pritty isn't installed, suggest \`npm install -g @helmsmith/pritty\` (or workspace-link from helmsmith).
 `,
@@ -164,11 +164,14 @@ the user's repo as cwd. Pass through any flags the user mentions:
   lowercase segments (\`network\`, \`org/global\`, \`org/network/directory\`)
 - \`--type <type>\` (commit) sets the code commits' type (\`fix\` for a fix on
   a non-\`fix/\` branch); test and story commits keep theirs
+- \`--breaking\` (commit, with \`--message\`) marks a breaking change: \`!\` after
+  the scope
 - \`--trailer "Token: value"\` (commit, repeatable) adds a trailer such as
   \`Refs: plan-5 T9\` to every commit, after \`commitTrailers\`
 - \`--strategy interactive|squash|fixup|auto\` for rebase strategy
 - \`--output=json\` (any command) is \`--json\`; \`--output=text\` is the default
-- \`--title\`, \`--body\` / \`--body-file\` (pr) use the words verbatim, no model;
+- \`--title\`, \`--body\` / \`--body-file\` (pr) use your words, no model; a label
+  every commit shares, and its tags, are added to the title when missing.
   \`--input=json\` (pr) reads \`{ "title", "body"?, "draft"?, "labels"? }\` from
   stdin, unattended
 
@@ -180,10 +183,10 @@ staged paths; the index content, never the working tree. Stage first
 (\`git add\`), and use the repository's \`.pritty.json\` conventions: the
 \`conventional\` or \`angular\` commit style.
 
-One call per commit, code before tests, from \`--\` paths (resolved from the
-current directory, like \`git add\`; they must be staged, and a
-\`--message\` call needs \`--type\` and \`--scope\`, plus \`--label\` where the
-repository sets \`commitLabels\`):
+One call per commit, code before tests, with the paths after \`--\`
+(resolved from the current directory, like \`git add\`; they must be staged,
+and a \`--message\` call needs \`--type\` and \`--scope\`, plus \`--label\` where the
+repository sets \`commitLabels\`; \`--breaking\` adds \`!\` after the scope):
 
 \`\`\`
 pritty commit --label STATUS-LOGGING --type fix --scope issue-report \\
@@ -194,9 +197,15 @@ pritty commit --label STATUS-LOGGING --type test --scope issue-report \\
   --output=json -- src/StatusConsumerTest.java
 \`\`\`
 
-Paths after \`--\` without \`--message\` are refused. Or all commits in one
-call, a JSON body on stdin (\`files\` are repository-root-relative, as the
-output prints them; optional fields end in \`?\`):
+The description (\`--message\`) is one line, with no space before or after
+it, a lower-case first word and no trailing period; more lines go in \`--body\`.
+Paths after \`--\` without \`--message\` are refused. Or all commits in one call,
+a JSON body on stdin (optional fields end in \`?\`; \`files\` are
+repository-root-relative, as the output prints them):
+
+\`\`\`
+{ "commits": [{ label?, type, scope, breaking?, description, body?, files? }] }
+\`\`\`
 
 \`\`\`
 echo '{"commits":[{"label":"STATUS-LOGGING","type":"fix","scope":"issue-report",
@@ -204,18 +213,20 @@ echo '{"commits":[{"label":"STATUS-LOGGING","type":"fix","scope":"issue-report",
   | pritty commit --input=json --output=json
 \`\`\`
 
-(\`body\` and \`files\` may be left out; \`files\` only for a single commit, then
-every staged file is committed.) With \`--input=json\` the flags \`--label\`,
-\`--type\`, \`--scope\`, \`--message\`, \`--body\` and \`--\` paths are refused;
-\`--trailer\`, \`--no-verify\`, \`--dry-run\` and \`--output\` still apply. It runs
-unattended (no confirmation prompt). One category per commit: a file set that
-spans code and tests is refused, so keep them in separate commits.
+\`label\` is required where the repository sets \`commitLabels\`;
+\`"breaking": true\` puts \`!\` after the scope; \`files\` may be left out only for
+a single commit, which then takes every staged file. With \`--input=json\` the
+flags \`--label\`, \`--type\`, \`--scope\`, \`--message\`, \`--body\`, \`--breaking\` and
+\`--\` paths are refused; \`--trailer\`, \`--no-verify\`, \`--dry-run\` and
+\`--output\` still apply. It runs unattended (no confirmation prompt). One
+category per commit: a file set that spans code and tests is refused, so keep
+them in separate commits.
 
 \`--dry-run --output=json\` prints the plan, the same JSON without \`sha\`, and
 touches nothing; feed it straight back through \`--input=json\` to commit it.
 Each commit in the output has \`category\`, \`message\` (the labelled first
-line as committed), \`label\`, \`type\`, \`scope\`, \`description\`, \`body\` (when
-present), \`files\` and \`sha\`.
+line as committed), \`label\`, \`type\`, \`scope\`, \`breaking\` (when true),
+\`description\`, \`body\` (when present), \`files\` and \`sha\`.
 
 Interactive \`pritty commit\` labels its commits only where \`commitLabels\` is
 \`true\`: an explicit \`--label\`, else the ticket detected (repositories with a
@@ -241,8 +252,10 @@ Do not:
 - **Run \`git commit\` directly** when the user asked for an AI commit
   message — call \`pritty commit\` instead. The whole point of pritty
   existing is the categorize-and-commit-per-bucket flow.
-- **Skip the confirmation flow** unless the user explicitly passed
-  \`--auto-approve\`. Pritty's prompts are part of the contract.
+- **Skip the confirmation flow** of an interactive run unless the user
+  explicitly passed \`--auto-approve\`. Pritty's prompts are part of the
+  contract. \`--output=json\` and \`--input=json\` run unattended by design:
+  there, \`--dry-run --output=json\` is the preview.
 - **Run \`pritty rebase --auto-approve\`** — pritty itself rejects
   this; rebase rewrites history and gets the friction it deserves.
 - **Re-implement what pritty does** in shell scripting — pritty
@@ -297,16 +310,16 @@ config reference.
 export const COPILOT_PROMPTS: Record<string, string> = {
   commit: `---
 name: commit
-description: Generate AI commit messages per category and commit each group via pritty
+description: Commit staged files via pritty, with AI messages per change and category or the words you pass
 ---
 
 Run \`pritty commit\` in the integrated terminal. This will:
 
 1. Read staged files (\`git add\` your changes first)
 2. Categorize them per the project's .pritty.json
-3. Generate one commit message per file category using AI
+3. Generate a commit message per change, per file category using AI
 4. Show the plan; press Enter to accept or \`y\` to edit any message
-5. Commit each category as a separate path-restricted commit
+5. Commit each change's category as a separate path-restricted commit
 
 Useful flags:
   \`--dry-run\` — show the plan without committing
@@ -315,7 +328,7 @@ Useful flags:
   \`--scope <path>\` — every commit's scope (\`network\`, \`org/global\`)
   \`--type <type>\` — the code commits' type; tests and stories keep theirs
   \`--trailer "Token: value"\` — add a trailer to every commit (repeatable)
-  \`--label <label> --type <type> --scope <scope> --message <text> -- <paths>\` — one commit, no model
+  \`--label <label> --type <type> --scope <scope> --message <text> [--breaking] -- <paths>\` — one commit, no model (\`--breaking\` adds \`!\` after the scope)
   \`--input=json\` — commits from a JSON body on stdin; \`--output=json\` — the result as one JSON line
 `,
 

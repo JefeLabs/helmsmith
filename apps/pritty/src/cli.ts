@@ -161,7 +161,7 @@ addOutputOption(program.command('commit'))
   )
   .option(
     '--message <text>',
-    'Make one commit with this description, no AI (needs --type and --scope)',
+    'Make one commit with this description, no AI (needs --type and --scope): one line, no surrounding spaces; more lines go in --body',
   )
   .option('--body <text>', 'Body of the --message commit')
   .option('--breaking', 'Mark the --message commit a breaking change: `!` after the scope')
@@ -210,10 +210,13 @@ addOutputOption(program.command('pr'))
   .option('--dry-run', 'Show the plan without pushing or creating the PR')
   .option(
     '--json',
-    'Print one JSON line { number, url, created, draft, head, base, title, labels } on stdout (with --dry-run: { dryRun, title, body, labels, draft, head, base }); implies --auto-approve; needs --base or a configured baseBranch',
+    'Print one JSON line { number, url, created, draft, head, base, title, labels } on stdout (with --dry-run: { dryRun, title, body?, labels, draft, head, base }, body absent only when an open PR keeps its own); implies --auto-approve; needs --base or a configured baseBranch',
   )
   .option('--draft', 'Open the PR as a draft')
-  .option('--title <title>', 'Use this title verbatim (no AI, no ticket flow)')
+  .option(
+    '--title <title>',
+    'Use this title, no AI or ticket flow; a label every commit shares, and its tags, are added when missing',
+  )
   .option('--body <text>', 'Use this body verbatim (with --title)')
   .option('--body-file <path>', 'Read the body from a file (with --title)')
   .option(
