@@ -12,13 +12,16 @@ describe('judgeBash', () => {
     'git diff --cached',
     'git log -5 --format=%s',
     'git show HEAD',
-    'git show HEAD^',
+    'git show "HEAD^"',
+    'git diff "HEAD~1"',
     'git add -- src/a.ts src/a.test.ts',
     'pritty commit --label abc --type fix --scope api --message "handle 404" --output=json -- src/a.ts',
     'pritty commit --message "handle 404" --body "more, detail (really)" --breaking',
     `pritty commit --input=json --dry-run --output=json < ${S}/plan.json`,
     `pritty commit --input json < .git/pritty/plan.json`,
     `pritty pr --input=json --output=json < ${S}/pr.json`,
+    `pritty commit --input=json < "${S}/a"`,
+    `pritty pr --base main --input=json --output=json < "${S}/pr.json"`,
     'pritty pr --title "x" --body "y" --draft --base main --no-footer --check',
     'pritty commit --message "a;b"',
     `pritty pr --base main --input=json --output=json < ${S}/pr.json`,
@@ -73,6 +76,12 @@ describe('judgeBash', () => {
     ['git status #x', 'allowed'],
     ['git status "$HOME"', 'allowed'],
     ['git status "a\\b"', 'allowed'],
+    // R8: `^` and `~` are glob operators under zsh EXTENDED_GLOB; quote revisions
+    ['git log ^zzz', 'allowed'],
+    ['git log -1 ^zzz', 'allowed'],
+    ['git log a^b', 'allowed'],
+    ['git show HEAD^', 'allowed'],
+    ['git diff HEAD~1', 'allowed'],
     ['pritty commit --label =(touch X)', 'allowed'],
     ['pritty categorize *(e:sh:)', 'allowed'],
     // S2: flag allowlists
@@ -94,18 +103,73 @@ describe('judgeBash', () => {
     ['pritty rebase', 'not allowed'],
     ['pritty --version x', 'no arguments'],
     // redirect
-    ['pritty commit --input=json < src/plan.json', '.git/pritty/'],
-    ['pritty commit --input=json < .git/pritty/../../src/x', '.git/pritty/'],
-    ['pritty commit --input=json < /other/.git/pritty/x', '.git/pritty/'],
-    ['git status < .git/pritty/x', '.git/pritty/'],
+    ['pritty commit --input=json < src/plan.json', `${S}/`],
+    ['pritty commit --input=json < .git/pritty/../../src/x', `${S}/`],
+    ['pritty commit --input=json < /other/.git/pritty/x', `${S}/`],
+    ['pritty commit --input=json < "/other/.git/pritty/x"', `${S}/`],
+    ['git status < .git/pritty/x', `${S}/`],
     [`pritty commit --input=json <${S}/x`, 'allowed'],
     [`pritty commit < ${S}/plan.json`, '--input=json'],
-    [`pritty commit --input=json < ${S}/a < ${S}/b`, '.git/pritty/'],
-    [`pritty commit --input=json < "${S}/a"`, '.git/pritty/'],
+    [`pritty commit --input=json < ${S}/a < ${S}/b`, `${S}/`],
+    [`pritty commit --input=json < "${S}/a" x`, `${S}/`],
   ])('refuses %j', (cmd, fragment) => {
     const v = judge(cmd);
     expect(v.allow).toBe(false);
     if (!v.allow) expect(v.reason).toContain(fragment);
+  });
+});
+
+describe.each([
+  ['a space', '/nonexistent-pritty/My Projects/repo'],
+  ['a non-ASCII character', '/nonexistent-pritty/josé/repo'],
+])('a scratch directory with %s', (_, cwd) => {
+  const dir = `${cwd}/.git/pritty`;
+  const j = (cmd: string) => judgeBash(cmd, cwd, () => dir);
+  it('allows a double-quoted redirect from it', () => {
+    expect(j(`pritty commit --input=json --dry-run --output=json < "${dir}/plan.json"`)).toEqual({
+      allow: true,
+    });
+    expect(j(`pritty pr --base main --input=json --output=json < "${dir}/pr.json"`)).toEqual({
+      allow: true,
+    });
+  });
+  it('refuses the unquoted redirect', () => {
+    expect(j(`pritty commit --input=json < ${dir}/plan.json`).allow).toBe(false);
+  });
+  it('refuses a double-quoted path outside it', () => {
+    for (const path of [`${cwd}/src/plan.json`, `${dir}/../../src/plan.json`, dir]) {
+      const v = j(`pritty commit --input=json < "${path}"`);
+      expect(v.allow, path).toBe(false);
+      if (!v.allow) expect(v.reason).toContain(`${dir}/`);
+    }
+  });
+});
+
+describe('refusal messages', () => {
+  const WT = '/main/.git/worktrees/wt/pritty';
+  const write = (resolver: () => string | null) =>
+    judgeHookPayload(
+      JSON.stringify({ tool_name: 'Write', tool_input: { file_path: '/wt/src/a.ts' }, cwd: '/wt' }),
+      resolver,
+    );
+  const redirect = (resolver: () => string | null) =>
+    judgeBash('pritty commit --input=json < src/plan.json', '/wt', resolver);
+  it('name the resolved scratch directory', () => {
+    for (const v of [write(() => WT), redirect(() => WT)]) {
+      expect(v.allow).toBe(false);
+      if (!v.allow) {
+        expect(v.reason).toContain(`${WT}/`);
+        expect(v.reason).not.toContain('.git/pritty/');
+      }
+    }
+  });
+  it('name the rev-parse command when no scratch directory resolves', () => {
+    for (const v of [write(() => null), redirect(() => null)]) {
+      expect(v.allow).toBe(false);
+      if (!v.allow) {
+        expect(v.reason).toContain('git rev-parse --path-format=absolute --git-path pritty');
+      }
+    }
   });
 });
 

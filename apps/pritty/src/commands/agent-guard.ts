@@ -8,7 +8,8 @@
  *
  * The Bash check is an allowlist, not a denylist: the command is tokenized and
  * only plain words and "double-quoted text without expansions" survive, so no
- * shell (bash or zsh) can expand, glob, substitute or chain anything.
+ * shell (bash or zsh) can expand, glob, substitute or chain anything. The one
+ * redirect, `< path`, takes either form and must stay inside the scratch dir.
  */
 import { execFileSync } from 'node:child_process';
 import { lstatSync, realpathSync } from 'node:fs';
@@ -95,8 +96,14 @@ function realOfNearest(p: string): string | null {
   }
 }
 
-function insideScratch(path: string, cwd: string, scratch: ScratchResolver): boolean {
-  const dir = scratch(cwd);
+/** How refusals name the scratch directory: its resolved path, else how to find it. */
+const scratchLabel = (dir: string | null): string =>
+  dir
+    ? `${dir}/`
+    : 'the scratch directory from `git rev-parse --path-format=absolute --git-path pritty`';
+
+/** Whether `path` (relative to `cwd`) lies inside the resolved scratch directory `dir`. */
+function insideScratch(path: string, cwd: string, dir: string | null): boolean {
   if (!dir) return false;
   const realDir = realOfNearest(dir);
   const real = realOfNearest(resolve(cwd, path));
@@ -106,7 +113,8 @@ function insideScratch(path: string, cwd: string, scratch: ScratchResolver): boo
 
 type Token = { text: string; quoted: boolean };
 
-const PLAIN = /^[A-Za-z0-9._/:@%^,+=-]$/;
+// No `^`, `~` or `#`: zsh EXTENDED_GLOB treats them as glob operators (`^x` matches every file but x).
+const PLAIN = /^[A-Za-z0-9._/:@%,+=-]$/;
 
 /** Plain words and double-quoted text only; null when anything else appears. `<` is its own token. */
 function tokenize(cmd: string): Token[] | null {
@@ -193,7 +201,7 @@ export function judgeBash(
   const tokens = tokenize(command.trim());
   if (!tokens) {
     return refuse(
-      'Only plain words and double-quoted text (no $, `, \\, !, quotes inside) are allowed: no operators, globs, braces, expansions, single quotes or redirects.',
+      'Only plain words and double-quoted text (no $, `, \\, !, quotes inside) are allowed: no operators, globs, braces, expansions, single quotes or redirects. Quote revisions that use ^ or ~, e.g. "HEAD^".',
     );
   }
   if (tokens.length === 0) return refuse(`An empty command is not allowed. ${ALLOWED_FORMS}`);
@@ -202,17 +210,19 @@ export function judgeBash(
   let redirect = false;
   const lt = tokens.findIndex((t) => t.text === '<' && !t.quoted);
   if (lt >= 0) {
+    // The path may be double-quoted (spaces, non-ASCII): the quoted-text rules
+    // already exclude expansions, and the shell opens the unquoted text judged here.
     const path = tokens[lt + 1];
+    const dir = scratch(cwd);
     const ok =
       lt === tokens.length - 2 &&
       path !== undefined &&
-      !path.quoted &&
       args[0] === 'pritty' &&
       (args[1] === 'commit' || args[1] === 'pr') &&
-      insideScratch(path.text, cwd, scratch);
+      insideScratch(path.text, cwd, dir);
     if (!ok) {
       return refuse(
-        'Input redirection is only allowed as `pritty commit|pr … --input=json < <path>` with one plain path inside .git/pritty/.',
+        `Input redirection is only allowed as \`pritty commit|pr … --input=json < "<path>"\` with one path inside ${scratchLabel(dir)}`,
       );
     }
     redirect = true;
@@ -274,9 +284,10 @@ export function judgeHookPayload(
     if (typeof fields.file_path !== 'string' || typeof cwd !== 'string') {
       return refuse('The file payload is missing tool_input.file_path or cwd.');
     }
-    return insideScratch(fields.file_path, cwd, scratch)
+    const dir = scratch(cwd);
+    return insideScratch(fields.file_path, cwd, dir)
       ? { allow: true }
-      : refuse('Writes are only allowed inside the repository .git/pritty/ directory.');
+      : refuse(`Writes are only allowed inside ${scratchLabel(dir)}`);
   }
   return { allow: true };
 }
