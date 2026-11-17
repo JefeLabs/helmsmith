@@ -446,3 +446,37 @@ describe('GitOps.log carries commit bodies (item 9)', () => {
     ]);
   });
 });
+
+describe('GitOps.stagedFor', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('resolves a pathspec from the given directory and returns repo-root paths', async () => {
+    const r = makeRepo();
+    cleanup = r.cleanup;
+    write(r.dir, 'src/a.ts', 'A\n');
+    write(r.dir, 'src/b.ts', 'B\n');
+    gitIn(r.dir, 'add', 'src/a.ts');
+
+    const got = await createGit(r.dir).stagedFor(
+      ['a.ts', 'b.ts', '../nowhere'],
+      join(r.dir, 'src'),
+    );
+
+    expect(got.get('a.ts')).toEqual(['src/a.ts']);
+    expect(got.get('b.ts')).toEqual([]);
+    expect(got.get('../nowhere')).toEqual([]);
+  });
+
+  it('returns [] for a directory outside the repository', async () => {
+    const r = makeRepo();
+    cleanup = r.cleanup;
+    const outside = mkdtempSync(join(tmpdir(), 'pritty-outside-'));
+    try {
+      const got = await createGit(r.dir).stagedFor(['a.ts'], outside);
+      expect(got.get('a.ts')).toEqual([]);
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+});

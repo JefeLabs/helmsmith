@@ -18,6 +18,12 @@ export interface GitOps {
   getStaged(): Promise<string[]>;
   /** All changed files (staged + modified + untracked). */
   getAllChanged(): Promise<string[]>;
+  /**
+   * For each pathspec, the staged files it names. Unlike every other method the
+   * pathspecs resolve from `fromDir` (as `git add` would); results are
+   * repo-root-relative. `[]` when nothing matches or the path lies outside the repository.
+   */
+  stagedFor(pathspecs: readonly string[], fromDir: string): Promise<Map<string, string[]>>;
   /** Current branch name. */
   getCurrentBranch(): Promise<string>;
   /** Diff of staged changes. Optionally restrict to a file list. */
@@ -104,6 +110,31 @@ export function createGit(dir: string = process.cwd()): GitOps {
       // --no-renames so a staged rename shows as its old and new path; simple-git's
       // status.staged omits renames entirely.
       return zList(runGit(cwd, ['diff', '--cached', '--name-only', '--no-renames', '-z']));
+    },
+
+    async stagedFor(pathspecs: readonly string[], fromDir: string): Promise<Map<string, string[]>> {
+      const out = new Map<string, string[]>();
+      for (const spec of pathspecs) {
+        try {
+          out.set(
+            spec,
+            zList(
+              runGit(fromDir, [
+                'diff',
+                '--cached',
+                '--name-only',
+                '--no-renames',
+                '-z',
+                '--',
+                spec,
+              ]),
+            ),
+          );
+        } catch {
+          out.set(spec, []);
+        }
+      }
+      return out;
     },
 
     async getAllChanged(): Promise<string[]> {
