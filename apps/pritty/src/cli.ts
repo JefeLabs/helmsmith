@@ -13,6 +13,7 @@ import { createCli } from '@helmsmith/cli-kit';
 import chalk from 'chalk';
 import type { Command } from 'commander';
 import { prittyAuthProvider } from './auth-provider.js';
+import { runAgentGuard } from './commands/agent-guard.js';
 import { runAuthLogin } from './commands/auth-login.js';
 import { runAuthLogout } from './commands/auth-logout.js';
 import { runAuthStatus } from './commands/auth-status.js';
@@ -23,6 +24,7 @@ import { runCommit } from './commands/commit.js';
 import { runInit } from './commands/init.js';
 import { runPr } from './commands/pr.js';
 import { runRebase } from './commands/rebase.js';
+import { readStdin } from './stdin.js';
 import { VERSION } from './version.js';
 
 // Only destructure `program` — `auth` is already used below as the
@@ -264,6 +266,15 @@ addOutputOption(program.command('rebase'))
   .action((options: { strategy?: string; base?: string; dryRun?: boolean; json?: boolean }) =>
     runRebase(options),
   );
+
+// ─── agent-guard (hidden: PreToolUse hook for the committer subagent) ──
+
+program.command('agent-guard', { hidden: true }).action(async () => {
+  process.exitCode = await runAgentGuard({
+    readStdin,
+    err: (line) => console.error(line),
+  });
+});
 
 program.parseAsync(process.argv).catch((err) => {
   console.error(chalk.red(err instanceof Error ? err.message : String(err)));
