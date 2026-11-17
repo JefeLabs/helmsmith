@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CommitMessage } from '../ai.js';
 import { ConfigSchema } from '../config.js';
 import type { GitOps } from '../git.js';
+import { parseCommitInput } from './_shared/explicit.js';
 import type { PlanCache } from './_shared/plan-cache.js';
 import { type CommitDeps, runCommit } from './commit.js';
 
@@ -714,6 +715,58 @@ describe('runCommit --input=json', () => {
       /✗ failed to commit WEDMODD-23444 test\(api\): cover 404: pre-commit hook refused; already committed: sha1 WEDMODD-23444 fix\(api\): handle 404/,
     );
     expect(f.out).toEqual([]);
+  });
+
+  it('carries each commit body in the dry run outcome, so feeding it back keeps the body', async () => {
+    const body = JSON.stringify({
+      commits: [
+        {
+          type: 'fix',
+          scope: 'api',
+          description: 'handle 404',
+          body: 'why it changed',
+          files: ['src/a.ts'],
+        },
+      ],
+    });
+    const f = fakes({ stdin: body });
+    await runCommit({ input: 'json', dryRun: true, json: true }, f.deps);
+    expect(f.out).toHaveLength(1);
+    const line = JSON.parse(f.out[0]!);
+    expect(line.commits[0]).toMatchObject({
+      message: 'fix(api): handle 404',
+      body: 'why it changed',
+    });
+
+    expect(parseCommitInput(f.out[0]!)).toEqual([
+      {
+        type: 'fix',
+        scope: 'api',
+        description: 'handle 404',
+        body: 'why it changed',
+        paths: ['src/a.ts'],
+      },
+    ]);
+  });
+
+  it('reports the body of a committed commit, from args or the model, and no body key when a commit has none', async () => {
+    const f = fakes({ staged: ['src/a.ts'] });
+    await runCommit(
+      { message: 'handle 404', type: 'fix', scope: 'api', body: 'why it changed', json: true },
+      f.deps,
+    );
+    expect(JSON.parse(f.out[0]!).commits[0].body).toBe('why it changed');
+
+    const g = fakes({ staged: ['src/a.ts'] });
+    await runCommit({ message: 'handle 404', type: 'fix', scope: 'api', json: true }, g.deps);
+    expect(JSON.parse(g.out[0]!).commits[0]).not.toHaveProperty('body');
+
+    const m = fakes({
+      staged: ['src/a.ts'],
+      answer: (groups) => oneEach(groups).map((c) => ({ ...c, body: 'the model says why' })),
+    });
+    await runCommit({ json: true }, m.deps);
+    expect(JSON.parse(m.out[0]!).commits[0].body).toBe('the model says why');
   });
 
   it('refuses an empty stdin with the stdin message', async () => {

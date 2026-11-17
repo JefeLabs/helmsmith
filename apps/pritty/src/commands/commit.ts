@@ -67,6 +67,8 @@ export interface CommitOutcome {
     type?: string;
     scope?: string;
     description?: string;
+    /** The message body, when the commit has one: a dry run's output fed back to `--input=json` keeps it. */
+    body?: string;
     files: string[];
     sha?: string;
   }>;
@@ -78,8 +80,8 @@ type OutcomeCommit = CommitOutcome['commits'][number];
 
 /**
  * A planned commit as the outcome reports it: `message` is the subject as
- * committed, the label is the plan's own, and the other parts are parsed from
- * the subject when it is conventional.
+ * committed, the label and body are the plan's own, and the other parts are
+ * parsed from the subject when it is conventional.
  */
 function entryOf(c: CommitMessage): OutcomeCommit {
   const message = subjectOf(c);
@@ -93,6 +95,7 @@ function entryOf(c: CommitMessage): OutcomeCommit {
     ...(p ? { type: p.type } : {}),
     ...(p?.scope ? { scope: p.scope } : {}),
     ...(p ? { description: p.description } : {}),
+    ...(c.body ? { body: c.body } : {}),
     files: c.files,
   };
 }
