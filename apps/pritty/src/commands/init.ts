@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
@@ -24,6 +24,22 @@ export interface InitOptions {
    * --no-aliases, since an unattended run should not edit a shell rc file.
    */
   json?: boolean;
+}
+
+/**
+ * Why `init` must not touch `path`: it is a symlink or not a regular file
+ * (writing would go through the link). Undefined when absent or a plain file.
+ */
+function unsafeTarget(path: string): string | undefined {
+  let st: ReturnType<typeof lstatSync>;
+  try {
+    st = lstatSync(path);
+  } catch {
+    return undefined;
+  }
+  if (st.isSymbolicLink()) return 'it is a symlink; init does not write through links';
+  if (!st.isFile()) return 'it is not a regular file';
+  return undefined;
 }
 
 /**
@@ -60,6 +76,10 @@ export async function runInit(options: InitOptions = {}): Promise<void> {
 
   const written: string[] = [];
   const skipped: string[] = [];
+  const refuse = (path: string, why: string): void => {
+    console.error(chalk.yellow(`! skipped ${path}: ${why}`));
+    skipped.push(path);
+  };
 
   // 1. The config (always)
   for (const configPath of configTargets(cwd)) {
@@ -109,7 +129,10 @@ export async function runInit(options: InitOptions = {}): Promise<void> {
   // 2.6. The committer subagent (in git repos only; kept when present).
   if (includeAgent && inGitRepo) {
     const agentPath = join(cwd, '.claude', 'agents', 'pritty.md');
-    if (existsSync(agentPath) && !force) {
+    const unsafe = unsafeTarget(agentPath);
+    if (unsafe) {
+      refuse(agentPath, unsafe);
+    } else if (existsSync(agentPath) && !force) {
       say(chalk.dim(`· skipped ${agentPath} (exists; --force to overwrite)`));
       skipped.push(agentPath);
     } else {
@@ -123,10 +146,20 @@ export async function runInit(options: InitOptions = {}): Promise<void> {
   // 2.7. The AGENTS.md section (in git repos only; replaced on every run).
   if (includeAgentsMd && inGitRepo) {
     const agentsPath = join(cwd, 'AGENTS.md');
-    const existing = existsSync(agentsPath) ? readFileSync(agentsPath, 'utf8') : undefined;
-    writeFileSync(agentsPath, upsertSection(existing, readAgentFile('AGENTS.section.md')));
-    say(chalk.green(`✓ ${agentsPath}`));
-    written.push(agentsPath);
+    const unsafe = unsafeTarget(agentsPath);
+    if (unsafe) {
+      refuse(agentsPath, unsafe);
+    } else {
+      const existing = existsSync(agentsPath) ? readFileSync(agentsPath, 'utf8') : undefined;
+      const upserted = upsertSection(existing, readAgentFile('AGENTS.section.md'));
+      if (upserted.ok) {
+        writeFileSync(agentsPath, upserted.text);
+        say(chalk.green(`✓ ${agentsPath}`));
+        written.push(agentsPath);
+      } else {
+        refuse(agentsPath, `its pritty markers are broken (${upserted.problem}); fix them by hand`);
+      }
+    }
     if (existsSync(join(cwd, 'CLAUDE.md'))) {
       say(
         chalk.dim(

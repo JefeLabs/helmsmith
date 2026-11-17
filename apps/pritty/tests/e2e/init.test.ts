@@ -1,4 +1,11 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { jsonLine, makeRepo, makeSandbox, runCli, type Sandbox } from './helpers.js';
@@ -149,6 +156,48 @@ describe('pritty init', () => {
       expect(r.stderr).toContain('@AGENTS.md');
       expect(r.stderr).toContain('CLAUDE.md');
       expect(readFileSync(join(repo, 'CLAUDE.md'), 'utf8')).toBe('# Claude\n');
+    });
+
+    it('leaves AGENTS.md untouched and skipped when its markers are broken', async () => {
+      sb = makeSandbox();
+      const repo = makeRepo(sb);
+      const original =
+        '# Mine\n<!-- pritty:begin (managed by `pritty init`; edits inside are replaced) -->\nuser text\n';
+      const agentsMd = join(repo, 'AGENTS.md');
+      writeFileSync(agentsMd, original);
+      await runCli(sb, repo, ['init', '--json', '--no-aliases']);
+      const second = await runCli(sb, repo, ['init', '--json', '--no-aliases']);
+      expect(readFileSync(agentsMd, 'utf8')).toBe(original);
+      expect(jsonLine<InitJson>(second).skipped).toContain(agentsMd);
+      expect(jsonLine<InitJson>(second).written).not.toContain(agentsMd);
+      expect(second.stderr).toMatch(/marker/i);
+    });
+
+    it('never writes through a symlinked AGENTS.md', async () => {
+      sb = makeSandbox();
+      const repo = makeRepo(sb);
+      const target = join(sb.root, 'victim.rc');
+      writeFileSync(target, 'export A=1\n');
+      const agentsMd = join(repo, 'AGENTS.md');
+      symlinkSync(target, agentsMd);
+      const r = await runCli(sb, repo, ['init', '--json', '--no-aliases']);
+      expect(readFileSync(target, 'utf8')).toBe('export A=1\n');
+      expect(jsonLine<InitJson>(r).skipped).toContain(agentsMd);
+      expect(r.stderr).toContain(agentsMd);
+    });
+
+    it('never writes through a symlinked .claude/agents/pritty.md, even with --force', async () => {
+      sb = makeSandbox();
+      const repo = makeRepo(sb);
+      const target = join(sb.root, 'victim2.rc');
+      writeFileSync(target, 'export B=1\n');
+      mkdirSync(join(repo, '.claude', 'agents'), { recursive: true });
+      const agent = join(repo, '.claude', 'agents', 'pritty.md');
+      symlinkSync(target, agent);
+      const r = await runCli(sb, repo, ['init', '--json', '--no-aliases', '--force']);
+      expect(readFileSync(target, 'utf8')).toBe('export B=1\n');
+      expect(jsonLine<InitJson>(r).skipped).toContain(agent);
+      expect(r.stderr).toContain(agent);
     });
   });
 });
