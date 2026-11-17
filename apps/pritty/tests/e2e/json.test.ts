@@ -208,8 +208,10 @@ describe('init --json', () => {
 
     const again = await runCli(sb, repo, ['init', '--json'], { env });
     const second = jsonLine<typeof out>(again);
-    expect(second.written).toEqual([]);
-    expect([...second.skipped].sort()).toEqual([...out.written].sort());
+    // AGENTS.md's managed section is replaced on every run, so it is written again.
+    const agentsMd = join(repo, 'AGENTS.md');
+    expect(second.written).toEqual([agentsMd]);
+    expect([...second.skipped].sort()).toEqual(out.written.filter((p) => p !== agentsMd).sort());
   });
 
   it('reports gitRepo: false outside a repository', async () => {

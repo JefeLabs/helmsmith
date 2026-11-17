@@ -1,9 +1,11 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
+import { readAgentFile } from '../agent-files.js';
 import { defaultStarterConfig } from '../config.js';
 import { detectShell, installShellAliases } from '../shell-aliases.js';
+import { upsertSection } from './_shared/agents-md.js';
 import { output } from './_shared/output.js';
 import { CLAUDE_COMMANDS, COPILOT_PROMPTS, PRITTY_SKILL } from './_shared/templates.js';
 
@@ -13,6 +15,10 @@ export interface InitOptions {
   copilot?: boolean;
   aliases?: boolean;
   skill?: boolean;
+  /** The `.claude/agents/pritty.md` committer subagent (default true). */
+  agent?: boolean;
+  /** The managed section in `AGENTS.md` (default true). */
+  agentsMd?: boolean;
   /**
    * One JSON line { written, skipped, gitRepo } (absolute paths); implies
    * --no-aliases, since an unattended run should not edit a shell rc file.
@@ -48,6 +54,8 @@ export async function runInit(options: InitOptions = {}): Promise<void> {
   const includeCopilot = options.copilot !== false;
   const includeAliases = options.aliases !== false && !options.json;
   const includeSkill = options.skill !== false;
+  const includeAgent = options.agent !== false;
+  const includeAgentsMd = options.agentsMd !== false;
   const inGitRepo = existsSync(join(cwd, '.git'));
 
   const written: string[] = [];
@@ -95,6 +103,36 @@ export async function runInit(options: InitOptions = {}): Promise<void> {
       writeFileSync(skillPath, PRITTY_SKILL);
       say(chalk.green(`✓ ${skillPath}`));
       written.push(skillPath);
+    }
+  }
+
+  // 2.6. The committer subagent (in git repos only; kept when present).
+  if (includeAgent && inGitRepo) {
+    const agentPath = join(cwd, '.claude', 'agents', 'pritty.md');
+    if (existsSync(agentPath) && !force) {
+      say(chalk.dim(`· skipped ${agentPath} (exists; --force to overwrite)`));
+      skipped.push(agentPath);
+    } else {
+      mkdirSync(dirname(agentPath), { recursive: true });
+      writeFileSync(agentPath, readAgentFile('pritty.md'));
+      say(chalk.green(`✓ ${agentPath}`));
+      written.push(agentPath);
+    }
+  }
+
+  // 2.7. The AGENTS.md section (in git repos only; replaced on every run).
+  if (includeAgentsMd && inGitRepo) {
+    const agentsPath = join(cwd, 'AGENTS.md');
+    const existing = existsSync(agentsPath) ? readFileSync(agentsPath, 'utf8') : undefined;
+    writeFileSync(agentsPath, upsertSection(existing, readAgentFile('AGENTS.section.md')));
+    say(chalk.green(`✓ ${agentsPath}`));
+    written.push(agentsPath);
+    if (existsSync(join(cwd, 'CLAUDE.md'))) {
+      say(
+        chalk.dim(
+          '  CLAUDE.md is untouched. To have Claude Code read AGENTS.md, add a line `@AGENTS.md` to CLAUDE.md.',
+        ),
+      );
     }
   }
 
@@ -149,7 +187,7 @@ export async function runInit(options: InitOptions = {}): Promise<void> {
   }
 
   // 5. Summary
-  if (!inGitRepo && (includeClaude || includeCopilot)) {
+  if (!inGitRepo && (includeClaude || includeCopilot || includeAgent || includeAgentsMd)) {
     say(
       chalk.dim(
         `\nNot a git repository (no .git/ found) — skipped Claude Code & Copilot integration files.`,

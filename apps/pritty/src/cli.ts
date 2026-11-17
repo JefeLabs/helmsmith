@@ -82,13 +82,15 @@ addOutputOption(authCmd.command('status'))
 
 addOutputOption(program.command('init'))
   .description(
-    'Write a starter config (.helmsmith/pritty.json in a repo with a .helmsmith folder, else .pritty.json) + Claude Code / VS Code Copilot slash commands. Skips integration files outside a git repo.',
+    'Write a starter config (.helmsmith/pritty.json in a repo with a .helmsmith folder, else .pritty.json) + Claude Code / VS Code Copilot slash commands, the committer subagent (.claude/agents/pritty.md) and a managed AGENTS.md section. Skips integration files outside a git repo.',
   )
   .option('--force', 'Overwrite existing files')
   .option('--no-claude', 'Skip writing .claude/commands/{commit,pr}.md')
   .option('--no-copilot', 'Skip writing .github/prompts/{commit,pr}.prompt.md')
   .option('--no-aliases', 'Skip the shell-alias prompt for `commit` / `pr`')
   .option('--no-skill', 'Skip writing .claude/skills/pritty/SKILL.md')
+  .option('--no-agent', 'Skip writing .claude/agents/pritty.md (the committer subagent)')
+  .option('--no-agents-md', 'Skip the managed pritty section in AGENTS.md')
   .option(
     '--json',
     'Print one JSON line { written, skipped, gitRepo } on stdout; implies --no-aliases',
@@ -100,6 +102,8 @@ addOutputOption(program.command('init'))
       copilot?: boolean;
       aliases?: boolean;
       skill?: boolean;
+      agent?: boolean;
+      agentsMd?: boolean;
       json?: boolean;
     }) => runInit(options),
   );
