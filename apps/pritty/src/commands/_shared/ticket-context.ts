@@ -17,7 +17,7 @@ import chalk from 'chalk';
 import { getCachedTicket, setCachedTicket } from '../../adapters/cache.js';
 import { buildAdapter, deriveLinkTemplate, type ValidationResult } from '../../adapters/index.js';
 import type { TicketContext } from '../../ai.js';
-import { type loadConfig } from '../../config.js';
+import { type Config, type loadConfig } from '../../config.js';
 import { type createGit } from '../../git.js';
 import { detectTicket, findRecentTicket, ticketLink } from '../../ticket.js';
 import { confirm } from './prompts.js';
@@ -90,31 +90,12 @@ export async function resolveTicketContext(
   let resolvedLink = ticketLink(ticket, config.ticket.linkTemplate);
   if (ticket && config.ticket.validation) {
     const validation = config.ticket.validation;
-    const cached = getCachedTicket(ticket, validation.type);
     let result: ValidationResult | null;
-    if (cached) {
-      result = {
-        exists: cached.exists,
-        ...(cached.title ? { title: cached.title } : {}),
-        ...(cached.status ? { status: cached.status } : {}),
-        ...(cached.url ? { url: cached.url } : {}),
-      };
-    } else {
-      try {
-        const adapter = await buildAdapter(validation);
-        result = await adapter.validate(ticket);
-      } catch (err) {
-        console.error(chalk.yellow(`⚠ Ticket validation failed: ${(err as Error).message}`));
-        result = null;
-      }
-      if (result) {
-        setCachedTicket(ticket, validation.type, {
-          exists: result.exists,
-          ...(result.title ? { title: result.title } : {}),
-          ...(result.status ? { status: result.status } : {}),
-          ...(result.url ? { url: result.url } : {}),
-        });
-      }
+    try {
+      result = await lookupTicket(config, ticket);
+    } catch (err) {
+      console.error(chalk.yellow(`⚠ Ticket validation failed: ${(err as Error).message}`));
+      result = null;
     }
 
     if (result) {
@@ -150,6 +131,47 @@ export async function resolveTicketContext(
     link: resolvedLink,
     title,
   };
+}
+
+/**
+ * What `ticket.validation`'s tracker says about a ticket: the cached answer
+ * when there is one, else the adapter's, which is then cached when the cache
+ * can be written. Null without `ticket.validation`, or when the adapter cannot
+ * reach its tracker; an adapter that fails to build or run throws. Prints
+ * nothing and never exits: the caller decides what a missing ticket means.
+ */
+export async function lookupTicket(
+  config: Config,
+  ticket: string,
+): Promise<ValidationResult | null> {
+  const validation = config.ticket?.validation;
+  if (!validation) return null;
+  const cached = getCachedTicket(ticket, validation.type);
+  if (cached) {
+    return {
+      exists: cached.exists,
+      ...(cached.title ? { title: cached.title } : {}),
+      ...(cached.status ? { status: cached.status } : {}),
+      ...(cached.url ? { url: cached.url } : {}),
+    };
+  }
+  const adapter = await buildAdapter(validation);
+  const result = await adapter.validate(ticket);
+  if (result) {
+    // Best effort: a cache that cannot be written must not turn the tracker's
+    // answer into "couldn't verify", or validateStrict would pass a missing ticket.
+    try {
+      setCachedTicket(ticket, validation.type, {
+        exists: result.exists,
+        ...(result.title ? { title: result.title } : {}),
+        ...(result.status ? { status: result.status } : {}),
+        ...(result.url ? { url: result.url } : {}),
+      });
+    } catch {
+      // the next run asks the tracker again
+    }
+  }
+  return result;
 }
 
 function formatAge(hours: number): string {

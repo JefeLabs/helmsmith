@@ -1,5 +1,6 @@
 import type { CommitMessage } from '../../ai.js';
 import type { Config } from '../../config.js';
+import { splitLabel } from './label.js';
 
 /** Conventional commit types, most significant first: the order a PR title picks by. */
 const TYPE_RANK = [
@@ -19,22 +20,30 @@ const TYPE_RANK = [
 const SUBJECT = /^([a-z]+)(?:\(([^)]*)\))?(!)?:\s*(.*)$/s;
 
 export interface ConventionalSubject {
+  label?: string;
   type: string;
   scope?: string;
   breaking: boolean;
   description: string;
 }
 
-/** `fix(phone)!: x` → { type, scope, breaking, description }; null for a type outside TYPE_RANK. */
+/** `[LABEL ]fix(phone)!: x` → { label?, type, scope, breaking, description }; null for a type outside TYPE_RANK. */
 export function parseConventional(subject: string): ConventionalSubject | null {
-  const m = subject.match(SUBJECT);
+  const { label, rest } = splitLabel(subject);
+  const m = rest.match(SUBJECT);
   if (!m || !(TYPE_RANK as readonly string[]).includes(m[1]!)) return null;
   return {
+    ...(label ? { label } : {}),
     type: m[1]!,
     ...(m[2] ? { scope: m[2] } : {}),
     breaking: m[3] === '!',
     description: m[4]!,
   };
+}
+
+/** `{ label, type, scope, breaking, description }` → `[label ]type[(scope)][!]: description`. */
+export function formatConventional(p: ConventionalSubject): string {
+  return `${p.label ? `${p.label} ` : ''}${p.type}${p.scope ? `(${p.scope})` : ''}${p.breaking ? '!' : ''}: ${p.description}`;
 }
 
 const BRANCH_PREFIX: Record<string, string> = {
@@ -80,7 +89,7 @@ export function retypeForBranch(
     if (!parsed || OWN_TYPE_CATEGORIES.has(c.category) || !RETYPED_ON_FIX_BRANCH.has(parsed.type)) {
       return c;
     }
-    const message = `fix${c.message.slice(parsed.type.length)}`;
+    const message = formatConventional({ ...parsed, type: 'fix' });
     retyped.push({ category: c.category, from: c.message, to: message });
     return { ...c, message };
   });
@@ -128,7 +137,7 @@ export function applySubjectOverrides(
     }
     const type = setsType ? o.type! : parsed.type;
     const scope = o.scope ?? parsed.scope;
-    const message = `${type}${scope ? `(${scope})` : ''}${parsed.breaking ? '!' : ''}: ${parsed.description}`;
+    const message = formatConventional({ ...parsed, type, scope });
     return { ...c, message };
   });
   return { plan: out, kept };
@@ -176,4 +185,59 @@ function sharedScope(commits: readonly ConventionalSubject[]): string | undefine
 /** `Reject phone numbers` → `reject phone numbers`; `API v1`, `HeroUI` and `iOS` stay as written. */
 function lowerFirstWord(text: string): string {
   return /^[A-Z][a-z]+\b/.test(text) ? `${text[0]!.toLowerCase()}${text.slice(1)}` : text;
+}
+
+export interface SharedLabel {
+  label: string;
+  tags: string[];
+}
+
+/**
+ * The label every non-merge commit carries, with the tags a PR title lists:
+ * each type once in TYPE_RANK order, then each scope once in the order the
+ * commits used them. `commits` is newest first (git log order). Null unless
+ * at least one commit remains and all parse with the same label.
+ */
+export function sharedLabel(
+  commits: ReadonlyArray<{ subject: string; merge?: boolean }>,
+): SharedLabel | null {
+  const parsed: ConventionalSubject[] = [];
+  for (const c of commits) {
+    if (c.merge) continue;
+    const p = parseConventional(c.subject);
+    if (!p?.label) return null;
+    parsed.push(p);
+  }
+  const label = parsed[0]?.label;
+  if (!label || parsed.some((p) => p.label !== label)) return null;
+  const types = TYPE_RANK.filter((t) => parsed.some((p) => p.type === t));
+  const scopes = new Set<string>();
+  for (const p of [...parsed].reverse()) if (p.scope) scopes.add(p.scope);
+  return { label, tags: [...types, ...scopes] };
+}
+
+/**
+ * `LABEL: summary [tag] [tag]`: the model's summary under the label every
+ * commit shares. Only that label's own `LABEL:` is taken off the model's
+ * title; another upper-case word (`API: …`) is part of the summary.
+ */
+export function labelledPrTitle(modelTitle: string, shared: SharedLabel): string {
+  const trimmed = modelTitle.trim();
+  const prefix = `${shared.label}:`;
+  const bare = trimmed.startsWith(prefix) ? trimmed.slice(prefix.length).trimStart() : trimmed;
+  const own = parseConventional(bare);
+  const summary = lowerFirstWord(own ? own.description : bare);
+  return addSharedLabel(`${shared.label}: ${summary}`, shared);
+}
+
+/**
+ * A title as written, with the label in front and any missing `[tag]` after
+ * it. A title that already opens with the label (`LABEL: …`, or a labelled
+ * subject `LABEL type(scope): …`) gets no second one.
+ */
+export function addSharedLabel(title: string, shared: SharedLabel): string {
+  const labelled = title.startsWith(`${shared.label}: `) || title.startsWith(`${shared.label} `);
+  let out = labelled ? title : `${shared.label}: ${title}`;
+  for (const tag of shared.tags) if (!out.includes(`[${tag}]`)) out += ` [${tag}]`;
+  return out;
 }

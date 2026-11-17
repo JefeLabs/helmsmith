@@ -24,6 +24,7 @@ interface Outcome {
     change?: string;
     category: string;
     message: string;
+    breaking?: boolean;
     files: string[];
     sha?: string;
   }>;
@@ -376,5 +377,148 @@ describe('pritty commit: what the trial found (order, type, reuse, hooks, one-co
     const r = await runCli(sb, repo, ['commit', '--json']);
     expect(r.exitCode, r.stderr).toBe(0);
     expect(gitIn(repo, 'log', '-1', '--format=%s').trim()).toBe('feat(feature): add greet');
+  });
+});
+
+describe('pritty commit from args and a JSON body', () => {
+  it('commits one labelled commit per call, from args, without a model', async () => {
+    sb = makeSandbox();
+    const repo = stagedRepo(sb);
+
+    const first = await runCli(sb, repo, [
+      'commit',
+      '--label',
+      'wedmodd-23444',
+      '--type',
+      'feat',
+      '--scope',
+      'feature',
+      '--message',
+      'greet users',
+      '--output=json',
+      '--',
+      'src/feature.ts',
+    ]);
+    expect(first.exitCode, first.stderr).toBe(0);
+    const second = await runCli(sb, repo, [
+      'commit',
+      '--label',
+      'wedmodd-23444',
+      '--type',
+      'test',
+      '--scope',
+      'feature',
+      '--message',
+      'cover greeting',
+      '--output=json',
+      '--',
+      'src/feature.test.ts',
+    ]);
+    expect(second.exitCode, second.stderr).toBe(0);
+
+    expect(gitIn(repo, 'log', '-2', '--format=%s').trim().split('\n')).toEqual([
+      'WEDMODD-23444 test(feature): cover greeting',
+      'WEDMODD-23444 feat(feature): greet users',
+    ]);
+    expect(stagedPaths(repo)).toEqual([]);
+  });
+
+  it('commits what a dry run of a JSON body planned, fed back as the body', async () => {
+    sb = makeSandbox();
+    const repo = stagedRepo(sb);
+    const before = head(repo);
+    const body = JSON.stringify({
+      commits: [
+        {
+          label: 'abc 1',
+          type: 'feat',
+          scope: 'feature',
+          description: 'greet users',
+          files: ['src/feature.ts'],
+        },
+        {
+          label: 'abc 1',
+          type: 'test',
+          scope: 'feature',
+          description: 'cover greeting',
+          files: ['src/feature.test.ts'],
+        },
+      ],
+    });
+
+    const dry = await runCli(sb, repo, ['commit', '--input=json', '--dry-run', '--output=json'], {
+      stdin: body,
+    });
+    expect(dry.exitCode, dry.stderr).toBe(0);
+    const planned = jsonLine<Outcome>(dry);
+    expect(planned.dryRun).toBe(true);
+    expect(head(repo)).toBe(before);
+
+    const r = await runCli(sb, repo, ['commit', '--input=json', '--output=json'], {
+      stdin: dry.stdout,
+    });
+    expect(r.exitCode, r.stderr).toBe(0);
+    expect(jsonLine<Outcome>(r).dryRun).toBe(false);
+    const subjects = gitIn(repo, 'log', '-2', '--format=%s').trim().split('\n').reverse();
+    expect(subjects).toEqual(planned.commits.map((c) => c.message));
+    expect(subjects).toHaveLength(2);
+    expect(stagedPaths(repo)).toEqual([]);
+  });
+
+  it("keeps a breaking change's `!` when a dry run of a JSON body is fed back", async () => {
+    sb = makeSandbox();
+    const repo = stagedRepo(sb);
+    const body = JSON.stringify({
+      commits: [
+        {
+          label: 'abc 1',
+          type: 'feat',
+          scope: 'feature',
+          breaking: true,
+          description: 'drop the old greeting',
+          files: ['src/feature.ts'],
+        },
+      ],
+    });
+
+    const dry = await runCli(sb, repo, ['commit', '--input=json', '--dry-run', '--output=json'], {
+      stdin: body,
+    });
+    expect(dry.exitCode, dry.stderr).toBe(0);
+    expect(jsonLine<Outcome>(dry).commits[0]).toMatchObject({
+      message: 'ABC-1 feat(feature)!: drop the old greeting',
+      breaking: true,
+    });
+
+    const r = await runCli(sb, repo, ['commit', '--input=json', '--output=json'], {
+      stdin: dry.stdout,
+    });
+    expect(r.exitCode, r.stderr).toBe(0);
+    expect(gitIn(repo, 'log', '-1', '--format=%s').trim()).toBe(
+      'ABC-1 feat(feature)!: drop the old greeting',
+    );
+  });
+
+  it('refuses a test commit of an app file: reason on stderr, nothing on stdout, HEAD unchanged', async () => {
+    sb = makeSandbox();
+    const repo = stagedRepo(sb);
+    const before = head(repo);
+
+    const r = await runCli(sb, repo, [
+      'commit',
+      '--type',
+      'test',
+      '--scope',
+      'feature',
+      '--message',
+      'cover greeting',
+      '--output=json',
+      '--',
+      'src/feature.ts',
+    ]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr.trim()).not.toBe('');
+    expect(r.stdout).toBe('');
+    expect(head(repo)).toBe(before);
   });
 });

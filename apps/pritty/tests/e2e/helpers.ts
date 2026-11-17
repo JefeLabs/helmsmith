@@ -82,13 +82,13 @@ export interface CliResult {
  * developer's real `claude`, `gh` login and tokens are out of reach and
  * nothing in these tests can call a model or GitHub; HOME and PRITTY_HOME
  * point into the sandbox. stdin is closed at once, so a prompt fails on EOF
- * instead of waiting. Never throws on a non-zero exit.
+ * instead of waiting, unless `opts.stdin` is given: that text is written first. Never throws on a non-zero exit.
  */
 export function runCli(
   sb: Sandbox,
   cwd: string,
   args: string[],
-  opts: { env?: Record<string, string>; timeoutMs?: number } = {},
+  opts: { env?: Record<string, string>; timeoutMs?: number; stdin?: string } = {},
 ): Promise<CliResult> {
   const env: NodeJS.ProcessEnv = {
     PATH: [sb.bin, '/usr/bin', '/bin'].join(delimiter),
@@ -116,7 +116,8 @@ export function runCli(
     child.stderr.on('data', (d) => {
       stderr += d;
     });
-    child.stdin.end();
+    child.stdin.on('error', () => {});
+    child.stdin.end(opts.stdin);
 
     const timer = setTimeout(() => {
       timedOut = true;

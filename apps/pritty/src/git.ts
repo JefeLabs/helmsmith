@@ -18,6 +18,13 @@ export interface GitOps {
   getStaged(): Promise<string[]>;
   /** All changed files (staged + modified + untracked). */
   getAllChanged(): Promise<string[]>;
+  /**
+   * For each pathspec, the staged files it names. Given `fromDir`, the pathspecs
+   * resolve from it (as `git add` would); without it, from the repository root,
+   * like every other method. Results are repo-root-relative. `[]` when nothing
+   * matches or the path lies outside the repository.
+   */
+  stagedFor(pathspecs: readonly string[], fromDir?: string): Promise<Map<string, string[]>>;
   /** Current branch name. */
   getCurrentBranch(): Promise<string>;
   /** Diff of staged changes. Optionally restrict to a file list. */
@@ -43,11 +50,11 @@ export interface GitOps {
   gitPath(name: string): Promise<string>;
   /** Push the current branch. setUpstream=true on first push. */
   push(branch: string, opts?: { setUpstream?: boolean }): Promise<void>;
-  /** Commits reachable from `head` (default HEAD) but not from `base`: `base..head`. Newest first, each with its body (`''` when it has none). */
+  /** Commits reachable from `head` (default HEAD) but not from `base`: `base..head`. Newest first, each with its body (`''` when it has none); merge commits carry `merge: true`. */
   log(
     base: string,
     head?: string,
-  ): Promise<Array<{ hash: string; subject: string; body?: string }>>;
+  ): Promise<Array<{ hash: string; subject: string; body?: string; merge?: true }>>;
   /** Files `head` (default HEAD) changed since its merge base with `base`: `base...head`. */
   changedFilesBetween(base: string, head?: string): Promise<string[]>;
   /**
@@ -104,6 +111,31 @@ export function createGit(dir: string = process.cwd()): GitOps {
       // --no-renames so a staged rename shows as its old and new path; simple-git's
       // status.staged omits renames entirely.
       return zList(runGit(cwd, ['diff', '--cached', '--name-only', '--no-renames', '-z']));
+    },
+
+    async stagedFor(pathspecs: readonly string[], fromDir = cwd): Promise<Map<string, string[]>> {
+      const out = new Map<string, string[]>();
+      for (const spec of pathspecs) {
+        try {
+          out.set(
+            spec,
+            zList(
+              runGit(fromDir, [
+                'diff',
+                '--cached',
+                '--name-only',
+                '--no-renames',
+                '-z',
+                '--',
+                spec,
+              ]),
+            ),
+          );
+        } catch {
+          out.set(spec, []);
+        }
+      }
+      return out;
     },
 
     async getAllChanged(): Promise<string[]> {
@@ -167,11 +199,21 @@ export function createGit(dir: string = process.cwd()): GitOps {
     async log(
       base: string,
       head?: string,
-    ): Promise<Array<{ hash: string; subject: string; body?: string }>> {
+    ): Promise<Array<{ hash: string; subject: string; body?: string; merge?: true }>> {
       // Two dots on purpose: simple-git's { from, to } form emits `base...head`,
       // which for `git log` is the symmetric difference and includes base-only commits.
       const result = await git.log([`${base}..${head ?? 'HEAD'}`]);
-      return result.all.map((c) => ({ hash: c.hash, subject: c.message, body: c.body.trim() }));
+      const merges = new Set(
+        (await git.raw(['rev-list', '--merges', `${base}..${head ?? 'HEAD'}`]))
+          .split('\n')
+          .filter(Boolean),
+      );
+      return result.all.map((c) => ({
+        hash: c.hash,
+        subject: c.message,
+        body: c.body.trim(),
+        ...(merges.has(c.hash) ? { merge: true as const } : {}),
+      }));
     },
 
     async resolveBaseRef(base: string): Promise<string> {

@@ -64,6 +64,8 @@ export interface TicketContext {
 export interface CommitMessage {
   /** Which change this commit belongs to, when the model grouped files by change. */
   change?: string;
+  /** Normalised subject label; `message` stays `type(scope): description`. */
+  label?: string;
   category: string;
   message: string; // first line, e.g. "feat(api): add /users endpoint"
   body?: string; // optional body paragraph
@@ -247,14 +249,17 @@ const COMMIT_STYLE_GUIDES: Record<Config['commitStyle'], string> = {
  * Generate one commit message per non-empty category. The model
  * returns JSON which we strip-and-parse. Validation is best-effort:
  * if the model returns a malformed shape, we surface the raw output
- * with the parse error rather than crashing.
+ * with the parse error rather than crashing. With `context.labels` the
+ * caller will label the commits from the model's `change` names, so they
+ * are asked for as names of two to four words, and a per-category plan
+ * also carries one shared name for the run.
  */
 export async function generateCommitMessages(
   groups: CategorizedFiles,
   diff: string,
   config: Config,
   ticket?: TicketContext,
-  context: { branch?: string } = {},
+  context: { branch?: string; labels?: boolean } = {},
 ): Promise<CommitMessage[]> {
   const adapter = await buildAdapter(config);
 
@@ -274,16 +279,21 @@ export async function generateCommitMessages(
     ? ticketPromptGuidance(ticket.ticket, ticket.link, ticket.title)
     : '';
 
+  // With labels, the change names become subject labels: ask for usable ones.
+  const name = 'a name of two to four words for the change';
+  const sharedChange = context.labels
+    ? `\`change\` (${name}, one shared name for the whole set, the same on every entry), `
+    : '';
   const shape =
     config.commitGrouping === 'change'
       ? [
           `Group the files into changes: a change is one logical unit of work (a feature, a fix, a refactor), and it may span several categories. Write one commit message per change per category. ${styleGuide}`,
-          'Return strict JSON: an array of objects with keys `change` (a short label, the same on every entry of that change), `category`, `message`, `body` (optional), `files` (that change’s files from that category’s list).',
+          `Return strict JSON: an array of objects with keys \`change\` (${context.labels ? name : 'a short label'}, the same on every entry of that change), \`category\`, \`message\`, \`body\` (optional), \`files\` (that change’s files from that category’s list).`,
           'Every listed file goes in exactly one entry. When a category holds a single change, its one entry lists all of its files. List the changes in the order they should be committed.',
         ]
       : [
           `Produce one commit message per file category. ${styleGuide}`,
-          'Return strict JSON: an array of objects with keys `category`, `message`, `body` (optional), `files` (the input files for that category).',
+          `Return strict JSON: an array of objects with keys ${sharedChange}\`category\`, \`message\`, \`body\` (optional), \`files\` (the input files for that category).`,
         ];
   const system = [
     'You are an expert engineer writing git commit messages for a developer.',

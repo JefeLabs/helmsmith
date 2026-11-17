@@ -173,6 +173,13 @@ export interface ScanResult {
 const CONVENTIONAL_RE =
   /^(feat|fix|refactor|docs|test|tests|chore|ci|build|perf|style|revert)(\(([^)]+)\))?([!])?:/i;
 
+/**
+ * A leading label (a ticket id such as `WEDMODD-23444`) before a conventional header.
+ * Case-sensitive, unlike CONVENTIONAL_RE. Mirrors pritty's splitLabel pattern; gitradar
+ * does not import pritty.
+ */
+const LABELLED = /^[A-Z0-9]+(?:-[A-Z0-9]+)* (?=[a-z]+(?:\([^)]*\))?!?:)/;
+
 export interface ParsedIntent {
   intent: IntentType;
   scope?: string;
@@ -184,7 +191,7 @@ export function parseIntent(subject: string): IntentType {
 }
 
 export function parseConventionalCommit(subject: string): ParsedIntent {
-  const match = CONVENTIONAL_RE.exec(subject.trim());
+  const match = CONVENTIONAL_RE.exec(subject.trim().replace(LABELLED, ''));
   if (!match) return { intent: 'other', breaking: false };
 
   const prefix = match[1].toLowerCase();

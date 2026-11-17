@@ -21,11 +21,18 @@ import {
   updatePR,
 } from '../github.js';
 import { findPullRequestTemplate, type PullRequestTemplate } from '../pr-template.js';
+import { readStdin } from '../stdin.js';
 import { applyFooter } from './_shared/attribution.js';
 import { resolveBaseBranch } from './_shared/base.js';
-import { conventionalPrTitle } from './_shared/conventional.js';
+import {
+  addSharedLabel,
+  conventionalPrTitle,
+  labelledPrTitle,
+  sharedLabel,
+} from './_shared/conventional.js';
 import { splitTitleBody } from './_shared/format.js';
 import { inferLabels } from './_shared/labels.js';
+import { parsePrInput } from './_shared/pr-input.js';
 import { confirm, editor } from './_shared/prompts.js';
 import { resolveTicketContext, type TicketContextOptions } from './_shared/ticket-context.js';
 
@@ -37,7 +44,7 @@ export interface PrOptions {
   json?: boolean;
   /** Open the PR as a draft. */
   draft?: boolean;
-  /** Use this title verbatim: no model, no ticket flow. */
+  /** Use this title: no model, no ticket flow; a label every commit shares, and its tags, are added when missing. */
   title?: string;
   /** Use this body verbatim (with --title). */
   body?: string;
@@ -49,6 +56,8 @@ export interface PrOptions {
   check?: boolean;
   /** Leave `prFooter` out of this body (a caller that appends its own, or a preview to paste elsewhere). */
   noFooter?: boolean;
+  /** `json`: take the title, body, draft and labels from one JSON document on stdin. */
+  input?: string;
 }
 
 export interface PrOutcome {
@@ -56,6 +65,20 @@ export interface PrOutcome {
   url: string;
   /** false when an open PR for this head and base already existed and was returned instead. */
   created: boolean;
+  draft: boolean;
+  head: string;
+  base: string;
+  title: string;
+  labels: string[];
+}
+
+/** What a `--dry-run --json` run prints: the PR it would open, or what it would set on the open one. */
+export interface PrDryRun {
+  dryRun: true;
+  title: string;
+  /** Absent only for an open PR whose body the run would leave as it is. */
+  body?: string;
+  labels: string[];
   draft: boolean;
   head: string;
   base: string;
@@ -101,6 +124,10 @@ export interface PrDeps {
   };
   /** Where human output goes; under --json everything but the JSON line goes to err. */
   io?: { out: (line: string) => void; err: (line: string) => void };
+  /** All of stdin, for --input=json. */
+  readStdin?: () => Promise<string>;
+  /** Whether stdin is a terminal (nothing piped in); default `process.stdin.isTTY`. */
+  stdinIsTTY?: boolean;
 }
 
 function defaultDeps(): PrDeps {
@@ -129,13 +156,14 @@ function defaultDeps(): PrDeps {
  * Open a pull request for the current branch. Order matters: the token and
  * the open-PR check come first, so nothing is generated or pushed when the
  * PR cannot be created or already exists; then commits and the words (given
- * verbatim, or drafted by the model); push and create last. Errors are
+ * by the caller, or drafted by the model); push and create last. Errors are
  * thrown (the CLI prints them and exits 1).
  */
 export async function runPr(
   options: PrOptions = {},
   deps: PrDeps = defaultDeps(),
 ): Promise<PrOutcome | undefined> {
+  const input = chooseInput(options, deps.stdinIsTTY ?? Boolean(process.stdin.isTTY));
   const { git, config } = deps;
   const io = deps.io ?? {
     out: (l: string) => console.log(l),
@@ -143,13 +171,18 @@ export async function runPr(
   };
   const machine = Boolean(options.json) || Boolean(options.check);
   const say = machine ? io.err : io.out;
-  const auto = machine || (options.autoApprove ?? config.autoApprove);
+  // Unattended under --json, and under --input=json, where stdin is the body, not a person.
+  const auto = machine || input === 'json' || (options.autoApprove ?? config.autoApprove);
   const dryRun = options.dryRun ?? config.dryRun;
   const finish = (o: PrOutcome): PrOutcome => {
     if (options.json) io.out(JSON.stringify(o));
     return o;
   };
-  const given = resolveGivenText(options);
+  const given: GivenText | null =
+    input === 'json'
+      ? parsePrInput(await (deps.readStdin ?? readStdin)())
+      : resolveGivenText(options);
+  const asDraft = Boolean(options.draft || given?.draft);
   const footer = options.noFooter ? undefined : config.prFooter;
 
   // 1. Branch + remote → owner/repo
@@ -209,8 +242,8 @@ export async function runPr(
   );
 
   // 4. An open PR for this head and base already exists: return it (updating its
-  //    title/body when they were given explicitly), create nothing. A failed
-  //    lookup is fatal; pushing without knowing would be worse.
+  //    title/body when they were given explicitly, except under --dry-run),
+  //    create nothing. A failed lookup is fatal; pushing without knowing would be worse.
   const open = await deps.github.listOpenPRs(repo.owner, repo.repo, branch, effectiveBase);
   if (options.check) {
     const existing = open[0];
@@ -222,10 +255,13 @@ export async function runPr(
           draft: existing.draft,
           head: branch,
           base: effectiveBase,
+          title: existing.title,
+          labels: [],
         }
       : undefined;
     if (outcome) {
-      io.out(JSON.stringify({ open: outcome }));
+      const { title: _title, labels: _labels, ...line } = outcome;
+      io.out(JSON.stringify({ open: line }));
       return outcome;
     }
     // nothing open: say what became of the last one, so a caller can tell merged from closed
@@ -244,12 +280,44 @@ export async function runPr(
         `An open PR already exists for ${branch} → ${effectiveBase}: #${existing.number}`,
       ),
     );
+    let title = existing.title;
     if (given) {
+      const shared =
+        given.title !== undefined
+          ? sharedLabel(await git.log(await git.resolveBaseRef(effectiveBase)))
+          : null;
       const patch: PRPatch = {
-        ...(given.title !== undefined ? { title: given.title } : {}),
+        ...(given.title !== undefined
+          ? { title: shared ? addSharedLabel(given.title, shared) : given.title }
+          : {}),
         ...(given.body !== undefined ? { body: applyFooter(given.body, footer) } : {}),
       };
+      // A dry run touches nothing: it shows what the update would set.
+      if (dryRun) {
+        if (patch.title !== undefined) say(chalk.bold.cyan(patch.title));
+        if (patch.body !== undefined)
+          for (const line of patch.body.split('\n')) say(`  ${chalk.dim(line)}`);
+        say(
+          chalk.yellow(
+            `Dry-run — #${existing.number} not updated. Re-run without --dry-run to apply.`,
+          ),
+        );
+        if (options.json) {
+          const line: PrDryRun = {
+            dryRun: true,
+            title: patch.title ?? existing.title,
+            ...(patch.body !== undefined ? { body: patch.body } : {}),
+            labels: [],
+            draft: existing.draft,
+            head: branch,
+            base: effectiveBase,
+          };
+          io.out(JSON.stringify(line));
+        }
+        return undefined;
+      }
       await deps.github.updatePR(repo.owner, repo.repo, existing.number, patch);
+      title = patch.title ?? title;
       say(chalk.dim('  Updated its title/body in place.'));
     }
     say(chalk.green(`✓ ${existing.url}`));
@@ -260,6 +328,8 @@ export async function runPr(
       draft: existing.draft,
       head: branch,
       base: effectiveBase,
+      title,
+      labels: [],
     });
   }
 
@@ -276,11 +346,17 @@ export async function runPr(
   }
   say('');
 
-  // 6. The words: given verbatim (no model, no ticket flow), or drafted by the model
+  // 6. The words: given (no model, no ticket flow; a shared label goes on the title), or drafted by the model
   let draft: PRDraft;
   let changedFiles: string[] | undefined;
+  const shared = sharedLabel(commits);
   if (given) {
-    draft = { title: given.title ?? '', body: given.body ?? '', labels: inferLabels(commits) };
+    const givenTitle = given.title ?? '';
+    draft = {
+      title: shared && givenTitle ? addSharedLabel(givenTitle, shared) : givenTitle,
+      body: given.body ?? '',
+      labels: given.labels ?? inferLabels(commits),
+    };
     if (draft.title.length === 0) {
       throw new Error('--title is required when --body/--body-file is given.');
     }
@@ -312,12 +388,14 @@ export async function runPr(
     // The model writes the summary; the commits decide the `type(scope):` it opens with.
     draft = {
       ...draft,
-      title: conventionalPrTitle(
-        draft.title,
-        commits.map((c) => c.subject),
-        branch,
-        config.commitStyle,
-      ),
+      title: shared
+        ? labelledPrTitle(draft.title, shared)
+        : conventionalPrTitle(
+            draft.title,
+            commits.map((c) => c.subject),
+            branch,
+            config.commitStyle,
+          ),
     };
   }
 
@@ -359,6 +437,18 @@ export async function runPr(
   // 8. Dry-run stops here
   if (dryRun) {
     say(chalk.yellow('Dry-run — no push, no PR created. Re-run without --dry-run to apply.'));
+    if (options.json) {
+      const line: PrDryRun = {
+        dryRun: true,
+        title: draft.title,
+        body: draft.body,
+        labels: draft.labels,
+        draft: asDraft,
+        head: branch,
+        base: effectiveBase,
+      };
+      io.out(JSON.stringify(line));
+    }
     return undefined;
   }
 
@@ -399,9 +489,9 @@ export async function runPr(
       base: effectiveBase,
       title: draft.title,
       body: draft.body,
-      ...(options.draft ? { draft: true } : {}),
+      ...(asDraft ? { draft: true } : {}),
     });
-    prSpinner.succeed(`${options.draft ? 'Draft PR' : 'PR'} #${result.number} created`);
+    prSpinner.succeed(`${asDraft ? 'Draft PR' : 'PR'} #${result.number} created`);
   } catch (err) {
     prSpinner.fail((err as Error).message);
     throw err;
@@ -454,11 +544,52 @@ export async function runPr(
     draft: result.draft,
     head: branch,
     base: effectiveBase,
+    title: draft.title,
+    labels: draft.labels,
   });
 }
 
+/** The words and settings a caller gave: from `--title`/`--body`, or the JSON body. */
+interface GivenText {
+  title?: string;
+  body?: string;
+  draft?: boolean;
+  labels?: string[];
+}
+
+/**
+ * Where the words come from: `--input=json` (stdin), the args (`--title`, `--body`,
+ * `--body-file`) or neither (the model). Refusals come before stdin or git is touched.
+ */
+function chooseInput(options: PrOptions, stdinIsTTY: boolean): 'json' | 'args' | 'interactive' {
+  if (options.input !== undefined && options.input !== 'json') {
+    throw new Error('--input must be json');
+  }
+  if (options.input === 'json') {
+    const given = [
+      options.title !== undefined && '--title',
+      options.body !== undefined && '--body',
+      options.bodyFile !== undefined && '--body-file',
+    ].filter((flag): flag is string => typeof flag === 'string');
+    if (given.length > 0) {
+      throw new Error(
+        `--input=json takes the title and body from the JSON body; drop ${given.join(', ')}`,
+      );
+    }
+    if (stdinIsTTY) {
+      throw new Error(
+        'expected a JSON document on stdin: { "title": "…", "body": "…" }; stdin is a terminal, so nothing is piped in',
+      );
+    }
+    return 'json';
+  }
+  return options.title !== undefined || options.body !== undefined || options.bodyFile !== undefined
+    ? 'args'
+    : 'interactive';
+}
+
 /** `--title` / `--body` / `--body-file` as given; null when none was passed. */
-function resolveGivenText(o: PrOptions): { title?: string; body?: string } | null {
+function resolveGivenText(o: PrOptions): GivenText | null {
   if (o.title === undefined && o.body === undefined && o.bodyFile === undefined) return null;
   if (o.body !== undefined && o.bodyFile !== undefined) {
     throw new Error('Pass --body or --body-file, not both.');

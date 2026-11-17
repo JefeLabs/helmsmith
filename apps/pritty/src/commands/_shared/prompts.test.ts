@@ -45,3 +45,38 @@ describe('confirm', () => {
     );
   });
 });
+
+describe('input', () => {
+  const tty = process.stdin.isTTY;
+  afterEach(() => {
+    process.stdin.isTTY = tty;
+    vi.doUnmock('@inquirer/prompts');
+    vi.resetModules();
+  });
+
+  it('asks through inquirer with the prompt context when a terminal is attached', async () => {
+    vi.resetModules();
+    vi.doMock('@inquirer/prompts', () => ({
+      confirm: vi.fn(),
+      editor: vi.fn(),
+      input: vi.fn(async () => 'abc-1'),
+    }));
+    process.stdin.isTTY = true;
+    const { input } = await import('./prompts.js');
+    const inquirer = await import('@inquirer/prompts');
+
+    await expect(input({ message: 'Label?' }, { output: process.stderr })).resolves.toBe('abc-1');
+    expect(inquirer.input).toHaveBeenCalledWith({ message: 'Label?' }, { output: process.stderr });
+  });
+
+  it('fails with the unattended flag instead of asking when stdin is not a terminal', async () => {
+    vi.resetModules();
+    const ask = vi.fn();
+    vi.doMock('@inquirer/prompts', () => ({ confirm: vi.fn(), editor: vi.fn(), input: ask }));
+    process.stdin.isTTY = false;
+    const { input } = await import('./prompts.js');
+
+    await expect(input({ message: 'Label?' })).rejects.toThrow(/--auto-approve/);
+    expect(ask).not.toHaveBeenCalled();
+  });
+});

@@ -41,6 +41,44 @@ describe('--json everywhere', () => {
   });
 });
 
+describe('--output', () => {
+  it('every command accepts --output', async () => {
+    sb = makeSandbox();
+    for (const cmd of await leafCommands(sb)) {
+      const r = await runCli(sb, sb.root, [...cmd, '--help']);
+      expect(r.stdout, cmd.join(' ')).toMatch(/^\s+--output <format>/m);
+    }
+  });
+
+  it('categorize --output=json prints the same line as --json', async () => {
+    sb = makeSandbox();
+    const repo = makeRepo(sb);
+    write(repo, 'src/app.ts', 'export const a = 1;\n');
+    gitIn(repo, 'add', 'src/app.ts');
+    const viaJson = await runCli(sb, repo, ['categorize', '--json']);
+    const viaOutput = await runCli(sb, repo, ['categorize', '--output=json']);
+    expect(viaOutput.exitCode, viaOutput.stderr).toBe(0);
+    expect(viaOutput.stdout).toBe(viaJson.stdout);
+    expect(jsonLine(viaOutput)).toHaveProperty('categories');
+  });
+
+  it('--output=text keeps the human output', async () => {
+    sb = makeSandbox();
+    const r = await runCli(sb, sb.root, ['cache', 'path', '--output=text']);
+    expect(r.exitCode, r.stderr).toBe(0);
+    expect(r.stdout.trim()).toBe(join(sb.prittyHome, 'cache.json'));
+  });
+
+  it('refuses any other format with nothing on stdout', async () => {
+    sb = makeSandbox();
+    const repo = makeRepo(sb);
+    const r = await runCli(sb, repo, ['categorize', '--output=yaml']);
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain('--output must be json or text');
+    expect(r.stdout).toBe('');
+  });
+});
+
 describe('cache --json', () => {
   it('cache path prints { path }', async () => {
     sb = makeSandbox();

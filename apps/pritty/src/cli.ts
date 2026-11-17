@@ -11,6 +11,7 @@
  */
 import { createCli } from '@helmsmith/cli-kit';
 import chalk from 'chalk';
+import type { Command } from 'commander';
 import { prittyAuthProvider } from './auth-provider.js';
 import { runAuthLogin } from './commands/auth-login.js';
 import { runAuthLogout } from './commands/auth-logout.js';
@@ -34,12 +35,27 @@ const { program } = createCli({
   auth: prittyAuthProvider,
 });
 
+/**
+ * `--output <format>` (json | text) on a command, the long form of `--json`:
+ * `json` sets the command's `json` option, `text` is today's human output,
+ * anything else is refused before the action runs.
+ */
+function addOutputOption(cmd: Command): Command {
+  return cmd
+    .option('--output <format>', 'Output format: json (same as --json) or text (default)')
+    .hook('preAction', (thisCommand) => {
+      const format = thisCommand.opts<{ output?: string }>().output;
+      if (format === undefined || format === 'text') return;
+      if (format !== 'json') throw new Error('--output must be json or text');
+      thisCommand.setOptionValue('json', true);
+    });
+}
+
 // ─── auth ─────────────────────────────────────────────────────────────
 
 const authCmd = program.command('auth').description('Manage GitHub Copilot authentication');
 
-authCmd
-  .command('login')
+addOutputOption(authCmd.command('login'))
   .description('Run the GitHub Device Flow and persist credentials')
   .option(
     '--json',
@@ -47,14 +63,12 @@ authCmd
   )
   .action((options: { json?: boolean }) => runAuthLogin(options));
 
-authCmd
-  .command('logout')
+addOutputOption(authCmd.command('logout'))
   .description('Remove the local auth file')
   .option('--json', 'Print one JSON line { path, removed } on stdout')
   .action((options: { json?: boolean }) => runAuthLogout(options));
 
-authCmd
-  .command('status')
+addOutputOption(authCmd.command('status'))
   .description('Show authentication status')
   .option(
     '--json',
@@ -64,8 +78,7 @@ authCmd
 
 // ─── init ─────────────────────────────────────────────────────────────
 
-program
-  .command('init')
+addOutputOption(program.command('init'))
   .description(
     'Write a starter config (.helmsmith/pritty.json in a repo with a .helmsmith folder, else .pritty.json) + Claude Code / VS Code Copilot slash commands. Skips integration files outside a git repo.',
   )
@@ -91,8 +104,7 @@ program
 
 // ─── categorize ───────────────────────────────────────────────────────
 
-program
-  .command('categorize')
+addOutputOption(program.command('categorize'))
   .description('Categorize staged files (read-only — does not commit)')
   .option('--all', 'Include unstaged + untracked files too')
   .option('--json', 'Print one JSON line { all, categories: [{ category, files }] } on stdout')
@@ -104,29 +116,32 @@ const cache = program
   .command('cache')
   .description('Manage the validated-ticket cache (~/.pritty/cache.json)');
 
-cache
-  .command('clear')
+addOutputOption(cache.command('clear'))
   .description('Wipe the validated-ticket cache')
   .option('--json', 'Print one JSON line { path, removed } on stdout')
   .action((options: { json?: boolean }) => runCacheClear(options));
 
-cache
-  .command('path')
+addOutputOption(cache.command('path'))
   .description('Print the cache file path (useful for inspection / scripting)')
   .option('--json', 'Print one JSON line { path } on stdout')
   .action((options: { json?: boolean }) => runCachePath(options));
 
 // ─── commit / pr / rebase ─────────────────────────────────────────────
 
-program
-  .command('commit')
-  .description('Generate AI commit messages per category and commit each group')
+addOutputOption(program.command('commit'))
+  .description(
+    'Commit staged files: one commit from --message, the commits of a JSON body (--input=json), or AI-written commits per change and category',
+  )
+  .argument(
+    '[paths...]',
+    'With --message: the staged paths to commit (after --), resolved from the current directory; default every staged file',
+  )
   .option('--auto-approve', 'Skip the confirmation prompt before committing')
   .option('--dry-run', 'Show the plan without making any commits')
   .option('--commit-style <style>', 'conventional | gitmoji | angular | simple')
   .option(
     '--json',
-    'Print one JSON line { dryRun, commits: [{ category, message, files, sha }], reusedPlan? } on stdout; implies --auto-approve',
+    'Print one JSON line { dryRun, commits: [{ category, message, label?, type, scope, breaking?, description, body?, files, sha? }], reusedPlan? } on stdout (message is the labelled first line; a dry run omits sha, and its output can be fed back through --input=json); implies --auto-approve',
   )
   .option(
     '--no-verify',
@@ -134,11 +149,25 @@ program
   )
   .option(
     '--scope <scope>',
-    'Scope of every commit: one to three lowercase segments (network, org/global, org/network/directory)',
+    "One to three lowercase segments (network, org/global, org/network/directory): with --message the commit's scope, otherwise the scope of every commit",
   )
   .option(
     '--type <type>',
-    'Type of the code commits (feat, fix, …); test and story commits keep theirs',
+    "With --message the commit's type; otherwise the type of the code commits (feat, fix, …), test and story commits keep theirs",
+  )
+  .option(
+    '--label <label>',
+    'Label at the start of every subject: a ticket or effort name, normalised (abc 1 → ABC-1)',
+  )
+  .option(
+    '--message <text>',
+    'Make one commit with this description, no AI (needs --type and --scope): one line, no surrounding spaces; more lines go in --body',
+  )
+  .option('--body <text>', 'Body of the --message commit')
+  .option('--breaking', 'Mark the --message commit a breaking change: `!` after the scope')
+  .option(
+    '--input <format>',
+    'json: read the commits from stdin, { "commits": [{ label?, type, scope, breaking?, description, body?, files? }] }; files are repository-root paths, as --output=json prints them; unattended; refuses --label, --type, --scope, --message, --body, --breaking and paths after --',
   )
   .option(
     '--trailer <line>',
@@ -147,35 +176,53 @@ program
     [] as string[],
   )
   .action(
-    async (options: {
-      autoApprove?: boolean;
-      dryRun?: boolean;
-      commitStyle?: string;
-      json?: boolean;
-      verify: boolean;
-      scope?: string;
-      type?: string;
-      trailer: string[];
-    }) => {
+    async (
+      paths: string[],
+      options: {
+        autoApprove?: boolean;
+        dryRun?: boolean;
+        commitStyle?: string;
+        json?: boolean;
+        verify: boolean;
+        scope?: string;
+        type?: string;
+        trailer: string[];
+        label?: string;
+        message?: string;
+        body?: string;
+        breaking?: boolean;
+        input?: string;
+      },
+    ) => {
       const { verify, ...rest } = options;
-      await runCommit({ ...rest, noVerify: verify === false });
+      await runCommit({
+        ...rest,
+        noVerify: verify === false,
+        ...(paths.length > 0 ? { paths } : {}),
+      });
     },
   );
 
-program
-  .command('pr')
+addOutputOption(program.command('pr'))
   .description('Generate a pull request title + body via AI and open it on GitHub')
   .option('--base <branch>', "Base branch (default: repo's default branch)")
   .option('--auto-approve', 'Skip the confirmation prompt before pushing/creating')
   .option('--dry-run', 'Show the plan without pushing or creating the PR')
   .option(
     '--json',
-    'Print one JSON line { number, url, created, draft, head, base } on stdout; implies --auto-approve; needs --base or a configured baseBranch',
+    'Print one JSON line { number, url, created, draft, head, base, title, labels } on stdout (with --dry-run: { dryRun, title, body?, labels, draft, head, base }, body absent only when an open PR keeps its own); implies --auto-approve; needs --base or a configured baseBranch',
   )
   .option('--draft', 'Open the PR as a draft')
-  .option('--title <title>', 'Use this title verbatim (no AI, no ticket flow)')
+  .option(
+    '--title <title>',
+    'Use this title, no AI or ticket flow; a label every commit shares, and its tags, are added when missing',
+  )
   .option('--body <text>', 'Use this body verbatim (with --title)')
   .option('--body-file <path>', 'Read the body from a file (with --title)')
+  .option(
+    '--input <format>',
+    'json: read { title, body?, draft?, labels? } from stdin instead of drafting with the model; unattended',
+  )
   .option('--no-push', 'Do not push: the branch is already on origin')
   .option('--no-footer', 'Leave the prFooter from .pritty.json out of the body')
   .option(
@@ -192,6 +239,7 @@ program
       title?: string;
       body?: string;
       bodyFile?: string;
+      input?: string;
       check?: boolean;
       push: boolean;
       footer: boolean;
@@ -201,8 +249,7 @@ program
     },
   );
 
-program
-  .command('rebase')
+addOutputOption(program.command('rebase'))
   .description('AI-planned interactive rebase over commits ahead of base branch')
   .option(
     '--strategy <strategy>',

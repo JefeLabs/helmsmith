@@ -2,6 +2,7 @@ import type { CommitMessage } from '../../ai.js';
 import type { CategorizedFiles } from '../../categorizer.js';
 import type { CommitGrouping } from '../../config.js';
 import { applyTrailers } from './attribution.js';
+import { labelFromChange } from './label.js';
 
 /** Committed after the code, in this order: tests exercise it, stories render it. */
 const LAST_CATEGORIES: readonly string[] = ['test', 'storybook'];
@@ -192,6 +193,28 @@ function pairRenamedCategory(
 
 /** Subject, optional body, then the configured trailers. */
 export function composeCommitMessage(c: CommitMessage, trailers: readonly string[]): string {
-  const base = c.body ? `${c.message}\n\n${c.body}` : c.message;
+  const subject = subjectOf(c);
+  const base = c.body ? `${subject}\n\n${c.body}` : subject;
   return applyTrailers(base, trailers);
+}
+
+/** The first line as committed: the label, when there is one, then `type(scope): description`. */
+export function subjectOf(c: CommitMessage): string {
+  return c.label ? `${c.label} ${c.message}` : c.message;
+}
+
+/**
+ * Gives every unlabelled commit a label: the first of `explicit`, `chosen`,
+ * `ticket`, the label derived from its change name, then `runLabel`. A commit
+ * that already has a label keeps it.
+ */
+export function applyLabels(
+  plan: readonly CommitMessage[],
+  o: { explicit?: string; chosen?: string; ticket?: string; runLabel?: string },
+): CommitMessage[] {
+  return plan.map((c) => {
+    if (c.label) return c;
+    const label = o.explicit || o.chosen || o.ticket || labelFromChange(c.change) || o.runLabel;
+    return label ? { ...c, label } : c;
+  });
 }

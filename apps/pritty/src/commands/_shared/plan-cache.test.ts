@@ -60,6 +60,8 @@ describe('planKey', () => {
     commitStyle: 'conventional',
     commitGrouping: 'change',
     categories: { app: ['src/**'] },
+    commitLabels: false,
+    label: null,
     version: '0.3.4',
   };
 
@@ -71,6 +73,8 @@ describe('planKey', () => {
       { commitStyle: 'simple' },
       { commitGrouping: 'category' },
       { categories: { app: ['lib/**'] } },
+      { commitLabels: true },
+      { label: 'ABC-1' },
       { version: '0.3.5' },
     ]) {
       expect(planKey({ ...parts, ...change })).not.toBe(planKey(parts));

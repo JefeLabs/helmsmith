@@ -446,3 +446,74 @@ describe('GitOps.log carries commit bodies (item 9)', () => {
     ]);
   });
 });
+
+describe('GitOps.stagedFor', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('resolves a pathspec from the given directory and returns repo-root paths', async () => {
+    const r = makeRepo();
+    cleanup = r.cleanup;
+    write(r.dir, 'src/a.ts', 'A\n');
+    write(r.dir, 'src/b.ts', 'B\n');
+    gitIn(r.dir, 'add', 'src/a.ts');
+
+    const got = await createGit(r.dir).stagedFor(
+      ['a.ts', 'b.ts', '../nowhere'],
+      join(r.dir, 'src'),
+    );
+
+    expect(got.get('a.ts')).toEqual(['src/a.ts']);
+    expect(got.get('b.ts')).toEqual([]);
+    expect(got.get('../nowhere')).toEqual([]);
+  });
+
+  it('without a directory resolves from the repository root, wherever pritty runs', async () => {
+    const r = makeRepo();
+    cleanup = r.cleanup;
+    write(r.dir, 'src/a.ts', 'A\n');
+    gitIn(r.dir, 'add', 'src/a.ts');
+
+    const got = await createGit(join(r.dir, 'src')).stagedFor(['src/a.ts', 'a.ts']);
+
+    expect(got.get('src/a.ts')).toEqual(['src/a.ts']);
+    expect(got.get('a.ts')).toEqual([]);
+  });
+
+  it('returns [] for a directory outside the repository', async () => {
+    const r = makeRepo();
+    cleanup = r.cleanup;
+    const outside = mkdtempSync(join(tmpdir(), 'pritty-outside-'));
+    try {
+      const got = await createGit(r.dir).stagedFor(['a.ts'], outside);
+      expect(got.get('a.ts')).toEqual([]);
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('GitOps.log marks merge commits', () => {
+  let cleanup = () => {};
+  afterEach(() => cleanup());
+
+  it('flags a merge commit and leaves ordinary commits unflagged', async () => {
+    const r = makeRepo();
+    cleanup = r.cleanup;
+    gitIn(r.dir, 'switch', '-q', '-c', 'feature');
+    commitFile(r.dir, 'a.txt', 'a\n', 'ABC-1 fix(x): a');
+    gitIn(r.dir, 'switch', '-q', 'main');
+    gitIn(r.dir, 'switch', '-q', '-c', 'other');
+    commitFile(r.dir, 'b.txt', 'b\n', 'other work');
+    gitIn(r.dir, 'switch', '-q', 'feature');
+    gitIn(r.dir, 'merge', '--no-ff', '-q', '-m', 'Merge branch other', 'other');
+
+    const log = await createGit(r.dir).log('main');
+
+    const merge = log.find((c) => c.subject === 'Merge branch other');
+    const ordinary = log.find((c) => c.subject === 'ABC-1 fix(x): a');
+    expect(merge?.merge).toBe(true);
+    expect(ordinary).toBeDefined();
+    expect(ordinary).not.toHaveProperty('merge');
+  });
+});

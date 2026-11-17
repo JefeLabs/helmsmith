@@ -21,6 +21,8 @@ function fakes(o: {
   listFails?: boolean;
   remoteDefault?: string;
   config?: Record<string, unknown>;
+  stdin?: string;
+  stdinIsTTY?: boolean;
 }): { deps: PrDeps; calls: string[]; createArgs: unknown[] } {
   const calls: string[] = [];
   const createArgs: unknown[] = [];
@@ -87,6 +89,11 @@ function fakes(o: {
       confirm: async () => true,
       editor: async (d: string) => d,
     },
+    readStdin: async () => {
+      calls.push('readStdin');
+      return o.stdin ?? '';
+    },
+    stdinIsTTY: o.stdinIsTTY ?? false,
   };
   return { deps, calls, createArgs };
 }
@@ -104,6 +111,8 @@ describe('runPr ordering', () => {
       draft: false,
       head: 'feature/x',
       base: 'main',
+      title: 't',
+      labels: [],
     });
     expect(f.calls).not.toContain('generatePR');
     expect(f.calls).not.toContain('push');
@@ -133,6 +142,8 @@ describe('runPr ordering', () => {
       draft: false,
       head: 'feature/x',
       base: 'main',
+      title: 'feat: x',
+      labels: [],
     });
     const order = f.calls.filter((c) =>
       ['assertToken', 'listOpenPRs', 'generatePR', 'push', 'createPR'].includes(c),
@@ -188,6 +199,8 @@ describe('runPr --json', () => {
       draft: false,
       head: 'feature/x',
       base: 'develop',
+      title: 'feat: x',
+      labels: [],
     });
     expect(err.length).toBeGreaterThan(0);
     expect(result?.created).toBe(true);
@@ -543,5 +556,215 @@ describe('runPr gives the model commit bodies and changed files (item 9)', () =>
         files: ['src/a.ts', 'src/a.test.ts'],
       },
     ]);
+  });
+});
+
+describe('runPr title from a shared label', () => {
+  const labelled = async () => [
+    { hash: 'a'.repeat(40), subject: 'ABC-1 test(issue-report): b' },
+    { hash: 'b'.repeat(40), subject: 'ABC-1 fix(issue-report): a' },
+    { hash: 'c'.repeat(40), subject: "Merge remote-tracking branch 'origin/develop'", merge: true },
+  ];
+  const titleOf = (f: ReturnType<typeof fakes>) => (f.createArgs[0] as { title: string }).title;
+
+  it('titles the model path with the label and tags', async () => {
+    const f = fakes({ config: { baseBranch: 'main' } });
+    f.deps.git.log = labelled;
+    f.deps.ai.generatePR = async () => ({
+      title: 'fix(api): Stop logging exception text',
+      body: 'b',
+      labels: [],
+    });
+    await runPr({ autoApprove: true }, f.deps);
+    expect(titleOf(f)).toBe('ABC-1: stop logging exception text [fix] [test] [issue-report]');
+  });
+
+  it('keeps type(scope): summary when the labels differ', async () => {
+    const f = fakes({ config: { baseBranch: 'main' } });
+    f.deps.git.log = async () => [
+      { hash: 'a'.repeat(40), subject: 'ABC-1 fix(x): a' },
+      { hash: 'b'.repeat(40), subject: 'ABC-2 fix(x): b' },
+    ];
+    f.deps.ai.generatePR = async () => ({ title: 'Stop it', body: 'b', labels: [] });
+    await runPr({ autoApprove: true }, f.deps);
+    expect(titleOf(f)).toBe('fix(x): stop it');
+  });
+
+  it('adds the label and tags to a --title', async () => {
+    const f = fakes({ config: { baseBranch: 'main' } });
+    f.deps.git.log = labelled;
+    await runPr({ autoApprove: true, title: 'my words', body: 'b' }, f.deps);
+    expect(titleOf(f)).toBe('ABC-1: my words [fix] [test] [issue-report]');
+  });
+
+  it('adds only the missing tags to a --title that already carries the label', async () => {
+    for (const [title, expected] of [
+      ['ABC-1: my words', 'ABC-1: my words [fix] [test] [issue-report]'],
+      ['ABC-1 fix(x): stop logging', 'ABC-1 fix(x): stop logging [fix] [test] [issue-report]'],
+    ]) {
+      const f = fakes({ config: { baseBranch: 'main' } });
+      f.deps.git.log = labelled;
+      await runPr({ autoApprove: true, title, body: 'b' }, f.deps);
+      expect(titleOf(f)).toBe(expected);
+    }
+  });
+
+  it('keeps an upper-case word the model opened its title with', async () => {
+    const f = fakes({ config: { baseBranch: 'main' } });
+    f.deps.git.log = labelled;
+    f.deps.ai.generatePR = async () => ({ title: 'API: add rate limiting', body: 'b', labels: [] });
+    await runPr({ autoApprove: true }, f.deps);
+    expect(titleOf(f)).toBe('ABC-1: API: add rate limiting [fix] [test] [issue-report]');
+  });
+
+  it('updates an existing open PR title with the label and tags', async () => {
+    const f = fakes({
+      config: { baseBranch: 'main' },
+      openPRs: [
+        { number: 7, url: 'u', title: 'old', head: 'feature/x', base: 'main', draft: false },
+      ],
+    });
+    f.deps.git.log = labelled;
+    const updates: unknown[] = [];
+    f.deps.github.updatePR = async (_o, _r, _n, patch) => {
+      updates.push(patch);
+    };
+    await runPr({ autoApprove: true, title: 'my words' }, f.deps);
+    expect(updates).toEqual([{ title: 'ABC-1: my words [fix] [test] [issue-report]' }]);
+  });
+});
+
+describe('runPr --input=json', () => {
+  const body = (o: Record<string, unknown>) => JSON.stringify(o);
+
+  it('takes the PR from stdin, labels the title, and never calls the model', async () => {
+    const f = fakes({
+      config: { baseBranch: 'main' },
+      stdin: body({ title: 'my words', labels: ['x'] }),
+    });
+    f.deps.git.log = async () => [{ hash: 'a'.repeat(40), subject: 'ABC-1 feat(x): add' }];
+    const labelled: unknown[] = [];
+    f.deps.github.addLabels = async (_o, _r, _n, labels) => {
+      labelled.push([...labels]);
+    };
+    await runPr({ input: 'json' }, f.deps);
+    expect(f.calls).not.toContain('generatePR');
+    expect(f.createArgs[0]).toMatchObject({ title: 'ABC-1: my words [feat] [x]' });
+    expect(labelled).toEqual([['x']]);
+  });
+
+  it('is unattended: no confirm, and draft:true opens a draft', async () => {
+    const f = fakes({
+      config: { baseBranch: 'main' },
+      stdin: body({ title: 't', body: 'b', draft: true }),
+    });
+    const asked: string[] = [];
+    f.deps.prompts = {
+      confirm: async (o) => {
+        asked.push(o.message);
+        return true;
+      },
+      editor: async (d) => d.default ?? '',
+    };
+    await runPr({ input: 'json' }, f.deps);
+    expect(asked).toEqual([]);
+    expect(f.createArgs[0]).toMatchObject({ draft: true, title: 't', body: 'b' });
+  });
+
+  it('updates an open PR in place with the labelled title', async () => {
+    const f = fakes({
+      config: { baseBranch: 'main' },
+      stdin: body({ title: 'new', body: 'nb' }),
+      openPRs: [{ number: 7, url: 'u', title: 'o', head: 'feature/x', base: 'main', draft: false }],
+    });
+    f.deps.git.log = async () => [{ hash: 'a'.repeat(40), subject: 'ABC-1 feat(x): add' }];
+    const updates: unknown[] = [];
+    f.deps.github.updatePR = async (_o, _r, _n, patch) => {
+      updates.push(patch);
+    };
+    await runPr({ input: 'json' }, f.deps);
+    expect(updates).toEqual([{ title: 'ABC-1: new [feat] [x]', body: 'nb' }]);
+  });
+
+  it('refuses --title, --body and --body-file alongside it, before stdin is read', async () => {
+    for (const extra of [{ title: 't' }, { body: 'b' }, { bodyFile: 'f' }]) {
+      const f = fakes({ stdin: body({ title: 'x' }) });
+      await expect(runPr({ input: 'json', ...extra }, f.deps)).rejects.toThrow(/--input/);
+      expect(f.calls).toEqual([]);
+    }
+  });
+
+  it('refuses a terminal stdin before reading it, and any other format', async () => {
+    const f = fakes({ stdinIsTTY: true });
+    await expect(runPr({ input: 'json' }, f.deps)).rejects.toThrow(/terminal/);
+    expect(f.calls).toEqual([]);
+    await expect(runPr({ input: 'yaml' }, fakes({}).deps)).rejects.toThrow(/--input must be json/);
+  });
+});
+
+describe('runPr --dry-run --json', () => {
+  it('prints one PrDryRun line and neither pushes nor creates', async () => {
+    const f = fakes({ config: { baseBranch: 'main' } });
+    const out: string[] = [];
+    f.deps.io = { out: (s) => out.push(s), err: () => {} };
+    const result = await runPr({ dryRun: true, json: true, draft: true }, f.deps);
+    expect(out).toHaveLength(1);
+    expect(JSON.parse(out[0]!)).toEqual({
+      dryRun: true,
+      title: 'feat: x',
+      body: 'body',
+      labels: [],
+      draft: true,
+      head: 'feature/x',
+      base: 'main',
+    });
+    expect(result).toBeUndefined();
+    expect(f.calls).not.toContain('push');
+    expect(f.calls).not.toContain('createPR');
+  });
+
+  it('never edits an open PR: prints the title and body it would set instead', async () => {
+    const f = fakes({
+      config: { baseBranch: 'main', prFooter: 'FOOTER' },
+      openPRs: [{ number: 7, url: 'u', title: 'o', head: 'feature/x', base: 'main', draft: true }],
+    });
+    f.deps.git.log = async () => [{ hash: 'a'.repeat(40), subject: 'ABC-1 feat(x): add' }];
+    const out: string[] = [];
+    f.deps.io = { out: (s) => out.push(s), err: () => {} };
+    const result = await runPr(
+      { dryRun: true, json: true, title: 'new words', body: 'nb' },
+      f.deps,
+    );
+    expect(f.calls).not.toContain('updatePR');
+    expect(out).toHaveLength(1);
+    expect(JSON.parse(out[0]!)).toEqual({
+      dryRun: true,
+      title: 'ABC-1: new words [feat] [x]',
+      body: 'nb\n\nFOOTER',
+      labels: [],
+      draft: true,
+      head: 'feature/x',
+      base: 'main',
+    });
+    expect(result).toBeUndefined();
+    expect(f.calls).not.toContain('push');
+    expect(f.calls).not.toContain('createPR');
+  });
+
+  it('leaves the body out when only a title is given, and edits nothing without --json either', async () => {
+    const open = [
+      { number: 7, url: 'u', title: 'o', head: 'feature/x', base: 'main', draft: false },
+    ];
+    const f = fakes({ config: { baseBranch: 'main' }, openPRs: open });
+    const out: string[] = [];
+    f.deps.io = { out: (s) => out.push(s), err: () => {} };
+    await runPr({ dryRun: true, json: true, title: 'feat: new' }, f.deps);
+    expect(JSON.parse(out[0]!)).not.toHaveProperty('body');
+    expect(JSON.parse(out[0]!)).toMatchObject({ title: 'feat: new', draft: false });
+
+    const g = fakes({ config: { baseBranch: 'main' }, openPRs: open });
+    g.deps.io = { out: () => {}, err: () => {} };
+    await runPr({ dryRun: true, title: 't', body: 'b' }, g.deps);
+    expect(g.calls).not.toContain('updatePR');
   });
 });

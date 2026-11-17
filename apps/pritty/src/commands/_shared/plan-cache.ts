@@ -17,7 +17,9 @@ export interface PlanCache {
 /**
  * Everything the plan depends on. `stagedState` is HEAD plus the index's tree
  * (`git write-tree`), so a staged edit, a commit made elsewhere or a reset
- * each miss; the rest covers how the plan was categorised, grouped and typed.
+ * each miss; the rest covers how the plan was categorised, grouped, typed and
+ * labelled. A kept plan carries its labels, so a run with another `--label`
+ * (`label`) or with `commitLabels` switched must not reuse it.
  */
 export function planKey(parts: {
   stagedState: string;
@@ -25,6 +27,8 @@ export function planKey(parts: {
   commitStyle: string;
   commitGrouping: string;
   categories: Record<string, string[]>;
+  commitLabels: boolean;
+  label: string | null;
   version: string;
 }): string {
   return createHash('sha256').update(JSON.stringify(parts)).digest('hex');

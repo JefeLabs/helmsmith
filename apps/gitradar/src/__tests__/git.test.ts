@@ -84,6 +84,7 @@ const {
   getISOWeek,
   scanRepo,
   generateDateChunks,
+  parseConventionalCommit,
   parseIntent,
   GitLogLineParser,
   classifyGitError,
@@ -803,6 +804,22 @@ describe('generateDateChunks', () => {
 // ── parseIntent ──────────────────────────────────────────────────────────────
 
 describe('parseIntent', () => {
+  it('reads the type after a leading label', () => {
+    expect(parseIntent('WEDMODD-23444 fix(issue-report): x')).toBe('fix');
+  });
+
+  it('reads the scope after a leading label', () => {
+    expect(parseConventionalCommit('STATUS-LOGGING test(issue-report): x')).toEqual({
+      intent: 'test',
+      scope: 'issue-report',
+      breaking: false,
+    });
+  });
+
+  it('does not treat a lower-case first word as a label', () => {
+    expect(parseIntent('update feat: x')).toBe('other');
+  });
+
   it('parses feat prefix', () => {
     expect(parseIntent('feat: add new button')).toBe('feat');
   });

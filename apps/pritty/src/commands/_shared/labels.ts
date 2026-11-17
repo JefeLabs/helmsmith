@@ -1,3 +1,5 @@
+import { parseConventional } from './conventional.js';
+
 const LABEL_BY_TYPE: Record<string, string> = {
   feat: 'enhancement',
   fix: 'bug',
@@ -14,8 +16,8 @@ const LABEL_BY_TYPE: Record<string, string> = {
 export function inferLabels(commits: ReadonlyArray<{ subject: string }>): string[] {
   const out: string[] = [];
   for (const c of commits) {
-    const m = c.subject.match(/^([a-z]+)(?:\([^)]*\))?!?:/);
-    const label = m ? LABEL_BY_TYPE[m[1]!] : undefined;
+    const type = parseConventional(c.subject)?.type;
+    const label = type ? LABEL_BY_TYPE[type] : undefined;
     if (label && !out.includes(label)) out.push(label);
   }
   return out;
