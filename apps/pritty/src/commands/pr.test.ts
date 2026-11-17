@@ -21,6 +21,8 @@ function fakes(o: {
   listFails?: boolean;
   remoteDefault?: string;
   config?: Record<string, unknown>;
+  stdin?: string;
+  stdinIsTTY?: boolean;
 }): { deps: PrDeps; calls: string[]; createArgs: unknown[] } {
   const calls: string[] = [];
   const createArgs: unknown[] = [];
@@ -87,6 +89,11 @@ function fakes(o: {
       confirm: async () => true,
       editor: async (d: string) => d,
     },
+    readStdin: async () => {
+      calls.push('readStdin');
+      return o.stdin ?? '';
+    },
+    stdinIsTTY: o.stdinIsTTY ?? false,
   };
   return { deps, calls, createArgs };
 }
@@ -104,6 +111,8 @@ describe('runPr ordering', () => {
       draft: false,
       head: 'feature/x',
       base: 'main',
+      title: 't',
+      labels: [],
     });
     expect(f.calls).not.toContain('generatePR');
     expect(f.calls).not.toContain('push');
@@ -133,6 +142,8 @@ describe('runPr ordering', () => {
       draft: false,
       head: 'feature/x',
       base: 'main',
+      title: 'feat: x',
+      labels: [],
     });
     const order = f.calls.filter((c) =>
       ['assertToken', 'listOpenPRs', 'generatePR', 'push', 'createPR'].includes(c),
@@ -188,6 +199,8 @@ describe('runPr --json', () => {
       draft: false,
       head: 'feature/x',
       base: 'develop',
+      title: 'feat: x',
+      labels: [],
     });
     expect(err.length).toBeGreaterThan(0);
     expect(result?.created).toBe(true);
@@ -598,5 +611,95 @@ describe('runPr title from a shared label', () => {
     };
     await runPr({ autoApprove: true, title: 'my words' }, f.deps);
     expect(updates).toEqual([{ title: 'ABC-1: my words [fix] [test] [issue-report]' }]);
+  });
+});
+
+describe('runPr --input=json', () => {
+  const body = (o: Record<string, unknown>) => JSON.stringify(o);
+
+  it('takes the PR from stdin, labels the title, and never calls the model', async () => {
+    const f = fakes({
+      config: { baseBranch: 'main' },
+      stdin: body({ title: 'my words', labels: ['x'] }),
+    });
+    f.deps.git.log = async () => [{ hash: 'a'.repeat(40), subject: 'ABC-1 feat(x): add' }];
+    const labelled: unknown[] = [];
+    f.deps.github.addLabels = async (_o, _r, _n, labels) => {
+      labelled.push([...labels]);
+    };
+    await runPr({ input: 'json' }, f.deps);
+    expect(f.calls).not.toContain('generatePR');
+    expect(f.createArgs[0]).toMatchObject({ title: 'ABC-1: my words [feat] [x]' });
+    expect(labelled).toEqual([['x']]);
+  });
+
+  it('is unattended: no confirm, and draft:true opens a draft', async () => {
+    const f = fakes({
+      config: { baseBranch: 'main' },
+      stdin: body({ title: 't', body: 'b', draft: true }),
+    });
+    const asked: string[] = [];
+    f.deps.prompts = {
+      confirm: async (o) => {
+        asked.push(o.message);
+        return true;
+      },
+      editor: async (d) => d.default ?? '',
+    };
+    await runPr({ input: 'json' }, f.deps);
+    expect(asked).toEqual([]);
+    expect(f.createArgs[0]).toMatchObject({ draft: true, title: 't', body: 'b' });
+  });
+
+  it('updates an open PR in place with the labelled title', async () => {
+    const f = fakes({
+      config: { baseBranch: 'main' },
+      stdin: body({ title: 'new', body: 'nb' }),
+      openPRs: [{ number: 7, url: 'u', title: 'o', head: 'feature/x', base: 'main', draft: false }],
+    });
+    f.deps.git.log = async () => [{ hash: 'a'.repeat(40), subject: 'ABC-1 feat(x): add' }];
+    const updates: unknown[] = [];
+    f.deps.github.updatePR = async (_o, _r, _n, patch) => {
+      updates.push(patch);
+    };
+    await runPr({ input: 'json' }, f.deps);
+    expect(updates).toEqual([{ title: 'ABC-1: new [feat] [x]', body: 'nb' }]);
+  });
+
+  it('refuses --title, --body and --body-file alongside it, before stdin is read', async () => {
+    for (const extra of [{ title: 't' }, { body: 'b' }, { bodyFile: 'f' }]) {
+      const f = fakes({ stdin: body({ title: 'x' }) });
+      await expect(runPr({ input: 'json', ...extra }, f.deps)).rejects.toThrow(/--input/);
+      expect(f.calls).toEqual([]);
+    }
+  });
+
+  it('refuses a terminal stdin before reading it, and any other format', async () => {
+    const f = fakes({ stdinIsTTY: true });
+    await expect(runPr({ input: 'json' }, f.deps)).rejects.toThrow(/terminal/);
+    expect(f.calls).toEqual([]);
+    await expect(runPr({ input: 'yaml' }, fakes({}).deps)).rejects.toThrow(/--input must be json/);
+  });
+});
+
+describe('runPr --dry-run --json', () => {
+  it('prints one PrDryRun line and neither pushes nor creates', async () => {
+    const f = fakes({ config: { baseBranch: 'main' } });
+    const out: string[] = [];
+    f.deps.io = { out: (s) => out.push(s), err: () => {} };
+    const result = await runPr({ dryRun: true, json: true, draft: true }, f.deps);
+    expect(out).toHaveLength(1);
+    expect(JSON.parse(out[0]!)).toEqual({
+      dryRun: true,
+      title: 'feat: x',
+      body: 'body',
+      labels: [],
+      draft: true,
+      head: 'feature/x',
+      base: 'main',
+    });
+    expect(result).toBeUndefined();
+    expect(f.calls).not.toContain('push');
+    expect(f.calls).not.toContain('createPR');
   });
 });

@@ -208,12 +208,16 @@ addOutputOption(program.command('pr'))
   .option('--dry-run', 'Show the plan without pushing or creating the PR')
   .option(
     '--json',
-    'Print one JSON line { number, url, created, draft, head, base } on stdout; implies --auto-approve; needs --base or a configured baseBranch',
+    'Print one JSON line { number, url, created, draft, head, base, title, labels } on stdout (with --dry-run: { dryRun, title, body, labels, draft, head, base }); implies --auto-approve; needs --base or a configured baseBranch',
   )
   .option('--draft', 'Open the PR as a draft')
   .option('--title <title>', 'Use this title verbatim (no AI, no ticket flow)')
   .option('--body <text>', 'Use this body verbatim (with --title)')
   .option('--body-file <path>', 'Read the body from a file (with --title)')
+  .option(
+    '--input <format>',
+    'json: read { title, body?, draft?, labels? } from stdin instead of drafting with the model; unattended',
+  )
   .option('--no-push', 'Do not push: the branch is already on origin')
   .option('--no-footer', 'Leave the prFooter from .pritty.json out of the body')
   .option(
@@ -230,6 +234,7 @@ addOutputOption(program.command('pr'))
       title?: string;
       body?: string;
       bodyFile?: string;
+      input?: string;
       check?: boolean;
       push: boolean;
       footer: boolean;
