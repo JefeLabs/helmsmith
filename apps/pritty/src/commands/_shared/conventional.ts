@@ -1,5 +1,6 @@
 import type { CommitMessage } from '../../ai.js';
 import type { Config } from '../../config.js';
+import { splitLabel } from './label.js';
 
 /** Conventional commit types, most significant first: the order a PR title picks by. */
 const TYPE_RANK = [
@@ -19,22 +20,30 @@ const TYPE_RANK = [
 const SUBJECT = /^([a-z]+)(?:\(([^)]*)\))?(!)?:\s*(.*)$/s;
 
 export interface ConventionalSubject {
+  label?: string;
   type: string;
   scope?: string;
   breaking: boolean;
   description: string;
 }
 
-/** `fix(phone)!: x` → { type, scope, breaking, description }; null for a type outside TYPE_RANK. */
+/** `[LABEL ]fix(phone)!: x` → { label?, type, scope, breaking, description }; null for a type outside TYPE_RANK. */
 export function parseConventional(subject: string): ConventionalSubject | null {
-  const m = subject.match(SUBJECT);
+  const { label, rest } = splitLabel(subject);
+  const m = rest.match(SUBJECT);
   if (!m || !(TYPE_RANK as readonly string[]).includes(m[1]!)) return null;
   return {
+    ...(label ? { label } : {}),
     type: m[1]!,
     ...(m[2] ? { scope: m[2] } : {}),
     breaking: m[3] === '!',
     description: m[4]!,
   };
+}
+
+/** `{ label, type, scope, breaking, description }` → `[label ]type[(scope)][!]: description`. */
+export function formatConventional(p: ConventionalSubject): string {
+  return `${p.label ? `${p.label} ` : ''}${p.type}${p.scope ? `(${p.scope})` : ''}${p.breaking ? '!' : ''}: ${p.description}`;
 }
 
 const BRANCH_PREFIX: Record<string, string> = {
@@ -80,7 +89,7 @@ export function retypeForBranch(
     if (!parsed || OWN_TYPE_CATEGORIES.has(c.category) || !RETYPED_ON_FIX_BRANCH.has(parsed.type)) {
       return c;
     }
-    const message = `fix${c.message.slice(parsed.type.length)}`;
+    const message = formatConventional({ ...parsed, type: 'fix' });
     retyped.push({ category: c.category, from: c.message, to: message });
     return { ...c, message };
   });
@@ -128,7 +137,7 @@ export function applySubjectOverrides(
     }
     const type = setsType ? o.type! : parsed.type;
     const scope = o.scope ?? parsed.scope;
-    const message = `${type}${scope ? `(${scope})` : ''}${parsed.breaking ? '!' : ''}: ${parsed.description}`;
+    const message = formatConventional({ ...parsed, type, scope });
     return { ...c, message };
   });
   return { plan: out, kept };
