@@ -100,6 +100,12 @@ export function planExplicit(
     const d = c.description;
     if (d.trim() === '') bad('description is empty');
     else {
+      // Refused, not trimmed: pritty never rewrites the agent's words (rule C).
+      if (/^\s/.test(d)) bad(`description ${JSON.stringify(d)} starts with whitespace`);
+      if (/[\r\n]/.test(d)) {
+        bad('description must be one line; give the rest as the body (--body, or "body" in JSON)');
+      }
+      if (/\s$/.test(d)) bad(`description ${JSON.stringify(d)} ends with whitespace`);
       if (CAPITALISED.test(d))
         bad(`description "${d}" starts with a capital letter; start lower-case`);
       if (d.endsWith('.')) bad(`description "${d}" ends with a "."`);

@@ -663,6 +663,14 @@ describe('runCommit --message (args)', () => {
     expect(f.calls).not.toContain('commit');
   });
 
+  it('refuses a description with surrounding whitespace or a second line, committing nothing', async () => {
+    const f = fakes({ staged: ['src/a.ts'] });
+    const run = runCommit({ ...args, message: ' handle it\nsecond line', json: true }, f.deps);
+    await expect(run).rejects.toThrow(/starts with whitespace[\s\S]*one line/);
+    expect(f.calls).not.toContain('commit');
+    expect(f.out).toEqual([]);
+  });
+
   it('refuses --message without --type and --scope, naming both', async () => {
     const f = fakes({ staged: ['src/a.ts'] });
     const run = runCommit({ message: 'handle 404', json: true }, f.deps);
