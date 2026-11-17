@@ -50,9 +50,13 @@ export interface CommitOptions {
   message?: string;
   /** The body of the `message` commit. */
   body?: string;
-  /** `json`: the commits come from a JSON body on stdin, `{ "commits": [...] }`. */
+  /**
+   * `json`: the commits come from a JSON body on stdin, `{ "commits": [...] }`,
+   * whose `files` are repository-root paths (the form the outcome prints).
+   * Implies autoApprove: stdin is the body, so no prompt can be answered.
+   */
   input?: string;
-  /** Pathspecs of the staged files the `message` commit takes, from `cwd`; default every staged file. */
+  /** Pathspecs of the staged files the `message` commit takes, from `cwd` like `git add`; default every staged file. */
   paths?: string[];
 }
 
@@ -122,7 +126,10 @@ export interface CommitDeps {
   readStdin?: () => Promise<string>;
   /** A terminal stdin refuses `--input=json` at once (default: process.stdin.isTTY). */
   stdinIsTTY?: boolean;
-  /** Where paths after `--` resolve from, as `git add` would (default: process.cwd()). */
+  /**
+   * Where paths after `--` resolve from, as `git add` would (default:
+   * process.cwd()). A JSON body's `files` ignore it: they are repository-root paths.
+   */
   cwd?: string;
 }
 
@@ -332,11 +339,16 @@ async function commitExplicit(
           },
         ];
   const staged = await git.getStaged();
+  // Paths after `--` resolve from the current directory, like `git add`; a JSON
+  // body's files are repository-root paths, as the outcome prints them, so a
+  // dry run's output fed back finds the same files from any directory.
   const specs = [...new Set(commits.flatMap((c) => c.paths ?? []))];
   const matched =
-    specs.length > 0
-      ? await git.stagedFor(specs, deps.cwd ?? process.cwd())
-      : new Map<string, string[]>();
+    specs.length === 0
+      ? new Map<string, string[]>()
+      : input === 'json'
+        ? await git.stagedFor(specs)
+        : await git.stagedFor(specs, deps.cwd ?? process.cwd());
   const { plan, warnings } = planExplicit(commits, {
     staged,
     matched,
@@ -381,7 +393,9 @@ export async function runCommit(
     err: (l: string) => console.error(l),
   };
   const say = options.json ? io.err : io.out;
-  const auto = Boolean(options.json) || (options.autoApprove ?? config.autoApprove);
+  // Unattended under --json, and under --input=json, where stdin is the body, not a person.
+  const auto =
+    Boolean(options.json) || input === 'json' || (options.autoApprove ?? config.autoApprove);
   const dryRun = options.dryRun ?? config.dryRun;
   const finish = (o: CommitOutcome): CommitOutcome => {
     if (options.json) io.out(JSON.stringify(o));

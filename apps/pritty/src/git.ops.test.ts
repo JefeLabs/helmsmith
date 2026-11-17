@@ -468,6 +468,18 @@ describe('GitOps.stagedFor', () => {
     expect(got.get('../nowhere')).toEqual([]);
   });
 
+  it('without a directory resolves from the repository root, wherever pritty runs', async () => {
+    const r = makeRepo();
+    cleanup = r.cleanup;
+    write(r.dir, 'src/a.ts', 'A\n');
+    gitIn(r.dir, 'add', 'src/a.ts');
+
+    const got = await createGit(join(r.dir, 'src')).stagedFor(['src/a.ts', 'a.ts']);
+
+    expect(got.get('src/a.ts')).toEqual(['src/a.ts']);
+    expect(got.get('a.ts')).toEqual([]);
+  });
+
   it('returns [] for a directory outside the repository', async () => {
     const r = makeRepo();
     cleanup = r.cleanup;

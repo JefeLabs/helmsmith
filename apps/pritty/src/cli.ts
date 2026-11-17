@@ -166,7 +166,7 @@ addOutputOption(program.command('commit'))
   .option('--body <text>', 'Body of the --message commit')
   .option(
     '--input <format>',
-    'json: read the commits from stdin, { "commits": [{ label, type, scope, description, body?, files? }] }',
+    'json: read the commits from stdin, { "commits": [{ label, type, scope, description, body?, files? }] }; files are repository-root paths, as --output=json prints them; implies --auto-approve',
   )
   .option(
     '--trailer <line>',

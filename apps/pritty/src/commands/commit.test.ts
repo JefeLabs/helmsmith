@@ -1,3 +1,4 @@
+import { posix } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { CommitMessage } from '../ai.js';
 import { ConfigSchema } from '../config.js';
@@ -49,7 +50,7 @@ function fakes(
   const calls: string[] = [];
   const committed: Array<{ message: string; files: string[]; noVerify: boolean }> = [];
   const generated: Array<{ branch?: string }> = [];
-  const stagedFor: Array<{ pathspecs: string[]; fromDir: string }> = [];
+  const stagedFor: Array<{ pathspecs: string[]; fromDir?: string }> = [];
   let sha = 0;
   let attempts = 0;
   let failures = o.failCommits ?? 0;
@@ -62,13 +63,15 @@ function fakes(
   const git = {
     getCurrentBranch: async () => o.branch ?? 'feature/x',
     getStaged: async () => [...state.files],
-    stagedFor: async (pathspecs: readonly string[], fromDir: string) => {
-      stagedFor.push({ pathspecs: [...pathspecs], fromDir });
+    // The repository root is /repo: a pathspec resolves from fromDir, or from the root without one.
+    stagedFor: async (pathspecs: readonly string[], fromDir?: string) => {
+      stagedFor.push({ pathspecs: [...pathspecs], ...(fromDir ? { fromDir } : {}) });
+      const base = fromDir ? posix.relative('/repo', fromDir) : '';
       return new Map(
-        pathspecs.map((p) => [
-          p,
-          state.files.filter((f) => f === p || f.startsWith(`${p.replace(/\/$/, '')}/`)),
-        ]),
+        pathspecs.map((p) => {
+          const spec = posix.join(base, p).replace(/\/$/, '');
+          return [p, state.files.filter((f) => f === spec || f.startsWith(`${spec}/`))];
+        }),
       );
     },
     getStagedDiff: async () => '+a',
@@ -560,14 +563,20 @@ describe('runCommit --message (args)', () => {
   const args = { message: 'handle 404', type: 'fix', scope: 'api' };
 
   it('makes one commit from the flags, with the normalised label, only the listed files and no model call', async () => {
-    const f = fakes({ cwd: '/repo/apps/x' });
+    const f = fakes();
     await runCommit({ ...args, label: 'abc 1', paths: ['src/a.ts'] }, f.deps);
     expect(f.committed).toHaveLength(1);
     expect(subjects(f.committed)).toEqual(['ABC-1 fix(api): handle 404']);
     expect(f.committed[0]!.files).toEqual(['src/a.ts']);
     expect(f.calls).not.toContain('generate');
     expect(f.calls).not.toContain('ticket');
+  });
+
+  it('resolves paths after -- from the current directory, like git add', async () => {
+    const f = fakes({ staged: ['apps/x/src/a.ts', 'src/a.ts'], cwd: '/repo/apps/x' });
+    await runCommit({ ...args, paths: ['src/a.ts'], json: true }, f.deps);
     expect(f.stagedFor).toEqual([{ pathspecs: ['src/a.ts'], fromDir: '/repo/apps/x' }]);
+    expect(f.committed.map((c) => c.files)).toEqual([['apps/x/src/a.ts']]);
   });
 
   it('adds --body and the trailers after the subject', async () => {
@@ -767,6 +776,40 @@ describe('runCommit --input=json', () => {
     });
     await runCommit({ json: true }, m.deps);
     expect(JSON.parse(m.out[0]!).commits[0].body).toBe('the model says why');
+  });
+
+  it('reads `files` from the repository root, from any directory, so a dry run fed back makes the same commits', async () => {
+    const staged = ['apps/x/src/a.ts', 'apps/x/src/a.test.ts'];
+    const body = JSON.stringify({
+      commits: [
+        { type: 'fix', scope: 'x', description: 'handle 404', files: ['apps/x/src/a.ts'] },
+        { type: 'test', scope: 'x', description: 'cover 404', files: ['apps/x/src/a.test.ts'] },
+      ],
+    });
+    const dry = fakes({ staged, cwd: '/repo/apps/x', stdin: body });
+    await runCommit({ input: 'json', dryRun: true, json: true }, dry.deps);
+    expect(JSON.parse(dry.out[0]!).commits.map((c: { files: string[] }) => c.files)).toEqual([
+      ['apps/x/src/a.ts'],
+      ['apps/x/src/a.test.ts'],
+    ]);
+
+    const f = fakes({ staged, cwd: '/repo/apps/x', stdin: dry.out[0]! });
+    await runCommit({ input: 'json', json: true }, f.deps);
+    expect(f.stagedFor.map((c) => c.fromDir)).toEqual([undefined]);
+    expect(f.committed.map((c) => c.files)).toEqual([
+      ['apps/x/src/a.ts'],
+      ['apps/x/src/a.test.ts'],
+    ]);
+  });
+
+  it('runs unattended without --json: no confirm prompt, since stdin is the body', async () => {
+    const f = fakes({ stdin: twoCommits });
+    f.deps.prompts.confirm = async () => {
+      throw new Error('This step needs a terminal');
+    };
+    const result = await runCommit({ input: 'json' }, f.deps);
+    expect(f.committed).toHaveLength(2);
+    expect(result?.commits.map((c) => c.sha)).toEqual(['sha1', 'sha2']);
   });
 
   it('refuses an empty stdin with the stdin message', async () => {
