@@ -1,0 +1,29 @@
+#!/bin/sh
+# Installed by `work init` (@helmsmith/workbrokr). Refuses a push to, or a delete of, a protected branch here; the rest in workbrokr.
+PROTECTED="main"
+input=$(cat)
+printf '%s\n' "$input" | while read -r lref lsha rref rsha; do
+  [ -n "$rref" ] || continue
+  dest=${rref#refs/heads/}
+  for p in $PROTECTED; do
+    if [ "$dest" = "$p" ]; then
+      echo "work: \"$dest\" is protected ($PROTECTED): nothing is pushed to it directly, open a PR from an area branch" >&2
+      exit 2
+    fi
+  done
+done || exit 2
+if command -v workbrokr >/dev/null 2>&1; then
+  printf '%s\n' "$input" | workbrokr hook pre-push "$@" || exit $?
+else
+  echo "work: workbrokr is not on PATH; scope and commons warnings skipped" >&2
+fi
+COMMON_DIR=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+LEGACY="$COMMON_DIR/hooks/pre-push"
+if [ -n "$COMMON_DIR" ] && [ -x "$LEGACY" ]; then
+  SELF_DIR=$(cd "$(dirname "$0")" && pwd)
+  LEGACY_DIR=$(cd "$(dirname "$LEGACY")" && pwd)
+  if [ "$SELF_DIR" != "$LEGACY_DIR" ]; then
+    printf '%s\n' "$input" | exec "$LEGACY" "$@"
+  fi
+fi
+exit 0
