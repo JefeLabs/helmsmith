@@ -66,6 +66,11 @@ describe('planExplicit', () => {
     expect(() => plan([fix(over)])).toThrow(fragment);
   });
 
+  it('puts `!` after the scope of a breaking commit', () => {
+    const { plan: p } = plan([fix({ label: 'abc 1', breaking: true })]);
+    expect(p[0]).toMatchObject({ label: 'ABC-1', message: 'fix(api)!: handle 404' });
+  });
+
   it('lets an acronym start a description', () => {
     expect(() => plan([fix({ description: 'API errors surface' })])).not.toThrow();
   });
@@ -135,6 +140,18 @@ describe('parseCommitInput', () => {
     expect(parseCommitInput(text)).toEqual([
       { label: 'X-1', type: 'fix', scope: 'api', description: 'd', paths: ['a'] },
     ]);
+  });
+
+  it('keeps breaking: true, drops breaking: false, and refuses a breaking that is not a boolean', () => {
+    const one = (breaking: unknown) =>
+      JSON.stringify({ commits: [{ type: 'feat', scope: 'api', description: 'd', breaking }] });
+    expect(parseCommitInput(one(true))).toEqual([
+      { type: 'feat', scope: 'api', description: 'd', breaking: true },
+    ]);
+    expect(parseCommitInput(one(false))).toEqual([
+      { type: 'feat', scope: 'api', description: 'd' },
+    ]);
+    expect(() => parseCommitInput(one('yes'))).toThrow(/commits\.0\.breaking/);
   });
 
   it.each(['', 'nope', '  '])('rejects %j as not a JSON document', (text) => {

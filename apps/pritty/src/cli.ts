@@ -141,7 +141,7 @@ addOutputOption(program.command('commit'))
   .option('--commit-style <style>', 'conventional | gitmoji | angular | simple')
   .option(
     '--json',
-    'Print one JSON line { dryRun, commits: [{ category, message, label?, type, scope, description, body?, files, sha? }], reusedPlan? } on stdout (message is the labelled first line; a dry run omits sha, and its output can be fed back through --input=json); implies --auto-approve',
+    'Print one JSON line { dryRun, commits: [{ category, message, label?, type, scope, breaking?, description, body?, files, sha? }], reusedPlan? } on stdout (message is the labelled first line; a dry run omits sha, and its output can be fed back through --input=json); implies --auto-approve',
   )
   .option(
     '--no-verify',
@@ -164,9 +164,10 @@ addOutputOption(program.command('commit'))
     'Make one commit with this description, no AI (needs --type and --scope)',
   )
   .option('--body <text>', 'Body of the --message commit')
+  .option('--breaking', 'Mark the --message commit a breaking change: `!` after the scope')
   .option(
     '--input <format>',
-    'json: read the commits from stdin, { "commits": [{ label?, type, scope, description, body?, files? }] }; files are repository-root paths, as --output=json prints them; unattended; refuses --label, --type, --scope, --message, --body and paths after --',
+    'json: read the commits from stdin, { "commits": [{ label?, type, scope, breaking?, description, body?, files? }] }; files are repository-root paths, as --output=json prints them; unattended; refuses --label, --type, --scope, --message, --body, --breaking and paths after --',
   )
   .option(
     '--trailer <line>',
@@ -189,6 +190,7 @@ addOutputOption(program.command('commit'))
         label?: string;
         message?: string;
         body?: string;
+        breaking?: boolean;
         input?: string;
       },
     ) => {

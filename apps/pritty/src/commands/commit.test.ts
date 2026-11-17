@@ -632,6 +632,23 @@ describe('runCommit --message (args)', () => {
     expect(f.calls).not.toContain('commit');
   });
 
+  it('marks a --breaking commit with `!` after the scope, and reports breaking', async () => {
+    const f = fakes({ staged: ['src/a.ts'] });
+    await runCommit({ ...args, label: 'abc 1', breaking: true, json: true }, f.deps);
+    expect(subjects(f.committed)).toEqual(['ABC-1 fix(api)!: handle 404']);
+    expect(JSON.parse(f.out[0]!).commits[0]).toEqual({
+      category: 'app',
+      message: 'ABC-1 fix(api)!: handle 404',
+      label: 'ABC-1',
+      type: 'fix',
+      scope: 'api',
+      breaking: true,
+      description: 'handle 404',
+      files: ['src/a.ts'],
+      sha: 'sha1',
+    });
+  });
+
   it('keeps the given type on a fix/ branch and keeps no plan', async () => {
     const cache = memoryCache();
     const f = fakes({ staged: ['src/a.ts'], branch: 'fix/api/not-found', planCache: cache });
@@ -821,6 +838,43 @@ describe('runCommit --input=json', () => {
     ]);
   });
 
+  it('commits `!` for breaking: true, and a dry run fed back keeps it', async () => {
+    const body = JSON.stringify({
+      commits: [
+        { type: 'feat', scope: 'api', breaking: true, description: 'drop v1', files: ['src/a.ts'] },
+      ],
+    });
+    const dry = fakes({ staged: ['src/a.ts'], stdin: body });
+    await runCommit({ input: 'json', dryRun: true, json: true }, dry.deps);
+    expect(JSON.parse(dry.out[0]!).commits[0]).toMatchObject({
+      message: 'feat(api)!: drop v1',
+      breaking: true,
+    });
+
+    const f = fakes({ staged: ['src/a.ts'], stdin: dry.out[0]! });
+    await runCommit({ input: 'json', json: true }, f.deps);
+    expect(subjects(f.committed)).toEqual(['feat(api)!: drop v1']);
+  });
+
+  it('reports breaking for a model subject with `!`, so its dry run fed back keeps the mark', async () => {
+    const f = fakes({
+      staged: ['src/a.ts'],
+      answer: (groups) => oneEach(groups).map((c) => ({ ...c, message: 'feat(a)!: drop old api' })),
+    });
+    await runCommit({ json: true, dryRun: true }, f.deps);
+    const line = JSON.parse(f.out[0]!);
+    expect(line.commits[0]).toMatchObject({ type: 'feat', scope: 'a', breaking: true });
+    expect(parseCommitInput(f.out[0]!)).toEqual([
+      {
+        type: 'feat',
+        scope: 'a',
+        breaking: true,
+        description: 'drop old api',
+        paths: ['src/a.ts'],
+      },
+    ]);
+  });
+
   it('runs unattended without --json: no confirm prompt, since stdin is the body', async () => {
     const f = fakes({ stdin: twoCommits });
     f.deps.prompts.confirm = async () => {
@@ -869,6 +923,7 @@ describe('runCommit input selection', () => {
       [{ type: 'fix' }, '--type'],
       [{ scope: 'api' }, '--scope'],
       [{ body: 'why' }, '--body'],
+      [{ breaking: true }, '--breaking'],
       [{ paths: ['src/a.ts'] }, 'paths after --'],
     ];
     for (const [o, flag] of cases) {
@@ -878,8 +933,8 @@ describe('runCommit input selection', () => {
     }
   });
 
-  it('refuses --body and paths without --message', async () => {
-    for (const o of [{ body: 'why' }, { paths: ['src/a.ts'] }]) {
+  it('refuses --body, --breaking and paths without --message', async () => {
+    for (const o of [{ body: 'why' }, { breaking: true }, { paths: ['src/a.ts'] }]) {
       const f = fakes();
       await expect(runCommit(o, f.deps)).rejects.toThrow(/--message/);
       expect(f.calls).toEqual([]);

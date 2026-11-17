@@ -61,6 +61,8 @@ export interface CommitOptions {
   message?: string;
   /** The body of the `message` commit. */
   body?: string;
+  /** Marks the `message` commit a breaking change: `!` after the scope. */
+  breaking?: boolean;
   /**
    * `json`: the commits come from a JSON body on stdin, `{ "commits": [...] }`,
    * whose `files` are repository-root paths (the form the outcome prints).
@@ -81,6 +83,8 @@ export interface CommitOutcome {
     label?: string;
     type?: string;
     scope?: string;
+    /** Present, and true, only for a breaking change (`!` in the subject). */
+    breaking?: boolean;
     description?: string;
     /** The message body, when the commit has one: a dry run's output fed back to `--input=json` keeps it. */
     body?: string;
@@ -109,6 +113,7 @@ function entryOf(c: CommitMessage): OutcomeCommit {
     ...(label ? { label } : {}),
     ...(p ? { type: p.type } : {}),
     ...(p?.scope ? { scope: p.scope } : {}),
+    ...(p?.breaking ? { breaking: true } : {}),
     ...(p ? { description: p.description } : {}),
     ...(c.body ? { body: c.body } : {}),
     files: c.files,
@@ -194,6 +199,7 @@ function chooseInput(options: CommitOptions, stdinIsTTY: boolean): 'args' | 'jso
       options.type !== undefined && '--type',
       options.scope !== undefined && '--scope',
       options.body !== undefined && '--body',
+      options.breaking && '--breaking',
       paths && 'paths after --',
     ].filter((flag): flag is string => typeof flag === 'string');
     if (given.length > 0) {
@@ -206,6 +212,7 @@ function chooseInput(options: CommitOptions, stdinIsTTY: boolean): 'args' | 'jso
   }
   if (options.message !== undefined) return 'args';
   if (options.body !== undefined) throw new Error('--body needs --message');
+  if (options.breaking) throw new Error('--breaking needs --message');
   if (paths) {
     throw new Error('paths after -- need --message: a run without it commits every staged file');
   }
@@ -361,6 +368,7 @@ async function commitExplicit(
             ...(options.label !== undefined ? { label: options.label } : {}),
             type: options.type!,
             scope: options.scope!,
+            ...(options.breaking ? { breaking: true } : {}),
             description: options.message!,
             ...(options.body !== undefined ? { body: options.body } : {}),
             ...(options.paths?.length ? { paths: options.paths } : {}),

@@ -24,6 +24,7 @@ interface Outcome {
     change?: string;
     category: string;
     message: string;
+    breaking?: boolean;
     files: string[];
     sha?: string;
   }>;
@@ -462,6 +463,40 @@ describe('pritty commit from args and a JSON body', () => {
     expect(subjects).toEqual(planned.commits.map((c) => c.message));
     expect(subjects).toHaveLength(2);
     expect(stagedPaths(repo)).toEqual([]);
+  });
+
+  it("keeps a breaking change's `!` when a dry run of a JSON body is fed back", async () => {
+    sb = makeSandbox();
+    const repo = stagedRepo(sb);
+    const body = JSON.stringify({
+      commits: [
+        {
+          label: 'abc 1',
+          type: 'feat',
+          scope: 'feature',
+          breaking: true,
+          description: 'drop the old greeting',
+          files: ['src/feature.ts'],
+        },
+      ],
+    });
+
+    const dry = await runCli(sb, repo, ['commit', '--input=json', '--dry-run', '--output=json'], {
+      stdin: body,
+    });
+    expect(dry.exitCode, dry.stderr).toBe(0);
+    expect(jsonLine<Outcome>(dry).commits[0]).toMatchObject({
+      message: 'ABC-1 feat(feature)!: drop the old greeting',
+      breaking: true,
+    });
+
+    const r = await runCli(sb, repo, ['commit', '--input=json', '--output=json'], {
+      stdin: dry.stdout,
+    });
+    expect(r.exitCode, r.stderr).toBe(0);
+    expect(gitIn(repo, 'log', '-1', '--format=%s').trim()).toBe(
+      'ABC-1 feat(feature)!: drop the old greeting',
+    );
   });
 
   it('refuses a test commit of an app file: reason on stderr, nothing on stdout, HEAD unchanged', async () => {

@@ -1,7 +1,12 @@
 import { z } from 'zod';
 import type { CommitMessage } from '../../ai.js';
 import { type CategoryMap, categorize, UNKNOWN_CATEGORY } from '../../categorizer.js';
-import { isCommitScope, isCommitType, parseConventional } from './conventional.js';
+import {
+  formatConventional,
+  isCommitScope,
+  isCommitType,
+  parseConventional,
+} from './conventional.js';
 import { normalizeLabel } from './label.js';
 import { subjectOf } from './plan.js';
 
@@ -10,6 +15,8 @@ export interface ExplicitCommit {
   label?: string;
   type: string;
   scope: string;
+  /** A breaking change: `!` after the scope. */
+  breaking?: boolean;
   description: string;
   body?: string;
   paths?: string[];
@@ -22,6 +29,7 @@ const commitShape = z.object({
   label: z.string().optional(),
   type: z.string(),
   scope: z.string(),
+  breaking: z.boolean().optional(),
   description: z.string(),
   body: z.string().optional(),
   files: z.array(z.string()).optional(),
@@ -29,7 +37,7 @@ const commitShape = z.object({
 
 const inputShape = z.object({ commits: z.array(commitShape).min(1) });
 
-/** Parse `{ "commits": [...] }`; `files` becomes `paths`, other keys are ignored. */
+/** Parse `{ "commits": [...] }`; `files` becomes `paths`, `breaking: false` is dropped, other keys are ignored. */
 export function parseCommitInput(text: string): ExplicitCommit[] {
   let json: unknown;
   try {
@@ -43,8 +51,9 @@ export function parseCommitInput(text: string): ExplicitCommit[] {
       parsed.error.issues.map((i) => `${i.path.join('.') || 'input'}: ${i.message}`).join('\n'),
     );
   }
-  return parsed.data.commits.map(({ files, ...rest }) => ({
+  return parsed.data.commits.map(({ files, breaking, ...rest }) => ({
     ...rest,
+    ...(breaking ? { breaking: true } : {}),
     ...(files ? { paths: files } : {}),
   }));
 }
@@ -150,7 +159,12 @@ export function planExplicit(
     entries.push({
       ...(label ? { label } : {}),
       category,
-      message: `${c.type}(${c.scope}): ${d}`,
+      message: formatConventional({
+        type: c.type,
+        scope: c.scope,
+        breaking: Boolean(c.breaking),
+        description: d,
+      }),
       ...(c.body ? { body: c.body } : {}),
       files,
     });
